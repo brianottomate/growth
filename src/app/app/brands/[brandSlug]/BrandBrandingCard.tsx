@@ -39,7 +39,7 @@ export function BrandBrandingCard({
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold">Branding</h2>
-          <p className="text-muted-foreground mt-0.5 text-sm">
+          <p className="mt-0.5 text-sm text-muted-foreground">
             {identity?.extractedAt
               ? `Read from ${website ?? "the site"} on ${new Date(identity.extractedAt).toLocaleDateString()}. Compositions start from these.`
               : website

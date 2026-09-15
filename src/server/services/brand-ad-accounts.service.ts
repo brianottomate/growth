@@ -161,7 +161,7 @@ export async function listBrandAdAccounts(
     );
     return owner
       ? (foreignBrands.find((b) => b.id === owner.brandId)?.name ??
-        "another brand")
+          "another brand")
       : null;
   };
 
@@ -186,11 +186,7 @@ export async function listBrandAdAccounts(
       platform: row.platform,
       externalId: row.externalId,
       name: row.name ?? registry?.name ?? unbranded?.name ?? null,
-      allowed: registry
-        ? registry.isAllowed
-        : unbranded
-          ? false
-          : null,
+      allowed: registry ? registry.isAllowed : unbranded ? false : null,
       sharedFrom: ownerOf(row.platform, row.externalId),
       discovered: true,
     });
@@ -239,7 +235,10 @@ export async function setBrandAdAccountAllowed(input: {
   const unbranded = rows.find((row) => row.brandId === null);
   const ownedElsewhere = rows.some(
     (row) =>
-      row.brandId && row.brandId !== input.brandId && row.isAllowed && !row.isShared,
+      row.brandId &&
+      row.brandId !== input.brandId &&
+      row.isAllowed &&
+      !row.isShared,
   );
 
   const note = `${input.isAllowed ? "Allowed" : "Denied"}${

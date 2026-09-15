@@ -24,7 +24,7 @@ export default async function PillarsPage() {
   const org = membership?.organization;
   if (!org) {
     return (
-      <div className="text-muted-foreground p-8">No organization found.</div>
+      <div className="p-8 text-muted-foreground">No organization found.</div>
     );
   }
 
@@ -90,7 +90,7 @@ export default async function PillarsPage() {
   return (
     <div>
       <h1 className="text-2xl font-semibold tracking-tight">Pillars</h1>
-      <p className="text-muted-foreground mt-1 text-sm">
+      <p className="mt-1 text-sm text-muted-foreground">
         Content pillars &amp; strategy — the themes each brand publishes
         against.
       </p>
@@ -98,11 +98,11 @@ export default async function PillarsPage() {
       {brandsWithPillars.map(({ brand, pillars }) => (
         <section key={brand.id} className="mt-8">
           <div className="mb-3 flex items-center gap-2">
-            <div className="bg-muted text-foreground flex size-6 items-center justify-center rounded-md text-[10px] font-semibold">
+            <div className="flex size-6 items-center justify-center rounded-md bg-muted text-[10px] font-semibold text-foreground">
               {brand.name.slice(0, 2)}
             </div>
             <h2 className="text-sm font-semibold">{brand.name}</h2>
-            <span className="text-muted-foreground text-xs">
+            <span className="text-xs text-muted-foreground">
               · {pillars.length} pillars
             </span>
             <span className="flex-1" />
@@ -120,10 +120,10 @@ export default async function PillarsPage() {
                   <Link
                     key={s.id}
                     href={`/app/series/${s.id}`}
-                    className="bg-card rounded-full border px-3 py-1 text-xs transition hover:border-neutral-500"
+                    className="rounded-full border bg-card px-3 py-1 text-xs transition hover:border-neutral-500"
                   >
                     {s.name}
-                    <span className="text-muted-foreground ml-1.5 text-[10px] capitalize">
+                    <span className="ml-1.5 text-[10px] text-muted-foreground capitalize">
                       {s.status}
                     </span>
                   </Link>
@@ -137,7 +137,7 @@ export default async function PillarsPage() {
               return (
                 <div
                   key={p.slug}
-                  className="bg-card relative overflow-hidden rounded-xl border p-4"
+                  className="relative overflow-hidden rounded-xl border bg-card p-4"
                 >
                   <span
                     className="absolute inset-y-0 left-0 w-1"
@@ -150,12 +150,12 @@ export default async function PillarsPage() {
                     />
                     <span className="text-sm font-semibold">{p.name}</span>
                     <span className="flex-1" />
-                    <span className="text-muted-foreground text-[11px] tabular-nums">
+                    <span className="text-[11px] text-muted-foreground tabular-nums">
                       {count} post{count === 1 ? "" : "s"}
                       {seriesCount > 0 ? ` · ${seriesCount} series` : ""}
                     </span>
                   </div>
-                  <p className="text-muted-foreground mt-1.5 text-xs leading-relaxed">
+                  <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
                     {p.description}
                   </p>
                 </div>
@@ -165,7 +165,7 @@ export default async function PillarsPage() {
         </section>
       ))}
 
-      <p className="text-muted-foreground mt-8 text-[11px]">
+      <p className="mt-8 text-[11px] text-muted-foreground">
         Pillars are brand-specific. Wander defaults ship with the workspace;
         chat-created and edited pillars are stored as durable brand overrides.
         Post counts update live.

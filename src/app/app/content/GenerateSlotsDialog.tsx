@@ -114,7 +114,7 @@ export function GenerateSlotsDialog({
         <DialogHeader>
           <DialogTitle>Generate month slots</DialogTitle>
         </DialogHeader>
-        <p className="text-muted-foreground -mt-2 text-sm">
+        <p className="-mt-2 text-sm text-muted-foreground">
           Expands the cadence &amp; mix targets (set on{" "}
           <span className="text-foreground">/channels</span>) into empty
           calendar slots. Idempotent: filled or claimed slots still count, so
@@ -140,7 +140,7 @@ export function GenerateSlotsDialog({
               setMonth(e.target.value);
               setPreview(null);
             }}
-            className="border-border bg-background rounded-md border px-2 py-1 text-sm"
+            className="rounded-md border border-border bg-background px-2 py-1 text-sm"
             aria-label="Month"
           />
         </div>
@@ -149,7 +149,7 @@ export function GenerateSlotsDialog({
           <div className="max-h-96 overflow-y-auto rounded-lg border">
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-muted-foreground bg-muted/30 sticky top-0 text-left">
+                <tr className="sticky top-0 bg-muted/30 text-left text-muted-foreground">
                   <th className="px-2 py-1.5 font-medium">Format</th>
                   <th className="px-2 py-1.5 text-right font-medium">Target</th>
                   <th className="px-2 py-1.5 text-right font-medium">
@@ -162,7 +162,7 @@ export function GenerateSlotsDialog({
                 {sections.map(({ platform, rows, mix }) => (
                   <Fragment key={platform}>
                     {/* channel header: identity + weekly tempo + new-slot subtotal */}
-                    <tr className="bg-muted/20 border-t">
+                    <tr className="border-t bg-muted/20">
                       <td colSpan={3} className="px-2 py-1.5">
                         <span className="flex items-center gap-1.5 text-[11px] font-semibold">
                           <ChannelLogo
@@ -170,7 +170,7 @@ export function GenerateSlotsDialog({
                             className="size-3.5"
                           />
                           {platformLabel(platform)}
-                          <span className="text-muted-foreground/60 font-normal tabular-nums">
+                          <span className="font-normal text-muted-foreground/60 tabular-nums">
                             ≈
                             {rows
                               .reduce(
@@ -197,9 +197,9 @@ export function GenerateSlotsDialog({
                         key={`${r.platform}|${r.archetype}`}
                         className="border-t"
                       >
-                        <td className="text-muted-foreground px-2 py-1 pl-7">
+                        <td className="px-2 py-1 pl-7 text-muted-foreground">
                           {r.archetype}
-                          <span className="text-muted-foreground/50 ml-1.5 tabular-nums">
+                          <span className="ml-1.5 text-muted-foreground/50 tabular-nums">
                             {r.count}/
                             {r.period === "week"
                               ? "wk"
@@ -218,7 +218,7 @@ export function GenerateSlotsDialog({
                           className={
                             r.created > 0
                               ? "px-2 py-1 text-right font-semibold text-emerald-400 tabular-nums"
-                              : "text-muted-foreground px-2 py-1 text-right tabular-nums"
+                              : "px-2 py-1 text-right text-muted-foreground tabular-nums"
                           }
                         >
                           +{r.created}
@@ -230,7 +230,7 @@ export function GenerateSlotsDialog({
                       <tr className="border-t">
                         <td colSpan={4} className="px-2 py-1.5 pl-7">
                           <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                            <span className="text-muted-foreground/60 text-[10px] font-medium tracking-wide uppercase">
+                            <span className="text-[10px] font-medium tracking-wide text-muted-foreground/60 uppercase">
                               Mix{mix.isOverride ? "" : " (brand default)"}
                             </span>
                             {mix.pillars.map((p) => (
@@ -269,7 +269,7 @@ export function GenerateSlotsDialog({
           <button
             onClick={() => onOpenChange(false)}
             disabled={generate.isPending}
-            className="border-border hover:bg-accent rounded-full border px-4 py-1.5 text-sm"
+            className="rounded-full border border-border px-4 py-1.5 text-sm hover:bg-accent"
           >
             Cancel
           </button>

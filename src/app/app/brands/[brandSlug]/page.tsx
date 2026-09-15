@@ -154,7 +154,7 @@ export default async function BrandPage({
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold tracking-tight">
             {brand.name}{" "}
-            <span className="text-muted-foreground text-base font-normal">
+            <span className="text-base font-normal text-muted-foreground">
               brand map
             </span>
           </h1>
@@ -196,7 +196,7 @@ export default async function BrandPage({
             </Link>
           </div>
         </div>
-        <p className="text-muted-foreground text-sm">
+        <p className="text-sm text-muted-foreground">
           A shared view of what the workspace knows, how it is structured, and
           what needs human attention. Activity is observed over the last{" "}
           {strategy.windowDays} days
@@ -237,13 +237,13 @@ export default async function BrandPage({
           <div className="flex items-end justify-between">
             <div>
               <h2 className="text-base font-semibold">Latest ads</h2>
-              <p className="text-muted-foreground mt-0.5 text-sm">
+              <p className="mt-0.5 text-sm text-muted-foreground">
                 The most recently synced ads across this brand&apos;s accounts.
               </p>
             </div>
             <Link
               href={`/app/brands/${brandSlug}/ads`}
-              className="text-muted-foreground text-sm hover:underline"
+              className="text-sm text-muted-foreground hover:underline"
             >
               All ads
             </Link>
@@ -257,11 +257,11 @@ export default async function BrandPage({
                     ? `/app/brands/${brandSlug}/ads/platform/${spot.platformCampaignId}`
                     : `/app/brands/${brandSlug}/ads`
                 }
-                className="bg-card w-40 shrink-0 overflow-hidden rounded-xl border transition-colors hover:border-white/20"
+                className="w-40 shrink-0 overflow-hidden rounded-xl border bg-card transition-colors hover:border-white/20"
               >
-                <div className="bg-muted relative h-24">
+                <div className="relative h-24 bg-muted">
                   {(spot.media?.[0]?.url ?? spot.thumbnailUrl) && (
-                    // eslint-disable-next-line @next/next/no-img-element
+                    // oxlint-disable-next-line nextjs/no-img-element
                     <img
                       src={spot.media?.[0]?.url ?? spot.thumbnailUrl ?? ""}
                       alt=""
@@ -278,7 +278,7 @@ export default async function BrandPage({
                   <p className="truncate text-xs font-medium">
                     {spot.name ?? "Untitled ad"}
                   </p>
-                  <p className="text-muted-foreground truncate text-[10px]">
+                  <p className="truncate text-[10px] text-muted-foreground">
                     {(spot.platformCampaignId
                       ? campaignName.get(spot.platformCampaignId)
                       : null) ?? spot.platform}
@@ -293,7 +293,7 @@ export default async function BrandPage({
       <section id="strategy" className="scroll-mt-6 space-y-3">
         <div>
           <h2 className="text-base font-semibold">Strategy and cadence</h2>
-          <p className="text-muted-foreground mt-0.5 text-sm">
+          <p className="mt-0.5 text-sm text-muted-foreground">
             Compare observed behavior with the structure the team wants AI to
             plan against.
           </p>

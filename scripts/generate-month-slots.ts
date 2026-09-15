@@ -17,7 +17,9 @@ const year = Number(yearArg);
 const month = Number(monthArg);
 const dryRun = flags.includes("--dry");
 if (!year || !month || month < 1 || month > 12) {
-  console.error("usage: bun run scripts/generate-month-slots.ts <year> <month 1-12> [--dry]");
+  console.error(
+    "usage: bun run scripts/generate-month-slots.ts <year> <month 1-12> [--dry]",
+  );
   process.exit(1);
 }
 
@@ -37,5 +39,7 @@ for (const r of rows)
   console.log(
     ` ${r.platform} · ${r.archetype}: target ${r.target}, existing ${r.existing} → +${r.created}`,
   );
-console.log(`${dryRun ? "[dry] would create" : "created"} ${created} slots for ${year}-${String(month).padStart(2, "0")}`);
+console.log(
+  `${dryRun ? "[dry] would create" : "created"} ${created} slots for ${year}-${String(month).padStart(2, "0")}`,
+);
 process.exit(0);

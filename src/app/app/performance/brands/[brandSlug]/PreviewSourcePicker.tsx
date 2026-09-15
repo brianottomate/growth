@@ -18,8 +18,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/toast";
 import { useTRPC } from "@/trpc/react";
 
-export type PickerHome = { url: string; name: string; imageUrl: string; thumbUrl: string | null };
-export type PickerImage = { id: string; url: string; thumbnailUrl: string | null; title: string | null };
+export type PickerHome = {
+  url: string;
+  name: string;
+  imageUrl: string;
+  thumbUrl: string | null;
+};
+export type PickerImage = {
+  id: string;
+  url: string;
+  thumbnailUrl: string | null;
+  title: string | null;
+};
 
 /**
  * Where the on-demand ad previews draw their photo from. Two doors: one of
@@ -56,14 +66,18 @@ export function PreviewSourcePicker({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="hover:bg-muted flex items-center gap-2 rounded-full border py-0.5 pr-3 pl-0.5 text-[11.5px]"
+        className="flex items-center gap-2 rounded-full border py-0.5 pr-3 pl-0.5 text-[11.5px] hover:bg-muted"
         title="Choose the photo the previews are drawn on"
       >
         {current.thumbUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={current.thumbUrl} alt="" className="size-6 rounded-full object-cover" />
+          // oxlint-disable-next-line nextjs/no-img-element
+          <img
+            src={current.thumbUrl}
+            alt=""
+            className="size-6 rounded-full object-cover"
+          />
         ) : (
-          <span className="bg-muted grid size-6 place-items-center rounded-full">
+          <span className="grid size-6 place-items-center rounded-full bg-muted">
             <ImageIcon className="size-3" />
           </span>
         )}
@@ -72,31 +86,53 @@ export function PreviewSourcePicker({
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="flex max-h-[85vh] w-[96vw] max-w-3xl flex-col overflow-hidden p-0">
-          <DialogHeader className="shrink-0 border-b px-5 py-3 pr-12 text-left">
-            <DialogTitle className="text-sm">Photo for the ad previews</DialogTitle>
+          <DialogHeader
+            divider="default"
+            className="shrink-0 px-5 py-3 pr-12 text-left"
+          >
+            <DialogTitle className="text-sm">
+              Photo for the ad previews
+            </DialogTitle>
             <DialogDescription className="text-xs">
-              A home brings its copy with it; a library image keeps the featured home&apos;s copy.
+              A home brings its copy with it; a library image keeps the featured
+              home&apos;s copy.
             </DialogDescription>
           </DialogHeader>
-          <Tabs defaultValue={homes.length > 0 ? "homes" : "library"} className="min-h-0 flex-1 overflow-hidden">
+          <Tabs
+            defaultValue={homes.length > 0 ? "homes" : "library"}
+            className="min-h-0 flex-1 overflow-hidden"
+          >
             <div className="flex items-center justify-between gap-2 px-5 pt-3">
               <TabsList>
-                <TabsTrigger value="homes">Their homes{homes.length ? ` · ${homes.length}` : ""}</TabsTrigger>
-                <TabsTrigger value="library">Library{images.length ? ` · ${images.length}` : ""}</TabsTrigger>
+                <TabsTrigger value="homes">
+                  Their homes{homes.length ? ` · ${homes.length}` : ""}
+                </TabsTrigger>
+                <TabsTrigger value="library">
+                  Library{images.length ? ` · ${images.length}` : ""}
+                </TabsTrigger>
               </TabsList>
               {current.sourceUrl ? (
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-7 text-[11.5px]"
+                  density="editorial"
                   disabled={set.isPending}
-                  onClick={() => set.mutate({ id: brandId, listingUrl: null, sourceUrl: null })}
+                  onClick={() =>
+                    set.mutate({
+                      id: brandId,
+                      listingUrl: null,
+                      sourceUrl: null,
+                    })
+                  }
                 >
                   Clear choice
                 </Button>
               ) : null}
             </div>
-            <TabsContent value="homes" className="min-h-0 overflow-y-auto p-5 pt-3">
+            <TabsContent
+              value="homes"
+              className="min-h-0 overflow-y-auto p-5 pt-3"
+            >
               <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
                 {homes.map((home) => (
                   <Tile
@@ -105,14 +141,25 @@ export function PreviewSourcePicker({
                     label={home.name}
                     selected={current.sourceUrl === home.imageUrl}
                     disabled={set.isPending}
-                    onClick={() => set.mutate({ id: brandId, listingUrl: home.url, sourceUrl: home.imageUrl })}
+                    onClick={() =>
+                      set.mutate({
+                        id: brandId,
+                        listingUrl: home.url,
+                        sourceUrl: home.imageUrl,
+                      })
+                    }
                   />
                 ))}
               </ul>
             </TabsContent>
-            <TabsContent value="library" className="min-h-0 overflow-y-auto p-5 pt-3">
+            <TabsContent
+              value="library"
+              className="min-h-0 overflow-y-auto p-5 pt-3"
+            >
               {images.length === 0 ? (
-                <p className="text-muted-foreground text-xs">Nothing in the library yet.</p>
+                <p className="text-xs text-muted-foreground">
+                  Nothing in the library yet.
+                </p>
               ) : (
                 <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
                   {images.map((image) => (
@@ -122,7 +169,9 @@ export function PreviewSourcePicker({
                       label={image.title ?? "Untitled"}
                       selected={current.sourceUrl === image.url}
                       disabled={set.isPending}
-                      onClick={() => set.mutate({ id: brandId, sourceUrl: image.url })}
+                      onClick={() =>
+                        set.mutate({ id: brandId, sourceUrl: image.url })
+                      }
                     />
                   ))}
                 </ul>
@@ -161,14 +210,21 @@ function Tile({
         )}
         title={label}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt={label} loading="lazy" className="aspect-square w-full object-cover" />
+        {/* oxlint-disable-next-line nextjs/no-img-element */}
+        <img
+          src={src}
+          alt={label}
+          loading="lazy"
+          className="aspect-square w-full object-cover"
+        />
         {selected ? (
           <span className="absolute top-1 right-1 grid size-5 place-items-center rounded-full bg-sky-400 text-white">
             <Check className="size-3" />
           </span>
         ) : null}
-        <span className="block truncate px-1.5 py-1 text-[10.5px]">{label}</span>
+        <span className="block truncate px-1.5 py-1 text-[10.5px]">
+          {label}
+        </span>
       </button>
     </li>
   );

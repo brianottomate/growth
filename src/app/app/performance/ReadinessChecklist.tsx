@@ -44,8 +44,8 @@ export function ReadinessChecklist({
       collapsible
       defaultValue={defaultOpen ? "checklist" : undefined}
     >
-      <AccordionItem value="checklist" className="border-b-0">
-        <AccordionTrigger className="py-2.5 hover:no-underline">
+      <AccordionItem value="checklist" border="none">
+        <AccordionTrigger appearance="compact">
           <span className="flex flex-1 items-baseline justify-between gap-3">
             <span className={sectionLabel}>Checklist</span>
             <span
@@ -59,7 +59,7 @@ export function ReadinessChecklist({
           </span>
         </AccordionTrigger>
 
-        <div className="bg-muted/60 h-1 overflow-hidden rounded-full">
+        <div className="h-1 overflow-hidden rounded-full bg-muted/60">
           <div
             className={cn(
               "h-full rounded-full transition-[width]",
@@ -76,7 +76,7 @@ export function ReadinessChecklist({
             <section key={group.id} className="space-y-1">
               <div className="flex items-baseline gap-2">
                 <span className={sectionLabel}>{group.label}</span>
-                <span className="text-muted-foreground/70 text-[10px] tabular-nums">
+                <span className="text-[10px] text-muted-foreground/70 tabular-nums">
                   {group.done}/{group.total}
                 </span>
               </div>
@@ -91,7 +91,7 @@ export function ReadinessChecklist({
                       {item.done ? (
                         <CircleCheck className="mt-[3px] size-3.5 shrink-0 text-emerald-400" />
                       ) : (
-                        <Circle className="text-muted-foreground/50 mt-[3px] size-3.5 shrink-0" />
+                        <Circle className="mt-[3px] size-3.5 shrink-0 text-muted-foreground/50" />
                       )}
                       <span className="min-w-0 flex-1">
                         <span
@@ -100,7 +100,7 @@ export function ReadinessChecklist({
                           {item.label}
                         </span>
                         {item.detail ? (
-                          <span className="text-muted-foreground/80 text-[11.5px]">
+                          <span className="text-[11.5px] text-muted-foreground/80">
                             {" "}
                             · {item.detail}
                           </span>

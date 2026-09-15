@@ -114,7 +114,7 @@ export function ContentCalendar({
       <div className="mb-3 flex items-center gap-2">
         <button
           onClick={prev}
-          className="border-border hover:bg-accent flex size-7 items-center justify-center rounded-md border"
+          className="flex size-7 items-center justify-center rounded-md border border-border hover:bg-accent"
           aria-label="Previous month"
         >
           <ChevronLeft className="size-4" />
@@ -124,7 +124,7 @@ export function ContentCalendar({
         </span>
         <button
           onClick={next}
-          className="border-border hover:bg-accent flex size-7 items-center justify-center rounded-md border"
+          className="flex size-7 items-center justify-center rounded-md border border-border hover:bg-accent"
           aria-label="Next month"
         >
           <ChevronRight className="size-4" />
@@ -134,13 +134,13 @@ export function ContentCalendar({
             setYear(now.getFullYear());
             setMonth(now.getMonth());
           }}
-          className="border-border text-muted-foreground hover:bg-accent rounded-full border px-3 py-1 text-xs font-medium"
+          className="rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-accent"
         >
           Today
         </button>
         <Link
           href="/app/calendar"
-          className="text-muted-foreground hover:text-foreground ml-auto text-xs underline"
+          className="ml-auto text-xs text-muted-foreground underline hover:text-foreground"
         >
           Year view ↗
         </Link>
@@ -148,7 +148,7 @@ export function ContentCalendar({
 
       <DndContext sensors={sensors} onDragEnd={onDragEnd}>
         <div className="overflow-hidden rounded-xl border">
-          <div className="text-muted-foreground bg-muted/30 grid grid-cols-7 border-b text-[11px] font-medium">
+          <div className="grid grid-cols-7 border-b bg-muted/30 text-[11px] font-medium text-muted-foreground">
             {WEEKDAYS.map((w) => (
               <div key={w} className="px-2 py-1.5">
                 {w}
@@ -203,7 +203,7 @@ function DayCell({
         className={cn(
           "flex size-5 items-center justify-center rounded-full text-xs tabular-nums",
           isToday
-            ? "bg-foreground text-background font-semibold"
+            ? "bg-foreground font-semibold text-background"
             : "text-muted-foreground",
         )}
       >
@@ -249,7 +249,7 @@ function CalChip({
         if (spot.contentPostId) onOpen(spot.contentPostId);
       }}
       className={cn(
-        "bg-card flex cursor-grab touch-none items-center gap-1 overflow-hidden rounded-md border p-1 text-[11px]",
+        "flex cursor-grab touch-none items-center gap-1 overflow-hidden rounded-md border bg-card p-1 text-[11px]",
         spot.status === "slot" && "border-dashed bg-transparent opacity-75",
         isDragging && "opacity-40",
       )}
@@ -261,7 +261,7 @@ function CalChip({
         className="size-3.5 shrink-0"
       />
       {spot.mediaUrl && (
-        // eslint-disable-next-line @next/next/no-img-element
+        // oxlint-disable-next-line nextjs/no-img-element
         <img
           src={spot.mediaUrl}
           alt=""

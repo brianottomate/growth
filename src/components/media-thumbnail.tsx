@@ -72,14 +72,14 @@ export function MediaThumbnail({
   // rather than showing the same broken glyph a dead image gets.
   if (!candidates.length) {
     return (
-      <span className="bg-muted absolute inset-0 flex flex-col items-center justify-center gap-1">
+      <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-muted">
         {isVideo ? (
-          <Film className="text-muted-foreground size-4" />
+          <Film className="size-4 text-muted-foreground" />
         ) : (
-          <ImageOff className="text-muted-foreground size-4" />
+          <ImageOff className="size-4 text-muted-foreground" />
         )}
         {isVideo && (
-          <span className="text-muted-foreground text-[9px]">Video</span>
+          <span className="text-[9px] text-muted-foreground">Video</span>
         )}
       </span>
     );
@@ -91,15 +91,15 @@ export function MediaThumbnail({
   return (
     <>
       {state !== "loaded" && (
-        <span className="bg-muted absolute inset-0 flex items-center justify-center">
+        <span className="absolute inset-0 flex items-center justify-center bg-muted">
           {state === "failed" ? (
             isVideo ? (
-              <Film className="text-muted-foreground size-4" />
+              <Film className="size-4 text-muted-foreground" />
             ) : (
-              <ImageOff className="text-muted-foreground size-4" />
+              <ImageOff className="size-4 text-muted-foreground" />
             )
           ) : (
-            <Loader2 className="text-muted-foreground size-4 animate-spin" />
+            <Loader2 className="size-4 animate-spin text-muted-foreground" />
           )}
         </span>
       )}

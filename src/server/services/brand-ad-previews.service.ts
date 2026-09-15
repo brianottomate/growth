@@ -241,8 +241,13 @@ export async function setBrandPreviewSource(input: {
     .update(brandTable)
     .set({
       previewSourceUrl: input.sourceUrl,
-      ...(input.listingUrl !== undefined ? { featuredListingUrl: input.listingUrl } : {}),
+      ...(input.listingUrl !== undefined
+        ? { featuredListingUrl: input.listingUrl }
+        : {}),
     })
     .where(eq(brandTable.id, input.brandId));
-  return { previewSourceUrl: input.sourceUrl, featuredListingUrl: input.listingUrl ?? null };
+  return {
+    previewSourceUrl: input.sourceUrl,
+    featuredListingUrl: input.listingUrl ?? null,
+  };
 }

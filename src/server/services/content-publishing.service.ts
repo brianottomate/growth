@@ -25,7 +25,10 @@ import { buildZernioReschedulePayload } from "@/lib/zernio-reschedule";
 
 export type SocialDeliveryMode = "schedule" | "publish_now";
 export type SocialPublishingPlatform =
-  "facebook" | "instagram" | "linkedin" | "x";
+  | "facebook"
+  | "instagram"
+  | "linkedin"
+  | "x";
 
 const SUPPORTED_PLATFORMS = new Set<SocialPublishingPlatform>([
   "facebook",

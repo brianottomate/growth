@@ -47,13 +47,13 @@ export async function PlatformSection({
     const googleBlocked = platform === "google_ads" && !google?.campaignType;
     const pushable = isPushableAdPlatform(platform);
     return (
-      <div className="bg-card flex flex-wrap items-center gap-2.5 rounded-xl border p-3.5">
+      <div className="flex flex-wrap items-center gap-2.5 rounded-xl border bg-card p-3.5">
         <ChannelLogo platform={platform} className="size-5" />
         <span className="text-sm font-semibold">On {label}</span>
-        <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-[11px] font-medium">
+        <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
           planned
         </span>
-        <span className="text-muted-foreground text-xs">
+        <span className="text-xs text-muted-foreground">
           {draftAdCount === 0
             ? "Add ads to the plan, set the budget, then push."
             : googleBlocked
@@ -93,7 +93,7 @@ export async function PlatformSection({
             />
           )}
           {!pushable && (
-            <span className="text-muted-foreground text-xs">
+            <span className="text-xs text-muted-foreground">
               Push not wired for {label} yet
             </span>
           )}
@@ -133,7 +133,7 @@ export async function PlatformSection({
     .join(" – ");
 
   return (
-    <div className="bg-card space-y-3 rounded-xl border p-3.5">
+    <div className="space-y-3 rounded-xl border bg-card p-3.5">
       <div className="flex flex-wrap items-center gap-2.5">
         <ChannelLogo platform={platform} className="size-5" />
         <Link
@@ -149,7 +149,7 @@ export async function PlatformSection({
         >
           {platformCampaign.status}
         </span>
-        <span className="text-muted-foreground truncate text-xs">
+        <span className="truncate text-xs text-muted-foreground">
           {[
             window,
             ads.length > 0
@@ -165,7 +165,7 @@ export async function PlatformSection({
               href={platformCampaign.manageUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-muted-foreground hover:text-foreground text-xs"
+              className="text-xs text-muted-foreground hover:text-foreground"
             >
               Ads Manager ↗
             </a>
@@ -194,7 +194,7 @@ export async function PlatformSection({
         <div className="flex flex-wrap gap-x-6 gap-y-1">
           {figures.map((figure) => (
             <div key={figure.label}>
-              <p className="text-muted-foreground text-[11px]">
+              <p className="text-[11px] text-muted-foreground">
                 {figure.label}
               </p>
               <p className="text-sm font-medium tabular-nums">{figure.value}</p>
@@ -210,11 +210,11 @@ export async function PlatformSection({
             return (
               <div
                 key={ad.id}
-                className="bg-background w-32 shrink-0 overflow-hidden rounded-lg border"
+                className="w-32 shrink-0 overflow-hidden rounded-lg border bg-background"
               >
-                <div className="bg-muted relative h-20">
+                <div className="relative h-20 bg-muted">
                   {image && (
-                    // eslint-disable-next-line @next/next/no-img-element
+                    // oxlint-disable-next-line nextjs/no-img-element
                     <img
                       src={image}
                       alt=""
@@ -230,7 +230,7 @@ export async function PlatformSection({
                     {ad.headline ?? ad.name ?? "Untitled ad"}
                   </p>
                   {ad.stats?.spend != null && (
-                    <p className="text-muted-foreground text-[10px] tabular-nums">
+                    <p className="text-[10px] text-muted-foreground tabular-nums">
                       {money(ad.stats.spend)}
                       {ad.stats.ctr != null ? ` · ${ad.stats.ctr}% CTR` : ""}
                     </p>

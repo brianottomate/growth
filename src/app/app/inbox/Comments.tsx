@@ -9,7 +9,7 @@ import {
 export async function Comments() {
   if (!isZernioConfigured) {
     return (
-      <div className="bg-card text-muted-foreground rounded-lg border p-4 text-sm">
+      <div className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
         Zernio isn&apos;t configured (no{" "}
         <code className="font-mono">ZERNIO_API_KEY</code>).
       </div>
@@ -21,7 +21,7 @@ export async function Comments() {
     result = await getRecentOrganicComments();
   } catch (error) {
     return (
-      <div className="border-destructive/30 bg-destructive/10 text-destructive rounded-lg border p-4 text-sm">
+      <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
         <p className="font-semibold">Failed to fetch comments</p>
         <p className="mt-1 font-mono text-xs">
           {error instanceof Error ? error.message : String(error)}
@@ -32,7 +32,7 @@ export async function Comments() {
 
   if (result.comments.length === 0) {
     return (
-      <div className="bg-card text-muted-foreground rounded-lg border p-4 text-sm">
+      <div className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
         No comments on posts published in the last {LISTENING_WINDOW_DAYS} days
         across connected accounts.
       </div>

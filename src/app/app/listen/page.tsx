@@ -50,7 +50,7 @@ export default async function ListenPage({
     <div className="space-y-8">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Listen</h1>
-        <p className="text-muted-foreground mt-2 max-w-3xl text-sm">
+        <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
           Brand-specific social listening — the channels you monitor, what
           counts as signal, and how each brand replies. Configure it here; no
           seed script or deploy required.

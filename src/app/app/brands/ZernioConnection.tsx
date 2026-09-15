@@ -94,15 +94,15 @@ export function ZernioConnectDialog({
 
         <div className="flex flex-col gap-4 py-2">
           {catalogQ.isLoading ? (
-            <p className="text-muted-foreground text-sm">
+            <p className="text-sm text-muted-foreground">
               Loading Zernio profiles…
             </p>
           ) : !catalog?.configured ? (
-            <p className="text-destructive text-sm">
+            <p className="text-sm text-destructive">
               Zernio is not configured.
             </p>
           ) : catalog.profiles.length === 0 ? (
-            <p className="text-muted-foreground text-sm">
+            <p className="text-sm text-muted-foreground">
               No profiles exist in the connected Zernio workspace.
             </p>
           ) : (
@@ -138,12 +138,12 @@ export function ZernioConnectDialog({
                 <div className="rounded-lg border p-3">
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-sm font-medium">{selected.name}</span>
-                    <span className="text-muted-foreground text-xs">
+                    <span className="text-xs text-muted-foreground">
                       {selected.accounts.length} connected
                     </span>
                   </div>
                   {selected.accounts.length === 0 ? (
-                    <p className="text-muted-foreground text-xs">
+                    <p className="text-xs text-muted-foreground">
                       This profile has no connected accounts yet. You can still
                       assign it now and refresh after connecting accounts in
                       Zernio.
@@ -159,7 +159,7 @@ export function ZernioConnectDialog({
                           <span className="font-medium">
                             {platformLabel(account.platform)}
                           </span>
-                          <span className="text-muted-foreground truncate text-xs">
+                          <span className="truncate text-xs text-muted-foreground">
                             {account.username ??
                               account.displayName ??
                               "Connected account"}
@@ -174,7 +174,7 @@ export function ZernioConnectDialog({
           )}
 
           {(error || catalogQ.error) && (
-            <p className="text-destructive text-sm">
+            <p className="text-sm text-destructive">
               {error ?? catalogQ.error?.message}
             </p>
           )}
@@ -193,7 +193,6 @@ export function ZernioConnectDialog({
             onClick={submit}
             loading={connectM.isPending}
             disabled={!profileId || !catalog?.configured}
-            className="gap-1.5"
           >
             {currentProfileId ? <RefreshCw className="size-3.5" /> : null}
             {currentProfileId ? "Refresh accounts" : "Connect profile"}

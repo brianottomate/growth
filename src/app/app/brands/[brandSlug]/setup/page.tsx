@@ -67,11 +67,11 @@ export default async function BrandSetupPage({
         </div>
         <h1 className="text-2xl font-semibold tracking-tight">
           {brand.name}{" "}
-          <span className="text-muted-foreground text-base font-normal">
+          <span className="text-base font-normal text-muted-foreground">
             setup
           </span>
         </h1>
-        <p className="text-muted-foreground text-sm">
+        <p className="text-sm text-muted-foreground">
           Connect the client&apos;s accounts and decide which ad accounts this
           brand may consume. Once this page is green, the work happens on the
           brand and ads pages.

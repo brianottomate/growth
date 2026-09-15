@@ -31,7 +31,7 @@ const usd = (value: number | null | undefined) =>
 /** A count of 0 reads as a gap, not as data — keep it visually quiet. */
 function Count({ value }: { value: number }) {
   if (value === 0)
-    return <Minus className="text-muted-foreground/40 mx-auto size-3" />;
+    return <Minus className="mx-auto size-3 text-muted-foreground/40" />;
   return <span>{value}</span>;
 }
 
@@ -39,7 +39,7 @@ function Yes({ value }: { value: boolean }) {
   return value ? (
     <Check className="mx-auto size-3.5 text-emerald-400" />
   ) : (
-    <Minus className="text-muted-foreground/40 mx-auto size-3" />
+    <Minus className="mx-auto size-3 text-muted-foreground/40" />
   );
 }
 
@@ -56,22 +56,24 @@ export function PerformanceClient() {
       </header>
 
       {isLoading && (
-        <p className="text-muted-foreground text-sm">Loading accounts…</p>
+        <p className="text-sm text-muted-foreground">Loading accounts…</p>
       )}
 
       {!isLoading && accounts.length === 0 && (
-        <div className="border-border rounded-lg border border-dashed p-8 text-center">
-          <p className="text-sm font-medium">No Performance clients on record yet</p>
-          <p className="text-muted-foreground mt-1 text-sm">
+        <div className="rounded-lg border border-dashed border-border p-8 text-center">
+          <p className="text-sm font-medium">
+            No Performance clients on record yet
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
             Use the button above, or ask the assistant to onboard one.
           </p>
         </div>
       )}
 
       {accounts.length > 0 && (
-        <div className="border-border overflow-x-auto rounded-lg border">
+        <div className="overflow-x-auto rounded-lg border border-border">
           <table className="w-full text-sm">
-            <thead className="bg-surface-secondary/40 text-muted-foreground text-xs">
+            <thead className="bg-surface-secondary/40 text-xs text-muted-foreground">
               <tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:text-left [&>th]:font-medium">
                 <th>Customer</th>
                 <th>Status</th>
@@ -95,7 +97,7 @@ export function PerformanceClient() {
                 return (
                   <tr
                     key={account.id}
-                    className="border-border hover:bg-surface-secondary/30 border-t [&>td]:px-3 [&>td]:py-2.5"
+                    className="border-t border-border hover:bg-surface-secondary/30 [&>td]:px-3 [&>td]:py-2.5"
                   >
                     <td>
                       <Link
@@ -105,7 +107,7 @@ export function PerformanceClient() {
                         {account.name}
                       </Link>
                       {account.contactName && (
-                        <div className="text-muted-foreground text-xs">
+                        <div className="text-xs text-muted-foreground">
                           {account.contactName}
                         </div>
                       )}
@@ -120,7 +122,7 @@ export function PerformanceClient() {
                         {status.label}
                       </span>
                     </td>
-                    <td className="text-muted-foreground text-xs">
+                    <td className="text-xs text-muted-foreground">
                       {account.plan ?? "—"}
                     </td>
                     <td className="text-center">
@@ -150,7 +152,11 @@ export function PerformanceClient() {
                               : undefined
                           }
                         >
-                          ${(cycle.actualSpendCents / 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}
+                          $
+                          {(cycle.actualSpendCents / 100).toLocaleString(
+                            "en-US",
+                            { maximumFractionDigits: 2 },
+                          )}
                         </span>
                       ) : (
                         <span className="text-muted-foreground/40">—</span>
@@ -179,7 +185,7 @@ export function PerformanceClient() {
         </div>
       )}
 
-      <p className="text-muted-foreground text-xs">
+      <p className="text-xs text-muted-foreground">
         Spent is the sum of every campaign attached to the cycle, refreshed by
         the Zernio ads sync, and turns red past the media budget. Bookings and
         recommendations are not tracked yet — attribution needs the Order

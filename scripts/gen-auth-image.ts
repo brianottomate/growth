@@ -30,8 +30,11 @@ const result = await client.subscribe("fal-ai/flux/dev", {
 
 const data = result.data as { images?: Array<{ url: string }> };
 const url = data.images?.[0]?.url;
-if (!url) throw new Error(`No image in Fal response: ${JSON.stringify(result.data)}`);
+if (!url)
+  throw new Error(`No image in Fal response: ${JSON.stringify(result.data)}`);
 
 const bytes = Buffer.from(await (await fetch(url)).arrayBuffer());
 await Bun.write("public/auth-hero.jpg", bytes);
-console.log(`saved public/auth-hero.jpg (${(bytes.length / 1024).toFixed(0)} KB) from ${url}`);
+console.log(
+  `saved public/auth-hero.jpg (${(bytes.length / 1024).toFixed(0)} KB) from ${url}`,
+);

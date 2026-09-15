@@ -1054,11 +1054,15 @@ export const listListingPhotos = growthAction({
   }),
   execute: async ({ brandId, limit }, ctx) => {
     const brand = await requireOwnedBrand(brandId, ctx);
-    const listings = (await brandListings({ id: brand.id, website: brand.website }))
+    const listings = (
+      await brandListings({ id: brand.id, website: brand.website })
+    )
       .filter((row) => row.imageUrl)
       .slice(0, limit);
     const imported = await Promise.all(
-      listings.map((row) => findImportedImage({ brandId: brand.id, url: row.imageUrl! })),
+      listings.map((row) =>
+        findImportedImage({ brandId: brand.id, url: row.imageUrl! }),
+      ),
     );
     return {
       brandId: brand.id,
@@ -1106,13 +1110,15 @@ export const importListingPhotos = growthAction({
   }),
   execute: async ({ brandId, listingUrls, limit }, ctx) => {
     const brand = await requireOwnedBrand(brandId, ctx);
-    const listings = (await brandListings({ id: brand.id, website: brand.website })).filter(
-      (row) => row.imageUrl,
-    );
+    const listings = (
+      await brandListings({ id: brand.id, website: brand.website })
+    ).filter((row) => row.imageUrl);
     const notes: string[] = [];
     let chosen = listings.slice(0, limit);
     if (listingUrls?.length) {
-      const byUrl = new Map(listings.map((row) => [normalizeListingUrl(row.url), row] as const));
+      const byUrl = new Map(
+        listings.map((row) => [normalizeListingUrl(row.url), row] as const),
+      );
       chosen = listingUrls.flatMap((url) => {
         const row = byUrl.get(normalizeListingUrl(url));
         if (!row) notes.push(`${url} is not on the listing feed right now.`);
@@ -1130,7 +1136,10 @@ export const importListingPhotos = growthAction({
     const assets = [];
     // Sequential: each import is a download and an R2 write.
     for (const row of chosen) {
-      const existing = await findImportedImage({ brandId: brand.id, url: row.imageUrl! });
+      const existing = await findImportedImage({
+        brandId: brand.id,
+        url: row.imageUrl!,
+      });
       const asset =
         existing ??
         (await importRemoteImage({
@@ -1141,7 +1150,12 @@ export const importListingPhotos = growthAction({
         }));
       if (existing) reused += 1;
       else imported += 1;
-      assets.push({ mediaAssetId: asset.id, url: asset.url, name: row.name, listingUrl: row.url });
+      assets.push({
+        mediaAssetId: asset.id,
+        url: asset.url,
+        name: row.name,
+        listingUrl: row.url,
+      });
     }
     return { brandId: brand.id, imported, reused, assets, notes };
   },

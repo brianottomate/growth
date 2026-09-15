@@ -90,7 +90,7 @@ export function LaunchDetail({
                 status: e.target.value as (typeof launchStatuses)[number],
               })
             }
-            className="border-input bg-background rounded-md border px-2 py-1 text-xs"
+            className="rounded-md border border-input bg-background px-2 py-1 text-xs"
           >
             {launchStatuses.map((s) => (
               <option key={s} value={s}>
@@ -99,7 +99,7 @@ export function LaunchDetail({
             ))}
           </select>
         </div>
-        <p className="text-muted-foreground text-sm">
+        <p className="text-sm text-muted-foreground">
           Tier {launch.tier} · {launch.maturity.replaceAll("_", " ")} ·{" "}
           {launch.targetDate ?? "no date"}
           {launch.product ? ` · ${launch.product.name}` : ""}
@@ -112,7 +112,7 @@ export function LaunchDetail({
             href={launch.sourceUrl}
             target="_blank"
             rel="noreferrer"
-            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
           >
             Brief <ExternalLink className="size-3" />
           </a>
@@ -140,7 +140,7 @@ export function LaunchDetail({
           <Field label="Changelog entry" value={brief.changelogEntry} />
           {brief.claims.length > 0 && (
             <div>
-              <dt className="text-muted-foreground text-xs">Claims</dt>
+              <dt className="text-xs text-muted-foreground">Claims</dt>
               <dd>
                 <ul className="list-inside list-disc">
                   {brief.claims.map((claim) => (
@@ -158,14 +158,14 @@ export function LaunchDetail({
       <section className="space-y-3">
         <h2 className="text-sm font-semibold">
           Features
-          <span className="text-muted-foreground ml-2 text-xs font-normal">
+          <span className="ml-2 text-xs font-normal text-muted-foreground">
             {shipping.length === 0
               ? `${launch.product?.name ?? "The product"} itself`
               : `${shipping.length} of ${features.length}`}
           </span>
         </h2>
         {features.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
+          <p className="text-sm text-muted-foreground">
             {launch.product?.name ?? "This product"} has no features in Product
             Atlas yet.
           </p>
@@ -173,7 +173,7 @@ export function LaunchDetail({
           <ul className="grid gap-1 sm:grid-cols-2">
             {features.map((feature) => (
               <li key={feature.id}>
-                <label className="hover:bg-accent/50 flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-sm">
+                <label className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent/50">
                   <input
                     type="checkbox"
                     checked={feature.shipping}
@@ -183,7 +183,7 @@ export function LaunchDetail({
                   <span>
                     {feature.name}
                     {feature.job && (
-                      <span className="text-muted-foreground block text-xs">
+                      <span className="block text-xs text-muted-foreground">
                         {feature.job}
                       </span>
                     )}
@@ -194,7 +194,7 @@ export function LaunchDetail({
           </ul>
         )}
         {unknownStoryIds.length > 0 && (
-          <p className="text-destructive text-xs">
+          <p className="text-xs text-destructive">
             Not in this product&apos;s atlas: {unknownStoryIds.join(", ")}
           </p>
         )}
@@ -205,7 +205,7 @@ export function LaunchDetail({
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
             <thead>
-              <tr className="text-muted-foreground border-b text-left text-xs">
+              <tr className="border-b text-left text-xs text-muted-foreground">
                 <th className="py-2 font-medium">Surface</th>
                 <th className="py-2 font-medium">Owner</th>
                 <th className="py-2 font-medium">Ready by</th>
@@ -216,9 +216,7 @@ export function LaunchDetail({
             <tbody>
               {deliverables.map((d) => (
                 <tr key={d.surface} className="border-b last:border-0">
-                  <td className="py-2">
-                    {launchSurfaceLabels[d.surface]}
-                  </td>
+                  <td className="py-2">{launchSurfaceLabels[d.surface]}</td>
                   <td className="py-2">
                     <select
                       value={d.ownerId ?? ""}
@@ -232,7 +230,7 @@ export function LaunchDetail({
                               ?.name ?? null,
                         })
                       }
-                      className="border-input bg-background w-full rounded-md border px-2 py-1 text-xs"
+                      className="w-full rounded-md border border-input bg-background px-2 py-1 text-xs"
                     >
                       <option value="">{d.ownerName ?? "Unassigned"}</option>
                       {members.map((m) => (
@@ -253,7 +251,8 @@ export function LaunchDetail({
                           readyBy: e.target.value || null,
                         })
                       }
-                      className="h-7 w-36 text-xs"
+                      textSize="xs"
+                      className="h-7 w-36"
                     />
                   </td>
                   <td className="py-2">
@@ -281,7 +280,7 @@ export function LaunchDetail({
                     ) : d.resolved?.href ? (
                       <Link
                         href={d.resolved.href}
-                        className="hover:text-foreground text-muted-foreground inline-flex items-center gap-1"
+                        className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
                       >
                         {d.resolved.label ?? "Open"}
                         <ExternalLink className="size-3" />
@@ -300,12 +299,12 @@ export function LaunchDetail({
       <section className="space-y-2">
         <h2 className="text-sm font-semibold">Linked work</h2>
         {series.length === 0 && campaigns.length === 0 && posts.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
+          <p className="text-sm text-muted-foreground">
             Nothing linked. Point a series, campaign, or idea at this launch to
             see it here.
           </p>
         ) : (
-          <ul className="text-muted-foreground space-y-1 text-sm">
+          <ul className="space-y-1 text-sm text-muted-foreground">
             {series.map((s) => (
               <li key={s.id}>Series · {s.name}</li>
             ))}
@@ -325,7 +324,7 @@ export function LaunchDetail({
 function Field({ label, value }: { label: string; value?: string | null }) {
   return (
     <div>
-      <dt className="text-muted-foreground text-xs">{label}</dt>
+      <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd>{value || <span className="text-muted-foreground">—</span>}</dd>
     </div>
   );

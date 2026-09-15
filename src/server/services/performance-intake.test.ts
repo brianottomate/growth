@@ -88,7 +88,9 @@ describe("property rows", () => {
 
   it("invents nothing for an all-properties request", () => {
     // "Advertise everything" is an instruction to the operator, not a list.
-    expect(propertyRowsFromAnswers("perf_1", { allProperties: true }, [])).toHaveLength(0);
+    expect(
+      propertyRowsFromAnswers("perf_1", { allProperties: true }, []),
+    ).toHaveLength(0);
   });
 });
 
@@ -174,7 +176,10 @@ describe("public access-check throttle", () => {
 describe("prefill contact fields", () => {
   it("uses the commercial record when a token addressed the form", () => {
     expect(
-      prefillContact(true, { contactName: "Cynthia", contactEmail: "c@wpe.com" }),
+      prefillContact(true, {
+        contactName: "Cynthia",
+        contactEmail: "c@wpe.com",
+      }),
     ).toEqual({ contact: "Cynthia", email: "c@wpe.com" });
   });
 
@@ -186,11 +191,13 @@ describe("prefill contact fields", () => {
 
   it("withholds contact details from a guessable slug link", () => {
     expect(
-      prefillContact(false, { contactName: "Cynthia", contactEmail: "c@wpe.com" }),
+      prefillContact(false, {
+        contactName: "Cynthia",
+        contactEmail: "c@wpe.com",
+      }),
     ).toEqual({ contact: null, email: null });
   });
 });
-
 
 describe("property addresses", () => {
   const addresses = new Map([
@@ -220,9 +227,17 @@ describe("property addresses", () => {
 
   it("leaves a hand-pasted URL unlocated rather than guessing", () => {
     expect(
-      withPropertyAddresses([{ siteUrl: "https://elsewhere.com/cabin" }], addresses),
+      withPropertyAddresses(
+        [{ siteUrl: "https://elsewhere.com/cabin" }],
+        addresses,
+      ),
     ).toEqual([
-      { siteUrl: "https://elsewhere.com/cabin", city: null, state: null, country: null },
+      {
+        siteUrl: "https://elsewhere.com/cabin",
+        city: null,
+        state: null,
+        country: null,
+      },
     ]);
   });
 });
@@ -257,7 +272,9 @@ describe("audience geography from the homes", () => {
     // An empty plan means "no geography layer", which is a broad buy. A plan
     // with empty arrays would compile into a targeting spec that asks for
     // nowhere.
-    expect(geographyFromProperties([{ city: null, state: null, country: null }])).toEqual({});
+    expect(
+      geographyFromProperties([{ city: null, state: null, country: null }]),
+    ).toEqual({});
     expect(geographyFromProperties([])).toEqual({});
   });
 });

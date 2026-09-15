@@ -235,16 +235,16 @@ export function ImageBatchImporter({
   };
 
   return (
-    <div className="bg-muted/20 min-w-0 flex-1 rounded-xl border p-3">
+    <div className="min-w-0 flex-1 rounded-xl border bg-muted/20 p-3">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold">Upload image batch</p>
-          <p className="text-muted-foreground mt-0.5 text-[10px]">
+          <p className="mt-0.5 text-[10px] text-muted-foreground">
             Add individual images, a folder, or a ZIP. Files keep their natural
             filename order for carousel work in chat.
           </p>
         </div>
-        <span className="text-muted-foreground text-[10px] tabular-nums">
+        <span className="text-[10px] text-muted-foreground tabular-nums">
           {existingCount + slides.length}/{maximum}
         </span>
       </div>
@@ -263,7 +263,7 @@ export function ImageBatchImporter({
       </div>
 
       {processing && (
-        <p className="text-muted-foreground mt-2 flex items-center gap-1.5 text-xs">
+        <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
           <Loader2 className="size-3.5 animate-spin" />
           Reading and ordering slides…
         </p>
@@ -275,9 +275,9 @@ export function ImageBatchImporter({
             {slides.map((slide, index) => (
               <div
                 key={slide.id}
-                className="bg-background relative overflow-hidden rounded-lg border"
+                className="relative overflow-hidden rounded-lg border bg-background"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {/* oxlint-disable-next-line nextjs/no-img-element */}
                 <img
                   src={slide.previewUrl}
                   alt={`Slide ${index + 1}`}
@@ -315,7 +315,7 @@ export function ImageBatchImporter({
                   </button>
                 </div>
                 <p
-                  className="text-muted-foreground truncate px-1.5 py-1 text-[9px]"
+                  className="truncate px-1.5 py-1 text-[9px] text-muted-foreground"
                   title={slide.sourcePath}
                 >
                   {slide.sourcePath}

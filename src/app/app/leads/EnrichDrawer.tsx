@@ -97,7 +97,7 @@ export function HsMarker({
 
 function Json({ value }: { value: unknown }) {
   return (
-    <pre className="bg-muted/40 mt-2 max-h-[70vh] overflow-auto rounded-lg border p-3 text-[11px] leading-relaxed">
+    <pre className="mt-2 max-h-[70vh] overflow-auto rounded-lg border bg-muted/40 p-3 text-[11px] leading-relaxed">
       {JSON.stringify(value, null, 2)}
     </pre>
   );
@@ -245,7 +245,7 @@ export function EnrichDrawer({
     setSteer("");
     setRecipientOverride("");
     setHubspotContactId("");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
   }, [domain]);
 
   const buildContext = (): string => {
@@ -330,13 +330,13 @@ export function EnrichDrawer({
         <div className="flex-1 overflow-y-auto px-4 pb-6">
           {/* What you clicked — basic info from our row, before any enrichment. */}
           {lead && (
-            <div className="bg-muted/30 mt-2 rounded-lg border p-3">
+            <div className="mt-2 rounded-lg border bg-muted/30 p-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="truncate text-sm font-semibold">
                     {lead.companyName ?? lead.domain}
                   </div>
-                  <div className="text-muted-foreground text-[11px]">
+                  <div className="text-[11px] text-muted-foreground">
                     {[lead.city, lead.state, lead.country]
                       .filter(Boolean)
                       .join(", ") || "location unknown"}
@@ -347,7 +347,7 @@ export function EnrichDrawer({
                   leadStatus={lead.hubspotLeadStatus}
                 />
               </div>
-              <div className="text-muted-foreground mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
                 <span>
                   PMS: <b className="text-foreground">{lead.pms ?? "—"}</b>
                   {lead.isIntegratedPms ? " · integrated" : ""}
@@ -373,7 +373,7 @@ export function EnrichDrawer({
                 <span className="text-sm font-medium">
                   Contacts ({rankedContacts.length})
                 </span>
-                <span className="text-muted-foreground text-[11px]">
+                <span className="text-[11px] text-muted-foreground">
                   ★ = would send (top 3 by title/email)
                 </span>
               </div>
@@ -392,14 +392,14 @@ export function EnrichDrawer({
                         </span>
                       )}
                     </div>
-                    <div className="text-muted-foreground truncate">
+                    <div className="truncate text-muted-foreground">
                       {c.email}
                     </div>
                   </div>
                 ))}
               </div>
               {rankedContacts.length > 8 && (
-                <div className="text-muted-foreground mt-1.5 text-[11px]">
+                <div className="mt-1.5 text-[11px] text-muted-foreground">
                   +{rankedContacts.length - 8} more
                 </div>
               )}
@@ -419,18 +419,18 @@ export function EnrichDrawer({
                   };
                   return (
                     <div key={c.id} className="flex items-center gap-2 text-xs">
-                      <meta.Icon className="text-muted-foreground size-3.5 shrink-0" />
-                      <span className="text-muted-foreground shrink-0">
+                      <meta.Icon className="size-3.5 shrink-0 text-muted-foreground" />
+                      <span className="shrink-0 text-muted-foreground">
                         {meta.label}
                       </span>
                       <span className="truncate font-medium">{c.value}</span>
                       {c.vendor && (
-                        <span className="text-muted-foreground shrink-0">
+                        <span className="shrink-0 text-muted-foreground">
                           · {c.vendor}
                         </span>
                       )}
                       {c.deliveryState !== "discovered" && (
-                        <span className="text-muted-foreground ml-auto shrink-0 text-[10px]">
+                        <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">
                           {c.deliveryState}
                         </span>
                       )}
@@ -456,7 +456,7 @@ export function EnrichDrawer({
                   });
                 }}
                 disabled={outreachPending || !lead}
-                className="border-border inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
               >
                 {outreachPending ? (
                   <>
@@ -475,7 +475,7 @@ export function EnrichDrawer({
               onChange={(e) => setSteer(e.target.value)}
               placeholder="Steer the AI (optional) — e.g. “pretend this is a 200-unit luxury PM in Aspen”, or notes about the person"
               rows={2}
-              className="border-border bg-background focus:ring-ring mt-2 w-full rounded-md border px-2 py-1.5 text-[11px] focus:ring-1 focus:outline-none"
+              className="mt-2 w-full rounded-md border border-border bg-background px-2 py-1.5 text-[11px] focus:ring-1 focus:ring-ring focus:outline-none"
             />
 
             {outreachError && (
@@ -485,7 +485,7 @@ export function EnrichDrawer({
             )}
 
             {!outreachDraft && !outreachPending && (
-              <p className="text-muted-foreground mt-1 text-[11px]">
+              <p className="mt-1 text-[11px] text-muted-foreground">
                 {`Writes a ${pregenMotion} HubSpot draft from the current website, the generated preview, the lead record, and the team's logged emails, calls and notes. Draft only — review before publishing.`}
               </p>
             )}
@@ -501,7 +501,7 @@ export function EnrichDrawer({
                     {(outreachDraft.personalizedOn ?? []).map((p, i) => (
                       <span
                         key={i}
-                        className="bg-muted rounded px-1.5 py-0.5 text-[10px]"
+                        className="rounded bg-muted px-1.5 py-0.5 text-[10px]"
                       >
                         {p}
                       </span>
@@ -510,7 +510,7 @@ export function EnrichDrawer({
                 )}
                 {(outreachDraft.steps ?? []).map((s, i) => (
                   <div key={i} className="rounded-md border p-2">
-                    <div className="text-muted-foreground text-[10px] font-medium">
+                    <div className="text-[10px] font-medium text-muted-foreground">
                       Step {i + 1} ·{" "}
                       {s.delayDays === 0 ? "day 0" : `day ${s.delayDays}`}
                       {s.subject ? ` · ${s.subject}` : " · (in-thread reply)"}
@@ -528,7 +528,7 @@ export function EnrichDrawer({
                       onChange={(event) =>
                         setHubspotContactId(event.target.value)
                       }
-                      className="border-border bg-background focus:ring-ring w-full rounded-md border px-2 py-1 text-[11px] focus:ring-1 focus:outline-none"
+                      className="w-full rounded-md border border-border bg-background px-2 py-1 text-[11px] focus:ring-1 focus:ring-ring focus:outline-none"
                     >
                       <option value="">
                         Choose a HubSpot contact to publish
@@ -560,7 +560,7 @@ export function EnrichDrawer({
                         ? "Publishing…"
                         : "Publish reviewed copy to HubSpot"}
                     </button>
-                    <p className="text-muted-foreground text-[10px]">
+                    <p className="text-[10px] text-muted-foreground">
                       Copies the reviewed subject, model-written paragraphs, and
                       preview URL to this contact. It does not enroll or send.
                     </p>
@@ -587,7 +587,7 @@ export function EnrichDrawer({
                           ? `${recipientEmail} — default; edit to send to yourself / Kyle`
                           : "recipient email (no corporate one found)"
                       }
-                      className="border-border bg-background focus:ring-ring w-full rounded-md border px-2 py-1 text-[11px] focus:ring-1 focus:outline-none"
+                      className="w-full rounded-md border border-border bg-background px-2 py-1 text-[11px] focus:ring-1 focus:ring-ring focus:outline-none"
                     />
                     <div className="flex items-center gap-2">
                       <button
@@ -612,7 +612,7 @@ export function EnrichDrawer({
                         {launch.isPending ? "Launching…" : "Launch campaign"}
                       </button>
                     </div>
-                    <p className="text-muted-foreground text-[10px]">
+                    <p className="text-[10px] text-muted-foreground">
                       Queue adds this lead to the shared “WanderOS Personalized”
                       draft campaign at the address above. Launch activates that
                       campaign → everyone currently queued starts sending.
@@ -648,7 +648,7 @@ export function EnrichDrawer({
                   ? "Copy HubSpot + enrichment + merge as markdown"
                   : "Run a pull/enrichment first"
               }
-              className="border-border text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium disabled:opacity-40"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-40"
             >
               {copied ? (
                 <>
@@ -672,7 +672,7 @@ export function EnrichDrawer({
                     href={hubspot.data.hubspot.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="border-border text-muted-foreground hover:text-foreground inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-medium"
+                    className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
                   >
                     Open in HubSpot
                     <ExternalLink className="size-3" />
@@ -681,7 +681,7 @@ export function EnrichDrawer({
                 <button
                   onClick={pull}
                   disabled={hubspot.isPending || !domain}
-                  className="border-border inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
                 >
                   {hubspot.isPending ? (
                     <>
@@ -703,14 +703,14 @@ export function EnrichDrawer({
             )}
 
             {hubspot.data?.configured === false && (
-              <p className="text-muted-foreground mt-2 text-xs">
+              <p className="mt-2 text-xs text-muted-foreground">
                 HubSpot isn&apos;t configured yet — set{" "}
                 <code>HUBSPOT_ACCESS_TOKEN_OPERATED</code> to enable live pulls.
               </p>
             )}
 
             {hubspot.data?.configured === true && !hubspot.data.hubspot && (
-              <p className="text-muted-foreground mt-2 text-xs">
+              <p className="mt-2 text-xs text-muted-foreground">
                 No HubSpot company found for this domain — it&apos;d be net-new.
               </p>
             )}
@@ -719,7 +719,7 @@ export function EnrichDrawer({
               <>
                 <table className="mt-3 w-full text-xs">
                   <thead>
-                    <tr className="text-muted-foreground text-left">
+                    <tr className="text-left text-muted-foreground">
                       <th className="py-1 pr-2 font-medium">Field</th>
                       <th className="px-2 py-1 font-medium">Ours</th>
                       <th className="px-2 py-1 font-medium">HubSpot</th>
@@ -729,7 +729,7 @@ export function EnrichDrawer({
                   <tbody>
                     {hubspot.data.diff.map((d) => (
                       <tr key={d.field} className="border-t">
-                        <td className="text-muted-foreground py-1 pr-2 capitalize">
+                        <td className="py-1 pr-2 text-muted-foreground capitalize">
                           {d.field}
                         </td>
                         <td className="px-2 py-1">{d.ours ?? "—"}</td>
@@ -746,7 +746,7 @@ export function EnrichDrawer({
                   </tbody>
                 </table>
                 {hubspot.data.hubspot.contacts.length > 0 && (
-                  <div className="text-muted-foreground mt-3 text-[11px]">
+                  <div className="mt-3 text-[11px] text-muted-foreground">
                     {hubspot.data.hubspot.contacts.length} HubSpot contact
                     {hubspot.data.hubspot.contacts.length === 1
                       ? ""
@@ -765,7 +765,7 @@ export function EnrichDrawer({
           <button
             onClick={run}
             disabled={enrich.isPending || !domain}
-            className="bg-foreground text-background mt-2 inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium disabled:opacity-50"
+            className="mt-2 inline-flex items-center gap-2 rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-50"
           >
             {enrich.isPending ? (
               <>
@@ -797,7 +797,7 @@ export function EnrichDrawer({
               </TabsList>
 
               <TabsContent value="extraction">
-                <div className="text-muted-foreground mt-2 flex flex-wrap gap-3 text-[11px]">
+                <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-muted-foreground">
                   <span>
                     pregenFit:{" "}
                     <b className="text-foreground">
@@ -825,7 +825,7 @@ export function EnrichDrawer({
               </TabsContent>
 
               <TabsContent value="discovery">
-                <div className="text-muted-foreground mt-2 flex flex-wrap gap-2 text-[11px]">
+                <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
                   {enrich.data.discovery.providers.map((p) => (
                     <span
                       key={p.source}
@@ -841,7 +841,7 @@ export function EnrichDrawer({
                   {enrich.data.discovery.skipped.map((s) => (
                     <span
                       key={s}
-                      className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 font-medium"
+                      className="rounded bg-muted px-1.5 py-0.5 font-medium text-muted-foreground"
                     >
                       {s} · no key
                     </span>
@@ -862,7 +862,7 @@ export function EnrichDrawer({
               <button
                 onClick={proposeMerge}
                 disabled={merge.isPending || !domain}
-                className="border-border inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
               >
                 {merge.isPending ? (
                   <>
@@ -875,7 +875,7 @@ export function EnrichDrawer({
                 )}
               </button>
             </div>
-            <p className="text-muted-foreground mt-1 text-[11px]">
+            <p className="mt-1 text-[11px] text-muted-foreground">
               AI reconciles the three sources. Tick the fields to write, then
               choose a target. HubSpot writes are deliberate — your sales CRM.
             </p>
@@ -888,7 +888,7 @@ export function EnrichDrawer({
 
             {merge.data && (
               <>
-                <p className="text-muted-foreground mt-3 text-xs">
+                <p className="mt-3 text-xs text-muted-foreground">
                   {merge.data.summary}
                 </p>
                 {merge.data.conflicts.length > 0 && (
@@ -909,7 +909,7 @@ export function EnrichDrawer({
                   {merge.data.fields.map((f) => (
                     <label
                       key={f.key}
-                      className="hover:bg-accent/30 flex cursor-pointer items-start gap-2 rounded-md px-1.5 py-1 text-xs"
+                      className="flex cursor-pointer items-start gap-2 rounded-md px-1.5 py-1 text-xs hover:bg-accent/30"
                     >
                       <input
                         type="checkbox"
@@ -930,11 +930,11 @@ export function EnrichDrawer({
                           <span className="font-medium">
                             {f.proposed ?? "—"}
                           </span>
-                          <span className="text-muted-foreground text-[10px]">
+                          <span className="text-[10px] text-muted-foreground">
                             {f.source} · {f.confidence}
                           </span>
                         </div>
-                        <div className="text-muted-foreground text-[10px]">
+                        <div className="text-[10px] text-muted-foreground">
                           ours: {f.ours ?? "—"}
                           {f.hubspot != null ? ` · hs: ${f.hubspot}` : ""}
                           {f.web != null ? ` · web: ${f.web}` : ""} —{" "}
@@ -957,7 +957,7 @@ export function EnrichDrawer({
                   <button
                     onClick={() => write("db")}
                     disabled={apply.isPending}
-                    className="border-border rounded-md border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+                    className="rounded-md border border-border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
                   >
                     Save to my DB
                   </button>

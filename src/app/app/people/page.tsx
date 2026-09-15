@@ -45,7 +45,7 @@ export default async function PeoplePage() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">People</h1>
-          <p className="text-muted-foreground text-sm">
+          <p className="text-sm text-muted-foreground">
             {members.length} member{members.length === 1 ? "" : "s"} in{" "}
             {org.name}
             {pending.length > 0 && ` · ${pending.length} pending`}

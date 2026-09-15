@@ -31,7 +31,7 @@ export default function RootLayout({
       data-theme="dark"
       className={cn(instrumentSans.variable, geistMono.variable)}
     >
-      <body className="bg-surface-primary text-primary min-h-screen font-sans antialiased">
+      <body className="min-h-screen bg-surface-primary font-sans text-primary antialiased">
         <TRPCReactProvider>
           <ThemeProvider>
             <AnalyticsProvider>

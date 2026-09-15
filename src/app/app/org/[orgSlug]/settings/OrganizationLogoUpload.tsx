@@ -127,13 +127,13 @@ export function OrganizationLogoUpload({
       <div className="flex items-center gap-4">
         <Avatar className="size-16">
           <AvatarImage src={currentLogo ?? undefined} alt={organizationName} />
-          <AvatarFallback className="bg-primary text-primary-foreground">
+          <AvatarFallback tone="primary">
             <Building2 className="size-6" />
           </AvatarFallback>
         </Avatar>
         <div className="flex-1">
           <p className="font-medium">{organizationName}</p>
-          <p className="text-muted-foreground text-sm">
+          <p className="text-sm text-muted-foreground">
             {currentLogo ? "Custom logo" : "Default logo"}
           </p>
         </div>
@@ -176,20 +176,20 @@ export function OrganizationLogoUpload({
               size="sm"
               onClick={handleRemove}
               disabled={isLoading}
-              className="text-destructive hover:text-destructive"
+              tone="danger"
             >
               <Trash2 className="mr-2 size-4" />
               Remove Logo
             </Button>
           </div>
-          <p className="text-muted-foreground text-center text-xs">
+          <p className="text-center text-xs text-muted-foreground">
             Replace with a new logo or remove to restore the default
           </p>
         </div>
       )}
 
       {isLoading && (
-        <div className="text-muted-foreground text-center text-sm">
+        <div className="text-center text-sm text-muted-foreground">
           {uploading ? "Uploading..." : "Updating organization..."}
         </div>
       )}

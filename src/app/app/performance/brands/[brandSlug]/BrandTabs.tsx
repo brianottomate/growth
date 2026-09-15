@@ -39,8 +39,8 @@ export function BrandTabs({ slug }: { slug: string }) {
             className={cn(
               "-mb-px border-b-2 px-3 py-2 text-sm transition-colors",
               active
-                ? "border-foreground text-foreground font-medium"
-                : "text-muted-foreground hover:text-foreground border-transparent",
+                ? "border-foreground font-medium text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
             )}
           >
             {item.label}

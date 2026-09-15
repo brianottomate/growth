@@ -47,7 +47,6 @@ import { authClient } from "@/server/better-auth/client";
 import { useTRPC } from "@/trpc/react";
 import { NAV_GROUPS, type NavItem } from "@/components/app-nav";
 
-
 interface AppSidebarProps {
   orgName: string;
   orgSlug?: string;
@@ -97,20 +96,20 @@ export function AppSidebar({
                 {/* The real logomark, not the first letter of the org name.
                     Same component the client-facing connect page uses, so the
                     back-office and the pages we send clients agree. */}
-                <div className="bg-primary text-primary-foreground flex aspect-square size-7 items-center justify-center rounded-md">
+                <div className="flex aspect-square size-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
                   <Logo variant="logomark" className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left leading-tight">
                   <span className="truncate text-sm font-semibold">
                     {orgName}
                   </span>
-                  <span className="text-muted-foreground truncate text-xs">
+                  <span className="truncate text-xs text-muted-foreground">
                     Organization
                   </span>
                 </div>
               </SidebarMenuButton>
               <DropdownMenuContent align="start" side="right" className="w-56">
-                <DropdownMenuLabel className="text-muted-foreground text-xs">
+                <DropdownMenuLabel tone="muted" textSize="xs">
                   Organizations
                 </DropdownMenuLabel>
                 {orgs?.map((o) => (
@@ -157,7 +156,7 @@ export function AppSidebar({
                 >
                   <Search />
                   <span>Search</span>
-                  <kbd className="text-muted-foreground bg-muted ml-auto rounded px-1.5 py-0.5 text-[10px] font-medium group-data-[collapsible=icon]:hidden">
+                  <kbd className="ml-auto rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground group-data-[collapsible=icon]:hidden">
                     ⌘K
                   </kbd>
                 </SidebarMenuButton>
@@ -203,7 +202,11 @@ export function AppSidebar({
                 <SidebarMenuButton size="lg" tooltip={userEmail}>
                   <Avatar className="size-7">
                     <AvatarImage src={userImage} alt={userName} />
-                    <AvatarFallback className="text-foreground text-xs font-semibold">
+                    <AvatarFallback
+                      tone="foreground"
+                      textSize="xs"
+                      weight="semibold"
+                    >
                       {userName.slice(0, 2).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
@@ -211,7 +214,7 @@ export function AppSidebar({
                     <span className="truncate text-sm font-medium">
                       {userName}
                     </span>
-                    <span className="text-muted-foreground truncate text-xs">
+                    <span className="truncate text-xs text-muted-foreground">
                       {userEmail}
                     </span>
                   </div>
@@ -219,12 +222,12 @@ export function AppSidebar({
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" side="right" className="w-56">
-                <DropdownMenuLabel className="font-normal">
+                <DropdownMenuLabel weight="normal">
                   <div className="flex flex-col space-y-1">
                     <span className="truncate text-sm font-medium">
                       {userName}
                     </span>
-                    <span className="text-muted-foreground truncate text-xs">
+                    <span className="truncate text-xs text-muted-foreground">
                       {userEmail}
                     </span>
                   </div>
@@ -237,7 +240,7 @@ export function AppSidebar({
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuLabel className="text-muted-foreground text-xs">
+                <DropdownMenuLabel tone="muted" textSize="xs">
                   Theme
                 </DropdownMenuLabel>
                 <DropdownMenuRadioGroup

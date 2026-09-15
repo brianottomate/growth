@@ -42,8 +42,9 @@ describe("pickRecipient", () => {
   test("prefers whoever the logged history actually names most", () => {
     const history =
       "Call with Walt Kubiak. Call with Walt Kubiak. Emailed Barb Kubiak.";
-    expect(pickRecipient([barb, walt], undefined, "mauiwestside.com", history))
-      .toMatchObject({ email: "walt@mauiwestside.com" });
+    expect(
+      pickRecipient([barb, walt], undefined, "mauiwestside.com", history),
+    ).toMatchObject({ email: "walt@mauiwestside.com" });
   });
 
   test("an explicit request wins over the scoring", () => {

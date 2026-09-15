@@ -22,7 +22,9 @@ function normalizeWebsite(raw: string): string | null {
   const value = raw.trim();
   if (!value) return null;
   try {
-    const url = new URL(/^https?:\/\//i.test(value) ? value : `https://${value}`);
+    const url = new URL(
+      /^https?:\/\//i.test(value) ? value : `https://${value}`,
+    );
     if (!url.hostname.includes(".")) return null;
     return url.origin;
   } catch {
@@ -58,7 +60,7 @@ export function NewClientDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant={variant} size={size} className="rounded-full">
+        <Button variant={variant} size={size} shape="round">
           <Sparkles className="size-3.5" />
           New client
         </Button>

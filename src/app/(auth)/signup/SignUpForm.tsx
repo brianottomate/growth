@@ -74,7 +74,7 @@ export function SignUpForm({
             ? "Create account to accept invite"
             : "Create your account"}
         </h1>
-        <p className="text-muted-foreground text-sm text-balance">
+        <p className="text-sm text-balance text-muted-foreground">
           {searchParams.get("inviteId")
             ? "Create an account to accept the collection invitation"
             : searchParams.get("orgInviteId")
@@ -96,11 +96,11 @@ export function SignUpForm({
               disabled={isEmailLoading}
             />
             <div className="flex items-center gap-3">
-              <span className="bg-border h-px flex-1" />
-              <span className="text-muted-foreground text-xs">
+              <span className="h-px flex-1 bg-border" />
+              <span className="text-xs text-muted-foreground">
                 or sign up with email
               </span>
-              <span className="bg-border h-px flex-1" />
+              <span className="h-px flex-1 bg-border" />
             </div>
           </>
         )}
@@ -142,7 +142,7 @@ export function SignUpForm({
               minLength={8}
               disabled={isEmailLoading}
             />
-            <p className="text-muted-foreground text-xs">
+            <p className="text-xs text-muted-foreground">
               At least 8 characters
             </p>
           </div>

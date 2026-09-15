@@ -72,7 +72,7 @@ export function CampaignsClient({
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Campaigns</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
+          <p className="mt-1 text-sm text-muted-foreground">
             Every brand&apos;s campaigns in one place. A campaign is created on
             the brand it belongs to and opens there; this is the index across
             all of them.
@@ -95,7 +95,7 @@ export function CampaignsClient({
           return (
             <span
               key={s}
-              className="border-border flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs"
+              className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs"
             >
               <span className={`size-1.5 rounded-full ${meta.dot}`} />
               <span className={meta.cls}>{meta.label}</span>
@@ -106,7 +106,7 @@ export function CampaignsClient({
       </div>
 
       {campaigns.length === 0 && (
-        <p className="text-muted-foreground mt-10 text-sm">
+        <p className="mt-10 text-sm text-muted-foreground">
           No campaigns yet. Create one here, or commit a moment from{" "}
           <Link href="/app/plan" className="underline underline-offset-2">
             Plan
@@ -121,7 +121,7 @@ export function CampaignsClient({
         const meta = STATUS_META[s];
         return (
           <section key={s} className="mt-8">
-            <h2 className="text-muted-foreground mb-3 flex items-center gap-2 text-xs font-semibold tracking-wider uppercase">
+            <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
               <span className={`size-1.5 rounded-full ${meta.dot}`} />
               {meta.label} · {list.length}
             </h2>
@@ -136,7 +136,7 @@ export function CampaignsClient({
                         ? `/app/brands/${i.brand.slug}/ads/${i.id}`
                         : `/app/campaigns/${i.id}`
                     }
-                    className="bg-card hover:bg-accent/40 flex items-center gap-3 rounded-xl border p-3.5 transition-colors"
+                    className="flex items-center gap-3 rounded-xl border bg-card p-3.5 transition-colors hover:bg-accent/40"
                   >
                     <span
                       className="h-9 w-1 shrink-0 rounded-full"
@@ -148,17 +148,17 @@ export function CampaignsClient({
                           {i.name}
                         </span>
                         {i.goal && (
-                          <span className="border-border text-muted-foreground rounded-full border px-1.5 py-0.5 text-[10px] font-medium">
+                          <span className="rounded-full border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
                             {i.goal}
                           </span>
                         )}
                         {brands.length > 1 && i.brand && (
-                          <span className="text-muted-foreground text-[10px]">
+                          <span className="text-[10px] text-muted-foreground">
                             {i.brand.name}
                           </span>
                         )}
                       </div>
-                      <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-2 text-[11px]">
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
                         {range && <span>{range}</span>}
                         {i.contentCount > 0 && (
                           <span>

@@ -56,7 +56,7 @@ export function TextField<
           {label && (
             <FormLabel>
               {label}
-              {required && <span className="text-destructive ml-1">*</span>}
+              {required && <span className="ml-1 text-destructive">*</span>}
             </FormLabel>
           )}
           <FormControl>

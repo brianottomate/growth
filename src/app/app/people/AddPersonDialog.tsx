@@ -111,7 +111,7 @@ export function AddPersonDialog({
                 immediately and change the password later.
               </DialogDescription>
             </DialogHeader>
-            <div className="bg-muted/50 space-y-2 rounded-lg border p-3 text-sm">
+            <div className="space-y-2 rounded-lg border bg-muted/50 p-3 text-sm">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-muted-foreground">Email</span>
                 <span className="font-medium">{created.email}</span>
@@ -119,7 +119,7 @@ export function AddPersonDialog({
               <div className="flex items-center justify-between gap-2">
                 <span className="text-muted-foreground">Temp password</span>
                 <div className="flex items-center gap-2">
-                  <code className="bg-background rounded border px-2 py-0.5 font-mono text-xs">
+                  <code className="rounded border bg-background px-2 py-0.5 font-mono text-xs">
                     {created.tempPassword}
                   </code>
                   <Button

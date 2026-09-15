@@ -260,7 +260,7 @@ export default async function PerformanceBrandPage({
           <p
             className={cn(
               panel,
-              "text-muted-foreground px-4 py-6 text-center text-xs",
+              "px-4 py-6 text-center text-xs text-muted-foreground",
             )}
           >
             Nothing in the library yet.
@@ -296,7 +296,7 @@ export default async function PerformanceBrandPage({
           <p
             className={cn(
               panel,
-              "text-muted-foreground px-4 py-6 text-center text-xs",
+              "px-4 py-6 text-center text-xs text-muted-foreground",
             )}
           >
             No contacts on record.
@@ -308,7 +308,7 @@ export default async function PerformanceBrandPage({
                 key={`${contact.role}-${contact.email ?? contact.name}`}
                 className="flex flex-wrap items-center gap-x-3 px-4 py-2.5 text-xs"
               >
-                <span className="text-muted-foreground w-28 shrink-0">
+                <span className="w-28 shrink-0 text-muted-foreground">
                   {contact.role}
                 </span>
                 {contact.name ? (
@@ -338,7 +338,7 @@ export default async function PerformanceBrandPage({
                 : ""}
             </SectionLabel>
             {people.company ? (
-              <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 text-xs">
+              <div className="flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
                 {people.company.leadStatus ? (
                   <span>{people.company.leadStatus}</span>
                 ) : null}
@@ -376,7 +376,7 @@ export default async function PerformanceBrandPage({
             <p
               className={cn(
                 panel,
-                "text-muted-foreground px-4 py-6 text-center text-xs",
+                "px-4 py-6 text-center text-xs text-muted-foreground",
               )}
             >
               No contacts on file for {people.domain}.
@@ -399,12 +399,12 @@ export default async function PerformanceBrandPage({
                         {person.name ?? "No name on file"}
                       </span>
                       {person.jobTitle ? (
-                        <span className="text-muted-foreground text-xs">
+                        <span className="text-xs text-muted-foreground">
                           {person.jobTitle}
                         </span>
                       ) : null}
                       {person.optedOut ? (
-                        <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-[10px] font-medium">
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
                           Opted out
                         </span>
                       ) : null}
@@ -412,14 +412,14 @@ export default async function PerformanceBrandPage({
                   </div>
                   <a
                     href={`mailto:${person.email}`}
-                    className="text-muted-foreground text-xs hover:underline"
+                    className="text-xs text-muted-foreground hover:underline"
                   >
                     {person.email}
                   </a>
                   {person.phone ? (
                     <a
                       href={`tel:${person.phone}`}
-                      className="text-muted-foreground text-xs hover:underline"
+                      className="text-xs text-muted-foreground hover:underline"
                     >
                       {person.phone}
                     </a>
@@ -427,7 +427,7 @@ export default async function PerformanceBrandPage({
                 </li>
               ))}
               {people.moreCount > 0 ? (
-                <li className="text-muted-foreground px-4 py-2 text-xs">
+                <li className="px-4 py-2 text-xs text-muted-foreground">
                   {people.moreCount} more in HubSpot
                 </li>
               ) : null}

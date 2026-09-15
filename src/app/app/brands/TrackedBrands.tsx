@@ -108,7 +108,7 @@ export function TrackedBrands({
         >
           <Link
             href={`#tracked-brand-${t.id}`}
-            className="text-foreground/80 hover:text-foreground font-medium"
+            className="font-medium text-foreground/80 hover:text-foreground"
             title={`${t.purpose} · jump to ${t.name}`}
           >
             {t.name}
@@ -117,7 +117,7 @@ export function TrackedBrands({
             onClick={() => untrackM.mutate({ inspirationId: t.inspirationId })}
             disabled={untrackM.isPending}
             title="Stop tracking"
-            className="text-muted-foreground hover:text-foreground opacity-0 transition-opacity group-hover:opacity-100"
+            className="text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
           >
             <X className="size-3" />
           </button>
@@ -203,7 +203,7 @@ export function TrackedBrands({
                   placeholder="https://linkedin.com/in/…"
                 />
               </div>
-              <p className="text-muted-foreground text-xs">
+              <p className="text-xs text-muted-foreground">
                 Optional — saves the exact public profile immediately, without
                 discovery.
               </p>
@@ -215,7 +215,7 @@ export function TrackedBrands({
                 onChange={(e) => setWebsite(e.target.value)}
                 placeholder="airbnb.com"
               />
-              <p className="text-muted-foreground text-xs">
+              <p className="text-xs text-muted-foreground">
                 Optional — we&apos;ll auto-fill details from the site.
               </p>
             </div>

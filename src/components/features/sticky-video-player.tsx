@@ -99,7 +99,7 @@ export function StickyVideoPlayer({
 
   return (
     <div
-      className={`bg-surface-secondary relative aspect-652/440 w-full overflow-hidden rounded-xl ${className}`}
+      className={`relative aspect-652/440 w-full overflow-hidden rounded-xl bg-surface-secondary ${className}`}
     >
       {/* Debug Label */}
       <div className="absolute top-4 left-4 z-10 rounded-lg bg-black/70 px-3 py-1.5 text-sm font-medium text-white">

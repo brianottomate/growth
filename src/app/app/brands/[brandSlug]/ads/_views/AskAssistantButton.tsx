@@ -3,7 +3,10 @@
 import { MessageSquare } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { sendAssistantIntent, type CampaignFocus } from "@/lib/assistant-events";
+import {
+  sendAssistantIntent,
+  type CampaignFocus,
+} from "@/lib/assistant-events";
 
 /**
  * Hand one step of the campaign to the assistant. The same intent as "Work in

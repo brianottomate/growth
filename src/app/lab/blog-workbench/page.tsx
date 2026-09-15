@@ -489,7 +489,7 @@ function ArticleView({ run }: { run: BlogRunRecord | null }) {
               className="mb-8 scroll-mt-4"
             >
               <h2 className="mb-3 text-lg font-semibold">{section.heading}</h2>
-              <div className="prose prose-sm prose-stone max-w-none text-[13px] leading-relaxed [&_a]:text-blue-700 [&_a]:underline [&_p]:mb-3">
+              <div className="prose prose-sm max-w-none text-[13px] leading-relaxed prose-stone [&_a]:text-blue-700 [&_a]:underline [&_p]:mb-3">
                 <ReactMarkdown>
                   {htmlAnchorsToMarkdown(section.markdown)}
                 </ReactMarkdown>

@@ -32,11 +32,11 @@ export function ContentAssistantActions({
     });
 
   return (
-    <section className="bg-card mt-5 rounded-xl border p-4">
+    <section className="mt-5 rounded-xl border bg-card p-4">
       <div className="flex flex-wrap items-start gap-3">
         <div>
           <p className="text-sm font-semibold">Production readiness</p>
-          <p className="text-muted-foreground mt-0.5 text-xs">
+          <p className="mt-0.5 text-xs text-muted-foreground">
             {readiness.completed}/{readiness.total} complete
             {readiness.next ? ` · Next: ${readiness.next.detail}` : " · Ready"}
           </p>
@@ -49,17 +49,17 @@ export function ContentAssistantActions({
         {readiness.checks.map((check) => (
           <div
             key={check.id}
-            className="bg-background flex items-start gap-2 rounded-lg border px-2.5 py-2"
+            className="flex items-start gap-2 rounded-lg border bg-background px-2.5 py-2"
             title={check.detail}
           >
             {check.complete ? (
               <Check className="mt-0.5 size-3.5 shrink-0 text-emerald-500" />
             ) : (
-              <Circle className="text-muted-foreground mt-0.5 size-3.5 shrink-0" />
+              <Circle className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
             )}
             <span className="min-w-0">
               <span className="block text-xs font-medium">{check.label}</span>
-              <span className="text-muted-foreground block truncate text-[10px]">
+              <span className="block truncate text-[10px] text-muted-foreground">
                 {check.detail}
               </span>
             </span>

@@ -73,13 +73,7 @@ function channelTone(c: {
  * big mono figure) so the numbers read at a glance on a wall screen.
  */
 function Kpi(props: Parameters<typeof StatCard>[0]) {
-  return (
-    <StatCard
-      {...props}
-      className="p-5"
-      valueClassName="mt-1.5 font-mono text-3xl tracking-tight"
-    />
-  );
+  return <StatCard {...props} presentation="wall" />;
 }
 
 export default async function SpendPage({
@@ -150,7 +144,7 @@ export default async function SpendPage({
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Spend</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
+          <p className="mt-1 text-sm text-muted-foreground">
             Marketing unit economics · {startDate} → {endDate} ·{" "}
             <a href="#methodology" className="underline underline-offset-2">
               what am I looking at?
@@ -300,7 +294,7 @@ export default async function SpendPage({
       <div className="overflow-x-auto rounded-xl border">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-muted-foreground border-b text-left text-xs tracking-wide uppercase">
+            <tr className="border-b text-left text-xs tracking-wide text-muted-foreground uppercase">
               <th className="px-4 py-3 font-medium">Channel</th>
               <th className="px-4 py-3 text-right font-medium">Spend</th>
               {showPacing && (
@@ -348,7 +342,7 @@ export default async function SpendPage({
                         <span className="block leading-tight font-medium">
                           {cfg.name}
                         </span>
-                        <span className="text-muted-foreground block text-xs leading-tight">
+                        <span className="block text-xs leading-tight text-muted-foreground">
                           {c.dataSource}
                         </span>
                       </span>
@@ -358,7 +352,7 @@ export default async function SpendPage({
                     {compactOr(c.spend)}
                   </td>
                   {showPacing && (
-                    <td className="text-muted-foreground px-4 py-2.5 text-right font-mono tabular-nums">
+                    <td className="px-4 py-2.5 text-right font-mono text-muted-foreground tabular-nums">
                       {compactOr(c.pacing)}
                     </td>
                   )}
@@ -375,11 +369,11 @@ export default async function SpendPage({
                     {compactOr(c.gmv)}
                   </td>
                   {showPacing && (
-                    <td className="text-muted-foreground px-4 py-2.5 text-right font-mono tabular-nums">
+                    <td className="px-4 py-2.5 text-right font-mono text-muted-foreground tabular-nums">
                       {compactOr(c.gmvPacing)}
                     </td>
                   )}
-                  <td className="text-muted-foreground px-4 py-2.5 text-right font-mono tabular-nums">
+                  <td className="px-4 py-2.5 text-right font-mono text-muted-foreground tabular-nums">
                     {intOr(c.checkoutStarted)}
                   </td>
                   <td className="px-4 py-2.5">
@@ -403,7 +397,7 @@ export default async function SpendPage({
           </tbody>
         </table>
       </div>
-      <p className="text-muted-foreground -mt-6 text-xs">
+      <p className="-mt-6 text-xs text-muted-foreground">
         Channel rows are platform-attributed (Meta = 28d click + 1d view; others
         = BigQuery last-touch) and labelled with their source under the channel
         name. Top-line KPI cards use finance-aligned totals — the two don&apos;t
@@ -424,7 +418,7 @@ export default async function SpendPage({
         <summary className="cursor-pointer text-sm font-medium">
           Methodology — locked decisions
         </summary>
-        <div className="text-muted-foreground [&_b]:text-foreground mt-3 space-y-2 text-sm">
+        <div className="mt-3 space-y-2 text-sm text-muted-foreground [&_b]:text-foreground">
           <p>
             <b>DCPB (primary, ${CPB_TARGET} target)</b> = total marketing spend
             / direct bookings. Direct excludes the 4 OTAs (Airbnb, Vrbo,

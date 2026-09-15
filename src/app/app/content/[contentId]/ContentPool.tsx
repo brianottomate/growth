@@ -84,7 +84,7 @@ export function ContentPool({
 
   return (
     <section className="mt-8">
-      <h2 className="text-muted-foreground mb-3 text-xs font-semibold tracking-wider uppercase">
+      <h2 className="mb-3 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
         Media pool · {pool.length}
       </h2>
       <div className="flex flex-wrap gap-3">
@@ -93,9 +93,9 @@ export function ContentPool({
           return (
             <div
               key={keyOf(m)}
-              className="bg-card w-28 rounded-lg border p-1.5"
+              className="w-28 rounded-lg border bg-card p-1.5"
             >
-              <div className="bg-muted relative aspect-square overflow-hidden rounded-md">
+              <div className="relative aspect-square overflow-hidden rounded-md bg-muted">
                 <MediaThumbnail
                   src={m.url}
                   thumbnail={m.thumbnail}
@@ -125,7 +125,7 @@ export function ContentPool({
                         className={cn(
                           "rounded p-0.5 transition-opacity",
                           on
-                            ? "ring-foreground/40 opacity-100 ring-1"
+                            ? "opacity-100 ring-1 ring-foreground/40"
                             : "opacity-40 hover:opacity-100",
                         )}
                       >
@@ -150,14 +150,14 @@ export function ContentPool({
         />
         <button
           onClick={() => setDriveOpen(true)}
-          className="border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground flex w-24 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-dashed text-xs transition-colors"
+          className="flex w-24 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border text-xs text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
         >
           <HardDrive className="size-5" />
           Drive
         </button>
         <button
           onClick={() => setPickerOpen(true)}
-          className="border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground flex w-24 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-dashed text-xs transition-colors"
+          className="flex w-24 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border text-xs text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
         >
           <Images className="size-5" />
           Library
@@ -173,13 +173,13 @@ export function ContentPool({
               visibleText: `Suggest media for “${contentTitle}” from the library, our archives, or a strong AI image prompt`,
             })
           }
-          className="border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground flex w-28 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-dashed text-xs transition-colors"
+          className="flex w-28 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border text-xs text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
         >
           <Sparkles className="size-5" />
           Suggest media
         </button>
       </div>
-      <p className="text-muted-foreground mt-1.5 text-[10px]">
+      <p className="mt-1.5 text-[10px] text-muted-foreground">
         Anything attached to a spot also shows here. Toggle a platform icon to
         add or remove it on that spot, or ask chat to turn an ordered batch into
         a carousel. New uploads are saved to your media library.

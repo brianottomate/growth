@@ -88,7 +88,7 @@ export function Sources({
           <h2 className="text-lg font-semibold tracking-tight">
             What we monitor
           </h2>
-          <p className="text-muted-foreground mt-1 text-sm">
+          <p className="mt-1 text-sm text-muted-foreground">
             Every place we listen, and what we listen for.
           </p>
         </div>
@@ -103,13 +103,13 @@ export function Sources({
         return (
           <div key={g.key} className="space-y-2.5">
             <div>
-              <h3 className="text-foreground text-sm font-semibold">
+              <h3 className="text-sm font-semibold text-foreground">
                 {g.title}
               </h3>
-              <p className="text-muted-foreground text-xs">{g.blurb}</p>
+              <p className="text-xs text-muted-foreground">{g.blurb}</p>
             </div>
             {groupSources.length === 0 ? (
-              <p className="text-muted-foreground/70 rounded-lg border border-dashed px-4 py-3 text-xs">
+              <p className="rounded-lg border border-dashed px-4 py-3 text-xs text-muted-foreground/70">
                 Nothing here yet.
               </p>
             ) : (
@@ -155,12 +155,12 @@ function SourceCard({
   const verifiedAt = verifiedDates.at(-1) ?? null;
 
   return (
-    <article className="bg-card rounded-xl border p-4">
+    <article className="rounded-xl border bg-card p-4">
       <div className="flex items-start gap-3">
         <ChannelLogo platform={source.platform} className="mt-0.5 size-5" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-foreground text-sm font-medium">
+            <span className="text-sm font-medium text-foreground">
               {source.label ?? platformLabel(source.platform)}
             </span>
             {verifiedAt && <VerifiedBadge date={verifiedAt} />}
@@ -170,7 +170,7 @@ function SourceCard({
           <Watching source={source} />
 
           {source.signalNotes && (
-            <p className="text-muted-foreground mt-2 line-clamp-2 text-xs italic">
+            <p className="mt-2 line-clamp-2 text-xs text-muted-foreground italic">
               {source.signalNotes}
             </p>
           )}
@@ -287,7 +287,7 @@ function SetupTasks({ source }: { source: Source }) {
             ) : (
               <Minus className="size-3.5 shrink-0 text-rose-400" />
             )}
-            <span className="text-foreground min-w-0">
+            <span className="min-w-0 text-foreground">
               {t.status === "to_add" ? "Add" : "Remove"}{" "}
               <span className="font-mono">&ldquo;{t.term}&rdquo;</span>
               {t.status === "to_add" && t.flags?.length ? (
@@ -306,7 +306,9 @@ function SetupTasks({ source }: { source: Source }) {
             <Button
               variant="outline"
               size="sm"
-              className="ml-auto h-6 shrink-0 px-2 text-[11px]"
+              textSize="caption"
+              density="tight"
+              className="ml-auto h-6 shrink-0"
               disabled={update.isPending}
               onClick={() => markApplied(t.term)}
             >
@@ -348,7 +350,7 @@ function Watching({ source }: { source: Source }) {
         : source.acquisition === "provider_alert"
           ? "Keyword alerts pushed from the provider"
           : "No terms configured yet";
-    return <p className="text-muted-foreground mt-1.5 text-xs">{fallback}</p>;
+    return <p className="mt-1.5 text-xs text-muted-foreground">{fallback}</p>;
   }
 
   const shown = chips.slice(0, 8);
@@ -358,13 +360,13 @@ function Watching({ source }: { source: Source }) {
       {shown.map((c) => (
         <span
           key={c}
-          className="border-border text-muted-foreground rounded-full border px-2 py-0.5 text-[11px]"
+          className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground"
         >
           {c}
         </span>
       ))}
       {extra > 0 && (
-        <span className="text-muted-foreground/70 px-1 text-[11px]">
+        <span className="px-1 text-[11px] text-muted-foreground/70">
           +{extra} more
         </span>
       )}
@@ -404,7 +406,7 @@ function StatusBadge({
           "border-emerald-500/40 bg-emerald-500/10 text-emerald-400",
         tone === "amber" &&
           "border-amber-500/40 bg-amber-500/10 text-amber-400",
-        tone === "muted" && "text-muted-foreground bg-muted border-transparent",
+        tone === "muted" && "border-transparent bg-muted text-muted-foreground",
       )}
     >
       {label}

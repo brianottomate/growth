@@ -78,8 +78,8 @@ export function WorkspaceSelector({
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="text-center">
-        <div className="bg-primary/10 mx-auto mb-2 flex size-12 items-center justify-center rounded-full">
-          <Building2 className="text-primary size-6" />
+        <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-primary/10">
+          <Building2 className="size-6 text-primary" />
         </div>
         <CardTitle>Choose a Wander Growth workspace</CardTitle>
         <CardDescription>
@@ -88,7 +88,7 @@ export function WorkspaceSelector({
       </CardHeader>
       <CardContent className="space-y-3">
         {organizations.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
+          <p className="text-sm text-muted-foreground">
             You do not belong to a Wander Growth organization yet.
           </p>
         ) : (
@@ -106,17 +106,17 @@ export function WorkspaceSelector({
             >
               <span>
                 <span className="block font-medium">{organization.name}</span>
-                <span className="text-muted-foreground text-xs">
+                <span className="text-xs text-muted-foreground">
                   {organization.slug ?? organization.id}
                 </span>
               </span>
-              <span className="text-muted-foreground text-xs capitalize">
+              <span className="text-xs text-muted-foreground capitalize">
                 {organization.role}
               </span>
             </button>
           ))
         )}
-        {error && <p className="text-destructive text-sm">{error}</p>}
+        {error && <p className="text-sm text-destructive">{error}</p>}
       </CardContent>
       <CardFooter>
         <Button

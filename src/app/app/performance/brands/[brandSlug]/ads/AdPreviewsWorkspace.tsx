@@ -176,7 +176,7 @@ export function AdPreviewsWorkspace({
                       ),
                     )
                   }
-                  className="bg-muted/40 h-7 w-12 rounded-full border text-center text-xs outline-none focus:ring-2 focus:ring-sky-400/40"
+                  className="h-7 w-12 rounded-full border bg-muted/40 text-center text-xs outline-none focus:ring-2 focus:ring-sky-400/40"
                 />
                 <span className="text-muted-foreground">homes</span>
               </label>
@@ -192,7 +192,8 @@ export function AdPreviewsWorkspace({
                       : { brandId, count },
                   )
                 }
-                className="h-7 rounded-full px-3 text-[11.5px]"
+                shape="round"
+                density="editorial"
               >
                 {build.isPending ? (
                   <Loader2 className="size-3 animate-spin" />
@@ -212,30 +213,30 @@ export function AdPreviewsWorkspace({
                 <button
                   type="button"
                   onClick={() => toggle(home.id)}
-                  className="hover:bg-muted flex items-center gap-1.5 rounded-full border py-0.5 pr-2 pl-0.5 text-[11.5px]"
+                  className="flex items-center gap-1.5 rounded-full border py-0.5 pr-2 pl-0.5 text-[11.5px] hover:bg-muted"
                   title="Take out of the set"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {/* oxlint-disable-next-line nextjs/no-img-element */}
                   <img
                     src={home.thumbUrl ?? home.imageUrl}
                     alt=""
                     className="size-5 rounded-full object-cover"
                   />
                   <span className="max-w-44 truncate">{home.name}</span>
-                  <X className="text-muted-foreground size-3" />
+                  <X className="size-3 text-muted-foreground" />
                 </button>
               </li>
             ))}
           </ul>
         ) : null}
         {!hasSite ? (
-          <p className="text-muted-foreground text-[11px]">
+          <p className="text-[11px] text-muted-foreground">
             {website
               ? "Not a WanderOS site, so there is no catalog to build from. Ads can still be added by hand and filled by upload."
               : "No website on record, so there is no catalog to build from. Ads can still be added by hand and filled by upload."}
           </p>
         ) : withoutPhoto > 0 ? (
-          <p className="text-muted-foreground text-[11px]">
+          <p className="text-[11px] text-muted-foreground">
             {withoutPhoto} {withoutPhoto === 1 ? "home has" : "homes have"} no
             photo on the feed and cannot be a card.
           </p>
@@ -254,7 +255,7 @@ export function AdPreviewsWorkspace({
                   <select
                     value={campaignId}
                     onChange={(event) => setCampaignId(event.target.value)}
-                    className="bg-muted/40 h-7 max-w-56 truncate rounded-full border px-2.5 text-[11.5px] outline-none focus:ring-2 focus:ring-sky-400/40"
+                    className="h-7 max-w-56 truncate rounded-full border bg-muted/40 px-2.5 text-[11.5px] outline-none focus:ring-2 focus:ring-sky-400/40"
                   >
                     {campaigns.map((campaign) => (
                       <option key={campaign.id} value={campaign.id}>
@@ -267,7 +268,8 @@ export function AdPreviewsWorkspace({
                     variant="outline"
                     disabled={!campaignId || attach.isPending}
                     onClick={() => attach.mutate({ brandId, campaignId })}
-                    className="h-7 rounded-full px-3 text-[11.5px]"
+                    shape="round"
+                    density="editorial"
                   >
                     Attach {approved} approved
                   </Button>
@@ -300,7 +302,7 @@ export function AdPreviewsWorkspace({
         <p
           className={cn(
             panel,
-            "text-muted-foreground px-4 py-8 text-center text-xs",
+            "px-4 py-8 text-center text-xs text-muted-foreground",
           )}
         >
           {hasSite

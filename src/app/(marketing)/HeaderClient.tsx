@@ -77,7 +77,7 @@ export default function HeaderClient({ navigation }: HeaderClientProps) {
         <button
           type="button"
           onClick={() => setMobileMenuOpen(true)}
-          className="text-secondary hover:text-primary -m-2.5 inline-flex items-center justify-center rounded-md p-2.5 transition-colors"
+          className="-m-2.5 inline-flex items-center justify-center rounded-md p-2.5 text-secondary transition-colors hover:text-primary"
         >
           <span className="sr-only">Open main menu</span>
           <Bars3Icon aria-hidden="true" className="size-6" />
@@ -174,7 +174,7 @@ export default function HeaderClient({ navigation }: HeaderClientProps) {
           >
             <Link
               href={item.href}
-              className="text-primary hover:bg-surface-secondary rounded-full px-3 py-1.5 transition-all"
+              className="rounded-full px-3 py-1.5 text-primary transition-all hover:bg-surface-secondary"
             >
               {item.name}
             </Link>
@@ -207,8 +207,8 @@ export default function HeaderClient({ navigation }: HeaderClientProps) {
         onClose={setMobileMenuOpen}
         className="lg:hidden"
       >
-        <div className="bg-neutral-1000/20 fixed inset-0 z-50 backdrop-blur-sm" />
-        <DialogPanel className="border-primary bg-surface-primary/95 fixed inset-y-0 right-0 z-50 flex w-full flex-col justify-between overflow-y-auto backdrop-blur-sm sm:max-w-sm sm:border-l">
+        <div className="fixed inset-0 z-50 bg-neutral-1000/20 backdrop-blur-sm" />
+        <DialogPanel className="fixed inset-y-0 right-0 z-50 flex w-full flex-col justify-between overflow-y-auto border-primary bg-surface-primary/95 backdrop-blur-sm sm:max-w-sm sm:border-l">
           <div className="p-6">
             <div className="flex items-center justify-between">
               <Link
@@ -223,7 +223,7 @@ export default function HeaderClient({ navigation }: HeaderClientProps) {
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen(false)}
-                className="text-secondary hover:text-primary -m-2.5 rounded-md p-2.5 transition-colors"
+                className="-m-2.5 rounded-md p-2.5 text-secondary transition-colors hover:text-primary"
               >
                 <span className="sr-only">Close menu</span>
                 <XMarkIcon aria-hidden="true" className="size-6" />
@@ -262,7 +262,7 @@ export default function HeaderClient({ navigation }: HeaderClientProps) {
                     <Link
                       key={item.name}
                       href={item.href}
-                      className="hover:bg-surface-secondary text-primary -mx-3 block rounded-lg px-3 py-2.5 transition-colors"
+                      className="-mx-3 block rounded-lg px-3 py-2.5 text-primary transition-colors hover:bg-surface-secondary"
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       <Text variant="body" weight="medium">
@@ -329,7 +329,7 @@ export default function HeaderClient({ navigation }: HeaderClientProps) {
           </div>
 
           {navigation.callsToAction.length > 0 && (
-            <div className="border-primary bg-surface-secondary sticky bottom-0 grid grid-cols-1 divide-y divide-neutral-200 border-t text-center">
+            <div className="sticky bottom-0 grid grid-cols-1 divide-y divide-neutral-200 border-t border-primary bg-surface-secondary text-center">
               {navigation.callsToAction.map((item) => {
                 const IconComponent = item.icon ? getIcon(item.icon) : null;
 
@@ -337,13 +337,13 @@ export default function HeaderClient({ navigation }: HeaderClientProps) {
                   <Link
                     key={item.name}
                     href={item.href}
-                    className="hover:bg-surface-tertiary flex items-center justify-center gap-x-2.5 p-3 transition-colors"
+                    className="flex items-center justify-center gap-x-2.5 p-3 transition-colors hover:bg-surface-tertiary"
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     {IconComponent && (
                       <IconComponent
                         aria-hidden="true"
-                        className="text-tertiary size-5 flex-none"
+                        className="size-5 flex-none text-tertiary"
                       />
                     )}
                     <Text variant="body" weight="medium">

@@ -30,13 +30,13 @@ bun dev                 # velite build + Next.js dev server (Turbopack)
 bun run velite:dev      # Re-run velite on MDX/blog content changes (only if editing content alongside dev)
 bun run email:dev       # Preview React Email templates
 
-bun run check           # eslint + tsc --noEmit — run this before considering work done
-bun run typecheck       # tsc --noEmit only
+bun run check           # generate content/routes + typed oxlint + format + plugin checks — run this before considering work done
+bun run typecheck       # check without the formatting step
 bun test                 # Bun unit tests
 bun run ai:contracts    # AI catalog/schema/policy contract gate
 bun run ai:gauntlet     # Contract gate plus isolated live DB access/receipt checks
-bun run lint:fix        # eslint --fix
-bun run format:write    # prettier
+bun run lint:fix        # oxlint --fix
+bun run format:write    # oxfmt
 
 bun run db:push         # Push schema to DB (dev iteration)
 bun run db:generate     # Generate migration files
@@ -49,6 +49,7 @@ bun run build           # velite build + next build
 ```
 
 `bun run check`, `bun test`, and `bun run ai:contracts` are the normal gates.
+See `docs/quality-tooling.md` for the staged-format/pre-push hooks and shadcn policies.
 Use the full `ai:gauntlet` only with a current non-production Neon branch.
 
 Tests must protect a business rule, operator outcome, security boundary, or

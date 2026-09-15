@@ -242,15 +242,14 @@ export async function readDriveDocument(input: {
     return {
       name: meta.name,
       mimeType: meta.mimeType,
-      text: await GoogleDrive.exportText(
-        accessToken,
-        fileId,
-        meta.mimeType,
-      ),
+      text: await GoogleDrive.exportText(accessToken, fileId, meta.mimeType),
     };
   }
 
-  if (!meta.mimeType.startsWith("text/") && meta.mimeType !== "application/json") {
+  if (
+    !meta.mimeType.startsWith("text/") &&
+    meta.mimeType !== "application/json"
+  ) {
     throw new GoogleDriveError(
       `Not a readable document: ${meta.name} is ${meta.mimeType}`,
     );

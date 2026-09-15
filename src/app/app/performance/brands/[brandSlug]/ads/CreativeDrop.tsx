@@ -129,14 +129,14 @@ export function CreativeDrop({
           <ul className="flex flex-wrap gap-2">
             {dropped.map((row, index) => (
               <li key={row.item.assetId ?? index} className="w-16 space-y-1">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {/* oxlint-disable-next-line nextjs/no-img-element */}
                 <img
                   src={row.item.thumbnail ?? row.item.url}
                   alt=""
                   className="size-16 rounded-lg border object-cover"
                 />
                 <p
-                  className="text-muted-foreground truncate text-[9px]"
+                  className="truncate text-[9px] text-muted-foreground"
                   title={row.filename}
                 >
                   {guesses[index] ?? row.filename}
@@ -163,7 +163,7 @@ export function CreativeDrop({
                     className={cn(
                       "flex-1 rounded-full px-2.5 py-1 text-[11.5px] transition-colors disabled:opacity-40",
                       as === option.id
-                        ? "bg-foreground text-background font-medium"
+                        ? "bg-foreground font-medium text-background"
                         : "text-muted-foreground hover:text-foreground",
                     )}
                   >
@@ -177,7 +177,7 @@ export function CreativeDrop({
             <div className="space-y-1.5">
               <Label htmlFor="drop-home">
                 Home{" "}
-                <span className="text-muted-foreground font-normal">
+                <span className="font-normal text-muted-foreground">
                   (by name; their site is not connected)
                 </span>
               </Label>
@@ -196,7 +196,7 @@ export function CreativeDrop({
             <div className="space-y-1.5">
               <Label>Home</Label>
               <div className="flex items-center gap-2">
-                <span className="text-muted-foreground min-w-0 truncate text-xs">
+                <span className="min-w-0 truncate text-xs text-muted-foreground">
                   {home
                     ? `All about ${home.name}`
                     : matched > 0
@@ -216,7 +216,7 @@ export function CreativeDrop({
                   <button
                     type="button"
                     onClick={() => setHomeId(null)}
-                    className="text-muted-foreground hover:text-foreground text-[11px]"
+                    className="text-[11px] text-muted-foreground hover:text-foreground"
                   >
                     Clear
                   </button>

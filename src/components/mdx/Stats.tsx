@@ -13,7 +13,7 @@ export function Stats({ stats, title }: StatsProps) {
   return (
     <div className="my-8">
       {title && (
-        <h3 className="text-primary mb-6 text-center text-lg font-semibold">
+        <h3 className="mb-6 text-center text-lg font-semibold text-primary">
           {title}
         </h3>
       )}
@@ -21,12 +21,12 @@ export function Stats({ stats, title }: StatsProps) {
         {stats.map((stat, index) => (
           <div
             key={index}
-            className="bg-surface-secondary border-secondary rounded-lg border p-6 shadow-sm"
+            className="rounded-lg border border-secondary bg-surface-secondary p-6 shadow-sm"
           >
             <div className="text-3xl font-bold text-amber-600">
               {stat.value}
             </div>
-            <div className="text-primary mt-1 text-sm font-medium">
+            <div className="mt-1 text-sm font-medium text-primary">
               {stat.label}
             </div>
             {stat.change && (

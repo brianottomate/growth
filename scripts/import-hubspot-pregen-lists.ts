@@ -368,7 +368,7 @@ await db.insert(leadImportTable).values({
       membership.domainId ? [membership.domainId] : [],
     ),
   ).size,
-        contactsUpdated: contactIdByHubspotId.size,
+  contactsUpdated: contactIdByHubspotId.size,
   notes: JSON.stringify(summary),
 });
 

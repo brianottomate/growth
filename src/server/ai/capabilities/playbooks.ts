@@ -45,6 +45,11 @@ export const readPlaybookAction = growthAction({
           .join(", ")}`,
       );
     }
-    return { id: playbook.id, title: playbook.title, kind: playbook.kind, body: playbook.body };
+    return {
+      id: playbook.id,
+      title: playbook.title,
+      kind: playbook.kind,
+      body: playbook.body,
+    };
   },
 });

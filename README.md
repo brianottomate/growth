@@ -79,11 +79,11 @@ bun dev
 Useful commands:
 
 ```bash
-bun run check          # ESLint + TypeScript
-bun run typecheck      # TypeScript only
-bun run lint           # ESLint only
-bun run format:check   # Prettier check
-bun run format:write   # Prettier write
+bun run check          # next typegen + oxlint (type-aware rules + TypeScript diagnostics incl. Next route contracts) + oxfmt --check
+bun run typecheck      # check without the formatting step
+bun run lint           # oxlint only, no type-check
+bun run format:check   # oxfmt check
+bun run format:write   # oxfmt write
 bun run build          # Velite build + Next build
 ```
 

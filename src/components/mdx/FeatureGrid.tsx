@@ -64,10 +64,10 @@ export function FeatureGrid({
         {features.map((feature, index) => (
           <div
             key={index}
-            className="border-secondary bg-surface-secondary group relative overflow-hidden rounded-lg border shadow-sm transition-all duration-200 hover:shadow-md"
+            className="group relative overflow-hidden rounded-lg border border-secondary bg-surface-secondary shadow-sm transition-all duration-200 hover:shadow-md"
           >
             {feature.image && (
-              <div className="bg-surface-tertiary relative aspect-video w-full overflow-hidden">
+              <div className="relative aspect-video w-full overflow-hidden bg-surface-tertiary">
                 <Image
                   src={feature.image}
                   alt={feature.imageAlt || feature.title}
@@ -78,18 +78,18 @@ export function FeatureGrid({
             )}
             <div className="p-6">
               {feature.icon && iconMap[feature.icon] && (
-                <div className="bg-surface-tertiary mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg">
+                <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg bg-surface-tertiary">
                   {(() => {
                     const IconComponent = iconMap[feature.icon];
                     // @ts-expect-error - this is ok
-                    return <IconComponent className="text-primary h-6 w-6" />;
+                    return <IconComponent className="h-6 w-6 text-primary" />;
                   })()}
                 </div>
               )}
-              <h3 className="text-primary mb-2 text-xl font-semibold">
+              <h3 className="mb-2 text-xl font-semibold text-primary">
                 {feature.title}
               </h3>
-              <p className="text-secondary text-sm leading-relaxed">
+              <p className="text-sm leading-relaxed text-secondary">
                 {feature.description}
               </p>
             </div>
@@ -107,14 +107,14 @@ export function FeatureGrid({
         return (
           <div
             key={index}
-            className="border-secondary bg-surface-secondary rounded-lg border p-6"
+            className="rounded-lg border border-secondary bg-surface-secondary p-6"
           >
             {IconComponent && (
-              <div className="bg-surface-tertiary mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg">
-                <IconComponent className="text-primary h-6 w-6" />
+              <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg bg-surface-tertiary">
+                <IconComponent className="h-6 w-6 text-primary" />
               </div>
             )}
-            <h3 className="text-primary mb-2 text-lg font-semibold">
+            <h3 className="mb-2 text-lg font-semibold text-primary">
               {feature.title}
             </h3>
             <p className="text-secondary">{feature.description}</p>

@@ -1,5 +1,6 @@
 "use client";
 
+import { cva, type VariantProps } from "class-variance-authority";
 import { useState } from "react";
 import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
@@ -15,11 +16,18 @@ import { cn } from "./lib/utils";
  * works in `Date | undefined`. For call sites that store a plain `yyyy-mm-dd`
  * string (what the native input emitted), use the `*DateInputValue` helpers.
  */
+const datePickerStyleVariants = cva("", {
+  variants: {
+    density: { form: "py-1.5 text-sm", compact: "px-1.5 py-0.5 text-[11px]" },
+  },
+});
+
 export function DatePicker({
   value,
   onChange,
   placeholder = "Pick a date",
-  className,
+  className: customClassName,
+  density,
   align = "start",
   captionLayout = "dropdown",
   disabled,
@@ -39,7 +47,9 @@ export function DatePicker({
   dateFormat?: string;
   id?: string;
   "aria-label"?: string;
-}) {
+} & VariantProps<typeof datePickerStyleVariants>) {
+  const className = cn(datePickerStyleVariants({ density }), customClassName);
+
   const [open, setOpen] = useState(false);
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -51,7 +61,7 @@ export function DatePicker({
           disabled={disabled}
           data-empty={!value}
           className={cn(
-            "border-border bg-background hover:bg-accent focus-visible:ring-ring/40 data-[empty=true]:text-muted-foreground inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs transition-colors outline-none focus-visible:ring-2 disabled:opacity-50",
+            "inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-xs transition-colors outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-50 data-[empty=true]:text-muted-foreground",
             className,
           )}
         >
@@ -79,7 +89,7 @@ export function DatePicker({
                 onChange(undefined);
                 setOpen(false);
               }}
-              className="text-muted-foreground hover:text-foreground w-full rounded-md py-1 text-xs"
+              className="w-full rounded-md py-1 text-xs text-muted-foreground hover:text-foreground"
             >
               Clear
             </button>

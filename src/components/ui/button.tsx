@@ -7,23 +7,23 @@ import { cva } from "class-variance-authority";
 import { cn } from "./lib/utils";
 
 const buttonVariants = cva(
-  "focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-md text-sm font-medium whitespace-nowrap transition-all outline-none focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-md text-sm font-medium whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs",
+          "bg-primary text-primary-foreground shadow-xs hover:bg-primary/90",
         primary:
-          "bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs",
+          "bg-primary text-primary-foreground shadow-xs hover:bg-primary/90",
         destructive:
-          "bg-destructive hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/80 dark:hover:bg-destructive/90 text-destructive-foreground shadow-xs",
+          "text-destructive-foreground bg-destructive shadow-xs hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:bg-destructive/80 dark:hover:bg-destructive/90 dark:focus-visible:ring-destructive/40",
         outline:
-          "bg-background hover:bg-accent hover:text-accent-foreground dark:bg-background dark:border-border dark:hover:bg-accent/80 border shadow-xs",
+          "border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:border-border dark:bg-background dark:hover:bg-accent/80",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80 dark:bg-secondary dark:text-secondary-foreground dark:hover:bg-secondary/80 border-secondary-foreground/20 hover:border-secondary-foreground/30 dark:border-secondary-foreground/20 dark:hover:border-secondary-foreground/30 border shadow-xs transition-colors",
+          "border border-secondary-foreground/20 bg-secondary text-secondary-foreground shadow-xs transition-colors hover:border-secondary-foreground/30 hover:bg-secondary/80 dark:border-secondary-foreground/20 dark:bg-secondary dark:text-secondary-foreground dark:hover:border-secondary-foreground/30 dark:hover:bg-secondary/80",
         ghost:
           "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/80 dark:hover:text-accent-foreground",
-        link: "text-primary dark:text-primary underline-offset-4 hover:underline",
+        link: "text-primary underline-offset-4 hover:underline dark:text-primary",
         unstyled: "",
       },
       size: {
@@ -37,6 +37,34 @@ const buttonVariants = cva(
         "icon-sm": "size-8",
         "icon-md": "size-9",
         "icon-lg": "size-10",
+      },
+
+      tone: {
+        muted: "text-muted-foreground",
+        "muted-danger": "text-muted-foreground hover:text-destructive",
+        "muted-active": "text-muted-foreground hover:text-foreground",
+        danger: "text-destructive hover:text-destructive",
+        media: "bg-black/55 text-white backdrop-blur hover:bg-black/75",
+        "media-subtle":
+          "bg-black/45 text-white backdrop-blur hover:bg-black/65",
+        "media-outline":
+          "border-white/20 bg-transparent text-white hover:bg-white/10",
+        "media-ghost": "text-white/80 hover:bg-white/10 hover:text-white",
+      },
+      shape: {
+        round: "rounded-full",
+        "attached-left": "rounded-r-none",
+        "attached-right": "rounded-l-none",
+      },
+      elevation: {
+        raised: "shadow-md",
+        floating: "shadow-lg transition-transform",
+      },
+      textSize: { xs: "text-xs", caption: "text-[11px]" },
+      weight: { semibold: "font-semibold" },
+      density: {
+        editorial: "h-7 px-3 text-[11.5px]",
+        tight: "px-2",
       },
     },
     defaultVariants: {
@@ -139,8 +167,15 @@ const Spinner = ({ className, ...props }: React.ComponentProps<"svg">) => (
  * - When using `asChild`, the child component must accept className and other button props
  * - For Next.js Link components with multiple children, use ButtonLink instead
  */
+
 function Button({
   className,
+  tone,
+  shape,
+  elevation,
+  textSize,
+  weight,
+  density,
   variant,
   size,
   asChild = false,
@@ -158,7 +193,19 @@ function Button({
   return (
     <Comp
       data-slot="button"
-      className={cn(buttonVariants({ variant, size, className }))}
+      className={cn(
+        buttonVariants({
+          variant,
+          size,
+          className,
+          tone,
+          shape,
+          elevation,
+          textSize,
+          weight,
+          density,
+        }),
+      )}
       disabled={disabled || loading}
       {...props}
     >
@@ -206,6 +253,12 @@ function Button({
  */
 function ButtonLink({
   className,
+  tone,
+  shape,
+  elevation,
+  textSize,
+  weight,
+  density,
   variant,
   size,
   children,
@@ -213,7 +266,19 @@ function ButtonLink({
 }: React.ComponentProps<typeof Link> & VariantProps<typeof buttonVariants>) {
   return (
     <Link
-      className={cn(buttonVariants({ variant, size, className }))}
+      className={cn(
+        buttonVariants({
+          variant,
+          size,
+          className,
+          tone,
+          shape,
+          elevation,
+          textSize,
+          weight,
+          density,
+        }),
+      )}
       {...props}
     >
       {children}

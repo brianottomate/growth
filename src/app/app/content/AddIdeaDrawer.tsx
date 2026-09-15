@@ -197,7 +197,7 @@ export function AddIdeaDrawer({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-2xl">
-        <SheetHeader className="border-b">
+        <SheetHeader divided>
           <SheetTitle>New idea</SheetTitle>
           {/* Seed: an idea can start from anywhere. */}
           <div className="mt-2 flex flex-wrap gap-1.5">
@@ -212,7 +212,7 @@ export function AddIdeaDrawer({
                   className={cn(
                     "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
                     seed === s.id
-                      ? "bg-foreground text-background border-foreground"
+                      ? "border-foreground bg-foreground text-background"
                       : "border-border text-muted-foreground hover:bg-accent",
                     disabled && "cursor-not-allowed opacity-40",
                   )}
@@ -228,10 +228,10 @@ export function AddIdeaDrawer({
         <div className="flex min-h-0 flex-1 overflow-hidden">
           {/* Chat rail — the artifact-molding assistant lights up here next. */}
           <aside className="hidden w-40 shrink-0 border-r p-3 sm:block">
-            <div className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+            <div className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
               Assist
             </div>
-            <div className="border-border/60 text-muted-foreground/70 mt-2 rounded-lg border border-dashed p-3 text-xs leading-relaxed">
+            <div className="mt-2 rounded-lg border border-dashed border-border/60 p-3 text-xs leading-relaxed text-muted-foreground/70">
               A chat that molds this brief — describe an angle, paste research,
               or drop a reference, and it fills the fields.
               <span className="mt-1 block font-medium">Coming next.</span>
@@ -262,7 +262,7 @@ export function AddIdeaDrawer({
             )}
 
             {seed === "media" && (
-              <div className="text-muted-foreground rounded-lg border border-dashed p-4 text-sm">
+              <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
                 Starting from a media asset (pick from the library, auto-draft a
                 brief around it) lands next. For now, fill the brief below.
               </div>
@@ -325,7 +325,8 @@ export function AddIdeaDrawer({
                   value={fromDateInputValue(date)}
                   onChange={(d) => setDate(d ? toDateInputValue(d) : "")}
                   placeholder="Plan date"
-                  className="w-full justify-start py-1.5 text-sm"
+                  density="form"
+                  className="w-full justify-start"
                 />
               </div>
             </div>
@@ -364,7 +365,7 @@ export function AddIdeaDrawer({
                       className={cn(
                         "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
                         on
-                          ? "bg-foreground text-background border-foreground"
+                          ? "border-foreground bg-foreground text-background"
                           : "border-border text-muted-foreground hover:bg-accent",
                       )}
                     >
@@ -382,7 +383,7 @@ export function AddIdeaDrawer({
                   );
                 })}
               </div>
-              <p className="text-muted-foreground text-xs">
+              <p className="text-xs text-muted-foreground">
                 Each selected channel becomes a spot at its primary format —
                 tune them on the idea page.
               </p>
@@ -390,7 +391,7 @@ export function AddIdeaDrawer({
           </div>
         </div>
 
-        <SheetFooter className="flex-row justify-end border-t">
+        <SheetFooter divided className="flex-row justify-end">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>

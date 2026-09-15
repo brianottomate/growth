@@ -112,11 +112,7 @@ export function AdWall({
         >
           <TabsList>
             {AD_MOCK_SURFACES.map((option) => (
-              <TabsTrigger
-                key={option.id}
-                value={option.id}
-                className="text-xs"
-              >
+              <TabsTrigger key={option.id} value={option.id} textSize="xs">
                 {option.label}
               </TabsTrigger>
             ))}
@@ -144,7 +140,7 @@ export function AdWall({
                 href={group.homeUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="text-muted-foreground truncate text-[11px] hover:underline"
+                className="truncate text-[11px] text-muted-foreground hover:underline"
               >
                 {group.homeUrl.replace(/^https?:\/\//, "")}
               </a>
@@ -379,7 +375,7 @@ function AdTile({
                   preload="metadata"
                 />
               ) : (
-                // eslint-disable-next-line @next/next/no-img-element
+                // oxlint-disable-next-line nextjs/no-img-element
                 <img
                   src={item.thumbnail ?? item.url}
                   alt={`Card ${index + 1}`}
@@ -469,7 +465,8 @@ function AdTile({
             uploading={uploading}
             title={capacity > 1 ? "Add cards" : "Add"}
             hint=""
-            className="size-16 min-h-0 p-0 text-[9px]"
+            density="thumbnail"
+            className="size-16 min-h-0"
           />
         </li>
       ) : null}
@@ -480,7 +477,7 @@ function AdTile({
             disabled={busy}
             onClick={() => setPicking("append")}
             title="Add a card from the library"
-            className="text-muted-foreground hover:text-foreground grid size-16 place-items-center rounded-lg border text-[9px] hover:border-white/30"
+            className="grid size-16 place-items-center rounded-lg border text-[9px] text-muted-foreground hover:border-white/30 hover:text-foreground"
           >
             <ImagePlus className="size-3.5" />
             Library
@@ -494,7 +491,7 @@ function AdTile({
     <li className={cn(panel, "p-3")}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-muted-foreground truncate text-[11px]">
+          <p className="truncate text-[11px] text-muted-foreground">
             {AD_FORMAT_LABEL[ad.format]}
             {ad.format === "video"
               ? ""
@@ -536,7 +533,7 @@ function AdTile({
                 "flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10.5px] font-medium transition disabled:opacity-40",
                 ad.status === "approved"
                   ? "border-emerald-400 bg-emerald-500/20 text-emerald-200"
-                  : "text-muted-foreground hover:text-foreground hover:border-white/30",
+                  : "text-muted-foreground hover:border-white/30 hover:text-foreground",
               )}
             >
               <Check className="size-3" />
@@ -564,7 +561,8 @@ function AdTile({
               <Button
                 size="sm"
                 variant="outline"
-                className="h-7 rounded-full px-3 text-[11.5px]"
+                shape="round"
+                density="editorial"
                 onClick={() => setNaming(true)}
               >
                 {ad.homeName ? "Rename home" : "Name the home"}
@@ -576,7 +574,7 @@ function AdTile({
               type="button"
               onClick={() => setChecking(true)}
               title="Check against Meta's own render"
-              className="text-muted-foreground hover:text-foreground rounded-full p-1"
+              className="rounded-full p-1 text-muted-foreground hover:text-foreground"
             >
               <Eye className="size-3.5" />
             </button>
@@ -587,7 +585,7 @@ function AdTile({
               disabled={busy}
               onClick={() => remove.mutate({ adId: ad.id })}
               title="Delete this ad"
-              className="text-muted-foreground rounded-full p-1 hover:text-red-300 disabled:opacity-40"
+              className="rounded-full p-1 text-muted-foreground hover:text-red-300 disabled:opacity-40"
             >
               <Trash2 className="size-3.5" />
             </button>
@@ -607,7 +605,7 @@ function AdTile({
           {!editing ? (
             <div className="space-y-1">
               <p className="truncate text-[12px] font-medium">{ad.headline}</p>
-              <p className="text-muted-foreground line-clamp-3 text-[11px] leading-snug whitespace-pre-line">
+              <p className="line-clamp-3 text-[11px] leading-snug whitespace-pre-line text-muted-foreground">
                 {ad.body || "No primary text yet."}
               </p>
               {locked ? null : (
@@ -627,14 +625,14 @@ function AdTile({
                 onChange={(event) => setHeadline(event.target.value)}
                 maxLength={60}
                 placeholder="Headline"
-                className="bg-muted/40 h-8 w-full rounded-lg border px-2.5 text-xs outline-none focus:ring-2 focus:ring-sky-400/40"
+                className="h-8 w-full rounded-lg border bg-muted/40 px-2.5 text-xs outline-none focus:ring-2 focus:ring-sky-400/40"
               />
               <textarea
                 value={body}
                 onChange={(event) => setBody(event.target.value)}
                 rows={6}
                 placeholder="Primary text"
-                className="bg-muted/40 w-full resize-y rounded-lg border px-2.5 py-2 text-xs leading-5 outline-none focus:ring-2 focus:ring-sky-400/40"
+                className="w-full resize-y rounded-lg border bg-muted/40 px-2.5 py-2 text-xs leading-5 outline-none focus:ring-2 focus:ring-sky-400/40"
               />
               <div className="flex items-center gap-3">
                 <Button
@@ -643,7 +641,8 @@ function AdTile({
                   onClick={() =>
                     setCopy.mutate({ adId: ad.id, headline, body })
                   }
-                  className="h-7 rounded-full px-3 text-[11.5px]"
+                  shape="round"
+                  density="editorial"
                 >
                   Save copy
                 </Button>
@@ -654,7 +653,7 @@ function AdTile({
                     setHeadline(ad.headline);
                     setEditing(false);
                   }}
-                  className="text-muted-foreground hover:text-foreground text-[11.5px]"
+                  className="text-[11.5px] text-muted-foreground hover:text-foreground"
                 >
                   Cancel
                 </button>
@@ -662,13 +661,13 @@ function AdTile({
             </div>
           )}
           {busy && !locked ? (
-            <p className="text-muted-foreground flex items-center gap-1 text-[11px]">
+            <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
               <Loader2 className="size-3 animate-spin" />
               {uploading > 0 ? "Bringing the file in…" : "Saving…"}
             </p>
           ) : null}
           {!ad.homeId && bindable ? (
-            <p className="text-muted-foreground flex items-center gap-1 text-[11px]">
+            <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
               <Home className="size-3" />
               {ad.homeName
                 ? `${ad.homeName}, by name; no listing on their site yet.`
@@ -787,7 +786,7 @@ function StorySlot({
           className="group/story relative"
           title={`Story · ${VIA_LABEL[story.via]}`}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {/* oxlint-disable-next-line nextjs/no-img-element */}
           <img
             src={story.thumbnail ?? story.url}
             alt="Story"
@@ -814,7 +813,7 @@ function StorySlot({
           disabled={busy}
           onClick={() => setOpen(true)}
           title="Give stories and reels their own 9:16"
-          className="text-muted-foreground hover:text-foreground flex h-16 w-9 flex-col items-center justify-center rounded-md border border-dashed text-[8px] hover:border-white/30 disabled:opacity-40"
+          className="flex h-16 w-9 flex-col items-center justify-center rounded-md border border-dashed text-[8px] text-muted-foreground hover:border-white/30 hover:text-foreground disabled:opacity-40"
         >
           <Smartphone className="size-3" />
           9:16
@@ -854,7 +853,7 @@ function StorySlot({
                 className="rounded-xl border p-2 text-left hover:border-white/30"
               >
                 <p className="text-xs font-medium">{option.label}</p>
-                <p className="text-muted-foreground text-[10px]">
+                <p className="text-[10px] text-muted-foreground">
                   {option.hint}
                 </p>
               </button>

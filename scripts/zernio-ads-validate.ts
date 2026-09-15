@@ -55,7 +55,7 @@ function aggregate(tree: ZernioAdsTreeCampaign[]): CampaignAgg[] {
           topAdSpend = sp;
           topAdHasThumb = thumb;
         }
-        const raw = (a.platformCreatedAt ?? a.createdAt);
+        const raw = a.platformCreatedAt ?? a.createdAt;
         const t = raw ? Date.parse(raw) : NaN;
         if (!Number.isNaN(t)) dates.push(t);
       }
@@ -67,7 +67,7 @@ function aggregate(tree: ZernioAdsTreeCampaign[]): CampaignAgg[] {
         ? Math.round((lastMs - firstMs) / 86_400_000)
         : undefined;
     return {
-      name: (obj.campaignName as string) ?? (c.name!) ?? "?",
+      name: (obj.campaignName as string) ?? c.name! ?? "?",
       status: c.status,
       objective: obj.platformObjective as string | undefined,
       ads,
@@ -122,7 +122,9 @@ async function main() {
 
   // 2. SPEND CONCENTRATION ---------------------------------------------
   console.log("\n=== 2. SPEND CONCENTRATION ===");
-  const spending = agg.filter((c) => c.spend > 0).sort((a, b) => b.spend - a.spend);
+  const spending = agg
+    .filter((c) => c.spend > 0)
+    .sort((a, b) => b.spend - a.spend);
   console.log(`  campaigns with spend>0: ${spending.length}/${total}`);
   console.log(`  total snapshot spend: $${totalSpend.toFixed(0)}`);
   let cum = 0;
@@ -145,7 +147,9 @@ async function main() {
     byObj.set(k, b);
   }
   for (const [k, b] of [...byObj.entries()].sort((a, b) => b[1].n - a[1].n)) {
-    console.log(`  ${k.padEnd(26)} | ${String(b.n).padStart(3)} campaigns | $${b.spend.toFixed(0)}`);
+    console.log(
+      `  ${k.padEnd(26)} | ${String(b.n).padStart(3)} campaigns | $${b.spend.toFixed(0)}`,
+    );
   }
 
   // 4. NAME-CONVENTION PARSEABILITY ------------------------------------
@@ -171,7 +175,9 @@ async function main() {
     if (hits.length) matched++;
     for (const h of hits) tokenHits.set(h, (tokenHits.get(h) ?? 0) + 1);
   }
-  console.log(`  campaigns matching ≥1 known funnel token: ${matched}/${total} (${((matched / total) * 100).toFixed(0)}%)`);
+  console.log(
+    `  campaigns matching ≥1 known funnel token: ${matched}/${total} (${((matched / total) * 100).toFixed(0)}%)`,
+  );
   for (const [t, n] of [...tokenHits.entries()].sort((a, b) => b[1] - a[1])) {
     console.log(`    ${t.padEnd(20)} ${n}`);
   }
@@ -183,12 +189,16 @@ async function main() {
   const anyThumb = agg.filter((c) => c.adsWithThumb > 0).length;
   const topHasThumb = agg.filter((c) => c.topAdHasThumb).length;
   console.log(`  campaigns with ≥1 ad thumbnail:        ${anyThumb}/${total}`);
-  console.log(`  campaigns whose TOP-spend ad has thumb: ${topHasThumb}/${total}`);
+  console.log(
+    `  campaigns whose TOP-spend ad has thumb: ${topHasThumb}/${total}`,
+  );
 
   // 6. OUTLIERS ---------------------------------------------------------
   console.log("\n=== 6. PRE-2024 OUTLIERS ===");
   const cutoff = Date.parse("2024-01-01");
-  for (const c of agg.filter((c) => c.firstMs !== undefined && c.firstMs < cutoff)) {
+  for (const c of agg.filter(
+    (c) => c.firstMs !== undefined && c.firstMs < cutoff,
+  )) {
     console.log(
       `  ${new Date(c.firstMs!).toISOString().slice(0, 10)} → ${new Date(c.lastMs!).toISOString().slice(0, 10)} [${c.status}] ${c.ads} ads $${c.spend.toFixed(0)} obj=${c.objective}  ${c.name.slice(0, 40)}`,
     );

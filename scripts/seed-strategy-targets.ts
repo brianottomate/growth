@@ -44,36 +44,118 @@ const BRAND_SLUG = "wander";
 // TikTok repurposes; Pinterest = batched seasonal board drops.
 const CADENCE: Record<
   string,
-  { archetype: string; count: number; period: "day" | "week" | "month"; notes?: string }[]
+  {
+    archetype: string;
+    count: number;
+    period: "day" | "week" | "month";
+    notes?: string;
+  }[]
 > = {
   instagram: [
-    { archetype: "video_short", count: 4, period: "week", notes: "Sheet platform guide: 4–5 Reels/wk (reach)" },
-    { archetype: "carousel", count: 2, period: "week", notes: "Sheet: 2 Carousels/wk (saves); also best observed engagement (7.8k avg views)" },
-    { archetype: "image", count: 1, period: "week", notes: "Data-informed addition — sheet omits the format but images match carousels on engagement" },
-    { archetype: "story", count: 3, period: "week", notes: "One slot = one story NARRATIVE (1 frame or a 5-frame series). Sheet says Daily Stories — dailies stay reactive, these are the planned ones" },
+    {
+      archetype: "video_short",
+      count: 4,
+      period: "week",
+      notes: "Sheet platform guide: 4–5 Reels/wk (reach)",
+    },
+    {
+      archetype: "carousel",
+      count: 2,
+      period: "week",
+      notes:
+        "Sheet: 2 Carousels/wk (saves); also best observed engagement (7.8k avg views)",
+    },
+    {
+      archetype: "image",
+      count: 1,
+      period: "week",
+      notes:
+        "Data-informed addition — sheet omits the format but images match carousels on engagement",
+    },
+    {
+      archetype: "story",
+      count: 3,
+      period: "week",
+      notes:
+        "One slot = one story NARRATIVE (1 frame or a 5-frame series). Sheet says Daily Stories — dailies stay reactive, these are the planned ones",
+    },
   ],
   tiktok: [
-    { archetype: "video_short", count: 4, period: "week", notes: "Sheet: 5–7 posts/wk total (low end taken)" },
+    {
+      archetype: "video_short",
+      count: 4,
+      period: "week",
+      notes: "Sheet: 5–7 posts/wk total (low end taken)",
+    },
     { archetype: "carousel", count: 1, period: "week" },
   ],
   linkedin: [
-    { archetype: "image", count: 1, period: "week", notes: "New lane — peer whitespace (Airbnb/Outsite/Rimowa all invest)" },
-    { archetype: "video_long", count: 1, period: "week", notes: "Airbnb's power format (1.4k avg likes); text post as fallback" },
+    {
+      archetype: "image",
+      count: 1,
+      period: "week",
+      notes: "New lane — peer whitespace (Airbnb/Outsite/Rimowa all invest)",
+    },
+    {
+      archetype: "video_long",
+      count: 1,
+      period: "week",
+      notes: "Airbnb's power format (1.4k avg likes); text post as fallback",
+    },
   ],
   x: [
-    { archetype: "text", count: 3, period: "week", notes: "Down from daily (35 avg views); slot-planned per Kristian 2026-07-03 — a planned tweet lane" },
-    { archetype: "video_short", count: 2, period: "month", notes: "The only format that has ever popped here (712k avg)" },
+    {
+      archetype: "text",
+      count: 3,
+      period: "week",
+      notes:
+        "Down from daily (35 avg views); slot-planned per Kristian 2026-07-03 — a planned tweet lane",
+    },
+    {
+      archetype: "video_short",
+      count: 2,
+      period: "month",
+      notes: "The only format that has ever popped here (712k avg)",
+    },
   ],
   facebook: [
-    { archetype: "image", count: 2, period: "week", notes: "IG crosspost mirror — fill by adding a FB spot to the IG idea; slot shells merge on fill" },
-    { archetype: "video_short", count: 1, period: "week", notes: "IG reel crosspost" },
+    {
+      archetype: "image",
+      count: 2,
+      period: "week",
+      notes:
+        "IG crosspost mirror — fill by adding a FB spot to the IG idea; slot shells merge on fill",
+    },
+    {
+      archetype: "video_short",
+      count: 1,
+      period: "week",
+      notes: "IG reel crosspost",
+    },
   ],
   youtube: [
-    { archetype: "video_long", count: 2, period: "month", notes: "48-hours-in itineraries (data-informed; sheet only covers Shorts)" },
-    { archetype: "video_short", count: 3, period: "week", notes: "Sheet: 3–4 repurposed TikTok/Reels per week" },
+    {
+      archetype: "video_long",
+      count: 2,
+      period: "month",
+      notes:
+        "48-hours-in itineraries (data-informed; sheet only covers Shorts)",
+    },
+    {
+      archetype: "video_short",
+      count: 3,
+      period: "week",
+      notes: "Sheet: 3–4 repurposed TikTok/Reels per week",
+    },
   ],
   pinterest: [
-    { archetype: "image", count: 10, period: "month", notes: "One slot = one batched board drop (the sheet's 10–15 pins/DAY counts pins, not planning units)" },
+    {
+      archetype: "image",
+      count: 10,
+      period: "month",
+      notes:
+        "One slot = one batched board drop (the sheet's 10–15 pins/DAY counts pins, not planning units)",
+    },
   ],
 };
 
@@ -137,7 +219,9 @@ const channels = await db.query.channelTable.findMany({
 const channelByPlatform = new Map(channels.map((c) => [c.platform, c]));
 
 // Full replace for this brand.
-await db.delete(cadenceTargetTable).where(eq(cadenceTargetTable.brandId, brand.id));
+await db
+  .delete(cadenceTargetTable)
+  .where(eq(cadenceTargetTable.brandId, brand.id));
 await db.delete(mixTargetTable).where(eq(mixTargetTable.brandId, brand.id));
 
 let cadCount = 0;

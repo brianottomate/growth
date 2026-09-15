@@ -54,15 +54,19 @@ export function BrandMarkCard({
   // What "Fix with AI" returned for the lockup as currently edited. Any edit
   // to the recipe drops it: the correction belonged to the previous picture.
   const [tuning, setTuning] = useState<Tuning | null>(null);
-  const editRecipe = <T,>(set: (v: T) => void) => (v: T) => {
-    set(v);
-    setTuning(null);
-  };
+  const editRecipe =
+    <T,>(set: (v: T) => void) =>
+    (v: T) => {
+      set(v);
+      setTuning(null);
+    };
 
   const fonts = identity?.fonts ?? [];
-  const headingFont = fonts.find((f) => f.role === "heading")?.family ?? fonts[0]?.family ?? null;
+  const headingFont =
+    fonts.find((f) => f.role === "heading")?.family ?? fonts[0]?.family ?? null;
   const bodyFont = fonts.find((f) => f.role === "body")?.family ?? null;
-  const fontFamily = font === "heading" ? headingFont : font === "body" ? bodyFont : "";
+  const fontFamily =
+    font === "heading" ? headingFont : font === "body" ? bodyFont : "";
 
   const library = useQuery({
     ...trpc.media.list.queryOptions({ brandId, kind: "image" }),
@@ -146,27 +150,50 @@ export function BrandMarkCard({
   const busy = setMark.isPending || clearMark.isPending;
 
   return (
-    <section id="brand-mark" className="scroll-mt-6 space-y-4 rounded-xl border p-4">
+    <section
+      id="brand-mark"
+      className="scroll-mt-6 space-y-4 rounded-xl border p-4"
+    >
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold">Brand mark</h2>
-          <p className="text-muted-foreground mt-0.5 text-sm">
+          <p className="mt-0.5 text-sm text-muted-foreground">
             {mark
               ? `${describe(mark)}. Cards draw the white version over photos and the colour version on light grounds.`
               : "No mark chosen. Cards fall back to the scraped logo, cut white over photos."}
           </p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" disabled={busy || !logo} onClick={() => setMark.mutate({ id: brandId, source: "logo" })}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy || !logo}
+            onClick={() => setMark.mutate({ id: brandId, source: "logo" })}
+          >
             Use logo
           </Button>
-          <Button size="sm" variant="outline" disabled={busy} onClick={() => setMark.mutate({ id: brandId, source: "favicon" })}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={() => setMark.mutate({ id: brandId, source: "favicon" })}
+          >
             Use favicon
           </Button>
-          <Button size="sm" variant={building ? "default" : "outline"} disabled={busy} onClick={() => setBuilding((b) => !b)}>
+          <Button
+            size="sm"
+            variant={building ? "default" : "outline"}
+            disabled={busy}
+            onClick={() => setBuilding((b) => !b)}
+          >
             Build lockup
           </Button>
-          <Button size="sm" variant="ghost" disabled title="Generated marks are coming later">
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled
+            title="Generated marks are coming later"
+          >
             <Sparkles className="mr-1.5 size-3.5" /> Generate
           </Button>
         </div>
@@ -176,9 +203,22 @@ export function BrandMarkCard({
 
       {variants ? (
         <div className="grid grid-cols-3 gap-2">
-          <Swatch label="Colour on white" src={variants.color} className="bg-white" />
-          <Swatch label="White on dark" src={variants.white} className="bg-neutral-900" />
-          <Swatch label="White on photo" src={variants.white} className="bg-neutral-800" photo={photo} />
+          <Swatch
+            label="Colour on white"
+            src={variants.color}
+            className="bg-white"
+          />
+          <Swatch
+            label="White on dark"
+            src={variants.white}
+            className="bg-neutral-900"
+          />
+          <Swatch
+            label="White on photo"
+            src={variants.white}
+            className="bg-neutral-800"
+            photo={photo}
+          />
         </div>
       ) : null}
 
@@ -189,7 +229,9 @@ export function BrandMarkCard({
               <Label>Icon</Label>
               <SimpleSelect
                 value={icon}
-                onValueChange={editRecipe((value: string) => setIcon(value as IconChoice))}
+                onValueChange={editRecipe((value: string) =>
+                  setIcon(value as IconChoice),
+                )}
                 options={[
                   ...(logo ? [{ value: "logo", label: "Site logo" }] : []),
                   { value: "favicon", label: "Favicon" },
@@ -204,17 +246,30 @@ export function BrandMarkCard({
               <Input
                 value={text}
                 maxLength={60}
-                onChange={editRecipe((event: React.ChangeEvent<HTMLInputElement>) => setText(event.target.value))}
+                onChange={editRecipe(
+                  (event: React.ChangeEvent<HTMLInputElement>) =>
+                    setText(event.target.value),
+                )}
               />
             </div>
             <div className="space-y-1.5">
               <Label>Font</Label>
               <SimpleSelect
                 value={font}
-                onValueChange={editRecipe((value: string) => setFont(value as FontChoice))}
+                onValueChange={editRecipe((value: string) =>
+                  setFont(value as FontChoice),
+                )}
                 options={[
-                  { value: "heading", label: headingFont ? `${headingFont} (heading)` : "Heading (none read)" },
-                  { value: "body", label: bodyFont ? `${bodyFont} (body)` : "Body (none read)" },
+                  {
+                    value: "heading",
+                    label: headingFont
+                      ? `${headingFont} (heading)`
+                      : "Heading (none read)",
+                  },
+                  {
+                    value: "body",
+                    label: bodyFont ? `${bodyFont} (body)` : "Body (none read)",
+                  },
                   { value: "house", label: "House font" },
                 ]}
                 className="w-full"
@@ -234,15 +289,21 @@ export function BrandMarkCard({
                     onClick={editRecipe(() => setIconAssetId(asset.id))}
                     className={cn(
                       "aspect-square overflow-hidden rounded-md border bg-white",
-                      iconAssetId === asset.id && "ring-primary ring-2",
+                      iconAssetId === asset.id && "ring-2 ring-primary",
                     )}
                     title={asset.title ?? undefined}
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={asset.thumbnailUrl ?? asset.url!} alt="" className="h-full w-full object-contain" />
+                    {/* oxlint-disable-next-line nextjs/no-img-element */}
+                    <img
+                      src={asset.thumbnailUrl ?? asset.url!}
+                      alt=""
+                      className="h-full w-full object-contain"
+                    />
                   </button>
                 ))}
-              {library.isLoading ? <Loader2 className="size-4 animate-spin" /> : null}
+              {library.isLoading ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : null}
             </div>
           ) : null}
 
@@ -252,7 +313,10 @@ export function BrandMarkCard({
                 key={t}
                 type="button"
                 onClick={() => setTone(t)}
-                className={cn("rounded-md border px-2 py-0.5 capitalize", tone === t && "bg-muted font-medium")}
+                className={cn(
+                  "rounded-md border px-2 py-0.5 capitalize",
+                  tone === t && "bg-muted font-medium",
+                )}
               >
                 {t}
               </button>
@@ -266,18 +330,26 @@ export function BrandMarkCard({
             )}
           >
             {previewUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img key={previewUrl} src={previewUrl} alt="" className="max-h-10 max-w-[90%] object-contain" />
+              // oxlint-disable-next-line nextjs/no-img-element
+              <img
+                key={previewUrl}
+                src={previewUrl}
+                alt=""
+                className="max-h-10 max-w-[90%] object-contain"
+              />
             ) : (
-              <span className="text-muted-foreground text-xs">Pick an image to preview.</span>
+              <span className="text-xs text-muted-foreground">
+                Pick an image to preview.
+              </span>
             )}
           </div>
 
           {tuning ? (
-            <p className="text-muted-foreground rounded-lg border border-dashed p-3 text-[11px] leading-4">
+            <p className="rounded-lg border border-dashed p-3 text-[11px] leading-4 text-muted-foreground">
               <span className="font-medium">Art director:</span> {tuning.note}{" "}
               <span className="font-mono">
-                (icon ×{tuning.iconScale}, shift {tuning.iconShift}, gap ×{tuning.gapScale})
+                (icon ×{tuning.iconScale}, shift {tuning.iconShift}, gap ×
+                {tuning.gapScale})
               </span>
             </p>
           ) : null}
@@ -286,21 +358,45 @@ export function BrandMarkCard({
             <Button
               size="sm"
               variant="outline"
-              disabled={busy || critique.isPending || (icon === "library" && !iconAssetId)}
+              disabled={
+                busy ||
+                critique.isPending ||
+                (icon === "library" && !iconAssetId)
+              }
               onClick={() => critique.mutate({ id: brandId, ...recipe })}
               title="Have Claude judge this lockup and apply its corrections to the preview"
             >
-              <Wand2 className={cn("mr-1.5 size-3.5", critique.isPending && "animate-pulse")} />
-              {critique.isPending ? "Judging…" : tuning ? "Fix again" : "Fix with AI"}
+              <Wand2
+                className={cn(
+                  "mr-1.5 size-3.5",
+                  critique.isPending && "animate-pulse",
+                )}
+              />
+              {critique.isPending
+                ? "Judging…"
+                : tuning
+                  ? "Fix again"
+                  : "Fix with AI"}
             </Button>
             <div className="flex gap-2">
-              <Button size="sm" variant="ghost" onClick={() => setBuilding(false)}>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setBuilding(false)}
+              >
                 Cancel
               </Button>
               <Button
                 size="sm"
                 disabled={busy || (icon === "library" && !iconAssetId)}
-                onClick={() => setMark.mutate({ id: brandId, source: "lockup", ...recipe, tuning })}
+                onClick={() =>
+                  setMark.mutate({
+                    id: brandId,
+                    source: "lockup",
+                    ...recipe,
+                    tuning,
+                  })
+                }
               >
                 {setMark.isPending ? "Rendering…" : "Save mark"}
               </Button>
@@ -319,11 +415,21 @@ export function BrandMarkCard({
               onClick={fixSavedLockup}
               title="Reopen the saved lockup, have Claude judge it, and apply its corrections to the preview"
             >
-              <Wand2 className={cn("mr-1.5 size-3.5", critique.isPending && "animate-pulse")} />
+              <Wand2
+                className={cn(
+                  "mr-1.5 size-3.5",
+                  critique.isPending && "animate-pulse",
+                )}
+              />
               {critique.isPending ? "Judging…" : "Fix with AI"}
             </Button>
           ) : null}
-          <Button size="sm" variant="ghost" disabled={busy} onClick={() => clearMark.mutate({ id: brandId })}>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={busy}
+            onClick={() => clearMark.mutate({ id: brandId })}
+          >
             Clear mark
           </Button>
         </div>
@@ -343,7 +449,7 @@ function Critique({ mark }: { mark: BrandMark | null }) {
   const note = mark?.tuning?.note;
   if (!note) return null;
   return (
-    <p className="text-muted-foreground rounded-lg border border-dashed p-3 text-[11px] leading-4">
+    <p className="rounded-lg border border-dashed p-3 text-[11px] leading-4 text-muted-foreground">
       <span className="font-medium">Art director:</span> {note}
     </p>
   );
@@ -362,13 +468,18 @@ function Swatch({
 }) {
   return (
     <div className="overflow-hidden rounded-md border">
-      <div className="text-muted-foreground border-b px-2 py-1 text-[11px]">{label}</div>
+      <div className="border-b px-2 py-1 text-[11px] text-muted-foreground">
+        {label}
+      </div>
       <div
-        className={cn("flex h-16 items-center justify-center bg-cover bg-center p-3", className)}
+        className={cn(
+          "flex h-16 items-center justify-center bg-cover bg-center p-3",
+          className,
+        )}
         style={photo ? { backgroundImage: `url(${photo})` } : undefined}
       >
         {/* The size a mark is drawn at on a card, so it is judged at that size. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {/* oxlint-disable-next-line nextjs/no-img-element */}
         <img src={src} alt="" className="max-h-9 max-w-full object-contain" />
       </div>
     </div>

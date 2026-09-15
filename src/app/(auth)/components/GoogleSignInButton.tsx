@@ -101,7 +101,7 @@ export function GoogleSignInButton({
         )}
         {label}
       </Button>
-      {error && <p className="text-destructive text-sm">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
 }

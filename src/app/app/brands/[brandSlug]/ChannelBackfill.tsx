@@ -16,27 +16,31 @@ import { CompactPlatformPreview } from "@/app/app/content/[contentId]/CompactPla
 type ScrapePlatform = "instagram" | "facebook" | "linkedin" | "x";
 
 /** Sample sizes an operator picks from. Small first: scraping bills per record. */
-const PULLS: { label: string; limit: number; sinceDays: number; title: string }[] =
-  [
-    {
-      label: "Sample 5",
-      limit: 5,
-      sinceDays: 93,
-      title: "Five most recent posts — confirms the channel is wired up",
-    },
-    {
-      label: "30 days",
-      limit: 30,
-      sinceDays: 30,
-      title: "Up to 30 posts from the last month",
-    },
-    {
-      label: "90 days",
-      limit: 100,
-      sinceDays: 93,
-      title: "Up to 100 posts from the last three months",
-    },
-  ];
+const PULLS: {
+  label: string;
+  limit: number;
+  sinceDays: number;
+  title: string;
+}[] = [
+  {
+    label: "Sample 5",
+    limit: 5,
+    sinceDays: 93,
+    title: "Five most recent posts — confirms the channel is wired up",
+  },
+  {
+    label: "30 days",
+    limit: 30,
+    sinceDays: 30,
+    title: "Up to 30 posts from the last month",
+  },
+  {
+    label: "90 days",
+    limit: 100,
+    sinceDays: 93,
+    title: "Up to 100 posts from the last three months",
+  },
+];
 
 const dateFmt = new Intl.DateTimeFormat(undefined, {
   month: "short",
@@ -114,7 +118,7 @@ export function ChannelBackfill({
     <>
       {state.recentPosts.length > 0 && (
         <div className="border-t px-4 pt-3 pb-1">
-          <div className="text-muted-foreground mb-2 text-[10px] font-semibold tracking-wide uppercase">
+          <div className="mb-2 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
             Latest pulled · {state.recentPosts.length} of {state.posts}
           </div>
           <div className="flex gap-3 overflow-x-auto pb-2">
@@ -133,7 +137,7 @@ export function ChannelBackfill({
       )}
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t px-4 py-2">
-        <span className="text-muted-foreground text-[11px] tabular-nums">
+        <span className="text-[11px] text-muted-foreground tabular-nums">
           {facts.join(" · ")}
         </span>
 
@@ -163,7 +167,10 @@ export function ChannelBackfill({
                 key={p.label}
                 variant="ghost"
                 size="sm"
-                className="text-muted-foreground h-6 px-2 text-[11px]"
+                tone="muted"
+                textSize="caption"
+                density="tight"
+                className="h-6"
                 title={p.title}
                 disabled={running != null}
                 loading={running === p.label}
@@ -173,7 +180,7 @@ export function ChannelBackfill({
               </Button>
             ))
           ) : (
-            <span className="text-muted-foreground text-[11px]">
+            <span className="text-[11px] text-muted-foreground">
               {state.profileUrl
                 ? `No scraper for ${labelFor(state.platform)} yet`
                 : "Add the page link to enable pulls"}
@@ -242,8 +249,13 @@ function PulledPost({
 
 function labelFor(platform: string) {
   return (
-    { instagram: "Instagram", facebook: "Facebook", linkedin: "LinkedIn", x: "X", youtube: "YouTube", tiktok: "TikTok" }[
-      platform
-    ] ?? platform
+    {
+      instagram: "Instagram",
+      facebook: "Facebook",
+      linkedin: "LinkedIn",
+      x: "X",
+      youtube: "YouTube",
+      tiktok: "TikTok",
+    }[platform] ?? platform
   );
 }

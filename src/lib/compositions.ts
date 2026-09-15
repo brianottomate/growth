@@ -152,25 +152,40 @@ const message: CompositionField[] = [
   { key: "subtitle", label: "Supporting copy", hint: "Optional" },
   { key: "cta", label: "CTA", hint: "Optional" },
 ];
-const accent = (hint: string): CompositionField => ({ key: "accent", label: "Accent", hint });
+const accent = (hint: string): CompositionField => ({
+  key: "accent",
+  label: "Accent",
+  hint,
+});
 
 /**
  * The fields each blueprint draws, and only those. The form is built from
  * this, so a field that exists on screen is a field the render reads, and the
  * label says what it means on that layout.
  */
-export const COMPOSITION_FIELDS: Record<CompositionTemplateId, CompositionField[]> = {
+export const COMPOSITION_FIELDS: Record<
+  CompositionTemplateId,
+  CompositionField[]
+> = {
   // The photo alone: nothing from the form reaches the canvas.
   "photo-only": [],
   "catalog-copy": [
     mark,
     { key: "title", label: "Home name" },
-    { key: "subtitle", label: "Facts", hint: "3 bedrooms · 2 baths · 8 guests" },
+    {
+      key: "subtitle",
+      label: "Facts",
+      hint: "3 bedrooms · 2 baths · 8 guests",
+    },
   ],
   "catalog-place": [
     { key: "eyebrow", label: "Lead-in", hint: "Arcade games & firepit in" },
     { key: "title", label: "Place", hint: "Winter Park, CO" },
-    { key: "subtitle", label: "Facts", hint: "3 bedrooms · 3.5 baths · 14 guests" },
+    {
+      key: "subtitle",
+      label: "Facts",
+      hint: "3 bedrooms · 3.5 baths · 14 guests",
+    },
     { key: "rating", label: "Guest rating", hint: "4.9" },
     accent("colours the rating pill"),
   ],
@@ -194,7 +209,11 @@ export const COMPOSITION_FIELDS: Record<CompositionTemplateId, CompositionField[
   ],
   "hero-overlay": [
     { key: "title", label: "Headline" },
-    { key: "cta", label: "Button", hint: "Optional; plain text on the story canvas" },
+    {
+      key: "cta",
+      label: "Button",
+      hint: "Optional; plain text on the story canvas",
+    },
   ],
   "image-hero": [mark, ...message],
   "split-frame": [mark, ...message],

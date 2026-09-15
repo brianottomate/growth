@@ -201,14 +201,14 @@ export function OverviewAssistantPopup({
         aria-label="Growth assistant"
         aria-hidden={!open}
         className={cn(
-          "bg-background fixed inset-3 z-50 flex flex-col overflow-hidden rounded-2xl border shadow-2xl transition-[width,opacity,transform] duration-200 xl:static xl:inset-auto xl:z-auto xl:h-svh xl:shrink-0 xl:rounded-none xl:border-y-0 xl:border-r-0 xl:shadow-none",
+          "fixed inset-3 z-50 flex flex-col overflow-hidden rounded-2xl border bg-background shadow-2xl transition-[width,opacity,transform] duration-200 xl:static xl:inset-auto xl:z-auto xl:h-svh xl:shrink-0 xl:rounded-none xl:border-y-0 xl:border-r-0 xl:shadow-none",
           open
             ? "translate-y-0 opacity-100 xl:w-[472px]"
             : "pointer-events-none invisible translate-y-2 opacity-0 xl:visible xl:w-0 xl:translate-y-0 xl:border-l-0",
         )}
       >
         <header className="flex h-12 shrink-0 items-center gap-3 border-b px-3">
-          <span className="bg-primary/10 text-primary grid size-7 place-items-center rounded-lg">
+          <span className="grid size-7 place-items-center rounded-lg bg-primary/10 text-primary">
             <Sparkles className="size-3.5" />
           </span>
           <div className="min-w-0 flex-1">
@@ -217,13 +217,13 @@ export function OverviewAssistantPopup({
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className="hover:bg-accent flex max-w-full items-center gap-1 rounded-md px-1 py-0.5 text-left text-sm font-semibold outline-none"
+                    className="flex max-w-full items-center gap-1 rounded-md px-1 py-0.5 text-left text-sm font-semibold outline-none hover:bg-accent"
                     aria-label="Choose assistant session"
                   >
                     <span className="truncate">
                       {activeThread?.title ?? "Session"}
                     </span>
-                    <ChevronDown className="text-muted-foreground size-3.5 shrink-0" />
+                    <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
@@ -268,7 +268,7 @@ export function OverviewAssistantPopup({
               onClick={() => void copyThreadId()}
               disabled={!activeThreadId}
               title={activeThreadId ?? undefined}
-              className="text-muted-foreground hover:text-foreground block max-w-full truncate text-[11px] disabled:pointer-events-none"
+              className="block max-w-full truncate text-[11px] text-muted-foreground hover:text-foreground disabled:pointer-events-none"
             >
               {activeThreadId
                 ? `Persistent session · ${activeThreadId}`
@@ -335,7 +335,7 @@ export function OverviewAssistantPopup({
               campaignContext={campaignContext ?? undefined}
             />
           ) : (
-            <div className="text-muted-foreground grid h-full place-items-center">
+            <div className="grid h-full place-items-center text-muted-foreground">
               <Loader2 className="size-5 animate-spin" />
             </div>
           )}
@@ -349,7 +349,9 @@ export function OverviewAssistantPopup({
           onClick={() => setVisible(true)}
           aria-label="Open growth assistant"
           aria-expanded={false}
-          className="fixed right-5 bottom-5 z-50 size-12 rounded-full shadow-lg transition-transform hover:scale-105"
+          shape="round"
+          elevation="floating"
+          className="fixed right-5 bottom-5 z-50 size-12 hover:scale-105"
         >
           <MessageSquare className="size-5" />
         </Button>

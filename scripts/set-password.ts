@@ -20,8 +20,7 @@ if (!email) {
   console.error("Usage: bun run scripts/set-password.ts <email> [password]");
   process.exit(1);
 }
-const password =
-  process.argv[3] ?? `${randomBytes(9).toString("base64url")}7`;
+const password = process.argv[3] ?? `${randomBytes(9).toString("base64url")}7`;
 
 const user = await db.query.userTable.findFirst({
   where: eq(userTable.email, email),

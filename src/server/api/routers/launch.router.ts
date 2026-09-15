@@ -78,7 +78,10 @@ export const launchRouter = createTRPCRouter({
         columns: { id: true },
       });
       if (!product) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Product not found" });
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Product not found",
+        });
       }
       return createLaunch({
         orgId,

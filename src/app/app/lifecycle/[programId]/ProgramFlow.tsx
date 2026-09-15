@@ -94,7 +94,7 @@ function TriggerNode({ data }: NodeProps) {
   const d = data as unknown as { label: string };
   return (
     <div
-      className="bg-card flex items-center gap-2 rounded-full border px-4 py-2 shadow-sm"
+      className="flex items-center gap-2 rounded-full border bg-card px-4 py-2 shadow-sm"
       style={{ minWidth: 160 }}
     >
       <Zap className="size-3.5 text-amber-400" />
@@ -109,7 +109,7 @@ function StepNode({ data }: NodeProps) {
   const meta = STATUS_META[s.status] ?? STATUS_META.planned;
   return (
     <div
-      className="bg-card rounded-lg border-2 px-3 py-2 shadow-sm"
+      className="rounded-lg border-2 bg-card px-3 py-2 shadow-sm"
       style={{ borderColor: meta.border, width: NODE_WIDTH }}
     >
       <Handle type="target" position={Position.Top} style={{ opacity: 0 }} />
@@ -124,7 +124,7 @@ function StepNode({ data }: NodeProps) {
             href={s.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-muted-foreground hover:text-foreground ml-auto"
+            className="ml-auto text-muted-foreground hover:text-foreground"
             title={s.url}
           >
             <ExternalLink className="size-3" />
@@ -132,22 +132,22 @@ function StepNode({ data }: NodeProps) {
         )}
       </div>
       {s.subject && (
-        <div className="text-muted-foreground mt-0.5 truncate text-[10px] italic">
+        <div className="mt-0.5 truncate text-[10px] text-muted-foreground italic">
           {s.subject}
         </div>
       )}
       <div className="mt-1.5 flex flex-wrap items-center gap-1">
-        <span className="border-border text-muted-foreground rounded border px-1 py-px text-[9px] font-medium">
+        <span className="rounded border border-border px-1 py-px text-[9px] font-medium text-muted-foreground">
           {CHANNEL_LABEL[s.channel] ?? s.channel}
         </span>
         {s.system && (
-          <span className="bg-accent rounded px-1 py-px text-[9px] font-medium">
+          <span className="rounded bg-accent px-1 py-px text-[9px] font-medium">
             {SYSTEM_LABEL[s.system] ?? s.system}
           </span>
         )}
         {s.campaign && (
           <span
-            className="text-muted-foreground text-[9px]"
+            className="text-[9px] text-muted-foreground"
             title={`Delivered by ${s.campaign.name} (${s.campaign.runState})`}
           >
             via{" "}
@@ -157,7 +157,7 @@ function StepNode({ data }: NodeProps) {
           </span>
         )}
         {formatDelay(s.delayMinutes, s.delayLabel) && (
-          <span className="text-muted-foreground ml-auto text-[9px] tabular-nums">
+          <span className="ml-auto text-[9px] text-muted-foreground tabular-nums">
             {formatDelay(s.delayMinutes, s.delayLabel)}
           </span>
         )}
@@ -269,7 +269,7 @@ export function ProgramFlow({
 
   if (steps.length === 0) {
     return (
-      <div className="text-muted-foreground mt-6 rounded-xl border border-dashed p-10 text-center text-sm">
+      <div className="mt-6 rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">
         No steps yet — add steps on the Lifecycle page to see the flow.
       </div>
     );
@@ -305,14 +305,14 @@ export function ProgramFlow({
           </ReactFlow>
         </ReactFlowProvider>
       </div>
-      <div className="bg-card flex flex-wrap items-center gap-x-4 gap-y-1 border-t px-4 py-2">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t bg-card px-4 py-2">
         {Object.entries(STATUS_META).map(([k, m]) => (
           <span key={k} className="flex items-center gap-1.5 text-[10px]">
             <span className={`size-2 rounded-full ${m.dot}`} />
             <span className="text-muted-foreground">{m.label}</span>
           </span>
         ))}
-        <span className="text-muted-foreground ml-2 border-l pl-4 text-[10px]">
+        <span className="ml-2 border-l pl-4 text-[10px] text-muted-foreground">
           dashed = conditional branch
         </span>
       </div>

@@ -57,7 +57,9 @@ export const AUDIENCE_BUDGET_TIERS = [
 ] as const;
 
 export type PerformanceAudienceKind =
-  "lookalike_booker_seed" | "prospecting_list" | "third_party_intent";
+  | "lookalike_booker_seed"
+  | "prospecting_list"
+  | "third_party_intent";
 
 /**
  * Audience count follows the budget, not the ambition.
@@ -260,7 +262,10 @@ export function hostScopedConversionRule(
 }
 
 export type PerformanceAdFormat =
-  "Static" | "Carousel" | "Video" | "Influencer Video";
+  | "Static"
+  | "Carousel"
+  | "Video"
+  | "Influencer Video";
 
 /** The format a creative ad compiles to, read off its media. */
 export function adFormatFor(content: {

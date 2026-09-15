@@ -148,7 +148,7 @@ export function EditPersonDialog({
               aria-label="Role"
             />
             {(isSelf || !canManage) && (
-              <p className="text-muted-foreground text-xs">
+              <p className="text-xs text-muted-foreground">
                 {isSelf
                   ? "You can't change your own role."
                   : "Only an admin or owner can change roles."}
@@ -158,12 +158,12 @@ export function EditPersonDialog({
 
           <div className="space-y-2 border-t pt-3">
             {newPassword ? (
-              <div className="bg-muted/50 flex items-center justify-between gap-2 rounded-lg border p-3 text-sm">
+              <div className="flex items-center justify-between gap-2 rounded-lg border bg-muted/50 p-3 text-sm">
                 <div className="min-w-0">
-                  <div className="text-muted-foreground text-xs">
+                  <div className="text-xs text-muted-foreground">
                     New temp password — share it once
                   </div>
-                  <code className="bg-background mt-1 inline-block rounded border px-2 py-0.5 font-mono text-xs">
+                  <code className="mt-1 inline-block rounded border bg-background px-2 py-0.5 font-mono text-xs">
                     {newPassword}
                   </code>
                 </div>

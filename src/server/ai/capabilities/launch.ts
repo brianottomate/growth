@@ -163,18 +163,14 @@ export const setLaunchFieldsAction = growthAction({
   }),
   execute: async ({ launchId, ...fields }, ctx) => {
     await requireLaunch(ctx.orgId, launchId);
-    const patch: Partial<typeof launchTable.$inferInsert> =
-      Object.fromEntries(
-        Object.entries(fields).filter(([, v]) => v !== undefined),
-      );
+    const patch: Partial<typeof launchTable.$inferInsert> = Object.fromEntries(
+      Object.entries(fields).filter(([, v]) => v !== undefined),
+    );
     if (Object.keys(patch).length === 0) {
       throw new GrowthActionError("invalid_input", "Nothing to set.");
     }
     if (patch.status === "shipped") patch.shippedAt = new Date();
-    await db
-      .update(launchTable)
-      .set(patch)
-      .where(eq(launchTable.id, launchId));
+    await db.update(launchTable).set(patch).where(eq(launchTable.id, launchId));
     return {
       action: "saved" as const,
       launchId,

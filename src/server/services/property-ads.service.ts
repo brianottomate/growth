@@ -297,7 +297,10 @@ export async function draftAdsFromHomes(input: {
   // Ten is Meta's own carousel ceiling. The cap used to be eight to fit a
   // two-minute route budget; the route now allows what the work needs.
   const size = Math.min(
-    Math.max(input.carouselSize ?? input.listingUrls?.length ?? DEFAULT_CAROUSEL_SIZE, 1),
+    Math.max(
+      input.carouselSize ?? input.listingUrls?.length ?? DEFAULT_CAROUSEL_SIZE,
+      1,
+    ),
     10,
   );
 
@@ -322,7 +325,11 @@ export async function draftAdsFromHomes(input: {
   const run: HomesRun = {
     status: "running",
     startedAt: new Date().toISOString(),
-    steps: chosen.map((row) => ({ name: row.name, url: row.url, status: "pending" })),
+    steps: chosen.map((row) => ({
+      name: row.name,
+      url: row.url,
+      status: "pending",
+    })),
     notes: [],
     adIds: [],
   };
@@ -376,7 +383,9 @@ function pickListings(
     else missing += 1;
   }
   if (missing > 0) {
-    notes.push(`${missing} chosen home(s) are not on the listing feed right now.`);
+    notes.push(
+      `${missing} chosen home(s) are not on the listing feed right now.`,
+    );
   }
   return picked;
 }
@@ -402,7 +411,6 @@ async function draftAdsFromChosenHomes({
   saveRun: () => Promise<void>;
   step: (index: number, patch: Partial<HomesRunStep>) => void;
 }): Promise<DraftAdsFromHomesResult> {
-
   const where = [
     ...new Set(
       chosen
@@ -451,7 +459,10 @@ async function draftAdsFromChosenHomes({
         }));
       if (!source.url) {
         notes.push(`The imported photo for ${listing.name} has no URL yet.`);
-        step(index, { status: "failed", note: "The imported photo has no URL yet." });
+        step(index, {
+          status: "failed",
+          note: "The imported photo has no URL yet.",
+        });
         continue;
       }
       // The feed card: name over the photo, facts under it, the brand's own
@@ -512,7 +523,9 @@ async function draftAdsFromChosenHomes({
     notes.push(`Reused ${reused} card(s) rendered on an earlier run.`);
   }
   if (adjusted > 0) {
-    notes.push(`The art director adjusted ${adjusted} of ${cards.length} card(s).`);
+    notes.push(
+      `The art director adjusted ${adjusted} of ${cards.length} card(s).`,
+    );
   }
   const first = cards[0];
   if (!first) {
@@ -585,7 +598,10 @@ async function draftAdsFromChosenHomes({
   run.adIds = adIds;
   await db
     .update(campaignTable)
-    .set({ homesRun: { ...run, notes: [...notes] }, creativePool: [...pool, ...fresh] })
+    .set({
+      homesRun: { ...run, notes: [...notes] },
+      creativePool: [...pool, ...fresh],
+    })
     .where(eq(campaignTable.id, campaign.id));
 
   return {

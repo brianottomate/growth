@@ -24,15 +24,27 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`Discovering handles for ${brand.name} (${brand.website ?? "no site"}) — verify=${verify}\n`);
+  console.log(
+    `Discovering handles for ${brand.name} (${brand.website ?? "no site"}) — verify=${verify}\n`,
+  );
   const r = await discoverAndSaveSuggestions(brand.id, { verify });
 
-  console.log(`discovered=${r.discovered} inserted=${r.inserted} updated=${r.updated} skippedRejected=${r.skippedRejected} verified=${r.verified}\n`);
+  console.log(
+    `discovered=${r.discovered} inserted=${r.inserted} updated=${r.updated} skippedRejected=${r.skippedRejected} verified=${r.verified}\n`,
+  );
   console.log("=== pending suggestions (channel_suggestion) ===");
-  for (const s of r.suggestions.sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))) {
+  for (const s of r.suggestions.sort(
+    (a, b) => (b.confidence ?? 0) - (a.confidence ?? 0),
+  )) {
     const ver =
-      s.verified == null ? "—" : s.verified ? `✓ ${s.followerCount?.toLocaleString() ?? "?"} followers` : "✗ unresolved";
-    console.log(`  ${s.platform.padEnd(10)} @${s.handle.padEnd(22)} ${((s.confidence ?? 0) * 100).toFixed(0)}%  ${ver}`);
+      s.verified == null
+        ? "—"
+        : s.verified
+          ? `✓ ${s.followerCount?.toLocaleString() ?? "?"} followers`
+          : "✗ unresolved";
+    console.log(
+      `  ${s.platform.padEnd(10)} @${s.handle.padEnd(22)} ${((s.confidence ?? 0) * 100).toFixed(0)}%  ${ver}`,
+    );
     console.log(`      ${s.profileUrl}  [${(s.sources ?? []).join(", ")}]`);
   }
   process.exit(0);

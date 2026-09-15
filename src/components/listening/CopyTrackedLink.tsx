@@ -69,10 +69,10 @@ export function CopyTrackedLink({ mention }: { mention: TrackedLinkInput }) {
   ];
 
   return (
-    <div className="bg-background/40 mt-1 flex w-full flex-col gap-2 rounded-lg border p-3">
+    <div className="mt-1 flex w-full flex-col gap-2 rounded-lg border bg-background/40 p-3">
       <div className="flex flex-wrap items-center gap-1.5">
-        <Link2 className="text-muted-foreground h-3 w-3" />
-        <span className="text-muted-foreground text-[11px] font-medium">
+        <Link2 className="h-3 w-3 text-muted-foreground" />
+        <span className="text-[11px] font-medium text-muted-foreground">
           Tracked link
         </span>
         {options.map((d) => (
@@ -93,7 +93,7 @@ export function CopyTrackedLink({ mention }: { mention: TrackedLinkInput }) {
           value={custom}
           onChange={(e) => setCustom(e.target.value)}
           placeholder="wander.com path or URL — e.g. /sites or https://www.wander.com/blog/…"
-          className="bg-background w-full rounded-md border px-2 py-1 text-xs"
+          className="w-full rounded-md border bg-background px-2 py-1 text-xs"
         />
       )}
 
@@ -102,7 +102,7 @@ export function CopyTrackedLink({ mention }: { mention: TrackedLinkInput }) {
           readOnly
           value={link}
           onFocus={(e) => e.currentTarget.select()}
-          className="bg-background text-muted-foreground w-full rounded-md border px-2 py-1 font-mono text-[11px]"
+          className="w-full rounded-md border bg-background px-2 py-1 font-mono text-[11px] text-muted-foreground"
         />
         <button type="button" onClick={copy} className={btn}>
           {copied ? (
@@ -114,7 +114,7 @@ export function CopyTrackedLink({ mention }: { mention: TrackedLinkInput }) {
         </button>
       </div>
 
-      <p className="text-muted-foreground/70 text-[11px] leading-relaxed">
+      <p className="text-[11px] leading-relaxed text-muted-foreground/70">
         Carries UTM tags so any signup from your reply is attributed to this
         mention in Amplitude. Only drop a link when it genuinely fits the
         conversation — and always disclose you&apos;re with Wander.

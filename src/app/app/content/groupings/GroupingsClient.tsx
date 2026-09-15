@@ -59,9 +59,9 @@ const isAmp = (m: Member) => AMP_KINDS.has(m.externalKind ?? "");
 function MemberTile({ m }: { m: Member }) {
   const inner = (
     <>
-      <div className="bg-muted relative size-12 shrink-0 overflow-hidden rounded">
+      <div className="relative size-12 shrink-0 overflow-hidden rounded bg-muted">
         {m.mediaUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
+          // oxlint-disable-next-line nextjs/no-img-element
           <img src={m.mediaUrl} alt="" className="h-full w-full object-cover" />
         ) : (
           <ChannelLogo
@@ -74,7 +74,7 @@ function MemberTile({ m }: { m: Member }) {
         </span>
       </div>
       <div className="min-w-0 flex-1">
-        <div className="text-muted-foreground flex items-center gap-1 text-[9px]">
+        <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
           <span className="truncate">
             {platformLabel(m.platform)}
             {m.at ? ` · ${m.at.slice(0, 10)}` : ""}
@@ -106,9 +106,9 @@ function MemberTile({ m }: { m: Member }) {
 function ThreadRow({ m }: { m: Member }) {
   const inner = (
     <div className="flex items-start gap-2">
-      <div className="bg-muted relative size-9 shrink-0 overflow-hidden rounded">
+      <div className="relative size-9 shrink-0 overflow-hidden rounded bg-muted">
         {m.mediaUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
+          // oxlint-disable-next-line nextjs/no-img-element
           <img src={m.mediaUrl} alt="" className="h-full w-full object-cover" />
         ) : (
           <ChannelLogo
@@ -118,7 +118,7 @@ function ThreadRow({ m }: { m: Member }) {
         )}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="text-muted-foreground flex items-center gap-1 text-[9px]">
+        <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
           <ChannelLogo platform={m.platform} className="size-3" />
           {m.at ? m.at.slice(0, 10) : ""}
           {m.externalUrl && <span>↗</span>}
@@ -132,7 +132,7 @@ function ThreadRow({ m }: { m: Member }) {
       href={m.externalUrl}
       target="_blank"
       rel="noreferrer"
-      className="hover:bg-accent/40 -mx-1 block rounded px-1 py-1"
+      className="-mx-1 block rounded px-1 py-1 hover:bg-accent/40"
     >
       {inner}
     </a>
@@ -163,7 +163,7 @@ function GroupCard({
 
   return (
     <div
-      className={`bg-card rounded-xl border p-4 transition-opacity ${status ? "opacity-55" : ""}`}
+      className={`rounded-xl border bg-card p-4 transition-opacity ${status ? "opacity-55" : ""}`}
     >
       <div className="flex items-start gap-2">
         <div className="flex-1">
@@ -175,7 +175,7 @@ function GroupCard({
               {g.groupKind}
             </span>
             <span
-              className="text-muted-foreground text-[10px]"
+              className="text-[10px] text-muted-foreground"
               title={
                 g.unit === "series"
                   ? "Accept → creates a series with one idea per post"
@@ -184,7 +184,7 @@ function GroupCard({
             >
               → {g.unit === "series" ? "series" : "idea"}
             </span>
-            <span className="text-muted-foreground text-[11px]">
+            <span className="text-[11px] text-muted-foreground">
               {g.members.length} posts · {g.brandName}
             </span>
             {g.pillarSlug && (
@@ -196,7 +196,7 @@ function GroupCard({
               const s = dateSpan(g);
               if (!s) return null;
               return (
-                <span className="text-muted-foreground text-[11px] tabular-nums">
+                <span className="text-[11px] text-muted-foreground tabular-nums">
                   {s.first === s.last
                     ? fmtD(s.first)
                     : `${fmtD(s.first)} → ${fmtD(s.last)}`}
@@ -205,7 +205,7 @@ function GroupCard({
             })()}
           </div>
           {g.rationale && (
-            <p className="text-muted-foreground mt-0.5 text-xs">
+            <p className="mt-0.5 text-xs text-muted-foreground">
               {g.rationale}
             </p>
           )}
@@ -231,7 +231,7 @@ function GroupCard({
               </button>
               <button
                 onClick={() => onResolve(g.id, false)}
-                className="border-border text-muted-foreground hover:bg-accent rounded-md border px-2.5 py-1 text-xs font-medium"
+                className="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-accent"
               >
                 Reject
               </button>
@@ -242,8 +242,8 @@ function GroupCard({
 
       <div className="mt-3 space-y-3">
         {isThread ? (
-          <div className="border-border/60 space-y-0.5 border-l-2 pl-3">
-            <div className="text-muted-foreground text-[10px] font-medium tracking-wide uppercase">
+          <div className="space-y-0.5 border-l-2 border-border/60 pl-3">
+            <div className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
               Thread · {core.length}
             </div>
             {coreSorted.map((m) => (
@@ -364,12 +364,12 @@ export function GroupingsClient() {
         </h1>
         <Link
           href="/app/content"
-          className="text-muted-foreground hover:text-foreground text-sm"
+          className="text-sm text-muted-foreground hover:text-foreground"
         >
           ← Content board
         </Link>
       </div>
-      <p className="text-muted-foreground mt-1 text-sm">
+      <p className="mt-1 text-sm text-muted-foreground">
         AI-proposed content ideas reconstructed from your posts. Accept to
         create the idea and link its posts; reject to dismiss.
       </p>
@@ -381,7 +381,7 @@ export function GroupingsClient() {
             onClick={() => setFilter(f.key)}
             className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
               filter === f.key
-                ? "bg-foreground text-background border-foreground"
+                ? "border-foreground bg-foreground text-background"
                 : "border-border text-muted-foreground hover:bg-accent"
             }`}
           >
@@ -391,7 +391,7 @@ export function GroupingsClient() {
         ))}
         <span className="flex-1" />
         {progress.done > 0 && (
-          <span className="text-muted-foreground text-xs tabular-nums">
+          <span className="text-xs text-muted-foreground tabular-nums">
             <span className="text-emerald-400">{progress.accepted}</span>{" "}
             accepted
             {" · "}
@@ -403,9 +403,9 @@ export function GroupingsClient() {
       </div>
 
       <div className="mt-6 space-y-3">
-        {isLoading && <p className="text-muted-foreground text-sm">Loading…</p>}
+        {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
         {!isLoading && visible.length === 0 && (
-          <p className="text-muted-foreground text-sm">
+          <p className="text-sm text-muted-foreground">
             No groupings in this view.
           </p>
         )}

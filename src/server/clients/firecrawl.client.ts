@@ -94,13 +94,24 @@ export async function scrapeSiteImages(url: string): Promise<string[]> {
       const parsed = new URL(candidate);
       const src = parsed.searchParams.get("src");
       if (src && /^https?:\/\//i.test(src)) resolved = src;
-      else if (/\.(jpe?g|png|webp|avif)(\?|$)/i.test(parsed.pathname + parsed.search)) resolved = candidate;
-      else if (/images\.unsplash\.com|assets\.wander\.com|cloudinary|imgix/i.test(parsed.hostname)) resolved = candidate;
+      else if (
+        /\.(jpe?g|png|webp|avif)(\?|$)/i.test(parsed.pathname + parsed.search)
+      )
+        resolved = candidate;
+      else if (
+        /images\.unsplash\.com|assets\.wander\.com|cloudinary|imgix/i.test(
+          parsed.hostname,
+        )
+      )
+        resolved = candidate;
     } catch {
       continue;
     }
     if (!resolved) continue;
-    if (/favicon|sprite|pixel|tracking|1x1|\.(svg|ico|gif)(\?|$)/i.test(resolved)) continue;
+    if (
+      /favicon|sprite|pixel|tracking|1x1|\.(svg|ico|gif)(\?|$)/i.test(resolved)
+    )
+      continue;
     const key = resolved.replace(/[?#].*$/, "");
     if (seen.has(key)) continue;
     seen.add(key);

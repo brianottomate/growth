@@ -116,7 +116,7 @@ export function OrganizationInviteClient({
           </div>
         </div>
         <h1 className="text-2xl font-bold">You&apos;re Invited!</h1>
-        <p className="text-muted-foreground text-sm text-balance">
+        <p className="text-sm text-balance text-muted-foreground">
           Join {initialInvitation.organization.name}
         </p>
       </div>
@@ -139,7 +139,7 @@ export function OrganizationInviteClient({
             </div>
 
             {initialInvitation.expiresAt && (
-              <div className="text-muted-foreground flex items-center gap-2 text-sm">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Clock className="h-4 w-4" />
                 <span>
                   Expires:{" "}

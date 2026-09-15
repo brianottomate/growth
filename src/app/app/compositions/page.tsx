@@ -24,7 +24,13 @@ export default async function CompositionsRoute() {
       eq(brandTable.organizationId, org.id),
       isNull(brandTable.deletedAt),
     ),
-    columns: { id: true, name: true, slug: true, logo: true, brandIdentity: true },
+    columns: {
+      id: true,
+      name: true,
+      slug: true,
+      logo: true,
+      brandIdentity: true,
+    },
     orderBy: (brand, { asc }) => [asc(brand.name)],
   });
 

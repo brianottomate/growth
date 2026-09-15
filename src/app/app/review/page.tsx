@@ -58,20 +58,20 @@ function ReviewCard({ item }: { item: ReviewItem }) {
   return (
     <Link
       href={item.href}
-      className="bg-card hover:border-foreground/25 group rounded-xl border p-4 transition-colors"
+      className="group rounded-xl border bg-card p-4 transition-colors hover:border-foreground/25"
     >
       <div className="flex items-start gap-3">
-        <span className="bg-muted text-muted-foreground grid size-9 shrink-0 place-items-center rounded-lg">
+        <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
           <Icon className="size-4" />
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex items-baseline gap-2">
             <span className="text-sm font-semibold">{item.title}</span>
-            <span className="text-muted-foreground text-xs tabular-nums">
+            <span className="text-xs text-muted-foreground tabular-nums">
               {item.total}
             </span>
           </span>
-          <span className="text-muted-foreground mt-0.5 block text-xs leading-relaxed">
+          <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
             {item.description}
           </span>
           {item.byBrand.length > 0 && (
@@ -79,7 +79,7 @@ function ReviewCard({ item }: { item: ReviewItem }) {
               {item.byBrand.map((brand) => (
                 <span
                   key={brand.name}
-                  className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-[10px]"
+                  className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground"
                 >
                   {brand.name} · {brand.count}
                 </span>
@@ -87,7 +87,7 @@ function ReviewCard({ item }: { item: ReviewItem }) {
             </span>
           )}
         </span>
-        <ArrowRight className="text-muted-foreground mt-1 size-4 transition-transform group-hover:translate-x-0.5" />
+        <ArrowRight className="mt-1 size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
       </div>
     </Link>
   );
@@ -119,7 +119,7 @@ export default async function ReviewPage() {
     return (
       <div className="mx-auto max-w-5xl p-6">
         <h1 className="text-2xl font-semibold">Review</h1>
-        <p className="text-muted-foreground mt-1 text-sm">
+        <p className="mt-1 text-sm text-muted-foreground">
           Add a brand before the assistant can propose structure for review.
         </p>
       </div>
@@ -307,7 +307,7 @@ export default async function ReviewPage() {
     <div className="mx-auto w-full max-w-5xl space-y-8 p-6">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Review</h1>
-        <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
+        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
           Human decisions and missing structure across the brand map. Confirm AI
           proposals first; then improve the gaps that limit planning context.
         </p>
@@ -318,7 +318,7 @@ export default async function ReviewPage() {
           <h2 className="text-base font-semibold">
             Decisions · {decisionTotal}
           </h2>
-          <p className="text-muted-foreground mt-0.5 text-sm">
+          <p className="mt-0.5 text-sm text-muted-foreground">
             AI-proposed changes that will not alter the confirmed map until a
             human reviews them.
           </p>
@@ -335,7 +335,7 @@ export default async function ReviewPage() {
           <h2 className="text-base font-semibold">
             Structural gaps · {gapTotal}
           </h2>
-          <p className="text-muted-foreground mt-0.5 text-sm">
+          <p className="mt-0.5 text-sm text-muted-foreground">
             Raw material the assistant can see but cannot yet use as strong,
             confirmed planning context.
           </p>

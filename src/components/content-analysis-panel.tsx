@@ -63,7 +63,7 @@ export function ContentAnalysisPanel({
             <Sparkles className="size-4" />
             <h2 className="text-sm font-semibold">AI analysis</h2>
           </div>
-          <p className="text-muted-foreground mt-1 text-xs">
+          <p className="mt-1 text-xs text-muted-foreground">
             Advisory only. Re-analysis never changes the source project.
           </p>
         </div>
@@ -72,7 +72,7 @@ export function ContentAnalysisPanel({
             href={sourceUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
           >
             Source <ExternalLink className="size-3" />
           </a>
@@ -86,12 +86,12 @@ export function ContentAnalysisPanel({
             {analysis.themes.map((theme) => (
               <span
                 key={theme}
-                className="bg-muted rounded-full px-2 py-0.5 text-[11px]"
+                className="rounded-full bg-muted px-2 py-0.5 text-[11px]"
               >
                 {theme}
               </span>
             ))}
-            <span className="border-border rounded-full border px-2 py-0.5 text-[11px] capitalize">
+            <span className="rounded-full border border-border px-2 py-0.5 text-[11px] capitalize">
               {analysis.funnelStage}
             </span>
           </div>
@@ -143,14 +143,14 @@ export function ContentAnalysisPanel({
               )}
               Copy coding-agent prompt
             </Button>
-            <span className="text-muted-foreground self-center text-[10px]">
+            <span className="self-center text-[10px] text-muted-foreground">
               {new Date(analysis.analyzedAt).toLocaleString()} ·{" "}
               {analysis.model}
             </span>
           </div>
         </div>
       ) : (
-        <p className="text-muted-foreground mt-5 text-sm">
+        <p className="mt-5 text-sm text-muted-foreground">
           Analyze the full {kind} source for its audience, purpose, structure,
           strengths, risks, and concrete improvements.
         </p>
@@ -193,7 +193,7 @@ function AnalysisList({
   const Tag = ordered ? "ol" : "ul";
   return (
     <div>
-      <h3 className="text-muted-foreground text-[10px] font-semibold tracking-wider uppercase">
+      <h3 className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
         {title}
       </h3>
       {items.length ? (
@@ -207,7 +207,7 @@ function AnalysisList({
           ))}
         </Tag>
       ) : (
-        <p className="text-muted-foreground mt-2 text-xs">{empty ?? "—"}</p>
+        <p className="mt-2 text-xs text-muted-foreground">{empty ?? "—"}</p>
       )}
     </div>
   );
@@ -218,7 +218,7 @@ function SpecializedAnalysis({ analysis }: { analysis: ContentAnalysis }) {
     return (
       <div className="grid gap-5 border-t pt-4 md:grid-cols-2">
         <div>
-          <h3 className="text-muted-foreground text-[10px] font-semibold tracking-wider uppercase">
+          <h3 className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
             Search intent
           </h3>
           <p className="mt-2 text-xs leading-relaxed">
@@ -226,7 +226,7 @@ function SpecializedAnalysis({ analysis }: { analysis: ContentAnalysis }) {
           </p>
         </div>
         <div>
-          <h3 className="text-muted-foreground text-[10px] font-semibold tracking-wider uppercase">
+          <h3 className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
             OG assessment
           </h3>
           <p className="mt-2 text-xs leading-relaxed">
@@ -240,7 +240,7 @@ function SpecializedAnalysis({ analysis }: { analysis: ContentAnalysis }) {
     return (
       <div className="grid gap-5 border-t pt-4 md:grid-cols-2">
         <div>
-          <h3 className="text-muted-foreground text-[10px] font-semibold tracking-wider uppercase">
+          <h3 className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
             Thesis
           </h3>
           <p className="mt-2 text-xs leading-relaxed">{analysis.blog.thesis}</p>
@@ -256,7 +256,7 @@ function SpecializedAnalysis({ analysis }: { analysis: ContentAnalysis }) {
     return (
       <div className="grid gap-5 border-t pt-4 md:grid-cols-2">
         <div>
-          <h3 className="text-muted-foreground text-[10px] font-semibold tracking-wider uppercase">
+          <h3 className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
             Lifecycle role
           </h3>
           <p className="mt-2 text-xs leading-relaxed">

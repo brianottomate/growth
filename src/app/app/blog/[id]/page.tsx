@@ -61,7 +61,7 @@ export default async function BlogArticlePage({
   return (
     <div className="mx-auto max-w-4xl">
       {/* breadcrumb */}
-      <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <Link
           href={
             post.brand?.slug
@@ -73,7 +73,7 @@ export default async function BlogArticlePage({
           Blog
         </Link>
         <span>/</span>
-        <span className="text-foreground font-medium">{title}</span>
+        <span className="font-medium text-foreground">{title}</span>
       </div>
 
       {isDraft && (
@@ -104,7 +104,7 @@ export default async function BlogArticlePage({
       )}
 
       {cover && (
-        // eslint-disable-next-line @next/next/no-img-element
+        // oxlint-disable-next-line nextjs/no-img-element
         <img
           src={cover}
           alt=""
@@ -114,7 +114,7 @@ export default async function BlogArticlePage({
 
       <h1 className="mt-5 text-2xl font-semibold tracking-tight">{title}</h1>
 
-      <div className="text-muted-foreground mt-2 flex flex-wrap items-center gap-2 text-sm">
+      <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
         {!isDraft && post.publishedAt && (
           <span>
             {post.publishedAt.toLocaleDateString([], {
@@ -130,7 +130,7 @@ export default async function BlogArticlePage({
         {(meta.tags ?? []).map((tag) => (
           <span
             key={tag}
-            className="border-border rounded-full border px-2 py-0.5 text-[11px]"
+            className="rounded-full border border-border px-2 py-0.5 text-[11px]"
           >
             {tag}
           </span>
@@ -138,7 +138,7 @@ export default async function BlogArticlePage({
       </div>
 
       {description && (
-        <p className="text-muted-foreground mt-4 text-sm leading-relaxed">
+        <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
           {description}
         </p>
       )}
@@ -149,7 +149,7 @@ export default async function BlogArticlePage({
             href={post.externalUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="bg-foreground text-background rounded-full px-3.5 py-1.5 text-xs font-medium"
+            className="rounded-full bg-foreground px-3.5 py-1.5 text-xs font-medium text-background"
           >
             Read original ↗
           </a>
@@ -157,7 +157,7 @@ export default async function BlogArticlePage({
         {draftPreviewHref && (
           <Link
             href={draftPreviewHref}
-            className="bg-foreground text-background rounded-full px-3.5 py-1.5 text-xs font-medium"
+            className="rounded-full bg-foreground px-3.5 py-1.5 text-xs font-medium text-background"
           >
             Read full draft
           </Link>
@@ -176,7 +176,7 @@ export default async function BlogArticlePage({
               </span>
             )}
           </div>
-          <div className="prose prose-invert prose-neutral max-w-none">
+          <div className="prose max-w-none prose-neutral prose-invert">
             <StructuredText
               data={datoArticle.body}
               renderBlock={({ record }) => <PreviewBlock block={record} />}
@@ -184,7 +184,7 @@ export default async function BlogArticlePage({
           </div>
         </section>
       ) : (
-        <p className="text-muted-foreground mt-6 text-xs">
+        <p className="mt-6 text-xs text-muted-foreground">
           This imported record currently exposes summary metadata only.
         </p>
       )}

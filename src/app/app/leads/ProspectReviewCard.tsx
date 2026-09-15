@@ -175,7 +175,7 @@ export const verdictTheme: Record<ProspectVerdict, VerdictTheme> = {
 function ChannelBadges({ channels }: { channels: ProspectChannel[] }) {
   if (!channels.length) {
     return (
-      <span className="text-muted-foreground text-xs">
+      <span className="text-xs text-muted-foreground">
         No channels captured yet
       </span>
     );
@@ -191,7 +191,7 @@ function ChannelBadges({ channels }: { channels: ProspectChannel[] }) {
         return (
           <span
             key={kind}
-            className="border-border text-muted-foreground inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium"
+            className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground"
           >
             <meta.Icon className="size-3" />
             {meta.label}
@@ -211,7 +211,7 @@ function EvidenceList({ data }: { data: ProspectCardData }) {
 
   if (!evidence.length) {
     return (
-      <span className="text-muted-foreground text-xs">
+      <span className="text-xs text-muted-foreground">
         No channel evidence yet
       </span>
     );
@@ -238,7 +238,7 @@ function EvidenceList({ data }: { data: ProspectCardData }) {
 /** The uppercase micro-heading the card's sections share. */
 function MicroLabel({ children }: { children: React.ReactNode }) {
   return (
-    <span className="text-muted-foreground text-[10px] font-medium tracking-wider uppercase">
+    <span className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
       {children}
     </span>
   );
@@ -253,7 +253,7 @@ function SequencePreview({ data }: { data: ProspectCardData }) {
   const outreach = data.outreach;
   if (!outreach?.steps.length) {
     return (
-      <div className="text-muted-foreground rounded-md border border-dashed p-4 text-center text-xs">
+      <div className="rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground">
         No sequence draft yet.
       </div>
     );
@@ -317,14 +317,14 @@ function SequencePreview({ data }: { data: ProspectCardData }) {
             href={data.pregenSiteUrl}
             target="_blank"
             rel="noreferrer"
-            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-[11px] underline underline-offset-2"
+            className="inline-flex items-center gap-1 text-[11px] text-muted-foreground underline underline-offset-2 hover:text-foreground"
           >
             Preview without the wrapper ↗
           </a>
         )}
         <button
           onClick={() => setFullCopy((v) => !v)}
-          className="text-muted-foreground hover:text-foreground text-[11px] underline underline-offset-2"
+          className="text-[11px] text-muted-foreground underline underline-offset-2 hover:text-foreground"
         >
           {fullCopy ? "Collapse copy" : "Show full copy"}
         </button>
@@ -332,7 +332,7 @@ function SequencePreview({ data }: { data: ProspectCardData }) {
       <div className="grid gap-2.5 @lg:grid-cols-2">
         {outreach.steps.slice(0, 4).map((step, index) => (
           <div key={index} className="rounded-md border p-3">
-            <div className="text-muted-foreground flex items-center justify-between gap-2 text-[10px] font-medium">
+            <div className="flex items-center justify-between gap-2 text-[10px] font-medium text-muted-foreground">
               <span className="truncate">
                 Touch {index + 1}
                 {step.subject ? ` · ${step.subject}` : " · in-thread reply"}
@@ -379,7 +379,7 @@ function ActionButton({
       onClick={onClick}
       disabled={busy}
       title={title}
-      className="border-border inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+      className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
     >
       {busy ? (
         <Loader2 className="size-3.5 animate-spin" />
@@ -481,7 +481,7 @@ export function ProspectReviewCard({
     // Viewport breakpoints lied whenever something beside the list (the
     // assistant panel, a drawer) squeezed the container while the window stayed
     // xl — the two-column grids below held on and overlapped into soup.
-    <section className="bg-card @container mb-3.5 flex overflow-hidden rounded-xl border">
+    <section className="@container mb-3.5 flex overflow-hidden rounded-xl border bg-card">
       <span className={`w-1 shrink-0 ${stageTheme.rail}`} aria-hidden />
       <div className="min-w-0 flex-1 space-y-5 p-5">
         {/* decision header — verdict left, the two everyday actions right, the
@@ -492,7 +492,7 @@ export function ProspectReviewCard({
             <div
               className={`grid size-11 shrink-0 place-items-center rounded-full border-2 ${stageTheme.border}`}
             >
-              <span className="text-foreground text-base font-medium tabular-nums">
+              <span className="text-base font-medium text-foreground tabular-nums">
                 {data.channel.score}
               </span>
             </div>
@@ -525,11 +525,11 @@ export function ProspectReviewCard({
                   href={`https://${data.domain}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-muted-foreground hover:text-foreground shrink-0"
+                  className="shrink-0 text-muted-foreground hover:text-foreground"
                 >
                   <ArrowUpRight className="size-3.5" />
                 </a>
-                <span className="text-muted-foreground truncate text-xs">
+                <span className="truncate text-xs text-muted-foreground">
                   · {data.companyName ?? "Unknown company"}
                   {data.location ? ` · ${data.location}` : ""}
                   {data.pms ? ` · ${data.pms}` : ""}
@@ -551,7 +551,7 @@ export function ProspectReviewCard({
                   rel="noreferrer"
                   title="Open the pregen preview they will see"
                   aria-label="Open the pregen preview"
-                  className="border-border text-muted-foreground hover:text-foreground inline-flex size-8 items-center justify-center rounded-md border"
+                  className="inline-flex size-8 items-center justify-center rounded-md border border-border text-muted-foreground hover:text-foreground"
                 >
                   <ExternalLink className="size-3.5" />
                 </a>
@@ -563,7 +563,7 @@ export function ProspectReviewCard({
                   rel="noreferrer"
                   title="Open the wander.com pitch wrapper"
                   aria-label="Open the wander.com pitch wrapper"
-                  className="border-border text-muted-foreground hover:text-foreground inline-flex size-8 items-center justify-center rounded-md border"
+                  className="inline-flex size-8 items-center justify-center rounded-md border border-border text-muted-foreground hover:text-foreground"
                 >
                   <Gift className="size-3.5" />
                 </a>
@@ -613,7 +613,7 @@ export function ProspectReviewCard({
                 <button
                   onClick={() => actions.onGenerate!(data.id)}
                   disabled={actions.generating}
-                  className="bg-primary text-primary-foreground inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
                 >
                   {actions.generating ? (
                     <Loader2 className="size-3.5 animate-spin" />
@@ -652,7 +652,7 @@ export function ProspectReviewCard({
                 <DropdownMenuTrigger asChild>
                   <button
                     aria-label="More actions"
-                    className="border-border inline-flex size-8 items-center justify-center rounded-md border"
+                    className="inline-flex size-8 items-center justify-center rounded-md border border-border"
                   >
                     <MoreHorizontal className="size-4" />
                   </button>
@@ -689,7 +689,7 @@ export function ProspectReviewCard({
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
-            <div className="text-muted-foreground text-xs tabular-nums">
+            <div className="text-xs text-muted-foreground tabular-nums">
               fit {fmt(data.fitScore)} · units {fmt(data.unitCount)}
               {data.unitConfidence ? ` · ${data.unitConfidence}` : ""}
             </div>
@@ -712,7 +712,7 @@ export function ProspectReviewCard({
                 <span className="text-muted-foreground">Not resolved</span>
               )}
             </div>
-            <div className="text-muted-foreground mt-0.5 text-[11px]">
+            <div className="mt-0.5 text-[11px] text-muted-foreground">
               {data.channel.route} · {data.contactCount} stored contacts
             </div>
             <div className="mt-1.5">
@@ -731,8 +731,8 @@ export function ProspectReviewCard({
           <div className="flex flex-wrap items-end gap-4">
             {data.captureTheirsUrl && (
               <figure>
-                <div className="border-border bg-muted h-[72px] w-32 overflow-hidden rounded-md border">
-                  {/* eslint-disable-next-line @next/next/no-img-element -- fixed-size R2 thumb */}
+                <div className="h-[72px] w-32 overflow-hidden rounded-md border border-border bg-muted">
+                  {/* oxlint-disable-next-line nextjs/no-img-element -- fixed-size R2 thumb */}
                   <img
                     src={data.captureTheirsUrl}
                     alt={`${data.domain} today`}
@@ -740,7 +740,7 @@ export function ProspectReviewCard({
                     loading="lazy"
                   />
                 </div>
-                <figcaption className="text-muted-foreground mt-1 text-[10px]">
+                <figcaption className="mt-1 text-[10px] text-muted-foreground">
                   Their site
                 </figcaption>
               </figure>
@@ -748,7 +748,7 @@ export function ProspectReviewCard({
             {data.captureOursUrl && (
               <figure>
                 <div className="h-[72px] w-32 overflow-hidden rounded-md border border-emerald-500/40">
-                  {/* eslint-disable-next-line @next/next/no-img-element -- fixed-size R2 thumb */}
+                  {/* oxlint-disable-next-line nextjs/no-img-element -- fixed-size R2 thumb */}
                   <img
                     src={data.captureOursUrl}
                     alt={`Preview built for ${data.domain}`}
@@ -756,7 +756,7 @@ export function ProspectReviewCard({
                     loading="lazy"
                   />
                 </div>
-                <figcaption className="text-muted-foreground mt-1 text-[10px]">
+                <figcaption className="mt-1 text-[10px] text-muted-foreground">
                   Our preview
                 </figcaption>
               </figure>
@@ -792,7 +792,7 @@ export function ProspectReviewCard({
                         <div className="flex items-center gap-2">
                           <span className="font-medium">{candidate.email}</span>
                           {selected && (
-                            <span className="border-border text-muted-foreground rounded-full border px-1.5 py-px text-[10px]">
+                            <span className="rounded-full border border-border px-1.5 py-px text-[10px] text-muted-foreground">
                               selected
                             </span>
                           )}
@@ -810,7 +810,7 @@ export function ProspectReviewCard({
                           </div>
                         )}
                       </td>
-                      <td className="text-muted-foreground border-t px-3 py-1.5">
+                      <td className="border-t px-3 py-1.5 text-muted-foreground">
                         {candidate.kind}
                       </td>
                       <td className="rounded-r-md border-t px-3 py-1.5 text-right tabular-nums">
@@ -829,7 +829,7 @@ export function ProspectReviewCard({
             <FileText className="size-4" />
             Sequence
             {data.outreach?.status && (
-              <span className="text-muted-foreground text-xs font-normal">
+              <span className="text-xs font-normal text-muted-foreground">
                 {data.outreach.status}
               </span>
             )}

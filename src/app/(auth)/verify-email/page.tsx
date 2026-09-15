@@ -69,7 +69,7 @@ function VerifyEmailContent() {
   }, [token, router]);
 
   return (
-    <div className="bg-muted flex min-h-svh flex-col items-center justify-center p-6 md:p-10">
+    <div className="flex min-h-svh flex-col items-center justify-center bg-muted p-6 md:p-10">
       <div className="flex w-full max-w-sm flex-col gap-6">
         <div className="flex justify-center">
           <Link href="/" className="flex items-center gap-2">
@@ -86,12 +86,12 @@ function VerifyEmailContent() {
           <CardContent className="p-6 pt-0 md:p-8">
             {status === "verifying" ? (
               <div className="space-y-4 text-center">
-                <Loader2 className="text-primary mx-auto h-16 w-16 animate-spin" />
+                <Loader2 className="mx-auto h-16 w-16 animate-spin text-primary" />
                 <div className="space-y-2">
                   <h3 className="text-lg font-semibold">
                     Verifying your email...
                   </h3>
-                  <p className="text-muted-foreground text-sm">
+                  <p className="text-sm text-muted-foreground">
                     Please wait a moment.
                   </p>
                 </div>
@@ -101,8 +101,8 @@ function VerifyEmailContent() {
                 <CheckCircle2 className="mx-auto h-16 w-16 text-green-600" />
                 <div className="space-y-2">
                   <h3 className="text-lg font-semibold">Email Verified!</h3>
-                  <p className="text-muted-foreground text-sm">{message}</p>
-                  <p className="text-muted-foreground text-xs">
+                  <p className="text-sm text-muted-foreground">{message}</p>
+                  <p className="text-xs text-muted-foreground">
                     Redirecting to sign in in {countdown} seconds...
                   </p>
                 </div>
@@ -118,7 +118,7 @@ function VerifyEmailContent() {
                 <XCircle className="mx-auto h-16 w-16 text-red-600" />
                 <div className="space-y-2">
                   <h3 className="text-lg font-semibold">Verification Failed</h3>
-                  <p className="text-muted-foreground text-sm">{message}</p>
+                  <p className="text-sm text-muted-foreground">{message}</p>
                 </div>
                 <Button
                   onClick={() => router.push("/signin")}
@@ -140,7 +140,7 @@ export default function VerifyEmailPage() {
   return (
     <Suspense
       fallback={
-        <div className="bg-muted flex min-h-svh flex-col items-center justify-center p-6 md:p-10">
+        <div className="flex min-h-svh flex-col items-center justify-center bg-muted p-6 md:p-10">
           <div className="flex w-full max-w-sm flex-col gap-6">
             <Card className="overflow-hidden p-0">
               <CardHeader className="p-6 md:p-8">
@@ -150,10 +150,10 @@ export default function VerifyEmailPage() {
               </CardHeader>
               <CardContent className="p-6 pt-0 md:p-8">
                 <div className="space-y-4 text-center">
-                  <Loader2 className="text-primary mx-auto h-16 w-16 animate-spin" />
+                  <Loader2 className="mx-auto h-16 w-16 animate-spin text-primary" />
                   <div className="space-y-2">
                     <h3 className="text-lg font-semibold">Loading...</h3>
-                    <p className="text-muted-foreground text-sm">
+                    <p className="text-sm text-muted-foreground">
                       Please wait a moment.
                     </p>
                   </div>

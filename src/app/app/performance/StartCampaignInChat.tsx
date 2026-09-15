@@ -6,11 +6,18 @@ import { Button } from "@/components/ui/button";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 
 /** Hand a client's first campaign to the chat: shell, ads from their homes, then the page. */
-export function StartCampaignInChat({ brandId, brandName }: { brandId: string; brandName: string }) {
+export function StartCampaignInChat({
+  brandId,
+  brandName,
+}: {
+  brandId: string;
+  brandName: string;
+}) {
   return (
     <Button
       size="sm"
-      className="h-7 rounded-full px-3 text-[11.5px]"
+      shape="round"
+      density="editorial"
       onClick={() =>
         sendAssistantIntent({
           type: "start_client_campaign",

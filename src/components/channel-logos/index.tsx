@@ -99,7 +99,7 @@ export function ChannelLogo({
     return (
       <span
         className={cn(
-          "bg-muted text-muted-foreground flex shrink-0 items-center justify-center rounded-md",
+          "flex shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground",
           className,
         )}
         title={PLATFORM_META[platform]?.name}
@@ -111,7 +111,7 @@ export function ChannelLogo({
   return (
     <span
       className={cn(
-        "bg-muted text-muted-foreground flex shrink-0 items-center justify-center rounded-md text-[10px] font-semibold",
+        "flex shrink-0 items-center justify-center rounded-md bg-muted text-[10px] font-semibold text-muted-foreground",
         className,
       )}
     >

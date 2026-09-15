@@ -120,11 +120,11 @@ export function GoogleDriveImportDialog({
         </DialogHeader>
 
         {status.isLoading ? (
-          <p className="text-muted-foreground py-8 text-center text-sm">
+          <p className="py-8 text-center text-sm text-muted-foreground">
             Checking Drive access…
           </p>
         ) : !status.data?.configured ? (
-          <p className="text-muted-foreground py-8 text-center text-sm">
+          <p className="py-8 text-center text-sm text-muted-foreground">
             Google Drive isn’t configured in this environment yet.
           </p>
         ) : !status.data.connected ? (
@@ -132,7 +132,7 @@ export function GoogleDriveImportDialog({
             <p className="text-sm">
               Growth needs read-only access to your Drive to pull creative in.
             </p>
-            <p className="text-muted-foreground text-xs">
+            <p className="text-xs text-muted-foreground">
               It only reads — nothing is ever written back to Drive.
             </p>
             <Button onClick={() => void connect()}>Connect Google Drive</Button>
@@ -141,17 +141,17 @@ export function GoogleDriveImportDialog({
           <>
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
-                <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+                <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Search your Drive"
-                  className="pl-9"
+                  leading="search"
                 />
               </div>
             </div>
 
-            <div className="text-muted-foreground flex flex-wrap items-center gap-1 text-xs">
+            <div className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
               <button
                 type="button"
                 onClick={() => setCrumbs([])}
@@ -175,15 +175,15 @@ export function GoogleDriveImportDialog({
 
             <div className="max-h-80 overflow-y-auto rounded-lg border">
               {files.isLoading ? (
-                <p className="text-muted-foreground p-6 text-center text-sm">
+                <p className="p-6 text-center text-sm text-muted-foreground">
                   Loading Drive…
                 </p>
               ) : files.error ? (
-                <p className="text-destructive p-6 text-center text-sm">
+                <p className="p-6 text-center text-sm text-destructive">
                   {files.error.message}
                 </p>
               ) : !rows.length ? (
-                <p className="text-muted-foreground p-6 text-center text-sm">
+                <p className="p-6 text-center text-sm text-muted-foreground">
                   No images here.
                 </p>
               ) : (
@@ -204,7 +204,7 @@ export function GoogleDriveImportDialog({
                           : toggle(file.id)
                       }
                       className={cn(
-                        "hover:bg-accent/40 flex w-full items-center gap-2 border-b px-3 py-2 text-left text-sm last:border-b-0",
+                        "flex w-full items-center gap-2 border-b px-3 py-2 text-left text-sm last:border-b-0 hover:bg-accent/40",
                         checked && "bg-accent/60",
                       )}
                     >
@@ -214,7 +214,7 @@ export function GoogleDriveImportDialog({
                         <span
                           className={cn(
                             "size-4 shrink-0 rounded border",
-                            checked && "bg-primary border-primary",
+                            checked && "border-primary bg-primary",
                           )}
                         />
                       )}
@@ -222,7 +222,7 @@ export function GoogleDriveImportDialog({
                         {file.name}
                       </span>
                       {isFolder && (
-                        <ChevronRight className="text-muted-foreground size-4" />
+                        <ChevronRight className="size-4 text-muted-foreground" />
                       )}
                     </button>
                   );
@@ -231,7 +231,7 @@ export function GoogleDriveImportDialog({
             </div>
 
             <DialogFooter className="items-center sm:justify-between">
-              <span className="text-muted-foreground text-xs">
+              <span className="text-xs text-muted-foreground">
                 {selected.length
                   ? `${selected.length} selected · imported in this order`
                   : "Select images, or open a folder"}

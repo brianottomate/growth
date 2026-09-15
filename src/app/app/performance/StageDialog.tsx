@@ -131,7 +131,7 @@ function Group({
       aria-label={label}
       className="grid content-start gap-1"
     >
-      <p className="text-muted-foreground mb-1 text-[10.5px] font-semibold tracking-[0.07em] uppercase">
+      <p className="mb-1 text-[10.5px] font-semibold tracking-[0.07em] text-muted-foreground uppercase">
         {label}
       </p>
       {children}
@@ -163,7 +163,7 @@ function Option({
     >
       <span>{label}</span>
       {auto ? (
-        <span className="text-muted-foreground text-[10px] tracking-wide uppercase">
+        <span className="text-[10px] tracking-wide text-muted-foreground uppercase">
           auto
         </span>
       ) : null}

@@ -69,11 +69,7 @@ export const launchTable = pgTable(
     releaseTheme: t.text(),
 
     brief: t.jsonb().$type<LaunchBrief>().notNull(),
-    deliverables: t
-      .jsonb()
-      .$type<LaunchDeliverable[]>()
-      .default([])
-      .notNull(),
+    deliverables: t.jsonb().$type<LaunchDeliverable[]>().default([]).notNull(),
 
     /** The Google Doc the brief was pasted or imported from, when there is one. */
     sourceUrl: t.text(),

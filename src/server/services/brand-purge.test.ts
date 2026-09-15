@@ -1,9 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import {
-  purgeBlockers,
-  purgeConfirmationMatches,
-} from "./brand-ops.service";
+import { purgeBlockers, purgeConfirmationMatches } from "./brand-ops.service";
 
 /**
  * Purging a brand cascades across 37 tables, deletes bytes out of R2 and

@@ -94,7 +94,7 @@ export function SignInForm({
                     ? "Sign in to accept invite"
                     : "Welcome back"}
                 </h1>
-                <p className="text-muted-foreground text-balance">
+                <p className="text-balance text-muted-foreground">
                   {searchParams.get("inviteId") ||
                   searchParams.get("orgInviteId")
                     ? "Sign in to your account to accept the invitation"
@@ -122,11 +122,11 @@ export function SignInForm({
                 <>
                   <GoogleSignInButton email={email} disabled={isEmailLoading} />
                   <div className="flex items-center gap-3">
-                    <span className="bg-border h-px flex-1" />
-                    <span className="text-muted-foreground text-xs">
+                    <span className="h-px flex-1 bg-border" />
+                    <span className="text-xs text-muted-foreground">
                       or continue with email
                     </span>
-                    <span className="bg-border h-px flex-1" />
+                    <span className="h-px flex-1 bg-border" />
                   </div>
                 </>
               )}
@@ -151,7 +151,7 @@ export function SignInForm({
                     <button
                       type="button"
                       onClick={() => setForgotPasswordOpen(true)}
-                      className="text-muted-foreground hover:text-foreground text-sm underline underline-offset-4"
+                      className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
                     >
                       Forgot password?
                     </button>
@@ -194,7 +194,7 @@ export function SignInForm({
               </div>
             </div>
           </div>
-          <div className="bg-muted relative hidden md:block">
+          <div className="relative hidden bg-muted md:block">
             <Image
               src="/auth-hero.jpg"
               alt="A Wander home at golden hour"

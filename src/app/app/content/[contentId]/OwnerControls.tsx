@@ -45,7 +45,7 @@ export function IdeaOwnerControl({
   });
   return (
     <span {...hover} className="inline-flex items-center gap-1.5">
-      <span className="text-muted-foreground text-xs">Owner</span>
+      <span className="text-xs text-muted-foreground">Owner</span>
       <AssigneeButton
         value={owner}
         members={members}

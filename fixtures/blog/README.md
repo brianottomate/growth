@@ -7,7 +7,7 @@ the lab for inspecting one complete SEO content-generation run
 ## Provenance rules
 
 - `seo-engine-response.json` is a real SEO Engine content-brief response,
-  preserved byte-for-byte (Prettier is told to leave it alone). Never edit it;
+  preserved byte-for-byte (oxfmt is told to leave it alone via `.oxfmtrc.json`). Never edit it;
   a new example is a new file.
 - `grounding/` holds crawl-derived grounding contexts. These stand-ins come
   from the target business's public site and remain distinct from the live

@@ -59,7 +59,7 @@ export function CheckboxGroupCardsField<
         <FormItem className={cn("space-y-3", className)}>
           {label && <FormLabel>{label}</FormLabel>}
           {description && (
-            <p className="text-muted-foreground text-sm">{description}</p>
+            <p className="text-sm text-muted-foreground">{description}</p>
           )}
           <div className={cn("grid gap-3", gridClassName)}>
             {options.map((option) => (
@@ -82,12 +82,12 @@ export function CheckboxGroupCardsField<
                             // revisit if the extra has-[:checked] is needed, the blue bg stopped working out of nowhere and this was a quick fix
                             layout === "grid"
                               ? cn(
-                                  "border-input hover:border-ring focus-within:border-ring focus-within:ring-ring/50 has-[:checked]:border-primary has-[:checked]:bg-primary/5 has-[:checked]:ring-primary/20 has-[*[data-state=checked]]:border-primary has-[*[data-state=checked]]:bg-primary/5 has-[*[data-state=checked]]:ring-primary/20 relative flex cursor-pointer gap-3 rounded-lg border p-4 shadow-sm transition-all focus-within:ring-[3px] has-[*[data-state=checked]]:ring-[3px] has-[:checked]:ring-[3px]",
+                                  "relative flex cursor-pointer gap-3 rounded-lg border border-input p-4 shadow-sm transition-all focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 hover:border-ring has-[*[data-state=checked]]:border-primary has-[*[data-state=checked]]:bg-primary/5 has-[*[data-state=checked]]:ring-[3px] has-[*[data-state=checked]]:ring-primary/20 has-[:checked]:border-primary has-[:checked]:bg-primary/5 has-[:checked]:ring-[3px] has-[:checked]:ring-primary/20",
                                   option.description
                                     ? "min-h-[80px] items-start"
                                     : "min-h-[60px] items-center",
                                 )
-                              : "border-input hover:border-ring focus-within:border-ring focus-within:ring-ring/50 has-[:checked]:border-primary has-[:checked]:bg-primary/5 has-[:checked]:ring-primary/20 has-[*[data-state=checked]]:border-primary has-[*[data-state=checked]]:bg-primary/5 has-[*[data-state=checked]]:ring-primary/20 relative flex cursor-pointer items-center gap-3 rounded-lg border p-4 shadow-sm transition-all focus-within:ring-[3px] has-[*[data-state=checked]]:ring-[3px] has-[:checked]:ring-[3px]",
+                              : "relative flex cursor-pointer items-center gap-3 rounded-lg border border-input p-4 shadow-sm transition-all focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 hover:border-ring has-[*[data-state=checked]]:border-primary has-[*[data-state=checked]]:bg-primary/5 has-[*[data-state=checked]]:ring-[3px] has-[*[data-state=checked]]:ring-primary/20 has-[:checked]:border-primary has-[:checked]:bg-primary/5 has-[:checked]:ring-[3px] has-[:checked]:ring-primary/20",
                             cardClassName,
                           )}
                         >
@@ -139,7 +139,7 @@ export function CheckboxGroupCardsField<
                               {option.description && (
                                 <p
                                   className={cn(
-                                    "text-muted-foreground text-xs",
+                                    "text-xs text-muted-foreground",
                                     layout === "grid" ? "leading-relaxed" : "",
                                   )}
                                 >
@@ -151,7 +151,7 @@ export function CheckboxGroupCardsField<
                           {option.icon && (
                             <div
                               className={cn(
-                                "text-muted-foreground flex size-6 shrink-0 items-center justify-center",
+                                "flex size-6 shrink-0 items-center justify-center text-muted-foreground",
                                 option.description
                                   ? "absolute top-3 right-3"
                                   : "relative",

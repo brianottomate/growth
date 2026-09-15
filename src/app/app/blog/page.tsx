@@ -164,7 +164,7 @@ export default async function BlogPage({
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Blog</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
+          <p className="mt-1 text-sm text-muted-foreground">
             {tagged.length} articles
             {selectedBrand
               ? ` · ${selectedBrand.name}${selectedBrand.website ? ` · ${new URL(/^https?:\/\//i.test(selectedBrand.website) ? selectedBrand.website : `https://${selectedBrand.website}`).hostname.replace(/^www\./, "")}` : ""}`
@@ -194,7 +194,7 @@ export default async function BlogPage({
           href={blogHref()}
           className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
             !tagFilter
-              ? "bg-foreground text-background border-foreground"
+              ? "border-foreground bg-foreground text-background"
               : "border-border text-muted-foreground hover:bg-accent"
           }`}
         >
@@ -206,7 +206,7 @@ export default async function BlogPage({
             href={blogHref({ tag })}
             className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
               tagFilter === tag
-                ? "bg-foreground text-background border-foreground"
+                ? "border-foreground bg-foreground text-background"
                 : "border-border text-muted-foreground hover:bg-accent"
             }`}
           >
@@ -223,7 +223,7 @@ export default async function BlogPage({
             href={blogHref({ view: v, tag: tagFilter })}
             className={`rounded-full border px-3 py-1 text-xs font-medium capitalize transition-colors ${
               view === v
-                ? "bg-foreground text-background border-foreground"
+                ? "border-foreground bg-foreground text-background"
                 : "border-border text-muted-foreground hover:bg-accent"
             }`}
           >
@@ -239,7 +239,7 @@ export default async function BlogPage({
       ) : (
         months.map((m) => (
           <section key={m.key} className="mt-8">
-            <h2 className="text-muted-foreground mb-2 text-xs font-semibold tracking-wider uppercase">
+            <h2 className="mb-2 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
               {m.key} · {m.items.length}
             </h2>
             <div className="flex flex-col">
@@ -247,9 +247,9 @@ export default async function BlogPage({
                 <Link
                   key={t.post.id}
                   href={`/app/blog/${t.post.id}`}
-                  className="hover:bg-accent/40 -mx-2 flex items-center gap-3 rounded-lg border-b px-2 py-3 text-sm transition-colors last:border-0"
+                  className="-mx-2 flex items-center gap-3 rounded-lg border-b px-2 py-3 text-sm transition-colors last:border-0 hover:bg-accent/40"
                 >
-                  <span className="text-muted-foreground w-12 shrink-0 text-xs tabular-nums">
+                  <span className="w-12 shrink-0 text-xs text-muted-foreground tabular-nums">
                     {dateOf(t.post).toLocaleDateString([], {
                       month: "short",
                       day: "numeric",
@@ -258,17 +258,17 @@ export default async function BlogPage({
                   {t.post.media?.[0]?.url ? (
                     // Dato serves a small Imgix derivative here; non-Dato
                     // sources retain their original URL and are still lazy.
-                    // eslint-disable-next-line @next/next/no-img-element
+                    // oxlint-disable-next-line nextjs/no-img-element
                     <img
                       src={blogThumbnailUrl(t.post.media[0].url)}
                       alt=""
                       loading="lazy"
-                      className="bg-muted h-9 w-14 shrink-0 rounded object-cover"
+                      className="h-9 w-14 shrink-0 rounded bg-muted object-cover"
                     />
                   ) : (
                     <span
                       aria-hidden="true"
-                      className="bg-muted/40 h-9 w-14 shrink-0 rounded border"
+                      className="h-9 w-14 shrink-0 rounded border bg-muted/40"
                     />
                   )}
                   {!t.post.publishedAt && (
@@ -277,17 +277,17 @@ export default async function BlogPage({
                     </span>
                   )}
                   <span className="min-w-0 flex-1 truncate">{t.post.text}</span>
-                  <span className="text-muted-foreground hidden shrink-0 gap-1 text-[11px] sm:flex">
+                  <span className="hidden shrink-0 gap-1 text-[11px] text-muted-foreground sm:flex">
                     {t.tags.slice(0, 2).map((tag) => (
                       <span
                         key={tag}
-                        className="border-border rounded-full border px-1.5 py-0.5"
+                        className="rounded-full border border-border px-1.5 py-0.5"
                       >
                         {tag}
                       </span>
                     ))}
                   </span>
-                  <span className="text-muted-foreground w-4 shrink-0 text-right text-xs">
+                  <span className="w-4 shrink-0 text-right text-xs text-muted-foreground">
                     ↗
                   </span>
                 </Link>
@@ -298,7 +298,7 @@ export default async function BlogPage({
       )}
 
       {visible.length === 0 && (
-        <p className="text-muted-foreground mt-10 text-sm">
+        <p className="mt-10 text-sm text-muted-foreground">
           {selectedBrand
             ? `No articles for ${selectedBrand.name} yet. Use Sync blog above to discover its public feed.`
             : "No articles for this filter."}

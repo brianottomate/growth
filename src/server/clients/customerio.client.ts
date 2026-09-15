@@ -499,7 +499,11 @@ export async function triggerBroadcast(
   data?: Record<string, unknown>,
   recipients?: { emails?: string[]; ids?: string[]; segment?: { id: number } },
 ) {
-  return apiClient.triggerBroadcast(platformCampaignId, data ?? {}, recipients ?? {});
+  return apiClient.triggerBroadcast(
+    platformCampaignId,
+    data ?? {},
+    recipients ?? {},
+  );
 }
 
 // =====================================================

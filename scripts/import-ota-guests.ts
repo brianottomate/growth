@@ -29,7 +29,12 @@
  * Existing prospects who have opted out of email are tagged-skipped unless
  * --include-opted-out is passed.
  */
-import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  existsSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 
 import {
   createProspect,
@@ -68,7 +73,11 @@ function option(name: string, fallback: string): string {
   const inline = args.find((arg) => arg.startsWith(`--${name}=`));
   if (inline) return inline.slice(name.length + 3);
   const positional = args.indexOf(`--${name}`);
-  if (positional !== -1 && args[positional + 1] && !args[positional + 1]!.startsWith("--")) {
+  if (
+    positional !== -1 &&
+    args[positional + 1] &&
+    !args[positional + 1]!.startsWith("--")
+  ) {
     return args[positional + 1]!;
   }
   return fallback;
@@ -95,7 +104,9 @@ const limit = Number.parseInt(option("limit", "0"), 10) || 0;
 const requestsPerSecond = Number.parseFloat(option("rps", "4")) || 4;
 const statePath = option("state", `${csvPath}.imported.jsonl`);
 const stage =
-  option("stage", "new") === "booked" ? OUTREACH_STAGES.DEMAND_BOOKED : OUTREACH_STAGES.DEMAND_NEW;
+  option("stage", "new") === "booked"
+    ? OUTREACH_STAGES.DEMAND_BOOKED
+    : OUTREACH_STAGES.DEMAND_NEW;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -108,11 +119,16 @@ async function withRetry<T>(label: string, fn: () => Promise<T>): Promise<T> {
     } catch (error) {
       lastError = error;
       const status = isOutreachError(error) ? error.statusCode : undefined;
-      const retryable = status === 429 || (status !== undefined && status >= 500);
+      const retryable =
+        status === 429 || (status !== undefined && status >= 500);
       if (!retryable || attempt === MAX_ATTEMPTS) break;
       const retryAfter = isOutreachError(error) ? error.retryAfter : undefined;
-      const waitMs = retryAfter ? retryAfter * 1000 : Math.min(60_000, 2 ** attempt * 1000);
-      console.warn(`⏳ ${label}: ${status} — retrying in ${Math.round(waitMs / 1000)}s`);
+      const waitMs = retryAfter
+        ? retryAfter * 1000
+        : Math.min(60_000, 2 ** attempt * 1000);
+      console.warn(
+        `⏳ ${label}: ${status} — retrying in ${Math.round(waitMs / 1000)}s`,
+      );
       await sleep(waitMs);
     }
   }
@@ -134,7 +150,11 @@ function loadLedger(): Set<string> {
   return done;
 }
 
-function recordDone(email: string, action: string, prospectId?: string | number) {
+function recordDone(
+  email: string,
+  action: string,
+  prospectId?: string | number,
+) {
   appendFileSync(
     statePath,
     `${JSON.stringify({ email, action, prospectId, at: new Date().toISOString() })}\n`,
@@ -214,7 +234,8 @@ async function main() {
     : allGuests.filter((guest) => !hasUpcomingStay(guest, today));
 
   console.log(`📄 ${rows.length} rows in CSV`);
-  for (const [reason, count] of skipCounts) console.log(`⏭️  ${count} skipped — ${reason}`);
+  for (const [reason, count] of skipCounts)
+    console.log(`⏭️  ${count} skipped — ${reason}`);
   if (upcoming.length > 0) {
     console.log(
       includeUpcoming
@@ -223,20 +244,28 @@ async function main() {
     );
   }
   console.log(`🎯 ${guests.length} distinct guests`);
-  console.log(`🏷️  tag: ${campaignTag}${channelTags ? " (+ per-channel tags)" : ""}`);
+  console.log(
+    `🏷️  tag: ${campaignTag}${channelTags ? " (+ per-channel tags)" : ""}`,
+  );
 
   const alreadyDone = loadLedger();
   let queue = guests.filter((guest) => !alreadyDone.has(guest.email));
   if (alreadyDone.size > 0) {
-    console.log(`↩️  ${alreadyDone.size} already processed in a previous run (${statePath})`);
+    console.log(
+      `↩️  ${alreadyDone.size} already processed in a previous run (${statePath})`,
+    );
   }
   if (limit > 0) queue = queue.slice(0, limit);
   console.log(`📬 ${queue.length} to sync this run\n`);
 
   if (!execute) {
     for (const guest of queue.slice(0, 10)) {
-      console.log(`DRY RUN — ${guest.name || "(no name)"} <${guest.email}> ${guest.phone ?? ""}`);
-      console.log(`   tags: ${buildTags(guest, campaignTag, { channelTags }).join(", ")}`);
+      console.log(
+        `DRY RUN — ${guest.name || "(no name)"} <${guest.email}> ${guest.phone ?? ""}`,
+      );
+      console.log(
+        `   tags: ${buildTags(guest, campaignTag, { channelTags }).join(", ")}`,
+      );
       console.log(`   note: ${buildNote(guest).slice(0, 200)}…\n`);
     }
     if (queue.length > 10) console.log(`… and ${queue.length - 10} more`);
@@ -244,7 +273,8 @@ async function main() {
     return;
   }
 
-  if (!isOutreachConfigured) throw new Error("Outreach is not configured (env)");
+  if (!isOutreachConfigured)
+    throw new Error("Outreach is not configured (env)");
 
   const failures: Array<{ email: string; error: string }> = [];
   let processed = 0;
@@ -253,7 +283,9 @@ async function main() {
   for (const guest of queue) {
     try {
       const result = await syncGuest(guest);
-      console.log(`${result.startsWith("skipped") ? "⏭️ " : "✅"} ${guest.email} — ${result}`);
+      console.log(
+        `${result.startsWith("skipped") ? "⏭️ " : "✅"} ${guest.email} — ${result}`,
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       failures.push({ email: guest.email, error: message });
@@ -275,7 +307,9 @@ async function main() {
       failurePath,
       `email,error\n${failures.map((f) => `${f.email},"${f.error.replace(/"/g, "'")}"`).join("\n")}\n`,
     );
-    console.log(`⚠️  failures written to ${failurePath} — re-run the script to retry just those`);
+    console.log(
+      `⚠️  failures written to ${failurePath} — re-run the script to retry just those`,
+    );
   }
 }
 

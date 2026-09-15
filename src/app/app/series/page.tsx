@@ -62,7 +62,7 @@ export default async function SeriesPage() {
   const org = membership?.organization;
   if (!org) {
     return (
-      <div className="text-muted-foreground p-8">No organization found.</div>
+      <div className="p-8 text-muted-foreground">No organization found.</div>
     );
   }
 
@@ -186,7 +186,7 @@ export default async function SeriesPage() {
       <div className="flex flex-wrap items-start gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Series</h1>
-          <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             Recurring editorial ideas, their publishing rhythm, and the content
             planned for each run.
           </p>
@@ -194,7 +194,7 @@ export default async function SeriesPage() {
         <span className="flex-1" />
         <Link
           href="/app/pillars"
-          className="text-muted-foreground hover:text-foreground rounded-md border px-3 py-1.5 text-xs transition"
+          className="rounded-md border px-3 py-1.5 text-xs text-muted-foreground transition hover:text-foreground"
         >
           Pillars &amp; strategy
         </Link>
@@ -208,9 +208,9 @@ export default async function SeriesPage() {
       </div>
 
       {series.length === 0 ? (
-        <div className="bg-card mt-8 rounded-xl border border-dashed p-8">
+        <div className="mt-8 rounded-xl border border-dashed bg-card p-8">
           <h2 className="text-sm font-semibold">No series yet</h2>
-          <p className="text-muted-foreground mt-1 max-w-xl text-xs leading-relaxed">
+          <p className="mt-1 max-w-xl text-xs leading-relaxed text-muted-foreground">
             Paste a recurring-content idea or team discussion into the
             assistant. Once you agree on the shape, it can create the series and
             map the first installments here.
@@ -228,11 +228,11 @@ export default async function SeriesPage() {
           return (
             <section key={brand.id} className="mt-8">
               <div className="mb-3 flex items-center gap-2">
-                <div className="bg-muted text-foreground flex size-7 items-center justify-center rounded-md text-[10px] font-semibold">
+                <div className="flex size-7 items-center justify-center rounded-md bg-muted text-[10px] font-semibold text-foreground">
                   {brand.name.slice(0, 2).toUpperCase()}
                 </div>
                 <h2 className="text-sm font-semibold">{brand.name}</h2>
-                <span className="text-muted-foreground text-xs">
+                <span className="text-xs text-muted-foreground">
                   · {brandSeries.length} series
                 </span>
                 <span className="flex-1" />
@@ -312,7 +312,7 @@ export default async function SeriesPage() {
                     <Link
                       key={item.id}
                       href={`/app/series/${item.id}`}
-                      className="bg-card group relative overflow-hidden rounded-xl border p-4 transition hover:border-neutral-500"
+                      className="group relative overflow-hidden rounded-xl border bg-card p-4 transition hover:border-neutral-500"
                     >
                       <span
                         className="absolute inset-y-0 left-0 w-1"
@@ -345,23 +345,23 @@ export default async function SeriesPage() {
                               </span>
                             ) : null}
                           </div>
-                          <p className="text-muted-foreground mt-1.5 line-clamp-2 text-xs leading-relaxed">
+                          <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
                             {item.description ??
                               item.theme ??
                               "The recurring promise still needs to be defined."}
                           </p>
                         </div>
-                        <ArrowUpRight className="text-muted-foreground group-hover:text-foreground size-4 shrink-0 transition" />
+                        <ArrowUpRight className="size-4 shrink-0 text-muted-foreground transition group-hover:text-foreground" />
                       </div>
 
                       <div className="mt-4">
-                        <div className="text-muted-foreground flex items-center justify-between text-[10px]">
+                        <div className="flex items-center justify-between text-[10px] text-muted-foreground">
                           <span>
                             {published} published · {posts.length} total
                           </span>
                           <span>First-post plan {mappedCount}/6</span>
                         </div>
-                        <div className="bg-muted mt-1.5 h-1 overflow-hidden rounded-full">
+                        <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-muted">
                           <div
                             className="h-full rounded-full"
                             style={{
@@ -376,18 +376,18 @@ export default async function SeriesPage() {
                         {targets.slice(0, 2).map((target) => (
                           <span
                             key={`${target.platform}-${target.archetype}-${target.period}`}
-                            className="text-muted-foreground rounded-full border px-2 py-0.5 text-[10px]"
+                            className="rounded-full border px-2 py-0.5 text-[10px] text-muted-foreground"
                           >
                             {cadenceLabel(target)}
                           </span>
                         ))}
                         {targets.length > 2 ? (
-                          <span className="text-muted-foreground text-[10px]">
+                          <span className="text-[10px] text-muted-foreground">
                             +{targets.length - 2} more
                           </span>
                         ) : null}
                         {targets.length === 0 ? (
-                          <span className="text-muted-foreground inline-flex items-center gap-1 text-[10px]">
+                          <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
                             <CircleDashed className="size-3" />
                             Cadence not set
                           </span>
@@ -402,17 +402,17 @@ export default async function SeriesPage() {
                       <div className="mt-3 border-t pt-3">
                         {next?.plannedAt ? (
                           <div className="flex items-center gap-2 text-xs">
-                            <CalendarClock className="text-muted-foreground size-3.5" />
+                            <CalendarClock className="size-3.5 text-muted-foreground" />
                             <span className="text-muted-foreground">Next</span>
                             <span className="min-w-0 flex-1 truncate">
                               {next.title ?? "Untitled installment"}
                             </span>
-                            <span className="text-muted-foreground text-[10px]">
+                            <span className="text-[10px] text-muted-foreground">
                               {dateLabel(next.plannedAt)}
                             </span>
                           </div>
                         ) : (
-                          <p className="text-muted-foreground text-[10px]">
+                          <p className="text-[10px] text-muted-foreground">
                             No upcoming installment scheduled
                           </p>
                         )}
@@ -431,8 +431,8 @@ export default async function SeriesPage() {
 
 function Metric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="bg-card rounded-xl border px-4 py-3">
-      <p className="text-muted-foreground text-[10px] font-medium tracking-wide uppercase">
+    <div className="rounded-xl border bg-card px-4 py-3">
+      <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
         {label}
       </p>
       <p className="mt-1 text-xl font-semibold tabular-nums">{value}</p>

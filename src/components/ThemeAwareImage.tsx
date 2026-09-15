@@ -1,4 +1,4 @@
-/* eslint-disable @next/next/no-img-element */
+/* oxlint-disable nextjs/no-img-element */
 import { cn } from "@/lib/utils";
 import type { ImgHTMLAttributes } from "react";
 

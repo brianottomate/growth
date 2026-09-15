@@ -294,7 +294,7 @@ export function PlatformPostEditDialog({
       <button
         type="button"
         onClick={beginEditing}
-        className="border-border text-muted-foreground hover:text-foreground hover:bg-accent flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors"
+        className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
       >
         <Pencil className="size-3.5" />
         Edit
@@ -344,10 +344,10 @@ export function PlatformPostEditDialog({
             {items.map((item, index) => (
               <section
                 key={item.clientKey}
-                className="bg-background rounded-xl border p-4"
+                className="rounded-xl border bg-background p-4"
               >
                 <div className="flex items-center gap-2">
-                  <span className="bg-muted flex size-6 items-center justify-center rounded-full text-[10px] font-semibold">
+                  <span className="flex size-6 items-center justify-center rounded-full bg-muted text-[10px] font-semibold">
                     {index + 1}
                   </span>
                   <h3 className="min-w-0 flex-1 text-sm font-medium">
@@ -363,8 +363,8 @@ export function PlatformPostEditDialog({
                     <span
                       className={
                         platformTextLength(item.text, platform) > characterLimit
-                          ? "text-destructive text-[11px]"
-                          : "text-muted-foreground text-[11px]"
+                          ? "text-[11px] text-destructive"
+                          : "text-[11px] text-muted-foreground"
                       }
                     >
                       {platformTextLength(item.text, platform)}/{characterLimit}
@@ -427,7 +427,7 @@ export function PlatformPostEditDialog({
                         : "Write the platform-ready copy"
                   }
                   rows={story ? 3 : items.length > 1 ? 5 : 8}
-                  className="focus:ring-ring/40 mt-3 w-full resize-y rounded-lg border px-3 py-2 text-sm leading-relaxed outline-none focus:ring-2"
+                  className="mt-3 w-full resize-y rounded-lg border px-3 py-2 text-sm leading-relaxed outline-none focus:ring-2 focus:ring-ring/40"
                 />
 
                 {item.media.length > 0 && (
@@ -435,7 +435,7 @@ export function PlatformPostEditDialog({
                     {item.media.map((mediaItem, mediaIndex) => (
                       <span
                         key={`${mediaItem.assetId ?? mediaItem.url}-${mediaIndex}`}
-                        className="bg-muted group relative size-20 overflow-hidden rounded-lg border"
+                        className="group relative size-20 overflow-hidden rounded-lg border bg-muted"
                       >
                         <MediaThumbnail
                           src={mediaItem.url}
@@ -499,7 +499,7 @@ export function PlatformPostEditDialog({
                 </div>
 
                 <details className="mt-3">
-                  <summary className="text-muted-foreground hover:text-foreground cursor-pointer text-xs">
+                  <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
                     Production links
                     {item.assetLinks.length
                       ? ` · ${item.assetLinks.length}`
@@ -556,7 +556,7 @@ export function PlatformPostEditDialog({
                         }
                       }}
                       placeholder="Paste a Drive or asset link"
-                      className="focus:ring-ring/40 min-w-0 flex-1 rounded-md border px-3 py-2 text-sm outline-none focus:ring-2"
+                      className="min-w-0 flex-1 rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring/40"
                     />
                     <Button
                       type="button"
@@ -587,7 +587,7 @@ export function PlatformPostEditDialog({
                     },
                   ])
                 }
-                className="border-border text-muted-foreground hover:text-foreground hover:bg-accent flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed py-3 text-sm font-medium transition-colors"
+                className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               >
                 <Plus className="size-4" />
                 Add another {sequenceNoun(format, 1)}
@@ -595,7 +595,7 @@ export function PlatformPostEditDialog({
             )}
 
             {save.isError && (
-              <p className="text-destructive text-sm">{save.error.message}</p>
+              <p className="text-sm text-destructive">{save.error.message}</p>
             )}
           </div>
 

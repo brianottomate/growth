@@ -60,7 +60,7 @@ export function EditLinkDialog({
       setKind(asset.kind);
       thumb.reset();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
   }, [asset?.id, open]);
 
   const updateExternal = useMutation(

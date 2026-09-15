@@ -69,10 +69,10 @@ export function AlignmentPanel({
   if (isLoading || !data) {
     return (
       <section className="mt-10">
-        <h2 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+        <h2 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
           Intent vs. actual
         </h2>
-        <div className="text-muted-foreground mt-4 flex items-center gap-2 text-sm">
+        <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" /> Checking alignment…
         </div>
       </section>
@@ -84,12 +84,12 @@ export function AlignmentPanel({
 
   return (
     <section className="mt-10">
-      <h2 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+      <h2 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
         Intent vs. actual
       </h2>
 
       {!hasIntent && (
-        <p className="text-muted-foreground mt-4 text-sm">
+        <p className="mt-4 text-sm text-muted-foreground">
           No planned platforms or budget set on this campaign yet — plan a
           platform on the campaign to compare strategy against what&apos;s
           running.
@@ -105,7 +105,7 @@ export function AlignmentPanel({
             return (
               <div
                 key={ch.platform}
-                className="bg-card flex items-center gap-3 rounded-lg border px-3 py-2.5"
+                className="flex items-center gap-3 rounded-lg border bg-card px-3 py-2.5"
               >
                 <ChannelLogo platform={ch.platform} className="size-4" />
                 <span className="min-w-0 flex-1 truncate text-sm capitalize">
@@ -129,7 +129,7 @@ export function AlignmentPanel({
 
       {/* Budget pacing. */}
       {budget.intended != null && (
-        <div className="text-muted-foreground mt-3 text-sm">
+        <div className="mt-3 text-sm text-muted-foreground">
           Spend {fmtUsd(budget.linkedSpend)} of {fmtUsd(budget.intended)}{" "}
           intended
           {budget.utilization != null && (
@@ -158,7 +158,7 @@ export function AlignmentPanel({
       {suggestions.length > 0 && (
         <div className="mt-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-muted-foreground text-xs font-medium">
+            <h3 className="text-xs font-medium text-muted-foreground">
               Suggested links · {suggestions.length}
             </h3>
             <Button
@@ -179,11 +179,11 @@ export function AlignmentPanel({
             {suggestions.map((s) => (
               <div
                 key={s.id}
-                className="bg-card flex items-center gap-3 rounded-lg border px-3 py-2 text-sm"
+                className="flex items-center gap-3 rounded-lg border bg-card px-3 py-2 text-sm"
               >
                 <ChannelLogo platform={s.platform} className="size-4" />
                 <span className="min-w-0 flex-1 truncate">{s.name}</span>
-                <span className="text-muted-foreground text-[10px] capitalize">
+                <span className="text-[10px] text-muted-foreground capitalize">
                   {s.status}
                 </span>
                 <Button
@@ -208,7 +208,7 @@ export function AlignmentPanel({
       {/* Linked-campaign unlink affordance, grouped per channel. */}
       {channels.some((c) => c.campaigns.length > 0) && (
         <div className="mt-4">
-          <h3 className="text-muted-foreground text-xs font-medium">
+          <h3 className="text-xs font-medium text-muted-foreground">
             Linked campaigns
           </h3>
           <div className="mt-2 flex flex-col gap-1.5">
@@ -221,7 +221,7 @@ export function AlignmentPanel({
                 >
                   <ChannelLogo platform={c.platform} className="size-3.5" />
                   <span className="min-w-0 flex-1 truncate">{c.name}</span>
-                  <span className="text-muted-foreground text-xs">
+                  <span className="text-xs text-muted-foreground">
                     {fmtUsd(c.spend)}
                   </span>
                   <Button

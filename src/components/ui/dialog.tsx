@@ -1,5 +1,6 @@
 "use client";
 
+import { cva, type VariantProps } from "class-variance-authority";
 import type * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { XIcon } from "lucide-react";
@@ -54,7 +55,7 @@ function DialogOverlayPrimitive({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50",
+        "fixed inset-0 z-50 bg-black/50 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0",
         className,
       )}
       {...props}
@@ -78,7 +79,7 @@ function DialogContentPrimitive({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200",
+          "fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border bg-background p-6 shadow-lg duration-200 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
           {
             "sm:max-w-lg": size === "default",
             "sm:max-w-sm": size === "sm",
@@ -95,7 +96,7 @@ function DialogContentPrimitive({
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="dialog-close"
-            className="ring-offset-background focus:ring-ring bg-muted hover:bg-muted/80 absolute top-3 right-3 rounded-full p-2 opacity-80 transition-all hover:scale-105 hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:size-5 [&_svg]:shrink-0"
+            className="absolute top-3 right-3 rounded-full bg-muted p-2 opacity-80 ring-offset-background transition-all hover:scale-105 hover:bg-muted/80 hover:opacity-100 focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:size-5 [&_svg]:shrink-0"
           >
             <XIcon />
             <span className="sr-only">Close</span>
@@ -152,7 +153,7 @@ function DialogDescriptionPrimitive({
   return (
     <DialogPrimitive.Description
       data-slot="dialog-description"
-      className={cn("text-muted-foreground text-sm", className)}
+      className={cn("text-sm text-muted-foreground", className)}
       {...props}
     />
   );
@@ -186,8 +187,13 @@ function DialogTrigger({
   return <DrawerTriggerPrimitive {...props} />;
 }
 
+const dialogContentStyleVariants = cva("", {
+  variants: { tone: { media: "border-white/10 bg-black/95 text-white" } },
+});
+
 function DialogContent({
-  className,
+  className: customClassName,
+  tone,
   children,
   scrollable = false,
   size = "default",
@@ -195,7 +201,9 @@ function DialogContent({
 }: React.ComponentProps<typeof DialogContentPrimitive> & {
   scrollable?: boolean;
   size?: "default" | "sm" | "lg" | "xl" | "2xl" | "full";
-}) {
+} & VariantProps<typeof dialogContentStyleVariants>) {
+  const className = cn(dialogContentStyleVariants({ tone }), customClassName);
+
   const isDesktop = useMediaQuery("(min-width: 768px)");
 
   if (isDesktop) {
@@ -224,10 +232,20 @@ function DialogContent({
   );
 }
 
+const dialogHeaderStyleVariants = cva("", {
+  variants: {
+    divider: { default: "border-b", media: "border-b border-white/10" },
+  },
+});
+
 function DialogHeader({
-  className,
+  className: customClassName,
+  divider,
   ...props
-}: React.ComponentProps<typeof DialogHeaderPrimitive>) {
+}: React.ComponentProps<typeof DialogHeaderPrimitive> &
+  VariantProps<typeof dialogHeaderStyleVariants>) {
+  const className = cn(dialogHeaderStyleVariants({ divider }), customClassName);
+
   const isDesktop = useMediaQuery("(min-width: 768px)");
 
   if (isDesktop) {
@@ -250,10 +268,18 @@ function DialogFooter({
   return <DrawerFooterPrimitive className={className} {...props} />;
 }
 
+const dialogTitleStyleVariants = cva("", {
+  variants: { tone: { media: "text-white" } },
+});
+
 function DialogTitle({
-  className,
+  className: customClassName,
+  tone,
   ...props
-}: React.ComponentProps<typeof DialogTitlePrimitive>) {
+}: React.ComponentProps<typeof DialogTitlePrimitive> &
+  VariantProps<typeof dialogTitleStyleVariants>) {
+  const className = cn(dialogTitleStyleVariants({ tone }), customClassName);
+
   const isDesktop = useMediaQuery("(min-width: 768px)");
 
   if (isDesktop) {
@@ -270,10 +296,21 @@ function DialogTitle({
   );
 }
 
+const dialogDescriptionStyleVariants = cva("", {
+  variants: { tone: { media: "text-white/55" } },
+});
+
 function DialogDescription({
-  className,
+  className: customClassName,
+  tone,
   ...props
-}: React.ComponentProps<typeof DialogDescriptionPrimitive>) {
+}: React.ComponentProps<typeof DialogDescriptionPrimitive> &
+  VariantProps<typeof dialogDescriptionStyleVariants>) {
+  const className = cn(
+    dialogDescriptionStyleVariants({ tone }),
+    customClassName,
+  );
+
   const isDesktop = useMediaQuery("(min-width: 768px)");
 
   if (isDesktop) {

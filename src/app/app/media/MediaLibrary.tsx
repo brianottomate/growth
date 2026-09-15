@@ -417,7 +417,7 @@ export function MediaLibrary({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">Media</h1>
-          <p className="text-muted-foreground text-sm">
+          <p className="text-sm text-muted-foreground">
             Reusable creative for Studio, stored in Cloudflare R2
           </p>
         </div>
@@ -477,12 +477,12 @@ export function MediaLibrary({
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-56 flex-1 sm:max-w-sm">
-          <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search media or tags"
-            className="pl-9"
+            leading="search"
           />
         </div>
         <SimpleSelect
@@ -520,7 +520,7 @@ export function MediaLibrary({
             <DialogTitle>Link an external file</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-4 py-2">
-            <p className="text-muted-foreground text-xs">
+            <p className="text-xs text-muted-foreground">
               Reference a file we don&apos;t host — a Google Drive / Dropbox /
               Frame.io master (e.g. a heavy working video). Cut-downs you
               publish get hosted separately and can link back to this as their
@@ -605,9 +605,9 @@ export function MediaLibrary({
 
       {/* Grid */}
       {isLoading ? (
-        <p className="text-muted-foreground text-sm">Loading…</p>
+        <p className="text-sm text-muted-foreground">Loading…</p>
       ) : (assets ?? []).length === 0 ? (
-        <p className="text-muted-foreground text-sm">
+        <p className="text-sm text-muted-foreground">
           No media yet. Upload your first asset above.
         </p>
       ) : (
@@ -712,14 +712,14 @@ function MediaCard({
           : FileText;
 
   return (
-    <div className="group bg-muted/30 relative overflow-hidden rounded-lg border">
+    <div className="group relative overflow-hidden rounded-lg border bg-muted/30">
       <div
-        className="bg-muted relative aspect-square cursor-zoom-in"
+        className="relative aspect-square cursor-zoom-in bg-muted"
         title="View full screen"
         onClick={onPreview}
       >
         {asset.status === "processing" ? (
-          <div className="text-muted-foreground absolute inset-0 flex flex-col items-center justify-center gap-1 text-xs">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-xs text-muted-foreground">
             <Loader2 className="size-5 animate-spin" />
             Processing…
           </div>
@@ -728,12 +728,12 @@ function MediaCard({
             href={externalHref ?? "#"}
             target="_blank"
             rel="noopener noreferrer"
-            className="group/link text-muted-foreground hover:text-foreground absolute inset-0 flex flex-col items-center justify-center gap-1.5 transition-colors"
+            className="group/link absolute inset-0 flex flex-col items-center justify-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground"
             onClick={(event) => event.stopPropagation()}
           >
             {preview ? (
               <>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {/* oxlint-disable-next-line nextjs/no-img-element */}
                 <img
                   src={preview}
                   alt={asset.title ?? ""}
@@ -764,14 +764,16 @@ function MediaCard({
             className="object-cover"
           />
         ) : (
-          <div className="text-muted-foreground absolute inset-0 flex items-center justify-center">
+          <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
             <KindIcon className="size-6" />
           </div>
         )}
 
         <Badge
           variant="outline"
-          className="absolute top-1.5 left-1.5 gap-1 bg-black/55 text-[10px] text-white backdrop-blur"
+          textSize="caption"
+          tone="media"
+          className="absolute top-1.5 left-1.5"
         >
           {isExternal ? (
             <Link2 className="size-3" />
@@ -783,7 +785,8 @@ function MediaCard({
         <Button
           variant="secondary"
           size="icon"
-          className="absolute top-1.5 right-1.5 z-10 size-7 bg-black/55 text-white backdrop-blur hover:bg-black/75"
+          tone="media"
+          className="absolute top-1.5 right-1.5 z-10 size-7"
           title="View full screen"
           onClick={(event) => {
             event.stopPropagation();
@@ -796,7 +799,8 @@ function MediaCard({
           <ButtonLink
             variant="secondary"
             size="icon"
-            className="absolute top-1.5 right-10 z-10 size-7 bg-black/55 text-white backdrop-blur hover:bg-black/75"
+            tone="media"
+            className="absolute top-1.5 right-10 z-10 size-7"
             title="Download original"
             href={`/api/media/${asset.id}/download`}
             onClick={(event) => event.stopPropagation()}
@@ -887,7 +891,7 @@ function MediaCard({
         {(asset.folder || asset.tagAssignments.length > 0) && (
           <div className="mt-1 flex flex-wrap gap-1">
             {asset.folder && (
-              <Badge variant="outline" className="h-4 px-1 text-[9px]">
+              <Badge variant="outline" textSize="micro" className="h-4">
                 {asset.folder.name}
               </Badge>
             )}
@@ -904,7 +908,8 @@ function MediaCard({
                 <Badge
                   key={tag.id}
                   variant="secondary"
-                  className="h-4 px-1 text-[9px]"
+                  textSize="micro"
+                  className="h-4"
                 >
                   {tag.name}
                 </Badge>

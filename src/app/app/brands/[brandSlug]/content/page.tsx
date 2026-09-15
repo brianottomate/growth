@@ -57,7 +57,7 @@ export default async function BrandContentPage({
   return (
     <HydrateClient>
       <div className="px-6 pt-6">
-        <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 text-xs">
+        <div className="flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
           <Link href={`/app/brands/${slug}`} className="hover:underline">
             {brand.name}
           </Link>

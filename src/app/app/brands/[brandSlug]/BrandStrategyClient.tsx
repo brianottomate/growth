@@ -184,21 +184,21 @@ function GaugeLegend() {
           className="h-[7px] w-4 rounded-full"
           style={{ background: "var(--color-neutral-450)" }}
         />
-        <span className="text-muted-foreground text-[10px]">observed</span>
+        <span className="text-[10px] text-muted-foreground">observed</span>
       </span>
       <span className="flex items-center gap-1.5">
         <span
           className="h-3 w-0.5 rounded-sm"
           style={{ background: "var(--color-primary)" }}
         />
-        <span className="text-muted-foreground text-[10px]">target</span>
+        <span className="text-[10px] text-muted-foreground">target</span>
       </span>
       <span className="flex items-center gap-1.5">
         <span
           className="h-3"
           style={{ borderLeft: "2px dotted var(--color-secondary)" }}
         />
-        <span className="text-muted-foreground text-[10px]">peers</span>
+        <span className="text-[10px] text-muted-foreground">peers</span>
       </span>
     </span>
   );
@@ -268,11 +268,11 @@ function Nums({
   const show = (v: number) => (unit === "%" ? v : fmt1(v));
   return (
     <span className="inline-flex items-baseline gap-1 whitespace-nowrap tabular-nums">
-      <span className="text-foreground text-[12.5px] font-semibold">
+      <span className="text-[12.5px] font-semibold text-foreground">
         {show(obs)}
         {u}
       </span>
-      <span className="text-muted-foreground text-[10px]">
+      <span className="text-[10px] text-muted-foreground">
         / {target == null ? "—" : `${target}${u}`}
         {peer == null ? "" : ` / ${show(peer)}${u} peer`}
       </span>
@@ -295,14 +295,14 @@ function TargetSlider({
   const [draft, setDraft] = useState(target ?? 0);
   return (
     <span className="flex items-center gap-2">
-      <span className="text-muted-foreground text-[11px]">
+      <span className="text-[11px] text-muted-foreground">
         {rhythm(obs)} now · target
       </span>
       <span className="inline-flex items-baseline gap-0.5">
         <span className="text-[12.5px] font-semibold tabular-nums">
           {draft === 0 ? "—" : fmt1(draft)}
         </span>
-        <span className="text-muted-foreground text-[10px]">/wk</span>
+        <span className="text-[10px] text-muted-foreground">/wk</span>
       </span>
       <input
         type="range"
@@ -370,7 +370,7 @@ function Verdict({ strategy }: { strategy: BrandStrategy }) {
   ].filter((p) => p.n > 0);
 
   return (
-    <div className="bg-card mb-4 rounded-2xl border p-4">
+    <div className="mb-4 rounded-2xl border bg-card p-4">
       <div className="flex flex-wrap items-center gap-3.5">
         <span
           className="size-2.5 shrink-0 rounded-full"
@@ -393,7 +393,7 @@ function Verdict({ strategy }: { strategy: BrandStrategy }) {
               <span className="text-[11px] font-semibold tabular-nums">
                 {p.n}
               </span>
-              <span className="text-muted-foreground text-[11px]">
+              <span className="text-[11px] text-muted-foreground">
                 {p.label}
               </span>
             </span>
@@ -416,7 +416,7 @@ function Verdict({ strategy }: { strategy: BrandStrategy }) {
                 >
                   Biggest gap vs peers · Short-form video
                 </span>
-                <span className="text-muted-foreground text-[11px] leading-snug">
+                <span className="text-[11px] leading-snug text-muted-foreground">
                   You post {gapObs.toFixed(1)}/wk across IG + TikTok; peers run{" "}
                   {gapPeer.toFixed(1)}/wk.
                 </span>
@@ -441,7 +441,7 @@ function Verdict({ strategy }: { strategy: BrandStrategy }) {
                 <span className="text-[11px] font-semibold">
                   Over-publishing · {overTop.label}
                 </span>
-                <span className="text-muted-foreground text-[11px] leading-snug">
+                <span className="text-[11px] leading-snug text-muted-foreground">
                   Capacity you could shift to where you&apos;re behind.
                 </span>
               </span>
@@ -486,7 +486,7 @@ function ChannelCard({
   const status = channelStatus(c);
   const peer = channelPeer(c);
   return (
-    <div className="bg-card overflow-hidden rounded-xl border">
+    <div className="overflow-hidden rounded-xl border bg-card">
       {/* header */}
       <div
         className={cn(
@@ -507,7 +507,7 @@ function ChannelCard({
         <span className="flex min-w-0 flex-col">
           <span className="text-[13.5px] font-semibold">{meta.short}</span>
           {c.handle && (
-            <span className="text-muted-foreground text-[10px]">
+            <span className="text-[10px] text-muted-foreground">
               {c.handle}
             </span>
           )}
@@ -515,7 +515,7 @@ function ChannelCard({
         <span className="ml-auto flex shrink-0 items-center gap-3.5">
           {!dormant && <PeerDelta obs={c.observedPerWeek} peer={peer} />}
           {!dormant && (
-            <span className="text-muted-foreground text-[11px] whitespace-nowrap tabular-nums">
+            <span className="text-[11px] whitespace-nowrap text-muted-foreground tabular-nums">
               {rhythm(c.observedPerWeek)}
               {c.targetPerWeek != null && (
                 <span className="text-muted-foreground">
@@ -531,7 +531,7 @@ function ChannelCard({
       {/* archetype rows */}
       {dormant ? (
         <div className="flex items-center gap-2.5 px-4 py-3">
-          <span className="text-muted-foreground text-[11px]">
+          <span className="text-[11px] text-muted-foreground">
             No posts in this window.
           </span>
         </div>
@@ -618,16 +618,16 @@ function MixCard({
   // recruiting empty state — posts aren't classified into pillars yet
   if (classified.length === 0) {
     return (
-      <div className="bg-card overflow-hidden rounded-xl border">
+      <div className="overflow-hidden rounded-xl border bg-card">
         <div className="flex items-baseline justify-between border-b px-4 py-3">
           <span className="text-[13.5px] font-semibold">Content mix</span>
-          <span className="text-muted-foreground text-[10px]">by pillar</span>
+          <span className="text-[10px] text-muted-foreground">by pillar</span>
         </div>
         <div className="flex flex-col gap-2.5 px-4 py-4">
           <span className="text-[12.5px] font-semibold">
             Your content isn&apos;t classified yet
           </span>
-          <span className="text-muted-foreground max-w-prose text-[11px] leading-relaxed">
+          <span className="max-w-prose text-[11px] leading-relaxed text-muted-foreground">
             100% of posts in this window are{" "}
             <strong className="text-foreground">Unsorted</strong>. Classify them
             into pillars to see your mix, set targets, and benchmark against
@@ -658,11 +658,11 @@ function MixCard({
       (b.targetPct ?? 0) - b.pct - ((a.targetPct ?? 0) - a.pct),
   );
   return (
-    <div className="bg-card overflow-hidden rounded-xl border">
+    <div className="overflow-hidden rounded-xl border bg-card">
       <div className="flex items-baseline justify-between border-b px-4 py-3">
         <span className="text-[13.5px] font-semibold">
           Content mix{" "}
-          <span className="text-muted-foreground font-normal">· by pillar</span>
+          <span className="font-normal text-muted-foreground">· by pillar</span>
         </span>
         <GaugeLegend />
       </div>
@@ -688,7 +688,7 @@ function MixCard({
               </span>
               {editing ? (
                 <span className="flex items-center gap-2">
-                  <span className="text-muted-foreground text-[11px]">
+                  <span className="text-[11px] text-muted-foreground">
                     {m.pct}% now · target
                   </span>
                   <input
@@ -702,9 +702,9 @@ function MixCard({
                       if (!Number.isNaN(n) && n !== (m.targetPct ?? 0))
                         onSetMix({ pillar: m.pillar, targetPct: n });
                     }}
-                    className="bg-background h-6 w-14 rounded border px-1.5 text-right text-[12.5px] tabular-nums"
+                    className="h-6 w-14 rounded border bg-background px-1.5 text-right text-[12.5px] tabular-nums"
                   />
-                  <span className="text-muted-foreground text-[10px]">%</span>
+                  <span className="text-[10px] text-muted-foreground">%</span>
                 </span>
               ) : (
                 <Gauge
@@ -794,8 +794,8 @@ export function BrandStrategyClient({
       <div className="flex items-center gap-3">
         <h2 className="text-[15px] font-semibold">Channel cadence</h2>
         <span className="ml-auto flex items-center gap-3">
-          <span className="text-muted-foreground text-[11px]">Sort</span>
-          <div className="bg-muted/50 inline-flex rounded-full p-0.5 text-[11px]">
+          <span className="text-[11px] text-muted-foreground">Sort</span>
+          <div className="inline-flex rounded-full bg-muted/50 p-0.5 text-[11px]">
             {(["attention", "volume"] as const).map((v) => (
               <button
                 key={v}

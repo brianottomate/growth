@@ -27,8 +27,9 @@ describe("countContactMentions", () => {
   // contact a score nobody earned.
   test("skips first names too short to match safely", () => {
     const jo = { email: "jo@x.com", firstName: "Jo", lastName: null };
-    expect(countContactMentions([jo], "Jo joined the job in Johannesburg."))
-      .toEqual({});
+    expect(
+      countContactMentions([jo], "Jo joined the job in Johannesburg."),
+    ).toEqual({});
   });
 });
 

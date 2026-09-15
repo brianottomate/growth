@@ -138,7 +138,7 @@ function ClientRow({
             </Link>
             <StageChips business={brand.business} delivery={brand.delivery} />
           </div>
-          <p className="text-muted-foreground mt-0.5 truncate text-xs">
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">
             {brand.website ? (
               <a
                 href={brand.website}
@@ -172,7 +172,7 @@ function ClientRow({
       {intake ? (
         <IntakeFacts intake={intake} plan={brand.account?.plan ?? null} />
       ) : (
-        <p className="text-muted-foreground mt-4 text-xs">
+        <p className="mt-4 text-xs text-muted-foreground">
           {brand.intakeUrl
             ? "No intake filed yet."
             : "No intake filed, and no intake link for this brand."}
@@ -342,7 +342,7 @@ function IntakeFacts({
       </div>
       {intake.notes ? (
         <p
-          className="text-muted-foreground line-clamp-2 text-xs"
+          className="line-clamp-2 text-xs text-muted-foreground"
           title={intake.notes}
         >
           “{intake.notes}”

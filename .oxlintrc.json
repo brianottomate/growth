@@ -1,0 +1,246 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  // Plugin set mirrors the old eslint.config.js: typescript-eslint,
+  // @next/eslint-plugin-next, eslint-plugin-react (+ hooks) and the official
+  // eslint-plugin-drizzle. unicorn/oxc are left off on purpose: they were never
+  // part of the ESLint gate and would only add churn.
+  "plugins": ["typescript", "react", "nextjs"],
+  "jsPlugins": ["eslint-plugin-drizzle", "@shadcn/lint"],
+  "options": {
+    "typeAware": true,
+    "reportUnusedDisableDirectives": "warn"
+  },
+  // The old ESLint config never extended eslint:recommended and skipped the
+  // React Compiler ruleset, so run only the rules listed below.
+  "categories": {
+    "correctness": "off"
+  },
+  // `.next/**` is not listed: oxlint's walker already skips dot-directories,
+  // and `bun run check` names `.next/types/validator.ts` explicitly so Next's
+  // generated route-contract checks stay in the type-check (see package.json).
+  "ignorePatterns": [
+    ".velite/**",
+    // Holds API + secret keys, gitignored, not part of the repo.
+    "scripts/amplitude-taxonomy/**",
+    // Standalone sub-projects with their own package.json/tsconfig (see
+    // agents/gdpr-scan). Their imports don't resolve from the root install.
+    "agents/**",
+    // Nested git worktrees are a second checkout of this repo.
+    ".worktrees/**",
+    // ESLint only ever ran on js/jsx/ts/tsx.
+    "**/*.mjs",
+    "**/*.cjs"
+  ],
+  "rules": {
+    // --- typescript-eslint recommended / recommendedTypeChecked / stylisticTypeChecked
+    "typescript/adjacent-overload-signatures": "error",
+    "typescript/await-thenable": "error",
+    "typescript/ban-ts-comment": "error",
+    "typescript/ban-tslint-comment": "error",
+    "typescript/class-literal-property-style": "error",
+    "typescript/consistent-generic-constructors": "error",
+    "typescript/consistent-indexed-object-style": "error",
+    "typescript/consistent-type-assertions": "error",
+    "typescript/consistent-type-imports": [
+      "warn",
+      { "prefer": "type-imports", "fixStyle": "inline-type-imports" }
+    ],
+    "typescript/dot-notation": "error",
+    "typescript/no-array-delete": "error",
+    "typescript/no-base-to-string": "error",
+    "typescript/no-confusing-non-null-assertion": "error",
+    "typescript/no-duplicate-enum-values": "error",
+    "typescript/no-duplicate-type-constituents": "error",
+    "typescript/no-empty-object-type": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-extra-non-null-assertion": "error",
+    "typescript/no-floating-promises": "error",
+    "typescript/no-for-in-array": "error",
+    "typescript/no-implied-eval": "error",
+    "typescript/no-inferrable-types": "error",
+    "typescript/no-misused-new": "error",
+    "typescript/no-misused-promises": [
+      "error",
+      { "checksVoidReturn": { "attributes": false } }
+    ],
+    "typescript/no-namespace": "error",
+    "typescript/no-non-null-asserted-optional-chain": "error",
+    "typescript/no-redundant-type-constituents": "error",
+    "typescript/no-require-imports": "error",
+    "typescript/no-this-alias": "error",
+    "typescript/no-unnecessary-type-assertion": "error",
+    "typescript/no-unnecessary-type-constraint": "error",
+    "typescript/no-unsafe-argument": "error",
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-declaration-merging": "error",
+    "typescript/no-unsafe-enum-comparison": "error",
+    "typescript/no-unsafe-function-type": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-return": "error",
+    "typescript/no-unsafe-unary-minus": "error",
+    "typescript/no-wrapper-object-types": "error",
+    "typescript/non-nullable-type-assertion-style": "error",
+    "typescript/only-throw-error": "error",
+    "typescript/prefer-as-const": "error",
+    "typescript/prefer-find": "error",
+    "typescript/prefer-for-of": "error",
+    "typescript/prefer-function-type": "error",
+    "typescript/prefer-includes": "error",
+    "typescript/prefer-namespace-keyword": "error",
+    "typescript/prefer-optional-chain": "error",
+    "typescript/prefer-promise-reject-errors": "error",
+    "typescript/prefer-regexp-exec": "error",
+    "typescript/prefer-string-starts-ends-with": "error",
+    "typescript/restrict-plus-operands": "error",
+    "typescript/restrict-template-expressions": "error",
+    "typescript/triple-slash-reference": "error",
+    "typescript/unbound-method": "error",
+    // These live under the eslint namespace in oxlint but are TS-aware.
+    "no-array-constructor": "error",
+    "no-empty-function": "error",
+    "no-unused-expressions": "error",
+    "no-unused-vars": [
+      "warn",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+        "caughtErrorsIgnorePattern": "^_",
+        "destructuredArrayIgnorePattern": "^_"
+      }
+    ],
+    "no-var": "error",
+    "prefer-const": "error",
+    "prefer-rest-params": "error",
+    "prefer-spread": "error",
+    // Explicitly off in the old config
+    "typescript/array-type": "off",
+    "typescript/consistent-type-definitions": "off",
+    "typescript/require-await": "off",
+    "typescript/prefer-nullish-coalescing": "off",
+
+    // --- eslint-plugin-react recommended + jsx-runtime
+    "react/display-name": "error",
+    "react/jsx-key": "error",
+    "react/jsx-no-comment-textnodes": "error",
+    "react/jsx-no-duplicate-props": "error",
+    "react/jsx-no-target-blank": "error",
+    "react/jsx-no-undef": "error",
+    "react/no-children-prop": "error",
+    "react/no-danger-with-children": "error",
+    "react/no-direct-mutation-state": "error",
+    "react/no-find-dom-node": "error",
+    "react/no-is-mounted": "error",
+    "react/no-render-return-value": "error",
+    "react/no-string-refs": "error",
+    "react/no-unescaped-entities": "error",
+    "react/no-unknown-property": "error",
+    "react/no-unsafe": "error",
+    "react/require-render-return": "error",
+    "react/react-in-jsx-scope": "off",
+    // --- react-hooks
+    "react/rules-of-hooks": "error",
+    "react/exhaustive-deps": "warn",
+
+    // --- @next/eslint-plugin-next recommended + core-web-vitals
+    "nextjs/google-font-display": "warn",
+    "nextjs/google-font-preconnect": "warn",
+    "nextjs/next-script-for-ga": "warn",
+    "nextjs/no-async-client-component": "warn",
+    "nextjs/no-before-interactive-script-outside-document": "warn",
+    "nextjs/no-css-tags": "warn",
+    "nextjs/no-head-element": "warn",
+    "nextjs/no-html-link-for-pages": "error",
+    "nextjs/no-img-element": "warn",
+    "nextjs/no-page-custom-font": "warn",
+    "nextjs/no-styled-jsx-in-document": "warn",
+    "nextjs/no-sync-scripts": "error",
+    "nextjs/no-title-in-document-head": "warn",
+    "nextjs/no-typos": "warn",
+    "nextjs/no-unwanted-polyfillio": "warn",
+    "nextjs/inline-script-id": "error",
+    "nextjs/no-assign-module-variable": "error",
+    "nextjs/no-document-import-in-page": "error",
+    "nextjs/no-duplicate-head": "error",
+    "nextjs/no-head-import-in-document": "error",
+    "nextjs/no-script-component-in-head": "error",
+
+    // --- official Drizzle rules; @typescript-eslint/utils is declared explicitly
+    "drizzle/enforce-delete-with-where": [
+      "error",
+      { "drizzleObjectName": ["db", "ctx.db"] }
+    ],
+    "drizzle/enforce-update-with-where": [
+      "error",
+      { "drizzleObjectName": ["db", "ctx.db"] }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["src/app/app/**/*.tsx", "src/components/**/*.tsx"],
+      "rules": {
+        "shadcn/no-unknown-classes": [
+          "error",
+          { "allow": ["not-prose", "toaster"] }
+        ],
+        "shadcn/no-raw-colors": "warn",
+        "shadcn/no-restyle": [
+          "error",
+          {
+            "allow": ["layout"],
+            "contracts": [
+              {
+                "pattern": "^(DialogTitle|DialogDescription|SheetTitle|SheetDescription)$",
+                "allow": ["layout", "typography", "gap-*", "pr-*"]
+              },
+              {
+                "pattern": "^(AccordionContent|AlertDialogDescription)$",
+                "allow": ["layout", "spacing", "typography"]
+              },
+              {
+                "pattern": "^CommandShortcut$",
+                "allow": ["layout", "tracking-normal", "truncate"]
+              },
+              {
+                "pattern": "^(Tabs|TabsContent|FormItem|DialogHeader|DialogFooter|SheetHeader|SheetFooter|CardFooter)$",
+                "allow": ["layout", "spacing"]
+              },
+              {
+                "pattern": "^(Badge|SelectItem)$",
+                "allow": ["layout", "capitalize", "tabular-nums"]
+              },
+              {
+                "pattern": "^(CardContent|CardHeader|DialogContent|SheetContent|PopoverContent|DropdownMenuContent)$",
+                "allow": ["layout", "spacing"]
+              },
+              {
+                "pattern": "^(CardTitle|CardDescription)$",
+                "allow": ["layout", "typography", "gap-*", "pr-*"]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      // Shared implementations own styling; callers use their public variants.
+      "files": [
+        "src/components/ui/**/*.tsx",
+        "src/components/social-mock/index.tsx"
+      ],
+      "rules": { "shadcn/no-restyle": "off" }
+    },
+    {
+      "files": [".next/**"],
+      "rules": {
+        "typescript/ban-ts-comment": "off",
+        "typescript/consistent-type-imports": "off",
+        "typescript/no-explicit-any": "off",
+        "typescript/no-redundant-type-constituents": "off",
+        "typescript/no-unsafe-function-type": "off",
+        "typescript/no-empty-object-type": "off",
+        "no-unused-vars": "off"
+      }
+    }
+  ]
+}

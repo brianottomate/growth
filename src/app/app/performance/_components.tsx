@@ -55,22 +55,42 @@ const DOT: Record<DeskCampaignState, string> = {
 };
 
 /** A coloured dot for a campaign state: green live, amber paused, grey draft. */
-export function StateDot({ state, className }: { state: DeskCampaignState; className?: string }) {
+export function StateDot({
+  state,
+  className,
+}: {
+  state: DeskCampaignState;
+  className?: string;
+}) {
   return (
     <span
       aria-label={STATE_LABEL[state]}
-      className={cn("inline-block size-[7px] shrink-0 rounded-full", DOT[state], className)}
+      className={cn(
+        "inline-block size-[7px] shrink-0 rounded-full",
+        DOT[state],
+        className,
+      )}
     />
   );
 }
 
 /** A bordered pill naming the state, for lists that mix states. */
-export function StateChip({ state, className }: { state: DeskCampaignState; className?: string }) {
+export function StateChip({
+  state,
+  className,
+}: {
+  state: DeskCampaignState;
+  className?: string;
+}) {
   return (
     <span
       className={cn(
-        "border-border/80 shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium whitespace-nowrap",
-        state === "live" ? "text-emerald-300" : state === "pushed" ? "text-amber-300" : "text-muted-foreground",
+        "shrink-0 rounded-full border border-border/80 px-2 py-0.5 text-[10px] font-medium whitespace-nowrap",
+        state === "live"
+          ? "text-emerald-300"
+          : state === "pushed"
+            ? "text-amber-300"
+            : "text-muted-foreground",
         className,
       )}
     >
@@ -79,18 +99,27 @@ export function StateChip({ state, className }: { state: DeskCampaignState; clas
   );
 }
 
-export function BrandLogo({ brand, className }: { brand: Pick<DeskBrand, "name" | "logo">; className?: string }) {
+export function BrandLogo({
+  brand,
+  className,
+}: {
+  brand: Pick<DeskBrand, "name" | "logo">;
+  className?: string;
+}) {
   return brand.logo ? (
-    // eslint-disable-next-line @next/next/no-img-element
+    // oxlint-disable-next-line nextjs/no-img-element
     <img
       src={brand.logo}
       alt=""
-      className={cn("shrink-0 rounded-[10px] border bg-white object-contain p-0.5", className)}
+      className={cn(
+        "shrink-0 rounded-[10px] border bg-white object-contain p-0.5",
+        className,
+      )}
     />
   ) : (
     <span
       className={cn(
-        "bg-muted text-muted-foreground flex shrink-0 items-center justify-center rounded-[10px] border text-xs font-semibold",
+        "flex shrink-0 items-center justify-center rounded-[10px] border bg-muted text-xs font-semibold text-muted-foreground",
         className,
       )}
     >
@@ -101,13 +130,18 @@ export function BrandLogo({ brand, className }: { brand: Pick<DeskBrand, "name" 
 
 function initials(name: string) {
   const words = name.split(/\s+/).filter(Boolean);
-  return (words.length > 1 ? words[0]![0]! + words[1]![0]! : name.slice(0, 2)).toUpperCase();
+  return (
+    words.length > 1 ? words[0]![0]! + words[1]![0]! : name.slice(0, 2)
+  ).toUpperCase();
 }
 
 export function brandAdsHref(brand: Pick<DeskBrand, "id" | "slug">) {
   return `/app/brands/${brand.slug ?? brand.id}/ads`;
 }
-export function campaignHref(brand: Pick<DeskBrand, "id" | "slug">, campaign: Pick<DeskCampaign, "id">) {
+export function campaignHref(
+  brand: Pick<DeskBrand, "id" | "slug">,
+  campaign: Pick<DeskCampaign, "id">,
+) {
   return `/app/brands/${brand.slug ?? brand.id}/ads/${campaign.id}`;
 }
 
@@ -179,16 +213,23 @@ export function CampaignRow({
           {campaign.name}
         </Link>
         {showBrand ? (
-          <span className="text-muted-foreground block truncate text-[11px]">{client}</span>
+          <span className="block truncate text-[11px] text-muted-foreground">
+            {client}
+          </span>
         ) : null}
       </div>
-      <span className="text-muted-foreground col-span-2 flex items-center gap-1.5 @lg:col-span-1">
+      <span className="col-span-2 flex items-center gap-1.5 text-muted-foreground @lg:col-span-1">
         {campaign.platforms.map((row) => (
-          <span key={row.id} title={`${platformLabel(row.platform)} · ${row.status}`}>
+          <span
+            key={row.id}
+            title={`${platformLabel(row.platform)} · ${row.status}`}
+          >
             <ChannelLogo platform={row.platform} className="size-3.5" />
           </span>
         ))}
-        {campaign.platforms.length === 0 ? <span className="text-[11px]">no platform</span> : null}
+        {campaign.platforms.length === 0 ? (
+          <span className="text-[11px]">no platform</span>
+        ) : null}
         <span className="ml-auto @lg:hidden">
           <SpendCell campaign={campaign} />
         </span>
@@ -202,7 +243,9 @@ export function CampaignRow({
             campaignId={campaign.id}
             campaignName={campaign.name}
             brandSlug={brand.slug ?? brand.id}
-            livePlatformCampaigns={campaign.platforms.filter((row) => row.status !== "draft").length}
+            livePlatformCampaigns={
+              campaign.platforms.filter((row) => row.status !== "draft").length
+            }
             compact
             afterDelete="refresh"
           />

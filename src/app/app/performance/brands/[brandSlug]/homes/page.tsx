@@ -62,7 +62,7 @@ export default async function PerformanceBrandHomesPage({
         <p
           className={cn(
             panel,
-            "text-muted-foreground px-4 py-8 text-center text-xs",
+            "px-4 py-8 text-center text-xs text-muted-foreground",
           )}
         >
           {brand.website
@@ -97,7 +97,7 @@ export default async function PerformanceBrandHomesPage({
             featuredUrl={brand.featuredListingUrl}
           />
           {homes.length > withPhoto.length ? (
-            <p className="text-muted-foreground text-[11px]">
+            <p className="text-[11px] text-muted-foreground">
               {homes.length - withPhoto.length} more on their site have no photo
               on the feed.
             </p>

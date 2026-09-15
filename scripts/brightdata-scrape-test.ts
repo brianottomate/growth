@@ -65,7 +65,10 @@ const SCRAPERS: Record<string, Scraper> = {
     label: "tiktok (single video by url)",
     datasetId: "gd_lu702nij2f790tmv9h",
     input: [
-      { url: "https://www.tiktok.com/@mrbeast/video/7553327774983802143", country: "" },
+      {
+        url: "https://www.tiktok.com/@mrbeast/video/7553327774983802143",
+        country: "",
+      },
     ],
     note: "item-level: needs a specific video URL (sample, not Airbnb)",
   },
@@ -85,14 +88,28 @@ const SCRAPERS: Record<string, Scraper> = {
 
 // Fields that commonly hold media across platforms.
 const MEDIA_KEYS = [
-  "image", "images", "img", "photos", "photo", "display_url", "thumbnail",
-  "video", "videos", "video_url", "video_thumbnail", "media", "attachments",
-  "media_url", "post_image",
+  "image",
+  "images",
+  "img",
+  "photos",
+  "photo",
+  "display_url",
+  "thumbnail",
+  "video",
+  "videos",
+  "video_url",
+  "video_thumbnail",
+  "media",
+  "attachments",
+  "media_url",
+  "post_image",
 ];
 
 function truncate(value: unknown, max = 200): unknown {
   if (typeof value === "string")
-    return value.length > max ? value.slice(0, max) + `…(${value.length})` : value;
+    return value.length > max
+      ? value.slice(0, max) + `…(${value.length})`
+      : value;
   if (Array.isArray(value))
     return value
       .slice(0, 2)
@@ -123,7 +140,8 @@ async function fetchSnapshot(snapshotId: string): Promise<unknown[]> {
       { headers: auth },
     ).then((r) => r.json() as Promise<{ status?: string }>);
     if (prog.status === "ready") break;
-    if (prog.status === "failed") throw new Error(`snapshot ${snapshotId} failed`);
+    if (prog.status === "failed")
+      throw new Error(`snapshot ${snapshotId} failed`);
     process.stdout.write(`  …${prog.status ?? "running"} (${i})\r`);
     await sleep(5000);
   }
@@ -135,7 +153,11 @@ async function fetchSnapshot(snapshotId: string): Promise<unknown[]> {
     const parsed: unknown = JSON.parse(text);
     return Array.isArray(parsed) ? (parsed as unknown[]) : [parsed];
   } catch {
-    return text.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => JSON.parse(l) as unknown);
+    return text
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .map((l) => JSON.parse(l) as unknown);
   }
 }
 
@@ -160,11 +182,16 @@ async function runScraper(key: string, s: Scraper) {
   const started = Date.now();
   const res = await fetch(endpoint, {
     method: "POST",
-    headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" },
+    headers: {
+      Authorization: `Bearer ${TOKEN}`,
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({ input: s.input }),
   });
   const text = await res.text();
-  console.log(`HTTP ${res.status} in ${((Date.now() - started) / 1000).toFixed(0)}s`);
+  console.log(
+    `HTTP ${res.status} in ${((Date.now() - started) / 1000).toFixed(0)}s`,
+  );
   if (!res.ok) {
     console.log("Body:", text.slice(0, 1500));
     return;
@@ -175,18 +202,26 @@ async function runScraper(key: string, s: Scraper) {
     const parsed: unknown = JSON.parse(text);
     records = Array.isArray(parsed) ? parsed : [parsed];
   } catch {
-    records = text.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => JSON.parse(l) as unknown);
+    records = text
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .map((l) => JSON.parse(l) as unknown);
   }
 
   // Async datasets return a snapshot_id (202) — poll + download.
-  const snap = (records[0] as { snapshot_id?: string } | undefined)?.snapshot_id;
+  const snap = (records[0] as { snapshot_id?: string } | undefined)
+    ?.snapshot_id;
   if (snap) {
     console.log(`  async snapshot ${snap} — polling…`);
     records = await fetchSnapshot(snap);
     console.log(`  downloaded ${records.length} records`);
   }
 
-  writeFileSync(`scripts/.brightdata-${key}.json`, JSON.stringify(records, null, 2));
+  writeFileSync(
+    `scripts/.brightdata-${key}.json`,
+    JSON.stringify(records, null, 2),
+  );
 
   const objs = records.filter(
     (r): r is Record<string, unknown> => !!r && typeof r === "object",
@@ -194,7 +229,9 @@ async function runScraper(key: string, s: Scraper) {
   const errs = objs.filter((o) => o.error ?? o.error_code);
   const posts = objs.filter((o) => !(o.error ?? o.error_code));
 
-  console.log(`records: ${records.length}  (posts: ${posts.length}, errors: ${errs.length})`);
+  console.log(
+    `records: ${records.length}  (posts: ${posts.length}, errors: ${errs.length})`,
+  );
   if (errs[0]) console.log(`  sample error: ${String(errs[0].error)}`);
 
   const keys = new Set<string>();
@@ -202,12 +239,16 @@ async function runScraper(key: string, s: Scraper) {
   console.log(`keys (${keys.size}): ${[...keys].join(", ")}`);
 
   const mediaCounts: Record<string, number> = {};
-  for (const p of posts) for (const k of mediaKeysPresent(p)) mediaCounts[k] = (mediaCounts[k] ?? 0) + 1;
+  for (const p of posts)
+    for (const k of mediaKeysPresent(p))
+      mediaCounts[k] = (mediaCounts[k] ?? 0) + 1;
   console.log(`media-bearing fields:`, mediaCounts);
 
   const withMedia = posts.find((p) => mediaKeysPresent(p).length > 0);
   console.log("sample post (with media if any):");
-  console.log(JSON.stringify(truncate(withMedia ?? posts[0] ?? errs[0] ?? {}), null, 2));
+  console.log(
+    JSON.stringify(truncate(withMedia ?? posts[0] ?? errs[0] ?? {}), null, 2),
+  );
 }
 
 async function main() {
@@ -215,7 +256,8 @@ async function main() {
   if (!arg) {
     console.log("Usage: bun run scripts/brightdata-scrape-test.ts <key|all>");
     console.log("Scrapers:");
-    for (const [k, s] of Object.entries(SCRAPERS)) console.log(`  ${k.padEnd(18)} ${s.label}`);
+    for (const [k, s] of Object.entries(SCRAPERS))
+      console.log(`  ${k.padEnd(18)} ${s.label}`);
     return;
   }
   const keys = arg === "all" ? Object.keys(SCRAPERS) : [arg];

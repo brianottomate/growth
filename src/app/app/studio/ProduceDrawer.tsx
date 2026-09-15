@@ -93,7 +93,7 @@ export function ProduceDrawer({
     if (targets.length && selected.size === 0 && !drafted) {
       setSelected(new Set(targets.map((t) => t.channelId ?? t.platform)));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
   }, [targets]);
 
   const key = (t: Target) => t.channelId ?? t.platform;
@@ -270,7 +270,7 @@ export function ProduceDrawer({
                         "flex items-start gap-2 rounded-md border p-1.5 text-left text-xs transition-colors",
                         on
                           ? "border-primary bg-primary/5"
-                          : "hover:bg-accent/40 border-transparent",
+                          : "border-transparent hover:bg-accent/40",
                       )}
                     >
                       <ChannelLogo
@@ -278,7 +278,7 @@ export function ProduceDrawer({
                         className="size-4 shrink-0"
                       />
                       <span className="min-w-0 flex-1">
-                        <span className="text-muted-foreground block text-[10px] uppercase">
+                        <span className="block text-[10px] text-muted-foreground uppercase">
                           {r.kind} · {r.brandName}
                           {r.likes ? ` · ${r.likes}♥` : ""}
                         </span>
@@ -287,7 +287,7 @@ export function ProduceDrawer({
                         </span>
                       </span>
                       {on && (
-                        <Check className="text-primary size-3.5 shrink-0" />
+                        <Check className="size-3.5 shrink-0 text-primary" />
                       )}
                     </button>
                   );
@@ -310,7 +310,7 @@ export function ProduceDrawer({
               size="sm"
               aria-label="Pillar"
             />
-            <Label htmlFor="steer" className="pt-1">
+            <Label htmlFor="steer" className="mt-1">
               Direction (optional)
             </Label>
             <Input
@@ -347,7 +347,7 @@ export function ProduceDrawer({
               {drafted ? "Re-draft with AI" : "Draft with AI"}
             </Button>
             {!pillarChoice && (
-              <p className="text-muted-foreground text-xs">
+              <p className="text-xs text-muted-foreground">
                 Pick a pillar to draft with AI.
               </p>
             )}
@@ -378,7 +378,7 @@ export function ProduceDrawer({
           {/* Media */}
           {media && media.length > 0 && (
             <div className="space-y-2">
-              <Label className="flex items-center gap-1.5">
+              <Label className="flex items-center">
                 <ImageIcon className="size-3.5" /> Attach media
               </Label>
               <div className="flex flex-wrap gap-1.5">
@@ -398,21 +398,21 @@ export function ProduceDrawer({
                         onClick={() => toggleMedia(m)}
                         className={cn(
                           "relative size-14 overflow-hidden rounded-md border",
-                          picked ? "ring-primary ring-2" : "",
+                          picked ? "ring-2 ring-primary" : "",
                         )}
                       >
                         {url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
+                          // oxlint-disable-next-line nextjs/no-img-element
                           <img
                             src={url}
                             alt=""
                             className="size-full object-cover"
                           />
                         ) : (
-                          <ImageIcon className="text-muted-foreground m-auto size-4" />
+                          <ImageIcon className="m-auto size-4 text-muted-foreground" />
                         )}
                         {picked && (
-                          <Check className="text-primary absolute top-0.5 right-0.5 size-3.5 rounded-full bg-white" />
+                          <Check className="absolute top-0.5 right-0.5 size-3.5 rounded-full bg-white text-primary" />
                         )}
                       </button>
                     );
@@ -434,7 +434,7 @@ export function ProduceDrawer({
                         <span className="text-sm font-medium">
                           {platformLabel(t.platform)}
                         </span>
-                        <span className="text-muted-foreground text-xs">
+                        <span className="text-xs text-muted-foreground">
                           {t.label}
                         </span>
                       </div>
@@ -452,7 +452,7 @@ export function ProduceDrawer({
                       {pickedMedia.length > 0 && (
                         <div className="mt-2 flex gap-1.5">
                           {pickedMedia.slice(0, 4).map((m, i) => (
-                            // eslint-disable-next-line @next/next/no-img-element
+                            // oxlint-disable-next-line nextjs/no-img-element
                             <img
                               key={i}
                               src={posterForMedia(m)}
@@ -470,7 +470,7 @@ export function ProduceDrawer({
         </div>
 
         {/* Footer */}
-        <div className="bg-background absolute inset-x-0 bottom-0 flex items-center justify-end gap-2 border-t p-3">
+        <div className="absolute inset-x-0 bottom-0 flex items-center justify-end gap-2 border-t bg-background p-3">
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>

@@ -71,11 +71,13 @@ async function enrichOne(domain: string) {
       computedTier: extraction.structured.icpTierGuess,
       scoreVersion: "enrich-batch-v1",
       scoredAt: new Date(),
-      enrichment: sql`coalesce(${leadDomainTable.enrichment}, '{}'::jsonb) || ${JSON.stringify({
-        unitEstimate: est,
-        extraction: extraction.structured,
-        providersUsed: unit.providersUsed,
-      })}::jsonb`,
+      enrichment: sql`coalesce(${leadDomainTable.enrichment}, '{}'::jsonb) || ${JSON.stringify(
+        {
+          unitEstimate: est,
+          extraction: extraction.structured,
+          providersUsed: unit.providersUsed,
+        },
+      )}::jsonb`,
     })
     .where(eq(leadDomainTable.id, row.id));
 
@@ -97,7 +99,9 @@ async function enrichOne(domain: string) {
 
 async function main() {
   const todo = domains.filter((d) => !done.has(d));
-  console.log(`${domains.length} domains, ${done.size} already done, ${todo.length} to go`);
+  console.log(
+    `${domains.length} domains, ${done.size} already done, ${todo.length} to go`,
+  );
 
   let ok = 0;
   let failed = 0;
@@ -117,9 +121,14 @@ async function main() {
         failed++;
         appendFileSync(
           resultsPath,
-          JSON.stringify({ domain, error: e instanceof Error ? e.message : String(e) }) + "\n",
+          JSON.stringify({
+            domain,
+            error: e instanceof Error ? e.message : String(e),
+          }) + "\n",
         );
-        console.log(`[${ok + failed}/${todo.length}] ${domain} → ERROR: ${e instanceof Error ? e.message : String(e)}`);
+        console.log(
+          `[${ok + failed}/${todo.length}] ${domain} → ERROR: ${e instanceof Error ? e.message : String(e)}`,
+        );
       }
     }
   }

@@ -267,9 +267,7 @@ async function predict(
           typeof finished.error === "string"
             ? finished.error
             : (JSON.stringify(finished.error) ?? "unknown provider error");
-        throw new Error(
-          `${finished.status}: ${providerError}`,
-        );
+        throw new Error(`${finished.status}: ${providerError}`);
       }
       console.log(`[${label}] succeeded (${finished.id})`);
       return finished;

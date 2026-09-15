@@ -81,7 +81,7 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
 
   if (!campaign) {
     return (
-      <div className="text-muted-foreground flex items-center gap-2 text-sm">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="size-4 animate-spin" /> Loading campaign…
       </div>
     );
@@ -94,7 +94,7 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
     <div>
       <Link
         href="/app/campaigns"
-        className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-xs transition-colors"
+        className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
       >
         <ArrowLeft className="size-3.5" /> Campaigns
       </Link>
@@ -109,17 +109,17 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
             <h1 className="text-2xl font-semibold tracking-tight">
               {campaign.name}
             </h1>
-            <span className="border-border flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs">
+            <span className="flex items-center gap-1.5 rounded-full border border-border px-2.5 py-0.5 text-xs">
               <span className={`size-1.5 rounded-full ${meta.dot}`} />
               <span className={meta.cls}>{meta.label}</span>
             </span>
             {campaign.goal && (
-              <span className="border-border text-muted-foreground rounded-full border px-2 py-0.5 text-xs">
+              <span className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground">
                 {campaign.goal}
               </span>
             )}
           </div>
-          <div className="text-muted-foreground mt-1.5 flex flex-wrap items-center gap-3 text-sm">
+          <div className="mt-1.5 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
             {campaign.brand && <span>{campaign.brand.name}</span>}
             {range && <span>{range}</span>}
             {campaign.budget != null && (
@@ -130,7 +130,7 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
                 href={campaign.landingUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:text-foreground flex items-center gap-1 transition-colors"
+                className="flex items-center gap-1 transition-colors hover:text-foreground"
               >
                 {campaign.landingUrl.replace(/^https?:\/\//, "")}
                 <ExternalLink className="size-3" />
@@ -138,7 +138,7 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
             )}
           </div>
           {campaign.description && (
-            <p className="text-muted-foreground mt-2 max-w-2xl text-sm">
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
               {campaign.description}
             </p>
           )}
@@ -163,7 +163,7 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
       {/* ---- linked content ------------------------------------------- */}
       <section className="mt-10">
         <div className="flex items-center justify-between">
-          <h2 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+          <h2 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
             Content · {campaign.contentPosts.length}
           </h2>
           <Button size="sm" variant="outline" onClick={() => setLinkOpen(true)}>
@@ -173,7 +173,7 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
         </div>
 
         {campaign.contentPosts.length === 0 ? (
-          <p className="text-muted-foreground mt-4 text-sm">
+          <p className="mt-4 text-sm text-muted-foreground">
             Nothing attached yet. Link existing pieces, or commit a moment from{" "}
             <Link href="/app/plan" className="underline underline-offset-2">
               Plan
@@ -187,7 +187,7 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
               return (
                 <div
                   key={p.id}
-                  className="bg-card hover:bg-accent/40 group flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors"
+                  className="group flex items-center gap-3 rounded-lg border bg-card px-3 py-2.5 transition-colors hover:bg-accent/40"
                 >
                   <Link
                     href={`/app/content/${p.id}`}
@@ -196,7 +196,7 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
                     <span className="truncate text-sm">
                       {p.title ?? "Untitled"}
                     </span>
-                    <span className="border-border text-muted-foreground shrink-0 rounded-full border px-1.5 py-0.5 text-[10px]">
+                    <span className="shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
                       {CONTENT_STATUS_LABEL[p.status] ?? p.status}
                     </span>
                     {pillar && (
@@ -220,7 +220,7 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
                       </span>
                     )}
                   </Link>
-                  <span className="text-muted-foreground shrink-0 text-[11px] tabular-nums">
+                  <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
                     {fmtDay(p.plannedAt)}
                   </span>
                   <button
@@ -229,7 +229,7 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
                     onClick={() =>
                       unlink.mutate({ campaignId, contentPostId: p.id })
                     }
-                    className="text-muted-foreground hover:text-foreground opacity-0 transition-opacity group-hover:opacity-100"
+                    className="text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
                   >
                     <X className="size-3.5" />
                   </button>
@@ -242,11 +242,11 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
 
       {/* ---- linked ad campaigns -------------------------------------- */}
       <section className="mt-10">
-        <h2 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+        <h2 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
           Ad campaigns · {campaign.adCampaigns.length}
         </h2>
         {campaign.adCampaigns.length === 0 ? (
-          <p className="text-muted-foreground mt-4 text-sm">
+          <p className="mt-4 text-sm text-muted-foreground">
             No ad campaigns linked. Paid implementations sync in under this
             campaign from the ads side.
           </p>
@@ -255,7 +255,7 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
             {campaign.adCampaigns.map((c) => (
               <div
                 key={c.id}
-                className="bg-card flex items-center gap-3 rounded-lg border px-3 py-2.5"
+                className="flex items-center gap-3 rounded-lg border bg-card px-3 py-2.5"
               >
                 {c.channel?.platform && (
                   <ChannelLogo
@@ -266,7 +266,7 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
                 <span className="min-w-0 flex-1 truncate text-sm">
                   {c.name}
                 </span>
-                <span className="border-border text-muted-foreground rounded-full border px-1.5 py-0.5 text-[10px] capitalize">
+                <span className="rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground capitalize">
                   {c.status}
                 </span>
               </div>
@@ -376,11 +376,11 @@ function LinkContentDialog({
 
         <div className="-mx-1 max-h-80 overflow-y-auto px-1">
           {isLoading ? (
-            <div className="text-muted-foreground flex items-center gap-2 py-6 text-sm">
+            <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
               <Loader2 className="size-4 animate-spin" /> Loading…
             </div>
           ) : filtered.length === 0 ? (
-            <p className="text-muted-foreground py-6 text-sm">
+            <p className="py-6 text-sm text-muted-foreground">
               {q
                 ? "No matches."
                 : "No unattached content on this brand — everything is already part of a campaign."}
@@ -390,7 +390,7 @@ function LinkContentDialog({
               {filtered.map((p) => (
                 <label
                   key={p.id}
-                  className="hover:bg-accent/40 flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 transition-colors"
+                  className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-accent/40"
                 >
                   <Checkbox
                     checked={picked.has(p.id)}
@@ -399,10 +399,10 @@ function LinkContentDialog({
                   <span className="min-w-0 flex-1 truncate text-sm">
                     {p.title ?? "Untitled"}
                   </span>
-                  <span className="border-border text-muted-foreground shrink-0 rounded-full border px-1.5 py-0.5 text-[10px]">
+                  <span className="shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
                     {CONTENT_STATUS_LABEL[p.status] ?? p.status}
                   </span>
-                  <span className="text-muted-foreground shrink-0 text-[11px] tabular-nums">
+                  <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
                     {fmtDay(p.plannedAt)}
                   </span>
                 </label>

@@ -127,13 +127,13 @@ export function MarketplaceWorkspace({
     <main className="mx-auto max-w-[1480px] space-y-8 p-5 sm:p-7">
       <header className="flex flex-col gap-5 border-b pb-6 xl:flex-row xl:items-end xl:justify-between">
         <div className="max-w-3xl">
-          <p className="text-muted-foreground text-xs font-medium tracking-[0.18em] uppercase">
+          <p className="text-xs font-medium tracking-[0.18em] text-muted-foreground uppercase">
             Wander brand map · persistent acquisition surfaces
           </p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">
             Apps & marketplaces
           </h1>
-          <p className="text-muted-foreground mt-2 max-w-2xl text-sm leading-relaxed">
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
             Plan the copy, screenshot narrative, discovery metadata, setup, and
             trust content for mobile stores, browser extensions, and AI
             connectors—without confusing a repository fact with a verified
@@ -149,10 +149,10 @@ export function MarketplaceWorkspace({
           ].map(([value, label]) => (
             <div
               key={label}
-              className="bg-card min-w-28 rounded-xl border px-3 py-2.5"
+              className="min-w-28 rounded-xl border bg-card px-3 py-2.5"
             >
               <div className="text-xl font-semibold tabular-nums">{value}</div>
-              <div className="text-muted-foreground text-[10px] tracking-wide uppercase">
+              <div className="text-[10px] tracking-wide text-muted-foreground uppercase">
                 {label}
               </div>
             </div>
@@ -166,7 +166,7 @@ export function MarketplaceWorkspace({
             <h2 id="marketplace-lens" className="text-sm font-semibold">
               Marketplace lens
             </h2>
-            <p className="text-muted-foreground text-xs">
+            <p className="text-xs text-muted-foreground">
               Store fields are exact; connector presentation stays intentionally
               directional.
             </p>
@@ -176,7 +176,7 @@ export function MarketplaceWorkspace({
             aria-pressed={showDeferred}
             onClick={() => setShowDeferred((current) => !current)}
             className={cn(
-              "text-muted-foreground hover:text-foreground inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs transition-colors",
+              "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground",
               showDeferred &&
                 "bg-foreground text-background hover:text-background",
             )}
@@ -196,7 +196,7 @@ export function MarketplaceWorkspace({
             className={cn(
               "rounded-xl border p-3 text-left transition-colors",
               surfaceId === "all"
-                ? "bg-foreground text-background border-foreground/30"
+                ? "border-foreground/30 bg-foreground text-background"
                 : "bg-card hover:border-foreground/25",
             )}
           >
@@ -221,7 +221,7 @@ export function MarketplaceWorkspace({
                 className={cn(
                   "rounded-xl border p-3 text-left transition-colors",
                   surfaceId === surface.id
-                    ? "bg-foreground text-background border-foreground/30"
+                    ? "border-foreground/30 bg-foreground text-background"
                     : "bg-card hover:border-foreground/25",
                 )}
               >
@@ -248,7 +248,7 @@ export function MarketplaceWorkspace({
           <h2 id="marketplace-queue" className="text-sm font-semibold">
             What to update next
           </h2>
-          <p className="text-muted-foreground text-xs">
+          <p className="text-xs text-muted-foreground">
             Missing placements lead the queue; verification and working drafts
             follow.
           </p>
@@ -260,15 +260,15 @@ export function MarketplaceWorkspace({
             return (
               <article
                 key={`${listing.id}-${item.fieldId}`}
-                className="bg-card rounded-xl border p-3.5"
+                className="rounded-xl border bg-card p-3.5"
               >
                 <div className="flex items-start gap-3">
-                  <span className="bg-muted text-muted-foreground grid size-8 shrink-0 place-items-center rounded-lg">
+                  <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
                     <Icon className="size-4" />
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground text-[10px] tabular-nums">
+                      <span className="text-[10px] text-muted-foreground tabular-nums">
                         0{index + 1}
                       </span>
                       <TruthBadge truth={item.truth} />
@@ -276,7 +276,7 @@ export function MarketplaceWorkspace({
                     <h3 className="mt-2 text-sm font-semibold">
                       {listing.product} · {definition.label}
                     </h3>
-                    <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                       {item.next ?? definition.purpose}
                     </p>
                   </div>
@@ -292,18 +292,18 @@ export function MarketplaceWorkspace({
           <h2 id="marketplace-inventory" className="text-sm font-semibold">
             Current placement inventory
           </h2>
-          <p className="text-muted-foreground text-xs">
+          <p className="text-xs text-muted-foreground">
             Every visible promise or asset gets its own truth state and evidence
             trail.
           </p>
         </div>
         <div className="space-y-4">
           {visibleListings.length === 0 ? (
-            <div className="bg-card rounded-2xl border border-dashed p-8 text-center">
+            <div className="rounded-2xl border border-dashed bg-card p-8 text-center">
               <p className="text-sm font-medium">
                 No Wander listing is mapped for this surface.
               </p>
-              <p className="text-muted-foreground mt-1 text-xs">
+              <p className="mt-1 text-xs text-muted-foreground">
                 The field playbook below remains ready for an evidence-backed
                 inventory.
               </p>
@@ -320,27 +320,27 @@ export function MarketplaceWorkspace({
               return (
                 <article
                   key={listing.id}
-                  className="bg-card overflow-hidden rounded-2xl border"
+                  className="overflow-hidden rounded-2xl border bg-card"
                 >
                   <div className="flex items-start gap-3 border-b p-4">
-                    <span className="bg-foreground text-background grid size-10 shrink-0 place-items-center rounded-xl">
+                    <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-foreground text-background">
                       <Icon className="size-5" />
                     </span>
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="font-semibold">{listing.product}</h3>
-                        <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-[10px]">
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
                           {surface.name}
                         </span>
                         <span className="rounded-full border px-2 py-0.5 text-[10px] capitalize">
                           {listing.availability}
                         </span>
                       </div>
-                      <p className="text-muted-foreground mt-1 max-w-3xl text-xs leading-relaxed">
+                      <p className="mt-1 max-w-3xl text-xs leading-relaxed text-muted-foreground">
                         {listing.strategy}
                       </p>
-                      <p className="text-muted-foreground mt-1 text-[11px]">
-                        <span className="text-foreground font-medium">
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        <span className="font-medium text-foreground">
                           Audience:
                         </span>{" "}
                         {listing.audience}
@@ -360,7 +360,7 @@ export function MarketplaceWorkspace({
                           className="border-b p-4 xl:odd:border-r"
                         >
                           <div className="flex items-start gap-3">
-                            <span className="bg-muted text-muted-foreground grid size-7 shrink-0 place-items-center rounded-lg">
+                            <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
                               <FieldIcon className="size-3.5" />
                             </span>
                             <div className="min-w-0 flex-1">
@@ -369,7 +369,7 @@ export function MarketplaceWorkspace({
                                   {definition.label}
                                 </h4>
                                 <TruthBadge truth={item.truth} />
-                                <span className="text-muted-foreground ml-auto text-[9px] tracking-wide uppercase">
+                                <span className="ml-auto text-[9px] tracking-wide text-muted-foreground uppercase">
                                   {definition.kind}
                                 </span>
                               </div>
@@ -378,7 +378,7 @@ export function MarketplaceWorkspace({
                                   {item.content}
                                 </p>
                               )}
-                              <p className="text-muted-foreground mt-1 text-[11px] leading-relaxed">
+                              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
                                 {item.next ?? definition.purpose}
                               </p>
                               {(item.evidence?.length ?? 0) > 0 && (
@@ -390,7 +390,7 @@ export function MarketplaceWorkspace({
                                         href={evidence.url}
                                         target="_blank"
                                         rel="noreferrer"
-                                        className="bg-muted text-muted-foreground hover:text-foreground inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px]"
+                                        className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground"
                                       >
                                         {evidence.label}
                                         <ExternalLink className="size-2.5" />
@@ -398,7 +398,7 @@ export function MarketplaceWorkspace({
                                     ) : (
                                       <span
                                         key={`${evidence.label}-${evidence.checkedAt}`}
-                                        className="bg-muted text-muted-foreground rounded-md px-2 py-1 text-[10px]"
+                                        className="rounded-md bg-muted px-2 py-1 text-[10px] text-muted-foreground"
                                       >
                                         {evidence.label} · {evidence.checkedAt}
                                       </span>
@@ -424,7 +424,7 @@ export function MarketplaceWorkspace({
           <h2 id="marketplace-playbooks" className="text-sm font-semibold">
             Surface field maps
           </h2>
-          <p className="text-muted-foreground text-xs">
+          <p className="text-xs text-muted-foreground">
             Official rules structure the audit; live listings and authenticated
             dashboards remain the source of current truth.
           </p>
@@ -435,10 +435,10 @@ export function MarketplaceWorkspace({
             return (
               <article
                 key={surface.id}
-                className="bg-card rounded-2xl border p-4"
+                className="rounded-2xl border bg-card p-4"
               >
                 <div className="flex items-start gap-3">
-                  <span className="bg-muted text-muted-foreground grid size-9 shrink-0 place-items-center rounded-xl">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground">
                     <Icon className="size-4" />
                   </span>
                   <div>
@@ -457,7 +457,7 @@ export function MarketplaceWorkspace({
                           : "Directional fields"}
                       </span>
                     </div>
-                    <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                       {surface.context}
                     </p>
                     <a
@@ -476,18 +476,18 @@ export function MarketplaceWorkspace({
                     return (
                       <div
                         key={definition.id}
-                        className="bg-muted/40 rounded-xl border p-3"
+                        className="rounded-xl border bg-muted/40 p-3"
                       >
                         <div className="flex items-center gap-2">
-                          <FieldIcon className="text-muted-foreground size-3.5" />
+                          <FieldIcon className="size-3.5 text-muted-foreground" />
                           <span className="text-xs font-semibold">
                             {definition.label}
                           </span>
-                          <span className="text-muted-foreground ml-auto text-[9px] uppercase">
+                          <span className="ml-auto text-[9px] text-muted-foreground uppercase">
                             {definition.need}
                           </span>
                         </div>
-                        <p className="text-muted-foreground mt-1.5 text-[11px] leading-relaxed">
+                        <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
                           {definition.purpose}
                         </p>
                         {definition.format && (

@@ -35,9 +35,15 @@ for (let page = 0; page < 20; page++) {
     total++;
     const domain = a.email.split("@")[1] ?? "?";
     byDomain[domain] = (byDomain[domain] ?? 0) + 1;
-    const provider = PROVIDER[a.provider_code ?? -999] ?? `code ${a.provider_code}`;
+    const provider =
+      PROVIDER[a.provider_code ?? -999] ?? `code ${a.provider_code}`;
     const status = STATUS[a.status] ?? `status ${a.status}`;
-    const warm = a.warmup_status === 1 ? "warming" : a.warmup_status === 0 ? "off" : `w:${a.warmup_status}`;
+    const warm =
+      a.warmup_status === 1
+        ? "warming"
+        : a.warmup_status === 0
+          ? "off"
+          : `w:${a.warmup_status}`;
     const name = [a.first_name, a.last_name].filter(Boolean).join(" ") || "—";
     console.log(
       `${a.email.padEnd(34)} | ${name.padEnd(18)} | ${provider.padEnd(16)} | ${status.padEnd(15)} | ${warm.padEnd(8)} | limit ${a.daily_limit ?? "—"} | track-domain ${a.tracking_domain_name ?? "—"}`,

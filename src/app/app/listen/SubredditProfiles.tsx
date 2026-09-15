@@ -105,7 +105,7 @@ export function SubredditProfiles({ source }: { source: Source }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-xs font-medium"
+        className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
       >
         <ChevronDown
           className={cn("size-3.5 transition-transform", open && "rotate-180")}
@@ -123,7 +123,8 @@ export function SubredditProfiles({ source }: { source: Source }) {
                 if (e.key === "Enter") addAndEvaluate();
               }}
               placeholder="Add a subreddit (e.g. AirBnBHosts)"
-              className="h-8 text-xs"
+              textSize="xs"
+              className="h-8"
             />
             <Button
               size="sm"
@@ -136,7 +137,7 @@ export function SubredditProfiles({ source }: { source: Source }) {
           </div>
 
           {profiles.length === 0 ? (
-            <p className="text-muted-foreground/70 text-xs">
+            <p className="text-xs text-muted-foreground/70">
               No subreddits configured yet.
             </p>
           ) : (
@@ -199,7 +200,7 @@ function SubredditCard({
   };
 
   return (
-    <div className="bg-background/40 rounded-lg border p-3">
+    <div className="rounded-lg border bg-background/40 p-3">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-medium">r/{p.name}</span>
         {stanceMeta && (
@@ -215,13 +216,13 @@ function SubredditCard({
         {(p.riskFlags ?? []).map((f) => (
           <span
             key={f}
-            className="text-muted-foreground bg-muted rounded px-1.5 py-0.5 font-mono text-[10px]"
+            className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
           >
             {f}
           </span>
         ))}
         {typeof p.subscribers === "number" && (
-          <span className="text-muted-foreground/70 text-[10px] tabular-nums">
+          <span className="text-[10px] text-muted-foreground/70 tabular-nums">
             {Intl.NumberFormat(undefined, { notation: "compact" }).format(
               p.subscribers,
             )}{" "}
@@ -253,7 +254,7 @@ function SubredditCard({
           <Button
             variant="ghost"
             size="sm"
-            className="text-destructive hover:text-destructive"
+            tone="danger"
             onClick={() => {
               if (confirm(`Remove r/${p.name}?`)) onRemove();
             }}
@@ -264,7 +265,7 @@ function SubredditCard({
       </div>
 
       {p.cultureSummary && (
-        <p className="text-muted-foreground mt-1.5 text-xs">
+        <p className="mt-1.5 text-xs text-muted-foreground">
           {p.cultureSummary}
         </p>
       )}
@@ -275,13 +276,13 @@ function SubredditCard({
         </p>
       )}
       {!editing && (p.voiceNotes ?? p.signalNotes) && (
-        <div className="text-muted-foreground/90 mt-1.5 space-y-0.5 text-xs italic">
+        <div className="mt-1.5 space-y-0.5 text-xs text-muted-foreground/90 italic">
           {p.voiceNotes && <p>Voice: {p.voiceNotes}</p>}
           {p.signalNotes && <p>Signal: {p.signalNotes}</p>}
         </div>
       )}
       {p.evaluatedAt && (
-        <p className="text-muted-foreground/60 mt-1.5 text-[10px]">
+        <p className="mt-1.5 text-[10px] text-muted-foreground/60">
           Evaluated {relDate(p.evaluatedAt)}
           {p.evaluatedModel ? ` · ${p.evaluatedModel}` : ""}
         </p>
@@ -290,12 +291,12 @@ function SubredditCard({
       {editing && (
         <div className="mt-2 space-y-2 border-t pt-2">
           <div className="space-y-1">
-            <Label className="text-xs">Stance</Label>
+            <Label textSize="xs">Stance</Label>
             <Select
               value={stance ?? ""}
               onValueChange={(v) => setStance(v as SubredditStance)}
             >
-              <SelectTrigger className="h-8 text-xs">
+              <SelectTrigger textSize="xs" className="h-8">
                 <SelectValue placeholder="No stance set" />
               </SelectTrigger>
               <SelectContent>
@@ -308,22 +309,22 @@ function SubredditCard({
             </Select>
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Voice notes (this sub)</Label>
+            <Label textSize="xs">Voice notes (this sub)</Label>
             <Textarea
               value={voiceNotes}
               onChange={(e) => setVoiceNotes(e.target.value)}
               rows={2}
-              className="text-xs"
+              textSize="xs"
               placeholder="How a reply should sound here, layered on the brand voice."
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Signal notes (this sub)</Label>
+            <Label textSize="xs">Signal notes (this sub)</Label>
             <Textarea
               value={signalNotes}
               onChange={(e) => setSignalNotes(e.target.value)}
               rows={2}
-              className="text-xs"
+              textSize="xs"
               placeholder="What counts as a worth-engaging post here."
             />
           </div>

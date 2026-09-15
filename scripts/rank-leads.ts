@@ -32,7 +32,8 @@ if (batch) {
   domains = rows.map((r) => r.domain);
 }
 if (limit > 0) domains = domains.slice(0, limit);
-if (!domains.length) throw new Error("no domains: pass domains or --batch <label>");
+if (!domains.length)
+  throw new Error("no domains: pass domains or --batch <label>");
 
 console.log(JSON.stringify({ count: domains.length, dry, batch }, null, 2));
 
@@ -52,7 +53,9 @@ async function worker() {
         `OK ${domain}  overall=${result.overall}  upside=${r.pregenUpside} assets=${r.assetQuality} design=${r.designQuality} copy=${r.copySpecificity}  imgs=${result.imageCount} shot=${result.screenshotUrl ? "y" : "n"} emails=${result.emailsSeen} notes=${result.activitiesSeen}  ${Date.now() - started}ms`,
       );
     } catch (error) {
-      console.error(`FAIL ${domain}: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(
+        `FAIL ${domain}: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 }

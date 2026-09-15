@@ -44,10 +44,10 @@ export function AddPropertyForm({ accountId }: { accountId: string }) {
   }
 
   return (
-    <div className="border-border bg-surface-secondary/30 space-y-2 rounded-md border p-3">
+    <div className="space-y-2 rounded-md border border-border bg-surface-secondary/30 p-3">
       <div className="grid gap-2 sm:grid-cols-2">
         <div className="space-y-1">
-          <Label htmlFor="prop-url" className="text-xs">
+          <Label htmlFor="prop-url" textSize="xs">
             wander.com URL
           </Label>
           <Input
@@ -55,11 +55,12 @@ export function AddPropertyForm({ accountId }: { accountId: string }) {
             value={url}
             onChange={(event) => setUrl(event.target.value)}
             placeholder="https://www.wander.com/property/…"
-            className="h-8 text-xs"
+            textSize="xs"
+            className="h-8"
           />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="prop-title" className="text-xs">
+          <Label htmlFor="prop-title" textSize="xs">
             Display name
           </Label>
           <Input
@@ -67,7 +68,8 @@ export function AddPropertyForm({ accountId }: { accountId: string }) {
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             placeholder="Wander Pawleys Island"
-            className="h-8 text-xs"
+            textSize="xs"
+            className="h-8"
           />
         </div>
       </div>
@@ -138,10 +140,10 @@ export function OpenCycleForm({ accountId }: { accountId: string }) {
   }
 
   return (
-    <div className="border-border bg-surface-secondary/30 space-y-2 rounded-md border p-3">
+    <div className="space-y-2 rounded-md border border-border bg-surface-secondary/30 p-3">
       <div className="grid gap-2 sm:grid-cols-3">
         <div className="space-y-1">
-          <Label htmlFor="cycle-period" className="text-xs">
+          <Label htmlFor="cycle-period" textSize="xs">
             Period
           </Label>
           <Input
@@ -149,11 +151,13 @@ export function OpenCycleForm({ accountId }: { accountId: string }) {
             value={period}
             onChange={(event) => setPeriod(event.target.value)}
             placeholder="2026-09"
-            className="h-8 font-mono text-xs"
+            textSize="xs"
+            monospace
+            className="h-8"
           />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="cycle-billed" className="text-xs">
+          <Label htmlFor="cycle-billed" textSize="xs">
             Billed ($/mo)
           </Label>
           <Input
@@ -162,11 +166,12 @@ export function OpenCycleForm({ accountId }: { accountId: string }) {
             value={billed}
             onChange={(event) => setBilled(event.target.value)}
             placeholder="500"
-            className="h-8 text-xs"
+            textSize="xs"
+            className="h-8"
           />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="cycle-media" className="text-xs">
+          <Label htmlFor="cycle-media" textSize="xs">
             Media ($/mo)
           </Label>
           <Input
@@ -175,7 +180,8 @@ export function OpenCycleForm({ accountId }: { accountId: string }) {
             value={media}
             onChange={(event) => setMedia(event.target.value)}
             placeholder="400"
-            className="h-8 text-xs"
+            textSize="xs"
+            className="h-8"
           />
         </div>
       </div>
@@ -186,7 +192,7 @@ export function OpenCycleForm({ accountId }: { accountId: string }) {
         </p>
       )}
       {media !== "" && mediaNum > 0 && (
-        <p className="text-muted-foreground text-xs">
+        <p className="text-xs text-muted-foreground">
           ≈${(mediaNum / 30).toFixed(2)}/day across a 30-day month.
         </p>
       )}
@@ -242,11 +248,10 @@ export function CycleStatusPicker({
       onChange={(event) =>
         update.mutate({
           cycleId,
-          status: event.target
-            .value as (typeof CYCLE_STATUSES)[number],
+          status: event.target.value as (typeof CYCLE_STATUSES)[number],
         })
       }
-      className="border-input bg-background text-muted-foreground h-6 rounded border px-1.5 text-xs"
+      className="h-6 rounded border border-input bg-background px-1.5 text-xs text-muted-foreground"
     >
       {CYCLE_STATUSES.map((value) => (
         <option key={value} value={value}>
@@ -303,7 +308,9 @@ export function PropertyIdField({
         value={value}
         onChange={(event) => setValue(event.target.value)}
         placeholder="listing id"
-        className="h-7 w-56 font-mono text-xs"
+        textSize="xs"
+        monospace
+        className="h-7 w-56"
       />
       <Button
         size="sm"

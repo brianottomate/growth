@@ -84,10 +84,22 @@ async function main() {
   // --- TIME SPREAD: campaigns have no own date; derive from their ads' ---
   // platformCreatedAt (fallback createdAt). Bucket campaigns by the month of
   // their EARLIEST ad (≈ launch month).
-  console.log("\n=== CAMPAIGN TIME SPREAD (by earliest ad's platformCreatedAt) ===");
-  const monthBuckets = new Map<string, { campaigns: number; ads: number; spend: number }>();
+  console.log(
+    "\n=== CAMPAIGN TIME SPREAD (by earliest ad's platformCreatedAt) ===",
+  );
+  const monthBuckets = new Map<
+    string,
+    { campaigns: number; ads: number; spend: number }
+  >();
   let datedCampaigns = 0;
-  const campaignSpans: Array<{ name: string; status?: string; first?: string; last?: string; ads: number; spend: number }> = [];
+  const campaignSpans: Array<{
+    name: string;
+    status?: string;
+    first?: string;
+    last?: string;
+    ads: number;
+    spend: number;
+  }> = [];
   for (const c of tree) {
     const adDates: number[] = [];
     let ads = 0;
@@ -97,13 +109,18 @@ async function main() {
         ads++;
         const m = a.metrics as { spend?: number } | undefined;
         if (typeof m?.spend === "number") spend += m.spend;
-        const raw = (a.platformCreatedAt ?? a.createdAt);
+        const raw = a.platformCreatedAt ?? a.createdAt;
         const t = raw ? Date.parse(raw) : NaN;
         if (!Number.isNaN(t)) adDates.push(t);
       }
     }
     if (adDates.length === 0) {
-      campaignSpans.push({ name: (c.campaignName as string) ?? "?", status: c.status, ads, spend });
+      campaignSpans.push({
+        name: (c.campaignName as string) ?? "?",
+        status: c.status,
+        ads,
+        spend,
+      });
       continue;
     }
     datedCampaigns++;
@@ -138,9 +155,16 @@ async function main() {
 
   console.log("\n  widest-span campaigns (first ad → last ad):");
   const dated = campaignSpans.filter((c) => c.first);
-  dated.sort((a, b) => Date.parse(b.last!) - Date.parse(b.first!) - (Date.parse(a.last!) - Date.parse(a.first!)));
+  dated.sort(
+    (a, b) =>
+      Date.parse(b.last!) -
+      Date.parse(b.first!) -
+      (Date.parse(a.last!) - Date.parse(a.first!)),
+  );
   for (const c of dated.slice(0, 10)) {
-    console.log(`    ${c.first} → ${c.last}  [${c.status}] ${c.ads} ads $${c.spend.toFixed(0)}  ${c.name.slice(0, 45)}`);
+    console.log(
+      `    ${c.first} → ${c.last}  [${c.status}] ${c.ads} ads $${c.spend.toFixed(0)}  ${c.name.slice(0, 45)}`,
+    );
   }
 
   if (WITH_COMMENTS && firstAd) {

@@ -105,7 +105,7 @@ function AuthorCard({
         </Heading>
 
         <div className="mx-auto mt-10 max-w-2xl">
-          <div className="border-secondary bg-surface-primary flex flex-col items-center rounded-2xl border p-8 shadow-sm">
+          <div className="flex flex-col items-center rounded-2xl border border-secondary bg-surface-primary p-8 shadow-sm">
             <Image
               src={authorInfo.image}
               alt={authorInfo.name}
@@ -123,7 +123,7 @@ function AuthorCard({
                   href={authorInfo.instagram}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-secondary hover:text-primary transition-colors"
+                  className="text-secondary transition-colors hover:text-primary"
                   aria-label="Instagram"
                 >
                   <InstagramIcon className="h-5 w-5" />
@@ -135,7 +135,7 @@ function AuthorCard({
               {authorInfo.description}
             </Text>
 
-            <div className="text-secondary mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-secondary">
               <div className="flex items-center gap-x-2">
                 <Calendar className="h-4 w-4" />
                 <time dateTime={publishedAt}>
@@ -154,10 +154,10 @@ function AuthorCard({
               </Text>
             )}
 
-            <div className="border-secondary mt-8 w-full border-t pt-6">
+            <div className="mt-8 w-full border-t border-secondary pt-6">
               <Link
                 href="/blog"
-                className="text-primary hover:text-secondary flex items-center justify-center gap-2 text-base font-semibold transition-colors"
+                className="flex items-center justify-center gap-2 text-base font-semibold text-primary transition-colors hover:text-secondary"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Back to Blog
@@ -241,7 +241,7 @@ export default async function BlogPostPage({
           aria-hidden="true"
         >
           <div
-            className="from-primary/30 to-primary relative left-[calc(50%-11rem)] aspect-1155/678 w-144.5 -translate-x-1/2 rotate-30 bg-linear-to-tr opacity-20 sm:left-[calc(50%-30rem)] sm:w-288.75"
+            className="relative left-[calc(50%-11rem)] aspect-1155/678 w-144.5 -translate-x-1/2 rotate-30 bg-linear-to-tr from-primary/30 to-primary opacity-20 sm:left-[calc(50%-30rem)] sm:w-288.75"
             style={{
               clipPath:
                 "polygon(74.1% 44.1%, 100% 61.6%, 97.5% 26.9%, 85.5% 0.1%, 80.7% 2%, 72.5% 32.5%, 60.2% 62.4%, 52.4% 68.1%, 47.5% 58.3%, 45.2% 34.5%, 27.5% 76.7%, 0.1% 64.9%, 17.9% 100%, 27.6% 76.8%, 76.1% 97.7%, 74.1% 44.1%)",

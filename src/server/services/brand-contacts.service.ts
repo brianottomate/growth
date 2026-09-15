@@ -42,7 +42,10 @@ export type BrandContacts = {
 
 // The leads mirror is keyed on the bare host, the way the HubSpot mirror
 // normalises it, so the same function decides what "this brand's domain" is.
-export function leadDomainFor(input: { leadDomain: string | null; website: string | null }): string | null {
+export function leadDomainFor(input: {
+  leadDomain: string | null;
+  website: string | null;
+}): string | null {
   return normalizeDomain(input.leadDomain) ?? normalizeDomain(input.website);
 }
 
@@ -55,7 +58,10 @@ export async function loadBrandContacts(input: {
 
   const [lead, rows, [total]] = await Promise.all([
     db.query.leadDomainTable.findFirst({
-      where: and(eq(leadDomainTable.domain, domain), isNull(leadDomainTable.deletedAt)),
+      where: and(
+        eq(leadDomainTable.domain, domain),
+        isNull(leadDomainTable.deletedAt),
+      ),
       columns: {
         companyName: true,
         hubspotRecordId: true,
@@ -124,9 +130,12 @@ export async function loadBrandContacts(input: {
             ? `https://app.hubspot.com/contacts/${HUBSPOT_ACCOUNT_ID}/record/0-2/${lead.hubspotRecordId}`
             : null,
           leadStatus: lead.hubspotLeadStatus
-            ? (HS_COMPANY_LEAD_STATUS_LABELS[lead.hubspotLeadStatus] ?? lead.hubspotLeadStatus)
+            ? (HS_COMPANY_LEAD_STATUS_LABELS[lead.hubspotLeadStatus] ??
+              lead.hubspotLeadStatus)
             : null,
-          owner: lead.hubspotOwner ? (HS_OWNER_NAMES[lead.hubspotOwner] ?? lead.hubspotOwner) : null,
+          owner: lead.hubspotOwner
+            ? (HS_OWNER_NAMES[lead.hubspotOwner] ?? lead.hubspotOwner)
+            : null,
           hasDeal: lead.hasHubspotDeal,
           isCustomer: lead.isExistingCustomer,
           pms: lead.pms,

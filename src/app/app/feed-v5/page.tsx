@@ -37,7 +37,7 @@ export default async function FeedV5Page() {
   const org = membership?.organization;
   if (!org) {
     return (
-      <div className="text-muted-foreground p-8">No organization found.</div>
+      <div className="p-8 text-muted-foreground">No organization found.</div>
     );
   }
 
@@ -73,9 +73,12 @@ export default async function FeedV5Page() {
   }
 
   const brands: V5Brand[] = [
-    ...owned.map(
-      (b): V5Brand => ({ id: b.id, name: b.name, logo: b.logo, role: "owned" }),
-    ),
+    ...owned.map((b): V5Brand => ({
+      id: b.id,
+      name: b.name,
+      logo: b.logo,
+      role: "owned",
+    })),
     ...tracked.values(),
   ];
   const allIds = brands.map((b) => b.id);

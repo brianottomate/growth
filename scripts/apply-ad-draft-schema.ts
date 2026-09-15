@@ -24,7 +24,9 @@ await db.execute(sql`
 `);
 
 // An ad may now exist before a campaign does: that is what a draft is.
-await db.execute(sql`alter table public.ad alter column campaign_id drop not null;`);
+await db.execute(
+  sql`alter table public.ad alter column campaign_id drop not null;`,
+);
 
 await db.execute(sql`
   alter table public.ad
@@ -42,6 +44,8 @@ await db.execute(sql`
   where campaign_id is not null and status = 'drawn'
 `);
 
-await db.execute(sql`create index if not exists ad_home_idx on public.ad (home_id);`);
+await db.execute(
+  sql`create index if not exists ad_home_idx on public.ad (home_id);`,
+);
 
 console.log("ad drafts are ready.");

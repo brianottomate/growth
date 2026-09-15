@@ -7,7 +7,11 @@ describe("identity from Firecrawl branding", () => {
     const identity = identityFromBranding(
       {
         colorScheme: "light",
-        colors: { primary: "#243735", accent: "rgb(23, 79, 81)", link: "#174F51" },
+        colors: {
+          primary: "#243735",
+          accent: "rgb(23, 79, 81)",
+          link: "#174F51",
+        },
         typography: {
           fontFamilies: { primary: "Inter", heading: "Gentium Book Plus" },
         },
@@ -35,7 +39,9 @@ describe("identity from Firecrawl branding", () => {
     expect(identity?.favicon).toBe("https://chaletshh.com/favicon.png");
     expect(identity?.personality?.tone).toBe("professional");
     // raw keeps Firecrawl's answer verbatim; the identity prefers the served asset.
-    expect(identity?.raw?.logo).toBe("https://chaletshh.com/i/format=jpeg?src=logo.png");
+    expect(identity?.raw?.logo).toBe(
+      "https://chaletshh.com/i/format=jpeg?src=logo.png",
+    );
   });
 
   test("is absent when Firecrawl returned no profile", () => {

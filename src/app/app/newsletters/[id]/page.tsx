@@ -75,12 +75,12 @@ export default async function NewsletterIssuePage({
     });
     return (
       <div>
-        <div className="text-muted-foreground mb-4 flex items-center gap-1.5 text-xs">
+        <div className="mb-4 flex items-center gap-1.5 text-xs text-muted-foreground">
           <Link href="/app/newsletters" className="hover:text-foreground">
             Newsletters
           </Link>
           <span>/</span>
-          <span className="text-foreground font-medium">
+          <span className="font-medium text-foreground">
             {issue.text || "Email workspace"}
           </span>
         </div>
@@ -123,7 +123,7 @@ export default async function NewsletterIssuePage({
   return (
     <div>
       {/* breadcrumb */}
-      <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <Link
           href={
             issue.brand?.slug
@@ -135,7 +135,7 @@ export default async function NewsletterIssuePage({
           Newsletters
         </Link>
         <span>/</span>
-        <span className="text-foreground font-medium">{issue.text}</span>
+        <span className="font-medium text-foreground">{issue.text}</span>
       </div>
 
       {/* header */}
@@ -150,7 +150,7 @@ export default async function NewsletterIssuePage({
           {meta.label}
         </span>
       </div>
-      <div className="text-muted-foreground mt-1.5 flex flex-wrap items-center gap-2 text-sm">
+      <div className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
         {issue.publishedAt && (
           <span>
             {issue.publishedAt.toLocaleDateString([], {
@@ -169,7 +169,7 @@ export default async function NewsletterIssuePage({
               href={issue.externalUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="hover:text-foreground underline"
+              className="underline hover:text-foreground"
             >
               Open in Customer.io ↗
             </a>
@@ -185,7 +185,7 @@ export default async function NewsletterIssuePage({
               <div className="text-lg font-semibold tabular-nums">
                 {fmt(m.value!)}
               </div>
-              <div className="text-muted-foreground text-[10px] tracking-wide uppercase">
+              <div className="text-[10px] tracking-wide text-muted-foreground uppercase">
                 {m.label}
               </div>
             </div>
@@ -195,7 +195,7 @@ export default async function NewsletterIssuePage({
               <div className="text-lg font-semibold tabular-nums">
                 {Math.round((s.opened / s.delivered) * 100)}%
               </div>
-              <div className="text-muted-foreground text-[10px] tracking-wide uppercase">
+              <div className="text-[10px] tracking-wide text-muted-foreground uppercase">
                 Open rate
               </div>
             </div>
@@ -204,7 +204,7 @@ export default async function NewsletterIssuePage({
       )}
 
       {/* basic body preview */}
-      <h2 className="text-muted-foreground mt-6 mb-2 text-xs font-semibold tracking-wider uppercase">
+      <h2 className="mt-6 mb-2 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
         Preview
       </h2>
       {content?.body ? (
@@ -215,14 +215,14 @@ export default async function NewsletterIssuePage({
           className="h-[75vh] w-full rounded-xl border bg-white"
         />
       ) : (
-        <div className="text-muted-foreground rounded-xl border p-6 text-sm">
+        <div className="rounded-xl border p-6 text-sm text-muted-foreground">
           Couldn&apos;t load the rendered body from Customer.io.{" "}
           {issue.externalUrl && (
             <a
               href={issue.externalUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="hover:text-foreground underline"
+              className="underline hover:text-foreground"
             >
               Open it in Customer.io ↗
             </a>

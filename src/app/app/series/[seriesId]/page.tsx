@@ -315,7 +315,7 @@ export default async function SeriesDetailPage({
 
   return (
     <div>
-      <div className="text-muted-foreground text-xs">
+      <div className="text-xs text-muted-foreground">
         <Link href="/app/series" className="hover:underline">
           Series
         </Link>{" "}
@@ -343,7 +343,7 @@ export default async function SeriesDetailPage({
         {cadence.map((target) => (
           <span
             key={`${target.platform}-${target.archetype}`}
-            className="text-muted-foreground rounded-full border px-2.5 py-0.5 text-[11px] tabular-nums"
+            className="rounded-full border px-2.5 py-0.5 text-[11px] text-muted-foreground tabular-nums"
           >
             {target.count} {target.archetype.replace("_", " ")}/{target.period}{" "}
             · {target.platform}
@@ -357,7 +357,7 @@ export default async function SeriesDetailPage({
       </div>
 
       {series.description ? (
-        <p className="text-muted-foreground mt-2 max-w-3xl text-sm leading-relaxed">
+        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">
           {series.description}
         </p>
       ) : null}
@@ -378,7 +378,7 @@ export default async function SeriesDetailPage({
             )}
             <div>
               <h2 className="text-sm font-semibold">Two-week runway</h2>
-              <p className="text-muted-foreground mt-1 text-xs">
+              <p className="mt-1 text-xs text-muted-foreground">
                 {runway.scheduled}/{runway.required} installments scheduled
                 {runway.reserve > 0
                   ? `, with ${runway.reserve} unscheduled in reserve`
@@ -393,11 +393,11 @@ export default async function SeriesDetailPage({
         </section>
       ) : null}
 
-      <section className="bg-card mt-5 rounded-xl border p-4">
+      <section className="mt-5 rounded-xl border bg-card p-4">
         <div className="flex flex-wrap items-start gap-3">
           <div className="min-w-0 flex-1">
             <h2 className="text-sm font-semibold">Map the first posts</h2>
-            <p className="text-muted-foreground mt-1 text-xs">
+            <p className="mt-1 text-xs text-muted-foreground">
               Next: {nextPlanningStep}
             </p>
           </div>
@@ -412,16 +412,16 @@ export default async function SeriesDetailPage({
           {planningChecks.map((check) => (
             <div
               key={check.label}
-              className="bg-background flex items-start gap-2 rounded-lg border px-3 py-2"
+              className="flex items-start gap-2 rounded-lg border bg-background px-3 py-2"
             >
               {check.complete ? (
                 <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-400" />
               ) : (
-                <CircleDashed className="text-muted-foreground mt-0.5 size-3.5 shrink-0" />
+                <CircleDashed className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
               )}
               <div className="min-w-0">
                 <p className="text-xs font-medium">{check.label}</p>
-                <p className="text-muted-foreground mt-0.5 text-[10px] leading-relaxed">
+                <p className="mt-0.5 text-[10px] leading-relaxed text-muted-foreground">
                   {check.detail}
                 </p>
               </div>
@@ -432,7 +432,7 @@ export default async function SeriesDetailPage({
 
       {unscheduled.length > 0 ? (
         <section className="mt-6">
-          <h2 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+          <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
             Unscheduled installments
           </h2>
           <div className="mt-2 grid gap-2 md:grid-cols-2">
@@ -451,25 +451,25 @@ export default async function SeriesDetailPage({
 
       <section className="mt-6">
         <div className="flex items-center gap-2">
-          <h2 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+          <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
             Scheduled installments
           </h2>
-          <span className="text-muted-foreground text-[11px]">
+          <span className="text-[11px] text-muted-foreground">
             other {series.brand.name} posts dimmed
           </span>
           <span className="flex-1" />
           <Link
             href="/app/calendar"
-            className="text-muted-foreground text-[11px] hover:underline"
+            className="text-[11px] text-muted-foreground hover:underline"
           >
             Open calendar →
           </Link>
         </div>
 
         {orderedWeeks.length === 0 ? (
-          <div className="bg-card mt-3 rounded-xl border p-6 text-sm">
+          <div className="mt-3 rounded-xl border bg-card p-6 text-sm">
             <p className="font-medium">No installments yet</p>
-            <p className="text-muted-foreground mt-1 text-xs">
+            <p className="mt-1 text-xs text-muted-foreground">
               Use “Plan first posts” to turn the series promise into distinct
               installments, channel renderings, and dates.
             </p>
@@ -478,7 +478,7 @@ export default async function SeriesDetailPage({
           <div className="mt-3 space-y-3">
             {orderedWeeks.map((week) => (
               <div key={week.start.getTime()} className="flex gap-4">
-                <div className="text-muted-foreground w-24 shrink-0 pt-3 text-[11px] tabular-nums">
+                <div className="w-24 shrink-0 pt-3 text-[11px] text-muted-foreground tabular-nums">
                   {weekLabel(week.start)}
                 </div>
                 <div className="min-w-0 flex-1 space-y-2 border-l pl-4">
@@ -500,13 +500,13 @@ export default async function SeriesDetailPage({
                       <span className="text-xs">
                         {post.title ?? "Untitled"}
                       </span>
-                      <span className="text-muted-foreground ml-2 text-[11px]">
+                      <span className="ml-2 text-[11px] text-muted-foreground">
                         {post.plannedAt ? dayLabel(post.plannedAt) : null}
                       </span>
                     </Link>
                   ))}
                   {week.context.length > 3 ? (
-                    <p className="text-muted-foreground px-3 text-[11px]">
+                    <p className="px-3 text-[11px] text-muted-foreground">
                       +{week.context.length - 3} more on the calendar
                     </p>
                   ) : null}
@@ -517,7 +517,7 @@ export default async function SeriesDetailPage({
         )}
       </section>
 
-      <p className="text-muted-foreground mt-8 text-[11px]">
+      <p className="mt-8 text-[11px] text-muted-foreground">
         Edit this series from the assistant panel — cadence, installments, and
         pillar changes land here live.
       </p>
@@ -562,19 +562,19 @@ function SpotTile({ spot }: { spot: SpotPreview }) {
     >
       <div className="h-14">
         {spot.thumb ? (
-          // eslint-disable-next-line @next/next/no-img-element
+          // oxlint-disable-next-line nextjs/no-img-element
           <img src={spot.thumb} alt="" className="h-full w-full object-cover" />
         ) : spot.text ? (
-          <p className="text-muted-foreground line-clamp-3 px-1.5 py-1 text-[9px] leading-tight">
+          <p className="line-clamp-3 px-1.5 py-1 text-[9px] leading-tight text-muted-foreground">
             {spot.text}
           </p>
         ) : (
-          <div className="text-muted-foreground/60 flex h-full items-center justify-center text-[10px]">
+          <div className="flex h-full items-center justify-center text-[10px] text-muted-foreground/60">
             empty
           </div>
         )}
       </div>
-      <div className="text-muted-foreground flex items-center gap-1 border-t px-1.5 py-0.5 text-[9px]">
+      <div className="flex items-center gap-1 border-t px-1.5 py-0.5 text-[9px] text-muted-foreground">
         <span
           className={`size-1.5 shrink-0 rounded-full ${
             SPOT_DOT[spot.status] ?? SPOT_DOT.draft
@@ -621,13 +621,13 @@ function InstallmentCard({
   return (
     <Link
       href={`/app/content/${post.id}`}
-      className="bg-card block rounded-lg border px-3 py-2 transition hover:border-neutral-500"
+      className="block rounded-lg border bg-card px-3 py-2 transition hover:border-neutral-500"
     >
       <div className="flex items-start gap-3">
         {/* Social-card hero: the installment's pool image. Its absence is the
             "no visual yet" signal, so no placeholder box when missing. */}
         {hero ? (
-          // eslint-disable-next-line @next/next/no-img-element
+          // oxlint-disable-next-line nextjs/no-img-element
           <img
             src={hero}
             alt=""
@@ -648,7 +648,7 @@ function InstallmentCard({
               {post.status.replace("_", " ")}
             </span>
           </div>
-          <div className="text-muted-foreground mt-0.5 flex items-center gap-2 text-[11px]">
+          <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
             {post.plannedAt ? <span>{dayLabel(post.plannedAt)}</span> : null}
             {post.owner?.name ? <span>· {post.owner.name}</span> : null}
           </div>
@@ -662,7 +662,7 @@ function InstallmentCard({
         </div>
       ) : null}
       {boosts.length > 0 ? (
-        <div className="text-muted-foreground mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px]">
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
           <span className="text-muted-foreground/70">Boost</span>
           {boosts.map((boost) => (
             <span

@@ -207,7 +207,7 @@ export function Twitter() {
   if (isLoading) return <Skeleton />;
   if (isError) {
     return (
-      <div className="border-destructive/30 bg-destructive/10 text-destructive rounded-lg border p-4 text-sm">
+      <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
         {error.message}
       </div>
     );
@@ -215,7 +215,7 @@ export function Twitter() {
 
   if (all.length === 0) {
     return (
-      <div className="bg-card text-muted-foreground rounded-lg border p-4 text-sm">
+      <div className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
         No X mentions yet. The 6-hourly cron (
         <code className="font-mono">/api/cron/x</code>) searches the watchlist
         terms, scores each tweet, and persists the hits here.
@@ -279,14 +279,14 @@ export function Twitter() {
           <h2 className="text-lg font-semibold tracking-tight">
             X — mentions queue
           </h2>
-          <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             One persisted queue of X signal. The 6-hourly cron searches the
             watchlist terms, scores each tweet, and drafts replies for the
             engage-worthy ones; status sticks across reloads and teammates.
           </p>
         </div>
         {lastReceived && (
-          <span className="text-muted-foreground text-xs">
+          <span className="text-xs text-muted-foreground">
             latest {relTime(lastReceived)} ago · {all.length} total
           </span>
         )}
@@ -302,7 +302,7 @@ export function Twitter() {
             onClick={toggle}
             render={(v) => (v === UNMATCHED ? "unmatched" : `“${v}”`)}
           />
-          <p className="text-muted-foreground/70 text-[11px] leading-relaxed">
+          <p className="text-[11px] leading-relaxed text-muted-foreground/70">
             Click a term to filter the queue. A tweet matching several terms
             counts under each; older rows without a recorded match sit under
             “unmatched”.
@@ -314,7 +314,7 @@ export function Twitter() {
           {filter && (
             <button
               onClick={() => setFilter(null)}
-              className="text-muted-foreground hover:text-foreground text-xs"
+              className="text-xs text-muted-foreground hover:text-foreground"
             >
               Filtered by {filter === UNMATCHED ? "unmatched" : `“${filter}”`} —
               clear ✕
@@ -378,7 +378,7 @@ export function Twitter() {
             <div>
               <button
                 onClick={() => setShowSkipped((v) => !v)}
-                className="text-muted-foreground hover:text-foreground text-xs"
+                className="text-xs text-muted-foreground hover:text-foreground"
               >
                 {showSkipped ? "Hide" : "Show"} skipped ({skipped.length})
               </button>
@@ -408,7 +408,7 @@ export function Twitter() {
           )}
 
           {act.length + monitor.length + handled.length === 0 && (
-            <p className="text-muted-foreground py-6 text-sm">
+            <p className="py-6 text-sm text-muted-foreground">
               Nothing in the queue for this filter.
             </p>
           )}
@@ -436,7 +436,7 @@ function RailGroup({
   if (items.length === 0) return null;
   return (
     <div className="space-y-2">
-      <span className="text-muted-foreground text-[11px] font-semibold tracking-wide uppercase">
+      <span className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
         {title}
       </span>
       <div className="flex flex-col gap-1.5">
@@ -454,7 +454,7 @@ function RailGroup({
               )}
             >
               <span className="truncate font-medium">{render(it.value)}</span>
-              <span className="text-muted-foreground/70 ml-auto tabular-nums">
+              <span className="ml-auto text-muted-foreground/70 tabular-nums">
                 {it.count}
               </span>
             </button>
@@ -495,11 +495,11 @@ function QueueGroup({
         >
           {label}
         </span>
-        <span className="text-muted-foreground text-xs tabular-nums">
+        <span className="text-xs text-muted-foreground tabular-nums">
           {count}
         </span>
       </div>
-      <div className="bg-card divide-y overflow-hidden rounded-xl border">
+      <div className="divide-y overflow-hidden rounded-xl border bg-card">
         {children}
       </div>
     </div>
@@ -589,7 +589,7 @@ function TweetCard({
       {/* header is a clickable div (not a <button>) so the @author link can nest */}
       <div
         onClick={() => setOpen((v) => !v)}
-        className="hover:bg-accent/30 flex w-full cursor-pointer flex-col gap-1.5 px-4 py-3 text-left transition-colors"
+        className="flex w-full cursor-pointer flex-col gap-1.5 px-4 py-3 text-left transition-colors hover:bg-accent/30"
       >
         <span className="flex flex-wrap items-center gap-2">
           {intent && (
@@ -610,7 +610,7 @@ function TweetCard({
             {provDetail ? ` · ${provDetail}` : ""}
           </span>
           {m.relevance != null && (
-            <span className="text-muted-foreground text-[10px] tabular-nums">
+            <span className="text-[10px] text-muted-foreground tabular-nums">
               {m.relevance}/10
             </span>
           )}
@@ -618,7 +618,7 @@ function TweetCard({
             {assignee && <OwnerAvatar member={assignee} size="sm" />}
             <ChevronDown
               className={cn(
-                "text-muted-foreground size-3.5 transition-transform",
+                "size-3.5 text-muted-foreground transition-transform",
                 open && "rotate-180",
               )}
             />
@@ -634,7 +634,7 @@ function TweetCard({
           {m.snippet ?? m.title ?? "(no text)"}
         </span>
 
-        <span className="text-muted-foreground/80 flex flex-wrap items-center gap-x-2 font-mono text-[11px]">
+        <span className="flex flex-wrap items-center gap-x-2 font-mono text-[11px] text-muted-foreground/80">
           {m.author && (
             <a
               href={m.url}
@@ -654,19 +654,19 @@ function TweetCard({
       {open && (
         <div className="flex flex-col gap-2.5 px-4 pb-3">
           {m.rationale && (
-            <p className="text-muted-foreground text-xs italic">
+            <p className="text-xs text-muted-foreground italic">
               {m.rationale}
             </p>
           )}
           {handled && (
-            <p className="text-muted-foreground text-[11px]">
+            <p className="text-[11px] text-muted-foreground">
               {m.status === "engaged" ? "Engaged" : "Skipped"}
               {resolver ? ` by ${resolver.name ?? "someone"}` : ""}
               {m.resolvedAt ? ` · ${relTime(m.resolvedAt)} ago` : ""}
             </p>
           )}
           {m.decisionNote && (
-            <p className="border-muted-foreground/30 text-muted-foreground border-l-2 pl-2 text-xs italic">
+            <p className="border-l-2 border-muted-foreground/30 pl-2 text-xs text-muted-foreground italic">
               {m.decisionNote}
             </p>
           )}
@@ -702,14 +702,14 @@ function TweetCard({
               href={m.url}
               target="_blank"
               rel="noreferrer noopener"
-              className="text-muted-foreground hover:text-primary text-xs"
+              className="text-xs text-muted-foreground hover:text-primary"
             >
               Open on X ↗
             </a>
             <button
               type="button"
               onClick={() => setSparOpen(true)}
-              className="text-muted-foreground hover:text-primary inline-flex items-center gap-1 text-xs"
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"
             >
               <MessagesSquare className="size-3.5" />
               Spar
@@ -734,13 +734,13 @@ function TweetCard({
               <button
                 type="button"
                 onClick={() => setEditingReply((v) => !v)}
-                className="text-muted-foreground hover:text-primary text-xs"
+                className="text-xs text-muted-foreground hover:text-primary"
               >
                 {m.replyUrl ? "edit reply" : "＋ reply link"}
               </button>
             )}
             <span className="ml-auto flex items-center gap-1.5">
-              <span className="text-muted-foreground text-[11px]">Owner</span>
+              <span className="text-[11px] text-muted-foreground">Owner</span>
               <AssigneeButton
                 value={assignee}
                 members={members}
@@ -752,20 +752,20 @@ function TweetCard({
           </div>
 
           {editingReply && (
-            <div className="bg-background/40 flex flex-col gap-2 rounded-lg border p-3">
+            <div className="flex flex-col gap-2 rounded-lg border bg-background/40 p-3">
               <input
                 type="url"
                 value={replyUrl}
                 onChange={(e) => setReplyUrl(e.target.value)}
                 placeholder="Permalink to our reply (e.g. https://x.com/WanderHQ/status/…)"
-                className="bg-background w-full rounded-md border px-2 py-1 text-xs"
+                className="w-full rounded-md border bg-background px-2 py-1 text-xs"
               />
               <input
                 type="text"
                 value={replyNote}
                 onChange={(e) => setReplyNote(e.target.value)}
                 placeholder="Note (optional) — e.g. replied from the Wander brand acct"
-                className="bg-background w-full rounded-md border px-2 py-1 text-xs"
+                className="w-full rounded-md border bg-background px-2 py-1 text-xs"
               />
               <div className="flex gap-2">
                 <Button size="sm" disabled={pending} onClick={saveReply}>
@@ -820,12 +820,12 @@ function SuggestedReply({ text }: { text: string }) {
     }
   };
   return (
-    <div className="bg-muted/60 flex flex-col gap-2 rounded-lg p-3">
+    <div className="flex flex-col gap-2 rounded-lg bg-muted/60 p-3">
       <span className="flex items-center">
-        <span className="text-muted-foreground text-[10px] font-medium tracking-wide uppercase">
+        <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
           Suggested reply · Claude
         </span>
-        <span className="text-muted-foreground ml-auto text-[10px] tabular-nums">
+        <span className="ml-auto text-[10px] text-muted-foreground tabular-nums">
           {text.length} chars
         </span>
       </span>
@@ -834,7 +834,7 @@ function SuggestedReply({ text }: { text: string }) {
         <button
           type="button"
           onClick={copy}
-          className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex items-center gap-1 rounded border px-2 py-1 text-xs transition"
+          className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs text-muted-foreground transition hover:bg-accent hover:text-foreground"
         >
           {copied ? (
             <Check className="h-3 w-3 text-emerald-500" />
@@ -866,7 +866,7 @@ function tally(values: string[]): { value: string; count: number }[] {
 
 function Skeleton() {
   return (
-    <div className="bg-card text-muted-foreground rounded-lg border p-4 text-sm">
+    <div className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
       Loading X queue…
     </div>
   );

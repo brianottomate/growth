@@ -16,7 +16,7 @@ const googleEnabled = Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
 
 export default function SignInPage() {
   return (
-    <div className="bg-muted flex min-h-svh flex-col items-center justify-center p-6 md:p-10">
+    <div className="flex min-h-svh flex-col items-center justify-center bg-muted p-6 md:p-10">
       <div className="flex w-full max-w-sm flex-col gap-6 md:max-w-3xl">
         <div className="flex justify-center">
           <Link href="/" className="flex items-center gap-2">

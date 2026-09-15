@@ -29,7 +29,7 @@ const MAX_CAROUSEL = 10;
 const panel = "bg-card overflow-hidden rounded-2xl border";
 const sectionLabel =
   "text-muted-foreground text-[10.5px] font-semibold tracking-[0.09em] uppercase";
-const empty = cn(panel, "text-muted-foreground px-4 py-6 text-center text-xs");
+const empty = cn(panel, "px-4 py-6 text-center text-xs text-muted-foreground");
 
 /** The payload a photo becomes when the carousel is saved. */
 const photoRef = (photo: HomePhoto) =>
@@ -149,7 +149,7 @@ export function HomeWorkbench({
       <section className="space-y-2.5">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <p className={sectionLabel}>All photos · {home.photos.length}</p>
-          <span className="text-muted-foreground/70 text-[11px]">
+          <span className="text-[11px] text-muted-foreground/70">
             {home.photos.some((photo) => photo.from === "library")
               ? "their site and uploads"
               : "from their site"}
@@ -165,7 +165,7 @@ export function HomeWorkbench({
               return (
                 <li key={photo.key} className={cn(panel, "group")}>
                   <div className="relative">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    {/* oxlint-disable-next-line nextjs/no-img-element */}
                     <img
                       src={photo.thumbUrl}
                       alt=""
@@ -197,7 +197,7 @@ export function HomeWorkbench({
                     </button>
                   </div>
                   {photo.room ? (
-                    <p className="text-muted-foreground truncate px-2 pt-1.5 text-[10px]">
+                    <p className="truncate px-2 pt-1.5 text-[10px] text-muted-foreground">
                       {photo.room}
                     </p>
                   ) : null}
@@ -244,7 +244,7 @@ export function HomeWorkbench({
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <p className={sectionLabel}>Hero</p>
           {!home.hero && heroUrl ? (
-            <span className="text-muted-foreground/80 text-[11px]">
+            <span className="text-[11px] text-muted-foreground/80">
               None picked, so the creatives use the first photo
             </span>
           ) : null}
@@ -254,7 +254,7 @@ export function HomeWorkbench({
         ) : (
           <>
             <div className={cn(panel, "w-full max-w-56")}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {/* oxlint-disable-next-line nextjs/no-img-element */}
               <img
                 src={heroUrl}
                 alt=""
@@ -265,7 +265,7 @@ export function HomeWorkbench({
               <div key={recipe.id} className="space-y-2">
                 <div className="flex flex-wrap items-baseline gap-2">
                   <span className={sectionLabel}>{recipe.label}</span>
-                  <span className="text-muted-foreground/80 truncate text-[11px]">
+                  <span className="truncate text-[11px] text-muted-foreground/80">
                     {recipe.title}
                   </span>
                 </div>
@@ -329,14 +329,14 @@ export function HomeWorkbench({
             <ul className="flex flex-wrap gap-2">
               {carousel.map((photo, index) => (
                 <li key={photo.key} className={cn(panel, "w-28")}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {/* oxlint-disable-next-line nextjs/no-img-element */}
                   <img
                     src={photo.thumbUrl}
                     alt=""
                     loading="lazy"
                     className="aspect-square w-full object-cover"
                   />
-                  <div className="text-muted-foreground flex items-center justify-between px-1 py-1 text-[10px]">
+                  <div className="flex items-center justify-between px-1 py-1 text-[10px] text-muted-foreground">
                     <button
                       type="button"
                       disabled={busy || index === 0}
@@ -397,7 +397,7 @@ export function HomeWorkbench({
                 />
               </div>
             ) : (
-              <p className="text-muted-foreground text-[11px]">
+              <p className="text-[11px] text-muted-foreground">
                 Two cards is the minimum Meta will run.
               </p>
             )}
@@ -432,7 +432,7 @@ function Chip({
         "flex-1 rounded-full border px-2 py-1 text-[10.5px] font-medium whitespace-nowrap transition disabled:opacity-40",
         on
           ? "border-sky-400 bg-sky-500/20 text-sky-200"
-          : "text-muted-foreground hover:text-foreground hover:border-white/30",
+          : "text-muted-foreground hover:border-white/30 hover:text-foreground",
       )}
     >
       {children}

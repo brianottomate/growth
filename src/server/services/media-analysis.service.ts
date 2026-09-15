@@ -220,7 +220,9 @@ ${vocabularyBlock(input.tags)}${
     steer: input.steer?.trim() || undefined,
     evidence: input.evidence,
     transcript: input.transcript,
-    ...(input.transcriptError ? { transcriptError: input.transcriptError } : {}),
+    ...(input.transcriptError
+      ? { transcriptError: input.transcriptError }
+      : {}),
   };
 }
 

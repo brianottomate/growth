@@ -25,14 +25,14 @@ export default function NextPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Next</h1>
-        <p className="text-muted-foreground mt-1 text-sm">
+        <p className="mt-1 text-sm text-muted-foreground">
           Sessions with the growth assistant. Pick one up here and it opens in
           the panel on the right, beside whatever you navigate to next.
         </p>
       </div>
 
       {threadsQuery.isPending ? (
-        <div className="text-muted-foreground grid h-40 place-items-center">
+        <div className="grid h-40 place-items-center text-muted-foreground">
           <Loader2 className="size-5 animate-spin" />
         </div>
       ) : threadsQuery.data?.length ? (
@@ -42,16 +42,16 @@ export default function NextPage() {
               <Link
                 href={`/app/next?thread=${encodeURIComponent(thread.id)}`}
                 className={cn(
-                  "hover:border-foreground/20 bg-card flex items-start gap-3 rounded-lg border px-4 py-3 transition-all duration-200 hover:-translate-y-px hover:shadow-md",
+                  "flex items-start gap-3 rounded-lg border bg-card px-4 py-3 transition-all duration-200 hover:-translate-y-px hover:border-foreground/20 hover:shadow-md",
                   thread.id === activeThreadId && "border-primary/50",
                 )}
               >
-                <span className="bg-primary/10 text-primary mt-0.5 grid size-7 shrink-0 place-items-center rounded-md">
+                <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-md bg-primary/10 text-primary">
                   <MessageSquare className="size-3.5" />
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{thread.title}</p>
-                  <p className="text-muted-foreground mt-0.5 flex items-center gap-2 text-xs">
+                  <p className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
                     <span>{whenLabel(thread.updatedAt)}</span>
                     {thread.visibility === "shared" && (
                       <span className="flex items-center gap-1">
@@ -65,7 +65,7 @@ export default function NextPage() {
           ))}
         </ul>
       ) : (
-        <p className="text-muted-foreground text-sm">
+        <p className="text-sm text-muted-foreground">
           No sessions yet. Start one with the + in the assistant panel.
         </p>
       )}

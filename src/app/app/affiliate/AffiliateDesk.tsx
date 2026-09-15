@@ -118,10 +118,10 @@ export function AffiliateDesk() {
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 p-6">
       <header className="flex items-center gap-3">
-        <Handshake className="text-muted-foreground size-6" />
+        <Handshake className="size-6 text-muted-foreground" />
         <div>
           <h1 className="text-lg font-semibold">Affiliate desk</h1>
-          <p className="text-muted-foreground text-sm">
+          <p className="text-sm text-muted-foreground">
             Inbound program mail, AI-triaged. Resolve here — the Slack ping is
             only the doorbell.
           </p>
@@ -129,9 +129,9 @@ export function AffiliateDesk() {
       </header>
 
       {isLoading ? (
-        <p className="text-muted-foreground text-sm">Loading…</p>
+        <p className="text-sm text-muted-foreground">Loading…</p>
       ) : items.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
+        <p className="text-sm text-muted-foreground">
           Nothing yet. Items appear when partner mail hits the partnerships@
           forward.
         </p>
@@ -183,7 +183,7 @@ function Section({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="text-muted-foreground flex items-center gap-1 text-left text-sm font-medium"
+        className="flex items-center gap-1 text-left text-sm font-medium text-muted-foreground"
       >
         <ChevronDown
           className={cn("size-4 transition-transform", !open && "-rotate-90")}
@@ -213,10 +213,10 @@ function ItemCard({
   const meta = intentMeta(item.intentTag);
 
   return (
-    <div className="bg-card rounded-lg border p-4 text-sm">
+    <div className="rounded-lg border bg-card p-4 text-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             {meta && (
               <span className={cn("inline-flex items-center gap-1", meta.text)}>
                 <span className={cn("size-1.5 rounded-full", meta.dot)} />
@@ -232,7 +232,7 @@ function ItemCard({
             {item.title ?? "(untitled)"}
           </p>
           {item.fromEmail && (
-            <p className="text-muted-foreground truncate text-xs">
+            <p className="truncate text-xs text-muted-foreground">
               {item.fromName ? `${item.fromName} · ` : ""}
               {item.fromEmail}
             </p>
@@ -269,12 +269,12 @@ function ItemCard({
       </div>
 
       {item.snippet && (
-        <p className="text-muted-foreground mt-2 line-clamp-3">
+        <p className="mt-2 line-clamp-3 text-muted-foreground">
           {item.snippet}
         </p>
       )}
       {item.rationale && (
-        <p className="text-muted-foreground mt-2 text-xs italic">
+        <p className="mt-2 text-xs text-muted-foreground italic">
           {item.rationale}
         </p>
       )}
@@ -284,7 +284,7 @@ function ItemCard({
           <button
             type="button"
             onClick={() => setShowReply((v) => !v)}
-            className="text-muted-foreground flex items-center gap-1 text-xs font-medium"
+            className="flex items-center gap-1 text-xs font-medium text-muted-foreground"
           >
             <ChevronDown
               className={cn(
@@ -295,7 +295,7 @@ function ItemCard({
             Suggested reply
           </button>
           {showReply && (
-            <div className="bg-muted/40 mt-1 rounded-md border p-3">
+            <div className="mt-1 rounded-md border bg-muted/40 p-3">
               <p className="text-sm whitespace-pre-wrap">
                 {item.suggestedReply}
               </p>

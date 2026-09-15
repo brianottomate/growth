@@ -147,7 +147,7 @@ export function ThemeToggle() {
         onValueChange={(value) => {
           if (value) setTheme(value as ThemeMode);
         }}
-        className="border-primary rounded-lg border"
+        className="rounded-lg border border-primary"
         suppressHydrationWarning
       >
         <Tooltip>

@@ -317,10 +317,12 @@ export const mediaRouter = createTRPCRouter({
         where: eq(brandTable.id, input.brandId),
         columns: { id: true, website: true },
       });
-      const listings = (await brandListings({
-        id: input.brandId,
-        website: brand?.website ?? null,
-      }))
+      const listings = (
+        await brandListings({
+          id: input.brandId,
+          website: brand?.website ?? null,
+        })
+      )
         .filter((row) => row.imageUrl)
         .slice(0, input.limit);
       const urls = listings.map((row) => row.imageUrl!);
@@ -372,7 +374,11 @@ export const mediaRouter = createTRPCRouter({
         columns: { id: true, website: true },
       });
       const site = input.url ?? brand?.website ?? null;
-      if (!site) return { site: null, images: [] as { url: string; importedAssetId: string | null }[] };
+      if (!site)
+        return {
+          site: null,
+          images: [] as { url: string; importedAssetId: string | null }[],
+        };
       const urls = (await scrapeSiteImages(site)).slice(0, 60);
       const imported = urls.length
         ? await ctx.db.query.mediaAssetTable.findMany({
@@ -389,11 +395,17 @@ export const mediaRouter = createTRPCRouter({
           })
         : [];
       const byUrl = new Map(
-        imported.map((row) => [(row.metadata as { sourceUrl?: string } | null)?.sourceUrl ?? "", row.id]),
+        imported.map((row) => [
+          (row.metadata as { sourceUrl?: string } | null)?.sourceUrl ?? "",
+          row.id,
+        ]),
       );
       return {
         site,
-        images: urls.map((url) => ({ url, importedAssetId: byUrl.get(url) ?? null })),
+        images: urls.map((url) => ({
+          url,
+          importedAssetId: byUrl.get(url) ?? null,
+        })),
       };
     }),
 
@@ -402,7 +414,15 @@ export const mediaRouter = createTRPCRouter({
     .input(
       z.object({
         brandId: z.string(),
-        images: z.array(z.object({ url: z.string().url(), title: z.string().max(180).optional() })).min(1).max(60),
+        images: z
+          .array(
+            z.object({
+              url: z.string().url(),
+              title: z.string().max(180).optional(),
+            }),
+          )
+          .min(1)
+          .max(60),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -410,7 +430,10 @@ export const mediaRouter = createTRPCRouter({
       const assets: { id: string; url: string | null }[] = [];
       for (const image of input.images) {
         const asset =
-          (await findImportedImage({ brandId: input.brandId, url: image.url })) ??
+          (await findImportedImage({
+            brandId: input.brandId,
+            url: image.url,
+          })) ??
           (await importRemoteImage({
             brandId: input.brandId,
             uploadedBy: ctx.session.user.id,
@@ -431,7 +454,9 @@ export const mediaRouter = createTRPCRouter({
       z.object({
         brandId: z.string(),
         homes: z
-          .array(z.object({ imageUrl: z.string().url(), name: z.string().min(1) }))
+          .array(
+            z.object({ imageUrl: z.string().url(), name: z.string().min(1) }),
+          )
           .min(1)
           .max(48),
       }),
@@ -442,7 +467,10 @@ export const mediaRouter = createTRPCRouter({
       // Sequential: each import is a download and an R2 write.
       for (const home of input.homes) {
         const asset =
-          (await findImportedImage({ brandId: input.brandId, url: home.imageUrl })) ??
+          (await findImportedImage({
+            brandId: input.brandId,
+            url: home.imageUrl,
+          })) ??
           (await importRemoteImage({
             brandId: input.brandId,
             uploadedBy: ctx.session.user.id,
@@ -512,8 +540,8 @@ export const mediaRouter = createTRPCRouter({
         // tile; the analysis body itself is far too big for a grid.
         analyzed: Boolean(
           row.metadata &&
-            typeof row.metadata === "object" &&
-            "aiAnalysis" in row.metadata,
+          typeof row.metadata === "object" &&
+          "aiAnalysis" in row.metadata,
         ),
         tags: row.tagAssignments.map((assignment) => assignment.tag.name),
       }));

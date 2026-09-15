@@ -27,10 +27,7 @@ import {
 import { cn } from "@/components/ui/lib/utils";
 import { toast } from "@/components/ui/toast";
 import { adPreviewStudioHref } from "@/lib/ad-preview-links";
-import {
-  homeCatalogCopy,
-  homeCatalogPreviewUrl,
-} from "@/lib/home-ad-previews";
+import { homeCatalogCopy, homeCatalogPreviewUrl } from "@/lib/home-ad-previews";
 import { useTRPC } from "@/trpc/react";
 
 /** A home as the listing feed reports it; only what the tile and lightbox draw. */
@@ -157,7 +154,7 @@ export function HomesStrip({
     <>
       <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
         <label className="relative min-w-0 flex-1">
-          <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" />
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <input
             value={query}
             onChange={(event) => {
@@ -166,7 +163,7 @@ export function HomesStrip({
               setPage(CATALOG_PAGE);
             }}
             placeholder={`Search ${homes.length} homes`}
-            className="bg-muted/40 h-8 w-full max-w-72 rounded-full border pr-3 pl-8 text-xs outline-none focus:ring-2 focus:ring-sky-400/40"
+            className="h-8 w-full max-w-72 rounded-full border bg-muted/40 pr-3 pl-8 text-xs outline-none focus:ring-2 focus:ring-sky-400/40"
           />
         </label>
         <div className="flex items-center gap-3 text-[11.5px]">
@@ -199,7 +196,7 @@ export function HomesStrip({
                 className={cn(
                   "rounded-full px-2.5 py-0.5 text-[11px] transition-colors",
                   view === option.id
-                    ? "bg-foreground text-background font-medium"
+                    ? "bg-foreground font-medium text-background"
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
@@ -213,7 +210,7 @@ export function HomesStrip({
         <p
           className={cn(
             panel,
-            "text-muted-foreground px-4 py-8 text-center text-xs",
+            "px-4 py-8 text-center text-xs text-muted-foreground",
           )}
         >
           No home matches “{query}”.
@@ -235,7 +232,7 @@ export function HomesStrip({
               className="block"
             >
               <span className="relative block">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {/* oxlint-disable-next-line nextjs/no-img-element */}
                 <img
                   src={
                     view === "catalog"
@@ -267,7 +264,7 @@ export function HomesStrip({
                     {home.name}
                   </span>
                 </span>
-                <span className="text-muted-foreground block truncate text-[11px]">
+                <span className="block truncate text-[11px] text-muted-foreground">
                   {home.facts}
                 </span>
               </span>
@@ -310,14 +307,24 @@ export function HomesStrip({
         onOpenChange={(next) => !next && setOpenIndex(null)}
       >
         {open ? (
-          <DialogContent className="flex h-[92vh] w-[96vw] max-w-[96vw] flex-col overflow-hidden border-white/10 bg-black/95 p-0 text-white sm:max-w-[96vw]">
-            <DialogHeader className="shrink-0 border-b border-white/10 px-5 py-3 pr-12 text-left">
-              <DialogTitle className="flex flex-wrap items-center gap-3 text-sm text-white">
+          <DialogContent
+            tone="media"
+            className="flex h-[92vh] w-[96vw] max-w-[96vw] flex-col overflow-hidden p-0 sm:max-w-[96vw]"
+          >
+            <DialogHeader
+              divider="media"
+              className="shrink-0 px-5 py-3 pr-12 text-left"
+            >
+              <DialogTitle
+                tone="media"
+                className="flex flex-wrap items-center gap-3 text-sm"
+              >
                 <span className="truncate">{open.name}</span>
                 <Button
                   size="sm"
                   variant="outline"
-                  className="h-7 shrink-0 border-white/20 bg-transparent text-white hover:bg-white/10"
+                  tone="media-outline"
+                  className="h-7 shrink-0"
                   loading={design.isPending}
                   onClick={() =>
                     design.mutate({
@@ -334,7 +341,8 @@ export function HomesStrip({
                 <Button
                   size="sm"
                   variant="outline"
-                  className="h-7 shrink-0 border-white/20 bg-transparent text-white hover:bg-white/10"
+                  tone="media-outline"
+                  className="h-7 shrink-0"
                   loading={feature.isPending}
                   onClick={() =>
                     feature.mutate(
@@ -363,13 +371,14 @@ export function HomesStrip({
                   rel="noreferrer"
                   size="sm"
                   variant="ghost"
-                  className="h-7 shrink-0 text-white/80 hover:bg-white/10 hover:text-white"
+                  tone="media-ghost"
+                  className="h-7 shrink-0"
                 >
                   <ExternalLink className="size-3.5" />
                   Their listing
                 </ButtonLink>
               </DialogTitle>
-              <DialogDescription className="text-xs text-white/55">
+              <DialogDescription tone="media" className="text-xs">
                 {[
                   `${(openIndex ?? 0) + 1} of ${shown.length}`,
                   open.facts || null,
@@ -379,7 +388,7 @@ export function HomesStrip({
               </DialogDescription>
             </DialogHeader>
             <div className="relative flex min-h-0 flex-1 items-center justify-center p-4">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {/* oxlint-disable-next-line nextjs/no-img-element */}
               <img
                 key={open.id}
                 src={open.imageUrl}
@@ -410,7 +419,6 @@ export function HomesStrip({
           </DialogContent>
         ) : null}
       </Dialog>
-
     </>
   );
 }

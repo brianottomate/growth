@@ -101,7 +101,7 @@ function AssistantPreview({
 
         <div className="relative min-h-64 overflow-hidden rounded-2xl bg-gradient-to-br from-sky-200 via-cyan-300 to-emerald-300 text-black">
           {screenshot?.url || screenshot?.thumbnailUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
+            // oxlint-disable-next-line nextjs/no-img-element
             <img
               src={screenshot.url ?? screenshot.thumbnailUrl ?? ""}
               alt={screenshot.alt ?? screenshot.title ?? "Product preview"}
@@ -169,8 +169,8 @@ function StorePreview({
   listingStatus: StorefrontListingStatus;
 }) {
   return (
-    <section className="bg-card rounded-2xl border p-6 shadow-sm sm:p-8">
-      <p className="text-muted-foreground text-xs">
+    <section className="rounded-2xl border bg-card p-6 shadow-sm sm:p-8">
+      <p className="text-xs text-muted-foreground">
         Internal {surface.replaceAll("_", " ")} preview ·{" "}
         {listingStatus.replaceAll("_", " ")}
       </p>
@@ -180,7 +180,7 @@ function StorePreview({
           <h2 className="text-2xl font-semibold">
             {content.copy.displayName || "Untitled app"}
           </h2>
-          <p className="text-muted-foreground mt-1 text-sm">
+          <p className="mt-1 text-sm text-muted-foreground">
             {content.copy.shortDescription || content.copy.tagline}
           </p>
           <p className="mt-2 text-xs font-medium">
@@ -192,7 +192,7 @@ function StorePreview({
       {screenshots.length > 0 && (
         <div className="mt-7 flex snap-x gap-3 overflow-x-auto pb-2">
           {screenshots.map((asset) => (
-            // eslint-disable-next-line @next/next/no-img-element
+            // oxlint-disable-next-line nextjs/no-img-element
             <img
               key={asset.id}
               src={asset.url ?? asset.thumbnailUrl ?? ""}
@@ -229,7 +229,7 @@ function PreviewIcon({
       }`}
     >
       {source ? (
-        // eslint-disable-next-line @next/next/no-img-element
+        // oxlint-disable-next-line nextjs/no-img-element
         <img
           src={source}
           alt={asset?.alt ?? name}

@@ -109,15 +109,15 @@ export function ProductAtlasWorkspace({
     <main className="space-y-6">
       <Link
         href="/app/product-atlas"
-        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs"
+        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="size-3.5" /> Product Atlas
       </Link>
       <header className="flex flex-col gap-4 border-b pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-muted-foreground text-xs">{product.brand.name}</p>
+          <p className="text-xs text-muted-foreground">{product.brand.name}</p>
           <h1 className="mt-1 text-3xl font-semibold">{product.name}</h1>
-          <p className="text-muted-foreground mt-2 max-w-2xl text-sm">
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
             {product.description || "No product summary yet."}
           </p>
         </div>
@@ -130,7 +130,7 @@ export function ProductAtlasWorkspace({
                 managerUserId: event.target.value || null,
               })
             }
-            className="bg-background rounded-lg border px-3 py-2 text-xs"
+            className="rounded-lg border bg-background px-3 py-2 text-xs"
           >
             <option value="">No product manager</option>
             {editors.map((editor) => (
@@ -139,7 +139,7 @@ export function ProductAtlasWorkspace({
               </option>
             ))}
           </select>
-          <span className="bg-muted rounded-full px-3 py-1.5 text-xs capitalize">
+          <span className="rounded-full bg-muted px-3 py-1.5 text-xs capitalize">
             {product.lifecycleStatus}
           </span>
         </div>
@@ -154,7 +154,7 @@ export function ProductAtlasWorkspace({
               "border-b-2 px-3 py-2 text-xs font-medium whitespace-nowrap",
               tab === item.id
                 ? "border-foreground text-foreground"
-                : "text-muted-foreground border-transparent",
+                : "border-transparent text-muted-foreground",
             )}
           >
             {item.label}
@@ -181,7 +181,7 @@ export function ProductAtlasWorkspace({
         <section className="space-y-3">
           <div>
             <h2 className="font-semibold">Complete atlas document</h2>
-            <p className="text-muted-foreground text-xs">
+            <p className="text-xs text-muted-foreground">
               JSON is validated before it reaches the shared service.
             </p>
           </div>
@@ -189,7 +189,7 @@ export function ProductAtlasWorkspace({
             value={rawJson}
             onChange={(event) => setRawJson(event.target.value)}
             spellCheck={false}
-            className="bg-muted/30 min-h-[520px] w-full rounded-xl border p-4 font-mono text-xs"
+            className="min-h-[520px] w-full rounded-xl border bg-muted/30 p-4 font-mono text-xs"
           />
           <button
             onClick={() => {
@@ -205,7 +205,7 @@ export function ProductAtlasWorkspace({
               }
             }}
             disabled={saveProduct.isPending}
-            className="bg-foreground text-background inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium"
+            className="inline-flex items-center gap-2 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background"
           >
             <Save className="size-4" /> Validate and save
           </button>
@@ -216,13 +216,13 @@ export function ProductAtlasWorkspace({
         <div className="flex items-end justify-between">
           <div>
             <h2 className="font-semibold">Storefronts</h2>
-            <p className="text-muted-foreground text-xs">
+            <p className="text-xs text-muted-foreground">
               Distribution representations owned by this product.
             </p>
           </div>
           <Link
             href="/app/apps"
-            className="text-primary text-xs hover:underline"
+            className="text-xs text-primary hover:underline"
           >
             Open operations queue
           </Link>
@@ -232,28 +232,28 @@ export function ProductAtlasWorkspace({
             <Link
               key={storefront.id}
               href={`/app/apps/${storefront.id}`}
-              className="bg-card hover:border-foreground/25 flex items-center justify-between rounded-xl border p-4"
+              className="flex items-center justify-between rounded-xl border bg-card p-4 hover:border-foreground/25"
             >
               <div>
                 <p className="font-medium">
                   {storefrontSurfaceRegistry[storefront.surface].label}
                 </p>
-                <p className="text-muted-foreground mt-1 text-xs">
+                <p className="mt-1 text-xs text-muted-foreground">
                   {storefront.listingStatus} ·{" "}
                   {storefront.freshnessStatus.replaceAll("_", " ")}
                 </p>
               </div>
-              <ArrowRight className="text-muted-foreground size-4" />
+              <ArrowRight className="size-4 text-muted-foreground" />
             </Link>
           ))}
           {availableSurfaces.length > 0 && selectedSurface && (
-            <div className="bg-muted/20 flex items-center gap-2 rounded-xl border border-dashed p-3">
+            <div className="flex items-center gap-2 rounded-xl border border-dashed bg-muted/20 p-3">
               <select
                 value={selectedSurface}
                 onChange={(event) =>
                   setSurface(event.target.value as StorefrontSurfaceId)
                 }
-                className="bg-background min-w-0 flex-1 rounded-lg border px-2 py-2 text-xs"
+                className="min-w-0 flex-1 rounded-lg border bg-background px-2 py-2 text-xs"
               >
                 {availableSurfaces.map((item) => (
                   <option key={item} value={item}>
@@ -269,7 +269,7 @@ export function ProductAtlasWorkspace({
                     content: emptyStorefrontContent,
                   })
                 }
-                className="bg-foreground text-background rounded-lg px-3 py-2 text-xs font-medium"
+                className="rounded-lg bg-foreground px-3 py-2 text-xs font-medium text-background"
               >
                 Add
               </button>
@@ -298,10 +298,10 @@ function Overview({
   return (
     <section className="grid gap-3 sm:grid-cols-5">
       {facts.map(([label, value, Icon]) => (
-        <div key={label} className="bg-card rounded-xl border p-4">
-          <Icon className="text-muted-foreground size-4" />
+        <div key={label} className="rounded-xl border bg-card p-4">
+          <Icon className="size-4 text-muted-foreground" />
           <p className="mt-4 text-2xl font-semibold">{value}</p>
-          <p className="text-muted-foreground text-xs">{label}</p>
+          <p className="text-xs text-muted-foreground">{label}</p>
         </div>
       ))}
     </section>
@@ -316,7 +316,7 @@ function JourneyMap({ atlas }: { atlas: ProductAtlas }) {
         <Empty label="No journeys mapped yet." />
       ) : (
         atlas.journeys.map((journey) => (
-          <div key={journey.id} className="bg-card rounded-2xl border p-5">
+          <div key={journey.id} className="rounded-2xl border bg-card p-5">
             <h2 className="font-semibold">{journey.name}</h2>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               {[...journey.steps]
@@ -333,8 +333,8 @@ function JourneyMap({ atlas }: { atlas: ProductAtlas }) {
                       .map((link) => link.viewId),
                   );
                   return (
-                    <div key={step.id} className="bg-muted/30 rounded-xl p-4">
-                      <p className="text-muted-foreground text-[10px] uppercase">
+                    <div key={step.id} className="rounded-xl bg-muted/30 p-4">
+                      <p className="text-[10px] text-muted-foreground uppercase">
                         Step {step.order + 1}
                       </p>
                       <h3 className="mt-1 font-medium">{step.name}</h3>
@@ -347,7 +347,7 @@ function JourneyMap({ atlas }: { atlas: ProductAtlas }) {
                         {[...linkedViewIds].map((id) => (
                           <span
                             key={id}
-                            className="bg-background rounded-full border px-2 py-1 text-[10px]"
+                            className="rounded-full border bg-background px-2 py-1 text-[10px]"
                           >
                             {viewById.get(id)?.name ?? id}
                           </span>
@@ -374,14 +374,14 @@ function Views({ atlas }: { atlas: ProductAtlas }) {
         <Empty label="No product views mapped yet." />
       ) : (
         atlas.views.map((view) => (
-          <div key={view.id} className="bg-card rounded-xl border p-4">
-            <Eye className="text-muted-foreground size-4" />
+          <div key={view.id} className="rounded-xl border bg-card p-4">
+            <Eye className="size-4 text-muted-foreground" />
             <h2 className="mt-3 font-medium">{view.name}</h2>
-            <p className="text-muted-foreground mt-1 text-xs">
+            <p className="mt-1 text-xs text-muted-foreground">
               {surfaceById.get(view.surfaceId)?.name ?? view.surfaceId}
             </p>
             {view.reference && (
-              <code className="bg-muted mt-3 block rounded-lg p-2 text-[10px]">
+              <code className="mt-3 block rounded-lg bg-muted p-2 text-[10px]">
                 {view.reference.value}
               </code>
             )}
@@ -401,7 +401,7 @@ function Observations({ atlas }: { atlas: ProductAtlas }) {
         atlas.observations.map((observation) => (
           <div
             key={observation.id}
-            className="bg-card flex items-start gap-3 rounded-xl border p-4"
+            className="flex items-start gap-3 rounded-xl border bg-card p-4"
           >
             {observation.state === "inferred" ? (
               <CircleDashed className="mt-0.5 size-4 text-amber-500" />
@@ -412,7 +412,7 @@ function Observations({ atlas }: { atlas: ProductAtlas }) {
               <p className="text-xs font-medium">
                 {observation.state.replaceAll("_", " ")}
               </p>
-              <p className="text-muted-foreground mt-1 text-xs">
+              <p className="mt-1 text-xs text-muted-foreground">
                 {observation.targetType} · {observation.targetId}
               </p>
               {observation.note && (
@@ -514,14 +514,14 @@ function GraphEditor({
           });
         }}
       />
-      <p className="text-muted-foreground text-xs">
+      <p className="text-xs text-muted-foreground">
         Journey steps, story/view links, implementation references, and
         observations are available in Advanced JSON in this first editor pass.
       </p>
       <button
         onClick={onSave}
         disabled={saving}
-        className="bg-foreground text-background inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium"
+        className="inline-flex items-center gap-2 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background"
       >
         <Save className="size-4" /> Save graph
       </button>
@@ -548,7 +548,7 @@ function EditorCollection({
         <h2 className="text-sm font-semibold">{title}</h2>
         <button
           onClick={onAdd}
-          className="text-primary inline-flex items-center gap-1 text-xs"
+          className="inline-flex items-center gap-1 text-xs text-primary"
         >
           <Plus className="size-3" /> Add
         </button>
@@ -559,15 +559,15 @@ function EditorCollection({
             <input
               value={item.name}
               onChange={(event) => onName(item.id, event.target.value)}
-              className="bg-background min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm"
+              className="min-w-0 flex-1 rounded-lg border bg-background px-3 py-2 text-sm"
             />
-            <code className="text-muted-foreground hidden text-[10px] sm:block">
+            <code className="hidden text-[10px] text-muted-foreground sm:block">
               {item.id}
             </code>
             <button
               onClick={() => onRemove(item.id)}
               aria-label={`Remove ${item.name}`}
-              className="text-muted-foreground hover:text-destructive rounded-lg border p-2"
+              className="rounded-lg border p-2 text-muted-foreground hover:text-destructive"
             >
               <Trash2 className="size-3.5" />
             </button>
@@ -580,7 +580,7 @@ function EditorCollection({
 
 function Empty({ label }: { label: string }) {
   return (
-    <div className="text-muted-foreground col-span-full rounded-xl border border-dashed p-8 text-center text-sm">
+    <div className="col-span-full rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
       {label}
     </div>
   );

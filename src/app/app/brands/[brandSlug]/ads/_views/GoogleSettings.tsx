@@ -94,7 +94,7 @@ export function GoogleSettings({
         <div className="flex items-end justify-between">
           <div>
             <h2 className="text-base font-semibold">Google settings</h2>
-            <p className="text-muted-foreground mt-0.5 text-sm">
+            <p className="mt-0.5 text-sm text-muted-foreground">
               {configured
                 ? `${config?.campaignType === "search" ? "Search" : "Display"} campaign${
                     config?.campaignType === "search"
@@ -120,7 +120,7 @@ export function GoogleSettings({
       )}
 
       {open && (
-        <div className="border-border bg-surface-secondary/30 space-y-3 rounded-xl border p-3">
+        <div className="space-y-3 rounded-xl border border-border bg-surface-secondary/30 p-3">
           <div className="space-y-1.5">
             <Label htmlFor="g-type">Campaign type</Label>
             <select
@@ -129,7 +129,7 @@ export function GoogleSettings({
               onChange={(event) =>
                 setCampaignType(event.target.value as "search" | "display")
               }
-              className="border-input bg-background h-8 w-full rounded-md border px-2 text-xs sm:w-56"
+              className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs sm:w-56"
             >
               <option value="search">Search · buys keywords</option>
               <option value="display">Display · buys placements</option>
@@ -148,7 +148,7 @@ export function GoogleSettings({
                   placeholder={
                     "vacation rental pawleys island\nbeach house rental sc"
                   }
-                  className="text-xs"
+                  textSize="xs"
                 />
               </div>
               <div className="space-y-1.5">
@@ -159,12 +159,12 @@ export function GoogleSettings({
                   value={negatives}
                   onChange={(event) => setNegatives(event.target.value)}
                   placeholder={"free\njobs"}
-                  className="text-xs"
+                  textSize="xs"
                 />
               </div>
             </div>
           ) : (
-            <p className="text-muted-foreground text-xs">
+            <p className="text-xs text-muted-foreground">
               Display uses the campaign&apos;s creative. Google needs a
               landscape and a square image; the first ad&apos;s creative is used
               for both until sized variants exist.
@@ -172,7 +172,7 @@ export function GoogleSettings({
           )}
 
           {campaignType === "search" && (
-            <div className="border-border space-y-2 rounded-lg border p-3">
+            <div className="space-y-2 rounded-lg border border-border p-3">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs font-medium">Keyword research</span>
                 <Button
@@ -193,7 +193,7 @@ export function GoogleSettings({
                   {brandUrl ? "Mine the brand site" : "No brand URL set"}
                 </Button>
                 {research.data && (
-                  <span className="text-muted-foreground text-xs">
+                  <span className="text-xs text-muted-foreground">
                     ~${research.data.monthlyCost.dollars.toLocaleString()}/mo to
                     buy these at{" "}
                     {Math.round(research.data.monthlyCost.ctrAssumption * 100)}%
@@ -210,7 +210,7 @@ export function GoogleSettings({
               {research.data && (
                 <div className="max-h-56 overflow-y-auto">
                   <table className="w-full text-xs">
-                    <thead className="text-muted-foreground sticky top-0 bg-[var(--card)] text-left">
+                    <thead className="sticky top-0 bg-[var(--card)] text-left text-muted-foreground">
                       <tr>
                         <th className="py-1 font-normal">Keyword</th>
                         <th className="py-1 text-right font-normal">
@@ -249,7 +249,7 @@ export function GoogleSettings({
                   </table>
                 </div>
               )}
-              <p className="text-muted-foreground text-[11px]">
+              <p className="text-[11px] text-muted-foreground">
                 Searches are not clicks. The monthly figure assumes{" "}
                 {Math.round(
                   (research.data?.monthlyCost.ctrAssumption ?? 0.35) * 100,

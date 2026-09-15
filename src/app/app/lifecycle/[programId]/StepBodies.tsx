@@ -44,13 +44,13 @@ export function StepBodies({ steps }: { steps: BodyStep[] }) {
     });
 
   return (
-    <div className="bg-card mt-4 rounded-xl border">
+    <div className="mt-4 rounded-xl border bg-card">
       <div className="flex items-center justify-between border-b px-4 py-2.5">
         <h2 className="text-sm font-semibold">Step bodies</h2>
         <button
           type="button"
           onClick={toggleAll}
-          className="text-muted-foreground hover:text-foreground text-xs"
+          className="text-xs text-muted-foreground hover:text-foreground"
         >
           {allOpen ? "Collapse all" : "Open all"}
         </button>
@@ -68,7 +68,7 @@ export function StepBodies({ steps }: { steps: BodyStep[] }) {
                 onClick={() => toggle(s.id)}
                 className="flex w-full items-center gap-2 text-left disabled:cursor-default"
               >
-                <span className="text-muted-foreground w-3.5 shrink-0">
+                <span className="w-3.5 shrink-0 text-muted-foreground">
                   {has ? (
                     isOpen ? (
                       <ChevronDown className="size-3.5" />
@@ -77,12 +77,12 @@ export function StepBodies({ steps }: { steps: BodyStep[] }) {
                     )
                   ) : null}
                 </span>
-                <span className="text-muted-foreground w-4 text-[11px] tabular-nums">
+                <span className="w-4 text-[11px] text-muted-foreground tabular-nums">
                   {i + 1}
                 </span>
                 <span className="text-sm font-medium">{s.name}</span>
                 {delay && (
-                  <span className="text-muted-foreground ml-auto text-[11px]">
+                  <span className="ml-auto text-[11px] text-muted-foreground">
                     {delay}
                   </span>
                 )}
@@ -90,12 +90,12 @@ export function StepBodies({ steps }: { steps: BodyStep[] }) {
               {isOpen && has && (
                 <div className="mt-2 ml-10 text-xs">
                   {s.subject && (
-                    <div className="text-foreground/90 font-medium">
+                    <div className="font-medium text-foreground/90">
                       Subject: {s.subject}
                     </div>
                   )}
                   {s.body && (
-                    <pre className="text-muted-foreground mt-1 font-sans whitespace-pre-wrap">
+                    <pre className="mt-1 font-sans whitespace-pre-wrap text-muted-foreground">
                       {s.body}
                     </pre>
                   )}

@@ -327,7 +327,7 @@ export function CalendarClient({
       },
     }),
     // memberById is derived from members; overrides drive re-render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
     [
       members,
       currentUserId,
@@ -448,7 +448,7 @@ export function CalendarClient({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Calendar</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
+          <p className="mt-1 text-sm text-muted-foreground">
             {zoom === "month"
               ? `${MONTHS[month]} ${year} · ${filtered.length} platform items · ${storyTotal} Stories`
               : `${yearMode === "heatmap" ? year : windowLabel} · ${filtered.length} platform items · ${storyTotal} Stories`}
@@ -485,7 +485,7 @@ export function CalendarClient({
             className={cn(
               "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
               mineOnly
-                ? "bg-foreground text-background border-foreground"
+                ? "border-foreground bg-foreground text-background"
                 : "border-border text-muted-foreground hover:bg-accent",
             )}
           >
@@ -497,7 +497,7 @@ export function CalendarClient({
             className={cn(
               "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
               trackedVisible
-                ? "bg-foreground text-background border-foreground"
+                ? "border-foreground bg-foreground text-background"
                 : "border-border text-muted-foreground hover:bg-accent",
             )}
           >
@@ -510,7 +510,7 @@ export function CalendarClient({
             className={cn(
               "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
               unscheduledVisible
-                ? "bg-foreground text-background border-foreground"
+                ? "border-foreground bg-foreground text-background"
                 : "border-border text-muted-foreground hover:bg-accent",
             )}
           >
@@ -522,12 +522,12 @@ export function CalendarClient({
               setGenerateMonth(null);
               setGenerateOpen(true);
             }}
-            className="border-border text-muted-foreground hover:bg-accent hover:text-foreground flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors"
+            className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
             <CalendarPlus className="size-3.5" /> Generate slots
           </button>
 
-          <span className="bg-border mx-1 h-5 w-px" />
+          <span className="mx-1 h-5 w-px bg-border" />
 
           <Segmented
             value={zoom}
@@ -562,7 +562,7 @@ export function CalendarClient({
                 setYear(now.getFullYear());
                 setMonth(now.getMonth());
               }}
-              className="border-border text-muted-foreground hover:bg-accent rounded-full border px-3 py-1 text-xs font-medium transition-colors"
+              className="rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent"
             >
               Today
             </button>
@@ -591,11 +591,11 @@ export function CalendarClient({
                 setYear(now.getFullYear());
                 setMonth(now.getMonth());
               }}
-              className="border-border text-muted-foreground hover:bg-accent rounded-full border px-3 py-1 text-xs font-medium transition-colors"
+              className="rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent"
             >
               Today
             </button>
-            <span className="bg-border mx-1 h-4 w-px" />
+            <span className="mx-1 h-4 w-px bg-border" />
             <Segmented
               value={yearMode}
               onChange={(v) => setYearMode(v)}
@@ -739,7 +739,7 @@ function MonthGrid({
   return (
     <div className="overflow-hidden rounded-xl border">
       {header && (
-        <div className="bg-muted/30 flex items-center gap-2 border-b px-2.5 py-1.5">
+        <div className="flex items-center gap-2 border-b bg-muted/30 px-2.5 py-1.5">
           <button
             onClick={header.onMonthClick}
             className="text-sm font-semibold hover:underline"
@@ -748,14 +748,14 @@ function MonthGrid({
           </button>
           <span className="flex-1" />
           {header.total > 0 && (
-            <span className="text-muted-foreground text-[11px] tabular-nums">
+            <span className="text-[11px] text-muted-foreground tabular-nums">
               {header.total}
             </span>
           )}
           {header.onEvaluate && (
             <button
               onClick={header.onEvaluate}
-              className="border-border text-muted-foreground hover:bg-accent hover:text-foreground rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors"
+              className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
               Evaluate
             </button>
@@ -770,7 +770,7 @@ function MonthGrid({
           )}
         </div>
       )}
-      <div className="text-muted-foreground bg-muted/30 grid grid-cols-7 border-b text-[11px] font-medium">
+      <div className="grid grid-cols-7 border-b bg-muted/30 text-[11px] font-medium text-muted-foreground">
         {WEEKDAYS.map((w) => (
           <div key={w} className="px-2 py-1.5">
             {w}
@@ -791,7 +791,7 @@ function MonthGrid({
               key={k}
               onClick={() => onDayClick(date)}
               className={cn(
-                "group hover:bg-accent/30 flex min-h-28 flex-col gap-1 border-r border-b p-1.5 text-left transition-colors [&:nth-child(7n)]:border-r-0",
+                "group flex min-h-28 flex-col gap-1 border-r border-b p-1.5 text-left transition-colors hover:bg-accent/30 [&:nth-child(7n)]:border-r-0",
                 !inMonth && "bg-muted/20 opacity-50",
               )}
             >
@@ -800,7 +800,7 @@ function MonthGrid({
                   className={cn(
                     "flex size-5 items-center justify-center rounded-full text-xs tabular-nums",
                     isToday
-                      ? "bg-foreground text-background font-semibold"
+                      ? "bg-foreground font-semibold text-background"
                       : "text-muted-foreground",
                   )}
                 >
@@ -823,7 +823,7 @@ function MonthGrid({
                   <ContentChip key={g.key} g={g} />
                 ))}
                 {extra > 0 && (
-                  <span className="text-muted-foreground px-1 text-[10px]">
+                  <span className="px-1 text-[10px] text-muted-foreground">
                     +{extra} more
                   </span>
                 )}
@@ -841,7 +841,8 @@ function MonthGrid({
  * "W…" for both). Order matters: WanderOS before Wander. */
 function brandBadge(name: string | undefined | null) {
   if (!name) return null;
-  if (/wanderos/i.test(name)) return { code: "OS", className: "text-emerald-400" };
+  if (/wanderos/i.test(name))
+    return { code: "OS", className: "text-emerald-400" };
   if (/^wander$/i.test(name)) return { code: "W", className: "text-sky-400" };
   return {
     code: name.slice(0, 2).toUpperCase(),
@@ -872,16 +873,16 @@ function ContentChip({ g }: { g: DayGroup }) {
     <span
       // Below lg (side-by-side windows, tablets) the thumbnail stacks on top so
       // the title still gets usable width; desktop keeps it inline on the left.
-      className="bg-card flex flex-col gap-1.5 overflow-hidden rounded-md border p-1 text-xs lg:flex-row lg:items-center"
+      className="flex flex-col gap-1.5 overflow-hidden rounded-md border bg-card p-1 text-xs lg:flex-row lg:items-center"
       style={pillar ? { borderLeft: `2px solid ${pillar.color}` } : undefined}
       title={label}
     >
-      <span className="bg-muted relative h-12 w-full shrink-0 overflow-hidden rounded lg:h-8 lg:w-8">
+      <span className="relative h-12 w-full shrink-0 overflow-hidden rounded bg-muted lg:h-8 lg:w-8">
         {media ? (
-          // eslint-disable-next-line @next/next/no-img-element
+          // oxlint-disable-next-line nextjs/no-img-element
           <img src={media} alt="" className="size-full object-cover" />
         ) : (
-          <span className="text-muted-foreground flex size-full items-center justify-center">
+          <span className="flex size-full items-center justify-center text-muted-foreground">
             <ChannelLogo platform={iconPlatform} className="size-4" />
           </span>
         )}
@@ -895,7 +896,7 @@ function ContentChip({ g }: { g: DayGroup }) {
               STATUS_DOT[status] ?? "bg-slate-400",
             )}
           />
-          <span className="text-muted-foreground shrink-0 text-[10px] capitalize">
+          <span className="shrink-0 text-[10px] text-muted-foreground capitalize">
             {status}
           </span>
           {brand && (
@@ -915,14 +916,14 @@ function ContentChip({ g }: { g: DayGroup }) {
                 <ChannelLogo key={p} platform={p} className="size-3" />
               ))}
               {platforms.length > 4 && (
-                <span className="text-muted-foreground text-[10px] tabular-nums">
+                <span className="text-[10px] text-muted-foreground tabular-nums">
                   +{platforms.length - 4}
                 </span>
               )}
             </span>
           ) : (
             g.entries.length > 1 && (
-              <span className="text-muted-foreground shrink-0 text-[10px] tabular-nums">
+              <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">
                 ×{g.entries.length}
               </span>
             )
@@ -1019,7 +1020,7 @@ function MiniMonth({
       onKeyDown={(e) => {
         if (e.key === "Enter") onClick();
       }}
-      className="hover:border-foreground/30 group cursor-pointer rounded-lg border p-2.5 text-left transition-colors"
+      className="group cursor-pointer rounded-lg border p-2.5 text-left transition-colors hover:border-foreground/30"
     >
       <div className="mb-1.5 flex items-center gap-1.5">
         <span className="text-sm font-semibold group-hover:underline">
@@ -1032,7 +1033,7 @@ function MiniMonth({
         >
           <button
             onClick={onEvaluate}
-            className="border-border text-muted-foreground hover:bg-accent hover:text-foreground rounded-full border px-1.5 py-0.5 text-[9px] font-medium"
+            className="rounded-full border border-border px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
           >
             Evaluate
           </button>
@@ -1044,7 +1045,7 @@ function MiniMonth({
           </button>
         </span>
         {total > 0 && (
-          <span className="text-muted-foreground text-[11px] tabular-nums group-hover:hidden">
+          <span className="text-[11px] text-muted-foreground tabular-nums group-hover:hidden">
             {total}
           </span>
         )}
@@ -1053,7 +1054,7 @@ function MiniMonth({
         {WEEKDAYS.map((w) => (
           <span
             key={w}
-            className="text-muted-foreground text-center text-[9px]"
+            className="text-center text-[9px] text-muted-foreground"
           >
             {w[0]}
           </span>
@@ -1074,7 +1075,7 @@ function MiniMonth({
                   className={cn(
                     "relative flex aspect-square items-center justify-center overflow-hidden rounded-[3px] text-[9px] tabular-nums",
                     !inMonth && "opacity-30",
-                    isToday && "ring-foreground ring-1",
+                    isToday && "ring-1 ring-foreground",
                     lv === 0 && "text-muted-foreground/50",
                   )}
                 >
@@ -1098,14 +1099,14 @@ function MiniMonth({
                     {name} {d.getDate()}
                   </span>
                   {dayEntries.length > 0 && (
-                    <span className="text-muted-foreground block text-xs">
+                    <span className="block text-xs text-muted-foreground">
                       {dayEntries.length} post
                       {dayEntries.length === 1 ? "" : "s"}
                       {pillar ? ` · mostly ${pillar.name}` : ""}
                     </span>
                   )}
                   {kd && (
-                    <span className="text-muted-foreground block text-xs">
+                    <span className="block text-xs text-muted-foreground">
                       {kd.emoji} {kd.name}
                     </span>
                   )}
@@ -1244,7 +1245,7 @@ function Heatmap({
     <div className="overflow-x-auto rounded-xl border p-4">
       <div className="inline-flex flex-col gap-1.5">
         {/* Month axis (offset must match the weekday rail width + gap: 24px + 4px) */}
-        <div className="text-muted-foreground relative ml-7 h-3 text-[10px]">
+        <div className="relative ml-7 h-3 text-[10px] text-muted-foreground">
           {monthLabels.map((l) => (
             <span key={l.col} className="absolute" style={{ left: l.col * 15 }}>
               {l.name}
@@ -1253,7 +1254,7 @@ function Heatmap({
         </div>
         <div className="flex gap-[3px]">
           {/* Weekday rail — single letters, right-aligned against the grid */}
-          <div className="text-muted-foreground mr-1 flex w-6 flex-col gap-[3px] text-[9px]">
+          <div className="mr-1 flex w-6 flex-col gap-[3px] text-[9px] text-muted-foreground">
             {WEEKDAYS.map((w, i) => (
               <span key={w} className="flex h-3 items-center justify-end">
                 {i % 2 === 0 ? w[0] : ""}
@@ -1276,7 +1277,7 @@ function Heatmap({
                         className={cn(
                           "size-3 rounded-[2px]",
                           inYear ? HEAT_BG[lv] : "bg-transparent",
-                          k === todayKey && "ring-foreground ring-1",
+                          k === todayKey && "ring-1 ring-foreground",
                         )}
                       />
                     </TooltipTrigger>
@@ -1285,7 +1286,7 @@ function Heatmap({
                         <span className="font-medium">
                           {MONTHS_SHORT[d.getMonth()]} {d.getDate()}
                         </span>
-                        <span className="text-muted-foreground block text-xs">
+                        <span className="block text-xs text-muted-foreground">
                           {n} post{n === 1 ? "" : "s"}
                         </span>
                       </TooltipContent>
@@ -1337,14 +1338,14 @@ function DayDetailDialog({
       {date && (
         <button
           onClick={() => onProduce(date)}
-          className="border-border hover:bg-accent mb-3 flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed py-2 text-sm font-medium transition-colors"
+          className="mb-3 flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-border py-2 text-sm font-medium transition-colors hover:bg-accent"
         >
           <Sparkles className="size-4" />
           Draft content for this day
         </button>
       )}
       {groups.length === 0 ? (
-        <p className="text-muted-foreground py-8 text-center text-sm">
+        <p className="py-8 text-center text-sm text-muted-foreground">
           Nothing planned for this day.
         </p>
       ) : (
@@ -1395,11 +1396,11 @@ function DayGroupBlock({ g, assign }: { g: DayGroup; assign: CalAssign }) {
           </span>
         )}
         {pillar && (
-          <span className="text-muted-foreground shrink-0 text-xs">
+          <span className="shrink-0 text-xs text-muted-foreground">
             {pillar.name}
           </span>
         )}
-        <span className="text-muted-foreground ml-auto shrink-0 text-xs">
+        <span className="ml-auto shrink-0 text-xs text-muted-foreground">
           {first?.brandName}
         </span>
         {g.contentPostId && !tracked && (
@@ -1426,7 +1427,7 @@ function DayGroupBlock({ g, assign }: { g: DayGroup; assign: CalAssign }) {
                 STATUS_DOT[e.status] ?? "bg-slate-400",
               )}
             />
-            <span className="text-muted-foreground shrink-0 capitalize">
+            <span className="shrink-0 text-muted-foreground capitalize">
               {e.status}
             </span>
             {isStoryEntry(e) && (
@@ -1482,7 +1483,7 @@ function NavStepper({
     <div className="flex items-center gap-1">
       <button
         onClick={onPrev}
-        className="border-border hover:bg-accent flex size-7 items-center justify-center rounded-md border transition-colors"
+        className="flex size-7 items-center justify-center rounded-md border border-border transition-colors hover:bg-accent"
         aria-label="Previous"
       >
         <ChevronLeft className="size-4" />
@@ -1492,7 +1493,7 @@ function NavStepper({
       </span>
       <button
         onClick={onNext}
-        className="border-border hover:bg-accent flex size-7 items-center justify-center rounded-md border transition-colors"
+        className="flex size-7 items-center justify-center rounded-md border border-border transition-colors hover:bg-accent"
         aria-label="Next"
       >
         <ChevronRight className="size-4" />
@@ -1511,7 +1512,7 @@ function Segmented<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="border-border flex overflow-hidden rounded-full border">
+    <div className="flex overflow-hidden rounded-full border border-border">
       {options.map((o) => (
         <button
           key={o.value}
@@ -1533,7 +1534,7 @@ function Segmented<T extends string>({
 function Legend({ mode }: { mode: "status" | "heat" }) {
   if (mode === "heat") {
     return (
-      <div className="text-muted-foreground flex items-center gap-1.5 text-[11px]">
+      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
         <span>Less</span>
         {HEAT_BG.map((bg, i) => (
           <span key={i} className={cn("size-3 rounded-[2px]", bg)} />
@@ -1548,7 +1549,7 @@ function Legend({ mode }: { mode: "status" | "heat" }) {
     { label: "Published", status: "published" },
   ];
   return (
-    <div className="text-muted-foreground flex items-center gap-3 text-[11px]">
+    <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
       {items.map((it) => (
         <span key={it.status} className="flex items-center gap-1">
           <span
@@ -1660,7 +1661,7 @@ function MonthReportDialog({
         <div className="flex w-full items-center justify-end gap-2">
           <button
             onClick={() => onOpenMonth(target.year, target.month)}
-            className="border-border hover:bg-accent rounded-full border px-4 py-1.5 text-sm"
+            className="rounded-full border border-border px-4 py-1.5 text-sm hover:bg-accent"
           >
             Open month
           </button>
@@ -1674,7 +1675,7 @@ function MonthReportDialog({
       }
     >
       {report.rows.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
+        <p className="text-sm text-muted-foreground">
           Nothing on the calendar for {monthLabel} yet — generate the
           month&apos;s slot skeleton to get started.
         </p>
@@ -1698,7 +1699,7 @@ function MonthReportDialog({
               );
             })}
             {report.trackedCount > 0 && (
-              <span className="border-border text-muted-foreground/70 rounded-full border border-dashed px-2 py-0.5 text-[11px] tabular-nums">
+              <span className="rounded-full border border-dashed border-border px-2 py-0.5 text-[11px] text-muted-foreground/70 tabular-nums">
                 tracked brands {report.trackedCount}
               </span>
             )}
@@ -1724,7 +1725,7 @@ function MonthReportDialog({
           {/* pillar mix */}
           {pillarTotal > 0 && (
             <div>
-              <div className="bg-muted/40 flex h-2 overflow-hidden rounded-full">
+              <div className="flex h-2 overflow-hidden rounded-full bg-muted/40">
                 {report.byPillar.map(([slug, n]) => (
                   <span
                     key={slug}

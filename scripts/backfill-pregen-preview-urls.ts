@@ -70,7 +70,9 @@ async function readExisting(ids: string[]): Promise<Map<string, string>> {
       },
     );
     if (!response.ok) {
-      throw new Error(`Batch read failed: ${response.status} ${await response.text()}`);
+      throw new Error(
+        `Batch read failed: ${response.status} ${await response.text()}`,
+      );
     }
     const body = (await response.json()) as {
       results: { id: string; properties: Record<string, string | null> }[];
@@ -97,7 +99,9 @@ for (const row of rows.sort((a, b) => a.domain.localeCompare(b.domain))) {
   const link = outreachLinkFor(row.previewUrl!, row.domain, {
     campaign: "pregen_blast",
   });
-  console.log(`${apply ? "stamp" : "would stamp"} ${row.domain}${row.excluded ? " (excluded from outreach)" : ""}`);
+  console.log(
+    `${apply ? "stamp" : "would stamp"} ${row.domain}${row.excluded ? " (excluded from outreach)" : ""}`,
+  );
   console.log(`      ${link}`);
   if (!apply) {
     written += 1;
@@ -108,7 +112,9 @@ for (const row of rows.sort((a, b) => a.domain.localeCompare(b.domain))) {
     written += 1;
   } catch (error) {
     failed += 1;
-    console.warn(`      FAILED: ${error instanceof Error ? error.message : String(error)}`);
+    console.warn(
+      `      FAILED: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 

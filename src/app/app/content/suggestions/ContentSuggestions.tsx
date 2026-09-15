@@ -21,14 +21,14 @@ export function ContentSuggestions() {
 
   if (isLoading) {
     return (
-      <p className="text-muted-foreground flex items-center gap-2 text-sm">
+      <p className="flex items-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="size-4 animate-spin" /> Loading suggestions…
       </p>
     );
   }
   if (!data?.length) {
     return (
-      <div className="bg-card text-muted-foreground rounded-xl border p-5 text-sm">
+      <div className="rounded-xl border bg-card p-5 text-sm text-muted-foreground">
         No classification or amplification decisions are waiting.
       </div>
     );
@@ -42,7 +42,7 @@ export function ContentSuggestions() {
         return (
           <article
             key={suggestion.id}
-            className="bg-card rounded-xl border p-4"
+            className="rounded-xl border bg-card p-4"
           >
             <div className="flex items-start gap-4">
               <div className="min-w-0 flex-1">
@@ -64,11 +64,11 @@ export function ContentSuggestions() {
                   {suggestion.subjectPost?.text || "Post without text"}
                 </p>
                 {suggestion.reasoning && (
-                  <p className="text-muted-foreground mt-2 text-xs">
+                  <p className="mt-2 text-xs text-muted-foreground">
                     {suggestion.reasoning}
                   </p>
                 )}
-                <pre className="bg-muted text-muted-foreground mt-3 overflow-x-auto rounded-lg p-2 text-[11px]">
+                <pre className="mt-3 overflow-x-auto rounded-lg bg-muted p-2 text-[11px] text-muted-foreground">
                   {JSON.stringify(suggestion.proposed, null, 2)}
                 </pre>
               </div>

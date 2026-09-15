@@ -1,6 +1,6 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- analysis boards are dynamic R2 URLs */
+/* oxlint-disable nextjs/no-img-element -- analysis boards are dynamic R2 URLs */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -353,7 +353,7 @@ export function VideoAnalysisWorkspace({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm font-medium">Reel workspace</p>
-          <p className="text-muted-foreground text-xs">
+          <p className="text-xs text-muted-foreground">
             Browser-local frames · permanent derived artifacts
           </p>
         </div>
@@ -364,7 +364,7 @@ export function VideoAnalysisWorkspace({
               variant={view === value ? "secondary" : "ghost"}
               size="sm"
               disabled={value !== "video" && !boards.length}
-              className="gap-1.5"
+
               onClick={() => onViewChange(value)}
             >
               <Icon className="size-3.5" /> {label}
@@ -377,11 +377,11 @@ export function VideoAnalysisWorkspace({
         <div className="rounded-lg border p-3">
           <div className="mb-2 flex items-center justify-between gap-3 text-xs">
             <span>{progress.message}</span>
-            <span className="text-muted-foreground font-mono">
+            <span className="font-mono text-muted-foreground">
               {Math.round(progress.progress * 100)}%
             </span>
           </div>
-          <div className="bg-muted h-1.5 overflow-hidden rounded-full">
+          <div className="h-1.5 overflow-hidden rounded-full bg-muted">
             <div
               className="h-full rounded-full bg-emerald-500 transition-[width]"
               style={{ width: `${progress.progress * 100}%` }}
@@ -402,7 +402,7 @@ export function VideoAnalysisWorkspace({
           />
           {!analysis?.artifactsSavedAt && (
             <Button
-              className="w-full gap-2"
+              className="w-full"
               loading={busy}
               onClick={() => void runAnalysis()}
             >
@@ -455,7 +455,7 @@ export function VideoAnalysisWorkspace({
 
       {view === "transcript" && (
         <div className="rounded-xl border p-4">
-          <p className="text-muted-foreground mb-2 text-xs font-medium uppercase">
+          <p className="mb-2 text-xs font-medium text-muted-foreground uppercase">
             Transcript{" "}
             {analysis?.transcriptLanguage
               ? `· ${analysis.transcriptLanguage}`
@@ -466,7 +466,7 @@ export function VideoAnalysisWorkspace({
               {analysis.transcriptWords.map((word, index) => (
                 <button
                   key={`${word.startMs}-${index}`}
-                  className="hover:bg-accent rounded px-0.5"
+                  className="rounded px-0.5 hover:bg-accent"
                   onClick={() => {
                     setPendingSeekMs(word.startMs);
                     onViewChange("video");
@@ -479,7 +479,7 @@ export function VideoAnalysisWorkspace({
             </div>
           ) : (
             <div className="space-y-3">
-              <p className="text-muted-foreground text-sm">
+              <p className="text-sm text-muted-foreground">
                 No transcript is saved yet. The storyboard remains fully
                 available.
               </p>
@@ -518,7 +518,7 @@ export function VideoAnalysisWorkspace({
               ].map(([label, value]) =>
                 value ? (
                   <section key={label}>
-                    <p className="text-muted-foreground text-xs font-medium uppercase">
+                    <p className="text-xs font-medium text-muted-foreground uppercase">
                       {label}
                     </p>
                     <p className="mt-1 text-sm">{value}</p>
@@ -527,7 +527,7 @@ export function VideoAnalysisWorkspace({
               )}
               {!!creative.keyBeats?.length && (
                 <section>
-                  <p className="text-muted-foreground text-xs font-medium uppercase">
+                  <p className="text-xs font-medium text-muted-foreground uppercase">
                     Key beats
                   </p>
                   <div className="mt-2 space-y-2">
@@ -537,7 +537,7 @@ export function VideoAnalysisWorkspace({
                         <button
                           key={`${beat.frameNumber}-${index}`}
                           className={cn(
-                            "hover:bg-accent block w-full rounded-lg border p-3 text-left",
+                            "block w-full rounded-lg border p-3 text-left hover:bg-accent",
                             !frame && "pointer-events-none",
                           )}
                           onClick={() => frame && seekToFrame(frame)}
@@ -554,7 +554,7 @@ export function VideoAnalysisWorkspace({
               )}
               {!!creative.reusableLessons?.length && (
                 <section>
-                  <p className="text-muted-foreground text-xs font-medium uppercase">
+                  <p className="text-xs font-medium text-muted-foreground uppercase">
                     Reusable lessons
                   </p>
                   <ul className="mt-2 space-y-2 text-sm">
@@ -569,7 +569,7 @@ export function VideoAnalysisWorkspace({
               )}
             </>
           ) : (
-            <div className="text-muted-foreground text-sm">
+            <div className="text-sm text-muted-foreground">
               Creative analysis will appear after the browser finishes the
               storyboard and local transcript.
             </div>

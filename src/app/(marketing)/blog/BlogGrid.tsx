@@ -103,7 +103,7 @@ function BlogCardSimple({
         {(post.tags || []).map((tag: string) => (
           <span
             key={tag}
-            className="bg-surface-secondary text-secondary hover:bg-surface-tertiary hover:text-primary relative z-10 rounded-full px-3 py-1.5 font-medium transition-colors"
+            className="relative z-10 rounded-full bg-surface-secondary px-3 py-1.5 font-medium text-secondary transition-colors hover:bg-surface-tertiary hover:text-primary"
           >
             #{tag}
           </span>
@@ -137,17 +137,17 @@ function BlogCardSimple({
             alt={post.author}
             width={40}
             height={40}
-            className="bg-surface-secondary size-10 rounded-full"
+            className="size-10 rounded-full bg-surface-secondary"
           />
         ) : (
-          <div className="bg-surface-secondary flex size-10 items-center justify-center rounded-full">
-            <span className="text-secondary text-sm font-semibold">
+          <div className="flex size-10 items-center justify-center rounded-full bg-surface-secondary">
+            <span className="text-sm font-semibold text-secondary">
               {post.author.charAt(0)}
             </span>
           </div>
         )}
         <div className="text-sm leading-6">
-          <p className="text-primary font-semibold">
+          <p className="font-semibold text-primary">
             <span className="absolute inset-0" />
             {post.author}
           </p>
@@ -168,7 +168,7 @@ export function BlogGrid({
   searchComponent,
 }: BlogGridProps) {
   return (
-    <main className="bg-surface-primary min-h-screen">
+    <main className="min-h-screen bg-surface-primary">
       <div className="mx-auto max-w-7xl space-y-8 px-4 py-6 sm:px-6 sm:py-12 lg:px-8">
         {/* Page Header */}
         <div className="space-y-2">
@@ -182,7 +182,7 @@ export function BlogGrid({
 
         {/* Featured Posts Section */}
         {showFeatured && featuredPosts.length > 0 && (
-          <div className="border-secondary space-y-6 border-b pb-12">
+          <div className="space-y-6 border-b border-secondary pb-12">
             <div>
               <Heading variant="headline-lg" as="h2">
                 Featured Posts
@@ -345,9 +345,9 @@ export function BlogGrid({
             </div>
           ) : (
             <div className="flex items-center justify-center py-16">
-              <div className="border-secondary bg-surface-primary rounded-xl border px-6 py-12 text-center shadow-sm">
+              <div className="rounded-xl border border-secondary bg-surface-primary px-6 py-12 text-center shadow-sm">
                 <svg
-                  className="text-tertiary mx-auto size-12"
+                  className="mx-auto size-12 text-tertiary"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"

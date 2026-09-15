@@ -73,7 +73,7 @@ export function ProfileForm() {
         <p className="text-sm text-green-600">Profile updated successfully!</p>
       )}
       {updateProfile.isError && (
-        <p className="text-destructive text-sm">
+        <p className="text-sm text-destructive">
           Error: {updateProfile.error.message}
         </p>
       )}

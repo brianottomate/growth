@@ -71,7 +71,7 @@ export function DeleteOrganizationButton({
 
   if (!isOwner) {
     return (
-      <div className="text-muted-foreground text-sm">
+      <div className="text-sm text-muted-foreground">
         Only the organization owner can delete the organization.
       </div>
     );
@@ -80,7 +80,7 @@ export function DeleteOrganizationButton({
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
-        <Button variant="destructive" className="gap-2">
+        <Button variant="destructive">
           <Trash2 className="size-4" />
           Delete Organization
         </Button>
@@ -117,7 +117,7 @@ export function DeleteOrganizationButton({
               confirmText !== orgData.organization.name ||
               deleteOrganizationMutation.isPending
             }
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            tone="destructive"
           >
             {deleteOrganizationMutation.isPending
               ? "Deleting..."

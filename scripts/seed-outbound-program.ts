@@ -1,24 +1,31 @@
 import { db } from "@/server/db";
-import { lifecycleProgramTable, lifecycleProgramStepTable } from "@/server/db/schema";
+import {
+  lifecycleProgramTable,
+  lifecycleProgramStepTable,
+} from "@/server/db/schema";
 
 const BRAND_ID = "brand_BvLx3xvsfaMvvr4k"; // WanderOS
 
-const [program] = await db.insert(lifecycleProgramTable).values({
-  brandId: BRAND_ID,
-  name: "WanderOS Pre-Gen Cold Outbound",
-  description: "Cold sequence pitching direct-booking sites to vacation-rental operators, anchored on the live Hollyhock flagship. First send: the Pregen Top 20 list.",
-  kind: "outbound",
-  status: "active",
-  priority: "should_have",
-  workspace: "os",
-  targetTouchpoints: 3,
-  metadata: {
-    instantlyTestCampaignId: "1287d6a2-6102-4222-be73-b1c5a5005269",
-    instantlyRealCampaignId: "5bc37887-d73e-45e5-a01c-e3577eb8111e",
-    leadList: "Pregen Top 20 — 2026-06-10 (279d99ae)",
-    flagship: "https://www.hollyhocksuites.com/",
-  },
-}).returning();
+const [program] = await db
+  .insert(lifecycleProgramTable)
+  .values({
+    brandId: BRAND_ID,
+    name: "WanderOS Pre-Gen Cold Outbound",
+    description:
+      "Cold sequence pitching direct-booking sites to vacation-rental operators, anchored on the live Hollyhock flagship. First send: the Pregen Top 20 list.",
+    kind: "outbound",
+    status: "active",
+    priority: "should_have",
+    workspace: "os",
+    targetTouchpoints: 3,
+    metadata: {
+      instantlyTestCampaignId: "1287d6a2-6102-4222-be73-b1c5a5005269",
+      instantlyRealCampaignId: "5bc37887-d73e-45e5-a01c-e3577eb8111e",
+      leadList: "Pregen Top 20 — 2026-06-10 (279d99ae)",
+      flagship: "https://www.hollyhocksuites.com/",
+    },
+  })
+  .returning();
 
 const steps = [
   {

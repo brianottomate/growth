@@ -50,7 +50,7 @@ export default async function TransactionalPage() {
   return (
     <div className="mx-auto w-full max-w-6xl px-6 py-8">
       <h1 className="text-2xl font-semibold">Transactional</h1>
-      <p className="text-muted-foreground mt-1 max-w-3xl text-sm">
+      <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
         The registry of product-triggered emails the backend owes users — what
         fires each one, where its template lives, and how far along the
         CIO-legacy → react-email → in-house migration it is. Growth never sends

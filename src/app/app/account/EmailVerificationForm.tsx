@@ -52,7 +52,7 @@ export function EmailVerificationForm() {
       <div className="space-y-2">
         <Label>Current Email</Label>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <code className="bg-muted rounded px-2 py-1 text-sm break-all">
+          <code className="rounded bg-muted px-2 py-1 text-sm break-all">
             {user?.email}
           </code>
           {isVerified ? (
@@ -112,7 +112,7 @@ export function EmailVerificationForm() {
           )}
 
           {sendVerificationEmail.isError && (
-            <p className="text-destructive text-sm">
+            <p className="text-sm text-destructive">
               Error: {sendVerificationEmail.error.message}
             </p>
           )}
@@ -143,7 +143,7 @@ export function EmailVerificationForm() {
                 placeholder="you@example.com"
                 required
               />
-              <p className="text-muted-foreground text-xs">
+              <p className="text-xs text-muted-foreground">
                 You&apos;ll need to verify the new email address.
               </p>
             </div>
@@ -174,7 +174,7 @@ export function EmailVerificationForm() {
               </p>
             )}
             {updateEmail.isError && (
-              <p className="text-destructive text-sm">
+              <p className="text-sm text-destructive">
                 Error: {updateEmail.error.message}
               </p>
             )}

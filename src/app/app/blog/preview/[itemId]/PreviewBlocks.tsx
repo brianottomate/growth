@@ -29,7 +29,7 @@ export function videoSrc(url: string): string | null {
 
 function Frame({ children }: { children: React.ReactNode }) {
   return (
-    <div className="bg-muted my-8 aspect-video w-full overflow-hidden rounded-xl">
+    <div className="my-8 aspect-video w-full overflow-hidden rounded-xl bg-muted">
       {children}
     </div>
   );
@@ -45,7 +45,7 @@ export function PreviewBlock({ block }: { block: DatoBlock }) {
     const src = url ? videoSrc(url) : null;
     if (!src) {
       return (
-        <p className="text-muted-foreground text-sm italic">
+        <p className="text-sm text-muted-foreground italic">
           Unrecognized video URL: {url}
         </p>
       );
@@ -69,7 +69,7 @@ export function PreviewBlock({ block }: { block: DatoBlock }) {
     const image = known.image;
     if (!image?.url) return null;
     return (
-      // eslint-disable-next-line @next/next/no-img-element -- Dato CDN host isn't in next/image remotePatterns; a preview doesn't need optimization
+      // oxlint-disable-next-line nextjs/no-img-element -- Dato CDN host isn't in next/image remotePatterns; a preview doesn't need optimization
       <img
         src={image.url}
         alt={image.alt ?? ""}
@@ -105,7 +105,7 @@ export function PreviewBlock({ block }: { block: DatoBlock }) {
                 {Object.values(row).map((cell, cellIndex) => (
                   <td
                     key={cellIndex}
-                    className="text-muted-foreground border-b px-3 py-2"
+                    className="border-b px-3 py-2 text-muted-foreground"
                   >
                     {cell}
                   </td>
@@ -121,7 +121,7 @@ export function PreviewBlock({ block }: { block: DatoBlock }) {
   // Visible rather than silent: a preview that hides content is worse than one
   // that admits it can't draw it.
   return (
-    <p className="text-muted-foreground text-sm italic">
+    <p className="text-sm text-muted-foreground italic">
       [{block.__typename} — not rendered in preview]
     </p>
   );

@@ -290,7 +290,8 @@ async function enrichBrandIfSparse(brand: {
 const MIN_PERSIST_CONFIDENCE = 0.3;
 
 /** A single post/video/status is never a profile, whatever the model says. */
-const NON_PROFILE_PATH = /\/(status|p|reel|reels|posts|watch|shorts|video|videos)\//i;
+const NON_PROFILE_PATH =
+  /\/(status|p|reel|reels|posts|watch|shorts|video|videos)\//i;
 
 /**
  * Cheap floor applied before persisting: drops low-confidence guesses and

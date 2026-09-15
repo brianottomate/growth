@@ -1,6 +1,6 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element -- social CDN URLs are dynamic and not in Next remote patterns */
+/* oxlint-disable nextjs/no-img-element -- social CDN URLs are dynamic and not in Next remote patterns */
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -191,7 +191,7 @@ export function PostDetailDialog({
           <DialogTitle className="flex flex-wrap items-center gap-2 pr-12">
             <ChannelLogo platform={entry.platform} className="size-5" />
             {entry.brandName} · {platformLabel(entry.platform)}
-            <span className="text-muted-foreground text-sm font-normal">
+            <span className="text-sm font-normal text-muted-foreground">
               {new Date(entry.at).toLocaleDateString()}
             </span>
           </DialogTitle>
@@ -214,14 +214,14 @@ export function PostDetailDialog({
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]">
             <div className="min-w-0">
               <div className="mb-3 flex items-center justify-between gap-3">
-                <span className="text-muted-foreground text-sm">
+                <span className="text-sm text-muted-foreground">
                   {media.length} media item{media.length === 1 ? "" : "s"}
                 </span>
                 <div className="flex rounded-md border p-0.5">
                   <Button
                     variant={mediaView === "carousel" ? "secondary" : "ghost"}
                     size="sm"
-                    className="gap-1.5"
+
                     onClick={() => setMediaView("carousel")}
                   >
                     <Images className="size-3.5" /> Carousel
@@ -229,7 +229,7 @@ export function PostDetailDialog({
                   <Button
                     variant={mediaView === "grid" ? "secondary" : "ghost"}
                     size="sm"
-                    className="gap-1.5"
+
                     onClick={() => setMediaView("grid")}
                   >
                     <Grid2X2 className="size-3.5" /> Grid
@@ -310,7 +310,7 @@ export function PostDetailDialog({
 
             <aside className="flex flex-col gap-4 rounded-xl border p-4">
               <div>
-                <p className="text-muted-foreground text-xs font-medium uppercase">
+                <p className="text-xs font-medium text-muted-foreground uppercase">
                   Caption
                 </p>
                 <p className="mt-1 text-sm whitespace-pre-wrap">
@@ -320,7 +320,7 @@ export function PostDetailDialog({
               <div className="mt-auto space-y-3 border-t pt-4">
                 {firstVideoIndex >= 0 && (
                   <Button
-                    className="w-full gap-2"
+                    className="w-full"
                     onClick={() =>
                       void setVideoParams({
                         media: firstVideoIndex,
@@ -336,7 +336,7 @@ export function PostDetailDialog({
                 {entry.platform === "instagram" && entry.externalUrl && (
                   <Button
                     variant="outline"
-                    className="w-full gap-2"
+                    className="w-full"
                     loading={refreshInstagram.isPending}
                     onClick={() =>
                       refreshInstagram.mutate({ platformPostId: entry.id })
@@ -348,19 +348,19 @@ export function PostDetailDialog({
                 )}
                 <Button
                   variant="outline"
-                  className="w-full gap-2"
+                  className="w-full"
                   loading={stabilize.isPending}
                   onClick={() => stabilize.mutate({ platformPostId: entry.id })}
                 >
                   <CloudDownload className="size-4" />
                   Keep previews
                 </Button>
-                <p className="text-muted-foreground -mt-1 text-[11px] leading-relaxed">
+                <p className="-mt-1 text-[11px] leading-relaxed text-muted-foreground">
                   Saves durable display copies to Blob when the social URL is
                   still live. It does not add anything to your library.
                 </p>
                 <button
-                  className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-xs"
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
                   onClick={() =>
                     setSelected(
                       allSelected
@@ -390,7 +390,7 @@ export function PostDetailDialog({
                   </Select>
                 )}
                 <Button
-                  className="w-full gap-2"
+                  className="w-full"
                   disabled={!selected.size || !destinationBrandId}
                   loading={capture.isPending}
                   onClick={() =>
@@ -404,7 +404,7 @@ export function PostDetailDialog({
                   <Library className="size-4" />
                   Save {selected.size || ""} to library
                 </Button>
-                <p className="text-muted-foreground text-[11px] leading-relaxed">
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
                   Selected originals are downloaded and stored in your Blob
                   library with a link back to this post.
                 </p>

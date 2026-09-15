@@ -600,9 +600,9 @@ export async function generateHomepageCopy(input: {
     // are good and the model still writes past them; naming the specific fault back to it is what
     // fixes the line, where a schema-level bound would just reject the object and leave the worse
     // copy in place.
-    const hero = sections.find((section) => section.type === "homepage-hero") as
-      | { title?: string; description?: string }
-      | undefined;
+    const hero = sections.find(
+      (section) => section.type === "homepage-hero",
+    ) as { title?: string; description?: string } | undefined;
     const faults = hero ? heroFaults(hero) : [];
     if (faults.length > 0) {
       console.warn("[pregen] hero copy tripped the style check, retrying", {

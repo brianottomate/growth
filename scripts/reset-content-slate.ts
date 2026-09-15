@@ -38,7 +38,9 @@ import {
 
 const apply = process.argv.includes("--apply");
 const includeSeries = process.argv.includes("--include-series");
-const includePublishedPlans = process.argv.includes("--include-published-plans");
+const includePublishedPlans = process.argv.includes(
+  "--include-published-plans",
+);
 
 // A published plan is a historical record, not clutter. Keep it unless asked.
 const plannedPostFilter = includePublishedPlans
@@ -73,7 +75,9 @@ const suggestions = await db
   .where(eq(contentSuggestionTable.status, "pending"));
 
 const series = includeSeries
-  ? await db.select({ id: seriesTable.id, name: seriesTable.name }).from(seriesTable)
+  ? await db
+      .select({ id: seriesTable.id, name: seriesTable.name })
+      .from(seriesTable)
   : [];
 
 const preserved = await db
@@ -89,7 +93,8 @@ console.log("  would delete:");
 console.log(`    content_suggestion (pending)      ${suggestions.length}`);
 console.log(`    content_post                      ${plannedIds.length}`);
 console.log(`    platform_post (unpublished spots) ${orphanSpots.length}`);
-if (includeSeries) console.log(`    series                            ${series.length}`);
+if (includeSeries)
+  console.log(`    series                            ${series.length}`);
 console.log("");
 console.log(`  preserved synced/published history  ${preserved[0]?.n ?? 0}`);
 console.log("");
@@ -112,7 +117,10 @@ const backup = {
     .from(contentSuggestionTable)
     .where(eq(contentSuggestionTable.status, "pending")),
   contentPost: plannedIds.length
-    ? await db.select().from(contentPostTable).where(inArray(contentPostTable.id, plannedIds))
+    ? await db
+        .select()
+        .from(contentPostTable)
+        .where(inArray(contentPostTable.id, plannedIds))
     : [],
   platformPost: orphanSpots.length
     ? await db
@@ -148,7 +156,9 @@ if (orphanSpots.length) {
   );
 }
 if (plannedIds.length) {
-  await db.delete(contentPostTable).where(inArray(contentPostTable.id, plannedIds));
+  await db
+    .delete(contentPostTable)
+    .where(inArray(contentPostTable.id, plannedIds));
 }
 if (includeSeries && series.length) {
   await db.delete(seriesTable).where(isNotNull(seriesTable.id));

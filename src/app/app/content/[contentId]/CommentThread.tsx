@@ -57,7 +57,7 @@ export function CommentThread({
   return (
     <div className="mt-2 flex flex-col gap-3">
       {comments.length === 0 && (
-        <p className="text-muted-foreground text-sm">
+        <p className="text-sm text-muted-foreground">
           No comments yet — start the discussion.
         </p>
       )}
@@ -69,13 +69,13 @@ export function CommentThread({
               <span className="text-sm font-medium">
                 {c.author?.name ?? "Unknown"}
               </span>
-              <span className="text-muted-foreground text-xs">
+              <span className="text-xs text-muted-foreground">
                 {rel(c.createdAt)}
               </span>
               {c.authorId === currentUserId && (
                 <button
                   onClick={() => del.mutate({ id: c.id })}
-                  className="text-muted-foreground hover:text-foreground ml-auto text-xs"
+                  className="ml-auto text-xs text-muted-foreground hover:text-foreground"
                 >
                   Delete
                 </button>
@@ -95,7 +95,7 @@ export function CommentThread({
           }}
           rows={2}
           placeholder="Add a comment… (⌘↵ to post)"
-          className="border-border bg-background w-full rounded-md border px-3 py-2 text-sm"
+          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
         />
         <div className="flex justify-end">
           <button

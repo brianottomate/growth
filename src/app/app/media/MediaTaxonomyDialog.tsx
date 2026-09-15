@@ -122,7 +122,8 @@ export function MediaTaxonomyDialog({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="text-muted-foreground ml-auto size-7"
+                      tone="muted"
+                      className="ml-auto size-7"
                       title={`Delete ${folder.name}`}
                       onClick={() => deleteFolder.mutate({ id: folder.id })}
                     >
@@ -131,7 +132,7 @@ export function MediaTaxonomyDialog({
                   </div>
                 ))
               ) : (
-                <p className="text-muted-foreground p-3 text-sm">
+                <p className="p-3 text-sm text-muted-foreground">
                   No folders yet.
                 </p>
               )}
@@ -189,7 +190,7 @@ export function MediaTaxonomyDialog({
                     <div className="min-w-0">
                       <p className="text-sm font-medium">{tag.name}</p>
                       {tag.description && (
-                        <p className="text-muted-foreground text-xs">
+                        <p className="text-xs text-muted-foreground">
                           {tag.description}
                         </p>
                       )}
@@ -197,7 +198,8 @@ export function MediaTaxonomyDialog({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="text-muted-foreground ml-auto size-7 shrink-0"
+                      tone="muted"
+                      className="ml-auto size-7 shrink-0"
                       title={`Delete ${tag.name}`}
                       onClick={() => deleteTag.mutate({ id: tag.id })}
                     >
@@ -206,7 +208,7 @@ export function MediaTaxonomyDialog({
                   </div>
                 ))
               ) : (
-                <p className="text-muted-foreground p-3 text-sm">
+                <p className="p-3 text-sm text-muted-foreground">
                   No managed tags yet. AI analysis will leave tags empty until
                   you create some.
                 </p>

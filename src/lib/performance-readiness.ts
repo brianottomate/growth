@@ -12,7 +12,12 @@
  * section, `ads` the full ads desk.
  */
 export type ReadinessFix =
-  "intake" | "connect" | "homes" | "draw" | "mark" | "ads";
+  | "intake"
+  | "connect"
+  | "homes"
+  | "draw"
+  | "mark"
+  | "ads";
 
 export type ReadinessItem = {
   id: string;

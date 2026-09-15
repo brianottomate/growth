@@ -92,7 +92,7 @@ export function ByHomeView({
       <header className="space-y-2">
         <Link
           href={back}
-          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <ChevronLeft className="size-4" />
           {campaignName}
@@ -118,7 +118,7 @@ export function ByHomeView({
         <p
           className={cn(
             panel,
-            "text-muted-foreground px-4 py-8 text-center text-xs",
+            "px-4 py-8 text-center text-xs text-muted-foreground",
           )}
         >
           {only
@@ -136,7 +136,7 @@ export function ByHomeView({
                 href={section.url}
                 target="_blank"
                 rel="noreferrer"
-                className="text-muted-foreground truncate text-[11px] hover:underline"
+                className="truncate text-[11px] text-muted-foreground hover:underline"
               >
                 {section.url.replace(/^https?:\/\//, "")}
               </a>
@@ -177,8 +177,8 @@ function Chip({
       className={cn(
         "rounded-full border px-2.5 py-0.5 text-[11.5px] transition-colors",
         active
-          ? "bg-foreground text-background border-foreground font-medium"
-          : "text-muted-foreground hover:text-foreground hover:border-white/30",
+          ? "border-foreground bg-foreground font-medium text-background"
+          : "text-muted-foreground hover:border-white/30 hover:text-foreground",
       )}
     >
       {children}
@@ -211,7 +211,7 @@ function AdAcross({
       <div className="grid gap-4 @4xl:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="flex flex-wrap items-start gap-4">
           {shell ? (
-            <div className="bg-muted/40 text-muted-foreground grid h-40 w-full max-w-md place-items-center rounded-xl border border-dashed text-xs">
+            <div className="grid h-40 w-full max-w-md place-items-center rounded-xl border border-dashed bg-muted/40 text-xs text-muted-foreground">
               No creative yet. Fill it on the campaign page.
             </div>
           ) : (
@@ -251,7 +251,7 @@ function AdAcross({
                 : ` · ${ad.cards.length} ${ad.cards.length === 1 ? "card" : "cards"}`}
               {ad.status === "approved" ? " · approved" : ""}
             </p>
-            <p className="text-muted-foreground mt-0.5 text-[11px] break-all">
+            <p className="mt-0.5 text-[11px] break-all text-muted-foreground">
               {ad.name}
             </p>
           </div>
@@ -261,13 +261,13 @@ function AdAcross({
           </div>
           <div>
             <p className={sectionLabel}>Primary text</p>
-            <p className="text-muted-foreground mt-0.5 leading-5 whitespace-pre-line">
+            <p className="mt-0.5 leading-5 whitespace-pre-line text-muted-foreground">
               {ad.body || "No primary text yet."}
             </p>
           </div>
           <div>
             <p className={sectionLabel}>Link · button</p>
-            <p className="text-muted-foreground mt-0.5 break-all">
+            <p className="mt-0.5 break-all text-muted-foreground">
               {ad.linkUrl ?? landingUrl ?? "—"}
               {ad.callToAction ? ` · ${ad.callToAction}` : ""}
             </p>
@@ -287,7 +287,7 @@ function AdAcross({
                     )}
                     title={`Card ${index + 1}`}
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    {/* oxlint-disable-next-line nextjs/no-img-element */}
                     <img
                       src={item.thumbnail ?? item.url}
                       alt=""

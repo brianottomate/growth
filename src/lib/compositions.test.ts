@@ -142,7 +142,10 @@ describe("composition blueprints", () => {
       }),
     );
     expect(plain.focal).toBeNull();
-    expect(directed).toMatchObject({ focal: { x: 72, y: 40 }, scrim: "#1b3a5c" });
+    expect(directed).toMatchObject({
+      focal: { x: 72, y: 40 },
+      scrim: "#1b3a5c",
+    });
     expect(
       freezeCompositionSchema.safeParse({ ...base, focal: { x: 120, y: 0 } })
         .success,
@@ -185,20 +188,23 @@ describe("the fields a blueprint declares", () => {
     // The form is built from the declaration and the schema enforces the
     // headline; the two must agree or the form asks for what it cannot show.
     for (const template of COMPOSITION_TEMPLATES) {
-      const requires = compositionSpecSchema.safeParse({
-        brandId: "b",
-        templateId: template.id,
-        formatId: "square",
-        sourceMediaAssetId: "m",
-        title: "",
-      }).success === false;
+      const requires =
+        compositionSpecSchema.safeParse({
+          brandId: "b",
+          templateId: template.id,
+          formatId: "square",
+          sourceMediaAssetId: "m",
+          title: "",
+        }).success === false;
       expect(compositionHasField(template.id, "title")).toBe(requires);
     }
   });
 
   test("the place and review cards are the ones with a rating", () => {
     expect(
-      COMPOSITION_TEMPLATES.filter((t) => compositionHasField(t.id, "rating")).map((t) => t.id),
+      COMPOSITION_TEMPLATES.filter((t) =>
+        compositionHasField(t.id, "rating"),
+      ).map((t) => t.id),
     ).toEqual(["catalog-place", "catalog-review"]);
   });
 });

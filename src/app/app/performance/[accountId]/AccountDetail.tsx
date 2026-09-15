@@ -49,10 +49,10 @@ export function AccountDetail({ accountId }: { accountId: string }) {
   );
 
   if (isLoading) {
-    return <p className="text-muted-foreground text-sm">Loading account…</p>;
+    return <p className="text-sm text-muted-foreground">Loading account…</p>;
   }
   if (!data) {
-    return <p className="text-muted-foreground text-sm">Account not found.</p>;
+    return <p className="text-sm text-muted-foreground">Account not found.</p>;
   }
 
   const { account, delivery } = data;
@@ -62,19 +62,19 @@ export function AccountDetail({ accountId }: { accountId: string }) {
       <div className="space-y-2">
         <Link
           href="/app/performance/accounts"
-          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs"
+          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="size-3" />
           Accounts
         </Link>
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <h1 className="text-xl font-semibold">{account.name}</h1>
-          <span className="text-muted-foreground text-sm">
+          <span className="text-sm text-muted-foreground">
             {account.contactName}
             {account.contactEmail ? ` · ${account.contactEmail}` : ""}
           </span>
         </div>
-        <p className="text-muted-foreground text-sm">
+        <p className="text-sm text-muted-foreground">
           {account.plan ?? "no plan set"} · {account.status}
           {account.brand?.slug ? (
             <>
@@ -93,7 +93,7 @@ export function AccountDetail({ accountId }: { accountId: string }) {
           )}
         </p>
         {account.notes && (
-          <p className="text-muted-foreground max-w-3xl text-sm">
+          <p className="max-w-3xl text-sm text-muted-foreground">
             {account.notes}
           </p>
         )}
@@ -106,7 +106,7 @@ export function AccountDetail({ accountId }: { accountId: string }) {
           </h2>
           <AddPropertyForm accountId={accountId} />
         </div>
-        <div className="border-border divide-border divide-y rounded-lg border">
+        <div className="divide-y divide-border rounded-lg border border-border">
           {account.properties.map((property) => (
             <div
               key={property.id}
@@ -121,7 +121,7 @@ export function AccountDetail({ accountId }: { accountId: string }) {
                     href={propertyUrl(property)!}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-muted-foreground inline-flex items-center gap-1 text-xs hover:underline"
+                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
                   >
                     {shortPropertyUrl(propertyUrl(property)!)}
                     <ExternalLink className="size-3" />
@@ -137,7 +137,7 @@ export function AccountDetail({ accountId }: { accountId: string }) {
             </div>
           ))}
           {account.properties.length === 0 && (
-            <p className="text-muted-foreground px-3 py-4 text-sm">
+            <p className="px-3 py-4 text-sm text-muted-foreground">
               No homes added yet.
             </p>
           )}
@@ -174,7 +174,7 @@ export function AccountDetail({ accountId }: { accountId: string }) {
           return (
             <div
               key={cycle.id}
-              className="border-border space-y-3 rounded-lg border p-4"
+              className="space-y-3 rounded-lg border border-border p-4"
             >
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <div className="flex items-baseline gap-3">
@@ -184,12 +184,15 @@ export function AccountDetail({ accountId }: { accountId: string }) {
                   <CycleStatusPicker cycleId={cycle.id} status={cycle.status} />
                 </div>
                 <div className="text-sm tabular-nums">
-                  <span className="text-muted-foreground text-xs">billed </span>
+                  <span className="text-xs text-muted-foreground">billed </span>
                   {usd(cycle.billedAmount)}
-                  <span className="text-muted-foreground text-xs"> · media </span>
+                  <span className="text-xs text-muted-foreground">
+                    {" "}
+                    · media{" "}
+                  </span>
                   {usd(cycle.mediaBudget)}
                   {impliedDaily && (
-                    <span className="text-muted-foreground text-xs">
+                    <span className="text-xs text-muted-foreground">
                       {" "}
                       (≈${impliedDaily.toFixed(2)}/day)
                     </span>
@@ -206,7 +209,7 @@ export function AccountDetail({ accountId }: { accountId: string }) {
               />
 
               {cycle.notes && (
-                <p className="text-muted-foreground text-xs">{cycle.notes}</p>
+                <p className="text-xs text-muted-foreground">{cycle.notes}</p>
               )}
 
               <div className="grid gap-3 sm:grid-cols-3">
@@ -238,7 +241,7 @@ export function AccountDetail({ accountId }: { accountId: string }) {
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="text-muted-foreground text-xs">
+                <div className="text-xs text-muted-foreground">
                   {reports.length > 0
                     ? `Report: ${reports.map((r) => `${r.periodLabel} (${r.status})`).join(", ")}`
                     : "No report generated yet."}
@@ -259,7 +262,11 @@ export function AccountDetail({ accountId }: { accountId: string }) {
                 <CampaignPicker
                   onAttach={(platformCampaignId) =>
                     attach.mutate(
-                      { cycleId: cycle.id, kind: "campaign", id: platformCampaignId },
+                      {
+                        cycleId: cycle.id,
+                        kind: "campaign",
+                        id: platformCampaignId,
+                      },
                       { onSuccess: () => setPickerFor(null) },
                     )
                   }
@@ -295,7 +302,7 @@ export function AccountDetail({ accountId }: { accountId: string }) {
                           id: row.id,
                         })
                       }
-                      className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
+                      className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                       title="Detach from this cycle"
                     >
                       <Unlink className="size-3" />
@@ -308,15 +315,13 @@ export function AccountDetail({ accountId }: { accountId: string }) {
           );
         })}
         {account.cycles.length === 0 && (
-          <p className="text-muted-foreground text-sm">
-            No cycles opened yet.
-          </p>
+          <p className="text-sm text-muted-foreground">No cycles opened yet.</p>
         )}
       </section>
 
       <SponsoredAbandonment accountId={accountId} />
 
-      <div className="border-border text-muted-foreground flex items-start gap-2 rounded-lg border border-dashed p-3 text-xs">
+      <div className="flex items-start gap-2 rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground">
         <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-amber-300" />
         <span>
           Launching ads is not wired into this page. Ads are created through the
@@ -337,11 +342,11 @@ function DeliveryList({
 }) {
   return (
     <div className="space-y-1.5">
-      <div className="text-muted-foreground text-xs font-medium">
+      <div className="text-xs font-medium text-muted-foreground">
         {label} ({rows.length})
       </div>
       {rows.length === 0 && (
-        <div className="text-muted-foreground/60 text-xs">none attached</div>
+        <div className="text-xs text-muted-foreground/60">none attached</div>
       )}
       {rows.map((row) => (
         <div key={row.id} className="text-xs">
@@ -378,7 +383,8 @@ function SpendPace({
   onRefresh: () => void;
   refreshing: boolean;
 }) {
-  const spent = typeof actualSpendCents === "number" ? actualSpendCents / 100 : null;
+  const spent =
+    typeof actualSpendCents === "number" ? actualSpendCents / 100 : null;
   const over = mediaBudget !== null && spent !== null && spent > mediaBudget;
   const pct =
     mediaBudget && spent !== null
@@ -393,7 +399,9 @@ function SpendPace({
             "Spend never computed"
           ) : (
             <>
-              <span className={over ? "font-medium text-red-300" : "font-medium"}>
+              <span
+                className={over ? "font-medium text-red-300" : "font-medium"}
+              >
                 ${spent.toLocaleString("en-US", { maximumFractionDigits: 2 })}
               </span>{" "}
               of {mediaBudget !== null ? `$${mediaBudget}` : "—"} media
@@ -406,7 +414,7 @@ function SpendPace({
           type="button"
           onClick={onRefresh}
           disabled={refreshing}
-          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+          className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
         >
           <RefreshCw className={`size-3 ${refreshing ? "animate-spin" : ""}`} />
           {actualSpendAt
@@ -420,7 +428,7 @@ function SpendPace({
         </button>
       </div>
       {pct !== null && (
-        <div className="bg-surface-secondary h-1 w-full overflow-hidden rounded-full">
+        <div className="h-1 w-full overflow-hidden rounded-full bg-surface-secondary">
           <div
             className={`h-full ${over ? "bg-red-400" : "bg-emerald-400"}`}
             style={{ width: `${pct}%` }}
@@ -450,18 +458,17 @@ function CampaignPicker({
   );
 
   return (
-    <div className="border-border bg-surface-secondary/30 space-y-2 rounded-md border p-3">
+    <div className="space-y-2 rounded-md border border-border bg-surface-secondary/30 p-3">
       <Input
         value={query}
         onChange={(event) => setQuery(event.target.value)}
         placeholder="Search unattached campaigns…"
-        className="h-8 text-xs"
+        textSize="xs"
+        className="h-8"
       />
-      {isLoading && (
-        <p className="text-muted-foreground text-xs">Searching…</p>
-      )}
+      {isLoading && <p className="text-xs text-muted-foreground">Searching…</p>}
       {data?.campaigns.length === 0 && (
-        <p className="text-muted-foreground text-xs">
+        <p className="text-xs text-muted-foreground">
           No unattached campaigns match.
         </p>
       )}
@@ -474,23 +481,23 @@ function CampaignPicker({
               type="button"
               disabled={attaching}
               onClick={() => onAttach(campaign.id)}
-              className="hover:bg-surface-secondary flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs disabled:opacity-50"
+              className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-surface-secondary disabled:opacity-50"
             >
               {campaign.heroThumbnailUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
+                // oxlint-disable-next-line nextjs/no-img-element
                 <img
                   src={campaign.heroThumbnailUrl}
                   alt=""
                   className="size-8 shrink-0 rounded object-cover"
                 />
               ) : (
-                <span className="bg-surface-secondary size-8 shrink-0 rounded" />
+                <span className="size-8 shrink-0 rounded bg-surface-secondary" />
               )}
               <span className="min-w-0 flex-1 truncate">{campaign.name}</span>
-              <span className="text-muted-foreground shrink-0 tabular-nums">
+              <span className="shrink-0 text-muted-foreground tabular-nums">
                 ${spend.toLocaleString("en-US", { maximumFractionDigits: 0 })}
               </span>
-              <span className="text-muted-foreground shrink-0">
+              <span className="shrink-0 text-muted-foreground">
                 {campaign.status}
               </span>
             </button>
@@ -524,35 +531,38 @@ function AdGrid({
   if (ads.length === 0) return null;
   return (
     <div className="space-y-2">
-      <div className="text-muted-foreground text-xs font-medium">
+      <div className="text-xs font-medium text-muted-foreground">
         Ads ({ads.length})
       </div>
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {ads.map((ad) => (
           <div
             key={ad.id}
-            className="border-border flex gap-2 rounded-md border p-2"
+            className="flex gap-2 rounded-md border border-border p-2"
           >
             {ad.thumbnailUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
+              // oxlint-disable-next-line nextjs/no-img-element
               <img
                 src={ad.thumbnailUrl}
                 alt=""
                 className="size-14 shrink-0 rounded object-cover"
               />
             ) : (
-              <span className="bg-surface-secondary text-muted-foreground/60 flex size-14 shrink-0 items-center justify-center rounded text-[10px]">
+              <span className="flex size-14 shrink-0 items-center justify-center rounded bg-surface-secondary text-[10px] text-muted-foreground/60">
                 no art
               </span>
             )}
             <div className="min-w-0 flex-1 space-y-0.5">
-              <div className="truncate text-xs font-medium" title={ad.name ?? ""}>
+              <div
+                className="truncate text-xs font-medium"
+                title={ad.name ?? ""}
+              >
                 {ad.name ?? ad.id}
               </div>
-              <div className="text-muted-foreground truncate text-[11px]">
+              <div className="truncate text-[11px] text-muted-foreground">
                 {ad.adSetName ?? "no ad set"}
               </div>
-              <div className="text-muted-foreground text-[11px] tabular-nums">
+              <div className="text-[11px] text-muted-foreground tabular-nums">
                 {ad.stats?.impressions !== undefined
                   ? `${ad.stats.impressions.toLocaleString("en-US")} impr`
                   : "no delivery"}
@@ -607,7 +617,7 @@ function SponsoredAbandonment({ accountId }: { accountId: string }) {
       </h2>
 
       {isLoading && (
-        <p className="text-muted-foreground text-sm">Checking funnel state…</p>
+        <p className="text-sm text-muted-foreground">Checking funnel state…</p>
       )}
 
       {data && data.unresolvedProperties.length > 0 && (
@@ -619,14 +629,14 @@ function SponsoredAbandonment({ accountId }: { accountId: string }) {
       )}
 
       {data?.events.length === 0 && data.matchedProperties > 0 && (
-        <p className="text-muted-foreground text-sm">
+        <p className="text-sm text-muted-foreground">
           No abandoned checkouts on the {data.matchedProperties} matched home
           {data.matchedProperties === 1 ? "" : "s"} in this window.
         </p>
       )}
 
       {data && data.events.length > 0 && (
-        <div className="border-border divide-border divide-y rounded-lg border">
+        <div className="divide-y divide-border rounded-lg border border-border">
           {data.events.map((event) => {
             const heat = HEAT_META[event.heat] ?? {
               label: event.heat,
@@ -641,7 +651,7 @@ function SponsoredAbandonment({ accountId }: { accountId: string }) {
                   <div className="truncate font-medium">
                     {event.email ?? event.userId}
                   </div>
-                  <div className="text-muted-foreground truncate">
+                  <div className="truncate text-muted-foreground">
                     {event.property?.title ?? event.propertyName ?? "—"}
                     {event.checkin && event.checkout
                       ? ` · ${event.checkin} → ${event.checkout}`
@@ -651,7 +661,10 @@ function SponsoredAbandonment({ accountId }: { accountId: string }) {
                 <div className="flex shrink-0 items-center gap-3">
                   {typeof event.value === "number" && (
                     <span className="tabular-nums">
-                      ${event.value.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+                      $
+                      {event.value.toLocaleString("en-US", {
+                        maximumFractionDigits: 0,
+                      })}
                     </span>
                   )}
                   <span className={heat.cls}>{heat.label}</span>
@@ -662,7 +675,7 @@ function SponsoredAbandonment({ accountId }: { accountId: string }) {
         </div>
       )}
 
-      <p className="text-muted-foreground text-xs">
+      <p className="text-xs text-muted-foreground">
         Matched on listing id from the tracked event, never on property name.
         Nothing is sent to Outreach from here yet.
       </p>

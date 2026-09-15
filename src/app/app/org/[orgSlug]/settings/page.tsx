@@ -41,7 +41,7 @@ export default async function OrganizationSettingsPage({
           <h1 className="text-2xl font-bold sm:text-3xl">
             Organization Settings
           </h1>
-          <p className="text-muted-foreground mt-2 text-sm sm:text-base">
+          <p className="mt-2 text-sm text-muted-foreground sm:text-base">
             Manage your organization information and settings.
           </p>
         </div>
@@ -51,7 +51,7 @@ export default async function OrganizationSettingsPage({
           <Card>
             <CardHeader>
               <CardTitle>Organization Logo</CardTitle>
-              <p className="text-muted-foreground text-sm">
+              <p className="text-sm text-muted-foreground">
                 Upload a logo for your organization.
               </p>
             </CardHeader>
@@ -69,7 +69,7 @@ export default async function OrganizationSettingsPage({
           <Card>
             <CardHeader>
               <CardTitle>General Information</CardTitle>
-              <p className="text-muted-foreground text-sm">
+              <p className="text-sm text-muted-foreground">
                 Update your organization&apos;s basic information.
               </p>
             </CardHeader>
@@ -81,10 +81,10 @@ export default async function OrganizationSettingsPage({
           </Card>
 
           {/* Danger Zone */}
-          <Card className="border-destructive">
+          <Card tone="error">
             <CardHeader>
-              <CardTitle className="text-destructive">Danger Zone</CardTitle>
-              <p className="text-muted-foreground text-sm">
+              <CardTitle tone="error">Danger Zone</CardTitle>
+              <p className="text-sm text-muted-foreground">
                 Dangerous actions for your organization.
               </p>
             </CardHeader>

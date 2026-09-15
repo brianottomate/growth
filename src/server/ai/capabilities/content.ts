@@ -1333,7 +1333,12 @@ export const extendCompositionAction = growthAction({
     brandId: z.string().min(1),
     sourceMediaAssetId: z.string().min(1),
     formatId: compositionFormatIdSchema,
-    title: z.string().trim().max(120).optional().describe("The home or subject, for the asset name."),
+    title: z
+      .string()
+      .trim()
+      .max(120)
+      .optional()
+      .describe("The home or subject, for the asset name."),
   }),
   outputSchema: z.object({
     mediaAssetId: z.string(),
@@ -1343,8 +1348,16 @@ export const extendCompositionAction = growthAction({
   }),
   execute: async (input, ctx) => {
     await requireOwnedBrandId(input.brandId, ctx);
-    const result = await extendCompositionSource({ userId: ctx.userId, ...input });
-    return { mediaAssetId: result.id, url: result.url, reused: result.reused, axis: result.axis };
+    const result = await extendCompositionSource({
+      userId: ctx.userId,
+      ...input,
+    });
+    return {
+      mediaAssetId: result.id,
+      url: result.url,
+      reused: result.reused,
+      axis: result.axis,
+    };
   },
 });
 
@@ -1357,7 +1370,8 @@ async function requireOwnedBrandId(brandId: string, ctx: CapabilityContext) {
     ),
     columns: { id: true },
   });
-  if (!brand) throw new Error("That brand is not available in the active organization.");
+  if (!brand)
+    throw new Error("That brand is not available in the active organization.");
   return brand;
 }
 

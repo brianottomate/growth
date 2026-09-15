@@ -159,7 +159,13 @@ export function Audiences({
 
   return (
     <div className="space-y-2">
-      <div className={audiences.length === 0 ? "hidden" : "flex items-center justify-end gap-2"}>
+      <div
+        className={
+          audiences.length === 0
+            ? "hidden"
+            : "flex items-center justify-end gap-2"
+        }
+      >
         <div className="ml-auto">
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -184,7 +190,7 @@ export function Audiences({
                       id="aud-persona"
                       value={personaId}
                       onChange={(event) => applyPersona(event.target.value)}
-                      className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                      className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                     >
                       <option value="">None — from scratch</option>
                       {personas.map((persona) => (
@@ -235,7 +241,7 @@ export function Audiences({
                       onChange={(event) => setCountries(event.target.value)}
                       placeholder="US"
                     />
-                    <p className="text-muted-foreground text-[11px]">
+                    <p className="text-[11px] text-muted-foreground">
                       ISO codes, comma-separated.
                     </p>
                   </div>
@@ -247,7 +253,7 @@ export function Audiences({
                       onChange={(event) => setStates(event.target.value)}
                       placeholder="CO"
                     />
-                    <p className="text-muted-foreground text-[11px]">
+                    <p className="text-[11px] text-muted-foreground">
                       Two-letter codes, as the client&rsquo;s listings state
                       them.
                     </p>
@@ -262,7 +268,7 @@ export function Audiences({
                       onChange={(event) => setRegions(event.target.value)}
                       placeholder="Colorado"
                     />
-                    <p className="text-muted-foreground text-[11px]">
+                    <p className="text-[11px] text-muted-foreground">
                       Resolved to real platform geo keys at push.
                     </p>
                   </div>
@@ -274,21 +280,21 @@ export function Audiences({
                       onChange={(event) => setCities(event.target.value)}
                       placeholder="Winter Park"
                     />
-                    <p className="text-muted-foreground text-[11px]">
+                    <p className="text-[11px] text-muted-foreground">
                       A metro layer, when the state is too wide a buy.
                     </p>
                   </div>
                 </div>
                 {geoPrefill?.states?.length ? (
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-muted-foreground text-[11px]">
+                    <p className="text-[11px] text-muted-foreground">
                       Their homes are in{" "}
                       {(geoPrefill.regions ?? geoPrefill.states).join(", ")}.
                     </p>
                     <button
                       type="button"
                       onClick={applyTheirMarkets}
-                      className="border-border text-muted-foreground hover:text-foreground rounded-full border px-2 py-0.5 text-[11px]"
+                      className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground hover:text-foreground"
                     >
                       Use their markets
                     </button>
@@ -302,7 +308,7 @@ export function Audiences({
                     onChange={(event) => setKeywords(event.target.value)}
                     placeholder="luxury vacation rentals, monthly stays"
                   />
-                  <p className="text-muted-foreground text-[11px]">
+                  <p className="text-[11px] text-muted-foreground">
                     Loose, comma-separated. Google derives its keywords from
                     these; Meta ignores them.
                   </p>
@@ -356,7 +362,7 @@ export function Audiences({
           }
         />
       ) : (
-        <div className="bg-card divide-y divide-white/5 rounded-xl border px-3.5 py-1">
+        <div className="divide-y divide-white/5 rounded-xl border bg-card px-3.5 py-1">
           {audiences.map((row) => (
             <div
               key={row.id}
@@ -366,12 +372,12 @@ export function Audiences({
                 <p className="truncate text-sm font-medium">
                   {row.name}
                   {row.persona && (
-                    <span className="text-muted-foreground ml-1.5 text-xs font-normal">
+                    <span className="ml-1.5 text-xs font-normal text-muted-foreground">
                       · {row.persona.name}
                     </span>
                   )}
                 </p>
-                <p className="text-muted-foreground truncate text-xs">
+                <p className="truncate text-xs text-muted-foreground">
                   {describe(row) || "Broad"}
                 </p>
               </div>
@@ -379,7 +385,8 @@ export function Audiences({
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="text-muted-foreground h-7"
+                  tone="muted"
+                  className="h-7"
                   disabled={remove.isPending}
                   onClick={() => remove.mutate({ audienceId: row.id })}
                 >

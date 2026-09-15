@@ -35,7 +35,7 @@ export default async function LaunchPage({
     <div className="space-y-6">
       <Link
         href="/app/launches"
-        className="text-muted-foreground hover:text-foreground text-xs"
+        className="text-xs text-muted-foreground hover:text-foreground"
       >
         ← Launches
       </Link>

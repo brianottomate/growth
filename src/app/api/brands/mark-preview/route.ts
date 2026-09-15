@@ -37,7 +37,9 @@ export async function GET(request: NextRequest) {
     iconAssetId: params.get("iconAssetId") || undefined,
     iconFrom: params.get("iconFrom") || undefined,
     text: params.get("text") || undefined,
-    fontFamily: params.has("fontFamily") ? params.get("fontFamily")! : undefined,
+    fontFamily: params.has("fontFamily")
+      ? params.get("fontFamily")!
+      : undefined,
     iconScale: params.get("iconScale") || undefined,
     iconShift: params.get("iconShift") || undefined,
     gapScale: params.get("gapScale") || undefined,
@@ -60,7 +62,10 @@ export async function GET(request: NextRequest) {
       })
     : null;
   if (!member) {
-    return NextResponse.json({ error: "No access to this brand" }, { status: 403 });
+    return NextResponse.json(
+      { error: "No access to this brand" },
+      { status: 403 },
+    );
   }
 
   try {
@@ -69,7 +74,9 @@ export async function GET(request: NextRequest) {
       brandId: parsed.data.brandId,
       tone: parsed.data.tone,
       tuning:
-        iconScale !== undefined || iconShift !== undefined || gapScale !== undefined
+        iconScale !== undefined ||
+        iconShift !== undefined ||
+        gapScale !== undefined
           ? {
               iconScale: iconScale ?? 1,
               iconShift: iconShift ?? 0,

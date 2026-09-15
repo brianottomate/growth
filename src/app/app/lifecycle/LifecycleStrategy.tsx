@@ -198,7 +198,7 @@ export function LifecycleStrategy({
   );
 
   if (isLoading) {
-    return <p className="text-muted-foreground mt-8 text-sm">Loading…</p>;
+    return <p className="mt-8 text-sm text-muted-foreground">Loading…</p>;
   }
 
   const allPrograms = [...(data?.programs ?? [])].sort((a, b) => {
@@ -234,7 +234,7 @@ export function LifecycleStrategy({
   return (
     <div>
       <div className="mt-1 flex items-start justify-between">
-        <p className="text-muted-foreground text-sm">
+        <p className="text-sm text-muted-foreground">
           The journeys we <em>want</em> — laid out step by step.{" "}
           {gaps > 0 && (
             <span className="text-red-300">
@@ -279,7 +279,7 @@ export function LifecycleStrategy({
       </div>
 
       {programs.length === 0 && (
-        <div className="text-muted-foreground mt-10 rounded-xl border border-dashed p-8 text-center text-sm">
+        <div className="mt-10 rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
           No programs yet. Add a journey you want to run, then lay out its steps
           — emails, BDR tasks, Slack nudges.
         </div>
@@ -289,7 +289,7 @@ export function LifecycleStrategy({
         {programs.map((p) => {
           const cov = COVERAGE[p.coverage] ?? COVERAGE.gap;
           return (
-            <div key={p.id} className="bg-card rounded-xl border p-4">
+            <div key={p.id} className="rounded-xl border bg-card p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
@@ -299,10 +299,10 @@ export function LifecycleStrategy({
                     >
                       {WORKSPACE_LABEL[p.workspace] ?? p.workspace}
                     </span>
-                    <span className="border-border text-muted-foreground rounded-full border px-1.5 py-0.5 text-[10px] font-medium">
+                    <span className="rounded-full border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
                       {KIND_LABEL[p.kind] ?? p.kind}
                     </span>
-                    <span className="text-muted-foreground text-[10px] tracking-wide uppercase">
+                    <span className="text-[10px] tracking-wide text-muted-foreground uppercase">
                       {PRIORITY_LABEL[p.priority] ?? p.priority}
                     </span>
                     <span
@@ -319,12 +319,12 @@ export function LifecycleStrategy({
                     </span>
                   </div>
                   {p.description && (
-                    <p className="text-muted-foreground mt-1 text-sm">
+                    <p className="mt-1 text-sm text-muted-foreground">
                       {p.description}
                     </p>
                   )}
                   {p.intendedTrigger && (
-                    <div className="text-muted-foreground mt-1.5 text-[11px]">
+                    <div className="mt-1.5 text-[11px] text-muted-foreground">
                       ⚡ {p.intendedTrigger}
                     </div>
                   )}
@@ -401,7 +401,7 @@ export function LifecycleStrategy({
                           <button
                             type="button"
                             onClick={toggleAll}
-                            className="text-muted-foreground hover:text-foreground text-[11px]"
+                            className="text-[11px] text-muted-foreground hover:text-foreground"
                           >
                             {allOpen ? "Collapse all" : "Open all bodies"}
                           </button>
@@ -417,13 +417,13 @@ export function LifecycleStrategy({
                               depth > 0 ? { marginLeft: depth * 24 } : undefined
                             }
                           >
-                            <div className="bg-background/50 group flex items-center gap-2.5 rounded-lg border px-2.5 py-1.5">
+                            <div className="group flex items-center gap-2.5 rounded-lg border bg-background/50 px-2.5 py-1.5">
                               {depth === 0 ? (
-                                <span className="text-muted-foreground w-4 text-center text-[11px] tabular-nums">
+                                <span className="w-4 text-center text-[11px] text-muted-foreground tabular-nums">
                                   {++mainIdx}
                                 </span>
                               ) : (
-                                <CornerDownRight className="text-muted-foreground size-3.5 w-4 shrink-0" />
+                                <CornerDownRight className="size-3.5 w-4 shrink-0 text-muted-foreground" />
                               )}
                               <span
                                 className={`size-2 shrink-0 rounded-full ${(STEP_STATUS[s.status] ?? STEP_STATUS.planned).dot}`}
@@ -432,11 +432,11 @@ export function LifecycleStrategy({
                                     .title
                                 }
                               />
-                              <span className="border-border text-muted-foreground rounded border px-1.5 py-0.5 text-[10px] font-medium">
+                              <span className="rounded border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
                                 {CHANNEL_LABEL[s.channel] ?? s.channel}
                               </span>
                               {s.system && (
-                                <span className="bg-accent rounded px-1.5 py-0.5 text-[10px] font-medium">
+                                <span className="rounded bg-accent px-1.5 py-0.5 text-[10px] font-medium">
                                   {SYSTEM_LABEL[s.system] ?? s.system}
                                 </span>
                               )}
@@ -444,7 +444,7 @@ export function LifecycleStrategy({
                                 <button
                                   type="button"
                                   onClick={() => toggleBody(s.id)}
-                                  className="hover:text-foreground flex min-w-0 items-center gap-1 text-left text-sm"
+                                  className="flex min-w-0 items-center gap-1 text-left text-sm hover:text-foreground"
                                   title="Show subject + body"
                                 >
                                   {open ? (
@@ -460,12 +460,12 @@ export function LifecycleStrategy({
                                 </span>
                               )}
                               {depth > 0 && s.branchLabel && (
-                                <span className="text-muted-foreground rounded border border-dashed px-1.5 py-0.5 text-[10px] italic">
+                                <span className="rounded border border-dashed px-1.5 py-0.5 text-[10px] text-muted-foreground italic">
                                   {s.branchLabel}
                                 </span>
                               )}
                               {formatDelay(s.delayMinutes, s.delayLabel) && (
-                                <span className="text-muted-foreground text-[11px]">
+                                <span className="text-[11px] text-muted-foreground">
                                   {formatDelay(s.delayMinutes, s.delayLabel)}
                                 </span>
                               )}
@@ -483,7 +483,7 @@ export function LifecycleStrategy({
                               )}
                               {s.campaign && (
                                 <span
-                                  className="text-muted-foreground ml-1 flex items-center gap-1 text-[10px]"
+                                  className="ml-1 flex items-center gap-1 text-[10px] text-muted-foreground"
                                   title={`Delivered by ${s.campaign.name}`}
                                 >
                                   <span
@@ -532,14 +532,14 @@ export function LifecycleStrategy({
                               </div>
                             </div>
                             {open && hasContent && (
-                              <div className="bg-background/30 mt-1 ml-6 rounded-lg border px-3 py-2 text-xs">
+                              <div className="mt-1 ml-6 rounded-lg border bg-background/30 px-3 py-2 text-xs">
                                 {s.subject && (
-                                  <div className="text-foreground/90 font-medium">
+                                  <div className="font-medium text-foreground/90">
                                     Subject: {s.subject}
                                   </div>
                                 )}
                                 {s.body && (
-                                  <pre className="text-muted-foreground mt-1 font-sans whitespace-pre-wrap">
+                                  <pre className="mt-1 font-sans whitespace-pre-wrap text-muted-foreground">
                                     {s.body}
                                   </pre>
                                 )}
@@ -555,7 +555,8 @@ export function LifecycleStrategy({
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="text-muted-foreground h-8 w-full justify-start"
+                  tone="muted"
+                  className="h-8 w-full justify-start"
                   onClick={() => openAddStep(p.id)}
                 >
                   <Plus className="size-3.5" />

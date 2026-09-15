@@ -105,7 +105,11 @@ async function resolveRef(
       columns: { id: true, title: true },
     });
     return row
-      ? { ...base, label: row.title ?? "Untitled idea", href: `/app/content?post=${row.id}` }
+      ? {
+          ...base,
+          label: row.title ?? "Untitled idea",
+          href: `/app/content?post=${row.id}`,
+        }
       : { ...base, label: ref.label ?? null, href: null, missing: true };
   }
   if (ref.kind === "email_document") {
@@ -114,7 +118,11 @@ async function resolveRef(
       columns: { id: true, subject: true },
     });
     return row
-      ? { ...base, label: row.subject || "Untitled email", href: `/app/newsletters` }
+      ? {
+          ...base,
+          label: row.subject || "Untitled email",
+          href: `/app/newsletters`,
+        }
       : { ...base, label: ref.label ?? null, href: null, missing: true };
   }
   if (ref.kind === "production_packet") {
@@ -199,9 +207,12 @@ export function nextMoves(
   deliverables: LaunchDeliverable[],
 ): string[] {
   const moves: string[] = [];
-  if (!brief.oneLine) moves.push("Write the one line (140 characters, benefit first).");
+  if (!brief.oneLine)
+    moves.push("Write the one line (140 characters, benefit first).");
   if (!brief.changelogEntry)
-    moves.push("Write the changelog entry. If it is hard to write, the scope is wrong.");
+    moves.push(
+      "Write the changelog entry. If it is hard to write, the scope is wrong.",
+    );
   if (brief.claims.length === 0) moves.push("Add up to three provable claims.");
   const unowned = deliverables.filter((d) => !d.ownerName && !d.ownerId);
   if (unowned.length > 0)
@@ -210,7 +221,9 @@ export function nextMoves(
     );
   const undated = deliverables.filter((d) => d.ownerName && !d.readyBy);
   if (undated.length > 0)
-    moves.push(`Set a ready-by date for ${undated.map((d) => d.surface).join(", ")}.`);
+    moves.push(
+      `Set a ready-by date for ${undated.map((d) => d.surface).join(", ")}.`,
+    );
   return moves;
 }
 

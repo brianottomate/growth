@@ -214,10 +214,10 @@ export function OnDemandTile({
     >
       {variant === "canvas" ? (
         <div className="flex flex-col gap-1">
-          <p className="text-muted-foreground/70 text-[10px] whitespace-nowrap">
+          <p className="text-[10px] whitespace-nowrap text-muted-foreground/70">
             {format.label} · {format.width}×{format.height}
           </p>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {/* oxlint-disable-next-line nextjs/no-img-element */}
           <img
             src={compositionPreviewUrl(shown)}
             alt={`${home.name}, ${format.label}`}
@@ -249,7 +249,7 @@ export function OnDemandTile({
       )}
       <div
         className={cn(
-          "text-muted-foreground flex w-full flex-col gap-1 text-[11px]",
+          "flex w-full flex-col gap-1 text-[11px] text-muted-foreground",
           variant === "mock" && "max-w-80",
         )}
       >

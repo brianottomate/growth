@@ -65,7 +65,7 @@ export function RadioGroupCardsField<
         <FormItem className={cn("space-y-3", className)}>
           {label && <FormLabel>{label}</FormLabel>}
           {description && (
-            <p className="text-muted-foreground text-sm">{description}</p>
+            <p className="text-sm text-muted-foreground">{description}</p>
           )}
           <FormControl>
             <RadioGroup
@@ -80,8 +80,8 @@ export function RadioGroupCardsField<
                       htmlFor={`radio-${option.value}`}
                       className={cn(
                         layout === "grid"
-                          ? "border-input hover:border-ring focus-within:border-ring focus-within:ring-ring/50 has-[:checked]:border-primary has-[:checked]:bg-primary/5 has-[:checked]:ring-primary/20 has-[*[data-state=checked]]:border-primary has-[*[data-state=checked]]:bg-primary/5 has-[*[data-state=checked]]:ring-primary/20 relative flex min-h-[80px] cursor-pointer items-start gap-3 rounded-lg border p-4 shadow-sm transition-all focus-within:ring-[3px] has-[*[data-state=checked]]:ring-[3px] has-[:checked]:ring-[3px]"
-                          : "border-input hover:border-ring focus-within:border-ring focus-within:ring-ring/50 has-[:checked]:border-primary has-[:checked]:bg-primary/5 has-[:checked]:ring-primary/20 has-[*[data-state=checked]]:border-primary has-[*[data-state=checked]]:bg-primary/5 has-[*[data-state=checked]]:ring-primary/20 relative flex cursor-pointer items-center gap-3 rounded-lg border p-4 shadow-sm transition-all focus-within:ring-[3px] has-[*[data-state=checked]]:ring-[3px] has-[:checked]:ring-[3px]",
+                          ? "relative flex min-h-[80px] cursor-pointer items-start gap-3 rounded-lg border border-input p-4 shadow-sm transition-all focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 hover:border-ring has-[*[data-state=checked]]:border-primary has-[*[data-state=checked]]:bg-primary/5 has-[*[data-state=checked]]:ring-[3px] has-[*[data-state=checked]]:ring-primary/20 has-[:checked]:border-primary has-[:checked]:bg-primary/5 has-[:checked]:ring-[3px] has-[:checked]:ring-primary/20"
+                          : "relative flex cursor-pointer items-center gap-3 rounded-lg border border-input p-4 shadow-sm transition-all focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 hover:border-ring has-[*[data-state=checked]]:border-primary has-[*[data-state=checked]]:bg-primary/5 has-[*[data-state=checked]]:ring-[3px] has-[*[data-state=checked]]:ring-primary/20 has-[:checked]:border-primary has-[:checked]:bg-primary/5 has-[:checked]:ring-[3px] has-[:checked]:ring-primary/20",
                         cardClassName,
                       )}
                     >
@@ -105,7 +105,7 @@ export function RadioGroupCardsField<
                           {option.description && (
                             <p
                               className={cn(
-                                "text-muted-foreground text-xs",
+                                "text-xs text-muted-foreground",
                                 layout === "grid" ? "leading-relaxed" : "",
                               )}
                             >
@@ -115,7 +115,7 @@ export function RadioGroupCardsField<
                         </div>
                       </div>
                       {option.icon && (
-                        <div className="text-muted-foreground absolute top-3 right-3 flex size-6 shrink-0 items-center justify-center">
+                        <div className="absolute top-3 right-3 flex size-6 shrink-0 items-center justify-center text-muted-foreground">
                           {option.icon}
                         </div>
                       )}

@@ -52,10 +52,9 @@ interface PostData {
 }
 
 async function fetchSubreddit(sub: string): Promise<PostData[]> {
-  const res = await fetch(
-    `https://www.reddit.com/r/${sub}/new.json?limit=25`,
-    { headers: { "User-Agent": USER_AGENT } },
-  );
+  const res = await fetch(`https://www.reddit.com/r/${sub}/new.json?limit=25`, {
+    headers: { "User-Agent": USER_AGENT },
+  });
   if (!res.ok) {
     console.warn(`r/${sub} failed: ${res.status}`);
     return [];
@@ -72,14 +71,18 @@ function formatPostForLLM(p: PostData): string {
     `id: ${p.id}`,
     `sub: r/${p.subreddit}`,
     `title: ${p.title}`,
-    body ? `body: ${body}${p.selftext.length > 600 ? "…" : ""}` : "body: (link post)",
+    body
+      ? `body: ${body}${p.selftext.length > 600 ? "…" : ""}`
+      : "body: (link post)",
   ].join("\n");
 }
 
 console.log("Fetching Tier 1 subreddits…");
 const fetched = await Promise.all(SUBREDDITS.map(fetchSubreddit));
 const posts = fetched.flat();
-console.log(`Fetched ${posts.length} posts across ${SUBREDDITS.length} subs.\n`);
+console.log(
+  `Fetched ${posts.length} posts across ${SUBREDDITS.length} subs.\n`,
+);
 
 console.log("Scoring with Claude Sonnet 4.6…");
 const start = Date.now();

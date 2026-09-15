@@ -133,8 +133,12 @@ export const funnelStateTable = pgTable(
     uniqueIndex("funnel_state_user_idx").on(table.userId),
     index("funnel_state_email_idx").on(table.email),
     // Sponsored-property lookups join on these.
-    index("funnel_state_checkout_property_idx").on(table.lastCheckoutPropertyId),
-    index("funnel_state_wishlist_property_idx").on(table.lastWishlistPropertyId),
+    index("funnel_state_checkout_property_idx").on(
+      table.lastCheckoutPropertyId,
+    ),
+    index("funnel_state_wishlist_property_idx").on(
+      table.lastWishlistPropertyId,
+    ),
     // The sweep filters on stage timestamps; keep them indexed.
     index("funnel_state_last_search_ts_idx").on(table.lastSearchTs),
     index("funnel_state_last_wishlist_ts_idx").on(table.lastWishlistTs),

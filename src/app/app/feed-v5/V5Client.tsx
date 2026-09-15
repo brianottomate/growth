@@ -449,7 +449,7 @@ export function V5Client({
     }
     const dayList = [...daySet].sort((a, b) => (a < b ? 1 : -1)); // desc
     return { days: dayList, cells: cellMap, weekLane: weekMap };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
   }, [windowed, axis, now]);
 
   const selectedEntries = useMemo(
@@ -499,7 +499,7 @@ export function V5Client({
         : e.seriesName === focus.key;
   const focusCount = useMemo(
     () => (focus ? windowed.filter(inFocus).length : 0),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
     [focus, windowed],
   );
 
@@ -529,7 +529,7 @@ export function V5Client({
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Timeline</h1>
-            <p className="text-muted-foreground mt-1 text-sm">
+            <p className="mt-1 text-sm text-muted-foreground">
               {windowed.length} posts · {lanes.length} lanes · {days.length}{" "}
               days
               {hasOlder && (
@@ -556,7 +556,7 @@ export function V5Client({
                 <X className="size-3.5" />
               </button>
             )}
-            <span className="text-muted-foreground ml-1 text-xs">Lanes</span>
+            <span className="ml-1 text-xs text-muted-foreground">Lanes</span>
             <Segmented
               value={axis}
               onChange={setAxis}
@@ -566,7 +566,7 @@ export function V5Client({
                 { value: "channel", label: "Channel" },
               ]}
             />
-            <span className="text-muted-foreground ml-1 text-xs">Group</span>
+            <span className="ml-1 text-xs text-muted-foreground">Group</span>
             <Segmented
               value={cellMode}
               onChange={setCellMode}
@@ -575,7 +575,7 @@ export function V5Client({
                 { value: "channel", label: "Channels" },
               ]}
             />
-            <span className="text-muted-foreground ml-1 text-xs">View</span>
+            <span className="ml-1 text-xs text-muted-foreground">View</span>
             <Segmented
               value={metricsMode}
               onChange={setMetricsMode}
@@ -589,13 +589,13 @@ export function V5Client({
 
         {/* Brand filter chips */}
         <div className="mt-4 flex flex-wrap items-center gap-1.5 border-b pb-4">
-          <span className="text-muted-foreground mr-1 text-xs">Brands</span>
+          <span className="mr-1 text-xs text-muted-foreground">Brands</span>
           <button
             onClick={() => setBrandSel(new Set(brands.map((b) => b.id)))}
             className={cn(
               "rounded-full border px-2 py-0.5 text-xs transition-colors",
               allBrandsOn
-                ? "bg-foreground text-background border-foreground"
+                ? "border-foreground bg-foreground text-background"
                 : "border-border text-muted-foreground hover:bg-accent",
             )}
           >
@@ -609,11 +609,11 @@ export function V5Client({
                 ),
               )
             }
-            className="border-border text-muted-foreground hover:bg-accent rounded-full border px-2 py-0.5 text-xs transition-colors"
+            className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-accent"
           >
             Only owned
           </button>
-          <span className="bg-border mx-1 h-4 w-px" />
+          <span className="mx-1 h-4 w-px bg-border" />
           {ownedFirst.map((b) => {
             const on = brandSel.has(b.id);
             return (
@@ -647,7 +647,7 @@ export function V5Client({
               </button>
             );
           })}
-          <span className="bg-border mx-1 h-4 w-px" />
+          <span className="mx-1 h-4 w-px bg-border" />
           <FilterSelect
             value={statusFilter}
             onChange={setStatusFilter}
@@ -681,7 +681,7 @@ export function V5Client({
         <MetricsCtx.Provider value={metricsMode === "performance"}>
           <div ref={ref} style={style} className="mt-5 px-8 sm:px-0">
             {lanes.length === 0 ? (
-              <p className="text-muted-foreground py-12 text-center text-sm">
+              <p className="py-12 text-center text-sm text-muted-foreground">
                 No lanes — turn on a brand above.
               </p>
             ) : (
@@ -693,7 +693,7 @@ export function V5Client({
                   }}
                 >
                   {/* Header row — sticks to the top; corner sticks to top+left. */}
-                  <div className="bg-muted sticky top-0 left-0 z-30 border-r border-b" />
+                  <div className="sticky top-0 left-0 z-30 border-r border-b bg-muted" />
                   {lanes.map((l) => (
                     <LaneHeader key={l.key} lane={l} />
                   ))}
@@ -719,7 +719,7 @@ export function V5Client({
                       <Fragment key={dk}>
                         {newMonth && (
                           <div
-                            className="bg-muted/60 border-y backdrop-blur-sm"
+                            className="border-y bg-muted/60 backdrop-blur-sm"
                             style={{ gridColumn: "1 / -1" }}
                           >
                             <span className="sticky left-0 inline-block px-2 py-1 text-xs font-semibold">
@@ -729,17 +729,17 @@ export function V5Client({
                         )}
                         <div
                           className={cn(
-                            "bg-muted sticky left-0 z-10 flex flex-col justify-start border-r border-b p-2 text-xs",
+                            "sticky left-0 z-10 flex flex-col justify-start border-r border-b bg-muted p-2 text-xs",
                             isToday && "!bg-emerald-500/15",
                           )}
                         >
-                          <span className="text-muted-foreground text-[10px]">
+                          <span className="text-[10px] text-muted-foreground">
                             {fmtWeekday(date)}
                           </span>
                           <span className="text-sm leading-tight font-semibold">
                             {date.getDate()}
                           </span>
-                          <span className="text-muted-foreground/60 text-[10px] tabular-nums">
+                          <span className="text-[10px] text-muted-foreground/60 tabular-nums">
                             {date.toLocaleDateString([], { month: "short" })}{" "}
                             {date.getFullYear()} · W{isoWeek(date)}
                           </span>
@@ -780,7 +780,7 @@ export function V5Client({
                     >
                       <button
                         onClick={() => setPastMonths((p) => p + 3)}
-                        className="border-border hover:bg-accent sticky left-3 rounded-full border px-4 py-1.5 text-xs font-medium transition-colors"
+                        className="sticky left-3 rounded-full border border-border px-4 py-1.5 text-xs font-medium transition-colors hover:bg-accent"
                       >
                         Load 3 more months back ↓
                       </button>
@@ -795,14 +795,14 @@ export function V5Client({
         {/* Selection action bar */}
         {selected.size > 0 && (
           <div className="fixed inset-x-0 bottom-6 z-30 flex justify-center px-4">
-            <div className="bg-card flex items-center gap-2 rounded-full border px-3 py-2 shadow-lg">
+            <div className="flex items-center gap-2 rounded-full border bg-card px-3 py-2 shadow-lg">
               <span className="px-1 text-sm font-medium">
                 {selected.size} selected
               </span>
-              <span className="bg-border h-5 w-px" />
+              <span className="h-5 w-px bg-border" />
               <button
                 onClick={() => setGroupOpen(true)}
-                className="hover:bg-accent flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition-colors"
+                className="flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition-colors hover:bg-accent"
               >
                 <Layers className="size-4" /> Group
               </button>
@@ -814,7 +814,7 @@ export function V5Client({
               </button>
               <button
                 onClick={() => setSelected(new Set())}
-                className="text-muted-foreground hover:text-foreground flex size-7 items-center justify-center rounded-full transition-colors"
+                className="flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
                 aria-label="Clear selection"
               >
                 <X className="size-4" />
@@ -829,17 +829,17 @@ export function V5Client({
           onOpenChange={setGroupOpen}
           title="Group into a content idea"
         >
-          <p className="text-muted-foreground text-sm">
+          <p className="text-sm text-muted-foreground">
             {selected.size} post{selected.size === 1 ? "" : "s"} → one content
             idea on the board.
           </p>
           <label className="mt-3 block">
-            <span className="text-muted-foreground text-xs">Title</span>
+            <span className="text-xs text-muted-foreground">Title</span>
             <input
               value={groupTitle}
               onChange={(e) => setGroupTitle(e.target.value)}
               placeholder="e.g. World Cup 2026 push"
-              className="border-border bg-background mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
+              className="mt-1 w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
             />
           </label>
           <div className="mt-3 flex gap-2">
@@ -868,7 +868,7 @@ export function V5Client({
           <div className="mt-4 flex items-center justify-end gap-2">
             <button
               onClick={() => setGroupOpen(false)}
-              className="text-muted-foreground hover:bg-accent rounded-md px-3 py-1.5 text-sm transition-colors"
+              className="rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent"
             >
               Cancel
             </button>
@@ -907,7 +907,7 @@ export function V5Client({
 function LaneHeader({ lane }: { lane: Lane }) {
   return (
     <div
-      className="bg-muted sticky top-0 z-20 flex items-center gap-1.5 border-r border-b px-2 py-2 text-xs font-medium [&:nth-last-child(1)]:border-r-0"
+      className="sticky top-0 z-20 flex items-center gap-1.5 border-r border-b bg-muted px-2 py-2 text-xs font-medium [&:nth-last-child(1)]:border-r-0"
       style={
         lane.color ? { borderBottom: `2px solid ${lane.color}` } : undefined
       }
@@ -915,7 +915,7 @@ function LaneHeader({ lane }: { lane: Lane }) {
       {lane.platform ? (
         <ChannelLogo platform={lane.platform} className="size-4 shrink-0" />
       ) : lane.logo ? (
-        // eslint-disable-next-line @next/next/no-img-element
+        // oxlint-disable-next-line nextjs/no-img-element
         <img
           src={lane.logo}
           alt=""
@@ -941,18 +941,18 @@ function StrategyRow({
   const monday = new Date(`${weekKey}T00:00:00`);
   return (
     <Fragment>
-      <div className="bg-muted/40 sticky left-0 z-10 flex flex-col justify-center border-y-2 border-r p-2">
-        <span className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
+      <div className="sticky left-0 z-10 flex flex-col justify-center border-y-2 border-r bg-muted/40 p-2">
+        <span className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
           Week
         </span>
-        <span className="text-muted-foreground/70 text-[10px]">
+        <span className="text-[10px] text-muted-foreground/70">
           of {fmtDay(monday)}
         </span>
       </div>
       {lanes.map((l) => (
         <div
           key={l.key}
-          className="bg-muted/20 border-y-2 border-r [&:nth-last-child(1)]:border-r-0"
+          className="border-y-2 border-r bg-muted/20 [&:nth-last-child(1)]:border-r-0"
         >
           <StrategyCell entries={weekLane.get(`${weekKey}|${l.key}`) ?? []} />
         </div>
@@ -992,7 +992,7 @@ function StrategyCell({ entries }: { entries: V5Entry[] }) {
       : null;
   return (
     <div className="flex items-center gap-2 px-3 py-1.5">
-      <span className="text-muted-foreground shrink-0 text-[11px] tabular-nums">
+      <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
         {total || "—"}
       </span>
       {metrics && total > 0 && (
@@ -1001,7 +1001,7 @@ function StrategyCell({ entries }: { entries: V5Entry[] }) {
             {fmtNum(totalEng)}
           </span>
           {best && engagementLabel(best) && (
-            <span className="text-muted-foreground truncate">
+            <span className="truncate text-muted-foreground">
               · top {engagementLabel(best)}
             </span>
           )}
@@ -1013,7 +1013,7 @@ function StrategyCell({ entries }: { entries: V5Entry[] }) {
             counts[i] === 0 ? (
               <span
                 key={f.id}
-                className="bg-muted-foreground/25 size-[3px] rounded-full"
+                className="size-[3px] rounded-full bg-muted-foreground/25"
               />
             ) : (
               <span
@@ -1043,7 +1043,7 @@ function StrategyCell({ entries }: { entries: V5Entry[] }) {
         </span>
       )}
       {open > 0 && (
-        <span className="border-border text-muted-foreground ml-auto shrink-0 rounded-full border border-dashed px-1.5 text-[10px] font-medium">
+        <span className="ml-auto shrink-0 rounded-full border border-dashed border-border px-1.5 text-[10px] font-medium text-muted-foreground">
           {open} open
         </span>
       )}
@@ -1132,7 +1132,7 @@ function Cell({
       ) : (
         channelGroups(entries).map((cg) => (
           <div key={cg.platform} className="flex flex-col gap-1">
-            <span className="text-muted-foreground flex items-center gap-1 text-[10px] font-medium">
+            <span className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
               <ChannelLogo platform={cg.platform} className="size-3" />
               {platformLabel(cg.platform)} · {cg.entries.length}
             </span>
@@ -1198,7 +1198,7 @@ function IdeaTray({
   ];
   return (
     <div
-      className="bg-card/50 rounded-md border"
+      className="rounded-md border bg-card/50"
       style={pillar ? { borderLeft: `2px solid ${pillar.color}` } : undefined}
     >
       <button
@@ -1206,7 +1206,7 @@ function IdeaTray({
           first.contentPostId && onFocusIdea(first.contentPostId, title)
         }
         title="Focus this idea across the board"
-        className="hover:text-foreground/80 flex w-full items-start px-1.5 pt-1.5 text-left"
+        className="flex w-full items-start px-1.5 pt-1.5 text-left hover:text-foreground/80"
       >
         <span className="line-clamp-2 min-w-0 flex-1 text-xs leading-tight font-medium break-words">
           {title}
@@ -1221,11 +1221,11 @@ function IdeaTray({
           />
         )}
         {formats.length > 0 && (
-          <span className="text-muted-foreground text-[10px]">
+          <span className="text-[10px] text-muted-foreground">
             {formats.join(" · ")}
           </span>
         )}
-        <span className="text-muted-foreground/60 ml-auto text-[10px] tabular-nums">
+        <span className="ml-auto text-[10px] text-muted-foreground/60 tabular-nums">
           {group.entries.length} spots
         </span>
       </div>
@@ -1271,7 +1271,7 @@ function SpotThumb({
         "group relative size-14 cursor-pointer overflow-hidden rounded",
         selected
           ? "ring-2 ring-emerald-500"
-          : "hover:ring-foreground/30 hover:ring-1",
+          : "hover:ring-1 hover:ring-foreground/30",
         repost && "opacity-50",
       )}
     >
@@ -1311,7 +1311,7 @@ function SpotThumb({
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
           title="Open original"
-          className="bg-card/80 text-muted-foreground hover:text-foreground absolute right-0.5 bottom-0.5 flex size-4 items-center justify-center rounded opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100"
+          className="absolute right-0.5 bottom-0.5 flex size-4 items-center justify-center rounded bg-card/80 text-muted-foreground opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 hover:text-foreground"
         >
           <ExternalLink className="size-2.5" />
         </a>
@@ -1352,7 +1352,7 @@ function SpotCard({
       }}
       title={label}
       className={cn(
-        "group bg-card relative flex h-full cursor-pointer flex-col overflow-hidden rounded-md border text-left text-xs transition-colors",
+        "group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-md border bg-card text-left text-xs transition-colors",
         selected ? "ring-2 ring-emerald-500" : "hover:border-foreground/30",
         repost && "opacity-60",
       )}
@@ -1396,7 +1396,7 @@ function SpotCard({
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
           title="Open original"
-          className="bg-card/80 text-muted-foreground hover:text-foreground absolute right-1 bottom-[3.25rem] flex size-5 items-center justify-center rounded border opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100"
+          className="absolute right-1 bottom-[3.25rem] flex size-5 items-center justify-center rounded border bg-card/80 text-muted-foreground opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 hover:text-foreground"
         >
           <ExternalLink className="size-3" />
         </a>
@@ -1448,7 +1448,7 @@ function SeriesChip({
         onClick();
       }}
       title={`Focus series: ${name}`}
-      className="hover:bg-accent flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium"
+      className="flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium hover:bg-accent"
       style={color ? { borderColor: color } : undefined}
     >
       <span
@@ -1481,11 +1481,11 @@ function Poster({
     return (
       <span
         className={cn(
-          "bg-muted relative shrink-0 overflow-hidden",
+          "relative shrink-0 overflow-hidden bg-muted",
           className ?? "size-8 rounded",
         )}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {/* oxlint-disable-next-line nextjs/no-img-element */}
         <img
           src={src}
           alt=""
@@ -1501,7 +1501,7 @@ function Poster({
   return (
     <span
       className={cn(
-        "from-muted to-muted/30 text-muted-foreground/40 relative flex shrink-0 items-center justify-center overflow-hidden bg-gradient-to-br",
+        "relative flex shrink-0 items-center justify-center overflow-hidden bg-gradient-to-br from-muted to-muted/30 text-muted-foreground/40",
         className ?? "size-8 rounded",
       )}
     >
@@ -1580,7 +1580,7 @@ function Segmented<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="border-border flex overflow-hidden rounded-full border">
+    <div className="flex overflow-hidden rounded-full border border-border">
       {options.map((o) => (
         <button
           key={o.value}

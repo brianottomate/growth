@@ -24,13 +24,13 @@ export function BriefOverview({
   ].filter((field) => field.value?.trim());
 
   return (
-    <section className="bg-card mt-5 rounded-xl border p-4">
+    <section className="mt-5 rounded-xl border bg-card p-4">
       <div className="flex flex-wrap items-center gap-3">
-        <h2 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+        <h2 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
           Working brief
         </h2>
         {plannedAt && (
-          <span className="text-muted-foreground ml-auto text-xs">
+          <span className="ml-auto text-xs text-muted-foreground">
             Planned{" "}
             {plannedAt.toLocaleDateString([], {
               month: "short",
@@ -40,7 +40,7 @@ export function BriefOverview({
         )}
       </div>
       {fields.length === 0 ? (
-        <p className="text-muted-foreground mt-3 text-sm">
+        <p className="mt-3 text-sm text-muted-foreground">
           No brief yet. Use the assistant to shape the hook, message, visual,
           and CTA.
         </p>
@@ -49,9 +49,9 @@ export function BriefOverview({
           {fields.map((field) => (
             <div
               key={field.label}
-              className="bg-background rounded-lg border px-3 py-2.5"
+              className="rounded-lg border bg-background px-3 py-2.5"
             >
-              <dt className="text-muted-foreground text-[10px] font-medium tracking-wide uppercase">
+              <dt className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
                 {field.label}
               </dt>
               <dd className="mt-1 text-sm leading-relaxed whitespace-pre-wrap">

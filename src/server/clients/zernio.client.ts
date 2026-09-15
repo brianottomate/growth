@@ -179,7 +179,8 @@ export async function createZernioProfile(input: {
 // https://docs.zernio.com/connect
 
 export type ZernioConnectPlatform =
-  { kind: "posting"; platform: string } | { kind: "ads"; platform: string };
+  | { kind: "posting"; platform: string }
+  | { kind: "ads"; platform: string };
 
 export async function getZernioConnectUrl(input: {
   target: ZernioConnectPlatform;

@@ -267,7 +267,7 @@ export function BrandChannels({
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5 text-[11px]">
-          <span className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
+          <span className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
             Channels{total > 0 && ` · ${total}`}
           </span>
           {reach > 0 && (
@@ -276,7 +276,7 @@ export function BrandChannels({
             </span>
           )}
           {(discoveredCount > 0 || suggestions.length > 0) && (
-            <span className="text-muted-foreground inline-flex items-center gap-1.5">
+            <span className="inline-flex items-center gap-1.5 text-muted-foreground">
               <span className="size-1.5 rounded-full bg-sky-400" />
               discovered, unconfirmed
             </span>
@@ -292,7 +292,7 @@ export function BrandChannels({
       </div>
 
       {total === 0 ? (
-        <p className="text-muted-foreground text-xs">
+        <p className="text-xs text-muted-foreground">
           No channels yet. Find public profiles or connect Zernio from the menu,
           or add one by hand.
         </p>
@@ -307,7 +307,7 @@ export function BrandChannels({
             return (
               <div
                 key={c.id}
-                className="group bg-background/40 hover:border-foreground/20 flex items-center gap-2.5 rounded-xl border px-3 py-2.5 transition-colors"
+                className="group flex items-center gap-2.5 rounded-xl border bg-background/40 px-3 py-2.5 transition-colors hover:border-foreground/20"
               >
                 <ChannelLogo platform={c.platform} className="size-5" />
                 <button
@@ -325,7 +325,7 @@ export function BrandChannels({
                       />
                     )}
                   </span>
-                  <span className="text-muted-foreground block truncate text-[11px]">
+                  <span className="block truncate text-[11px] text-muted-foreground">
                     {c.kind === "ad" ? (
                       <>
                         <span
@@ -344,7 +344,8 @@ export function BrandChannels({
                         handle,
                         c.followerCount != null &&
                           compactFmt.format(c.followerCount),
-                        posts > 0 && `${posts} ${posts === 1 ? "post" : "posts"}`,
+                        posts > 0 &&
+                          `${posts} ${posts === 1 ? "post" : "posts"}`,
                       ]
                         .filter(Boolean)
                         .join(" · ") ||
@@ -358,7 +359,7 @@ export function BrandChannels({
                     target="_blank"
                     rel="noopener noreferrer"
                     title={c.profileUrl ? "Open page" : "Open manage page"}
-                    className="text-muted-foreground hover:text-foreground shrink-0 rounded p-1"
+                    className="shrink-0 rounded p-1 text-muted-foreground hover:text-foreground"
                   >
                     <ExternalLink className="size-3.5" />
                   </a>
@@ -372,7 +373,7 @@ export function BrandChannels({
             return (
               <div
                 key={s.id}
-                className="border-sky-400/40 bg-sky-400/5 flex items-center gap-2.5 rounded-xl border border-dashed px-3 py-2.5"
+                className="flex items-center gap-2.5 rounded-xl border border-dashed border-sky-400/40 bg-sky-400/5 px-3 py-2.5"
               >
                 <ChannelLogo platform={s.platform} className="size-5" />
                 <span className="min-w-0 flex-1">
@@ -380,7 +381,7 @@ export function BrandChannels({
                     {platformLabel(s.platform)}
                     <span className="size-1.5 rounded-full bg-sky-400" />
                   </span>
-                  <span className="text-muted-foreground block truncate text-[11px]">
+                  <span className="block truncate text-[11px] text-muted-foreground">
                     {s.profileUrl ? (
                       <a
                         href={s.profileUrl}
@@ -404,7 +405,8 @@ export function BrandChannels({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="text-muted-foreground hover:text-destructive size-6 shrink-0"
+                  tone="muted-danger"
+                  className="size-6 shrink-0"
                   title="Reject"
                   disabled={rowBusy}
                   onClick={() => rejectM.mutate({ id: s.id })}
@@ -430,7 +432,9 @@ export function BrandChannels({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{form.id ? "Edit channel" : "Add channel"}</DialogTitle>
+            <DialogTitle>
+              {form.id ? "Edit channel" : "Add channel"}
+            </DialogTitle>
           </DialogHeader>
 
           <Tabs
@@ -444,7 +448,7 @@ export function BrandChannels({
                 <TabsTrigger value="followers">
                   Followers
                   {form.followerHistory.length > 0 && (
-                    <span className="text-muted-foreground ml-1 text-[11px] tabular-nums">
+                    <span className="ml-1 text-[11px] text-muted-foreground tabular-nums">
                       {followerFmt.format(
                         latestCount(form.followerHistory) ?? 0,
                       )}
@@ -513,7 +517,7 @@ export function BrandChannels({
                   }
                   placeholder="https://…/profile.jpg"
                 />
-                <p className="text-muted-foreground text-[11px]">
+                <p className="text-[11px] text-muted-foreground">
                   Imported from the provider when available; paste a current
                   image URL to override it.
                 </p>
@@ -570,26 +574,28 @@ export function BrandChannels({
                       Add
                     </Button>
                   </div>
-                  <p className="text-muted-foreground text-[11px]">
+                  <p className="text-[11px] text-muted-foreground">
                     Adds a capture dated today · {todayISO}. Persists when you
                     Save.
                   </p>
                 </div>
 
                 {form.followerHistory.length === 0 ? (
-                  <p className="text-muted-foreground py-4 text-center text-xs">
+                  <p className="py-4 text-center text-xs text-muted-foreground">
                     No captures yet.
                   </p>
                 ) : (
                   <div className="flex flex-col gap-1">
-                    <Label className="text-muted-foreground">History</Label>
+                    <Label tone="muted">History</Label>
                     <div className="flex max-h-48 flex-col gap-0.5 overflow-y-auto rounded-md border p-1.5">
                       {[...form.followerHistory]
-                        .sort((a, b) => b.capturedAt.localeCompare(a.capturedAt))
+                        .sort((a, b) =>
+                          b.capturedAt.localeCompare(a.capturedAt),
+                        )
                         .map((snap) => (
                           <div
                             key={snap.capturedAt}
-                            className="hover:bg-accent group flex items-baseline justify-between rounded px-2 py-1 text-xs"
+                            className="group flex items-baseline justify-between rounded px-2 py-1 text-xs hover:bg-accent"
                           >
                             <span className="font-medium tabular-nums">
                               {followerFmt.format(snap.count)}
@@ -602,7 +608,7 @@ export function BrandChannels({
                                 type="button"
                                 title="Remove capture"
                                 onClick={() => removeCapture(snap.capturedAt)}
-                                className="text-muted-foreground hover:text-destructive opacity-0 transition-opacity group-hover:opacity-100"
+                                className="text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-destructive"
                               >
                                 <X className="size-3.5" />
                               </button>
@@ -621,7 +627,7 @@ export function BrandChannels({
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-destructive gap-1.5"
+                tone="danger"
                 disabled={busy}
                 onClick={() => deleteM.mutate({ id: form.id! })}
               >

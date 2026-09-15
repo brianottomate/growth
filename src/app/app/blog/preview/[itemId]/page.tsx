@@ -46,7 +46,7 @@ export default async function DatoPreviewReactPage({
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-10">
-      <div className="text-muted-foreground mb-8 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+      <div className="mb-8 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
         <span
           className={`rounded-full px-2 py-0.5 font-medium ${
             published
@@ -67,7 +67,7 @@ export default async function DatoPreviewReactPage({
 
       <article>
         {hero?.url && (
-          // eslint-disable-next-line @next/next/no-img-element -- Dato CDN host isn't in next/image remotePatterns
+          // oxlint-disable-next-line nextjs/no-img-element -- Dato CDN host isn't in next/image remotePatterns
           <img
             src={hero.url}
             alt={hero.alt ?? ""}
@@ -78,11 +78,11 @@ export default async function DatoPreviewReactPage({
           {article.title ?? "Untitled"}
         </h1>
         {article.description && (
-          <p className="text-muted-foreground mt-3 text-lg">
+          <p className="mt-3 text-lg text-muted-foreground">
             {article.description}
           </p>
         )}
-        <div className="prose prose-invert prose-neutral mt-8 max-w-none">
+        <div className="prose mt-8 max-w-none prose-neutral prose-invert">
           <StructuredText
             data={article.body}
             renderBlock={({ record }) => <PreviewBlock block={record} />}
@@ -90,8 +90,8 @@ export default async function DatoPreviewReactPage({
         </div>
       </article>
 
-      <div className="text-muted-foreground mt-10 flex gap-4 border-t pt-4 text-xs">
-        <Link href="/app/content" className="hover:text-foreground underline">
+      <div className="mt-10 flex gap-4 border-t pt-4 text-xs text-muted-foreground">
+        <Link href="/app/content" className="underline hover:text-foreground">
           ← Back to content
         </Link>
       </div>

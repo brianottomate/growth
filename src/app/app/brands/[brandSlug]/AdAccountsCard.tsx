@@ -82,7 +82,7 @@ export function AdAccountsCard({
       <div className="flex items-end justify-between gap-4">
         <div>
           <h2 className="text-base font-semibold">Ad accounts</h2>
-          <p className="text-muted-foreground mt-0.5 text-sm">
+          <p className="mt-0.5 text-sm text-muted-foreground">
             Everything this brand&apos;s ad connections can reach. A
             client&apos;s login often sees accounts that aren&apos;t theirs, so
             nothing is consumed until you switch it on.
@@ -101,11 +101,11 @@ export function AdAccountsCard({
         )}
       </div>
 
-      <div className="border-border rounded-xl border">
+      <div className="rounded-xl border border-border">
         {loading ? (
-          <p className="text-muted-foreground p-4 text-sm">Loading…</p>
+          <p className="p-4 text-sm text-muted-foreground">Loading…</p>
         ) : ordered.length === 0 ? (
-          <p className="text-muted-foreground p-4 text-sm">
+          <p className="p-4 text-sm text-muted-foreground">
             {enumerated
               ? "Nothing to allow yet. Accounts appear here once the client connects an ad platform through the link above."
               : "Asking the connections what they can see…"}
@@ -123,7 +123,7 @@ export function AdAccountsCard({
                     <p className="truncate text-sm font-medium">
                       {row.name ?? row.externalId}
                     </p>
-                    <p className="text-muted-foreground font-mono text-xs">
+                    <p className="font-mono text-xs text-muted-foreground">
                       {adPlatformByAllowlistPlatform(row.platform)
                         ?.shortLabel ?? row.platform}{" "}
                       · {row.externalId}
@@ -162,7 +162,7 @@ export function AdAccountsCard({
       </div>
 
       {!enumerated && ordered.length > 0 && (
-        <p className="text-muted-foreground text-xs">
+        <p className="text-xs text-muted-foreground">
           Asking the connections what else they can see…
         </p>
       )}
@@ -171,7 +171,7 @@ export function AdAccountsCard({
         <p className="text-xs text-red-300">{decide.error.message}</p>
       )}
       {sync.data && (
-        <p className="text-muted-foreground text-xs">
+        <p className="text-xs text-muted-foreground">
           Pulled {sync.data.inserted} new and updated {sync.data.updated}{" "}
           campaigns ({sync.data.filteredOut} older ones left out) —{" "}
           <Link href={`/app/brands/${brandSlug}/ads`} className="underline">

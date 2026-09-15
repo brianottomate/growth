@@ -69,15 +69,22 @@ type PlatformCampaign = {
   adSets?: Array<{ adSetName?: string; ads?: Ad[] }>;
 };
 
-async function fetchTree(fromDate: string, toDate: string): Promise<PlatformCampaign[]> {
+async function fetchTree(
+  fromDate: string,
+  toDate: string,
+): Promise<PlatformCampaign[]> {
   const all: PlatformCampaign[] = [];
   for (let page = 1; page <= 60; page++) {
     const url = `${BASE}/ads/tree?source=all&fromDate=${fromDate}&toDate=${toDate}&page=${page}&limit=100`;
     const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" },
+      headers: {
+        Authorization: `Bearer ${KEY}`,
+        "Content-Type": "application/json",
+      },
       cache: "no-store",
     });
-    if (!res.ok) throw new Error(`tree page ${page}: ${res.status} ${await res.text()}`);
+    if (!res.ok)
+      throw new Error(`tree page ${page}: ${res.status} ${await res.text()}`);
     const data: unknown = await res.json();
     const obj = (data && typeof data === "object" ? data : {}) as {
       campaigns?: PlatformCampaign[];
@@ -106,14 +113,19 @@ type FlatAd = Ad & {
 function classifyDestination(ad: Ad): string {
   const link = ad.creative?.linkUrl ?? "";
   const lower = link.toLowerCase();
-  if (lower.includes("audit.wander.com") || lower.includes("/audit")) return "audit";
-  if (lower.includes("/os") || lower.includes("wanderos")) return "os (WanderOS)";
+  if (lower.includes("audit.wander.com") || lower.includes("/audit"))
+    return "audit";
+  if (lower.includes("/os") || lower.includes("wanderos"))
+    return "os (WanderOS)";
   if (lower.includes("/list")) return "list";
   if (lower.includes("wander.com")) return "marketplace/wander.com";
   if (link) return "other-link";
   // No link: lead-form / on-FB objectives
   if (ad.platformObjective === "OUTCOME_LEADS") return "lead-form (on-Meta)";
-  if (ad.platformObjective === "OUTCOME_ENGAGEMENT" || ad.platformObjective === "POST_ENGAGEMENT")
+  if (
+    ad.platformObjective === "OUTCOME_ENGAGEMENT" ||
+    ad.platformObjective === "POST_ENGAGEMENT"
+  )
     return "engagement (on-Meta)";
   return "unknown/no-link";
 }
@@ -164,10 +176,27 @@ function main() {
     };
 
     const byKey = (key: (a: FlatAd) => string) => {
-      const map = new Map<string, { ads: number; spend: number; impressions: number; clicks: number; engagement: number; conversions: number }>();
+      const map = new Map<
+        string,
+        {
+          ads: number;
+          spend: number;
+          impressions: number;
+          clicks: number;
+          engagement: number;
+          conversions: number;
+        }
+      >();
       for (const a of delivered) {
         const k = key(a);
-        const e = map.get(k) ?? { ads: 0, spend: 0, impressions: 0, clicks: 0, engagement: 0, conversions: 0 };
+        const e = map.get(k) ?? {
+          ads: 0,
+          spend: 0,
+          impressions: 0,
+          clicks: 0,
+          engagement: 0,
+          conversions: 0,
+        };
         e.ads++;
         e.spend += a.metrics?.spend ?? 0;
         e.impressions += a.metrics?.impressions ?? 0;
@@ -177,7 +206,12 @@ function main() {
         map.set(k, e);
       }
       return [...map.entries()]
-        .map(([k, v]) => ({ key: k, ...v, ctr: v.impressions ? v.clicks / v.impressions : 0, cpc: v.clicks ? v.spend / v.clicks : 0 }))
+        .map(([k, v]) => ({
+          key: k,
+          ...v,
+          ctr: v.impressions ? v.clicks / v.impressions : 0,
+          cpc: v.clicks ? v.spend / v.clicks : 0,
+        }))
         .sort((a, b) => b.impressions - a.impressions);
     };
 
@@ -202,38 +236,81 @@ function main() {
       body: a.bodyText.slice(0, 280),
     });
 
-    const topByImpressions = [...delivered].sort((a, b) => (b.metrics?.impressions ?? 0) - (a.metrics?.impressions ?? 0)).slice(0, 30).map(lite);
-    const topByClicks = [...delivered].sort((a, b) => (b.metrics?.clicks ?? 0) - (a.metrics?.clicks ?? 0)).slice(0, 30).map(lite);
+    const topByImpressions = [...delivered]
+      .sort(
+        (a, b) => (b.metrics?.impressions ?? 0) - (a.metrics?.impressions ?? 0),
+      )
+      .slice(0, 30)
+      .map(lite);
+    const topByClicks = [...delivered]
+      .sort((a, b) => (b.metrics?.clicks ?? 0) - (a.metrics?.clicks ?? 0))
+      .slice(0, 30)
+      .map(lite);
     const MIN_IMP = 5000;
-    const topByCtr = delivered.filter((a) => (a.metrics?.impressions ?? 0) >= MIN_IMP).sort((a, b) => b.ctrCalc - a.ctrCalc).slice(0, 30).map(lite);
-    const topByEngagement = [...delivered].sort((a, b) => (b.metrics?.engagement ?? 0) - (a.metrics?.engagement ?? 0)).slice(0, 30).map(lite);
-    const topBySpend = [...delivered].sort((a, b) => (b.metrics?.spend ?? 0) - (a.metrics?.spend ?? 0)).slice(0, 30).map(lite);
+    const topByCtr = delivered
+      .filter((a) => (a.metrics?.impressions ?? 0) >= MIN_IMP)
+      .sort((a, b) => b.ctrCalc - a.ctrCalc)
+      .slice(0, 30)
+      .map(lite);
+    const topByEngagement = [...delivered]
+      .sort(
+        (a, b) => (b.metrics?.engagement ?? 0) - (a.metrics?.engagement ?? 0),
+      )
+      .slice(0, 30)
+      .map(lite);
+    const topBySpend = [...delivered]
+      .sort((a, b) => (b.metrics?.spend ?? 0) - (a.metrics?.spend ?? 0))
+      .slice(0, 30)
+      .map(lite);
 
-    const out = { window: { fromDate, toDate, days: DAYS }, totals, byDestination, byObjective, topByImpressions, topByClicks, topByCtr, topByEngagement, topBySpend };
+    const out = {
+      window: { fromDate, toDate, days: DAYS },
+      totals,
+      byDestination,
+      byObjective,
+      topByImpressions,
+      topByClicks,
+      topByCtr,
+      topByEngagement,
+      topBySpend,
+    };
 
-    const path = "/private/tmp/claude-501/-Users-kristianeboe-Developer-wander/b3f09ff7-6ab7-45e2-a8f4-1a2403fe45ab/scratchpad/zernio-ads-perf.json";
+    const path =
+      "/private/tmp/claude-501/-Users-kristianeboe-Developer-wander/b3f09ff7-6ab7-45e2-a8f4-1a2403fe45ab/scratchpad/zernio-ads-perf.json";
     writeFileSync(path, JSON.stringify(out, null, 2));
 
     // ---- Digest ----
     const fmt = (n: number) => n.toLocaleString("en-US");
-    console.log(`TOTALS (delivered ads only): ${totals.delivered}/${totals.ads} ads · ${fmt(totals.impressions)} impressions · ${fmt(totals.clicks)} clicks · CTR ${(totals.clicks / totals.impressions * 100).toFixed(2)}% · $${fmt(Math.round(totals.spend))} spend · ${fmt(totals.engagement)} engagement\n`);
+    console.log(
+      `TOTALS (delivered ads only): ${totals.delivered}/${totals.ads} ads · ${fmt(totals.impressions)} impressions · ${fmt(totals.clicks)} clicks · CTR ${((totals.clicks / totals.impressions) * 100).toFixed(2)}% · $${fmt(Math.round(totals.spend))} spend · ${fmt(totals.engagement)} engagement\n`,
+    );
 
     console.log("=== BY DESTINATION ===");
-    console.log("dest                        ads   impressions     clicks    CTR%    spend    eng");
+    console.log(
+      "dest                        ads   impressions     clicks    CTR%    spend    eng",
+    );
     for (const d of byDestination) {
-      console.log(`${d.key.padEnd(26)} ${String(d.ads).padStart(4)} ${fmt(d.impressions).padStart(13)} ${fmt(d.clicks).padStart(10)} ${(d.ctr * 100).toFixed(2).padStart(7)} ${("$" + fmt(Math.round(d.spend))).padStart(9)} ${fmt(d.engagement).padStart(7)}`);
+      console.log(
+        `${d.key.padEnd(26)} ${String(d.ads).padStart(4)} ${fmt(d.impressions).padStart(13)} ${fmt(d.clicks).padStart(10)} ${(d.ctr * 100).toFixed(2).padStart(7)} ${("$" + fmt(Math.round(d.spend))).padStart(9)} ${fmt(d.engagement).padStart(7)}`,
+      );
     }
 
     console.log("\n=== BY OBJECTIVE ===");
-    console.log("objective                   ads   impressions     clicks    CTR%    spend");
+    console.log(
+      "objective                   ads   impressions     clicks    CTR%    spend",
+    );
     for (const d of byObjective) {
-      console.log(`${d.key.padEnd(26)} ${String(d.ads).padStart(4)} ${fmt(d.impressions).padStart(13)} ${fmt(d.clicks).padStart(10)} ${(d.ctr * 100).toFixed(2).padStart(7)} ${("$" + fmt(Math.round(d.spend))).padStart(9)}`);
+      console.log(
+        `${d.key.padEnd(26)} ${String(d.ads).padStart(4)} ${fmt(d.impressions).padStart(13)} ${fmt(d.clicks).padStart(10)} ${(d.ctr * 100).toFixed(2).padStart(7)} ${("$" + fmt(Math.round(d.spend))).padStart(9)}`,
+      );
     }
 
     const printTop = (title: string, rows: ReturnType<typeof lite>[]) => {
       console.log(`\n=== ${title} ===`);
       for (const r of rows.slice(0, 15)) {
-        console.log(`• [${r.destination}] imp ${fmt(r.impressions)} · clk ${fmt(r.clicks)} · CTR ${r.ctr}% · eng ${fmt(r.engagement)} · $${fmt(r.spend)} · ${r.created}`);
+        console.log(
+          `• [${r.destination}] imp ${fmt(r.impressions)} · clk ${fmt(r.clicks)} · CTR ${r.ctr}% · eng ${fmt(r.engagement)} · $${fmt(r.spend)} · ${r.created}`,
+        );
         console.log(`  ${r.name ?? "(no name)"}`);
         if (r.body) console.log(`  copy: "${r.body.slice(0, 160)}"`);
       }

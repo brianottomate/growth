@@ -131,7 +131,7 @@ export function PresetNumberField<
           <div className="flex items-center space-x-2">
             <Label
               htmlFor={`${name}-custom-switch`}
-              className="text-muted-foreground sr-only text-xs leading-none"
+              className="sr-only text-xs leading-none text-muted-foreground"
             >
               custom
             </Label>
@@ -160,7 +160,7 @@ export function PresetNumberField<
                 <ToggleGroupItem
                   key={preset.value}
                   value={preset.value.toString()}
-                  className="data-[state=on]:bg-primary px-3 data-[state=on]:text-white"
+                  className="px-3 data-[state=on]:bg-primary data-[state=on]:text-white"
                 >
                   {preset.label}
                 </ToggleGroupItem>

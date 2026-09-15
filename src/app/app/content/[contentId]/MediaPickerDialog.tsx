@@ -111,7 +111,7 @@ export function MediaPickerDialog({
             <Link
               href="/app/media"
               target="_blank"
-              className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs underline"
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground underline hover:text-foreground"
             >
               Open the full media library
               <ExternalLink className="size-3" />
@@ -122,9 +122,9 @@ export function MediaPickerDialog({
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Filter by name or tag…"
-                  className="border-border bg-background focus:border-foreground/40 w-52 rounded-md border px-2 py-1 text-xs outline-none"
+                  className="w-52 rounded-md border border-border bg-background px-2 py-1 text-xs outline-none focus:border-foreground/40"
                 />
-                <span className="text-muted-foreground text-xs tabular-nums">
+                <span className="text-xs text-muted-foreground tabular-nums">
                   {terms.length > 0
                     ? `${visible.length}/${pickable.length}`
                     : pickable.length}
@@ -135,9 +135,9 @@ export function MediaPickerDialog({
         </div>
 
         {isLoading ? (
-          <p className="text-muted-foreground py-8 text-sm">Loading…</p>
+          <p className="py-8 text-sm text-muted-foreground">Loading…</p>
         ) : visible.length === 0 ? (
-          <div className="text-muted-foreground py-8 text-center text-sm">
+          <div className="py-8 text-center text-sm text-muted-foreground">
             {terms.length > 0
               ? `Nothing matches “${query.trim()}”.`
               : "Nothing in this brand's library yet."}
@@ -178,14 +178,14 @@ export function MediaPickerDialog({
                       onOpenChange(false);
                     }}
                     className={cn(
-                      "bg-muted group relative block aspect-square w-full overflow-hidden rounded-lg border transition-opacity",
+                      "group relative block aspect-square w-full overflow-hidden rounded-lg border bg-muted transition-opacity",
                       already
                         ? "opacity-40"
-                        : "hover:ring-foreground/30 cursor-pointer hover:ring-2",
+                        : "cursor-pointer hover:ring-2 hover:ring-foreground/30",
                     )}
                   >
                     {thumb ? (
-                      // eslint-disable-next-line @next/next/no-img-element
+                      // oxlint-disable-next-line nextjs/no-img-element
                       <img
                         src={thumb}
                         alt={a.title ?? ""}
@@ -193,7 +193,7 @@ export function MediaPickerDialog({
                         loading="lazy"
                       />
                     ) : (
-                      <span className="text-muted-foreground flex size-full items-center justify-center">
+                      <span className="flex size-full items-center justify-center text-muted-foreground">
                         {isVideo ? (
                           <Film className="size-5" />
                         ) : (
@@ -234,7 +234,7 @@ export function MediaPickerDialog({
                   {/* A grid of near-identical property shots is unnavigable without
                   names, and a video with no poster is otherwise anonymous. */}
                   <p
-                    className="text-muted-foreground truncate text-[11px]"
+                    className="truncate text-[11px] text-muted-foreground"
                     title={name}
                   >
                     {name}

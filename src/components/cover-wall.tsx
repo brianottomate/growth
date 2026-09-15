@@ -60,14 +60,14 @@ function Cover({
   const previewMeta = SOCIAL_PREVIEW_META[preview];
   return (
     <div
-      className={`bg-muted relative w-full overflow-hidden bg-white ${
+      className={`relative w-full overflow-hidden bg-muted bg-white ${
         variant === "og" ? previewMeta.aspectClass : "h-[300px]"
       }`}
     >
       {item.html ? (
         <ScaledHtml html={item.html} title={item.title} />
       ) : item.coverImage ? (
-        // eslint-disable-next-line @next/next/no-img-element
+        // oxlint-disable-next-line nextjs/no-img-element
         <img
           src={item.coverImage}
           alt=""
@@ -76,7 +76,7 @@ function Cover({
           }`}
         />
       ) : (
-        <div className="text-muted-foreground flex h-full items-center justify-center text-xs">
+        <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
           No preview
         </div>
       )}
@@ -105,7 +105,7 @@ export function CoverWall({
         <Link
           key={it.id}
           href={it.href}
-          className="group bg-card hover:border-foreground/30 overflow-hidden rounded-xl border transition-colors"
+          className="group overflow-hidden rounded-xl border bg-card transition-colors hover:border-foreground/30"
         >
           <Cover item={it} variant={variant} preview={preview} />
           <div className="flex items-start gap-2 p-3">
@@ -120,12 +120,12 @@ export function CoverWall({
               <div className="truncate text-sm font-medium group-hover:underline">
                 {it.title}
               </div>
-              <div className="text-muted-foreground mt-0.5 text-[11px]">
+              <div className="mt-0.5 text-[11px] text-muted-foreground">
                 {it.date}
                 {it.stat ? ` · ${it.stat}` : ""}
               </div>
               {it.subtitle && (
-                <p className="text-muted-foreground mt-1 line-clamp-2 text-[11px] leading-snug">
+                <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
                   {it.subtitle}
                 </p>
               )}
@@ -150,13 +150,13 @@ export function DocumentReader({ items }: { items: CoverItem[] }) {
               />
             )}
             <span className="truncate text-sm font-medium">{it.title}</span>
-            <span className="text-muted-foreground shrink-0 text-xs">
+            <span className="shrink-0 text-xs text-muted-foreground">
               {it.date}
               {it.stat ? ` · ${it.stat}` : ""}
             </span>
             <Link
               href={it.href}
-              className="text-muted-foreground hover:text-foreground ml-auto shrink-0 text-xs"
+              className="ml-auto shrink-0 text-xs text-muted-foreground hover:text-foreground"
             >
               Open ↗
             </Link>
@@ -170,7 +170,7 @@ export function DocumentReader({ items }: { items: CoverItem[] }) {
               className="h-[80vh] w-full rounded-xl border bg-white"
             />
           ) : (
-            <div className="text-muted-foreground rounded-xl border p-6 text-sm">
+            <div className="rounded-xl border p-6 text-sm text-muted-foreground">
               No preview available.
             </div>
           )}

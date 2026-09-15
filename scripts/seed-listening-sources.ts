@@ -36,14 +36,54 @@ const INITIAL_SUBREDDITS = [
 // move with us. Casing + flags match the F5Bot config exactly.
 const F5BOT_VERIFIED_AT = "2026-06-17";
 const F5BOT_ALERT_TERMS: ListeningAlertTerm[] = [
-  { term: "airbnb alternatives", flags: ["whole", "only-reddit", "no-comments"], enabled: true, verifiedAt: F5BOT_VERIFIED_AT },
-  { term: "direct booking site", flags: ["whole", "only-reddit"], enabled: true, verifiedAt: F5BOT_VERIFIED_AT },
-  { term: "fire my property manager", flags: ["whole", "only-reddit"], enabled: true, verifiedAt: F5BOT_VERIFIED_AT },
-  { term: "wander listed", flags: ["whole", "only-reddit"], enabled: true, verifiedAt: F5BOT_VERIFIED_AT },
-  { term: "wander operated", flags: ["whole", "only-reddit"], enabled: true, verifiedAt: F5BOT_VERIFIED_AT },
-  { term: "wander sites", flags: ["whole", "only-reddit"], enabled: true, verifiedAt: F5BOT_VERIFIED_AT },
-  { term: "wander.com", flags: [], enabled: true, verifiedAt: F5BOT_VERIFIED_AT },
-  { term: "wanderos", flags: ["whole", "only-reddit"], enabled: true, verifiedAt: F5BOT_VERIFIED_AT },
+  {
+    term: "airbnb alternatives",
+    flags: ["whole", "only-reddit", "no-comments"],
+    enabled: true,
+    verifiedAt: F5BOT_VERIFIED_AT,
+  },
+  {
+    term: "direct booking site",
+    flags: ["whole", "only-reddit"],
+    enabled: true,
+    verifiedAt: F5BOT_VERIFIED_AT,
+  },
+  {
+    term: "fire my property manager",
+    flags: ["whole", "only-reddit"],
+    enabled: true,
+    verifiedAt: F5BOT_VERIFIED_AT,
+  },
+  {
+    term: "wander listed",
+    flags: ["whole", "only-reddit"],
+    enabled: true,
+    verifiedAt: F5BOT_VERIFIED_AT,
+  },
+  {
+    term: "wander operated",
+    flags: ["whole", "only-reddit"],
+    enabled: true,
+    verifiedAt: F5BOT_VERIFIED_AT,
+  },
+  {
+    term: "wander sites",
+    flags: ["whole", "only-reddit"],
+    enabled: true,
+    verifiedAt: F5BOT_VERIFIED_AT,
+  },
+  {
+    term: "wander.com",
+    flags: [],
+    enabled: true,
+    verifiedAt: F5BOT_VERIFIED_AT,
+  },
+  {
+    term: "wanderos",
+    flags: ["whole", "only-reddit"],
+    enabled: true,
+    verifiedAt: F5BOT_VERIFIED_AT,
+  },
 ];
 
 const brand = await db.query.brandTable.findFirst({
@@ -104,7 +144,8 @@ const rows: ListeningSourceInsert[] = [
         name: g.name,
         terms: [...g.terms],
       })),
-    },  },
+    },
+  },
   {
     brandId: brand.id,
     key: "f5bot",
@@ -123,7 +164,8 @@ const rows: ListeningSourceInsert[] = [
     trigger: "on_demand",
     adapter: "zernio-dms",
     label: "DMs (Zernio)",
-    config: {},  },
+    config: {},
+  },
   {
     brandId: brand.id,
     key: "zernio-comments-ig",
@@ -132,7 +174,8 @@ const rows: ListeningSourceInsert[] = [
     trigger: "on_demand",
     adapter: "zernio-comments",
     label: "Comments — Instagram",
-    config: {},  },
+    config: {},
+  },
   {
     brandId: brand.id,
     key: "zernio-comments-fb",
@@ -141,7 +184,8 @@ const rows: ListeningSourceInsert[] = [
     trigger: "on_demand",
     adapter: "zernio-comments",
     label: "Comments — Facebook",
-    config: {},  },
+    config: {},
+  },
   {
     brandId: brand.id,
     key: "zernio-comments-li",
@@ -150,7 +194,8 @@ const rows: ListeningSourceInsert[] = [
     trigger: "on_demand",
     adapter: "zernio-comments",
     label: "Comments — LinkedIn",
-    config: {},  },
+    config: {},
+  },
 ];
 
 const inserted = await db

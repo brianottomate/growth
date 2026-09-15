@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { constructMetadata } from "@/lib/metadata";
 
 export const metadata = constructMetadata({
@@ -305,9 +306,9 @@ function RedditSection() {
         <p className="mt-1 text-sm text-gray-600">
           Tier 1 STR-operator subs we monitor — via F5Bot keyword alerts plus
           the on-demand live scan. Duplicated from{" "}
-          <a href="/growth" className="font-mono hover:text-rose-600">
+          <Link href="/growth" className="font-mono hover:text-rose-600">
             /growth
-          </a>
+          </Link>
           .
         </p>
         <ul className="mt-3 space-y-1 text-sm text-gray-700">

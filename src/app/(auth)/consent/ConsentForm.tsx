@@ -87,8 +87,8 @@ export function ConsentForm() {
   return (
     <Card>
       <CardHeader className="text-center">
-        <div className="bg-primary/10 mx-auto mb-2 flex size-12 items-center justify-center rounded-full">
-          <ShieldCheck className="text-primary size-6" />
+        <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-primary/10">
+          <ShieldCheck className="size-6 text-primary" />
         </div>
         <CardTitle>Authorize access</CardTitle>
         <CardDescription>
@@ -101,13 +101,13 @@ export function ConsentForm() {
         <ul className="space-y-3">
           {(scopes.length ? scopes : ["growth:all"]).map((scope) => (
             <li key={scope} className="flex items-start gap-3 text-sm">
-              <CheckCircle2 className="text-muted-foreground mt-0.5 size-4 shrink-0" />
+              <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
               <span>{SCOPE_LABELS[scope] ?? scope}</span>
             </li>
           ))}
         </ul>
         {error && (
-          <p className="text-destructive rounded-md border p-3 text-sm">
+          <p className="rounded-md border p-3 text-sm text-destructive">
             {error}
           </p>
         )}

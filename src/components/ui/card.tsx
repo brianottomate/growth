@@ -1,13 +1,24 @@
+import { cva, type VariantProps } from "class-variance-authority";
 import type * as React from "react";
 
 import { cn } from "./lib/utils";
 
-function Card({ className, ...props }: React.ComponentProps<"div">) {
+const cardStyleVariants = cva("", {
+  variants: { tone: { error: "border-destructive" } },
+});
+
+function Card({
+  className: customClassName,
+  tone,
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof cardStyleVariants>) {
+  const className = cn(cardStyleVariants({ tone }), customClassName);
+
   return (
     <div
       data-slot="card"
       className={cn(
-        "bg-card text-card-foreground border-border/20 flex flex-col rounded-xl border shadow-sm",
+        "flex flex-col rounded-xl border border-border/20 bg-card text-card-foreground shadow-sm",
         "py-6",
         "gap-6", // i removed this at some point, but now i added it back 😅
         className,
@@ -30,7 +41,17 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
+const cardTitleStyleVariants = cva("", {
+  variants: { tone: { error: "text-destructive" } },
+});
+
+function CardTitle({
+  className: customClassName,
+  tone,
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof cardTitleStyleVariants>) {
+  const className = cn(cardTitleStyleVariants({ tone }), customClassName);
+
   return (
     <div
       data-slot="card-title"
@@ -44,7 +65,7 @@ function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-description"
-      className={cn("text-muted-foreground text-sm", className)}
+      className={cn("text-sm text-muted-foreground", className)}
       {...props}
     />
   );

@@ -22,7 +22,7 @@ export default async function CreateOrganizationPage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Create Organization</h1>
-          <p className="text-muted-foreground mt-2">
+          <p className="mt-2 text-muted-foreground">
             Set up a workspace to manage projects and collaborate with your
             team.
           </p>
@@ -31,36 +31,36 @@ export default async function CreateOrganizationPage() {
         <CreateOrganizationForm />
 
         {/* Quick benefits callout */}
-        <div className="bg-muted/50 flex gap-4 rounded-lg border p-4">
+        <div className="flex gap-4 rounded-lg border bg-muted/50 p-4">
           <div className="flex flex-1 items-start gap-3">
-            <div className="bg-background flex size-8 shrink-0 items-center justify-center rounded-md">
-              <Sparkles className="text-primary size-4" />
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-background">
+              <Sparkles className="size-4 text-primary" />
             </div>
             <div className="space-y-0.5">
               <p className="text-sm font-medium">Shared workspace</p>
-              <p className="text-muted-foreground text-xs">
+              <p className="text-xs text-muted-foreground">
                 Collaborate on projects with your team members
               </p>
             </div>
           </div>
           <div className="flex flex-1 items-start gap-3">
-            <div className="bg-background flex size-8 shrink-0 items-center justify-center rounded-md">
-              <Users className="text-primary size-4" />
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-background">
+              <Users className="size-4 text-primary" />
             </div>
             <div className="space-y-0.5">
               <p className="text-sm font-medium">Team management</p>
-              <p className="text-muted-foreground text-xs">
+              <p className="text-xs text-muted-foreground">
                 Invite members and manage permissions easily
               </p>
             </div>
           </div>
           <div className="flex flex-1 items-start gap-3">
-            <div className="bg-background flex size-8 shrink-0 items-center justify-center rounded-md">
-              <Building2 className="text-primary size-4" />
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-background">
+              <Building2 className="size-4 text-primary" />
             </div>
             <div className="space-y-0.5">
               <p className="text-sm font-medium">Organization settings</p>
-              <p className="text-muted-foreground text-xs">
+              <p className="text-xs text-muted-foreground">
                 Customize branding and team configuration
               </p>
             </div>

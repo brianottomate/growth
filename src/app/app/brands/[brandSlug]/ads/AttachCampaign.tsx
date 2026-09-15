@@ -83,9 +83,9 @@ export function AttachCampaign({
   }
 
   return (
-    <div className="border-border bg-surface-secondary/30 mt-2 flex flex-wrap items-center gap-2 rounded-md border p-2">
+    <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-border bg-surface-secondary/30 p-2">
       <select
-        className="border-input bg-background h-8 rounded-md border px-2 text-xs"
+        className="h-8 rounded-md border border-input bg-background px-2 text-xs"
         disabled={attach.isPending || options.isPending}
         defaultValue=""
         onChange={(event) => {
@@ -106,12 +106,13 @@ export function AttachCampaign({
           </option>
         ))}
       </select>
-      <span className="text-muted-foreground text-xs">or</span>
+      <span className="text-xs text-muted-foreground">or</span>
       <Input
         value={name}
         onChange={(event) => setName(event.target.value)}
         placeholder="New campaign name"
-        className="h-8 w-56 text-xs"
+        textSize="xs"
+        className="h-8 w-56"
       />
       <Button
         size="sm"

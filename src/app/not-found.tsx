@@ -7,16 +7,16 @@ export default function NotFound() {
     <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 py-16">
       <div className="mx-auto max-w-2xl text-center">
         <div className="mb-6 flex justify-center">
-          <div className="bg-muted text-muted-foreground flex size-20 items-center justify-center rounded-full">
+          <div className="flex size-20 items-center justify-center rounded-full bg-muted text-muted-foreground">
             <FileQuestion className="size-10" />
           </div>
         </div>
 
-        <h1 className="text-foreground text-4xl font-bold tracking-tight sm:text-5xl">
+        <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
           Page Not Found
         </h1>
 
-        <p className="text-muted-foreground mt-6 text-lg leading-8">
+        <p className="mt-6 text-lg leading-8 text-muted-foreground">
           Sorry, we couldn&apos;t find the page you&apos;re looking for. The
           page may have been moved, deleted, or the URL might be incorrect.
         </p>

@@ -140,12 +140,14 @@ export async function recordPregenPreviewView(input: {
   const about = [
     `Up: ${(assigned && mentionForOwnerId(assigned.ownerId)) ?? "unassigned"}`,
     `CRM owner: ${mentionForOwnerName(domain?.hubspotOwner ?? null)}`,
-    domain?.unitCount ?? domain?.unitEstimate
+    (domain?.unitCount ?? domain?.unitEstimate)
       ? `${domain.unitCount ?? domain.unitEstimate} homes`
       : null,
     domain?.pms ? escapeSlackMrkdwn(domain.pms) : null,
     [domain?.city, domain?.state].filter(Boolean).length
-      ? escapeSlackMrkdwn([domain?.city, domain?.state].filter(Boolean).join(", "))
+      ? escapeSlackMrkdwn(
+          [domain?.city, domain?.state].filter(Boolean).join(", "),
+        )
       : null,
     `views: ${viewCount}`,
   ]
@@ -169,9 +171,7 @@ export async function recordPregenPreviewView(input: {
     .join(" · ");
 
   const result = await postOnSlack({
-    channel: input.test
-      ? SLACK_TESTING_CHANNEL
-      : RADIO_CORE_INBOUND_CHANNEL_ID,
+    channel: input.test ? SLACK_TESTING_CHANNEL : RADIO_CORE_INBOUND_CHANNEL_ID,
     text: `👀 ${company} is looking at their pregen site right now${isFirst ? " (first view)" : ""}`,
     blocks: [
       {

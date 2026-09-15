@@ -131,7 +131,7 @@ export function StudioWheel({ brands }: { brands: Brand[] }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">Studio</h1>
-          <p className="text-muted-foreground text-sm">
+          <p className="text-sm text-muted-foreground">
             Plan the year by pillar, then produce platform posts from any slot
           </p>
         </div>
@@ -189,9 +189,9 @@ export function StudioWheel({ brands }: { brands: Brand[] }) {
       >
         <div style={{ minWidth: LABEL_W + TRACK_MIN }}>
           {/* Month axis */}
-          <div className="bg-muted/30 flex border-b text-[11px]">
+          <div className="flex border-b bg-muted/30 text-[11px]">
             <div
-              className="bg-muted/30 sticky left-0 z-10 shrink-0 border-r px-3 py-1.5 font-semibold"
+              className="sticky left-0 z-10 shrink-0 border-r bg-muted/30 px-3 py-1.5 font-semibold"
               style={{ width: LABEL_W }}
             >
               {brand.name}
@@ -202,7 +202,7 @@ export function StudioWheel({ brands }: { brands: Brand[] }) {
                 return (
                   <div
                     key={m}
-                    className="text-muted-foreground absolute top-1.5 border-l pl-1.5"
+                    className="absolute top-1.5 border-l pl-1.5 text-muted-foreground"
                     style={{ left: `${f * 100}%`, height: 18 }}
                   >
                     {m}
@@ -214,7 +214,7 @@ export function StudioWheel({ brands }: { brands: Brand[] }) {
 
           {/* Pillar lanes */}
           {isLoading ? (
-            <div className="text-muted-foreground p-6 text-sm">
+            <div className="p-6 text-sm text-muted-foreground">
               Loading the year…
             </div>
           ) : (
@@ -291,7 +291,7 @@ export function StudioWheel({ brands }: { brands: Brand[] }) {
               {/* Paid lane */}
               <Lane label="Campaigns" color="#f59e0b" muted>
                 {(data?.campaigns ?? []).length === 0 ? (
-                  <span className="text-muted-foreground absolute top-1/2 left-2 -translate-y-1/2 text-[11px]">
+                  <span className="absolute top-1/2 left-2 -translate-y-1/2 text-[11px] text-muted-foreground">
                     No campaigns this year
                   </span>
                 ) : (
@@ -320,7 +320,7 @@ export function StudioWheel({ brands }: { brands: Brand[] }) {
         </div>
       </div>
 
-      <p className="text-muted-foreground text-xs">
+      <p className="text-xs text-muted-foreground">
         Tip: click anywhere in a pillar lane to draft content for that pillar +
         date.
       </p>
@@ -355,7 +355,7 @@ function Lane({
   return (
     <div className="group flex border-b last:border-b-0">
       <div
-        className="bg-background sticky left-0 z-10 flex shrink-0 items-center gap-2 border-r px-3 py-2"
+        className="sticky left-0 z-10 flex shrink-0 items-center gap-2 border-r bg-background px-3 py-2"
         style={{ width: LABEL_W }}
       >
         <span
@@ -372,14 +372,14 @@ function Lane({
         </span>
       </div>
       <div
-        className="hover:bg-accent/20 relative h-14 flex-1 cursor-pointer transition-colors"
+        className="relative h-14 flex-1 cursor-pointer transition-colors hover:bg-accent/20"
         onClick={onClick}
       >
         {/* faint month gridlines */}
         {Array.from({ length: 12 }).map((_, i) => (
           <div
             key={i}
-            className="border-border/40 absolute inset-y-0 border-l"
+            className="absolute inset-y-0 border-l border-border/40"
             style={{ left: `${(i / 12) * 100}%` }}
           />
         ))}
@@ -436,7 +436,7 @@ function SeriesBar({
       </TooltipTrigger>
       <TooltipContent>
         <span className="font-medium">{label}</span>
-        <span className="text-muted-foreground block text-xs capitalize">
+        <span className="block text-xs text-muted-foreground capitalize">
           {status}
           {meta ? ` · ${meta}` : ""}
         </span>
@@ -474,7 +474,7 @@ function PieceDot({
           }}
         >
           <span
-            className="ring-background block size-2.5 rounded-full ring-2"
+            className="block size-2.5 rounded-full ring-2 ring-background"
             style={{ background: color }}
           />
         </div>
@@ -482,7 +482,7 @@ function PieceDot({
       <TooltipContent>
         <span className="font-medium">{label}</span>
         {ai && (
-          <span className="text-muted-foreground block text-xs">AI draft</span>
+          <span className="block text-xs text-muted-foreground">AI draft</span>
         )}
       </TooltipContent>
     </Tooltip>

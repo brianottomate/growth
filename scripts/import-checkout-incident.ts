@@ -41,7 +41,9 @@ const [csvPath, ...flags] = process.argv.slice(2);
 const execute = flags.includes("--execute");
 
 if (!csvPath) {
-  throw new Error("usage: bun run scripts/import-checkout-incident.ts <csv-path> [--execute]");
+  throw new Error(
+    "usage: bun run scripts/import-checkout-incident.ts <csv-path> [--execute]",
+  );
 }
 const inputPath: string = csvPath;
 
@@ -103,7 +105,8 @@ function parseRows(csv: string): IncidentRow[] {
 }
 
 function skipReason(row: IncidentRow): string | null {
-  if (!row.guestEmail || row.guestEmail === "n/a") return "no contact (not persisted)";
+  if (!row.guestEmail || row.guestEmail === "n/a")
+    return "no contact (not persisted)";
   if (row.guestEmail.endsWith("@wander.com")) return "internal employee";
   if (row.bookingStatus === "CONFIRMED") return "booking confirmed anyway";
   return null;
@@ -145,13 +148,17 @@ async function main() {
   }
 
   for (const { row, reason } of skipped) {
-    console.log(`⏭️  skip ${row.bookingId} (${row.guestEmail || row.propertyName}): ${reason}`);
+    console.log(
+      `⏭️  skip ${row.bookingId} (${row.guestEmail || row.propertyName}): ${reason}`,
+    );
   }
   console.log(`\n🎯 ${byEmail.size} distinct guests to sync\n`);
 
   if (!execute) {
     for (const [email, guestRows] of byEmail) {
-      console.log(`DRY RUN — ${guestRows[0]!.guestName} <${email}> (${guestRows.length} booking(s))`);
+      console.log(
+        `DRY RUN — ${guestRows[0]!.guestName} <${email}> (${guestRows.length} booking(s))`,
+      );
       console.log(`   note: ${buildIncidentNote(guestRows).slice(0, 220)}…\n`);
     }
     console.log("Re-run with --execute to write to Outreach.");
@@ -175,7 +182,11 @@ async function main() {
 
     if (existing) {
       const tags = Array.from(
-        new Set([...(existing.attributes.tags ?? []), "Abandoned Payment", INCIDENT_TAG]),
+        new Set([
+          ...(existing.attributes.tags ?? []),
+          "Abandoned Payment",
+          INCIDENT_TAG,
+        ]),
       );
       const updated = await updateProspect(existing.id, {
         attributes: { tags, personalNote2: note },
@@ -184,7 +195,8 @@ async function main() {
       continue;
     }
 
-    const bdr = (await getNextBdrFromOutreachLoad(!!phone)) ?? getNextBdr(!!phone);
+    const bdr =
+      (await getNextBdrFromOutreachLoad(!!phone)) ?? getNextBdr(!!phone);
     const created = await createProspect({
       attributes: {
         firstName: firstName ?? null,
@@ -200,7 +212,9 @@ async function main() {
       personaId: PERSONA_BOOKING_GUEST_ID,
       ownerId: bdr ? parseInt(bdr.outreachUserId, 10) : undefined,
     });
-    console.log(`✅ created #${created.id} ${email} → owner ${bdr?.name ?? "unassigned"}`);
+    console.log(
+      `✅ created #${created.id} ${email} → owner ${bdr?.name ?? "unassigned"}`,
+    );
   }
 }
 

@@ -348,12 +348,12 @@ export default async function ContentDetailPage({
   return (
     <div>
       {/* breadcrumb */}
-      <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <Link href="/app/content" className="hover:text-foreground">
           Content
         </Link>
         <span>/</span>
-        <span className="text-foreground font-medium">
+        <span className="font-medium text-foreground">
           {content.title ?? "Untitled"}
         </span>
       </div>
@@ -378,7 +378,7 @@ export default async function ContentDetailPage({
           />
         </div>
       </div>
-      <div className="text-muted-foreground mt-1.5 flex flex-wrap items-center gap-2 text-sm">
+      <div className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
         <Link
           href={`/app/brands/${content.brand?.slug ?? ""}/ads`}
           className="hover:text-foreground"
@@ -441,7 +441,7 @@ export default async function ContentDetailPage({
               <div className="text-lg font-semibold tabular-nums">
                 {fmt(m.value)}
               </div>
-              <div className="text-muted-foreground text-[10px] tracking-wide uppercase">
+              <div className="text-[10px] tracking-wide text-muted-foreground uppercase">
                 {m.label}
               </div>
             </div>
@@ -464,7 +464,7 @@ export default async function ContentDetailPage({
       />
 
       {/* platform renderings */}
-      <h2 className="text-muted-foreground mt-8 mb-3 text-xs font-semibold tracking-wider uppercase">
+      <h2 className="mt-8 mb-3 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
         Platform posts · {postGroups.length}
       </h2>
       <div className="flex flex-col gap-2.5">
@@ -548,11 +548,11 @@ export default async function ContentDetailPage({
       {/* series siblings */}
       {content.series && (
         <>
-          <h2 className="text-muted-foreground mt-8 mb-3 text-xs font-semibold tracking-wider uppercase">
+          <h2 className="mt-8 mb-3 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
             More in “{content.series.name}” · {siblings.length}
           </h2>
           {siblings.length === 0 ? (
-            <p className="text-muted-foreground text-sm">
+            <p className="text-sm text-muted-foreground">
               No other ideas in this series yet.
             </p>
           ) : (
@@ -561,7 +561,7 @@ export default async function ContentDetailPage({
                 <Link
                   key={sib.id}
                   href={`/app/content/${sib.id}`}
-                  className="bg-card hover:bg-accent/40 flex items-center justify-between rounded-lg border p-3 transition-colors"
+                  className="flex items-center justify-between rounded-lg border bg-card p-3 transition-colors hover:bg-accent/40"
                 >
                   <span className="truncate text-sm font-medium">
                     {sib.title ?? "Untitled"}
@@ -575,11 +575,11 @@ export default async function ContentDetailPage({
       )}
 
       {/* Team discussion on this idea (audience comment counts live in stats). */}
-      <h2 className="text-muted-foreground mt-8 mb-1 text-xs font-semibold tracking-wider uppercase">
+      <h2 className="mt-8 mb-1 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
         Discussion
       </h2>
       {totals.comments > 0 && (
-        <p className="text-muted-foreground mb-1 text-xs">
+        <p className="mb-1 text-xs text-muted-foreground">
           {fmt(totals.comments)} audience comments across platforms.
         </p>
       )}

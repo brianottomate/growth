@@ -23,8 +23,7 @@ function dayLabel(date: string | null) {
   return d.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
-    year:
-      d.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
+    year: d.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
   });
 }
 
@@ -56,7 +55,7 @@ export default async function LaunchesPage() {
       </div>
 
       {launches.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
+        <p className="text-sm text-muted-foreground">
           {products.length === 0
             ? "Add a product in Product Atlas first."
             : "Create a launch to give a ship date its owners and drafts."}
@@ -67,7 +66,7 @@ export default async function LaunchesPage() {
             <li key={launch.id}>
               <Link
                 href={`/app/launches/${launch.id}`}
-                className="hover:border-foreground/20 bg-card block rounded-lg border px-4 py-3 transition-all duration-200 hover:-translate-y-px hover:shadow-md"
+                className="block rounded-lg border bg-card px-4 py-3 transition-all duration-200 hover:-translate-y-px hover:border-foreground/20 hover:shadow-md"
               >
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <span className="font-medium">{launch.name}</span>
@@ -76,14 +75,14 @@ export default async function LaunchesPage() {
                   >
                     {launch.status}
                   </span>
-                  <span className="text-muted-foreground text-xs">
+                  <span className="text-xs text-muted-foreground">
                     Tier {launch.tier}
                   </span>
-                  <span className="text-muted-foreground ml-auto text-xs tabular-nums">
+                  <span className="ml-auto text-xs text-muted-foreground tabular-nums">
                     {dayLabel(launch.targetDate)}
                   </span>
                 </div>
-                <p className="text-muted-foreground mt-1 text-xs">
+                <p className="mt-1 text-xs text-muted-foreground">
                   {launch.productName ?? "No product"}
                   {launch.ownerName ? ` · ${launch.ownerName}` : ""}
                   {` · ${launch.ready}/${launch.total} ready`}
@@ -95,7 +94,7 @@ export default async function LaunchesPage() {
         </ul>
       )}
 
-      <div className="text-muted-foreground border-t pt-4 text-xs">
+      <div className="border-t pt-4 text-xs text-muted-foreground">
         {Object.values(launchTierGuidance).map((tier) => (
           <p key={tier.label}>
             {tier.label} · {tier.leadTime} ·{" "}

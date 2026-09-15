@@ -13,7 +13,7 @@ interface BlogSearchProps {
 }
 
 // Extract all unique tags from posts (case-insensitive deduplication) (unused, keeping for future use)
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+// oxlint-disable-next-line typescript/no-unused-vars
 function getAllTags(posts: readonly Post[]): string[] {
   const tagMap = new Map<string, string>();
   posts.forEach((post) => {
@@ -77,19 +77,19 @@ export function BlogSearch({ allPosts, resultCount }: BlogSearchProps) {
       {/* Search Input */}
       <div className="relative">
         <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-          <Search className="text-tertiary size-5" />
+          <Search className="size-5 text-tertiary" />
         </div>
         <input
           type="text"
           placeholder="Search posts by title, description, category, tags, or author..."
           value={searchQuery}
           onChange={(e) => handleSearchChange(e.target.value)}
-          className="border-secondary bg-surface-input text-primary placeholder:text-tertiary focus:border-primary block w-full rounded-lg border py-3 pr-12 pl-11 shadow-sm focus:ring-2 focus:ring-current/20 focus:outline-none sm:text-sm"
+          className="block w-full rounded-lg border border-secondary bg-surface-input py-3 pr-12 pl-11 text-primary shadow-sm placeholder:text-tertiary focus:border-primary focus:ring-2 focus:ring-current/20 focus:outline-none sm:text-sm"
         />
         {searchQuery && (
           <button
             onClick={() => handleSearchChange("")}
-            className="text-tertiary hover:text-primary absolute inset-y-0 right-0 flex items-center pr-4 transition-colors"
+            className="absolute inset-y-0 right-0 flex items-center pr-4 text-tertiary transition-colors hover:text-primary"
             aria-label="Clear search"
           >
             <X className="size-5" />
@@ -123,7 +123,7 @@ export function BlogSearch({ allPosts, resultCount }: BlogSearchProps) {
           {selectedCategory && (
             <button
               onClick={() => handleCategoryClick(selectedCategory)}
-              className="text-secondary hover:text-primary text-sm font-medium transition-colors"
+              className="text-sm font-medium text-secondary transition-colors hover:text-primary"
             >
               Clear
             </button>
@@ -132,14 +132,14 @@ export function BlogSearch({ allPosts, resultCount }: BlogSearchProps) {
       )}
 
       {/* Results Info & Clear Button */}
-      <div className="border-secondary flex items-center justify-between border-t pt-4">
+      <div className="flex items-center justify-between border-t border-secondary pt-4">
         <Text variant="body-sm" color="secondary">
           {isPending ? (
             <span className="opacity-50">Searching...</span>
           ) : (
             <>
               Showing{" "}
-              <span className="text-primary font-semibold">{resultCount}</span>{" "}
+              <span className="font-semibold text-primary">{resultCount}</span>{" "}
               {resultCount === 1 ? "post" : "posts"}
               {hasActiveFilters && (
                 <span className="text-tertiary"> (filtered)</span>
@@ -150,7 +150,7 @@ export function BlogSearch({ allPosts, resultCount }: BlogSearchProps) {
         {hasActiveFilters && (
           <button
             onClick={handleClearAll}
-            className="text-secondary hover:text-primary text-sm font-medium transition-colors"
+            className="text-sm font-medium text-secondary transition-colors hover:text-primary"
           >
             Clear all filters
           </button>

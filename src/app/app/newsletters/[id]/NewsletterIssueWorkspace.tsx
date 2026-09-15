@@ -130,7 +130,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
     preview.mutate({ platformPostId: workspace.spot.id, draft, viewAs });
     // Generate the initial projection once per persisted revision. Subsequent
     // unsaved changes are rendered explicitly so typing never causes requests.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
   }, [workspace.document.currentRevision]);
 
   const copyHandoff = async () => {
@@ -175,8 +175,8 @@ function Editor({ workspace }: { workspace: Workspace }) {
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
-            <span className="bg-muted rounded-full px-2 py-1 font-medium">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span className="rounded-full bg-muted px-2 py-1 font-medium">
               {formatLabel}
             </span>
             <span>{workspace.spot.status.replaceAll("_", " ")}</span>
@@ -190,7 +190,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
           <h1 className="mt-2 text-2xl font-semibold tracking-tight">
             {workspace.content?.title || draft.subject || "Untitled email"}
           </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
+          <p className="mt-1 text-sm text-muted-foreground">
             Markdown is the source of truth. The preview is a faithful React
             Email projection, while recipient eligibility and delivery stay in
             the product runtime.
@@ -212,7 +212,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
                 visibleText: `Help me work through the ${formatLabel.toLowerCase()} “${workspace.content?.title || draft.subject || "Untitled"}”. Read the email draft first, then help me refine it.`,
               })
             }
-            className="bg-primary text-primary-foreground flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium hover:opacity-90"
+            className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
           >
             <MessageSquare className="size-4" /> Work in chat
           </button>
@@ -224,7 +224,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
                   `/app/content/${workspace.content.id}?card=1`
                 : "/app/content"
             }
-            className="border-border hover:bg-accent flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium"
+            className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-accent"
           >
             Content item <ExternalLink className="size-3.5" />
           </Link>
@@ -245,7 +245,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
             />
           )}
 
-          <section className="bg-card rounded-xl border p-4">
+          <section className="rounded-xl border bg-card p-4">
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
@@ -257,7 +257,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
                   })
                 }
                 disabled={save.isPending}
-                className="bg-primary text-primary-foreground flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
               >
                 {save.isPending ? (
                   <Loader2 className="size-4 animate-spin" />
@@ -270,7 +270,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
                 type="button"
                 onClick={() => renderPreview()}
                 disabled={preview.isPending}
-                className="border-border hover:bg-accent flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-accent disabled:opacity-50"
               >
                 <RefreshCw
                   className={`size-4 ${preview.isPending ? "animate-spin" : ""}`}
@@ -280,11 +280,11 @@ function Editor({ workspace }: { workspace: Workspace }) {
               <button
                 type="button"
                 onClick={() => setFieldsOpen(true)}
-                className="border-border hover:bg-accent flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium"
+                className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-accent"
               >
                 <Pencil className="size-4" /> Edit fields manually
               </button>
-              <span className="text-muted-foreground text-xs">
+              <span className="text-xs text-muted-foreground">
                 Revision {workspace.document.currentRevision}
               </span>
             </div>
@@ -323,16 +323,16 @@ function Editor({ workspace }: { workspace: Workspace }) {
           )}
 
           {draft.productUpdate && (
-            <section className="bg-card rounded-xl border p-4">
+            <section className="rounded-xl border bg-card p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <h2 className="font-semibold">Verified product evidence</h2>
-                  <p className="text-muted-foreground mt-1 text-xs">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     Customer-facing claims are grounded in these exact changes.
                     Only release-verified evidence can enter delivery.
                   </p>
                 </div>
-                <span className="bg-muted rounded-full px-2 py-1 text-xs font-medium">
+                <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium">
                   {new Date(
                     draft.productUpdate.periodStart,
                   ).toLocaleDateString()}
@@ -347,7 +347,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
                     className="py-3 text-sm"
                   >
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="bg-muted rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase">
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold uppercase">
                         {change.category}
                       </span>
                       <span
@@ -361,7 +361,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
                       </span>
                       <span className="font-medium">{change.title}</span>
                     </div>
-                    <p className="text-muted-foreground mt-1 text-xs leading-5">
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
                       {change.summary}
                     </p>
                     {change.customerImpact && (
@@ -369,13 +369,13 @@ function Editor({ workspace }: { workspace: Workspace }) {
                         Customer impact: {change.customerImpact}
                       </p>
                     )}
-                    <p className="text-muted-foreground mt-1 font-mono text-[11px]">
+                    <p className="mt-1 font-mono text-[11px] text-muted-foreground">
                       {change.url ? (
                         <a
                           href={change.url}
                           target="_blank"
                           rel="noreferrer"
-                          className="hover:text-foreground underline underline-offset-2"
+                          className="underline underline-offset-2 hover:text-foreground"
                         >
                           {change.repository}@{change.ref}
                         </a>
@@ -391,12 +391,12 @@ function Editor({ workspace }: { workspace: Workspace }) {
             </section>
           )}
 
-          <section className="bg-card rounded-xl border p-4">
+          <section className="rounded-xl border bg-card p-4">
             <div className="flex items-center gap-2">
               <Sparkles className="size-4" />
               <h2 className="font-semibold">Generate this selected issue</h2>
             </div>
-            <p className="text-muted-foreground mt-1 text-xs">
+            <p className="mt-1 text-xs text-muted-foreground">
               Uses this slot’s premise, pillar or series, brand voice, and the
               current draft. It does not generate any neighboring slots.
             </p>
@@ -435,11 +435,11 @@ function Editor({ workspace }: { workspace: Workspace }) {
             )}
           </section>
 
-          <section className="bg-card rounded-xl border p-4">
+          <section className="rounded-xl border bg-card p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h2 className="font-semibold">Product handoff</h2>
-                <p className="text-muted-foreground mt-1 text-xs">
+                <p className="mt-1 text-xs text-muted-foreground">
                   Export approved editorial context for Claude Code in the
                   product repo. Contacts, consent, credentials, and sending are
                   intentionally excluded.
@@ -448,7 +448,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
               <button
                 type="button"
                 onClick={() => void copyHandoff()}
-                className="border-border hover:bg-accent flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium"
+                className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-accent"
               >
                 {copied ? (
                   <Check className="size-4 text-emerald-500" />
@@ -491,12 +491,12 @@ function Editor({ workspace }: { workspace: Workspace }) {
             </div>
           </section>
 
-          <section className="bg-card rounded-xl border p-4">
+          <section className="rounded-xl border bg-card p-4">
             <div className="flex items-center gap-2">
               <MailCheck className="size-4" />
               <h2 className="font-semibold">Customer.io delivery</h2>
             </div>
-            <p className="text-muted-foreground mt-1 text-xs">
+            <p className="mt-1 text-xs text-muted-foreground">
               Growth freezes one saved revision and one provider-managed
               segment. Customer.io remains responsible for live membership,
               consent, suppressions, and the unsubscribe footer.
@@ -566,7 +566,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
                 })
               }
               disabled={!canPrepare || prepareSend.isPending}
-              className="border-border hover:bg-accent mt-3 flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-50"
+              className="mt-3 flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-accent disabled:opacity-50"
             >
               {prepareSend.isPending ? (
                 <Loader2 className="size-4 animate-spin" />
@@ -577,13 +577,13 @@ function Editor({ workspace }: { workspace: Workspace }) {
             </button>
 
             {latestSend && (
-              <div className="bg-muted/50 mt-4 rounded-lg border p-3 text-sm">
+              <div className="mt-4 rounded-lg border bg-muted/50 p-3 text-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <span className="font-medium">
                       Revision {latestSend.revision} · {latestSend.status}
                     </span>
-                    <p className="text-muted-foreground mt-0.5 text-xs">
+                    <p className="mt-0.5 text-xs text-muted-foreground">
                       {latestSend.audienceLabel} · CIO broadcast{" "}
                       {latestSend.providerBroadcastId} · segment{" "}
                       {latestSend.audienceReference}
@@ -600,7 +600,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
                           })
                         }
                         disabled={approveSend.isPending}
-                        className="bg-primary text-primary-foreground flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+                        className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
                       >
                         <Check className="size-3.5" /> Approve exact revision
                       </button>
@@ -661,7 +661,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
                 {!workspace.canDeliver &&
                   latestSend.status !== "sent" &&
                   latestSend.status !== "sending" && (
-                    <p className="text-muted-foreground mt-2 text-xs">
+                    <p className="mt-2 text-xs text-muted-foreground">
                       An organization owner or admin must approve and send this
                       revision.
                     </p>
@@ -676,7 +676,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
           </section>
 
           {workspace.versions.length > 0 && (
-            <section className="bg-card rounded-xl border p-4">
+            <section className="rounded-xl border bg-card p-4">
               <h2 className="font-semibold">Revision history</h2>
               <div className="mt-3 divide-y">
                 {workspace.versions.map((version) => (
@@ -688,11 +688,11 @@ function Editor({ workspace }: { workspace: Workspace }) {
                       <span className="font-medium">
                         Revision {version.revision}
                       </span>
-                      <span className="text-muted-foreground ml-2">
+                      <span className="ml-2 text-muted-foreground">
                         {version.source} · {version.createdAt.toLocaleString()}
                       </span>
                       {version.note && (
-                        <p className="text-muted-foreground mt-0.5 text-xs">
+                        <p className="mt-0.5 text-xs text-muted-foreground">
                           {version.note}
                         </p>
                       )}
@@ -706,7 +706,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
                         })
                       }
                       disabled={restore.isPending}
-                      className="border-border hover:bg-accent flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
+                      className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs hover:bg-accent"
                     >
                       <RotateCcw className="size-3.5" /> Restore
                     </button>
@@ -831,7 +831,7 @@ function ManualFieldsDialog({
           <button
             type="button"
             onClick={() => close(false)}
-            className="border-border hover:bg-accent rounded-lg border px-3 py-2 text-sm font-medium"
+            className="rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-accent"
           >
             Cancel
           </button>
@@ -839,7 +839,7 @@ function ManualFieldsDialog({
             type="button"
             disabled={!dirty || saving}
             onClick={() => onSave(fields)}
-            className="bg-primary text-primary-foreground flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
           >
             {saving ? (
               <Loader2 className="size-4 animate-spin" />
@@ -934,7 +934,7 @@ export function NewsletterIssueWorkspace({
 
   if (query.isLoading) {
     return (
-      <div className="text-muted-foreground flex items-center gap-2 py-16 text-sm">
+      <div className="flex items-center gap-2 py-16 text-sm text-muted-foreground">
         <Loader2 className="size-4 animate-spin" /> Loading email workspace…
       </div>
     );

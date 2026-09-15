@@ -4,11 +4,7 @@ import { createHash } from "node:crypto";
 import type { ModelMessage } from "ai";
 import type { GrowthPromptCacheTtl } from "./prompt-cache";
 
-export type GrowthSurface =
-  | "overview-chat"
-  | "mcp"
-  | "invoke-growth"
-  | "test";
+export type GrowthSurface = "overview-chat" | "mcp" | "invoke-growth" | "test";
 
 export interface GrowthContextSection {
   id: string;

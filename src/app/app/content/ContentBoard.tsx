@@ -137,7 +137,7 @@ function Thumb({
     return (
       <span
         className={cn(
-          "bg-muted/40 text-muted-foreground/30 flex items-center justify-center rounded-md border",
+          "flex items-center justify-center rounded-md border bg-muted/40 text-muted-foreground/30",
           className,
         )}
       >
@@ -146,7 +146,7 @@ function Thumb({
     );
   }
   return (
-    // eslint-disable-next-line @next/next/no-img-element
+    // oxlint-disable-next-line nextjs/no-img-element
     <img
       src={src}
       alt=""
@@ -432,7 +432,7 @@ export function ContentBoard({
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Content</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
+          <p className="mt-1 text-sm text-muted-foreground">
             {visible.length} {visible.length === 1 ? "idea" : "ideas"}
             {view === "board" ? " · drag to move through the pipeline" : ""}
           </p>
@@ -450,7 +450,7 @@ export function ContentBoard({
               });
             }}
             disabled={!createBrand}
-            className="border-border text-muted-foreground hover:bg-accent hover:text-foreground flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors"
+            className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
             <MessageSquare className="size-3.5" /> Plan next two weeks
           </button>
@@ -459,7 +459,7 @@ export function ContentBoard({
               <button
                 type="button"
                 onClick={() => setGenerateOpen(true)}
-                className="border-border text-muted-foreground hover:bg-accent hover:text-foreground grid size-8 place-items-center rounded-full border transition-colors"
+                className="grid size-8 place-items-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                 aria-label="Manual monthly slot fill"
               >
                 <CalendarPlus className="size-3.5" />
@@ -469,7 +469,7 @@ export function ContentBoard({
           </Tooltip>
           <Link
             href="/app/content/groupings"
-            className="border-border text-muted-foreground hover:bg-accent hover:text-foreground rounded-full border px-3 py-1.5 text-xs font-medium transition-colors"
+            className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
             ✨ Groupings
           </Link>
@@ -508,7 +508,7 @@ export function ContentBoard({
             {createBrandId && (
               <button
                 onClick={() => setReshuffleOpen(true)}
-                className="border-border hover:bg-accent rounded-full border px-3 py-1 text-xs font-medium transition-colors"
+                className="rounded-full border border-border px-3 py-1 text-xs font-medium transition-colors hover:bg-accent"
               >
                 ✨ Reshuffle
               </button>
@@ -561,7 +561,7 @@ export function ContentBoard({
             className={cn(
               "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
               mineOnly
-                ? "bg-foreground text-background border-foreground"
+                ? "border-foreground bg-foreground text-background"
                 : "border-border text-muted-foreground hover:bg-accent",
             )}
           >
@@ -696,7 +696,7 @@ function Segmented<T extends string>({
   compact?: boolean;
 }) {
   return (
-    <div className="border-border flex overflow-hidden rounded-full border">
+    <div className="flex overflow-hidden rounded-full border border-border">
       {options.map((o) => (
         <button
           key={o.value}
@@ -751,7 +751,7 @@ function FiltersPopover({
           <SlidersHorizontal className="size-3.5" />
           Filters
           {activeCount > 0 && (
-            <span className="bg-foreground text-background flex size-4 items-center justify-center rounded-full text-[10px] tabular-nums">
+            <span className="flex size-4 items-center justify-center rounded-full bg-foreground text-[10px] text-background tabular-nums">
               {activeCount}
             </span>
           )}
@@ -788,7 +788,7 @@ function FiltersPopover({
                 onPillarChange("all");
                 onStatusChange("all");
               }}
-              className="text-muted-foreground hover:text-foreground self-start text-xs underline"
+              className="self-start text-xs text-muted-foreground underline hover:text-foreground"
             >
               Clear filters
             </button>
@@ -937,7 +937,7 @@ function ContentList({
   return (
     <div className="mt-5">
       {groups.length === 0 && (
-        <div className="text-muted-foreground rounded-xl border px-3 py-12 text-center text-sm">
+        <div className="rounded-xl border px-3 py-12 text-center text-sm text-muted-foreground">
           {loading ? "Loading…" : "No ideas yet"}
         </div>
       )}
@@ -971,7 +971,7 @@ function PastWeeksToggle({
     <div className="flex">
       <button
         onClick={onToggle}
-        className="border-border text-muted-foreground hover:bg-accent rounded-full border px-3 py-1 text-xs font-medium transition-colors"
+        className="rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent"
       >
         {open
           ? "Hide earlier weeks"
@@ -1005,7 +1005,7 @@ function ListGroup({
     <section>
       <div className="mb-1.5 flex items-center gap-2 px-1">
         <h3 className="text-sm font-semibold">{g.label}</h3>
-        <span className="text-muted-foreground text-xs tabular-nums">
+        <span className="text-xs text-muted-foreground tabular-nums">
           {g.cards.length}
         </span>
       </div>
@@ -1054,7 +1054,7 @@ function ListRow({
         onKeyDown={(e) => {
           if (e.key === "Enter") onOpen(c.id);
         }}
-        className="hover:bg-accent/40 group flex cursor-pointer items-center gap-3 px-3 py-2.5"
+        className="group flex cursor-pointer items-center gap-3 px-3 py-2.5 hover:bg-accent/40"
       >
         <span
           className={cn("size-2 shrink-0 rounded-full", DOT[c.status])}
@@ -1066,7 +1066,7 @@ function ListRow({
             {c.title ?? "Untitled"}
           </div>
           {c.hook && (
-            <div className="text-muted-foreground truncate text-xs">
+            <div className="truncate text-xs text-muted-foreground">
               {c.hook}
             </div>
           )}
@@ -1087,7 +1087,7 @@ function ListRow({
             <ChannelLogo key={p} platform={p} className="size-3.5" />
           ))}
         </span>
-        <span className="text-muted-foreground w-14 shrink-0 text-right text-xs tabular-nums">
+        <span className="w-14 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
           {c.plannedAt ? fmtDate(c.plannedAt) : "—"}
         </span>
         <span
@@ -1160,7 +1160,7 @@ function CommentChip({
       <TooltipTrigger asChild>{btn}</TooltipTrigger>
       <TooltipContent>
         <span className="font-medium">{last.author ?? "Someone"}</span>
-        <span className="text-muted-foreground block max-w-[220px] truncate text-xs">
+        <span className="block max-w-[220px] truncate text-xs text-muted-foreground">
           {last.body}
         </span>
       </TooltipContent>
@@ -1205,11 +1205,11 @@ function InlineCommentThread({
     if (t) add.mutate({ contentPostId, body: t });
   };
   return (
-    <div className="bg-muted/20 border-t px-3 py-2.5">
+    <div className="border-t bg-muted/20 px-3 py-2.5">
       {isLoading ? (
-        <p className="text-muted-foreground text-xs">Loading…</p>
+        <p className="text-xs text-muted-foreground">Loading…</p>
       ) : comments.length === 0 ? (
-        <p className="text-muted-foreground mb-2 text-xs">No comments yet.</p>
+        <p className="mb-2 text-xs text-muted-foreground">No comments yet.</p>
       ) : (
         <div className="mb-2 flex flex-col gap-2">
           {comments.map((cm) => (
@@ -1226,7 +1226,7 @@ function InlineCommentThread({
                     day: "numeric",
                   })}
                 </span>
-                <p className="text-foreground/90 whitespace-pre-wrap">
+                <p className="whitespace-pre-wrap text-foreground/90">
                   {cm.body}
                 </p>
               </div>
@@ -1251,18 +1251,18 @@ function InlineCommentThread({
             if (e.key === "Enter") submit();
           }}
           placeholder="Reply…"
-          className="bg-background focus:ring-ring/40 flex-1 rounded-md border px-2 py-1 text-sm outline-none focus:ring-2"
+          className="flex-1 rounded-md border bg-background px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-ring/40"
         />
         <button
           onClick={submit}
           disabled={!body.trim() || add.isPending}
-          className="bg-foreground text-background rounded-md px-2.5 py-1 text-xs font-medium disabled:opacity-50"
+          className="rounded-md bg-foreground px-2.5 py-1 text-xs font-medium text-background disabled:opacity-50"
         >
           Send
         </button>
         <button
           onClick={onOpen}
-          className="text-muted-foreground hover:text-foreground text-xs underline"
+          className="text-xs text-muted-foreground underline hover:text-foreground"
         >
           Open ↗
         </button>
@@ -1285,7 +1285,7 @@ function InlineAdd({ onCreate }: { onCreate: (title: string) => void }) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="text-muted-foreground hover:bg-accent/40 hover:text-foreground flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors"
+        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground"
       >
         <span className="text-base leading-none">+</span> Add idea
       </button>
@@ -1306,7 +1306,7 @@ function InlineAdd({ onCreate }: { onCreate: (title: string) => void }) {
         }}
         onBlur={submit}
         placeholder="New idea…"
-        className="bg-background focus:ring-ring/40 w-full rounded-md border px-2 py-1 text-sm outline-none focus:ring-2"
+        className="w-full rounded-md border bg-background px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-ring/40"
       />
     </div>
   );
@@ -1361,7 +1361,7 @@ function ScheduleView({
 
   if (!loading && rows.length === 0) {
     return (
-      <div className="text-muted-foreground mt-5 rounded-xl border px-3 py-12 text-center text-sm">
+      <div className="mt-5 rounded-xl border px-3 py-12 text-center text-sm text-muted-foreground">
         Nothing scheduled
       </div>
     );
@@ -1382,13 +1382,13 @@ function ScheduleView({
   return (
     <div className="mt-5 flex flex-col gap-4">
       {loading && rows.length === 0 && (
-        <div className="text-muted-foreground text-sm">Loading…</div>
+        <div className="text-sm text-muted-foreground">Loading…</div>
       )}
       {pastDays.length > 0 && (
         <div className="flex">
           <button
             onClick={() => setShowPast((v) => !v)}
-            className="border-border text-muted-foreground hover:bg-accent rounded-full border px-3 py-1 text-xs font-medium transition-colors"
+            className="rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent"
           >
             {showPast
               ? "Hide past"
@@ -1397,7 +1397,7 @@ function ScheduleView({
         </div>
       )}
       {shownDays.length === 0 && undated.length === 0 && (
-        <div className="text-muted-foreground rounded-xl border px-3 py-12 text-center text-sm">
+        <div className="rounded-xl border px-3 py-12 text-center text-sm text-muted-foreground">
           Nothing upcoming
         </div>
       )}
@@ -1424,7 +1424,7 @@ function ScheduleView({
                   Today
                 </span>
               )}
-              <span className="text-muted-foreground text-xs tabular-nums">
+              <span className="text-xs text-muted-foreground tabular-nums">
                 {g.rows.length}
               </span>
             </div>
@@ -1444,10 +1444,10 @@ function ScheduleView({
       {undated.length > 0 && (
         <section>
           <div className="mb-1.5 flex items-center gap-2 px-1">
-            <h3 className="text-muted-foreground text-sm font-semibold">
+            <h3 className="text-sm font-semibold text-muted-foreground">
               No date yet
             </h3>
-            <span className="text-muted-foreground text-xs tabular-nums">
+            <span className="text-xs text-muted-foreground tabular-nums">
               {undated.length}
             </span>
           </div>
@@ -1497,7 +1497,7 @@ function ScheduleRow({
   return (
     <div
       className={cn(
-        "bg-card rounded-xl border",
+        "rounded-xl border bg-card",
         row.status === "slot" && "border-dashed bg-transparent opacity-80",
       )}
     >
@@ -1524,13 +1524,13 @@ function ScheduleRow({
             {row.title ?? "Untitled"}
           </div>
           {row.hook && (
-            <div className="text-muted-foreground truncate text-xs">
+            <div className="truncate text-xs text-muted-foreground">
               {row.hook}
             </div>
           )}
         </button>
         {time && (
-          <span className="text-muted-foreground hidden shrink-0 text-xs tabular-nums sm:inline">
+          <span className="hidden shrink-0 text-xs text-muted-foreground tabular-nums sm:inline">
             {time}
           </span>
         )}
@@ -1563,7 +1563,7 @@ function ScheduleRow({
         <div className="space-y-2 border-t px-3 py-2.5">
           {copyText && (
             <div className="flex items-start gap-2">
-              <p className="text-muted-foreground min-w-0 flex-1 text-sm whitespace-pre-wrap">
+              <p className="min-w-0 flex-1 text-sm whitespace-pre-wrap text-muted-foreground">
                 {copyText}
               </p>
               <button
@@ -1572,7 +1572,7 @@ function ScheduleRow({
                   setCopied(true);
                   setTimeout(() => setCopied(false), 1500);
                 }}
-                className="border-border hover:bg-accent shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-medium"
+                className="shrink-0 rounded-md border border-border px-2 py-0.5 text-[11px] font-medium hover:bg-accent"
               >
                 {copied ? "Copied" : "Copy"}
               </button>
@@ -1585,7 +1585,7 @@ function ScheduleRow({
                 href={url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="border-border text-muted-foreground hover:text-foreground hover:bg-accent rounded-md border px-1.5 py-0.5 transition-colors"
+                className="rounded-md border border-border px-1.5 py-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               >
                 ↗ Asset{(row.assetLinks?.length ?? 0) > 1 ? ` ${i + 1}` : ""}
               </a>
@@ -1595,7 +1595,7 @@ function ScheduleRow({
                 href={row.externalUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-muted-foreground hover:text-foreground underline"
+                className="text-muted-foreground underline hover:text-foreground"
               >
                 Open ↗
               </a>
@@ -1603,7 +1603,7 @@ function ScheduleRow({
             {row.contentPostId && (
               <button
                 onClick={() => onOpen(row.contentPostId!)}
-                className="text-muted-foreground hover:text-foreground ml-auto underline"
+                className="ml-auto text-muted-foreground underline hover:text-foreground"
               >
                 Open idea →
               </button>
@@ -1636,7 +1636,7 @@ function Column({
       <div className="mb-2 flex items-center gap-2 px-1">
         <span className={cn("size-2 rounded-full", DOT[status])} />
         <span className="text-sm font-semibold">{label}</span>
-        <span className="text-muted-foreground text-xs tabular-nums">
+        <span className="text-xs text-muted-foreground tabular-nums">
           {cards.length}
         </span>
       </div>
@@ -1651,7 +1651,7 @@ function Column({
           <DraggableCard key={c.id} card={c} onOpen={onOpen} assign={assign} />
         ))}
         {cards.length === 0 && (
-          <div className="text-muted-foreground px-1 py-6 text-center text-xs">
+          <div className="px-1 py-6 text-center text-xs text-muted-foreground">
             {loading ? "Loading…" : "Nothing here"}
           </div>
         )}
@@ -1711,7 +1711,7 @@ function ContentCardBody({
   return (
     <div
       className={cn(
-        "bg-card rounded-lg border p-3 text-left",
+        "rounded-lg border bg-card p-3 text-left",
         // Slots are empty containers, not work — render as ghosts.
         card.status === "slot" && "border-dashed bg-transparent opacity-80",
         dragging && "shadow-lg",
@@ -1719,7 +1719,7 @@ function ContentCardBody({
       style={pillar ? { borderLeft: `2px solid ${pillar.color}` } : undefined}
     >
       {card.mediaUrl && (
-        // eslint-disable-next-line @next/next/no-img-element
+        // oxlint-disable-next-line nextjs/no-img-element
         <img
           src={card.mediaUrl}
           alt=""
@@ -1752,7 +1752,7 @@ function ContentCardBody({
             </span>
           )}
           {pillar && (
-            <span className="text-muted-foreground flex items-center gap-1 text-[11px]">
+            <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
               <span
                 className="size-1.5 rounded-full"
                 style={{ background: pillar.color }}
@@ -1763,7 +1763,7 @@ function ContentCardBody({
         </div>
       )}
 
-      <div className="text-muted-foreground mt-2 flex items-center gap-2 text-[11px]">
+      <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
         <span className="truncate">{card.brandName}</span>
         <span className="ml-auto flex items-center gap-1">
           {card.spotOwners.length > 0 && (
@@ -1779,7 +1779,7 @@ function ContentCardBody({
 
       <div className="mt-1.5 flex items-center gap-2">
         {(card.postCount > 0 || reach) && (
-          <div className="text-muted-foreground flex items-center gap-2 text-[11px] tabular-nums">
+          <div className="flex items-center gap-2 text-[11px] text-muted-foreground tabular-nums">
             <span>
               {card.postCount} post{card.postCount === 1 ? "" : "s"}
             </span>

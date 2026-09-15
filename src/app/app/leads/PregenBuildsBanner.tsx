@@ -60,7 +60,7 @@ export function PregenBuildsBanner({
   const anyStuck = builds.some(isStuck);
 
   return (
-    <div className="border-border bg-muted/40 mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border px-3 py-2 text-xs">
+    <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs">
       <span className="flex items-center gap-2 font-medium">
         <Loader2 className="size-3.5 animate-spin" />
         {builds.length === 1 ? "Building" : `${builds.length} builds`}
@@ -68,10 +68,12 @@ export function PregenBuildsBanner({
       {builds.map((build) => (
         <span
           key={build.id}
-          className="text-muted-foreground flex items-center gap-1.5"
+          className="flex items-center gap-1.5 text-muted-foreground"
         >
           <span className="text-foreground">{build.domain}</span>
-          <span className="tabular-nums">{elapsedLabel(build.requestedAt)}</span>
+          <span className="tabular-nums">
+            {elapsedLabel(build.requestedAt)}
+          </span>
           {/* The URL serves 200 from creation — it renders the page as it
               exists mid-flight, gallery last, so an early peek reads thin
               rather than unfinished. */}
@@ -104,7 +106,7 @@ export function PregenBuildsBanner({
       ))}
       {/* Plumbing talk only when it is actually relevant. */}
       {anyStuck && (
-        <span className="text-muted-foreground text-[11px]">
+        <span className="text-[11px] text-muted-foreground">
           Builds settle over a webhook — one stuck past {STUCK_AFTER_MINUTES}m
           likely lost its event; refresh re-reads WanderOS directly.
         </span>

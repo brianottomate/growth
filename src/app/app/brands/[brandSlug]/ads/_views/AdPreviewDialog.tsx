@@ -118,16 +118,16 @@ export function AdPreviewDialog({
               Check against Meta&apos;s own render
             </Button>
           ) : destinations.isPending ? (
-            <p className="text-muted-foreground text-xs">
+            <p className="text-xs text-muted-foreground">
               Finding the allowlisted destination…
             </p>
           ) : !destination ? (
-            <p className="text-muted-foreground text-xs">
+            <p className="text-xs text-muted-foreground">
               No allowlisted Meta destination yet — connect and allow an ad
               account on the setup page.
             </p>
           ) : isVideo ? (
-            <p className="text-muted-foreground text-xs">
+            <p className="text-xs text-muted-foreground">
               Meta cannot render a video draft before it is pushed. The local
               preview above is the shape; push paused to see the real thing.
             </p>
@@ -158,7 +158,7 @@ export function AdPreviewDialog({
               >
                 Render on Meta
               </Button>
-              <span className="text-muted-foreground text-xs">
+              <span className="text-xs text-muted-foreground">
                 Feed placements only before a push.
               </span>
             </div>

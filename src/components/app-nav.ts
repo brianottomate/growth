@@ -54,9 +54,18 @@ export const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
   {
     label: "Wander Performance",
     items: [
-      { label: "Dashboard", href: "/app/performance", icon: Crosshair, exact: true },
+      {
+        label: "Dashboard",
+        href: "/app/performance",
+        icon: Crosshair,
+        exact: true,
+      },
       { label: "Clients", href: "/app/performance/clients", icon: Building2 },
-      { label: "Campaigns", href: "/app/performance/campaigns", icon: Megaphone },
+      {
+        label: "Campaigns",
+        href: "/app/performance/campaigns",
+        icon: Megaphone,
+      },
       { label: "Prospects", href: "/app/performance/prospects", icon: Target },
     ],
   },

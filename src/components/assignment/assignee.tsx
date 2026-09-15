@@ -65,7 +65,7 @@ export function OwnerAvatar({
     return (
       <span
         className={cn(
-          "border-muted-foreground/40 text-muted-foreground/50 flex shrink-0 items-center justify-center rounded-full border border-dashed",
+          "flex shrink-0 items-center justify-center rounded-full border border-dashed border-muted-foreground/40 text-muted-foreground/50",
           SIZE[size],
           className,
         )}
@@ -81,7 +81,7 @@ export function OwnerAvatar({
       title={member.name ?? undefined}
     >
       {member.image ? (
-        // eslint-disable-next-line @next/next/no-img-element
+        // oxlint-disable-next-line nextjs/no-img-element
         <img
           src={member.image}
           alt=""
@@ -94,7 +94,7 @@ export function OwnerAvatar({
       ) : (
         <span
           className={cn(
-            "bg-muted text-foreground flex items-center justify-center rounded-full font-semibold",
+            "flex items-center justify-center rounded-full bg-muted font-semibold text-foreground",
             SIZE[size],
             suggested && "opacity-50",
           )}
@@ -129,13 +129,13 @@ export function AvatarStack({
           key={m.id}
           member={m}
           size={size}
-          className="ring-card rounded-full ring-2"
+          className="rounded-full ring-2 ring-card"
         />
       ))}
       {extra > 0 && (
         <span
           className={cn(
-            "bg-muted text-muted-foreground ring-card flex items-center justify-center rounded-full font-medium ring-2",
+            "flex items-center justify-center rounded-full bg-muted font-medium text-muted-foreground ring-2 ring-card",
             SIZE[size],
           )}
         >
@@ -176,7 +176,7 @@ export function AssigneeButton({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         aria-label={value ? `Owner: ${value.name ?? "assigned"}` : label}
-        className="focus-visible:ring-ring rounded-full outline-none focus-visible:ring-2"
+        appearance="avatar"
         onClick={(e) => e.stopPropagation()}
       >
         <OwnerAvatar
@@ -202,7 +202,7 @@ export function AssigneeButton({
                     onChange(null);
                     setOpen(false);
                   }}
-                  className="text-muted-foreground"
+                  tone="muted"
                 >
                   Clear owner
                 </CommandItem>
@@ -215,17 +215,16 @@ export function AssigneeButton({
                     onChange(m.id);
                     setOpen(false);
                   }}
-                  className="gap-2"
                 >
                   <OwnerAvatar member={m} size="sm" />
                   <span className="truncate">{m.name ?? "Unknown"}</span>
                   {m.id === currentUserId && (
-                    <span className="text-muted-foreground ml-auto text-xs">
+                    <span className="ml-auto text-xs text-muted-foreground">
                       you
                     </span>
                   )}
                   {value?.id === m.id && (
-                    <span className="text-foreground ml-auto text-xs">✓</span>
+                    <span className="ml-auto text-xs text-foreground">✓</span>
                   )}
                 </CommandItem>
               ))}
@@ -274,7 +273,7 @@ export function MultiAssigneeButton({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         aria-label="Assignees"
-        className="focus-visible:ring-ring rounded-full outline-none focus-visible:ring-2"
+        appearance="avatar"
         onClick={(e) => e.stopPropagation()}
       >
         {value.length ? (
@@ -298,19 +297,18 @@ export function MultiAssigneeButton({
                   key={m.id}
                   value={`${m.name ?? ""} ${m.id}`}
                   onSelect={() => toggle(m.id)}
-                  className="gap-2"
                 >
                   <OwnerAvatar member={m} size="sm" />
                   <span className="truncate">{m.name ?? "Unknown"}</span>
                   {m.id === currentUserId && (
-                    <span className="text-muted-foreground ml-auto text-xs">
+                    <span className="ml-auto text-xs text-muted-foreground">
                       you
                     </span>
                   )}
                   {selected.has(m.id) && (
                     <span
                       className={cn(
-                        "text-foreground text-xs",
+                        "text-xs text-foreground",
                         m.id === currentUserId ? "" : "ml-auto",
                       )}
                     >

@@ -31,7 +31,9 @@ export function ListingSamplesDialog({
 }: {
   brandId: string;
   /** The imported assets, in the order picked; the first becomes the source. */
-  onImported: (assets: { id: string; url: string | null }[]) => void | Promise<void>;
+  onImported: (
+    assets: { id: string; url: string | null }[],
+  ) => void | Promise<void>;
 }) {
   const trpc = useTRPC();
   const [open, setOpen] = useState(false);
@@ -90,18 +92,18 @@ export function ListingSamplesDialog({
         </DialogHeader>
 
         {samples.isLoading ? (
-          <div className="text-muted-foreground flex h-40 items-center justify-center gap-2 text-xs">
+          <div className="flex h-40 items-center justify-center gap-2 text-xs text-muted-foreground">
             <Loader2 className="size-4 animate-spin" />
             Reading their listings
           </div>
         ) : samples.error ? (
           <p className="text-xs text-red-300">{samples.error.message}</p>
         ) : !samples.data?.hasSite ? (
-          <p className="text-muted-foreground text-sm">
+          <p className="text-sm text-muted-foreground">
             This brand has no website on record, so there is no feed to read.
           </p>
         ) : homes.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
+          <p className="text-sm text-muted-foreground">
             No listings with photos on their site. Check the website is a
             WanderOS site.
           </p>
@@ -117,11 +119,11 @@ export function ListingSamplesDialog({
                   aria-pressed={on}
                   className={cn(
                     "group relative overflow-hidden rounded-lg border text-left transition",
-                    on ? "ring-primary ring-2" : "hover:border-white/30",
+                    on ? "ring-2 ring-primary" : "hover:border-white/30",
                   )}
                   title={home.name}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {/* oxlint-disable-next-line nextjs/no-img-element */}
                   <img
                     src={home.thumbUrl}
                     alt={home.name}
@@ -129,13 +131,17 @@ export function ListingSamplesDialog({
                     loading="lazy"
                   />
                   <div className="space-y-0.5 p-2">
-                    <div className="truncate text-xs font-medium">{home.name}</div>
-                    <div className="text-muted-foreground truncate text-[11px]">
-                      {home.importedAssetId ? "Already in the library" : home.place}
+                    <div className="truncate text-xs font-medium">
+                      {home.name}
+                    </div>
+                    <div className="truncate text-[11px] text-muted-foreground">
+                      {home.importedAssetId
+                        ? "Already in the library"
+                        : home.place}
                     </div>
                   </div>
                   {on ? (
-                    <span className="bg-primary text-primary-foreground absolute top-1.5 right-1.5 flex size-5 items-center justify-center rounded-full">
+                    <span className="absolute top-1.5 right-1.5 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
                       <Check className="size-3" />
                     </span>
                   ) : null}
@@ -151,7 +157,9 @@ export function ListingSamplesDialog({
             variant="ghost"
             disabled={homes.length === 0}
             onClick={() =>
-              setPicked(allPicked ? new Set() : new Set(homes.map((home) => home.id)))
+              setPicked(
+                allPicked ? new Set() : new Set(homes.map((home) => home.id)),
+              )
             }
           >
             {allPicked ? "Clear" : `Select all ${homes.length}`}
@@ -165,7 +173,10 @@ export function ListingSamplesDialog({
                 brandId,
                 homes: homes
                   .filter((home) => picked.has(home.id))
-                  .map((home) => ({ imageUrl: home.imageUrl, name: home.name })),
+                  .map((home) => ({
+                    imageUrl: home.imageUrl,
+                    name: home.name,
+                  })),
               })
             }
           >

@@ -58,10 +58,10 @@ export function DigestImageBoard({
   const missing = homes.filter((property) => !property.imageUrl).length;
 
   return (
-    <section className="bg-card rounded-xl border p-4">
+    <section className="rounded-xl border bg-card p-4">
       <div className="mb-3 flex items-baseline justify-between gap-3">
         <h2 className="text-sm font-semibold">Digest photos</h2>
-        <p className="text-muted-foreground text-xs">
+        <p className="text-xs text-muted-foreground">
           {missing === 0
             ? `All ${homes.length} homes have a photo`
             : `${missing} of ${homes.length} still need one`}
@@ -71,7 +71,7 @@ export function DigestImageBoard({
       <div className="space-y-4">
         {digest.sections.map((section, sectionIndex) => (
           <div key={`${section.heading}-${sectionIndex}`}>
-            <p className="text-muted-foreground mb-2 text-[11px] font-semibold tracking-wider uppercase">
+            <p className="mb-2 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
               {section.heading}
             </p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -94,14 +94,14 @@ export function DigestImageBoard({
                         : `Choose a photo for ${property.name}`
                     }
                     className={cn(
-                      "bg-muted group relative block aspect-[3/2] w-full overflow-hidden rounded-lg border transition-colors",
+                      "group relative block aspect-[3/2] w-full overflow-hidden rounded-lg border bg-muted transition-colors",
                       property.imageUrl
-                        ? "hover:ring-foreground/30 hover:ring-2"
+                        ? "hover:ring-2 hover:ring-foreground/30"
                         : "border-dashed hover:border-solid",
                     )}
                   >
                     {property.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
+                      // oxlint-disable-next-line nextjs/no-img-element
                       <img
                         src={property.imageUrl}
                         alt={property.name}
@@ -109,7 +109,7 @@ export function DigestImageBoard({
                         loading="lazy"
                       />
                     ) : (
-                      <span className="text-muted-foreground flex size-full flex-col items-center justify-center gap-1">
+                      <span className="flex size-full flex-col items-center justify-center gap-1 text-muted-foreground">
                         <ImagePlus className="size-4" />
                         <span className="text-[10px] font-medium">
                           Image needed
@@ -136,7 +136,7 @@ export function DigestImageBoard({
                           href={property.href}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-muted-foreground hover:text-foreground text-[10px] underline underline-offset-2"
+                          className="text-[10px] text-muted-foreground underline underline-offset-2 hover:text-foreground"
                         >
                           Open listing
                         </a>
@@ -150,7 +150,7 @@ export function DigestImageBoard({
                         onClick={() =>
                           setImage(sectionIndex, propertyIndex, null)
                         }
-                        className="text-muted-foreground hover:text-foreground shrink-0"
+                        className="shrink-0 text-muted-foreground hover:text-foreground"
                       >
                         <X className="size-3" />
                       </button>

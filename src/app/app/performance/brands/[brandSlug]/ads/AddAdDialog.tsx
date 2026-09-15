@@ -68,11 +68,7 @@ export function AddAdDialog({
       title="Add an ad"
       size="sm"
       trigger={
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-7 rounded-full px-3 text-[11.5px]"
-        >
+        <Button size="sm" variant="outline" shape="round" density="editorial">
           <Plus className="size-3" />
           Add ad
         </Button>
@@ -112,7 +108,7 @@ export function AddAdDialog({
                 className={cn(
                   "flex-1 rounded-full px-2.5 py-1 text-[11.5px] transition-colors",
                   format === option
-                    ? "bg-foreground text-background font-medium"
+                    ? "bg-foreground font-medium text-background"
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
@@ -121,7 +117,7 @@ export function AddAdDialog({
             ))}
           </div>
           {format === "catalog" ? (
-            <p className="text-muted-foreground text-[11px]">
+            <p className="text-[11px] text-muted-foreground">
               One card per home. Meta renders the live ad from the product set;
               the cards here show the shape.
             </p>
@@ -131,7 +127,7 @@ export function AddAdDialog({
           <div className="space-y-1.5">
             <Label htmlFor="shell-home">
               Home{" "}
-              <span className="text-muted-foreground font-normal">
+              <span className="font-normal text-muted-foreground">
                 (by name; their site is not connected)
               </span>
             </Label>
@@ -148,7 +144,7 @@ export function AddAdDialog({
             <div className="flex items-center gap-2">
               {home ? (
                 <span className="flex min-w-0 items-center gap-1.5 text-xs">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {/* oxlint-disable-next-line nextjs/no-img-element */}
                   <img
                     src={home.thumbUrl ?? home.imageUrl}
                     alt=""
@@ -157,7 +153,7 @@ export function AddAdDialog({
                   <span className="truncate">{home.name}</span>
                 </span>
               ) : (
-                <span className="text-muted-foreground text-xs">
+                <span className="text-xs text-muted-foreground">
                   About no home in particular
                 </span>
               )}
@@ -176,7 +172,7 @@ export function AddAdDialog({
         <div className="space-y-1.5">
           <Label htmlFor="shell-name">
             Name{" "}
-            <span className="text-muted-foreground font-normal">
+            <span className="font-normal text-muted-foreground">
               (optional)
             </span>
           </Label>

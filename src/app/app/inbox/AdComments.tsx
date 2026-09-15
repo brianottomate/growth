@@ -16,7 +16,7 @@ export async function AdComments() {
     result = await getRecentAdComments();
   } catch (error) {
     return (
-      <div className="border-destructive/30 bg-destructive/10 text-destructive rounded-lg border p-4 text-sm">
+      <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
         <p className="font-semibold">Failed to fetch ad comments</p>
         <p className="mt-1 font-mono text-xs">
           {error instanceof Error ? error.message : String(error)}
@@ -36,7 +36,7 @@ export async function AdComments() {
 
   return (
     <div className="space-y-4">
-      <p className="text-muted-foreground text-xs">
+      <p className="text-xs text-muted-foreground">
         <span className="font-mono">{result.totalAds}</span> ads ·{" "}
         <span className="font-mono">{result.adsWithComments}</span> with
         comments · <span className="font-mono">{result.comments.length}</span>{" "}
@@ -48,7 +48,7 @@ export async function AdComments() {
       </p>
 
       {result.errors.length > 0 ? (
-        <details className="bg-muted/50 text-muted-foreground rounded-lg border p-3 text-xs">
+        <details className="rounded-lg border bg-muted/50 p-3 text-xs text-muted-foreground">
           <summary className="cursor-pointer font-semibold">
             {result.errors.length} ad{result.errors.length === 1 ? "" : "s"}{" "}
             errored (likely Stories / DPA — not commentable)
@@ -67,13 +67,13 @@ export async function AdComments() {
       ) : null}
 
       {top.length === 0 ? (
-        <div className="bg-card text-muted-foreground rounded-lg border p-4 text-sm">
+        <div className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
           No ad comments in the last {LISTENING_WINDOW_DAYS} days. Either no
           active ads drew comments recently, or the ad account isn&apos;t
           connected in Zernio.
         </div>
       ) : (
-        <ul className="bg-card divide-y rounded-lg border">
+        <ul className="divide-y rounded-lg border bg-card">
           {top.map((c, idx) => {
             const id = c.id ?? c._id ?? `idx-${idx}`;
             const author = c.from?.name ?? "Unknown";
@@ -85,28 +85,28 @@ export async function AdComments() {
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                      <span className="text-foreground text-sm font-medium">
+                      <span className="text-sm font-medium text-foreground">
                         {author}
                       </span>
                       {when ? (
-                        <span className="text-muted-foreground text-xs">
+                        <span className="text-xs text-muted-foreground">
                           · {new Date(when).toLocaleDateString()}
                         </span>
                       ) : null}
                       {c.parent ? (
-                        <span className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 text-xs">
+                        <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
                           reply
                         </span>
                       ) : null}
                     </div>
-                    <p className="text-foreground/90 mt-1 text-sm whitespace-pre-line">
+                    <p className="mt-1 text-sm whitespace-pre-line text-foreground/90">
                       {short || (
                         <span className="text-muted-foreground italic">
                           (no text)
                         </span>
                       )}
                     </p>
-                    <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
                       <span>
                         on ad:{" "}
                         {c.adUrl ? (
@@ -137,7 +137,7 @@ export async function AdComments() {
                     </div>
                     <ListenItemActions context={buildAdCommentContext(c)} />
                   </div>
-                  <span className="bg-muted text-muted-foreground shrink-0 rounded px-2 py-0.5 font-mono text-xs">
+                  <span className="shrink-0 rounded bg-muted px-2 py-0.5 font-mono text-xs text-muted-foreground">
                     {c.platform ?? "ads"}
                   </span>
                 </div>

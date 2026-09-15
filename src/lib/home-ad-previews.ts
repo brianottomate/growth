@@ -29,8 +29,11 @@ export type HomeForPreview = {
 };
 
 /** A feed rating on the card's five-point scale, or null when there is none. */
-export function ratingOutOfFive(rating: number | null | undefined): number | null {
-  if (typeof rating !== "number" || !Number.isFinite(rating) || rating <= 0) return null;
+export function ratingOutOfFive(
+  rating: number | null | undefined,
+): number | null {
+  if (typeof rating !== "number" || !Number.isFinite(rating) || rating <= 0)
+    return null;
   const scaled = rating > 5 ? rating / 2 : rating;
   const rounded = Math.round(Math.min(5, scaled) * 10) / 10;
   return rounded >= 1 ? rounded : null;
@@ -67,7 +70,9 @@ export function homePreviewRecipes(home: HomeForPreview): HomePreviewRecipe[] {
     {
       id: "hero",
       label: "Hero",
-      title: where ? `Your private ${town} escape awaits` : `${home.name} awaits`,
+      title: where
+        ? `Your private ${town} escape awaits`
+        : `${home.name} awaits`,
       cta: BUTTON,
     },
     {
@@ -118,7 +123,8 @@ export function compositionPreviewUrl(spec: PreviewSpec) {
     params.set("focalY", String(spec.focal.y));
   }
   if (spec.scrim) params.set("scrim", spec.scrim);
-  if ("assetId" in spec.source) params.set("sourceMediaAssetId", spec.source.assetId);
+  if ("assetId" in spec.source)
+    params.set("sourceMediaAssetId", spec.source.assetId);
   else params.set("sourceUrl", spec.source.url);
   return `/api/compositions/preview?${params.toString()}`;
 }
@@ -134,8 +140,12 @@ export type HomeCatalogCopy = {
 export function homeCatalogCopy(home: HomeForPreview): HomeCatalogCopy {
   const where = place(home);
   const facts = [
-    home.bedrooms ? `${home.bedrooms} ${home.bedrooms === 1 ? "bedroom" : "bedrooms"}` : null,
-    home.bathrooms ? `${home.bathrooms} ${home.bathrooms === 1 ? "bath" : "baths"}` : null,
+    home.bedrooms
+      ? `${home.bedrooms} ${home.bedrooms === 1 ? "bedroom" : "bedrooms"}`
+      : null,
+    home.bathrooms
+      ? `${home.bathrooms} ${home.bathrooms === 1 ? "bath" : "baths"}`
+      : null,
     home.guests ? `${home.guests} guests` : null,
   ].filter((part): part is string => Boolean(part));
   const rating = ratingOutOfFive(home.rating);

@@ -116,7 +116,7 @@ export function BrandingPanel({
 
       {sizes.length > 0 && (
         <Row label="Type sizes">
-          <span className="text-muted-foreground font-mono">
+          <span className="font-mono text-muted-foreground">
             {sizes.map(([k, v]) => `${k} ${v}`).join(" · ")}
           </span>
         </Row>
@@ -124,7 +124,7 @@ export function BrandingPanel({
 
       {raw?.spacing && (raw.spacing.baseUnit || raw.spacing.borderRadius) ? (
         <Row label="Spacing">
-          <span className="text-muted-foreground font-mono">
+          <span className="font-mono text-muted-foreground">
             {[
               raw.spacing.baseUnit ? `base ${raw.spacing.baseUnit}` : null,
               raw.spacing.borderRadius
@@ -142,7 +142,9 @@ export function BrandingPanel({
           <span>
             <span className="capitalize">{identity.personality.tone}</span>
             {" · "}
-            <span className="capitalize">{identity.personality.energy}</span>{" "}
+            <span className="capitalize">
+              {identity.personality.energy}
+            </span>{" "}
             energy
             {" · "}
             {identity.personality.targetAudience}
@@ -152,7 +154,7 @@ export function BrandingPanel({
 
       {!compact && raw?.confidence ? (
         <Row label="Confidence">
-          <span className="text-muted-foreground font-mono">
+          <span className="font-mono text-muted-foreground">
             {Object.entries(raw.confidence as Record<string, number>)
               .map(([k, v]) => `${k} ${Math.round(v * 100)}%`)
               .join(" · ")}
@@ -163,7 +165,13 @@ export function BrandingPanel({
   );
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+function Row({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="grid grid-cols-[80px_minmax(0,1fr)] items-start gap-2">
       <span className="text-muted-foreground">{label}</span>
@@ -183,10 +191,10 @@ function ImageCell({
 }) {
   return (
     <div className="overflow-hidden rounded-md border">
-      <div className="text-muted-foreground border-b px-2 py-1">{label}</div>
+      <div className="border-b px-2 py-1 text-muted-foreground">{label}</div>
       <div className="flex h-16 items-center justify-center bg-white p-2">
         {src ? (
-          // eslint-disable-next-line @next/next/no-img-element
+          // oxlint-disable-next-line nextjs/no-img-element
           <img
             src={src}
             alt=""

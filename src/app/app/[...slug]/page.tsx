@@ -14,17 +14,17 @@ export default async function PlaceholderPage({
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 p-16 text-center">
-      <div className="border-muted-foreground/30 text-muted-foreground flex size-12 items-center justify-center rounded-xl border border-dashed text-lg font-semibold">
+      <div className="flex size-12 items-center justify-center rounded-xl border border-dashed border-muted-foreground/30 text-lg font-semibold text-muted-foreground">
         {title.slice(0, 1).toUpperCase()}
       </div>
       <div className="text-lg font-semibold capitalize">{title}</div>
-      <p className="text-muted-foreground max-w-sm text-sm">
+      <p className="max-w-sm text-sm text-muted-foreground">
         Not built yet — we&apos;re adding screens one at a time. This one&apos;s
         queued.
       </p>
       <Link
         href="/app"
-        className="border-border hover:bg-accent/40 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors"
+        className="rounded-md border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent/40"
       >
         ← Back to overview
       </Link>

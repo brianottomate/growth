@@ -106,14 +106,17 @@ export async function rehostImages(
  * longer appears literally in the crawl corpus.
  */
 export const rehostedSourceHash = (sourceUrl: string): string =>
-  createHash("sha256").update(sourceUrl).digest("hex").slice(0, HASH_PREFIX_LENGTH);
+  createHash("sha256")
+    .update(sourceUrl)
+    .digest("hex")
+    .slice(0, HASH_PREFIX_LENGTH);
 
 const isR2Configured = (): boolean =>
   Boolean(
     env.CLOUDFLARE_ACCOUNT_ID &&
-      env.R2_ACCESS_KEY_ID &&
-      env.R2_SECRET_ACCESS_KEY &&
-      env.R2_PUBLIC_BASE_URL,
+    env.R2_ACCESS_KEY_ID &&
+    env.R2_SECRET_ACCESS_KEY &&
+    env.R2_PUBLIC_BASE_URL,
   );
 
 async function fetchAndUpload(
@@ -248,8 +251,9 @@ const EXTENSIONS: Record<string, string> = {
 const extensionFor = (contentType: string): string =>
   EXTENSIONS[contentType] ?? "jpg";
 
-const chunk = <T,>(items: T[], size: number): T[][] => {
+const chunk = <T>(items: T[], size: number): T[][] => {
   const out: T[][] = [];
-  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  for (let i = 0; i < items.length; i += size)
+    out.push(items.slice(i, i + size));
   return out;
 };

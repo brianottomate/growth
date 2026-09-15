@@ -149,9 +149,7 @@ export async function POST(request: Request) {
     );
   }
   const { apply, retry } = parsed.data;
-  const domains = [
-    ...new Set(parsed.data.domains.map((d) => d.toLowerCase())),
-  ];
+  const domains = [...new Set(parsed.data.domains.map((d) => d.toLowerCase()))];
 
   if (apply && !isWanderApiConfigured) {
     return NextResponse.json(

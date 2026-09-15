@@ -71,7 +71,11 @@ function brandPalette(identity: BrandIdentity | null | undefined) {
   });
 }
 
-type Direction = { verdict: "keep" | "adjust"; note: string; changes: string[] };
+type Direction = {
+  verdict: "keep" | "adjust";
+  note: string;
+  changes: string[];
+};
 
 /** Where the crop leans, as the focal point the renderer keeps in frame. */
 const CROP_PRESETS = {
@@ -136,10 +140,12 @@ export function CompositionWorkbench({
   // Copy lives outside the blueprint: switching layouts keeps it, and a field
   // reappears with its text when a layout uses it again. The standard
   // placeholder copy stands until the operator types or asks for copy.
-  const [title, setTitle] = useState(initialTitle ?? "The view is only the beginning.");
+  const [title, setTitle] = useState(
+    initialTitle ?? "The view is only the beginning.",
+  );
   const [subtitle, setSubtitle] = useState(
     initialSubtitle ??
-    "Turn a strong property image into channel-ready creative without rebuilding the layout.",
+      "Turn a strong property image into channel-ready creative without rebuilding the layout.",
   );
   const [eyebrow, setEyebrow] = useState(initialEyebrow ?? "Stay with Wander");
   const [cta, setCta] = useState(initialCta ?? "Explore the stay");
@@ -150,7 +156,9 @@ export function CompositionWorkbench({
   // The home the copywriter matched the photo to, kept for the brand row.
   const [homeUrl, setHomeUrl] = useState<string | null>(null);
   const [sourceSearch, setSourceSearch] = useState("");
-  const [mark, setMark] = useState<"auto" | "color" | "white" | "dark" | "none">("auto");
+  const [mark, setMark] = useState<
+    "auto" | "color" | "white" | "dark" | "none"
+  >("auto");
   // The crop is a focal point: the point of the photo that must stay in
   // frame. A landscape photo on a portrait canvas loses its sides, a portrait
   // one on a square loses top and bottom, and one control has to cover both.
@@ -196,7 +204,7 @@ export function CompositionWorkbench({
         : null,
     );
     setHydratedFrom(openAssetId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
   }, [reopened.data, openAssetId, hydratedFrom]);
   useEffect(() => {
     if (reopened.error) toast.error(reopened.error.message);
@@ -242,7 +250,8 @@ export function CompositionWorkbench({
           Boolean(asset.url) &&
           // The brand mark's own renders live in the library too; they are
           // drawn onto cards, never used as the photo under one.
-          (asset.metadata as { source?: string } | null)?.source !== "brand_mark" &&
+          (asset.metadata as { source?: string } | null)?.source !==
+            "brand_mark" &&
           // Nor is a card the Studio already rendered: type over type. Every
           // freeze lands at the top of the library, so without this the
           // newest "photo" is always the last card and each render stacks on
@@ -286,7 +295,8 @@ export function CompositionWorkbench({
       formatId,
       sourceMediaAssetId: renderSourceId || undefined,
       title: needsTitle ? title.trim() : "",
-      subtitle: has("subtitle") && subtitle.trim() ? subtitle.trim() : undefined,
+      subtitle:
+        has("subtitle") && subtitle.trim() ? subtitle.trim() : undefined,
       eyebrow: has("eyebrow") && eyebrow.trim() ? eyebrow.trim() : undefined,
       cta: has("cta") && cta.trim() ? cta.trim() : undefined,
       accent: has("accent") ? accent : undefined,
@@ -296,8 +306,24 @@ export function CompositionWorkbench({
       focal: focal ?? undefined,
       scrim: scrim ?? undefined,
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [brandId, templateId, formatId, renderSourceId, title, subtitle, eyebrow, cta, accent, rating, mark, imagePosition, focal, scrim, fields],
+    // oxlint-disable-next-line react/exhaustive-deps
+    [
+      brandId,
+      templateId,
+      formatId,
+      renderSourceId,
+      title,
+      subtitle,
+      eyebrow,
+      cta,
+      accent,
+      rating,
+      mark,
+      imagePosition,
+      focal,
+      scrim,
+      fields,
+    ],
   );
 
   const previewUrl = useMemo(() => {
@@ -310,7 +336,8 @@ export function CompositionWorkbench({
       imagePosition,
       mark: spec.mark,
     });
-    if (spec.sourceMediaAssetId) params.set("sourceMediaAssetId", spec.sourceMediaAssetId);
+    if (spec.sourceMediaAssetId)
+      params.set("sourceMediaAssetId", spec.sourceMediaAssetId);
     if (spec.subtitle) params.set("subtitle", spec.subtitle);
     if (spec.eyebrow) params.set("eyebrow", spec.eyebrow);
     if (spec.cta) params.set("cta", spec.cta);
@@ -340,7 +367,8 @@ export function CompositionWorkbench({
           ),
         );
       },
-      onError: (error) => toast.error(`Frozen, but not put on the ad: ${error.message}`),
+      onError: (error) =>
+        toast.error(`Frozen, but not put on the ad: ${error.message}`),
     }),
   );
   const addAdPreview = useMutation(
@@ -458,7 +486,7 @@ export function CompositionWorkbench({
     <div className="grid gap-6 2xl:grid-cols-[440px_minmax(0,1fr)]">
       <div className="space-y-5">
         {openAssetId || adPreviewTarget ? (
-          <div className="bg-muted/40 flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-xs">
+          <div className="flex items-center justify-between gap-3 rounded-xl border bg-muted/40 px-3 py-2 text-xs">
             <span>
               {openAssetId && reopened.isLoading
                 ? "Opening the card…"
@@ -471,11 +499,17 @@ export function CompositionWorkbench({
                       : "Reopened from the library. Freezing makes a new card; the old one stays."}
             </span>
             {replaceTarget?.back ? (
-              <Link href={replaceTarget.back} className="text-primary shrink-0 hover:underline">
+              <Link
+                href={replaceTarget.back}
+                className="shrink-0 text-primary hover:underline"
+              >
                 Back to the campaign
               </Link>
             ) : adPreviewTarget?.back ? (
-              <Link href={adPreviewTarget.back} className="text-primary shrink-0 hover:underline">
+              <Link
+                href={adPreviewTarget.back}
+                className="shrink-0 text-primary hover:underline"
+              >
                 Back to the brand
               </Link>
             ) : null}
@@ -521,12 +555,14 @@ export function CompositionWorkbench({
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs">
               <span className="font-semibold">Brand defaults</span>{" "}
-              <span className="text-muted-foreground">read from the brand page</span>
+              <span className="text-muted-foreground">
+                read from the brand page
+              </span>
             </p>
             {selectedBrand?.slug ? (
               <Link
                 href={`/app/brands/${selectedBrand.slug}`}
-                className="text-primary inline-flex items-center gap-1 text-xs hover:underline"
+                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
               >
                 Edit on {selectedBrand.name}
                 <ExternalLink className="size-3" />
@@ -536,8 +572,12 @@ export function CompositionWorkbench({
           <div className="flex flex-wrap items-center gap-3 text-xs">
             {selectedBrand?.logo ? (
               <span className="inline-flex h-7 items-center rounded-md border bg-white px-2">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={selectedBrand.logo} alt="" className="max-h-4 max-w-28 object-contain" />
+                {/* oxlint-disable-next-line nextjs/no-img-element */}
+                <img
+                  src={selectedBrand.logo}
+                  alt=""
+                  className="max-h-4 max-w-28 object-contain"
+                />
               </span>
             ) : null}
             {palette.length > 0 ? (
@@ -568,8 +608,12 @@ export function CompositionWorkbench({
             ) : null}
           </div>
           {identity?.personality ? (
-            <p className="text-muted-foreground text-[11px]">
-              {[identity.personality.tone, identity.personality.energy, identity.personality.targetAudience]
+            <p className="text-[11px] text-muted-foreground">
+              {[
+                identity.personality.tone,
+                identity.personality.energy,
+                identity.personality.targetAudience,
+              ]
                 .filter(Boolean)
                 .join(" · ")}
             </p>
@@ -581,7 +625,7 @@ export function CompositionWorkbench({
             <p className="flex items-center gap-2 text-sm">
               <Layers3 className="size-4" />
               <span className="font-semibold">Blueprint</span>
-              <span className="text-muted-foreground text-xs">
+              <span className="text-xs text-muted-foreground">
                 decides which fields exist below
               </span>
             </p>
@@ -594,18 +638,18 @@ export function CompositionWorkbench({
                 type="button"
                 onClick={() => chooseTemplate(template.id)}
                 className={cn(
-                  "hover:bg-muted/70 relative rounded-lg border p-3 text-left transition-colors",
+                  "relative rounded-lg border p-3 text-left transition-colors hover:bg-muted/70",
                   templateId === template.id &&
-                    "border-primary bg-primary/5 ring-primary/20 ring-2",
+                    "border-primary bg-primary/5 ring-2 ring-primary/20",
                 )}
               >
                 {templateId === template.id && (
-                  <Check className="text-primary absolute top-2 right-2 size-3.5" />
+                  <Check className="absolute top-2 right-2 size-3.5 text-primary" />
                 )}
                 <span className="block pr-4 text-xs font-semibold">
                   {template.label}
                 </span>
-                <span className="text-muted-foreground mt-1 block text-[11px] leading-4">
+                <span className="mt-1 block text-[11px] leading-4 text-muted-foreground">
                   {template.description}
                 </span>
               </button>
@@ -620,7 +664,7 @@ export function CompositionWorkbench({
               {fields.length} field{fields.length === 1 ? "" : "s"}
             </Badge>
             {fields.length === 0 ? (
-              <span className="text-muted-foreground text-xs">
+              <span className="text-xs text-muted-foreground">
                 draws the photo and nothing else
               </span>
             ) : null}
@@ -628,10 +672,12 @@ export function CompositionWorkbench({
 
           {fields.map((field) => (
             <div key={field.key} className="space-y-1.5">
-              <Label className="flex items-center gap-2">
+              <Label className="flex items-center">
                 {field.label}
                 {field.hint && field.key === "accent" ? (
-                  <span className="text-muted-foreground font-normal">{field.hint}</span>
+                  <span className="font-normal text-muted-foreground">
+                    {field.hint}
+                  </span>
                 ) : null}
               </Label>
               {field.key === "mark" ? (
@@ -639,7 +685,10 @@ export function CompositionWorkbench({
                   value={mark}
                   onValueChange={(value) => setMark(value as typeof mark)}
                   options={[
-                    { value: "auto", label: "Brand default · white over photos" },
+                    {
+                      value: "auto",
+                      label: "Brand default · white over photos",
+                    },
                     { value: "color", label: "Colour" },
                     { value: "white", label: "White" },
                     { value: "dark", label: "Dark" },
@@ -686,7 +735,11 @@ export function CompositionWorkbench({
                   value={rating ?? ""}
                   onChange={(event) => {
                     const next = Number(event.target.value);
-                    setRating(event.target.value === "" || Number.isNaN(next) ? undefined : Math.round(next * 10) / 10);
+                    setRating(
+                      event.target.value === "" || Number.isNaN(next)
+                        ? undefined
+                        : Math.round(next * 10) / 10,
+                    );
                   }}
                   placeholder={field.hint}
                   className="w-28"
@@ -733,7 +786,8 @@ export function CompositionWorkbench({
                     type="color"
                     value={accent}
                     onChange={(event) => setAccent(event.target.value)}
-                    className="h-7 w-10 p-0.5"
+                    appearance="swatch"
+                    className="h-7 w-10"
                     title="Custom"
                   />
                 </div>
@@ -742,13 +796,16 @@ export function CompositionWorkbench({
           ))}
 
           {direction ? (
-            <p className="text-muted-foreground rounded-lg border border-dashed p-3 text-[11px] leading-4">
-              <span className="font-medium">Art director:</span> {direction.note}
-              {direction.changes.length > 0 ? ` Applied: ${direction.changes.join("; ")}.` : ""}
+            <p className="rounded-lg border border-dashed p-3 text-[11px] leading-4 text-muted-foreground">
+              <span className="font-medium">Art director:</span>{" "}
+              {direction.note}
+              {direction.changes.length > 0
+                ? ` Applied: ${direction.changes.join("; ")}.`
+                : ""}
             </p>
           ) : null}
 
-          <p className="text-muted-foreground text-[11px]">
+          <p className="text-[11px] text-muted-foreground">
             Copy is kept when you switch blueprints. It reappears when a layout
             uses it.
           </p>
@@ -760,7 +817,7 @@ export function CompositionWorkbench({
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm">
               <span className="font-semibold">Source media</span>{" "}
-              <span className="text-muted-foreground text-xs">
+              <span className="text-xs text-muted-foreground">
                 from this brand&apos;s media library
               </span>
             </p>
@@ -805,7 +862,12 @@ export function CompositionWorkbench({
                   }
                   title="Paint more of the scene in so the photo fills this canvas without cropping"
                 >
-                  <Expand className={cn("size-3.5", extend.isPending && "animate-pulse")} />
+                  <Expand
+                    className={cn(
+                      "size-3.5",
+                      extend.isPending && "animate-pulse",
+                    )}
+                  />
                   {extend.isPending ? "Extending…" : "Extend to canvas"}
                 </Button>
               )}
@@ -824,7 +886,12 @@ export function CompositionWorkbench({
                     { value: "top", label: "Crop toward top" },
                     { value: "bottom", label: "Crop toward bottom" },
                     ...(cropPreset === "custom"
-                      ? [{ value: "custom", label: `Art director's point (${focal?.x}%, ${focal?.y}%)` }]
+                      ? [
+                          {
+                            value: "custom",
+                            label: `Art director's point (${focal?.x}%, ${focal?.y}%)`,
+                          },
+                        ]
                       : []),
                   ]}
                   size="sm"
@@ -834,19 +901,20 @@ export function CompositionWorkbench({
           </div>
 
           {!requiresImage ? (
-            <div className="text-muted-foreground flex h-28 flex-col items-center justify-center gap-2 rounded-lg border border-dashed text-xs">
+            <div className="flex h-28 flex-col items-center justify-center gap-2 rounded-lg border border-dashed text-xs text-muted-foreground">
               <Layers3 className="size-5" />
               Brand statement uses brand and copy without a source image.
             </div>
           ) : isLoading ? (
-            <div className="text-muted-foreground flex h-28 items-center justify-center gap-2 text-xs">
+            <div className="flex h-28 items-center justify-center gap-2 text-xs text-muted-foreground">
               <Loader2 className="size-4 animate-spin" />
               Loading images
             </div>
           ) : hostedAssets.length === 0 ? (
-            <div className="text-muted-foreground flex h-28 flex-col items-center justify-center gap-2 rounded-lg border border-dashed text-xs">
+            <div className="flex h-28 flex-col items-center justify-center gap-2 rounded-lg border border-dashed text-xs text-muted-foreground">
               <ImageIcon className="size-5" />
-              Nothing in the library yet. Pull a few from their homes, or upload in Media.
+              Nothing in the library yet. Pull a few from their homes, or upload
+              in Media.
             </div>
           ) : (
             <div className="grid max-h-72 grid-cols-4 gap-2 overflow-y-auto pr-1 sm:grid-cols-6">
@@ -858,13 +926,13 @@ export function CompositionWorkbench({
                     key={asset.id}
                     onClick={() => chooseSource(asset.id)}
                     className={cn(
-                      "bg-muted relative aspect-square overflow-hidden rounded-lg border",
+                      "relative aspect-square overflow-hidden rounded-lg border bg-muted",
                       selected &&
-                        "border-primary ring-primary/30 ring-2 ring-offset-1",
+                        "border-primary ring-2 ring-primary/30 ring-offset-1",
                     )}
                     title={asset.title ?? asset.filename ?? "Library image"}
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    {/* oxlint-disable-next-line nextjs/no-img-element */}
                     <img
                       src={asset.thumbnailUrl ?? asset.url!}
                       alt={asset.alt ?? asset.title ?? ""}
@@ -872,7 +940,7 @@ export function CompositionWorkbench({
                       className="absolute inset-0 size-full object-cover"
                     />
                     {selected && (
-                      <span className="bg-primary text-primary-foreground absolute top-1 right-1 flex size-5 items-center justify-center rounded-full">
+                      <span className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
                         <Check className="size-3" />
                       </span>
                     )}
@@ -884,10 +952,10 @@ export function CompositionWorkbench({
         </section>
 
         <section className="overflow-hidden rounded-xl border">
-          <div className="bg-muted/30 flex items-center justify-between border-b px-4 py-3">
+          <div className="flex items-center justify-between border-b bg-muted/30 px-4 py-3">
             <p className="text-sm">
               <span className="font-semibold">Live composition</span>{" "}
-              <span className="text-muted-foreground text-xs">
+              <span className="text-xs text-muted-foreground">
                 {selectedFormat.width}×{selectedFormat.height} PNG
               </span>
             </p>
@@ -895,14 +963,14 @@ export function CompositionWorkbench({
           </div>
           <div className="flex min-h-96 items-center justify-center bg-[radial-gradient(circle_at_center,var(--color-muted)_1px,transparent_1px)] bg-size-[16px_16px] p-5">
             {previewUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
+              // oxlint-disable-next-line nextjs/no-img-element
               <img
                 src={previewUrl}
                 alt="Composition preview"
                 className="max-h-[680px] max-w-full rounded-md object-contain shadow-2xl"
               />
             ) : (
-              <div className="text-muted-foreground flex flex-col items-center gap-2 text-sm">
+              <div className="flex flex-col items-center gap-2 text-sm text-muted-foreground">
                 <ImageIcon className="size-6" />
                 {needsTitle && !title.trim()
                   ? `Add a ${fields.find((f) => f.key === "title")?.label.toLowerCase() ?? "headline"} to render this blueprint.`
@@ -937,7 +1005,12 @@ export function CompositionWorkbench({
                 }
                 title="Fill the fields from the brand's voice and the home behind the photo"
               >
-                <PenLine className={cn("size-4", writeCopy.isPending && "animate-pulse")} />
+                <PenLine
+                  className={cn(
+                    "size-4",
+                    writeCopy.isPending && "animate-pulse",
+                  )}
+                />
                 {writeCopy.isPending ? "Writing…" : "Write copy"}
               </Button>
             ) : null}
@@ -948,13 +1021,23 @@ export function CompositionWorkbench({
                 onClick={() => direct.mutate(spec)}
                 title="Have the art director judge this card and apply its corrections to the form"
               >
-                <Wand2 className={cn("size-4", direct.isPending && "animate-pulse")} />
-                {direct.isPending ? "Judging…" : direction ? "Judge again" : "Art director"}
+                <Wand2
+                  className={cn("size-4", direct.isPending && "animate-pulse")}
+                />
+                {direct.isPending
+                  ? "Judging…"
+                  : direction
+                    ? "Judge again"
+                    : "Art director"}
               </Button>
             ) : null}
             <Button
               disabled={!canRender || !assetTitle.trim()}
-              loading={freeze.isPending || replaceCard.isPending || addAdPreview.isPending}
+              loading={
+                freeze.isPending ||
+                replaceCard.isPending ||
+                addAdPreview.isPending
+              }
               onClick={() =>
                 freeze.mutate({ ...spec, assetTitle: assetTitle.trim() })
               }

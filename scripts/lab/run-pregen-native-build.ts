@@ -23,9 +23,8 @@ if (!input) {
   );
 }
 
-const origin = new URL(
-  /^https?:\/\//i.test(input) ? input : `https://${input}`,
-).origin;
+const origin = new URL(/^https?:\/\//i.test(input) ? input : `https://${input}`)
+  .origin;
 const domain = new URL(origin).hostname.replace(/^www\./, "");
 
 const [prospect] = await db

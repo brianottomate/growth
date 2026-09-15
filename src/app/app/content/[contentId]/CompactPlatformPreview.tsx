@@ -81,13 +81,13 @@ function PreviewMedia({
   return (
     <div
       className={cn(
-        "bg-muted relative w-full overflow-hidden",
+        "relative w-full overflow-hidden bg-muted",
         cropClass(format, platform),
       )}
     >
       {firstMedia?.type === "video" && !firstMedia.thumbnail ? (
-        <div className="from-muted via-background to-muted flex size-full items-center justify-center bg-gradient-to-br">
-          <span className="bg-foreground/90 text-background flex size-9 items-center justify-center rounded-full">
+        <div className="flex size-full items-center justify-center bg-gradient-to-br from-muted via-background to-muted">
+          <span className="flex size-9 items-center justify-center rounded-full bg-foreground/90 text-background">
             <Play className="ml-0.5 size-4 fill-current" />
           </span>
         </div>
@@ -101,7 +101,7 @@ function PreviewMedia({
           sizes="256px"
         />
       ) : (
-        // eslint-disable-next-line @next/next/no-img-element -- arbitrary external OG hosts
+        // oxlint-disable-next-line nextjs/no-img-element -- arbitrary external OG hosts
         <img
           src={fallbackImage ?? ""}
           alt=""
@@ -172,7 +172,7 @@ export function CompactPlatformPreview({
   return (
     <aside
       className={cn(
-        "bg-background/50 mx-auto w-full max-w-64 self-start rounded-xl border p-2.5 lg:mx-0",
+        "mx-auto w-full max-w-64 self-start rounded-xl border bg-background/50 p-2.5 lg:mx-0",
         className,
       )}
     >
@@ -185,7 +185,7 @@ export function CompactPlatformPreview({
           {platformLabel(platform)}{" "}
           {story ? "Story" : isThread ? "thread" : "preview"}
         </span>
-        <span className="text-muted-foreground truncate text-[9px]">
+        <span className="truncate text-[9px] text-muted-foreground">
           {caption ??
             (story || isThread
               ? `${items.length} ${sequenceNoun(format, items.length)}`
@@ -213,10 +213,10 @@ export function CompactPlatformPreview({
           play={false}
         />
       ) : (
-        <div className="bg-background overflow-hidden rounded-lg border shadow-sm">
+        <div className="overflow-hidden rounded-lg border bg-background shadow-sm">
           {channelBannerImageUrl && (
             <div className="relative h-10 overflow-hidden border-b">
-              {/* eslint-disable-next-line @next/next/no-img-element -- channel images may use arbitrary provider hosts */}
+              {/* oxlint-disable-next-line nextjs/no-img-element -- channel images may use arbitrary provider hosts */}
               <img
                 src={channelBannerImageUrl}
                 alt=""
@@ -228,18 +228,18 @@ export function CompactPlatformPreview({
           {items.map((item, index) => (
             <div
               key={item.id}
-              className={cn(index > 0 && "border-border border-t")}
+              className={cn(index > 0 && "border-t border-border")}
             >
               <div className="flex items-center gap-2 px-2.5 py-2">
                 {channelProfileImageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- channel images may use arbitrary provider hosts
+                  // oxlint-disable-next-line nextjs/no-img-element -- channel images may use arbitrary provider hosts
                   <img
                     src={channelProfileImageUrl}
                     alt=""
-                    className="bg-muted size-6 rounded-full border object-cover"
+                    className="size-6 rounded-full border bg-muted object-cover"
                   />
                 ) : (
-                  <span className="bg-muted flex size-6 items-center justify-center rounded-full text-[9px] font-semibold">
+                  <span className="flex size-6 items-center justify-center rounded-full bg-muted text-[9px] font-semibold">
                     {identity.slice(0, 1).toUpperCase()}
                   </span>
                 )}
@@ -247,7 +247,7 @@ export function CompactPlatformPreview({
                   {identity}
                 </span>
                 {(story || isThread) && (
-                  <span className="text-muted-foreground text-[9px]">
+                  <span className="text-[9px] text-muted-foreground">
                     {index + 1}/{items.length}
                   </span>
                 )}
@@ -268,7 +268,7 @@ export function CompactPlatformPreview({
               <div className="px-2.5 py-2">
                 {story ? (
                   item.text.trim() ? (
-                    <p className="text-muted-foreground line-clamp-2 text-[9px] leading-relaxed whitespace-pre-wrap italic">
+                    <p className="line-clamp-2 text-[9px] leading-relaxed whitespace-pre-wrap text-muted-foreground italic">
                       Internal note: {item.text}
                     </p>
                   ) : null
@@ -277,7 +277,7 @@ export function CompactPlatformPreview({
                     {item.text}
                   </p>
                 ) : (
-                  <div className="text-muted-foreground flex items-center gap-1.5 text-[10px] italic">
+                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground italic">
                     <ImageIcon className="size-3" />
                     No post copy yet.
                   </div>
@@ -288,7 +288,7 @@ export function CompactPlatformPreview({
 
           {linkCard && (
             <div className="border-t px-2.5 py-2">
-              <div className="text-muted-foreground truncate text-[8px] tracking-wide uppercase">
+              <div className="truncate text-[8px] tracking-wide text-muted-foreground uppercase">
                 {linkCard.domain}
                 {linkCard.predicted ? " · predicted" : ""}
               </div>

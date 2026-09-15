@@ -111,7 +111,7 @@ export function ForgotPasswordDialog({
                 <Mail className="h-4 w-4" />
                 Open {getEmailProviderName(email)}
               </a>
-              <span className="text-muted-foreground text-sm">or</span>
+              <span className="text-sm text-muted-foreground">or</span>
               <Button
                 type="button"
                 variant="link"

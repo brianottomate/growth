@@ -93,7 +93,7 @@ export function ImportZernioBrands() {
       <Button
         variant="outline"
         size="sm"
-        className="gap-1.5"
+
         onClick={() => setOpen(true)}
       >
         <Download className="size-3.5" />
@@ -112,15 +112,15 @@ export function ImportZernioBrands() {
 
           <div className="flex flex-col gap-3 py-2">
             {catalogQ.isLoading ? (
-              <p className="text-muted-foreground text-sm">
+              <p className="text-sm text-muted-foreground">
                 Loading workspace…
               </p>
             ) : !catalogQ.data?.configured ? (
-              <p className="text-destructive text-sm">
+              <p className="text-sm text-destructive">
                 Zernio is not configured.
               </p>
             ) : profiles.length === 0 ? (
-              <p className="text-muted-foreground text-sm">
+              <p className="text-sm text-muted-foreground">
                 No Zernio profiles found.
               </p>
             ) : (
@@ -131,7 +131,7 @@ export function ImportZernioBrands() {
                   <div key={profile.id} className="rounded-xl border p-4">
                     <div className="flex items-start gap-3">
                       {imported ? (
-                        <CheckCircle2 className="text-muted-foreground mt-0.5 size-4" />
+                        <CheckCircle2 className="mt-0.5 size-4 text-muted-foreground" />
                       ) : (
                         <Checkbox
                           checked={isSelected}
@@ -144,12 +144,12 @@ export function ImportZernioBrands() {
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-medium">{profile.name}</span>
-                          <span className="text-muted-foreground text-xs">
+                          <span className="text-xs text-muted-foreground">
                             {profile.accounts.length} account
                             {profile.accounts.length === 1 ? "" : "s"}
                           </span>
                           {imported && (
-                            <span className="text-muted-foreground text-xs">
+                            <span className="text-xs text-muted-foreground">
                               Imported as {imported.name}
                             </span>
                           )}
@@ -159,7 +159,7 @@ export function ImportZernioBrands() {
                             {profile.accounts.map((account) => (
                               <span
                                 key={account.id}
-                                className="bg-muted flex items-center gap-1.5 rounded-md px-2 py-1 text-xs"
+                                className="flex items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-xs"
                               >
                                 <ChannelLogo platform={account.platform} />
                                 {platformLabel(account.platform)}
@@ -170,7 +170,7 @@ export function ImportZernioBrands() {
                             ))}
                           </div>
                         ) : (
-                          <p className="text-muted-foreground mt-2 text-xs">
+                          <p className="mt-2 text-xs text-muted-foreground">
                             No accounts connected yet; the profile can still be
                             imported.
                           </p>
@@ -202,12 +202,12 @@ export function ImportZernioBrands() {
             )}
 
             {available.length === 0 && profiles.length > 0 && (
-              <p className="text-muted-foreground text-sm">
+              <p className="text-sm text-muted-foreground">
                 Every Zernio profile is already represented in the workspace.
               </p>
             )}
             {(error || catalogQ.error) && (
-              <p className="text-destructive text-sm">
+              <p className="text-sm text-destructive">
                 {error ?? catalogQ.error?.message}
               </p>
             )}
@@ -219,7 +219,7 @@ export function ImportZernioBrands() {
             </Button>
             <Button
               size="sm"
-              className="gap-1.5"
+
               onClick={submit}
               loading={importM.isPending}
               disabled={selected.length === 0}

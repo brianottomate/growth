@@ -28,7 +28,7 @@ function ExplainerTip({
     <Popover>
       <PopoverTrigger
         aria-label={`About ${label}`}
-        className="focus-visible:ring-ring cursor-help rounded-full opacity-60 transition-opacity hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-1 focus-visible:outline-none"
+        className="cursor-help rounded-full opacity-60 transition-opacity hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
       >
         <Info className="size-3.5" aria-hidden />
       </PopoverTrigger>
@@ -59,6 +59,7 @@ export function StatCard({
   explainer,
   className,
   valueClassName,
+  presentation,
 }: {
   label: string;
   value: string;
@@ -68,10 +69,17 @@ export function StatCard({
   className?: string;
   /** Extra classes on the value line (e.g. a larger mono figure on /app/spend). */
   valueClassName?: string;
+  presentation?: "wall";
 }) {
   return (
-    <div className={cn("bg-card rounded-xl border p-4", className)}>
-      <div className="text-muted-foreground flex items-center gap-1.5 text-xs font-medium tracking-wide uppercase">
+    <div
+      className={cn(
+        "rounded-xl border bg-card p-4",
+        presentation === "wall" && "p-5",
+        className,
+      )}
+    >
+      <div className="flex items-center gap-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase">
         <span>{label}</span>
         {explainer && <ExplainerTip label={label} explainer={explainer} />}
       </div>
@@ -81,12 +89,13 @@ export function StatCard({
           tone === "good" && "text-emerald-400",
           tone === "warn" && "text-amber-400",
           tone === "bad" && "text-red-400",
+          presentation === "wall" && "mt-1.5 font-mono text-3xl tracking-tight",
           valueClassName,
         )}
       >
         {value}
       </div>
-      {hint && <div className="text-muted-foreground mt-1 text-xs">{hint}</div>}
+      {hint && <div className="mt-1 text-xs text-muted-foreground">{hint}</div>}
     </div>
   );
 }

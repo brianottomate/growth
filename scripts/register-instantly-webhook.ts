@@ -9,10 +9,7 @@
  * at the same URL + event. Set INSTANTLY_WEBHOOK_SECRET in env first.
  */
 import { env } from "@/env";
-import {
-  createWebhook,
-  listWebhooks,
-} from "@/server/clients/instantly.client";
+import { createWebhook, listWebhooks } from "@/server/clients/instantly.client";
 
 const HOOK_URL = "https://growth-red.vercel.app/api/instantly/webhook";
 const EVENT = "reply_received" as const;

@@ -140,13 +140,13 @@ export function UserProfileImageUpload() {
             src={user.image ?? undefined}
             alt={user.displayUsername || user.name || user.email || "User"}
           />
-          <AvatarFallback className="text-lg">{getInitials()}</AvatarFallback>
+          <AvatarFallback textSize="lg">{getInitials()}</AvatarFallback>
         </Avatar>
         <div className="flex-1">
           <p className="font-medium">
             {user.displayUsername || user.name || "User"}
           </p>
-          <p className="text-muted-foreground text-sm">
+          <p className="text-sm text-muted-foreground">
             {user.image ? "Custom image" : "Default avatar"}
           </p>
         </div>
@@ -189,20 +189,20 @@ export function UserProfileImageUpload() {
               size="sm"
               onClick={handleRemove}
               disabled={isLoading}
-              className="text-destructive hover:text-destructive"
+              tone="danger"
             >
               <Trash2 className="mr-2 size-4" />
               Remove Image
             </Button>
           </div>
-          <p className="text-muted-foreground text-center text-xs">
+          <p className="text-center text-xs text-muted-foreground">
             Replace with a new image or remove to restore the default avatar
           </p>
         </div>
       )}
 
       {isLoading && (
-        <div className="text-muted-foreground text-center text-sm">
+        <div className="text-center text-sm text-muted-foreground">
           {uploading ? "Uploading..." : "Updating profile..."}
         </div>
       )}

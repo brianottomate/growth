@@ -1,9 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import {
-  launchDeliverableSchema,
-  type LaunchDeliverable,
-} from "@/lib/launch";
+import { launchDeliverableSchema, type LaunchDeliverable } from "@/lib/launch";
 
 /**
  * The patch-key filter in setDeliverable. `status` carries a zod default that

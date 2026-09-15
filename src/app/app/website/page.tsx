@@ -96,7 +96,7 @@ function PathList({ pages, cap }: { pages: WebPage[]; cap?: number }) {
           href={p.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="hover:bg-accent/40 -mx-2 flex items-center gap-3 rounded-lg border-b px-2 py-2.5 text-sm transition-colors last:border-0"
+          className="-mx-2 flex items-center gap-3 rounded-lg border-b px-2 py-2.5 text-sm transition-colors last:border-0 hover:bg-accent/40"
         >
           <span
             className="size-1.5 shrink-0 rounded-full"
@@ -104,16 +104,16 @@ function PathList({ pages, cap }: { pages: WebPage[]; cap?: number }) {
             title={PAGE_TYPE_META[p.pageType].label}
           />
           <span className="min-w-0 flex-1 truncate">{p.title}</span>
-          <span className="text-muted-foreground hidden min-w-0 shrink truncate text-xs sm:block">
+          <span className="hidden min-w-0 shrink truncate text-xs text-muted-foreground sm:block">
             {p.path}
           </span>
-          <span className="text-muted-foreground w-4 shrink-0 text-right text-xs">
+          <span className="w-4 shrink-0 text-right text-xs text-muted-foreground">
             ↗
           </span>
         </a>
       ))}
       {cap && pages.length > cap && (
-        <p className="text-muted-foreground mt-2 text-xs">
+        <p className="mt-2 text-xs text-muted-foreground">
           Showing {cap} of {pages.length}.
         </p>
       )}
@@ -176,7 +176,7 @@ function LocationTree({
             >
               {h.hub?.title ?? hubLabel(slug)} ↗
             </a>
-            <span className="text-muted-foreground text-xs">
+            <span className="text-xs text-muted-foreground">
               {h.total} pages · {h.cities.size} cities
             </span>
           </div>
@@ -188,20 +188,20 @@ function LocationTree({
                   href={c.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="border-border text-muted-foreground hover:bg-accent rounded-full border px-2 py-0.5 text-[11px]"
+                  className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-accent"
                 >
                   {c.citySlug ? humanizeSlug(c.citySlug) : c.title}
                 </a>
               ))}
               {h.cities.size > cityCap && (
-                <span className="text-muted-foreground px-1 py-0.5 text-[11px]">
+                <span className="px-1 py-0.5 text-[11px] text-muted-foreground">
                   +{h.cities.size - cityCap} more
                 </span>
               )}
             </div>
           )}
           {h.categories.size > 0 && (
-            <p className="text-muted-foreground mt-2 text-[11px]">
+            <p className="mt-2 text-[11px] text-muted-foreground">
               Category pages:{" "}
               {[...h.categories.entries()]
                 .sort((a, b) => b[1] - a[1])
@@ -217,7 +217,7 @@ function LocationTree({
       {!full && sorted.length > shown.length && (
         <Link
           href={allHref}
-          className="text-muted-foreground text-xs hover:underline"
+          className="text-xs text-muted-foreground hover:underline"
         >
           Show all {sorted.length} locations →
         </Link>
@@ -248,10 +248,10 @@ function HubList({ pages, baseUrl }: { pages: WebPage[]; baseUrl: string }) {
           href={new URL(hub, baseUrl).href}
           target="_blank"
           rel="noopener noreferrer"
-          className="hover:bg-accent/40 -mx-2 flex items-baseline justify-between gap-2 rounded-lg px-2 py-1.5 text-sm"
+          className="-mx-2 flex items-baseline justify-between gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-accent/40"
         >
           <span className="truncate">{hubLabel(hub)}</span>
-          <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+          <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
             {n} pages
           </span>
         </a>
@@ -277,7 +277,7 @@ function BulkSummary({
       <div className="text-3xl font-semibold tabular-nums">
         {info.count.toLocaleString()}
       </div>
-      <div className="text-muted-foreground mt-1 text-sm">{label}</div>
+      <div className="mt-1 text-sm text-muted-foreground">{label}</div>
       {info.samplePaths.length > 0 && (
         <div className="mt-4 flex flex-wrap gap-1.5">
           {info.samplePaths.map((p) => (
@@ -286,14 +286,14 @@ function BulkSummary({
               href={new URL(p, baseUrl).href}
               target="_blank"
               rel="noopener noreferrer"
-              className="border-border text-muted-foreground hover:bg-accent rounded-full border px-2 py-0.5 text-[11px]"
+              className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-accent"
             >
               {p}
             </a>
           ))}
         </div>
       )}
-      <p className="text-muted-foreground mt-4 text-xs">{note}</p>
+      <p className="mt-4 text-xs text-muted-foreground">{note}</p>
     </div>
   );
 }
@@ -309,13 +309,13 @@ function SectionHeading({
 }) {
   return (
     <div className="mb-3 flex items-baseline justify-between">
-      <h2 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+      <h2 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
         {title} · {count}
       </h2>
       {href && (
         <Link
           href={href}
-          className="text-muted-foreground text-xs hover:underline"
+          className="text-xs text-muted-foreground hover:underline"
         >
           View all →
         </Link>
@@ -455,7 +455,7 @@ export default async function WebsitePage({
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Website</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
+          <p className="mt-1 text-sm text-muted-foreground">
             {totalCount
               ? `${totalCount.toLocaleString()} pages`
               : "No pages synced yet"}
@@ -520,7 +520,7 @@ export default async function WebsitePage({
       {(tableMissing || pages.length === 0) && (
         <div className="mt-8 rounded-xl border p-6 text-sm">
           <p className="font-medium">No website pages yet.</p>
-          <p className="text-muted-foreground mt-2">
+          <p className="mt-2 text-muted-foreground">
             {tableMissing
               ? "Website storage is not provisioned in this environment yet."
               : selectedBrand && baseUrl
@@ -587,12 +587,12 @@ export default async function WebsitePage({
           <section className="mt-10 grid gap-4 sm:grid-cols-2">
             <Link
               href={websiteHref("property")}
-              className="hover:border-foreground/30 rounded-xl border p-5 transition-colors"
+              className="rounded-xl border p-5 transition-colors hover:border-foreground/30"
             >
               <div className="text-2xl font-semibold tabular-nums">
                 {property.count.toLocaleString()}
               </div>
-              <div className="text-muted-foreground mt-1 text-sm">
+              <div className="mt-1 text-sm text-muted-foreground">
                 Property pages · /property/[id]
               </div>
             </Link>
@@ -602,12 +602,12 @@ export default async function WebsitePage({
                   ? `/app/blog?brand=${selectedBrand.slug}`
                   : "/app/blog"
               }
-              className="hover:border-foreground/30 rounded-xl border p-5 transition-colors"
+              className="rounded-xl border p-5 transition-colors hover:border-foreground/30"
             >
               <div className="text-2xl font-semibold tabular-nums">
                 {article.count.toLocaleString()}
               </div>
-              <div className="text-muted-foreground mt-1 text-sm">
+              <div className="mt-1 text-sm text-muted-foreground">
                 Published article pages → Blog wall
               </div>
             </Link>
@@ -681,7 +681,7 @@ export default async function WebsitePage({
       )}
       {group?.key === "article" && (
         <div className="mt-6">
-          <p className="text-muted-foreground mb-4 text-sm">
+          <p className="mb-4 text-sm text-muted-foreground">
             Articles have their own wall with topics and covers —{" "}
             <Link
               href={

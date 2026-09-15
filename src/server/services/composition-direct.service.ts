@@ -91,7 +91,9 @@ export async function directComposition(input: {
         );
       } catch (error) {
         console.error("photo extension failed", error);
-        changes.push("wanted the photo extended, which failed, so the crop stands");
+        changes.push(
+          "wanted the photo extended, which failed, so the crop stands",
+        );
       }
     } else {
       changes.push("wanted the photo extended, which is not configured here");

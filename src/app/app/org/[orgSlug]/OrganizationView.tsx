@@ -79,9 +79,9 @@ export function OrganizationView({ orgSlug }: OrganizationViewProps) {
 
   if (error) {
     return (
-      <div className="border-destructive bg-destructive/10 rounded-lg border p-6 text-center">
+      <div className="rounded-lg border border-destructive bg-destructive/10 p-6 text-center">
         <h2 className="text-lg font-semibold">Error Loading Organization</h2>
-        <p className="text-muted-foreground mt-2">
+        <p className="mt-2 text-muted-foreground">
           {error.message || "Failed to load organization data."}
         </p>
       </div>
@@ -92,7 +92,7 @@ export function OrganizationView({ orgSlug }: OrganizationViewProps) {
     return (
       <div className="text-center">
         <h2 className="text-lg font-semibold">Organization Not Found</h2>
-        <p className="text-muted-foreground mt-2">
+        <p className="mt-2 text-muted-foreground">
           The organization you&apos;re looking for doesn&apos;t exist or you
           don&apos;t have access to it.
         </p>
@@ -113,7 +113,7 @@ export function OrganizationView({ orgSlug }: OrganizationViewProps) {
               src={organization.logo || undefined}
               alt={organization.name}
             />
-            <AvatarFallback className="bg-primary text-primary-foreground">
+            <AvatarFallback tone="primary">
               <Building2 className="size-6" />
             </AvatarFallback>
           </Avatar>
@@ -123,7 +123,7 @@ export function OrganizationView({ orgSlug }: OrganizationViewProps) {
               <Badge variant="outline" className="capitalize">
                 {organization.plan}
               </Badge>
-              <span className="text-muted-foreground text-sm">
+              <span className="text-sm text-muted-foreground">
                 Your role: {userRole}
               </span>
             </div>
@@ -137,7 +137,7 @@ export function OrganizationView({ orgSlug }: OrganizationViewProps) {
                 </Button>
               </Link>
               <OrganizationInviteDialog organizationId={organization.id}>
-                <Button className="gap-2">
+                <Button>
                   <Plus className="size-4" />
                   Invite Members
                 </Button>
@@ -158,7 +158,7 @@ export function OrganizationView({ orgSlug }: OrganizationViewProps) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{members.length}</div>
-            <p className="text-muted-foreground text-xs">Active team members</p>
+            <p className="text-xs text-muted-foreground">Active team members</p>
           </CardContent>
         </Card>
         <Card>
@@ -172,7 +172,7 @@ export function OrganizationView({ orgSlug }: OrganizationViewProps) {
             <div className="text-2xl font-bold capitalize">
               {organization.plan}
             </div>
-            <p className="text-muted-foreground text-xs">Current plan</p>
+            <p className="text-xs text-muted-foreground">Current plan</p>
           </CardContent>
         </Card>
         <Card>
@@ -186,7 +186,7 @@ export function OrganizationView({ orgSlug }: OrganizationViewProps) {
             <div className="truncate text-2xl font-bold">
               {organization.slug}
             </div>
-            <p className="text-muted-foreground text-xs">Organization ID</p>
+            <p className="text-xs text-muted-foreground">Organization ID</p>
           </CardContent>
         </Card>
       </div>
@@ -208,7 +208,7 @@ export function OrganizationView({ orgSlug }: OrganizationViewProps) {
         </CardHeader>
         <CardContent className="space-y-4">
           {members.length === 0 ? (
-            <p className="text-muted-foreground py-8 text-center">
+            <p className="py-8 text-center text-muted-foreground">
               No members found
             </p>
           ) : (
@@ -231,12 +231,12 @@ export function OrganizationView({ orgSlug }: OrganizationViewProps) {
                         <div className="font-medium">
                           {member.user.name || "Unknown User"}
                         </div>
-                        <div className="text-muted-foreground text-xs">
+                        <div className="text-xs text-muted-foreground">
                           {member.user.email}
                         </div>
                       </div>
                     </div>
-                    <Badge variant={roleColors[member.role]} className="gap-1">
+                    <Badge variant={roleColors[member.role]}>
                       <RoleIcon className="size-3" />
                       {member.role}
                     </Badge>
@@ -260,10 +260,10 @@ export function OrganizationView({ orgSlug }: OrganizationViewProps) {
           <div className="space-y-3">
             {isAdmin && members.length === 1 && (
               <div className="flex items-start gap-3 rounded-lg border p-3">
-                <Users className="text-primary mt-0.5 size-5" />
+                <Users className="mt-0.5 size-5 text-primary" />
                 <div className="flex-1">
                   <h4 className="font-medium">Invite team members</h4>
-                  <p className="text-muted-foreground text-sm">
+                  <p className="text-sm text-muted-foreground">
                     Collaborate with your team by inviting members to your
                     organization.
                   </p>
@@ -274,10 +274,10 @@ export function OrganizationView({ orgSlug }: OrganizationViewProps) {
               </div>
             )}
             <div className="flex items-start gap-3 rounded-lg border p-3">
-              <Settings className="text-primary mt-0.5 size-5" />
+              <Settings className="mt-0.5 size-5 text-primary" />
               <div className="flex-1">
                 <h4 className="font-medium">Customize settings</h4>
-                <p className="text-muted-foreground text-sm">
+                <p className="text-sm text-muted-foreground">
                   Update your organization name, logo, and other preferences.
                 </p>
               </div>

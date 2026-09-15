@@ -41,7 +41,7 @@ export function SmartLink({
 }: SmartLinkProps) {
   const isExternal = isExternalLink(href);
   const baseClassName = cn(
-    "text-primary hover:text-primary/90 transition-colors",
+    "text-primary transition-colors hover:text-primary/90",
     underline && "underline underline-offset-4",
     className,
   );

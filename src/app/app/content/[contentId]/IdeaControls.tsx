@@ -91,9 +91,9 @@ export function BriefEditor({
     update.mutate({ id: contentPostId, ...patch });
 
   return (
-    <div className="bg-card mt-5 rounded-xl border p-4">
+    <div className="mt-5 rounded-xl border bg-card p-4">
       <div className="mb-3 flex flex-wrap items-center gap-3">
-        <h2 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+        <h2 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
           Brief
         </h2>
         <div className="ml-auto flex items-center gap-2">
@@ -112,7 +112,7 @@ export function BriefEditor({
             value={plannedAtISO ? new Date(plannedAtISO) : undefined}
             onChange={(d) => save({ plannedAt: d ? d.toISOString() : null })}
             placeholder="Plan date"
-            className="text-xs"
+
             aria-label="Plan date"
           />
         </div>
@@ -179,7 +179,7 @@ function Field({
     "bg-background focus:ring-ring/40 w-full rounded-md border px-2 py-1.5 text-sm outline-none focus:ring-2";
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
+      <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
         {label}
       </span>
       {multiline ? (
@@ -268,7 +268,7 @@ export function AddSpotControl({
   if (available.length === 0) return null;
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2">
-      <span className="text-muted-foreground flex items-center gap-1 text-xs">
+      <span className="flex items-center gap-1 text-xs text-muted-foreground">
         <Plus className="size-3.5" /> Cross-post to
       </span>
       {available.map((option) => (
@@ -289,7 +289,7 @@ export function AddSpotControl({
               }, pick the format that fits the brief rather than defaulting, write channel-native copy, and tell me what you changed.`,
             })
           }
-          className="border-border hover:bg-accent flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50"
         >
           <ChannelLogo platform={option.platform} className="size-3.5" />
           {option.label}
@@ -317,7 +317,7 @@ export function RemoveSpotButton({
       onClick={() => remove.mutate({ platformPostId })}
       disabled={remove.isPending}
       aria-label="Remove channel"
-      className="text-muted-foreground hover:text-foreground hover:bg-accent rounded-md p-1 transition-colors disabled:opacity-50"
+      className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
     >
       <X className="size-3.5" />
     </button>

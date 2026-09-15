@@ -30,7 +30,7 @@ export default async function AccountPage() {
       <div className="mx-auto max-w-2xl space-y-8 sm:space-y-10">
         <div>
           <h1 className="text-2xl font-bold sm:text-3xl">Account Settings</h1>
-          <p className="text-muted-foreground mt-2 text-sm sm:text-base">
+          <p className="mt-2 text-sm text-muted-foreground sm:text-base">
             Manage your profile data and account security.
           </p>
         </div>
@@ -39,7 +39,7 @@ export default async function AccountPage() {
         <div className="space-y-4">
           <div>
             <h2 className="text-lg font-semibold">Profile</h2>
-            <p className="text-muted-foreground text-sm">
+            <p className="text-sm text-muted-foreground">
               Your personal information
             </p>
           </div>
@@ -47,7 +47,7 @@ export default async function AccountPage() {
           <Card>
             <CardHeader>
               <CardTitle>Profile Image</CardTitle>
-              <p className="text-muted-foreground text-sm">
+              <p className="text-sm text-muted-foreground">
                 Upload a profile picture to personalize your account.
               </p>
             </CardHeader>
@@ -63,7 +63,7 @@ export default async function AccountPage() {
         <div className="space-y-4">
           <div>
             <h2 className="text-lg font-semibold">Account & Security</h2>
-            <p className="text-muted-foreground text-sm">
+            <p className="text-sm text-muted-foreground">
               Manage your login credentials and account access
             </p>
           </div>
@@ -73,7 +73,7 @@ export default async function AccountPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Profile Information</CardTitle>
-                <p className="text-muted-foreground text-sm">
+                <p className="text-sm text-muted-foreground">
                   Basic account information for login and identification.
                 </p>
               </CardHeader>
@@ -88,7 +88,7 @@ export default async function AccountPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Email Verification</CardTitle>
-                <p className="text-muted-foreground text-sm">
+                <p className="text-sm text-muted-foreground">
                   Verify your email to enable password reset and important
                   account notifications.
                 </p>
@@ -101,10 +101,10 @@ export default async function AccountPage() {
             </Card>
 
             {/* Danger Zone */}
-            <Card className="border-destructive">
+            <Card tone="error">
               <CardHeader>
-                <CardTitle className="text-destructive">Danger Zone</CardTitle>
-                <p className="text-muted-foreground text-sm">
+                <CardTitle tone="error">Danger Zone</CardTitle>
+                <p className="text-sm text-muted-foreground">
                   Irreversible and destructive actions for your account.
                 </p>
               </CardHeader>

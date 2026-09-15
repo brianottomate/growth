@@ -72,13 +72,13 @@ export function StorefrontOperations({
   return (
     <main className="space-y-8">
       <header>
-        <p className="text-muted-foreground text-xs font-medium tracking-[0.18em] uppercase">
+        <p className="text-xs font-medium tracking-[0.18em] text-muted-foreground uppercase">
           Brand map · distribution operations
         </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">
           Apps & storefronts
         </h1>
-        <p className="text-muted-foreground mt-2 max-w-2xl text-sm leading-6">
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
           Keep target copy and Media Library assets aligned with what is
           actually published in every app store, marketplace, and connector.
         </p>
@@ -103,18 +103,18 @@ export function StorefrontOperations({
               <Link
                 key={item.id}
                 href={`/app/apps/${item.id}`}
-                className="bg-background flex items-center justify-between rounded-xl border p-3 hover:border-amber-500/40"
+                className="flex items-center justify-between rounded-xl border bg-background p-3 hover:border-amber-500/40"
               >
                 <div>
                   <p className="text-sm font-medium">
                     {item.product.name} ·{" "}
                     {storefrontSurfaceRegistry[item.surface].shortLabel}
                   </p>
-                  <p className="text-muted-foreground mt-1 line-clamp-1 text-xs">
+                  <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
                     {item.staleNote}
                   </p>
                 </div>
-                <ArrowRight className="text-muted-foreground size-4" />
+                <ArrowRight className="size-4 text-muted-foreground" />
               </Link>
             ))}
           </div>
@@ -126,7 +126,7 @@ export function StorefrontOperations({
           <select
             value={productId}
             onChange={(event) => setProductId(event.target.value)}
-            className="bg-background rounded-lg border px-3 py-2 text-xs"
+            className="rounded-lg border bg-background px-3 py-2 text-xs"
           >
             <option value="all">All products</option>
             {products.map((product) => (
@@ -140,7 +140,7 @@ export function StorefrontOperations({
             onChange={(event) =>
               setSurface(event.target.value as StorefrontSurfaceId | "all")
             }
-            className="bg-background rounded-lg border px-3 py-2 text-xs"
+            className="rounded-lg border bg-background px-3 py-2 text-xs"
           >
             <option value="all">All surfaces</option>
             {storefrontSurfaceIds.map((id) => (
@@ -151,20 +151,20 @@ export function StorefrontOperations({
           </select>
           <Link
             href="/app/apps/playbook"
-            className="text-primary ml-auto rounded-lg border px-3 py-2 text-xs"
+            className="ml-auto rounded-lg border px-3 py-2 text-xs text-primary"
           >
             Field playbook
           </Link>
           <Link
             href="/app/product-atlas"
-            className="text-primary rounded-lg border px-3 py-2 text-xs"
+            className="rounded-lg border px-3 py-2 text-xs text-primary"
           >
             Product Atlas
           </Link>
         </div>
 
         {visible.length === 0 ? (
-          <div className="text-muted-foreground rounded-xl border border-dashed p-10 text-center text-sm">
+          <div className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">
             No storefronts match this filter.
           </div>
         ) : (
@@ -176,17 +176,17 @@ export function StorefrontOperations({
                 <Link
                   key={item.id}
                   href={`/app/apps/${item.id}`}
-                  className="bg-card hover:border-foreground/25 rounded-2xl border p-5"
+                  className="rounded-2xl border bg-card p-5 hover:border-foreground/25"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <p className="text-muted-foreground text-xs">
+                      <p className="text-xs text-muted-foreground">
                         {item.product.brand.name}
                       </p>
                       <h2 className="mt-1 font-semibold">
                         {item.product.name}
                       </h2>
-                      <p className="text-muted-foreground mt-1 text-xs">
+                      <p className="mt-1 text-xs text-muted-foreground">
                         {storefrontSurfaceRegistry[item.surface].label}
                       </p>
                     </div>
@@ -199,7 +199,7 @@ export function StorefrontOperations({
                       <Icon className="size-3" /> {meta.label}
                     </span>
                   </div>
-                  <div className="text-muted-foreground mt-5 flex items-center justify-between text-xs">
+                  <div className="mt-5 flex items-center justify-between text-xs text-muted-foreground">
                     <span className="capitalize">{item.listingStatus}</span>
                     <span>
                       {item.manager?.name ??
@@ -227,10 +227,10 @@ function Summary({
   icon: typeof Store;
 }) {
   return (
-    <div className="bg-card rounded-xl border p-4">
-      <Icon className="text-muted-foreground size-4" />
+    <div className="rounded-xl border bg-card p-4">
+      <Icon className="size-4 text-muted-foreground" />
       <p className="mt-3 text-2xl font-semibold tabular-nums">{value}</p>
-      <p className="text-muted-foreground text-[10px] uppercase">{label}</p>
+      <p className="text-[10px] text-muted-foreground uppercase">{label}</p>
     </div>
   );
 }

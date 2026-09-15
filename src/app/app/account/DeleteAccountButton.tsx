@@ -75,13 +75,13 @@ export function DeleteAccountButton({
           <AlertDialogAction
             onClick={handleDelete}
             disabled={isDeleting}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            tone="destructive"
           >
             {isDeleting ? "Deleting..." : "Yes, delete my account"}
           </AlertDialogAction>
         </AlertDialogFooter>
         {deleteAccount.isError && (
-          <p className="text-destructive text-sm">
+          <p className="text-sm text-destructive">
             Error: {deleteAccount.error.message}
           </p>
         )}

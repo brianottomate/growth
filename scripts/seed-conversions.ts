@@ -50,19 +50,88 @@ type SeedEvent = {
 
 const EVENTS: SeedEvent[] = [
   // Supply (≈ WANDER_OS workspace)
-  { name: "WanderOS Inbound Clicked", canonicalEvent: "WanderOS Inbound Clicked", funnel: "supply", stage: 1 },
-  { name: "WanderOS Inbound Submitted", canonicalEvent: "WanderOS Inbound Submitted", funnel: "supply", stage: 2, isPrimary: true },
-  { name: "List Apply Clicked", canonicalEvent: "List Apply Clicked", funnel: "supply", stage: 3 },
-  { name: "List Apply Submitted", canonicalEvent: "List Apply Submitted", funnel: "supply", stage: 4, isPrimary: true },
-  { name: "Signed Up", canonicalEvent: "Signed Up", funnel: "supply", stage: 5 },
-  { name: "Org Created", canonicalEvent: null, funnel: "supply", stage: 6, description: "No exact canonical event yet — closest are User Set Organizations / Organization Name Updated. Needs reconciliation." },
-  { name: "PMS Connected", canonicalEvent: "Onboarding Completed", funnel: "supply", stage: 7, description: "Tentative: no distinct PMS-connected event; Onboarding Completed carries pms_name. Verify in code." },
-  { name: "Live", canonicalEvent: "Site Published", funnel: "supply", stage: 8 },
+  {
+    name: "WanderOS Inbound Clicked",
+    canonicalEvent: "WanderOS Inbound Clicked",
+    funnel: "supply",
+    stage: 1,
+  },
+  {
+    name: "WanderOS Inbound Submitted",
+    canonicalEvent: "WanderOS Inbound Submitted",
+    funnel: "supply",
+    stage: 2,
+    isPrimary: true,
+  },
+  {
+    name: "List Apply Clicked",
+    canonicalEvent: "List Apply Clicked",
+    funnel: "supply",
+    stage: 3,
+  },
+  {
+    name: "List Apply Submitted",
+    canonicalEvent: "List Apply Submitted",
+    funnel: "supply",
+    stage: 4,
+    isPrimary: true,
+  },
+  {
+    name: "Signed Up",
+    canonicalEvent: "Signed Up",
+    funnel: "supply",
+    stage: 5,
+  },
+  {
+    name: "Org Created",
+    canonicalEvent: null,
+    funnel: "supply",
+    stage: 6,
+    description:
+      "No exact canonical event yet — closest are User Set Organizations / Organization Name Updated. Needs reconciliation.",
+  },
+  {
+    name: "PMS Connected",
+    canonicalEvent: "Onboarding Completed",
+    funnel: "supply",
+    stage: 7,
+    description:
+      "Tentative: no distinct PMS-connected event; Onboarding Completed carries pms_name. Verify in code.",
+  },
+  {
+    name: "Live",
+    canonicalEvent: "Site Published",
+    funnel: "supply",
+    stage: 8,
+  },
   // Demand (≈ WANDER_COM workspace)
-  { name: "Property Reserve Clicked", canonicalEvent: null, funnel: "demand", stage: 1, description: "No clear canonical match yet (Book Live Clicked?). Needs reconciliation." },
-  { name: "Checkout Previewed", canonicalEvent: "Checkout Previewed", funnel: "demand", stage: 2 },
-  { name: "Payment Info Submitted", canonicalEvent: "Payment Info Entered", funnel: "demand", stage: 3 },
-  { name: "Order Completed", canonicalEvent: "Order Completed", funnel: "demand", stage: 4, isPrimary: true },
+  {
+    name: "Property Reserve Clicked",
+    canonicalEvent: null,
+    funnel: "demand",
+    stage: 1,
+    description:
+      "No clear canonical match yet (Book Live Clicked?). Needs reconciliation.",
+  },
+  {
+    name: "Checkout Previewed",
+    canonicalEvent: "Checkout Previewed",
+    funnel: "demand",
+    stage: 2,
+  },
+  {
+    name: "Payment Info Submitted",
+    canonicalEvent: "Payment Info Entered",
+    funnel: "demand",
+    stage: 3,
+  },
+  {
+    name: "Order Completed",
+    canonicalEvent: "Order Completed",
+    funnel: "demand",
+    stage: 4,
+    isPrimary: true,
+  },
 ];
 
 // ---- PLATFORM MAPPINGS (per-platform conversions) ----
@@ -81,35 +150,123 @@ type SeedMapping = {
 const MAPPINGS: SeedMapping[] = [
   // Google Ads — one conversion label per Wander event (platform leaves the
   // "platform event" blank, so we use the Wander event name as the label).
-  { platform: "google_ads", platformEventName: "WanderOS Inbound Clicked", externalConversionId: "AW-11520295109/xIEGCPn80bAcEMWBp_Uq", mode: "once", sourceEvents: ["WanderOS Inbound Clicked"] },
-  { platform: "google_ads", platformEventName: "WanderOS Inbound Submitted", externalConversionId: "AW-11520295109/vkUECJivmZUcEMWBp_Uq", mode: "every", sourceEvents: ["WanderOS Inbound Submitted"] },
-  { platform: "google_ads", platformEventName: "List Apply Clicked", externalConversionId: "AW-11520295109/fqj8CLSzubAcEMWBp_Uq", mode: "once", sourceEvents: ["List Apply Clicked"] },
-  { platform: "google_ads", platformEventName: "List Apply Submitted", externalConversionId: "AW-11520295109/onMTCJ6-mJccEMWBp_Uq", mode: "every", sourceEvents: ["List Apply Submitted"] },
+  {
+    platform: "google_ads",
+    platformEventName: "WanderOS Inbound Clicked",
+    externalConversionId: "AW-11520295109/xIEGCPn80bAcEMWBp_Uq",
+    mode: "once",
+    sourceEvents: ["WanderOS Inbound Clicked"],
+  },
+  {
+    platform: "google_ads",
+    platformEventName: "WanderOS Inbound Submitted",
+    externalConversionId: "AW-11520295109/vkUECJivmZUcEMWBp_Uq",
+    mode: "every",
+    sourceEvents: ["WanderOS Inbound Submitted"],
+  },
+  {
+    platform: "google_ads",
+    platformEventName: "List Apply Clicked",
+    externalConversionId: "AW-11520295109/fqj8CLSzubAcEMWBp_Uq",
+    mode: "once",
+    sourceEvents: ["List Apply Clicked"],
+  },
+  {
+    platform: "google_ads",
+    platformEventName: "List Apply Submitted",
+    externalConversionId: "AW-11520295109/onMTCJ6-mJccEMWBp_Uq",
+    mode: "every",
+    sourceEvents: ["List Apply Submitted"],
+  },
 
   // LinkedIn Ads
-  { platform: "linkedin_ads", platformEventName: "Lead", externalConversionId: "26084452", mode: "once", sourceEvents: ["WanderOS Inbound Clicked"] },
-  { platform: "linkedin_ads", platformEventName: "Submit Application", externalConversionId: "26084460", mode: "every", sourceEvents: ["WanderOS Inbound Submitted"] },
-  { platform: "linkedin_ads", platformEventName: "Sign up", externalConversionId: "26084468", mode: "once", sourceEvents: ["List Apply Clicked"] },
-  { platform: "linkedin_ads", platformEventName: "Qualified Lead", externalConversionId: "26084476", mode: "every", sourceEvents: ["List Apply Submitted"] },
+  {
+    platform: "linkedin_ads",
+    platformEventName: "Lead",
+    externalConversionId: "26084452",
+    mode: "once",
+    sourceEvents: ["WanderOS Inbound Clicked"],
+  },
+  {
+    platform: "linkedin_ads",
+    platformEventName: "Submit Application",
+    externalConversionId: "26084460",
+    mode: "every",
+    sourceEvents: ["WanderOS Inbound Submitted"],
+  },
+  {
+    platform: "linkedin_ads",
+    platformEventName: "Sign up",
+    externalConversionId: "26084468",
+    mode: "once",
+    sourceEvents: ["List Apply Clicked"],
+  },
+  {
+    platform: "linkedin_ads",
+    platformEventName: "Qualified Lead",
+    externalConversionId: "26084476",
+    mode: "every",
+    sourceEvents: ["List Apply Submitted"],
+  },
 
   // Meta Ads — no conversion IDs wired yet; sheet source labels differ from the
   // spine and are preserved in notes for reconciliation.
-  { platform: "meta_ads", platformEventName: "Contact", externalConversionId: null, mode: null, sourceEvents: ["WanderOS Inbound Submitted"], notes: 'Sheet source label: "Submitted Sites Get Started Form" — confirm mapping.' },
-  { platform: "meta_ads", platformEventName: "Subscribe", externalConversionId: null, mode: null, sourceEvents: ["WanderOS Inbound Clicked"], notes: 'Sheet source label: "Clicked to get started" — confirm mapping.' },
-  { platform: "meta_ads", platformEventName: "Start Trial", externalConversionId: null, mode: null, sourceEvents: ["PMS Connected"], notes: 'Sheet source label: "Onboarding Completed" (app.wander.com) — confirm mapping.' },
-  { platform: "meta_ads", platformEventName: "Website Lead", externalConversionId: null, mode: null, sourceEvents: ["Org Created"], notes: 'Sheet source label: "Organization Created" (app.wander.com) — confirm mapping.' },
+  {
+    platform: "meta_ads",
+    platformEventName: "Contact",
+    externalConversionId: null,
+    mode: null,
+    sourceEvents: ["WanderOS Inbound Submitted"],
+    notes:
+      'Sheet source label: "Submitted Sites Get Started Form" — confirm mapping.',
+  },
+  {
+    platform: "meta_ads",
+    platformEventName: "Subscribe",
+    externalConversionId: null,
+    mode: null,
+    sourceEvents: ["WanderOS Inbound Clicked"],
+    notes: 'Sheet source label: "Clicked to get started" — confirm mapping.',
+  },
+  {
+    platform: "meta_ads",
+    platformEventName: "Start Trial",
+    externalConversionId: null,
+    mode: null,
+    sourceEvents: ["PMS Connected"],
+    notes:
+      'Sheet source label: "Onboarding Completed" (app.wander.com) — confirm mapping.',
+  },
+  {
+    platform: "meta_ads",
+    platformEventName: "Website Lead",
+    externalConversionId: null,
+    mode: null,
+    sourceEvents: ["Org Created"],
+    notes:
+      'Sheet source label: "Organization Created" (app.wander.com) — confirm mapping.',
+  },
 
   // Reddit Ads — single standard "Lead" pixel (no per-conversion id), shared by
   // BOTH submit events. The many-to-one case the join table exists for.
-  { platform: "reddit_ads", platformEventName: "Lead", externalConversionId: null, mode: null, sourceEvents: ["WanderOS Inbound Submitted", "List Apply Submitted"], notes: "Single Lead pixel shared by two Wander events; fires via tracking-web reddit provider (standard event, no per-conversion id)." },
+  {
+    platform: "reddit_ads",
+    platformEventName: "Lead",
+    externalConversionId: null,
+    mode: null,
+    sourceEvents: ["WanderOS Inbound Submitted", "List Apply Submitted"],
+    notes:
+      "Single Lead pixel shared by two Wander events; fires via tracking-web reddit provider (standard event, no per-conversion id).",
+  },
 ];
 
 // Ad channels to ensure exist (kind: "ad"). meta_ads / google_ads are NOT
 // created here — linked only if a channel already exists (e.g. from Zernio sync).
-const ENSURE_AD_CHANNELS: { platform: ChannelPlatform; displayName: string }[] = [
-  { platform: "reddit_ads", displayName: "Reddit Ads" },
-  { platform: "linkedin_ads", displayName: "LinkedIn Ads" },
-];
+const ENSURE_AD_CHANNELS: { platform: ChannelPlatform; displayName: string }[] =
+  [
+    { platform: "reddit_ads", displayName: "Reddit Ads" },
+    { platform: "linkedin_ads", displayName: "LinkedIn Ads" },
+  ];
 
 async function main() {
   const brand = await db.query.brandTable.findFirst({
@@ -153,7 +310,10 @@ async function main() {
       ),
     });
     if (channel) channelByPlatform.set(platform, channel.id);
-    else console.log(`  · no ${platform} channel yet — mappings stay channelId=null`);
+    else
+      console.log(
+        `  · no ${platform} channel yet — mappings stay channelId=null`,
+      );
   }
 
   // --- 2. Upsert event spine by (brandId, name) ---
@@ -169,7 +329,11 @@ async function main() {
       // Update only structural fields; leave canonicalEvent/description (agent-owned).
       await db
         .update(conversionEventTable)
-        .set({ funnel: e.funnel, stage: e.stage, isPrimary: e.isPrimary ?? false })
+        .set({
+          funnel: e.funnel,
+          stage: e.stage,
+          isPrimary: e.isPrimary ?? false,
+        })
         .where(eq(conversionEventTable.id, row.id));
       console.log(`  ↻ event "${e.name}"`);
     } else {
@@ -228,13 +392,18 @@ async function main() {
         .returning();
       console.log(`  + mapping ${m.platform} · ${m.platformEventName}`);
     }
-    if (!row) throw new Error(`Failed to upsert mapping ${m.platform}/${m.platformEventName}`);
+    if (!row)
+      throw new Error(
+        `Failed to upsert mapping ${m.platform}/${m.platformEventName}`,
+      );
 
     // --- 4. Wire join rows (idempotent) ---
     for (const srcName of m.sourceEvents) {
       const eventId = eventIdByName.get(srcName);
       if (!eventId) {
-        console.warn(`    ! source event "${srcName}" not found — skipped link`);
+        console.warn(
+          `    ! source event "${srcName}" not found — skipped link`,
+        );
         continue;
       }
       await db

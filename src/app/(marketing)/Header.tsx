@@ -43,7 +43,7 @@ export default function Header({
   return (
     <header
       className={cn(
-        "bg-surface-primary/80 border-primary sticky inset-x-0 z-30 border-b backdrop-blur-sm",
+        "sticky inset-x-0 z-30 border-b border-primary bg-surface-primary/80 backdrop-blur-sm",
         showBanner ? "top-28 md:top-16 lg:top-12" : "top-0",
       )}
     >

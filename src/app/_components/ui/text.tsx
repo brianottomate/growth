@@ -85,14 +85,14 @@ function List(props: { children: React.ReactNode }) {
 
 function InlineCode(props: { children: React.ReactNode }) {
   return (
-    <code className="bg-muted relative rounded px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold">
+    <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold">
       {props.children}
     </code>
   );
 }
 
 function Lead(props: { children: React.ReactNode }) {
-  return <p className="text-muted-foreground text-xl">{props.children}</p>;
+  return <p className="text-xl text-muted-foreground">{props.children}</p>;
 }
 
 function Large(props: { children: React.ReactNode }) {
@@ -106,7 +106,7 @@ function Small(props: { children: React.ReactNode }) {
 }
 
 function Muted(props: { children: React.ReactNode }) {
-  return <p className="text-muted-foreground text-sm">{props.children}</p>;
+  return <p className="text-sm text-muted-foreground">{props.children}</p>;
 }
 
 function Prose(props: { children: React.ReactNode; className?: string }) {

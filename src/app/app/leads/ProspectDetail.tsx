@@ -44,7 +44,7 @@ function Row({
 }) {
   return (
     <div className="flex flex-col gap-0.5 py-1 text-sm sm:flex-row sm:gap-3">
-      <span className="text-muted-foreground shrink-0 text-xs sm:w-36 sm:text-sm">
+      <span className="shrink-0 text-xs text-muted-foreground sm:w-36 sm:text-sm">
         {label}
       </span>
       <span className="min-w-0 flex-1 break-words">{children}</span>
@@ -57,11 +57,11 @@ function Row({
 function DayRail({ day, label }: { day: number; label: string }) {
   return (
     <div className="flex items-center gap-3 pt-4 pb-1">
-      <span className="text-muted-foreground w-14 shrink-0 text-right text-xs tabular-nums">
+      <span className="w-14 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
         {day === 0 ? "Day 0" : `+${day}d`}
       </span>
-      <span className="bg-border h-px flex-1" />
-      <span className="text-muted-foreground shrink-0 text-xs">{label}</span>
+      <span className="h-px flex-1 bg-border" />
+      <span className="shrink-0 text-xs text-muted-foreground">{label}</span>
     </div>
   );
 }
@@ -95,7 +95,7 @@ function Merged({ parts, filled }: { parts: TemplatePart[]; filled: boolean }) {
               {part.text}
             </span>
             {filled ? (
-              <span className="text-muted-foreground block text-xs">
+              <span className="block text-xs text-muted-foreground">
                 {part.url}
               </span>
             ) : null}
@@ -127,7 +127,7 @@ function TouchCard({
       className={
         tone === "template"
           ? "rounded-lg border border-amber-500/25 bg-amber-500/5 p-4"
-          : "border-border bg-card rounded-lg border p-4"
+          : "rounded-lg border border-border bg-card p-4"
       }
     >
       <p
@@ -144,7 +144,7 @@ function TouchCard({
             className="mt-1 text-base font-semibold [overflow-wrap:anywhere]"
           >
             {subjects.length > 1 ? (
-              <span className="text-muted-foreground text-xs font-normal">
+              <span className="text-xs font-normal text-muted-foreground">
                 {String.fromCharCode(65 + index)}{" "}
               </span>
             ) : null}
@@ -152,7 +152,7 @@ function TouchCard({
           </p>
         ))
       ) : (
-        <p className="text-muted-foreground mt-1 text-xs italic">
+        <p className="mt-1 text-xs text-muted-foreground italic">
           Reply in the same thread — no new subject
         </p>
       )}
@@ -174,7 +174,7 @@ function Stat({
 }) {
   return (
     <div className="min-w-0">
-      <p className="text-muted-foreground text-xs">{label}</p>
+      <p className="text-xs text-muted-foreground">{label}</p>
       <p className="text-sm break-words">{children}</p>
     </div>
   );
@@ -190,10 +190,10 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="border-border rounded-lg border p-4">
+    <section className="rounded-lg border border-border p-4">
       <h2 className="text-sm font-semibold">{title}</h2>
       {note ? (
-        <p className="text-muted-foreground mt-0.5 text-xs">{note}</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">{note}</p>
       ) : null}
       <div className="mt-3">{children}</div>
     </section>
@@ -277,7 +277,7 @@ export function ProspectDetail({ domain }: { domain: string }) {
 
   if (prospect.isPending) {
     return (
-      <div className="text-muted-foreground flex items-center gap-2 p-6 text-sm">
+      <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" /> Loading {domain}…
       </div>
     );
@@ -385,7 +385,7 @@ export function ProspectDetail({ domain }: { domain: string }) {
   return (
     <div className="space-y-4">
       {/* Identity + the one thing that overrides everything else */}
-      <header className="border-border rounded-lg border p-4">
+      <header className="rounded-lg border border-border p-4">
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-lg font-semibold">{row.domain}</h1>
           <a
@@ -408,7 +408,7 @@ export function ProspectDetail({ domain }: { domain: string }) {
             </span>
           ) : null}
         </div>
-        <p className="text-muted-foreground mt-1 text-sm">
+        <p className="mt-1 text-sm text-muted-foreground">
           {[row.companyName, row.city, row.state, row.country]
             .filter(Boolean)
             .join(" · ")}
@@ -426,7 +426,7 @@ export function ProspectDetail({ domain }: { domain: string }) {
             to sit at the far end of a long page: the links inside the preview
             section and the buttons below the correspondence dump, so acting on
             a lead meant scrolling past everything you had just read. */}
-        <div className="border-border mt-4 flex flex-wrap items-center gap-2 border-t pt-3">
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-3">
           {preview.url ? (
             <a
               href={preview.url}
@@ -434,7 +434,7 @@ export function ProspectDetail({ domain }: { domain: string }) {
               rel="noreferrer"
               title="Open the pregen preview they will see"
               aria-label="Open the pregen preview"
-              className="border-border text-muted-foreground hover:text-foreground inline-flex size-8 items-center justify-center rounded-md border"
+              className="inline-flex size-8 items-center justify-center rounded-md border border-border text-muted-foreground hover:text-foreground"
             >
               <ExternalLink className="size-3.5" />
             </a>
@@ -446,12 +446,12 @@ export function ProspectDetail({ domain }: { domain: string }) {
               rel="noreferrer"
               title="Open the wander.com wrapper, the page this copy sends"
               aria-label="Open the wander.com wrapper"
-              className="border-border text-muted-foreground hover:text-foreground inline-flex size-8 items-center justify-center rounded-md border"
+              className="inline-flex size-8 items-center justify-center rounded-md border border-border text-muted-foreground hover:text-foreground"
             >
               <Gift className="size-3.5" />
             </a>
           ) : null}
-          <span className="bg-border mx-1 h-6 w-px" />
+          <span className="mx-1 h-6 w-px bg-border" />
           {prospectBrand?.slug ? (
             <>
               <Button
@@ -558,7 +558,7 @@ export function ProspectDetail({ domain }: { domain: string }) {
             Work in chat
           </Button>
         </div>
-        <p className="text-muted-foreground mt-2 text-xs">
+        <p className="mt-2 text-xs text-muted-foreground">
           Ranking scores the site and writes back. Generating saves a draft. It
           never publishes or enrols.
           {preview.state !== "live"
@@ -594,7 +594,7 @@ export function ProspectDetail({ domain }: { domain: string }) {
       <div className="grid gap-4 lg:grid-cols-2">
         <Section title="Their site" note={`https://${row.domain}`}>
           {screenshot ? (
-            <div className="border-border bg-muted relative aspect-[4/3] w-full overflow-hidden rounded border">
+            <div className="relative aspect-[4/3] w-full overflow-hidden rounded border border-border bg-muted">
               <Image
                 src={screenshot}
                 alt={`${row.domain} homepage`}
@@ -604,7 +604,7 @@ export function ProspectDetail({ domain }: { domain: string }) {
               />
             </div>
           ) : (
-            <p className="text-muted-foreground text-sm">
+            <p className="text-sm text-muted-foreground">
               No screenshot captured. Only ranked domains have one.
             </p>
           )}
@@ -625,7 +625,7 @@ export function ProspectDetail({ domain }: { domain: string }) {
               visible. Same frame as their site on the left, and the capture is
               shot at the same viewport, so the two are honestly comparable. */}
           {previewShot ? (
-            <div className="border-border bg-muted relative mt-3 aspect-[4/3] w-full overflow-hidden rounded border">
+            <div className="relative mt-3 aspect-[4/3] w-full overflow-hidden rounded border border-border bg-muted">
               <Image
                 src={previewShot}
                 alt={`Preview built for ${row.domain}`}
@@ -636,7 +636,7 @@ export function ProspectDetail({ domain }: { domain: string }) {
               />
             </div>
           ) : (
-            <p className="text-muted-foreground mt-3 text-sm">
+            <p className="mt-3 text-sm text-muted-foreground">
               No capture yet.{" "}
               {preview.url
                 ? "Capture one to see it beside their site."
@@ -656,7 +656,7 @@ export function ProspectDetail({ domain }: { domain: string }) {
               {previewShot ? "Recapture" : "Capture preview"}
             </Button>
             {previewShotAt ? (
-              <span className="text-muted-foreground text-xs">
+              <span className="text-xs text-muted-foreground">
                 shot {previewShotAt.slice(0, 10)}
               </span>
             ) : null}
@@ -665,13 +665,13 @@ export function ProspectDetail({ domain }: { domain: string }) {
             <p className="mt-2 text-xs text-red-300">{capture.error.message}</p>
           ) : null}
           {preview.url ? (
-            <div className="text-muted-foreground mt-2 space-y-1 text-xs break-all">
+            <div className="mt-2 space-y-1 text-xs break-all text-muted-foreground">
               {wrapperUrl ? (
                 <a
                   href={wrapperUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="hover:text-foreground block"
+                  className="block hover:text-foreground"
                 >
                   {wrapperUrl}
                 </a>
@@ -680,7 +680,7 @@ export function ProspectDetail({ domain }: { domain: string }) {
                 href={preview.url}
                 target="_blank"
                 rel="noreferrer"
-                className="hover:text-foreground block"
+                className="block hover:text-foreground"
               >
                 {preview.url}
               </a>
@@ -700,12 +700,12 @@ export function ProspectDetail({ domain }: { domain: string }) {
           read as the prospect looking. Mounted only when opened. */}
       {preview.url ? (
         <details
-          className="border-border rounded border"
+          className="rounded border border-border"
           onToggle={(event) =>
             setPreviewFrameOpen((event.target as HTMLDetailsElement).open)
           }
         >
-          <summary className="text-muted-foreground hover:text-foreground cursor-pointer px-4 py-2 text-sm select-none">
+          <summary className="cursor-pointer px-4 py-2 text-sm text-muted-foreground select-none hover:text-foreground">
             Browse the live preview inline
           </summary>
           {previewFrameOpen ? (
@@ -803,7 +803,7 @@ export function ProspectDetail({ domain }: { domain: string }) {
                   </div>
                 </div>
               ) : (
-                <p className="text-muted-foreground text-xs">
+                <p className="text-xs text-muted-foreground">
                   This draft predates provenance capture, so what it was written
                   from was not recorded. Regenerate to capture it.
                 </p>
@@ -842,7 +842,7 @@ export function ProspectDetail({ domain }: { domain: string }) {
                 href={PREGEN_SEQUENCE_URL}
                 target="_blank"
                 rel="noreferrer"
-                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs underline underline-offset-4"
+                className="inline-flex items-center gap-1 text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
               >
                 Live copy in HubSpot
                 <ExternalLink className="size-3" />
@@ -857,7 +857,7 @@ export function ProspectDetail({ domain }: { domain: string }) {
             </div>
           </div>
           {!bespokeSteps.length ? (
-            <p className="text-muted-foreground text-sm">
+            <p className="text-sm text-muted-foreground">
               Nothing generated for this company yet. The template touches below
               are what it would get today.
             </p>
@@ -891,7 +891,7 @@ export function ProspectDetail({ domain }: { domain: string }) {
                       filled={filled}
                     />
                   ) : (
-                    <div className="text-muted-foreground hidden items-center rounded-lg border border-dashed p-4 text-xs lg:flex">
+                    <div className="hidden items-center rounded-lg border border-dashed p-4 text-xs text-muted-foreground lg:flex">
                       The template has no touch {index + 1}.
                     </div>
                   )}
@@ -908,7 +908,7 @@ export function ProspectDetail({ domain }: { domain: string }) {
                       filled={filled}
                     />
                   ) : bespokeSteps.length ? (
-                    <div className="text-muted-foreground hidden items-center rounded-lg border border-dashed p-4 text-xs lg:flex">
+                    <div className="hidden items-center rounded-lg border border-dashed p-4 text-xs text-muted-foreground lg:flex">
                       The bespoke draft has no touch {index + 1}.
                     </div>
                   ) : null}
@@ -955,7 +955,7 @@ export function ProspectDetail({ domain }: { domain: string }) {
         note={`Selected channel: ${channel.bestEmail ?? "none"} · enrols ${channel.enrollable?.email ?? "nobody"} · route ${channel.route} · verdict ${channel.verdict}`}
       >
         {channel.candidates.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
+          <p className="text-sm text-muted-foreground">
             No contacts stored. Resolve channels to crawl their site.
           </p>
         ) : (
@@ -964,7 +964,7 @@ export function ProspectDetail({ domain }: { domain: string }) {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[560px] text-sm">
               <thead>
-                <tr className="text-muted-foreground text-left text-xs">
+                <tr className="text-left text-xs text-muted-foreground">
                   <th className="border-b py-1 pr-3 font-medium">Email</th>
                   <th className="border-b px-3 py-1 font-medium">Who</th>
                   <th className="border-b px-3 py-1 text-right font-medium">
@@ -1005,7 +1005,7 @@ export function ProspectDetail({ domain }: { domain: string }) {
                         {candidate.score}
                       </span>
                     </td>
-                    <td className="text-muted-foreground border-b px-3 py-1.5 text-xs">
+                    <td className="border-b px-3 py-1.5 text-xs text-muted-foreground">
                       {[...candidate.risks, ...candidate.reasons].join("; ") ||
                         "—"}
                     </td>
@@ -1018,7 +1018,7 @@ export function ProspectDetail({ domain }: { domain: string }) {
                         <button
                           type="button"
                           disabled={retire.isPending}
-                          className="text-muted-foreground hover:text-foreground text-xs underline underline-offset-2 disabled:opacity-50"
+                          className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground disabled:opacity-50"
                           onClick={() => {
                             const contactId = candidate.contactId!;
                             const wasRetired = contacts.some(
@@ -1057,7 +1057,7 @@ export function ProspectDetail({ domain }: { domain: string }) {
           </div>
         )}
         {channels.length > 0 ? (
-          <p className="text-muted-foreground mt-3 text-xs">
+          <p className="mt-3 text-xs text-muted-foreground">
             Captured channels:{" "}
             {channels
               .map((c) => `${c.kind}${c.value ? ` (${c.value})` : ""}`)
@@ -1100,13 +1100,13 @@ export function ProspectDetail({ domain }: { domain: string }) {
               {(correspondence.emails.items ?? []).map((item) => (
                 <div
                   key={item.engagementId}
-                  className="border-border rounded border p-2"
+                  className="rounded border border-border p-2"
                 >
                   <p>
                     <span className="text-foreground">{item.direction}</span> ·{" "}
                     {item.sentAt.slice(0, 10)} · {item.subject}
                   </p>
-                  <p className="text-muted-foreground mt-1 [overflow-wrap:anywhere]">
+                  <p className="mt-1 [overflow-wrap:anywhere] text-muted-foreground">
                     {item.excerpt}
                   </p>
                 </div>
@@ -1114,14 +1114,14 @@ export function ProspectDetail({ domain }: { domain: string }) {
               {(correspondence.activity.items ?? []).map((item) => (
                 <div
                   key={item.engagementId}
-                  className="border-border rounded border p-2"
+                  className="rounded border border-border p-2"
                 >
                   <p>
                     <span className="text-foreground">{item.title}</span>
                     {item.qualifier ? ` (${item.qualifier})` : ""} ·{" "}
                     {item.occurredAt.slice(0, 10)}
                   </p>
-                  <p className="text-muted-foreground mt-1 [overflow-wrap:anywhere]">
+                  <p className="mt-1 [overflow-wrap:anywhere] text-muted-foreground">
                     {item.excerpt}
                   </p>
                 </div>
@@ -1140,14 +1140,14 @@ export function ProspectDetail({ domain }: { domain: string }) {
                 : "Load correspondence"}
             </Button>
           ) : crm.isPending ? (
-            <div className="text-muted-foreground flex items-center gap-2 text-sm">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" /> Reading HubSpot…
             </div>
           ) : crm.data?.available === false ? (
-            <p className="text-muted-foreground text-sm">{crm.data.reason}.</p>
+            <p className="text-sm text-muted-foreground">{crm.data.reason}.</p>
           ) : crm.data?.available ? (
             <div className="space-y-2">
-              <p className="text-foreground font-medium">
+              <p className="font-medium text-foreground">
                 Live from HubSpot: {crm.data.emails.retained} of{" "}
                 {crm.data.emails.available} emails ·{" "}
                 {crm.data.activity.retained} of {crm.data.activity.available}{" "}
@@ -1156,13 +1156,13 @@ export function ProspectDetail({ domain }: { domain: string }) {
               {crm.data.emails.items.map((item) => (
                 <div
                   key={item.engagementId}
-                  className="border-border rounded border p-2"
+                  className="rounded border border-border p-2"
                 >
                   <p>
                     <span className="text-foreground">{item.direction}</span> ·{" "}
                     {item.sentAt.slice(0, 10)} · {item.subject}
                   </p>
-                  <p className="text-muted-foreground mt-1 [overflow-wrap:anywhere]">
+                  <p className="mt-1 [overflow-wrap:anywhere] text-muted-foreground">
                     {item.body.slice(0, 400)}
                   </p>
                 </div>
@@ -1170,21 +1170,21 @@ export function ProspectDetail({ domain }: { domain: string }) {
               {crm.data.activity.items.map((item) => (
                 <div
                   key={item.engagementId}
-                  className="border-border rounded border p-2"
+                  className="rounded border border-border p-2"
                 >
                   <p>
                     <span className="text-foreground">{item.title}</span>
                     {item.qualifier ? ` (${item.qualifier})` : ""} ·{" "}
                     {item.occurredAt.slice(0, 10)}
                   </p>
-                  <p className="text-muted-foreground mt-1 [overflow-wrap:anywhere]">
+                  <p className="mt-1 [overflow-wrap:anywhere] text-muted-foreground">
                     {item.body.slice(0, 400)}
                   </p>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-muted-foreground text-sm">Nothing returned.</p>
+            <p className="text-sm text-muted-foreground">Nothing returned.</p>
           )}
         </div>
       </Section>

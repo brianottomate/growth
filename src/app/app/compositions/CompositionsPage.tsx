@@ -71,7 +71,8 @@ export function CompositionsPage({ brands }: { brands: Brand[] }) {
   const initialEyebrow = searchParams.get("eyebrow");
   const initialSubtitle = searchParams.get("subtitle");
   const ratingParam = Number(searchParams.get("rating"));
-  const initialRating = ratingParam >= 1 && ratingParam <= 5 ? ratingParam : null;
+  const initialRating =
+    ratingParam >= 1 && ratingParam <= 5 ? ratingParam : null;
   // Designing an ad preview for the brand: freezing keeps the card on the
   // brand and goes back to its page.
   const adPreviewTarget =
@@ -90,7 +91,7 @@ export function CompositionsPage({ brands }: { brands: Brand[] }) {
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-semibold">Compositions</h1>
-        <p className="text-muted-foreground text-sm">
+        <p className="text-sm text-muted-foreground">
           Turn library images and brand copy into finished publishing assets.
         </p>
       </div>

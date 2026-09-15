@@ -19,7 +19,8 @@ import { classify } from "@/server/content/classify";
 import { displayPoster } from "@/lib/utils/media";
 
 const args = process.argv.slice(2);
-const arg = (k: string) => args.find((a) => a.startsWith(`--${k}=`))?.split("=")[1];
+const arg = (k: string) =>
+  args.find((a) => a.startsWith(`--${k}=`))?.split("=")[1];
 const limit = arg("limit") ? Number(arg("limit")) : undefined;
 const platform = arg("platform");
 const redo = args.includes("--redo");

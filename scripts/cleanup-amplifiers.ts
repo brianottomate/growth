@@ -37,7 +37,9 @@ async function main() {
   for (const a of buckets) console.log(`  ✗ ${a.name} [${a.type ?? "—"}]`);
 
   if (!commit) {
-    console.log(`\nDry run — pass --commit to delete the ${buckets.length} bucket rows.\n`);
+    console.log(
+      `\nDry run — pass --commit to delete the ${buckets.length} bucket rows.\n`,
+    );
     return;
   }
   if (buckets.length === 0) {
@@ -51,7 +53,9 @@ async function main() {
       buckets.map((a) => a.id),
     ),
   );
-  console.log(`\nDeleted ${buckets.length} role-bucket amplifiers (targets cascade).\n`);
+  console.log(
+    `\nDeleted ${buckets.length} role-bucket amplifiers (targets cascade).\n`,
+  );
 }
 
 await main();

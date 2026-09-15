@@ -25,9 +25,9 @@ const sharedComponents = {
 
 // Parse the Velite generated MDX code into a React component function
 const useMDXComponent = (code: string) => {
-  // eslint-disable-next-line @typescript-eslint/no-implied-eval
+  // oxlint-disable-next-line typescript/no-implied-eval
   const fn = new Function(code);
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+  // oxlint-disable-next-line typescript/no-unsafe-return, typescript/no-unsafe-member-access, typescript/no-unsafe-call
   return fn({ ...runtime }).default;
 };
 
@@ -38,7 +38,7 @@ interface MDXProps {
 
 // MDXContent component
 export function MDXContent({ code, components }: MDXProps) {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+  // oxlint-disable-next-line typescript/no-unsafe-assignment
   const Component = useMDXComponent(code);
   return <Component components={{ ...sharedComponents, ...components }} />;
 }

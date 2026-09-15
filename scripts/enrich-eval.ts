@@ -51,7 +51,9 @@ async function main() {
   for (let i = 0; i < targets.length; i += CONCURRENCY) {
     const batch = targets.slice(i, i + CONCURRENCY);
     results.push(...(await Promise.all(batch.map(evalDomain))));
-    process.stdout.write(`  …${Math.min(i + CONCURRENCY, targets.length)}/${targets.length}\n`);
+    process.stdout.write(
+      `  …${Math.min(i + CONCURRENCY, targets.length)}/${targets.length}\n`,
+    );
   }
 
   console.log(

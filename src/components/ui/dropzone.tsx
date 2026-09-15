@@ -1,5 +1,6 @@
 "use client";
 
+import { cva, type VariantProps } from "class-variance-authority";
 import { useCallback, useEffect, useRef, type MutableRefObject } from "react";
 import { useDropzone, type Accept } from "react-dropzone";
 import { FolderOpen, Loader2, UploadCloud } from "lucide-react";
@@ -39,6 +40,10 @@ function acceptsFile(file: File, accept?: Accept) {
  * spinner. Emits accepted `File[]`; the caller owns the upload (e.g. via
  * `useMediaUpload`). Borrowed/themed from the swipestats FileUploadZone.
  */
+const dropzoneStyleVariants = cva("", {
+  variants: { density: { thumbnail: "p-0 text-[9px]" } },
+});
+
 export function Dropzone({
   onFiles,
   uploading = 0,
@@ -47,7 +52,8 @@ export function Dropzone({
   multiple = true,
   folders = multiple,
   disabled,
-  className,
+  className: customClassName,
+  density,
   compact = false,
   title,
   hint = "or click to browse · saved to your library",
@@ -74,7 +80,9 @@ export function Dropzone({
   hint?: string;
   /** Receives an `open()` you can call to trigger the file picker elsewhere. */
   openRef?: MutableRefObject<(() => void) | null>;
-}) {
+} & VariantProps<typeof dropzoneStyleVariants>) {
+  const className = cn(dropzoneStyleVariants({ density }), customClassName);
+
   const onDrop = useCallback(
     (accepted: File[]) => {
       if (accepted.length) onFiles(accepted);
@@ -104,9 +112,9 @@ export function Dropzone({
     <div
       {...getRootProps()}
       className={cn(
-        "group border-border bg-muted/20 hover:border-foreground/40 hover:bg-accent/30 relative flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed text-center transition-all",
+        "group relative flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-muted/20 text-center transition-all hover:border-foreground/40 hover:bg-accent/30",
         compact ? "px-4 py-5" : "px-6 py-10",
-        isDragActive && "border-primary bg-primary/10 scale-[1.01]",
+        isDragActive && "scale-[1.01] border-primary bg-primary/10",
         (disabled || busy) && "cursor-not-allowed opacity-60",
         className,
       )}
@@ -141,7 +149,7 @@ export function Dropzone({
         {busy ? (
           <Loader2
             className={cn(
-              "text-muted-foreground animate-spin",
+              "animate-spin text-muted-foreground",
               compact ? "size-5" : "size-7",
             )}
           />
@@ -158,22 +166,22 @@ export function Dropzone({
       </div>
       {busy ? (
         <div className="w-full max-w-sm space-y-2">
-          <p className="text-muted-foreground text-sm font-medium">
+          <p className="text-sm font-medium text-muted-foreground">
             Uploading{uploading > 1 ? ` ${uploading}` : ""}…
           </p>
           {/* Per-file bars, because "is this stuck?" is the only question an
               operator has while a large video is in flight. */}
           {progress?.map((item) => (
             <div key={item.key} className="space-y-1 text-left">
-              <div className="text-muted-foreground flex justify-between gap-2 text-[11px]">
+              <div className="flex justify-between gap-2 text-[11px] text-muted-foreground">
                 <span className="truncate">{item.name}</span>
                 <span className="shrink-0 tabular-nums">
                   {Math.round(item.fraction * 100)}%
                 </span>
               </div>
-              <div className="bg-muted h-1 overflow-hidden rounded-full">
+              <div className="h-1 overflow-hidden rounded-full bg-muted">
                 <div
-                  className="bg-primary h-full transition-[width] duration-200"
+                  className="h-full bg-primary transition-[width] duration-200"
                   style={{ width: `${Math.round(item.fraction * 100)}%` }}
                 />
               </div>
@@ -181,13 +189,13 @@ export function Dropzone({
           ))}
         </div>
       ) : isDragActive ? (
-        <p className="text-primary text-sm font-semibold">Drop to upload</p>
+        <p className="text-sm font-semibold text-primary">Drop to upload</p>
       ) : (
         <div className="space-y-0.5">
           <p className={cn("font-medium", compact ? "text-xs" : "text-sm")}>
             {title ?? "Drop images here"}
           </p>
-          <p className="text-muted-foreground text-xs">{hint}</p>
+          <p className="text-xs text-muted-foreground">{hint}</p>
           {folders && (
             <button
               type="button"
@@ -198,7 +206,7 @@ export function Dropzone({
                 event.stopPropagation();
                 folderInput.current?.click();
               }}
-              className="text-muted-foreground hover:text-foreground mx-auto mt-1 flex items-center gap-1 text-xs underline underline-offset-2 disabled:opacity-50"
+              className="mx-auto mt-1 flex items-center gap-1 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground disabled:opacity-50"
             >
               <FolderOpen className="size-3" />
               Choose a folder

@@ -39,10 +39,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useMediaQuery } from "@/components/ui/hooks/use-media-query";
 import { toast } from "@/components/ui/toast";
-import {
-  ThinkingOrb,
-  capabilityOrbState,
-} from "@/components/thinking-orb";
+import { ThinkingOrb, capabilityOrbState } from "@/components/thinking-orb";
 import { useTRPC } from "@/trpc/react";
 import { CHAT_MARKDOWN_LAYOUT } from "@/lib/chat-markdown";
 import { isApprovalSuperseded } from "@/lib/chat-approval-state";
@@ -790,13 +787,11 @@ export function OverviewChat({
           aria-label="Overview assistant conversation"
           className="h-full scrollbar-thin overflow-x-hidden overflow-y-auto"
         >
-          <div
-            className="mx-auto w-full min-w-0 space-y-4 px-4 pb-4"
-          >
+          <div className="mx-auto w-full min-w-0 space-y-4 px-4 pb-4">
             {isEmpty && (
               <div
                 className={cn(
-                  "animate-in fade-in slide-in-from-bottom-2 flex flex-col gap-4 pt-4 duration-500",
+                  "flex animate-in flex-col gap-4 pt-4 duration-500 fade-in slide-in-from-bottom-2",
                 )}
               >
                 <div>
@@ -805,23 +800,21 @@ export function OverviewChat({
                       ? `What’s next${brandName ? ` for ${brandName}` : ""}?`
                       : `Hi ${firstName} 👋`}
                   </h1>
-                  <p className="text-muted-foreground mt-1 text-sm">
+                  <p className="mt-1 text-sm text-muted-foreground">
                     {mode !== "overview"
                       ? "Start with the next two weeks, or paste an image, link, or rough thought. I’ll use the brand context, act when the next step is clear, and take you to the right place to inspect or edit the result."
                       : "Ask me about what’s happening across the growth workspace — brands, content, leads, listening. This surface is early; I’ll tell you when something is outside what I can see yet."}
                   </p>
                 </div>
-                <div
-                  className="grid auto-rows-fr gap-2"
-                >
+                <div className="grid auto-rows-fr gap-2">
                   {starters.map(({ icon: Icon, text }) => (
                     <button
                       key={text}
                       type="button"
                       onClick={() => send(text)}
-                      className="group hover:border-foreground/20 bg-card flex items-start gap-2.5 rounded-lg border px-3.5 py-3 text-left transition-all duration-200 hover:-translate-y-px hover:shadow-md"
+                      className="group flex items-start gap-2.5 rounded-lg border bg-card px-3.5 py-3 text-left transition-all duration-200 hover:-translate-y-px hover:border-foreground/20 hover:shadow-md"
                     >
-                      <span className="bg-primary/10 text-primary grid size-6 shrink-0 place-items-center rounded-md">
+                      <span className="grid size-6 shrink-0 place-items-center rounded-md bg-primary/10 text-primary">
                         <Icon className="h-3.5 w-3.5" />
                       </span>
                       <span className="text-xs leading-snug">{text}</span>
@@ -864,13 +857,13 @@ export function OverviewChat({
                           return (
                             <details
                               key={key}
-                              className="group/r text-muted-foreground text-xs"
+                              className="group/r text-xs text-muted-foreground"
                             >
-                              <summary className="hover:text-foreground flex cursor-pointer list-none items-center gap-1 select-none [&::-webkit-details-marker]:hidden">
+                              <summary className="flex cursor-pointer list-none items-center gap-1 select-none hover:text-foreground [&::-webkit-details-marker]:hidden">
                                 <ChevronRight className="h-3 w-3 transition-transform group-open/r:rotate-90" />
                                 Thought process
                               </summary>
-                              <p className="border-border mt-1 border-l-2 pl-3 break-words whitespace-pre-wrap">
+                              <p className="mt-1 border-l-2 border-border pl-3 break-words whitespace-pre-wrap">
                                 {part.text}
                               </p>
                             </details>
@@ -923,7 +916,8 @@ export function OverviewChat({
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="text-muted-foreground h-6 w-6"
+                            tone="muted"
+                            className="h-6 w-6"
                             title="Copy"
                             onClick={() => copyMessageText(message)}
                           >
@@ -933,7 +927,8 @@ export function OverviewChat({
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="text-muted-foreground h-6 w-6"
+                              tone="muted"
+                              className="h-6 w-6"
                               title="Regenerate"
                               onClick={() => void regenerate()}
                             >
@@ -949,14 +944,14 @@ export function OverviewChat({
             })}
 
             {showWorking && (
-              <div className="text-muted-foreground flex items-center gap-2 text-xs">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <ThinkingOrb state="solving" size={20} aria-label="Thinking" />
                 Thinking…
               </div>
             )}
             {error && (
-              <div className="border-destructive/30 bg-destructive/5 space-y-2 rounded-md border p-3">
-                <p className="text-destructive text-xs">
+              <div className="space-y-2 rounded-md border border-destructive/30 bg-destructive/5 p-3">
+                <p className="text-xs text-destructive">
                   Something went wrong. {error.message}
                 </p>
                 <Button
@@ -977,7 +972,9 @@ export function OverviewChat({
             variant="outline"
             size="icon"
             onClick={scrollToBottom}
-            className="absolute bottom-3 left-1/2 z-10 h-8 w-8 -translate-x-1/2 rounded-full shadow-md"
+            shape="round"
+            elevation="raised"
+            className="absolute bottom-3 left-1/2 z-10 h-8 w-8 -translate-x-1/2"
             aria-label="Scroll to latest"
           >
             <ArrowDown className="h-4 w-4" />
@@ -985,18 +982,16 @@ export function OverviewChat({
         )}
       </div>
 
-      <div
-        className="mx-auto w-full border-t px-3 pb-3"
-      >
+      <div className="mx-auto w-full border-t px-3 pb-3">
         <form className="mt-3" onSubmit={submit}>
           <div
             className={cn(
-              "border-border focus-within:border-primary/50 bg-card relative rounded-xl border p-2.5 shadow-sm transition-[border-color,box-shadow] duration-200 focus-within:shadow-md",
-              dragActive && "border-primary ring-primary/20 ring-2",
+              "relative rounded-xl border border-border bg-card p-2.5 shadow-sm transition-[border-color,box-shadow] duration-200 focus-within:border-primary/50 focus-within:shadow-md",
+              dragActive && "border-primary ring-2 ring-primary/20",
             )}
           >
             {dragActive && (
-              <div className="bg-card/95 text-foreground absolute inset-0 z-20 flex items-center justify-center rounded-xl text-sm font-medium backdrop-blur-sm">
+              <div className="absolute inset-0 z-20 flex items-center justify-center rounded-xl bg-card/95 text-sm font-medium text-foreground backdrop-blur-sm">
                 Drop images or videos here
               </div>
             )}
@@ -1014,7 +1009,7 @@ export function OverviewChat({
                         preload="metadata"
                       />
                     ) : (
-                      // eslint-disable-next-line @next/next/no-img-element
+                      // oxlint-disable-next-line nextjs/no-img-element
                       <img
                         src={attachment.previewUrl}
                         alt={`Attachment ${index + 1}`}
@@ -1022,8 +1017,8 @@ export function OverviewChat({
                       />
                     )}
                     {attachment.uploading && (
-                      <div className="bg-background/70 absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-md">
-                        <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-md bg-background/70">
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                         <span className="text-[9px] tabular-nums">
                           {Math.round(attachment.progress * 100)}%
                         </span>
@@ -1040,7 +1035,7 @@ export function OverviewChat({
                         );
                       }}
                       aria-label={`Remove attachment ${index + 1}`}
-                      className="bg-background hover:bg-muted absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full border shadow-sm transition-colors"
+                      className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full border bg-background shadow-sm transition-colors hover:bg-muted"
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -1049,7 +1044,7 @@ export function OverviewChat({
               </div>
             )}
             {input.length >= LONG_TEXT_ATTACHMENT_THRESHOLD && (
-              <div className="text-muted-foreground mb-2 flex items-center gap-2 rounded-md border px-2.5 py-2 text-xs">
+              <div className="mb-2 flex items-center gap-2 rounded-md border px-2.5 py-2 text-xs text-muted-foreground">
                 <FileText className="size-4 shrink-0" />
                 <span className="font-medium">Pasted text</span>
                 <span className="ml-auto tabular-nums">
@@ -1075,7 +1070,8 @@ export function OverviewChat({
               }
               rows={1}
               autoFocus={desktop && active}
-              className="max-h-40 min-h-9 w-full resize-none border-0 bg-transparent px-1.5 py-1 shadow-none focus-visible:ring-0 dark:bg-transparent"
+              appearance="composer"
+              className="max-h-40 min-h-9 w-full resize-none"
             />
             <div className="mt-1 flex items-center justify-between">
               <input
@@ -1090,7 +1086,7 @@ export function OverviewChat({
                 type="button"
                 size="icon"
                 variant="ghost"
-                className="text-muted-foreground"
+                tone="muted"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={pendingAttachments.length >= MAX_CHAT_ATTACHMENTS}
                 aria-label="Attach images or videos"
@@ -1154,7 +1150,7 @@ function UserMessage({ message }: { message: UIMessage }) {
           {images.map((part, index) => {
             const url = (part as { url?: string }).url;
             return url ? (
-              // eslint-disable-next-line @next/next/no-img-element
+              // oxlint-disable-next-line nextjs/no-img-element
               <img
                 key={`${message.id}-img-${index}`}
                 src={url}
@@ -1187,7 +1183,7 @@ function UserMessage({ message }: { message: UIMessage }) {
         </div>
       )}
       {text && longText && (
-        <details className="border-primary/30 bg-primary text-primary-foreground group w-full max-w-md overflow-hidden rounded-2xl rounded-br-sm border">
+        <details className="group w-full max-w-md overflow-hidden rounded-2xl rounded-br-sm border border-primary/30 bg-primary text-primary-foreground">
           <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm">
             <FileText className="size-4 shrink-0" />
             <span className="font-medium">Pasted text</span>
@@ -1202,7 +1198,7 @@ function UserMessage({ message }: { message: UIMessage }) {
         </details>
       )}
       {text && !longText && (
-        <div className="bg-primary text-primary-foreground rounded-2xl rounded-br-sm px-4 py-2 text-sm break-words whitespace-pre-wrap">
+        <div className="rounded-2xl rounded-br-sm bg-primary px-4 py-2 text-sm break-words whitespace-pre-wrap text-primary-foreground">
           {text}
         </div>
       )}
@@ -1239,7 +1235,7 @@ function renderToolPart(
   }
   if (loose.state === "output-denied") {
     return (
-      <p key={key} className="text-muted-foreground text-xs">
+      <p key={key} className="text-xs text-muted-foreground">
         {toolLabel(toolName, action)} — skipped.
       </p>
     );
@@ -1256,7 +1252,7 @@ function renderToolPart(
   }
   if (part.state === "output-error") {
     return (
-      <p key={key} className="text-destructive text-xs">
+      <p key={key} className="text-xs text-destructive">
         {toolLabel(toolName, action)} failed: {part.errorText}
       </p>
     );
@@ -1267,7 +1263,7 @@ function renderToolPart(
     return (
       <div
         key={key}
-        className="bg-muted/40 text-muted-foreground rounded-lg border px-3 py-2 text-xs"
+        className="rounded-lg border bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
       >
         This result came from an older Growth assistant version. The surrounding
         conversation is still available; send a new message to use the current
@@ -1286,7 +1282,7 @@ function renderToolPart(
     return (
       <div
         key={key}
-        className="border-destructive/30 bg-destructive/5 rounded-lg border px-3 py-2 text-xs"
+        className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs"
       >
         <p className="text-destructive">{envelope.error.message}</p>
       </div>
@@ -1337,14 +1333,14 @@ function renderToolPart(
       return (
         <div
           key={key}
-          className="bg-muted/40 flex items-center gap-2 rounded-lg border px-3 py-2 text-xs"
+          className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-xs"
         >
           <Check className="size-3.5 text-emerald-500" />
           Opened {navigation.brandName ?? "the requested surface"}
           {navigation.href && (
             <Link
               href={navigation.href}
-              className="text-primary ml-auto hover:underline"
+              className="ml-auto text-primary hover:underline"
             >
               Open again
             </Link>
@@ -1589,12 +1585,12 @@ function ApprovalCard({
         <p className="mt-1.5 text-sm font-medium">{inp.title ?? inp.name}</p>
       )}
       {(inp?.hook || inp?.description) && (
-        <p className="text-muted-foreground mt-0.5 text-xs">
+        <p className="mt-0.5 text-xs text-muted-foreground">
           {inp.hook ?? inp.description}
         </p>
       )}
       {(inp?.pillarSlug || inp?.contentPostIds?.length) && (
-        <p className="text-muted-foreground mt-1 text-xs">
+        <p className="mt-1 text-xs text-muted-foreground">
           {[
             inp.pillarSlug ? `Pillar: ${inp.pillarSlug}` : null,
             inp.contentPostIds?.length
@@ -1606,31 +1602,31 @@ function ApprovalCard({
         </p>
       )}
       {isAudienceWrite && inp?.priority && (
-        <p className="text-muted-foreground mt-1 text-xs">
+        <p className="mt-1 text-xs text-muted-foreground">
           Priority: {inp.priority.replaceAll("_", " ")}
         </p>
       )}
       {isSchedulingApproval && inp?.localDateTime && inp.timeZone ? (
-        <p className="text-muted-foreground mt-1 text-xs">
+        <p className="mt-1 text-xs text-muted-foreground">
           {formatResolvedPublishingTime({
             localDateTime: inp.localDateTime,
             timeZone: inp.timeZone,
           })}
         </p>
       ) : inp?.platform ? (
-        <p className="text-muted-foreground mt-1 text-xs">
+        <p className="mt-1 text-xs text-muted-foreground">
           Channel: {inp.platform}
           {inp.scheduledAt
             ? ` · ${new Date(inp.scheduledAt).toLocaleString()}`
             : ""}
         </p>
       ) : (inp?.platforms ?? inp?.intendedChannels)?.length ? (
-        <p className="text-muted-foreground mt-1 text-xs">
+        <p className="mt-1 text-xs text-muted-foreground">
           Channels: {(inp.platforms ?? inp.intendedChannels)?.join(", ")}
         </p>
       ) : null}
       {approvalUnavailable ? (
-        <p className="text-muted-foreground mt-2 text-xs">
+        <p className="mt-2 text-xs text-muted-foreground">
           {superseded
             ? "Superseded by a later message. Ask for a fresh approval."
             : "This older scheduling approval must be regenerated."}
@@ -1664,7 +1660,7 @@ type CreatedIdeaOutput = {
 /** Success card for a created idea — links straight to the idea page. */
 function CreatedIdeaCard({ output }: { output: CreatedIdeaOutput }) {
   if (output?.error) {
-    return <p className="text-destructive text-xs">{output.error}</p>;
+    return <p className="text-xs text-destructive">{output.error}</p>;
   }
   return (
     <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
@@ -1673,7 +1669,7 @@ function CreatedIdeaCard({ output }: { output: CreatedIdeaOutput }) {
         Idea created
       </div>
       <p className="mt-1 text-sm font-medium">{output.title ?? "Untitled"}</p>
-      <p className="text-muted-foreground text-xs">
+      <p className="text-xs text-muted-foreground">
         {output.brandName ?? "—"}
         {output.platforms && output.platforms.length > 0
           ? ` · ${output.platforms.join(", ")}`
@@ -1682,7 +1678,7 @@ function CreatedIdeaCard({ output }: { output: CreatedIdeaOutput }) {
       {output.url && (
         <Link
           href={output.url}
-          className="text-primary mt-1.5 inline-flex items-center gap-1 text-xs font-medium hover:underline"
+          className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
         >
           Open idea
           <ExternalLink className="h-3 w-3" />
@@ -1717,7 +1713,7 @@ function AudienceTargetMutationCard({
   output: AudienceTargetMutationOutput;
 }) {
   if (output?.error) {
-    return <p className="text-destructive text-xs">{output.error}</p>;
+    return <p className="text-xs text-destructive">{output.error}</p>;
   }
   const target = output.target;
   const targets = output.targets ?? (target ? [target] : []);
@@ -1742,13 +1738,13 @@ function AudienceTargetMutationCard({
           <p className="mt-1 text-sm font-medium">
             {target?.name ?? "Audience profile"}
           </p>
-          <p className="text-muted-foreground text-xs">
+          <p className="text-xs text-muted-foreground">
             {[output.brandName, target?.priority?.replaceAll("_", " ")]
               .filter(Boolean)
               .join(" · ")}
           </p>
           {target?.intendedChannels && target.intendedChannels.length > 0 && (
-            <p className="text-muted-foreground mt-1 text-xs">
+            <p className="mt-1 text-xs text-muted-foreground">
               Channels: {target.intendedChannels.join(", ")}
             </p>
           )}
@@ -1757,7 +1753,7 @@ function AudienceTargetMutationCard({
       {output.url && (
         <Link
           href={output.url}
-          className="text-primary mt-1.5 inline-flex items-center gap-1 text-xs font-medium hover:underline"
+          className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
         >
           Open audiences
           <ExternalLink className="h-3 w-3" />

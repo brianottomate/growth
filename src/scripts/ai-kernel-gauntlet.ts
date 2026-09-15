@@ -7,10 +7,7 @@ import {
 } from "ai";
 import { z } from "zod";
 
-import {
-  MCP_TOOLS,
-  OVERVIEW_TOOLS,
-} from "@/server/ai/capabilities";
+import { MCP_TOOLS, OVERVIEW_TOOLS } from "@/server/ai/capabilities";
 import { composeGrowthContext } from "@/server/ai/kernel/context";
 import {
   completeAssistantRun,

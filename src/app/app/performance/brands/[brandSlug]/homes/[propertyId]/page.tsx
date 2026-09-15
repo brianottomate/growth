@@ -63,7 +63,7 @@ export default async function PerformanceHomePage({
             title it read as a heading, so the only way back was the tab. */}
         <Link
           href={brandTabHref(slug, "homes")}
-          className="text-muted-foreground hover:text-foreground -ml-1 inline-flex items-center gap-1 text-xs"
+          className="-ml-1 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
         >
           <ChevronLeft className="size-3.5" />
           All homes
@@ -78,7 +78,7 @@ export default async function PerformanceHomePage({
             </span>
           ) : null}
         </div>
-        <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 text-xs">
+        <div className="flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
           {place ? <span>{place}</span> : null}
           {facts.length > 0 ? <span>{facts.join(" · ")}</span> : null}
           <a

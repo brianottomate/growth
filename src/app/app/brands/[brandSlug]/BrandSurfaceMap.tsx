@@ -142,7 +142,7 @@ export function BrandSurfaceMap({
           <h2 id="brand-map-heading" className="text-base font-semibold">
             Brand map
           </h2>
-          <p className="text-muted-foreground mt-0.5 max-w-2xl text-sm">
+          <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">
             The confirmed surfaces the assistant can reason across. Open a
             surface to inspect the underlying reality or refine the structure
             layered over it.
@@ -152,7 +152,7 @@ export function BrandSurfaceMap({
           <Link
             href="/app/review"
             className={cn(
-              "hover:bg-accent inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 transition-colors",
+              "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 transition-colors hover:bg-accent",
               summary.pendingReviews > 0 &&
                 "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300",
             )}
@@ -164,7 +164,7 @@ export function BrandSurfaceMap({
           </Link>
           <Link
             href={`/app/next?brandId=${encodeURIComponent(brandId)}&intent=plan`}
-            className="bg-primary text-primary-foreground inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 font-medium"
+            className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 font-medium text-primary-foreground"
           >
             Plan ahead <ArrowRight className="size-3.5" />
           </Link>
@@ -178,10 +178,10 @@ export function BrandSurfaceMap({
             <Link
               key={surface.title}
               href={surface.href}
-              className="bg-card hover:border-foreground/25 group rounded-xl border p-3.5 transition-colors"
+              className="group rounded-xl border bg-card p-3.5 transition-colors hover:border-foreground/25"
             >
               <div className="flex items-start gap-3">
-                <span className="bg-muted text-muted-foreground grid size-8 shrink-0 place-items-center rounded-lg">
+                <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
                   <Icon className="size-4" />
                 </span>
                 <span className="min-w-0 flex-1">
@@ -189,7 +189,7 @@ export function BrandSurfaceMap({
                     <span className="text-sm font-semibold">
                       {surface.title}
                     </span>
-                    <span className="text-muted-foreground ml-auto flex items-center gap-1 text-[10px]">
+                    <span className="ml-auto flex items-center gap-1 text-[10px] text-muted-foreground">
                       <span
                         className={cn(
                           "size-1.5 rounded-full",
@@ -199,16 +199,16 @@ export function BrandSurfaceMap({
                       {stateLabel[surface.state]}
                     </span>
                   </span>
-                  <span className="text-muted-foreground mt-0.5 block text-[11px] leading-snug">
+                  <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
                     {surface.description}
                   </span>
-                  <span className="text-muted-foreground mt-2 flex flex-wrap gap-x-2 gap-y-0.5 text-[11px]">
+                  <span className="mt-2 flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
                     {surface.facts.map((item) => (
                       <span key={item}>{item}</span>
                     ))}
                   </span>
                 </span>
-                <ArrowRight className="text-muted-foreground mt-1 size-3.5 shrink-0 transition-transform group-hover:translate-x-0.5" />
+                <ArrowRight className="mt-1 size-3.5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
               </div>
             </Link>
           );

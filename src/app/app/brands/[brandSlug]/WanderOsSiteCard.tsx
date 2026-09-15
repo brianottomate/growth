@@ -49,16 +49,16 @@ export function WanderOsSiteCard({ brandId }: { brandId: string }) {
     <section className="space-y-3">
       <div>
         <h2 className="text-base font-semibold">Their booking site</h2>
-        <p className="text-muted-foreground mt-0.5 text-sm">
+        <p className="mt-0.5 text-sm text-muted-foreground">
           A WanderOS site lets us read their homes directly: the intake form
           offers them instead of asking for URLs, the pitch page shows them, and
           a campaign audience knows which states they are in.
         </p>
       </div>
 
-      <div className="border-border rounded-xl border p-4">
+      <div className="rounded-xl border border-border p-4">
         {!data?.website ? (
-          <p className="text-muted-foreground text-sm">
+          <p className="text-sm text-muted-foreground">
             No website on this brand yet.
           </p>
         ) : (
@@ -68,7 +68,7 @@ export function WanderOsSiteCard({ brandId }: { brandId: string }) {
                 {data.websiteId ? (
                   <p className="text-sm">
                     WanderOS site ·{" "}
-                    <code className="bg-surface-secondary/50 rounded px-1.5 py-0.5 font-mono text-xs">
+                    <code className="rounded bg-surface-secondary/50 px-1.5 py-0.5 font-mono text-xs">
                       {data.websiteId}
                     </code>
                   </p>
@@ -80,7 +80,7 @@ export function WanderOsSiteCard({ brandId }: { brandId: string }) {
                   </p>
                 )}
                 {checked && (
-                  <p className="text-muted-foreground mt-0.5 text-xs">
+                  <p className="mt-0.5 text-xs text-muted-foreground">
                     Last checked {checked.toLocaleDateString()}
                   </p>
                 )}
@@ -111,7 +111,9 @@ export function WanderOsSiteCard({ brandId }: { brandId: string }) {
                   value={manual}
                   onChange={(event) => setManual(event.target.value)}
                   placeholder="659510124225759302"
-                  className="w-64 font-mono text-xs"
+                  textSize="xs"
+                  monospace
+                  className="w-64"
                 />
                 <Button
                   size="sm"
@@ -122,7 +124,7 @@ export function WanderOsSiteCard({ brandId }: { brandId: string }) {
                 >
                   {setId.isPending ? "Saving…" : "Save"}
                 </Button>
-                <p className="text-muted-foreground w-full text-xs">
+                <p className="w-full text-xs text-muted-foreground">
                   The id is the run of digits in their image URLs, e.g.{" "}
                   <code className="font-mono">
                     assets-websites.wander.com/&lt;id&gt;/

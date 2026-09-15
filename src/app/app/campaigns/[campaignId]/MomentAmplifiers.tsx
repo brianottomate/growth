@@ -104,7 +104,7 @@ export function MomentAmplifiers({ momentId }: { momentId: string }) {
   return (
     <section className="mt-10">
       <div className="flex items-center justify-between">
-        <h2 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+        <h2 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
           Amplifiers · {targets?.length ?? 0}
         </h2>
         <Button size="sm" variant="outline" onClick={() => setAddOpen(true)}>
@@ -114,11 +114,11 @@ export function MomentAmplifiers({ momentId }: { momentId: string }) {
       </div>
 
       {isLoading ? (
-        <div className="text-muted-foreground mt-4 flex items-center gap-2 text-sm">
+        <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" /> Loading…
         </div>
       ) : !targets || targets.length === 0 ? (
-        <p className="text-muted-foreground mt-4 text-sm">
+        <p className="mt-4 text-sm text-muted-foreground">
           No one recruited yet. Add a friend-of-the-company, investor, or
           creator to boost this launch — they live in a shared org rolodex, so
           you can reuse them across brands.
@@ -130,24 +130,24 @@ export function MomentAmplifiers({ momentId }: { momentId: string }) {
             return (
               <div
                 key={t.id}
-                className="bg-card hover:bg-accent/40 group flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors"
+                className="group flex items-center gap-3 rounded-lg border bg-card px-3 py-2.5 transition-colors hover:bg-accent/40"
               >
                 <span className="truncate text-sm font-medium">
                   {t.amplifier.name}
                 </span>
                 {t.amplifier.type && (
-                  <span className="border-border text-muted-foreground shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] capitalize">
+                  <span className="shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground capitalize">
                     {t.amplifier.type}
                   </span>
                 )}
-                <span className="text-muted-foreground text-[10px] capitalize">
+                <span className="text-[10px] text-muted-foreground capitalize">
                   {t.actionKind.replace("_", " ")}
                 </span>
                 <div className="flex min-w-0 flex-1 items-center gap-1.5">
                   {(t.amplifier.handles ?? []).map((h) => (
                     <span
                       key={`${h.platform}:${h.handle}`}
-                      className="text-muted-foreground flex items-center gap-1 text-[11px]"
+                      className="flex items-center gap-1 text-[11px] text-muted-foreground"
                       title={`${h.platform}: @${h.handle}`}
                     >
                       <ChannelLogo platform={h.platform} className="size-3.5" />
@@ -200,7 +200,7 @@ export function MomentAmplifiers({ momentId }: { momentId: string }) {
                   type="button"
                   aria-label="Remove amplifier"
                   onClick={() => removeTarget.mutate({ targetId: t.id })}
-                  className="text-muted-foreground hover:text-foreground shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                  className="shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
                 >
                   <X className="size-3.5" />
                 </button>
@@ -319,7 +319,7 @@ function AddAmplifierDialog({
         </DialogHeader>
 
         {posts.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
+          <p className="text-sm text-muted-foreground">
             This launch has no posts yet — create content first, then recruit
             amplification for the post that matters.
           </p>
@@ -335,7 +335,7 @@ function AddAmplifierDialog({
           />
         )}
 
-        <div className="bg-muted flex gap-1 rounded-lg p-1">
+        <div className="flex gap-1 rounded-lg bg-muted p-1">
           {(["pick", "new"] as const).map((t) => (
             <button
               key={t}
@@ -355,21 +355,21 @@ function AddAmplifierDialog({
         {tab === "pick" ? (
           <>
             <div className="relative">
-              <Search className="text-muted-foreground absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" />
+              <Search className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Search amplifiers…"
-                className="pl-8"
+                leading="icon"
               />
             </div>
             <div className="-mx-1 max-h-72 overflow-y-auto px-1">
               {isLoading ? (
-                <div className="text-muted-foreground flex items-center gap-2 py-6 text-sm">
+                <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
                   <Loader2 className="size-4 animate-spin" /> Loading…
                 </div>
               ) : filtered.length === 0 ? (
-                <p className="text-muted-foreground py-6 text-sm">
+                <p className="py-6 text-sm text-muted-foreground">
                   {q
                     ? "No matches."
                     : rolodex && rolodex.length > 0
@@ -389,13 +389,13 @@ function AddAmplifierDialog({
                           amplifierId: a.id,
                         })
                       }
-                      className="hover:bg-accent/40 flex items-center gap-3 rounded-md px-2 py-2 text-left transition-colors disabled:opacity-50"
+                      className="flex items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/40 disabled:opacity-50"
                     >
                       <span className="min-w-0 flex-1 truncate text-sm font-medium">
                         {a.name}
                       </span>
                       {a.type && (
-                        <span className="border-border text-muted-foreground shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] capitalize">
+                        <span className="shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground capitalize">
                           {a.type}
                         </span>
                       )}
@@ -444,18 +444,18 @@ function AddAmplifierDialog({
                 aria-label="Platform"
               />
               <div className="relative flex-1">
-                <span className="text-muted-foreground absolute top-1/2 left-2.5 -translate-y-1/2 text-sm">
+                <span className="absolute top-1/2 left-2.5 -translate-y-1/2 text-sm text-muted-foreground">
                   @
                 </span>
                 <Input
                   value={handle}
                   onChange={(e) => setHandle(e.target.value.replace(/^@/, ""))}
                   placeholder="handle"
-                  className="pl-6"
+                  leading="handle"
                 />
               </div>
             </div>
-            <p className="text-muted-foreground text-xs">
+            <p className="text-xs text-muted-foreground">
               You can auto-discover their other handles later from the rolodex.
             </p>
           </div>

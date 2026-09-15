@@ -106,7 +106,7 @@ export function PersonasClient({ brands }: { brands: Brand[] }) {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Personas</h1>
-          <p className="text-muted-foreground mt-1 max-w-xl text-sm">
+          <p className="mt-1 max-w-xl text-sm text-muted-foreground">
             Who each brand talks to — the people counterpart of pillars. Few and
             stable. Campaigns narrow a persona into a buyable audience with real
             targeting and budget.
@@ -117,7 +117,7 @@ export function PersonasClient({ brands }: { brands: Brand[] }) {
             <select
               value={brandId}
               onChange={(event) => setBrandId(event.target.value)}
-              className="border-input bg-background h-9 rounded-md border px-3 text-sm"
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
             >
               {brands.map((brand) => (
                 <option key={brand.id} value={brand.id}>
@@ -134,12 +134,12 @@ export function PersonasClient({ brands }: { brands: Brand[] }) {
       </header>
 
       {personas.isPending ? (
-        <p className="text-muted-foreground text-sm">Loading…</p>
+        <p className="text-sm text-muted-foreground">Loading…</p>
       ) : (personas.data ?? []).length === 0 ? (
-        <div className="bg-card rounded-xl border p-8 text-center">
-          <Users className="text-muted-foreground mx-auto size-6" />
+        <div className="rounded-xl border bg-card p-8 text-center">
+          <Users className="mx-auto size-6 text-muted-foreground" />
           <p className="mt-2 text-sm font-medium">No personas yet</p>
-          <p className="text-muted-foreground mx-auto mt-1 max-w-md text-xs">
+          <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
             Start with the two or three kinds of people this brand exists for.
             &ldquo;Remote workers who travel&rdquo;, not &ldquo;CA remote
             workers 28-45&rdquo; — the narrowing happens per campaign.
@@ -148,7 +148,7 @@ export function PersonasClient({ brands }: { brands: Brand[] }) {
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
           {(personas.data ?? []).map((persona) => (
-            <div key={persona.id} className="bg-card rounded-xl border p-4">
+            <div key={persona.id} className="rounded-xl border bg-card p-4">
               <div className="flex items-start justify-between gap-2">
                 <p className="text-sm font-semibold">{persona.name}</p>
                 <div className="flex shrink-0 items-center gap-1">
@@ -172,7 +172,8 @@ export function PersonasClient({ brands }: { brands: Brand[] }) {
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="text-muted-foreground h-7"
+                    tone="muted"
+                    className="h-7"
                     disabled={remove.isPending}
                     onClick={() => remove.mutate({ personaId: persona.id })}
                   >
@@ -181,11 +182,11 @@ export function PersonasClient({ brands }: { brands: Brand[] }) {
                 </div>
               </div>
               {persona.description && (
-                <p className="text-muted-foreground mt-1 text-xs">
+                <p className="mt-1 text-xs text-muted-foreground">
                   {persona.description}
                 </p>
               )}
-              <p className="text-muted-foreground mt-2 text-[11px]">
+              <p className="mt-2 text-[11px] text-muted-foreground">
                 {[
                   (persona.ageRanges ?? []).join(", "),
                   (persona.geographies ?? []).join(", "),

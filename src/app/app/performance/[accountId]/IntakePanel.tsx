@@ -22,7 +22,9 @@ export function IntakePanel({ accountId }: { accountId: string }) {
   const queryClient = useQueryClient();
   const [openId, setOpenId] = useState<string | null>(null);
 
-  const intakes = useQuery(trpc.performance.intakes.queryOptions({ accountId }));
+  const intakes = useQuery(
+    trpc.performance.intakes.queryOptions({ accountId }),
+  );
   const rows = intakes.data ?? [];
 
   if (intakes.isPending) return null;
@@ -31,11 +33,11 @@ export function IntakePanel({ accountId }: { accountId: string }) {
   return (
     <section className="space-y-3">
       <h2 className="text-sm font-semibold">Intake</h2>
-      <div className="bg-card divide-y rounded-xl border">
+      <div className="divide-y rounded-xl border bg-card">
         {rows.map((intake) => (
           <div key={intake.id} className="px-3 py-2.5">
             <div className="flex flex-wrap items-center gap-2 text-sm">
-              <FileText className="text-muted-foreground size-4" />
+              <FileText className="size-4 text-muted-foreground" />
               <span className="font-medium">
                 {new Date(intake.submittedAt).toLocaleDateString(undefined, {
                   day: "numeric",
@@ -43,11 +45,11 @@ export function IntakePanel({ accountId }: { accountId: string }) {
                   year: "numeric",
                 })}
               </span>
-              <span className="text-muted-foreground text-xs">
+              <span className="text-xs text-muted-foreground">
                 {intakeBrandRef(intake)}
               </span>
               <StatusPill status={intake.status} />
-              <span className="text-muted-foreground text-xs">
+              <span className="text-xs text-muted-foreground">
                 {intake.mediaBudgetDollars != null
                   ? `$${intake.mediaBudgetDollars}/mo`
                   : intake.budgetIsRecommendation
@@ -66,7 +68,7 @@ export function IntakePanel({ accountId }: { accountId: string }) {
               </Button>
             </div>
 
-            <div className="text-muted-foreground mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
               <Signal ok={Boolean(intake.billingAcknowledgedAt)}>
                 Billing acknowledged
               </Signal>
@@ -147,14 +149,16 @@ function IntakeDetail({
   onApplied: () => void;
 }) {
   const trpc = useTRPC();
-  const preview = useQuery(trpc.performance.previewIntake.queryOptions({ intakeId }));
+  const preview = useQuery(
+    trpc.performance.previewIntake.queryOptions({ intakeId }),
+  );
   const [budget, setBudget] = useState("");
   const apply = useMutation(
     trpc.performance.applyIntake.mutationOptions({ onSuccess: onApplied }),
   );
 
   if (preview.isPending) {
-    return <p className="text-muted-foreground mt-3 text-xs">Loading…</p>;
+    return <p className="mt-3 text-xs text-muted-foreground">Loading…</p>;
   }
   if (!preview.data) return null;
   const data = preview.data;
@@ -163,17 +167,17 @@ function IntakeDetail({
   return (
     <div className="mt-3 space-y-3 border-t pt-3">
       <div>
-        <p className="text-muted-foreground text-[11px] tracking-wide uppercase">
+        <p className="text-[11px] tracking-wide text-muted-foreground uppercase">
           What they told us
         </p>
-        <pre className="bg-background mt-1.5 max-h-64 overflow-auto rounded-lg border p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap">
+        <pre className="mt-1.5 max-h-64 overflow-auto rounded-lg border bg-background p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap">
           {JSON.stringify(data.intake.answers, null, 2)}
         </pre>
       </div>
 
       {!applied && (
         <div className="space-y-2">
-          <p className="text-muted-foreground text-[11px] tracking-wide uppercase">
+          <p className="text-[11px] tracking-wide text-muted-foreground uppercase">
             Applying writes
           </p>
           <ul className="space-y-1 text-xs">
@@ -197,7 +201,8 @@ function IntakeDetail({
               inputMode="numeric"
               placeholder="Media budget, whole dollars per month"
               onChange={(event) => setBudget(event.target.value)}
-              className="h-8 max-w-xs text-xs"
+              textSize="xs"
+              className="h-8 max-w-xs"
             />
           )}
         </div>
@@ -212,7 +217,7 @@ function IntakeDetail({
       )}
 
       {applied ? (
-        <div className="text-muted-foreground space-y-0.5 text-xs">
+        <div className="space-y-0.5 text-xs text-muted-foreground">
           <p className="font-medium">Applied</p>
           {(data.intake.appliedSummary ?? []).map((line) => (
             <p key={line}>{line}</p>
@@ -287,7 +292,7 @@ function VerifyAccess({
           Check access in Zernio
         </Button>
         {verifiedPageId && (
-          <span className="text-muted-foreground text-xs">
+          <span className="text-xs text-muted-foreground">
             Page {verifiedPageId}
           </span>
         )}
@@ -302,10 +307,10 @@ function VerifyAccess({
 
       {result && !result.matched && (
         <div className="space-y-1.5">
-          <p className="text-muted-foreground text-xs">
+          <p className="text-xs text-muted-foreground">
             No Page named like &ldquo;{result.brandName}&rdquo;. Either the
-            grant has not landed, or their Page is named differently. Pick it
-            if you recognise it.
+            grant has not landed, or their Page is named differently. Pick it if
+            you recognise it.
           </p>
           <div className="flex flex-wrap gap-1.5">
             {result.candidates.map((page) => (

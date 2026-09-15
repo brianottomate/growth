@@ -108,7 +108,7 @@ export default function OnboardingPage() {
   };
 
   return (
-    <div className="bg-background min-h-screen">
+    <div className="min-h-screen bg-background">
       <div className="container mx-auto max-w-4xl px-4 py-16">
         <div className="mb-12">
           <ProgressIndicator current={step} total={2} />
@@ -122,10 +122,10 @@ export default function OnboardingPage() {
                 <div className="space-y-8">
                   <div className="space-y-4 text-center">
                     <h2 className="text-4xl font-bold">Welcome!</h2>
-                    <p className="text-muted-foreground text-xl">
+                    <p className="text-xl text-muted-foreground">
                       Let&apos;s get you set up. This will only take a moment.
                     </p>
-                    <p className="text-muted-foreground text-sm">
+                    <p className="text-sm text-muted-foreground">
                       Detected timezone:{" "}
                       <span className="font-mono">{browserTimeZone}</span>
                     </p>
@@ -138,7 +138,7 @@ export default function OnboardingPage() {
                 <div className="space-y-8">
                   <div className="space-y-2 text-center">
                     <h1 className="text-3xl font-bold">How did you find us?</h1>
-                    <p className="text-muted-foreground text-lg">
+                    <p className="text-lg text-muted-foreground">
                       This helps us know what&apos;s working (optional).
                     </p>
                   </div>

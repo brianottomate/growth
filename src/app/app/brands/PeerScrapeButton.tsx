@@ -87,7 +87,8 @@ export function PeerScrapeButton({
       <Button
         variant="ghost"
         size="sm"
-        className="text-muted-foreground gap-1.5 rounded-r-none"
+        tone="muted"
+        shape="attached-left"
         onClick={() => run(30)}
         loading={runningDays !== null}
       >
@@ -101,7 +102,8 @@ export function PeerScrapeButton({
           <Button
             variant="ghost"
             size="icon-sm"
-            className="text-muted-foreground rounded-l-none"
+            tone="muted"
+            shape="attached-right"
             disabled={runningDays !== null}
             aria-label="Choose scrape history window"
           >

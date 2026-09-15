@@ -2,7 +2,11 @@ import { describe, expect, it } from "bun:test";
 
 import { centsToDollars } from "@/server/clients/wanderos-site.client";
 
-import { catalogFeedRow, homeFacts, homeSubtitle } from "./property-ads.service";
+import {
+  catalogFeedRow,
+  homeFacts,
+  homeSubtitle,
+} from "./property-ads.service";
 
 const home = {
   id: "12",

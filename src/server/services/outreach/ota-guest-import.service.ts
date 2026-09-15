@@ -134,7 +134,9 @@ export function parseOtaGuestCsv(csv: string): OtaGuestRow[] {
   const header = rows[0];
   if (!header) return [];
 
-  const index = new Map(header.map((name, i) => [name.trim().toLowerCase(), i]));
+  const index = new Map(
+    header.map((name, i) => [name.trim().toLowerCase(), i]),
+  );
   const missing = REQUIRED_HEADERS.filter((name) => !index.has(name));
   if (missing.length > 0) {
     throw new Error(
@@ -163,7 +165,12 @@ export function parseOtaGuestCsv(csv: string): OtaGuestRow[] {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** Placeholder guest accounts used by the warehouse for identity-less syncs. */
-const PLACEHOLDER_EMAILS = new Set(["blocks@wander.com", "n/a", "none", "null"]);
+const PLACEHOLDER_EMAILS = new Set([
+  "blocks@wander.com",
+  "n/a",
+  "none",
+  "null",
+]);
 
 /**
  * Airbnb/Booking.com write `deleted@gdpr.com` (and similar) into the guest
@@ -300,13 +307,20 @@ export function dedupeByEmail(rows: OtaGuestRow[]): {
       email: existing.email,
       name: existing.name || incoming.name,
       phone: existing.phone ?? incoming.phone,
-      channels: Array.from(new Set([...existing.channels, ...incoming.channels])).sort(),
+      channels: Array.from(
+        new Set([...existing.channels, ...incoming.channels]),
+      ).sort(),
       bookings: existing.bookings + incoming.bookings,
       firstCheckin: minDate(existing.firstCheckin, incoming.firstCheckin),
       lastCheckin: maxDate(existing.lastCheckin, incoming.lastCheckin),
-      totalBookingValue: existing.totalBookingValue + incoming.totalBookingValue,
-      properties: Array.from(new Set([...existing.properties, ...incoming.properties])),
-      otaCodes: Array.from(new Set([...existing.otaCodes, ...incoming.otaCodes])),
+      totalBookingValue:
+        existing.totalBookingValue + incoming.totalBookingValue,
+      properties: Array.from(
+        new Set([...existing.properties, ...incoming.properties]),
+      ),
+      otaCodes: Array.from(
+        new Set([...existing.otaCodes, ...incoming.otaCodes]),
+      ),
     });
   }
 
@@ -390,13 +404,17 @@ export function buildCustomFields(
 ): Record<string, string> {
   const fields: Record<string, string> = {
     [FIELD_MAPPING.number_of_bookings]: String(guest.bookings),
-    [FIELD_MAPPING.total_money_spent]: String(Math.round(guest.totalBookingValue)),
+    [FIELD_MAPPING.total_money_spent]: String(
+      Math.round(guest.totalBookingValue),
+    ),
     [FIELD_MAPPING.last_sync_tag]: campaignTag,
   };
   const lastProperty = guest.properties[guest.properties.length - 1];
   if (lastProperty) {
     fields[FIELD_MAPPING.last_property_booked] = lastProperty;
-    fields[FIELD_MAPPING.last_5_booked_properties] = guest.properties.slice(0, 5).join(", ");
+    fields[FIELD_MAPPING.last_5_booked_properties] = guest.properties
+      .slice(0, 5)
+      .join(", ");
   }
   if (guest.lastCheckin) {
     fields[FIELD_MAPPING.last_booking_transaction_date] = guest.lastCheckin;

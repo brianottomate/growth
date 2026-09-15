@@ -47,7 +47,7 @@ export function CampaignLink({
 
   if (campaign) {
     return (
-      <span className="text-muted-foreground text-sm">
+      <span className="text-sm text-muted-foreground">
         Campaign:{" "}
         <Link
           href={`/app/brands/${brandSlug}/ads/${campaign.id}`}
@@ -69,9 +69,9 @@ export function CampaignLink({
   }
 
   return (
-    <div className="border-border bg-surface-secondary/30 flex flex-wrap items-center gap-2 rounded-md border p-2">
+    <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-surface-secondary/30 p-2">
       <select
-        className="border-input bg-background h-8 rounded-md border px-2 text-xs"
+        className="h-8 rounded-md border border-input bg-background px-2 text-xs"
         disabled={link.isPending || options.isPending}
         defaultValue=""
         onChange={(event) => {
@@ -89,12 +89,13 @@ export function CampaignLink({
           </option>
         ))}
       </select>
-      <span className="text-muted-foreground text-xs">or</span>
+      <span className="text-xs text-muted-foreground">or</span>
       <Input
         value={newName}
         onChange={(event) => setNewName(event.target.value)}
         placeholder="New campaign name"
-        className="h-8 w-44 text-xs"
+        textSize="xs"
+        className="h-8 w-44"
       />
       <Button
         size="sm"

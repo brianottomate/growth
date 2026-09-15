@@ -7,7 +7,7 @@ export default function ContentSuggestionsPage() {
         <h1 className="text-2xl font-semibold tracking-tight">
           Content suggestions
         </h1>
-        <p className="text-muted-foreground mt-1 text-sm">
+        <p className="mt-1 text-sm text-muted-foreground">
           Confirm classifications and cross-account amplification before they
           alter the content graph.
         </p>

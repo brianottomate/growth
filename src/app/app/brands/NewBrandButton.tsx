@@ -86,7 +86,7 @@ export function NewBrandButton() {
 
   return (
     <>
-      <Button size="sm" className="gap-1.5" onClick={() => setOpen(true)}>
+      <Button size="sm" onClick={() => setOpen(true)}>
         <Plus className="size-3.5" />
         New brand
       </Button>
@@ -136,17 +136,17 @@ export function NewBrandButton() {
             </div>
 
             {enrichment && (
-              <div className="border-border bg-surface-secondary/30 flex items-start gap-3 rounded-xl border p-3">
+              <div className="flex items-start gap-3 rounded-xl border border-border bg-surface-secondary/30 p-3">
                 {enrichment.logo ? (
-                  // eslint-disable-next-line @next/next/no-img-element
+                  // oxlint-disable-next-line nextjs/no-img-element
                   <img
                     src={enrichment.logo}
                     alt=""
-                    className="bg-muted size-14 shrink-0 rounded-lg border object-cover"
+                    className="size-14 shrink-0 rounded-lg border bg-muted object-cover"
                   />
                 ) : (
-                  <div className="bg-muted flex size-14 shrink-0 items-center justify-center rounded-lg border">
-                    <Globe className="text-muted-foreground size-5" />
+                  <div className="flex size-14 shrink-0 items-center justify-center rounded-lg border bg-muted">
+                    <Globe className="size-5 text-muted-foreground" />
                   </div>
                 )}
                 <div className="min-w-0 space-y-0.5">
@@ -156,11 +156,11 @@ export function NewBrandButton() {
                     </p>
                   )}
                   {enrichment.description && (
-                    <p className="text-muted-foreground line-clamp-3 text-xs">
+                    <p className="line-clamp-3 text-xs text-muted-foreground">
                       {enrichment.description}
                     </p>
                   )}
-                  <p className="text-muted-foreground/60 text-xs">
+                  <p className="text-xs text-muted-foreground/60">
                     {enrichment.website}
                   </p>
                 </div>

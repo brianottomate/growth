@@ -9,12 +9,20 @@ import { cn } from "@/components/ui/lib/utils";
  * One quiet chip for a link a rep sends: the name opens it, the icon on the
  * end copies it. Two links a row used to take four controls; this is two.
  */
-export function SendLink({ label, url, className }: { label: string; url: string; className?: string }) {
+export function SendLink({
+  label,
+  url,
+  className,
+}: {
+  label: string;
+  url: string;
+  className?: string;
+}) {
   const [copied, setCopied] = useState(false);
   return (
     <span
       className={cn(
-        "border-border/80 text-muted-foreground inline-flex h-7 items-stretch overflow-hidden rounded-full border text-[11.5px]",
+        "inline-flex h-7 items-stretch overflow-hidden rounded-full border border-border/80 text-[11.5px] text-muted-foreground",
         className,
       )}
     >
@@ -22,7 +30,7 @@ export function SendLink({ label, url, className }: { label: string; url: string
         href={url}
         target="_blank"
         rel="noreferrer"
-        className="hover:text-foreground hover:bg-muted/60 flex items-center pr-2 pl-3"
+        className="flex items-center pr-2 pl-3 hover:bg-muted/60 hover:text-foreground"
         title={`Open ${label.toLowerCase()}`}
       >
         {label}
@@ -37,7 +45,7 @@ export function SendLink({ label, url, className }: { label: string; url: string
         aria-label={`Copy ${label.toLowerCase()} link`}
         title={copied ? "Copied" : "Copy link"}
         className={cn(
-          "hover:text-foreground hover:bg-muted/60 flex items-center border-l px-2",
+          "flex items-center border-l px-2 hover:bg-muted/60 hover:text-foreground",
           copied && "text-emerald-300",
         )}
       >

@@ -32,7 +32,7 @@ function FeedMedia({
   const [failed, setFailed] = useState(false);
   if (mediaUrl && !failed) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
+      // oxlint-disable-next-line nextjs/no-img-element
       <img
         src={mediaUrl}
         alt=""
@@ -42,9 +42,9 @@ function FeedMedia({
     );
   }
   return (
-    <div className="from-muted to-muted/30 flex h-full w-full items-center bg-gradient-to-br px-3 pt-9 pb-2">
+    <div className="flex h-full w-full items-center bg-gradient-to-br from-muted to-muted/30 px-3 pt-9 pb-2">
       {text ? (
-        <p className="text-foreground/80 line-clamp-4 text-[13px] leading-snug font-medium">
+        <p className="line-clamp-4 text-[13px] leading-snug font-medium text-foreground/80">
           {text}
         </p>
       ) : (
@@ -59,12 +59,12 @@ function DetailMedia({ src }: { src: string }) {
   const [failed, setFailed] = useState(false);
   if (failed) return null;
   return (
-    // eslint-disable-next-line @next/next/no-img-element
+    // oxlint-disable-next-line nextjs/no-img-element
     <img
       src={src}
       alt=""
       onError={() => setFailed(true)}
-      className="bg-muted max-h-[55vh] w-full rounded-lg object-contain"
+      className="max-h-[55vh] w-full rounded-lg bg-muted object-contain"
     />
   );
 }
@@ -190,7 +190,7 @@ function FilterPill({
       onClick={onClick}
       className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
         active
-          ? "bg-foreground text-background border-foreground"
+          ? "border-foreground bg-foreground text-background"
           : "border-border text-muted-foreground hover:bg-accent"
       }`}
     >
@@ -209,7 +209,7 @@ function Segmented<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="border-border flex overflow-hidden rounded-full border">
+    <div className="flex overflow-hidden rounded-full border border-border">
       {options.map((o) => (
         <button
           key={o.value}
@@ -292,18 +292,18 @@ function FeedCard({ e }: { e: FeedEntry }) {
         }
       }}
       {...hover}
-      className={`bg-card hover:border-foreground/30 focus-visible:ring-ring flex w-64 flex-none cursor-pointer flex-col overflow-hidden rounded-xl border transition-colors focus:outline-none focus-visible:ring-2 ${
+      className={`flex w-64 flex-none cursor-pointer flex-col overflow-hidden rounded-xl border bg-card transition-colors hover:border-foreground/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
         e.published ? "opacity-90" : ""
       }`}
     >
       {/* media — falls back to a text-forward panel for posts with no
           (renderable) media, e.g. text-only updates, reshares, or media on a
           hotlink-blocked CDN. */}
-      <div className="bg-muted relative h-36">
+      <div className="relative h-36 bg-muted">
         <FeedMedia mediaUrl={e.mediaUrl} text={e.text} platform={e.platform} />
         <div className="absolute top-2 left-2 flex items-center gap-1">
           {e.brandLogo ? (
-            // eslint-disable-next-line @next/next/no-img-element
+            // oxlint-disable-next-line nextjs/no-img-element
             <img
               src={e.brandLogo}
               alt=""
@@ -364,10 +364,10 @@ function FeedCard({ e }: { e: FeedEntry }) {
       <div className="flex flex-1 flex-col gap-1.5 p-3">
         <div className="flex items-center gap-2 text-xs">
           <span className="font-semibold tabular-nums">{fmtTime(t)}</span>
-          <span className="bg-muted text-foreground flex size-4 items-center justify-center rounded text-[8px] font-semibold">
+          <span className="flex size-4 items-center justify-center rounded bg-muted text-[8px] font-semibold text-foreground">
             {e.brandName.slice(0, 2)}
           </span>
-          <span className="text-muted-foreground truncate">{e.handle}</span>
+          <span className="truncate text-muted-foreground">{e.handle}</span>
         </div>
 
         {e.mediaUrl && e.text && (
@@ -378,7 +378,7 @@ function FeedCard({ e }: { e: FeedEntry }) {
 
         <div className="flex-1" />
 
-        <div className="text-muted-foreground flex items-center gap-1.5 border-t pt-2 text-[11px]">
+        <div className="flex items-center gap-1.5 border-t pt-2 text-[11px] text-muted-foreground">
           {pillar && (
             <>
               <span
@@ -401,7 +401,7 @@ function FeedCard({ e }: { e: FeedEntry }) {
           )}
         </div>
         {via && (
-          <div className="text-muted-foreground text-[10px]">via {via}</div>
+          <div className="text-[10px] text-muted-foreground">via {via}</div>
         )}
       </div>
     </div>
@@ -412,7 +412,7 @@ function FeedCard({ e }: { e: FeedEntry }) {
 function ContentGroupBox({ g }: { g: ContentGroup }) {
   const pillar = g.pillarSlug ? PILLAR_BY_SLUG[g.pillarSlug] : null;
   return (
-    <div className="border-border/70 bg-muted/[0.04] flex flex-none flex-col gap-2 rounded-2xl border border-dashed p-2.5">
+    <div className="flex flex-none flex-col gap-2 rounded-2xl border border-dashed border-border/70 bg-muted/[0.04] p-2.5">
       <Link
         href={`/app/content/${g.contentPostId}`}
         className="group flex items-center gap-2 px-1 text-xs"
@@ -438,7 +438,7 @@ function ContentGroupBox({ g }: { g: ContentGroup }) {
             {g.seriesName}
           </span>
         )}
-        <span className="text-muted-foreground shrink-0">
+        <span className="shrink-0 text-muted-foreground">
           {g.entries.length} {g.entries.length === 1 ? "platform" : "platforms"}
         </span>
       </Link>
@@ -490,19 +490,19 @@ function BrandRow({
     <div>
       <div className="mb-1.5 flex items-center gap-1.5">
         {bg.brandLogo ? (
-          // eslint-disable-next-line @next/next/no-img-element
+          // oxlint-disable-next-line nextjs/no-img-element
           <img
             src={bg.brandLogo}
             alt=""
             className="size-5 rounded object-cover"
           />
         ) : (
-          <span className="bg-muted flex size-5 items-center justify-center rounded text-[9px] font-semibold">
+          <span className="flex size-5 items-center justify-center rounded bg-muted text-[9px] font-semibold">
             {bg.brandName.slice(0, 2)}
           </span>
         )}
         <span className="text-sm font-medium">{bg.brandName}</span>
-        <span className="text-muted-foreground text-[11px] tabular-nums">
+        <span className="text-[11px] text-muted-foreground tabular-nums">
           {bg.entries.length}
         </span>
       </div>
@@ -661,7 +661,7 @@ export function FeedClient({
       <AssignContext.Provider value={assignCtx}>
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Feed</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
+          <p className="mt-1 text-sm text-muted-foreground">
             Everything going out, newest first · {entries.length} posts
           </p>
 
@@ -676,7 +676,7 @@ export function FeedClient({
                 { value: "paid", label: "Paid" },
               ]}
             />
-            <span className="bg-border mx-1 h-4 w-px" />
+            <span className="mx-1 h-4 w-px bg-border" />
             <FilterPill
               active={brandFilter === "all"}
               onClick={() => setBrandFilter("all")}
@@ -692,7 +692,7 @@ export function FeedClient({
                 {b.name}
               </FilterPill>
             ))}
-            <span className="bg-border mx-1 h-4 w-px" />
+            <span className="mx-1 h-4 w-px bg-border" />
             <FilterPill
               active={channelFilter === "all"}
               onClick={() => setChannelFilter("all")}
@@ -728,11 +728,11 @@ export function FeedClient({
           {/* timeline */}
           <div ref={ref} style={style} className="px-8 sm:px-0">
             {typeFilter === "paid" ? (
-              <div className="text-muted-foreground py-16 text-center text-sm">
+              <div className="py-16 text-center text-sm text-muted-foreground">
                 Paid spots arrive with the ads schema — coming soon.
               </div>
             ) : days.length === 0 ? (
-              <div className="text-muted-foreground py-16 text-center text-sm">
+              <div className="py-16 text-center text-sm text-muted-foreground">
                 Nothing for these filters.
               </div>
             ) : (
@@ -742,15 +742,15 @@ export function FeedClient({
                     <span
                       className={`text-xs font-semibold ${
                         d.today
-                          ? "bg-foreground text-background rounded-full px-2.5 py-1"
+                          ? "rounded-full bg-foreground px-2.5 py-1 text-background"
                           : "text-foreground"
                       }`}
                     >
                       {fmtDay(new Date(d.key))}
                       {d.today ? " · today" : ""}
                     </span>
-                    <span className="bg-border h-px flex-1" />
-                    <span className="text-muted-foreground text-[11px]">
+                    <span className="h-px flex-1 bg-border" />
+                    <span className="text-[11px] text-muted-foreground">
                       {d.count} item{d.count === 1 ? "" : "s"}
                     </span>
                   </div>
@@ -807,7 +807,7 @@ function SpotlightDialog({
       {entry && (
         <div className="flex flex-col gap-4">
           {entry.mediaUrl && <DetailMedia src={entry.mediaUrl} />}
-          <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <ChannelLogo platform={entry.platform} className="size-4" />
             {entry.handle && <span>{entry.handle}</span>}
             <span>
@@ -825,7 +825,7 @@ function SpotlightDialog({
             {entry.contentPostId ? (
               <Link
                 href={`/app/content/${entry.contentPostId}`}
-                className="bg-foreground text-background hover:bg-foreground/90 inline-flex w-fit items-center rounded-full px-3.5 py-1.5 text-sm font-medium"
+                className="inline-flex w-fit items-center rounded-full bg-foreground px-3.5 py-1.5 text-sm font-medium text-background hover:bg-foreground/90"
               >
                 Open content idea
               </Link>
@@ -834,7 +834,7 @@ function SpotlightDialog({
                 type="button"
                 disabled={promote.isPending}
                 onClick={() => promote.mutate({ platformPostId: entry.id })}
-                className="bg-foreground text-background hover:bg-foreground/90 inline-flex w-fit items-center rounded-full px-3.5 py-1.5 text-sm font-medium disabled:opacity-50"
+                className="inline-flex w-fit items-center rounded-full bg-foreground px-3.5 py-1.5 text-sm font-medium text-background hover:bg-foreground/90 disabled:opacity-50"
               >
                 {promote.isPending
                   ? "Creating content idea…"
@@ -846,14 +846,14 @@ function SpotlightDialog({
                 href={entry.externalUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="border-border hover:bg-accent inline-flex w-fit items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium"
+                className="inline-flex w-fit items-center gap-1.5 rounded-full border border-border px-3.5 py-1.5 text-sm font-medium hover:bg-accent"
               >
                 Open on {platformLabel(entry.platform)} ↗
               </a>
             )}
           </div>
           {promote.error && (
-            <p className="text-destructive text-xs">{promote.error.message}</p>
+            <p className="text-xs text-destructive">{promote.error.message}</p>
           )}
         </div>
       )}

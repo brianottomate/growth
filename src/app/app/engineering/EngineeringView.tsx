@@ -56,7 +56,7 @@ function StatusDot({ status }: { status: TableStatus }) {
 
 function TableRow({ t }: { t: TableStat }) {
   return (
-    <div className="hover:bg-muted/40 grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 rounded-md px-3 py-1.5 text-sm">
+    <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 rounded-md px-3 py-1.5 text-sm hover:bg-muted/40">
       <span className="truncate font-mono text-xs">
         {t.schema !== "public" && (
           <span className="text-muted-foreground">{t.schema}.</span>
@@ -71,7 +71,7 @@ function TableRow({ t }: { t: TableStat }) {
           <span className="text-muted-foreground"> +{fmt(t.seed)} seed</span>
         )}
       </span>
-      <span className="text-muted-foreground w-20 text-right text-xs tabular-nums">
+      <span className="w-20 text-right text-xs text-muted-foreground tabular-nums">
         {relativeTime(t.lastWrite)}
       </span>
       <span className="w-24 text-right">
@@ -92,7 +92,7 @@ export function EngineeringView({ health }: { health: DataHealth }) {
     <div className="mx-auto w-full max-w-5xl space-y-8 p-6">
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">Engineering</h1>
-        <p className="text-muted-foreground text-sm">
+        <p className="text-sm text-muted-foreground">
           Live data-health view across every table. Real rows exclude{" "}
           <code className="text-xs">isSeed</code> data. Scanned{" "}
           {relativeTime(scannedAt)}.
@@ -115,11 +115,11 @@ export function EngineeringView({ health }: { health: DataHealth }) {
             tone: seedOnlyCount > 0 ? "text-amber-600 dark:text-amber-400" : "",
           },
         ].map((s) => (
-          <div key={s.label} className="bg-card rounded-lg border p-4">
+          <div key={s.label} className="rounded-lg border bg-card p-4">
             <div className={cn("text-2xl font-semibold tabular-nums", s.tone)}>
               {s.value}
             </div>
-            <div className="text-muted-foreground text-xs">{s.label}</div>
+            <div className="text-xs text-muted-foreground">{s.label}</div>
           </div>
         ))}
       </div>
@@ -134,7 +134,7 @@ export function EngineeringView({ health }: { health: DataHealth }) {
             {emptyTables.map((t) => (
               <span
                 key={`${t.schema}.${t.name}`}
-                className="bg-background inline-flex items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-xs"
+                className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2 py-1 font-mono text-xs"
                 title={`${t.domain} · ${t.status}`}
               >
                 <span
@@ -153,17 +153,17 @@ export function EngineeringView({ health }: { health: DataHealth }) {
       {/* Domain groups */}
       <div className="space-y-6">
         {groups.map((g) => (
-          <section key={g.domain} className="bg-card rounded-lg border">
+          <section key={g.domain} className="rounded-lg border bg-card">
             <div className="flex items-baseline justify-between border-b px-4 py-2.5">
               <h2 className="text-sm font-semibold">
                 {g.domain}
                 {g.domain === "Unmapped" && (
-                  <span className="text-muted-foreground ml-2 text-xs font-normal">
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">
                     (add to DOMAIN_BY_TABLE)
                   </span>
                 )}
               </h2>
-              <span className="text-muted-foreground text-xs tabular-nums">
+              <span className="text-xs text-muted-foreground tabular-nums">
                 {g.populated}/{g.tableCount} live · {fmt(g.totalRows)} rows
               </span>
             </div>

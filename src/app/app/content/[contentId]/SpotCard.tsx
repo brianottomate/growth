@@ -211,10 +211,10 @@ export function SpotCard({
   return (
     <div
       id={`platform-post-${spot.id}`}
-      className="bg-card scroll-mt-6 rounded-2xl border p-4 shadow-sm"
+      className="scroll-mt-6 rounded-2xl border bg-card p-4 shadow-sm"
     >
       <div className="flex items-start gap-3">
-        <span className="bg-muted flex size-10 shrink-0 items-center justify-center rounded-xl">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted">
           <ChannelLogo
             platform={
               spot.format === "newsletter.blast" ? "blast" : spot.platform
@@ -231,22 +231,22 @@ export function SpotCard({
                 : platformLabel(spot.platform)}
             </span>
             {spot.channelName && (
-              <span className="text-muted-foreground text-xs">
+              <span className="text-xs text-muted-foreground">
                 {spot.channelName}
               </span>
             )}
             {spot.username && (
-              <span className="text-muted-foreground text-xs">
+              <span className="text-xs text-muted-foreground">
                 {spot.username}
               </span>
             )}
             {label && (
-              <span className="bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 text-[10px] font-medium">
+              <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
                 {label}
               </span>
             )}
             {isSequence && (
-              <span className="bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 text-[10px] font-medium">
+              <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
                 {threadItems.length}{" "}
                 {sequenceNoun(spot.format, threadItems.length)}
               </span>
@@ -280,7 +280,7 @@ export function SpotCard({
             )}
           </div>
 
-          <div className="text-muted-foreground mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
             {owned ? (
               <>
                 {providerPublishing ? (
@@ -298,7 +298,7 @@ export function SpotCard({
                     }
                     disabled={deliveredCount > 0}
                     aria-label="Scheduled date and time"
-                    className="border-border bg-background text-muted-foreground rounded-md border px-1.5 py-0.5 text-[11px] disabled:opacity-50"
+                    className="rounded-md border border-border bg-background px-1.5 py-0.5 text-[11px] text-muted-foreground disabled:opacity-50"
                   />
                 ) : (
                   <DatePicker
@@ -314,7 +314,7 @@ export function SpotCard({
                       })
                     }
                     placeholder="Schedule"
-                    className="px-1.5 py-0.5 text-[11px]"
+                    density="compact"
                     aria-label="Scheduled date"
                   />
                 )}
@@ -363,7 +363,7 @@ export function SpotCard({
                 href={spot.previewPath}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:text-foreground underline"
+                className="underline hover:text-foreground"
               >
                 Preview ↗
               </a>
@@ -373,7 +373,7 @@ export function SpotCard({
                 href={spot.editorUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:text-foreground underline"
+                className="underline hover:text-foreground"
               >
                 Edit in Dato ↗
               </a>
@@ -383,7 +383,7 @@ export function SpotCard({
                 href={spot.externalUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:text-foreground underline"
+                className="underline hover:text-foreground"
                 title={
                   spot.editorUrl && spot.status !== "published"
                     ? "Public URL. Live after the draft is published in Dato."
@@ -413,7 +413,7 @@ export function SpotCard({
                     visibleText: `Help me refine the ${platformLabel(spot.platform)} version of “${contentTitle}”`,
                   })
                 }
-                className="border-border text-muted-foreground hover:text-foreground hover:bg-accent flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors"
+                className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               >
                 <MessageSquare className="size-3.5" />
                 Refine in chat
@@ -451,7 +451,7 @@ export function SpotCard({
               onClick={() => removeSpot.mutate({ platformPostId: spot.id })}
               disabled={removeSpot.isPending}
               aria-label="Remove channel"
-              className="text-muted-foreground hover:text-foreground hover:bg-accent rounded-md p-1 transition-colors disabled:opacity-50"
+              className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
             >
               <X className="size-3.5" />
             </button>
@@ -460,18 +460,18 @@ export function SpotCard({
       </div>
 
       {owned && isEmail ? (
-        <div className="bg-muted/25 mt-4 rounded-lg border p-3">
+        <div className="mt-4 rounded-lg border bg-muted/25 p-3">
           <p className="text-sm font-medium">
             This email has a subject, Markdown body, CTA, preview, and revision
             history in its issue workspace.
           </p>
-          <p className="text-muted-foreground mt-1 text-xs">
+          <p className="mt-1 text-xs text-muted-foreground">
             The content card holds the premise and calendar placement. The
             newsletter workspace holds the actual email artifact.
           </p>
           <Link
             href={`/app/newsletters/${spot.id}`}
-            className="border-border hover:bg-accent bg-background mt-3 inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium"
+            className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium hover:bg-accent"
           >
             Open email workspace
           </Link>
@@ -479,8 +479,8 @@ export function SpotCard({
       ) : (
         <div className="mt-4 grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
           <div className="min-w-0 space-y-3">
-            <section className="bg-background rounded-xl border p-4">
-              <h3 className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
+            <section className="rounded-xl border bg-background p-4">
+              <h3 className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
                 Copy
               </h3>
               {threadItems.some((item) => item.text?.trim()) ? (
@@ -491,10 +491,10 @@ export function SpotCard({
                       className="relative flex gap-3 pb-4 last:pb-0"
                     >
                       {isThread && index < threadItems.length - 1 && (
-                        <span className="bg-border absolute top-6 bottom-0 left-3 w-px" />
+                        <span className="absolute top-6 bottom-0 left-3 w-px bg-border" />
                       )}
                       {isThread && (
-                        <span className="bg-muted relative z-10 flex size-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold">
+                        <span className="relative z-10 flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold">
                           {index + 1}
                         </span>
                       )}
@@ -509,7 +509,7 @@ export function SpotCard({
                   ))}
                 </div>
               ) : (
-                <p className="text-muted-foreground mt-2 text-sm">
+                <p className="mt-2 text-sm text-muted-foreground">
                   No channel copy yet. Refine it in chat or open the manual
                   editor.
                 </p>
@@ -517,12 +517,12 @@ export function SpotCard({
             </section>
 
             {media.length > 0 && (
-              <section className="bg-background rounded-xl border p-4">
+              <section className="rounded-xl border bg-background p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
+                  <h3 className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
                     Media
                   </h3>
-                  <span className="text-muted-foreground text-[10px]">
+                  <span className="text-[10px] text-muted-foreground">
                     {media.length === 1
                       ? "1 asset"
                       : `${media.length} carousel slides`}
@@ -535,7 +535,7 @@ export function SpotCard({
                     return (
                       <div key={threadItem.id}>
                         {isThread && (
-                          <div className="text-muted-foreground mb-1.5 text-[10px]">
+                          <div className="mb-1.5 text-[10px] text-muted-foreground">
                             Post {threadIndex + 1}
                           </div>
                         )}
@@ -545,7 +545,7 @@ export function SpotCard({
                               key={`${item.assetId ?? item.url}-${mediaIndex}`}
                               className="min-w-0"
                             >
-                              <div className="bg-muted relative aspect-square overflow-hidden rounded-lg border">
+                              <div className="relative aspect-square overflow-hidden rounded-lg border bg-muted">
                                 <MediaThumbnail
                                   src={item.url}
                                   thumbnail={item.thumbnail}
@@ -569,8 +569,8 @@ export function SpotCard({
             )}
 
             {assetLinks.length > 0 && (
-              <section className="bg-background rounded-xl border p-4">
-                <h3 className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
+              <section className="rounded-xl border bg-background p-4">
+                <h3 className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
                   Production links
                 </h3>
                 <div className="mt-2 flex flex-wrap gap-2">
@@ -580,7 +580,7 @@ export function SpotCard({
                       href={url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="border-border text-muted-foreground hover:text-foreground max-w-full truncate rounded-md border px-2 py-1 text-xs underline underline-offset-2"
+                      className="max-w-full truncate rounded-md border border-border px-2 py-1 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
                     >
                       {url.replace(/^https?:\/\/(www\.)?/, "")}
                     </a>
@@ -614,7 +614,7 @@ export function SpotCard({
       )}
 
       {metrics.length > 0 && (
-        <div className="text-muted-foreground mt-3 flex flex-wrap gap-3 text-[11px] tabular-nums">
+        <div className="mt-3 flex flex-wrap gap-3 text-[11px] text-muted-foreground tabular-nums">
           {metrics.map((metric) => (
             <span key={metric}>{metric}</span>
           ))}

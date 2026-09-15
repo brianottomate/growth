@@ -115,7 +115,9 @@ async function notify(
   // The two qualifying answers are the whole reason the form exists, so they
   // get their own line rather than being folded into the facts run.
   const qualifying = [
-    application.marketsToday ? `Markets today: ${esc(application.marketsToday)}` : null,
+    application.marketsToday
+      ? `Markets today: ${esc(application.marketsToday)}`
+      : null,
     application.monthlySpend ? `Spend: ${esc(application.monthlySpend)}` : null,
   ]
     .filter(Boolean)

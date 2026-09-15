@@ -90,17 +90,17 @@ export function PeopleManager({
           return (
             <div
               key={m.id}
-              className="bg-card group flex items-center gap-3 rounded-xl border p-3"
+              className="group flex items-center gap-3 rounded-xl border bg-card p-3"
             >
               {m.image ? (
-                // eslint-disable-next-line @next/next/no-img-element
+                // oxlint-disable-next-line nextjs/no-img-element
                 <img
                   src={m.image}
                   alt=""
                   className="size-9 shrink-0 rounded-full object-cover"
                 />
               ) : (
-                <span className="bg-muted text-foreground flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground">
                   {initials(m.name, m.email)}
                 </span>
               )}
@@ -108,12 +108,12 @@ export function PeopleManager({
                 <div className="truncate text-sm font-medium">
                   {m.name ?? m.email ?? "Unknown"}
                   {isSelf && (
-                    <span className="text-muted-foreground ml-1 text-xs font-normal">
+                    <span className="ml-1 text-xs font-normal text-muted-foreground">
                       (you)
                     </span>
                   )}
                 </div>
-                <div className="text-muted-foreground truncate text-xs">
+                <div className="truncate text-xs text-muted-foreground">
                   {m.email ?? "—"}
                 </div>
               </div>
@@ -131,7 +131,8 @@ export function PeopleManager({
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="text-muted-foreground hover:text-foreground size-7"
+                    tone="muted-active"
+                    className="size-7"
                     onClick={() => setEditTarget(m)}
                     aria-label="Edit member"
                   >
@@ -142,7 +143,8 @@ export function PeopleManager({
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="text-muted-foreground hover:text-destructive size-7"
+                    tone="muted-danger"
+                    className="size-7"
                     onClick={() => setRemoveTarget(m)}
                     aria-label="Remove member"
                   >
@@ -157,7 +159,7 @@ export function PeopleManager({
 
       {pending.length > 0 && (
         <div>
-          <h2 className="text-muted-foreground mb-3 text-xs font-semibold tracking-wider uppercase">
+          <h2 className="mb-3 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
             Pending invitations · {pending.length}
           </h2>
           <div className="flex flex-col gap-2">
@@ -170,7 +172,7 @@ export function PeopleManager({
                   <div className="truncate text-sm font-medium">
                     {inv.email}
                   </div>
-                  <div className="text-muted-foreground text-xs">
+                  <div className="text-xs text-muted-foreground">
                     Invited {fmtDate(inv.createdAt)} · expires{" "}
                     {fmtDate(inv.expiresAt)}
                   </div>
@@ -186,7 +188,8 @@ export function PeopleManager({
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="text-muted-foreground hover:text-destructive"
+                    tone="muted-danger"
+                    className=""
                     disabled={cancelInvitation.isPending}
                     onClick={() =>
                       cancelInvitation.mutate({

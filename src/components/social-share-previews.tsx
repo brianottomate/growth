@@ -26,7 +26,7 @@ function PreviewImage({
   className: string;
 }) {
   return src ? (
-    // eslint-disable-next-line @next/next/no-img-element
+    // oxlint-disable-next-line nextjs/no-img-element
     <img
       src={src}
       alt={alt}
@@ -136,7 +136,7 @@ function Provider({
 }) {
   return (
     <div>
-      <div className="text-muted-foreground mb-2 text-[10px] font-semibold tracking-wider uppercase">
+      <div className="mb-2 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
         {label}
       </div>
       {children}

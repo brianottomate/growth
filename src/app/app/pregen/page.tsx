@@ -45,10 +45,14 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 function elapsed(from: Date, to: Date | null): string {
-  const minutes = Math.round(((to ?? new Date()).getTime() - from.getTime()) / 60000);
+  const minutes = Math.round(
+    ((to ?? new Date()).getTime() - from.getTime()) / 60000,
+  );
   if (minutes < 60) return `${minutes}m`;
   const hours = Math.floor(minutes / 60);
-  return hours < 24 ? `${hours}h ${minutes % 60}m` : `${Math.floor(hours / 24)}d`;
+  return hours < 24
+    ? `${hours}h ${minutes % 60}m`
+    : `${Math.floor(hours / 24)}d`;
 }
 
 export default async function PregenPage() {
@@ -80,7 +84,10 @@ export default async function PregenPage() {
       excludeReason: leadDomainTable.excludeReason,
     })
     .from(pregenBuildTable)
-    .leftJoin(leadDomainTable, eq(leadDomainTable.id, pregenBuildTable.domainId))
+    .leftJoin(
+      leadDomainTable,
+      eq(leadDomainTable.id, pregenBuildTable.domainId),
+    )
     .orderBy(desc(pregenBuildTable.requestedAt));
 
   // Fetched separately rather than joined: a company can carry more than one
@@ -128,32 +135,38 @@ export default async function PregenPage() {
               </Link>
             )}
           </div>
-          <p className="text-muted-foreground text-sm">
-            {builds.length} built · {ready} ready · {viewed} opened by the prospect ·{" "}
-            {enrolled} in sequence · newest first
+          <p className="text-sm text-muted-foreground">
+            {builds.length} built · {ready} ready · {viewed} opened by the
+            prospect · {enrolled} in sequence · newest first
           </p>
         </div>
         <Link
           href="/app/pregen/review"
-          className="border-border hover:bg-muted rounded border px-3 py-1.5 text-sm"
+          className="rounded border border-border px-3 py-1.5 text-sm hover:bg-muted"
         >
           Review next wave
         </Link>
       </header>
 
-      <ul className="divide-border divide-y">
+      <ul className="divide-y divide-border">
         {builds.map((build) => {
           // The beacon-free wrapper: opening from here is us looking, and an
           // operator's click must never read to sales as the prospect browsing.
-          const inspect = build.previewUrl ? osInspectUrl(build.previewUrl) : null;
+          const inspect = build.previewUrl
+            ? osInspectUrl(build.previewUrl)
+            : null;
           const enrolment = build.domainId
             ? sentByDomain.get(build.domainId)
             : undefined;
           return (
-            <li key={build.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
+            <li
+              key={build.id}
+              className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3"
+            >
               <span
                 className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
-                  STATUS_STYLES[build.status ?? ""] ?? "border-border text-muted-foreground"
+                  STATUS_STYLES[build.status ?? ""] ??
+                  "border-border text-muted-foreground"
                 }`}
               >
                 {build.status ?? "requested"}
@@ -186,14 +199,14 @@ export default async function PregenPage() {
                 </span>
               ) : build.excluded ? (
                 <span
-                  className="text-muted-foreground shrink-0 rounded-full border px-2 py-0.5 text-[11px]"
+                  className="shrink-0 rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground"
                   title={build.excludeReason ?? undefined}
                 >
                   excluded
                 </span>
               ) : null}
 
-              <span className="text-muted-foreground shrink-0 text-xs">
+              <span className="shrink-0 text-xs text-muted-foreground">
                 {[
                   build.batch,
                   build.pms,
@@ -208,14 +221,19 @@ export default async function PregenPage() {
                   .join(" · ")}
               </span>
 
-              <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
-                {build.requestedAt.toISOString().slice(0, 16).replace("T", " ")} ·{" "}
-                {elapsed(build.requestedAt, build.settledAt)}
+              <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                {build.requestedAt.toISOString().slice(0, 16).replace("T", " ")}{" "}
+                · {elapsed(build.requestedAt, build.settledAt)}
               </span>
 
               <span className="flex shrink-0 items-center gap-2 text-xs">
                 {inspect ? (
-                  <a href={inspect} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+                  <a
+                    href={inspect}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline underline-offset-2"
+                  >
                     preview ↗
                   </a>
                 ) : (
@@ -229,13 +247,18 @@ export default async function PregenPage() {
                 >
                   their site ↗
                 </a>
-                <Link href={`/app/leads/${build.domain}`} className="text-muted-foreground underline underline-offset-2">
+                <Link
+                  href={`/app/leads/${build.domain}`}
+                  className="text-muted-foreground underline underline-offset-2"
+                >
                   lead
                 </Link>
               </span>
 
               {build.errorMessage && (
-                <p className="text-muted-foreground w-full text-xs">{build.errorMessage}</p>
+                <p className="w-full text-xs text-muted-foreground">
+                  {build.errorMessage}
+                </p>
               )}
             </li>
           );

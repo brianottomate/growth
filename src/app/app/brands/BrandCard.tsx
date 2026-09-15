@@ -82,18 +82,18 @@ export function BrandCard({
   const blurb = brand.tagline ?? brand.description;
 
   return (
-    <div className="bg-card overflow-hidden rounded-2xl border shadow-sm">
+    <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
       {/* identity */}
       <div className="flex items-start gap-3.5 px-5 py-4">
         {brand.logo ? (
-          // eslint-disable-next-line @next/next/no-img-element
+          // oxlint-disable-next-line nextjs/no-img-element
           <img
             src={brand.logo}
             alt=""
             className="size-11 shrink-0 rounded-xl object-cover"
           />
         ) : (
-          <div className="bg-muted text-foreground flex size-11 shrink-0 items-center justify-center rounded-xl text-sm font-semibold">
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-muted text-sm font-semibold text-foreground">
             {brand.name.slice(0, 2).toUpperCase()}
           </div>
         )}
@@ -109,7 +109,7 @@ export function BrandCard({
             ) : (
               <span className="text-[15px] font-semibold">{brand.name}</span>
             )}
-            <span className="border-border text-muted-foreground rounded-full border px-2 py-0.5 text-[10px] font-medium">
+            <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
               {relationshipPill}
             </span>
             {brand.website && (
@@ -124,7 +124,7 @@ export function BrandCard({
             )}
           </div>
           {blurb && (
-            <p className="text-muted-foreground mt-0.5 truncate text-sm">
+            <p className="mt-0.5 truncate text-sm text-muted-foreground">
               {blurb}
             </p>
           )}
@@ -214,7 +214,7 @@ export function BrandCard({
               ))}
             </div>
           ) : (
-            <p className="text-muted-foreground text-xs">
+            <p className="text-xs text-muted-foreground">
               No pillars yet — the baseline drafts them once posts are in.
             </p>
           )}
@@ -246,7 +246,7 @@ export function BrandCard({
               )}
             </p>
           ) : (
-            <p className="text-muted-foreground text-xs">
+            <p className="text-xs text-muted-foreground">
               No personas yet — who the brand talks to, drafted from the
               baseline.
             </p>
@@ -261,7 +261,7 @@ export function BrandCard({
             <span className="flex items-center gap-2.5">
               <span className={LABEL}>Media · {media.total}</span>
               {media.liveAds > 0 && (
-                <span className="text-muted-foreground text-[11px]">
+                <span className="text-[11px] text-muted-foreground">
                   {media.liveAds} live {media.liveAds === 1 ? "ad" : "ads"}
                 </span>
               )}
@@ -280,9 +280,9 @@ export function BrandCard({
               {media.thumbs.map((t) => (
                 <div
                   key={t.id}
-                  className="bg-muted relative h-16 w-[88px] shrink-0 overflow-hidden rounded-lg"
+                  className="relative h-16 w-[88px] shrink-0 overflow-hidden rounded-lg bg-muted"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {/* oxlint-disable-next-line nextjs/no-img-element */}
                   <img
                     src={t.src}
                     alt=""
@@ -299,11 +299,9 @@ export function BrandCard({
               {media.total > media.thumbs.length && (
                 <Link
                   href={
-                    brand.slug
-                      ? `/app/media?brand=${brand.slug}`
-                      : "/app/media"
+                    brand.slug ? `/app/media?brand=${brand.slug}` : "/app/media"
                   }
-                  className="text-muted-foreground hover:text-foreground hover:border-foreground/30 flex h-16 w-[88px] shrink-0 items-center justify-center rounded-lg border border-dashed text-xs tabular-nums"
+                  className="flex h-16 w-[88px] shrink-0 items-center justify-center rounded-lg border border-dashed text-xs text-muted-foreground tabular-nums hover:border-foreground/30 hover:text-foreground"
                 >
                   +{media.total - media.thumbs.length}
                 </Link>
@@ -311,7 +309,7 @@ export function BrandCard({
             </div>
             <Link
               href="/app/studio"
-              className="hover:bg-accent shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors"
+              className="shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors hover:bg-accent"
             >
               Compose creative
             </Link>
@@ -321,11 +319,7 @@ export function BrandCard({
 
       {/* readiness + tracking */}
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t px-5 py-3">
-        {readiness ? (
-          <ReadinessChecklist readiness={readiness} />
-        ) : (
-          <span />
-        )}
+        {readiness ? <ReadinessChecklist readiness={readiness} /> : <span />}
         <TrackedBrands ownerBrandId={brand.id} tracked={tracked} />
       </div>
     </div>

@@ -148,7 +148,9 @@ function TitleLine({ property }: { property: DigestProperty }) {
     <>
       {property.title}
       {property.isNew ? " · New" : null}
-      {property.rating !== undefined ? ` · ★ ${property.rating.toFixed(1)}` : null}
+      {property.rating !== undefined
+        ? ` · ★ ${property.rating.toFixed(1)}`
+        : null}
     </>
   );
 }
@@ -162,13 +164,7 @@ function Kicker({ property }: { property: DigestProperty }) {
   );
 }
 
-function SavingsPill({
-  label,
-  small,
-}: {
-  label: string;
-  small?: boolean;
-}) {
+function SavingsPill({ label, small }: { label: string; small?: boolean }) {
   return (
     <Text style={{ margin: small ? "6px 0 0" : "10px 0 0" }}>
       <span
@@ -313,7 +309,11 @@ export default function ListingsDigest(props: ListingsDigestProps) {
 
           <Section style={{ paddingTop: "20px" }}>
             <Text
-              style={{ fontSize: "15px", color: colors.ink, margin: "0 0 12px" }}
+              style={{
+                fontSize: "15px",
+                color: colors.ink,
+                margin: "0 0 12px",
+              }}
             >
               {props.greeting}
             </Text>
@@ -709,7 +709,8 @@ ListingsDigest.PreviewProps = {
   footer: {
     logoSrc: cioAsset("01KXNRPZDGBB5VWW26X4VP4NBA.png"),
     tagline: "Find your happy place ®",
-    address: "Wander.com, Inc. · 200 Academy Drive, Suite 200 · Austin, TX 78704",
+    address:
+      "Wander.com, Inc. · 200 Academy Drive, Suite 200 · Austin, TX 78704",
     unsubscribeUrl: "{% unsubscribe_url %}",
   },
 } satisfies ListingsDigestProps;

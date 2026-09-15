@@ -63,7 +63,7 @@ export default async function PerformanceBrandCampaignsPage({
         <p
           className={cn(
             panel,
-            "text-muted-foreground px-4 py-8 text-center text-xs",
+            "px-4 py-8 text-center text-xs text-muted-foreground",
           )}
         >
           No campaign yet.

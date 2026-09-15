@@ -141,7 +141,12 @@ export async function rankImagesForLead(urls: string[]): Promise<string[]> {
     for (const n of output.order) {
       const index = n - 1;
       const url = candidates[index];
-      if (url && !seen.has(index) && !rejected.has(index) && !dropped.has(index)) {
+      if (
+        url &&
+        !seen.has(index) &&
+        !rejected.has(index) &&
+        !dropped.has(index)
+      ) {
         seen.add(index);
         ordered.push(url);
       }

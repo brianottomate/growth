@@ -43,13 +43,13 @@ export function CtaCard({
   const displayFeatures = features || defaultFeatures;
 
   return (
-    <section className="border-secondary bg-surface-secondary not-prose relative my-8 overflow-hidden rounded-xl border shadow-lg transition-shadow hover:shadow-xl">
+    <section className="not-prose relative my-8 overflow-hidden rounded-xl border border-secondary bg-surface-secondary shadow-lg transition-shadow hover:shadow-xl">
       <div className="relative z-10 p-6 sm:p-8">
-        <h2 className="text-primary text-[1.75rem] leading-[110%] font-bold tracking-tight">
+        <h2 className="text-[1.75rem] leading-[110%] font-bold tracking-tight text-primary">
           {title}
         </h2>
 
-        <div className="text-secondary mt-2.5 text-lg leading-[160%]">
+        <div className="mt-2.5 text-lg leading-[160%] text-secondary">
           <p>{description}</p>
         </div>
 
@@ -60,7 +60,7 @@ export function CtaCard({
                 <Check className="size-5 text-emerald-500" strokeWidth={2.5} />
               </span>
               <span className="block flex-1 text-[15px] leading-relaxed">
-                <span className="text-primary font-semibold">
+                <span className="font-semibold text-primary">
                   {feature.label}
                   {feature.description && ": "}
                 </span>
@@ -75,7 +75,7 @@ export function CtaCard({
         <div className="-mx-3 mt-6 flex items-center gap-1">
           <Link
             href={buttonHref}
-            className="text-primary hover:bg-surface-tertiary group flex items-center gap-1.5 rounded-lg bg-transparent p-3 text-sm leading-[110%] font-semibold transition-colors duration-100"
+            className="group flex items-center gap-1.5 rounded-lg bg-transparent p-3 text-sm leading-[110%] font-semibold text-primary transition-colors duration-100 hover:bg-surface-tertiary"
           >
             <p>{buttonText}</p>
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />

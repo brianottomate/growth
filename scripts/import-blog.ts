@@ -29,7 +29,11 @@ const CAP = 300;
 // Articles live at /article/{slug}; /blog/{n} is the paginated listing route.
 const BLOG_BASE = "https://www.wander.com/article";
 
-type SeoTag = { tag: string; attributes: Record<string, string> | null; content: string | null };
+type SeoTag = {
+  tag: string;
+  attributes: Record<string, string> | null;
+  content: string | null;
+};
 type Article = {
   id: string;
   title: string;
@@ -51,8 +55,14 @@ const Q = `query($first: IntType, $skip: IntType) {
 }`;
 
 /** Pull a value out of the rendered SEO meta tags by attribute match. */
-function seoValue(tags: SeoTag[], attr: "name" | "property", val: string): string | null {
-  return tags.find((t) => t.attributes?.[attr] === val)?.attributes?.content ?? null;
+function seoValue(
+  tags: SeoTag[],
+  attr: "name" | "property",
+  val: string,
+): string | null {
+  return (
+    tags.find((t) => t.attributes?.[attr] === val)?.attributes?.content ?? null
+  );
 }
 
 async function dato(skip: number): Promise<Article[]> {
@@ -80,13 +90,21 @@ async function main() {
   });
   if (!org) throw new Error("No 'wander' org — run the seed first.");
   const wander = await db.query.brandTable.findFirst({
-    where: and(eq(brandTable.slug, "wander"), eq(brandTable.organizationId, org.id)),
+    where: and(
+      eq(brandTable.slug, "wander"),
+      eq(brandTable.organizationId, org.id),
+    ),
   });
   if (!wander) throw new Error("No 'wander' brand.");
   const blogChannel = await db.query.channelTable.findFirst({
-    where: and(eq(channelTable.brandId, wander.id), eq(channelTable.kind, "blog")),
+    where: and(
+      eq(channelTable.brandId, wander.id),
+      eq(channelTable.kind, "blog"),
+    ),
   });
-  console.log(`✓ target: brand=${wander.id} blogChannel=${blogChannel?.id ?? "—"}`);
+  console.log(
+    `✓ target: brand=${wander.id} blogChannel=${blogChannel?.id ?? "—"}`,
+  );
 
   const articles: Article[] = [];
   for (let skip = 0; skip < CAP; skip += 100) {

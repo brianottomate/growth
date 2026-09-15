@@ -78,12 +78,12 @@ export default async function WebsiteDetailPage({
 
   return (
     <div className="mx-auto max-w-5xl">
-      <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <Link href={backHref} className="hover:text-foreground">
           Website
         </Link>
         <span>/</span>
-        <span className="text-foreground font-medium">{page.title}</span>
+        <span className="font-medium text-foreground">{page.title}</span>
       </div>
 
       <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
@@ -93,7 +93,7 @@ export default async function WebsiteDetailPage({
               className="size-2 rounded-full"
               style={{ background: PAGE_TYPE_META[page.pageType].color }}
             />
-            <span className="text-muted-foreground text-xs">
+            <span className="text-xs text-muted-foreground">
               {PAGE_TYPE_META[page.pageType].label}
             </span>
           </div>
@@ -101,7 +101,7 @@ export default async function WebsiteDetailPage({
             {metadata.ogTitle ?? page.title}
           </h1>
           {(metadata.ogDescription ?? page.description) && (
-            <p className="text-muted-foreground mt-2 max-w-3xl text-sm leading-relaxed">
+            <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">
               {metadata.ogDescription ?? page.description}
             </p>
           )}
@@ -110,7 +110,7 @@ export default async function WebsiteDetailPage({
           href={page.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="hover:bg-accent inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs"
+          className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs hover:bg-accent"
         >
           Open page <ExternalLink className="size-3" />
         </a>
@@ -120,12 +120,12 @@ export default async function WebsiteDetailPage({
         <div className="flex items-baseline justify-between gap-3">
           <div>
             <h2 className="text-sm font-semibold">OG and share audit</h2>
-            <p className="text-muted-foreground mt-1 text-xs">
+            <p className="mt-1 text-xs text-muted-foreground">
               The actual metadata and image currently published by the page.
             </p>
           </div>
           {metadata.metadataFetchedAt && (
-            <span className="text-muted-foreground text-[10px]">
+            <span className="text-[10px] text-muted-foreground">
               Checked {new Date(metadata.metadataFetchedAt).toLocaleString()}
             </span>
           )}
@@ -180,11 +180,11 @@ export default async function WebsiteDetailPage({
         {page.ogImage ? (
           <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_240px]">
             <div>
-              <p className="text-muted-foreground mb-2 text-[10px] font-semibold tracking-wider uppercase">
+              <p className="mb-2 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
                 Large card · 1.91:1
               </p>
               <div className="overflow-hidden rounded-xl border bg-white">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {/* oxlint-disable-next-line nextjs/no-img-element */}
                 <img
                   src={page.ogImage}
                   alt=""
@@ -193,11 +193,11 @@ export default async function WebsiteDetailPage({
               </div>
             </div>
             <div>
-              <p className="text-muted-foreground mb-2 text-[10px] font-semibold tracking-wider uppercase">
+              <p className="mb-2 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
                 Center crop · 1:1
               </p>
               <div className="overflow-hidden rounded-xl border bg-white">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {/* oxlint-disable-next-line nextjs/no-img-element */}
                 <img
                   src={page.ogImage}
                   alt=""
@@ -207,14 +207,14 @@ export default async function WebsiteDetailPage({
             </div>
           </div>
         ) : (
-          <div className="text-muted-foreground mt-5 rounded-xl border p-6 text-sm">
+          <div className="mt-5 rounded-xl border p-6 text-sm text-muted-foreground">
             This page does not publish an OG image.
           </div>
         )}
 
         <div className="mt-8 border-t pt-6">
           <h3 className="text-sm font-semibold">Provider previews</h3>
-          <p className="text-muted-foreground mt-1 mb-4 text-xs">
+          <p className="mt-1 mb-4 text-xs text-muted-foreground">
             Representative link cards using the metadata each provider would
             receive. Final rendering remains provider-controlled.
           </p>
@@ -255,8 +255,8 @@ function MetadataLine({
 }) {
   const length = value?.length ?? 0;
   return (
-    <div className="bg-muted/30 rounded-lg px-3 py-2.5">
-      <div className="text-muted-foreground flex items-center justify-between gap-2 text-[10px] font-semibold tracking-wider uppercase">
+    <div className="rounded-lg bg-muted/30 px-3 py-2.5">
+      <div className="flex items-center justify-between gap-2 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
         <span>{label}</span>
         <span className={length > max ? "text-red-500" : ""}>
           {length}/{max}

@@ -282,10 +282,10 @@ export function SourceDialog({
           {isEdit ? (
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <span className="text-muted-foreground">Surface:</span>
-              <span className="bg-muted rounded px-2 py-0.5 font-medium">
+              <span className="rounded bg-muted px-2 py-0.5 font-medium">
                 {platformLabel(platform)}
               </span>
-              <span className="bg-muted rounded px-2 py-0.5 font-medium">
+              <span className="rounded bg-muted px-2 py-0.5 font-medium">
                 {ACQUISITIONS.find((a) => a[0] === acquisition)?.[1] ??
                   acquisition}
               </span>
@@ -345,12 +345,13 @@ export function SourceDialog({
                 value={accounts}
                 onChange={(e) => setAccounts(e.target.value)}
                 rows={4}
-                className="font-mono text-xs"
+                textSize="xs"
+                monospace
                 placeholder={
                   "whowhatwear\ncondenasttraveler\nhttps://www.instagram.com/architecturaldigest/"
                 }
               />
-              <p className="text-muted-foreground text-[11px]">
+              <p className="text-[11px] text-muted-foreground">
                 Their recent posts are scanned daily; relevant ones surface in
                 the Instagram queue with a drafted comment.
               </p>
@@ -366,7 +367,8 @@ export function SourceDialog({
                   value={subreddits}
                   onChange={(e) => setSubreddits(e.target.value)}
                   rows={4}
-                  className="font-mono text-xs"
+                  textSize="xs"
+                  monospace
                   placeholder={"ShortTermRentals\nAirbnbHosts\nVRBOHosts"}
                 />
               </div>
@@ -380,7 +382,8 @@ export function SourceDialog({
                   value={keywords}
                   onChange={(e) => setKeywords(e.target.value)}
                   rows={4}
-                  className="font-mono text-xs"
+                  textSize="xs"
+                  monospace
                   placeholder={
                     "direct booking\nOTA fees\nalternative to Airbnb"
                   }
@@ -388,7 +391,7 @@ export function SourceDialog({
               </div>
             )
           ) : (
-            <p className="text-muted-foreground rounded-md border border-dashed px-3 py-2 text-xs">
+            <p className="rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">
               {acquisition === "owned_inbound"
                 ? "Reads DMs / comments from the connected account — no keyword config."
                 : "A provider pushes matches to us — keywords are managed in that tool."}
@@ -412,7 +415,7 @@ export function SourceDialog({
           <button
             type="button"
             onClick={() => setShowAdvanced((v) => !v)}
-            className="text-muted-foreground hover:text-foreground text-xs font-medium"
+            className="text-xs font-medium text-muted-foreground hover:text-foreground"
           >
             {showAdvanced ? "− Hide" : "+ Show"} advanced (cadence, connector,
             voice)
@@ -442,7 +445,8 @@ export function SourceDialog({
                     value={scheduleCron}
                     onChange={(e) => setScheduleCron(e.target.value)}
                     placeholder="cron e.g. 0 * * * *"
-                    className="font-mono text-xs"
+                    textSize="xs"
+                    monospace
                   />
                 )}
               </div>
@@ -460,7 +464,8 @@ export function SourceDialog({
                     value={adapter}
                     onChange={(e) => setAdapter(e.target.value)}
                     placeholder={deriveAdapter(platform, acquisition)}
-                    className="font-mono text-xs"
+                    textSize="xs"
+                    monospace
                   />
                 </div>
               )}
@@ -479,7 +484,7 @@ export function SourceDialog({
                   rows={2}
                 />
                 {voiceText.trim() && (
-                  <label className="text-muted-foreground flex items-center gap-2 text-xs">
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
                     <input
                       type="checkbox"
                       checked={overridesBrand}
@@ -498,7 +503,7 @@ export function SourceDialog({
           {isEdit && initial?.id ? (
             <Button
               variant="ghost"
-              className="text-destructive hover:text-destructive"
+              tone="danger"
               disabled={pending}
               onClick={() => {
                 if (confirm(`Remove "${initial.label ?? "this source"}"?`))

@@ -1,4 +1,7 @@
-import type { CompositionFormatId, CompositionTemplateId } from "@/lib/compositions";
+import type {
+  CompositionFormatId,
+  CompositionTemplateId,
+} from "@/lib/compositions";
 
 // Links into the Studio for ad previews. Client-safe: the brand page's
 // lightboxes build them in the browser, and the server service re-exports them.
@@ -9,7 +12,10 @@ export const AD_PREVIEW_DEFAULTS = {
   formatId: "portrait" satisfies CompositionFormatId,
 } as const;
 
-export function performanceBrandPath(brand: { id: string; slug: string | null }) {
+export function performanceBrandPath(brand: {
+  id: string;
+  slug: string | null;
+}) {
   return `/app/performance/brands/${brand.slug ?? brand.id}`;
 }
 
@@ -44,7 +50,11 @@ export function adPreviewStudioHref(input: {
 }
 
 /** The Studio, reopening a card the brand already has, with the way back. */
-export function reopenCardHref(input: { brandId: string; brandSlug: string | null; assetId: string }) {
+export function reopenCardHref(input: {
+  brandId: string;
+  brandSlug: string | null;
+  assetId: string;
+}) {
   const params = new URLSearchParams({
     brandId: input.brandId,
     asset: input.assetId,

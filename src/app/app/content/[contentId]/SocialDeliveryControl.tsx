@@ -112,7 +112,7 @@ export function SocialDeliveryControl({
           disabled={busy}
           title="Refresh delivery status"
           aria-label="Refresh Zernio delivery status"
-          className="text-muted-foreground hover:text-foreground rounded p-1 disabled:opacity-50"
+          className="rounded p-1 text-muted-foreground hover:text-foreground disabled:opacity-50"
         >
           {busy ? (
             <Loader2 className="size-3 animate-spin" />
@@ -127,7 +127,7 @@ export function SocialDeliveryControl({
             disabled={busy}
             title="Retry failed Zernio delivery"
             aria-label="Retry failed Zernio delivery"
-            className="text-muted-foreground hover:text-foreground rounded p-1 disabled:opacity-50"
+            className="rounded p-1 text-muted-foreground hover:text-foreground disabled:opacity-50"
           >
             <RotateCcw className="size-3" />
           </button>
@@ -162,7 +162,7 @@ export function SocialDeliveryControl({
         title={
           future ? "Queue this post in Zernio" : "Choose a future date first"
         }
-        className="border-border text-muted-foreground hover:bg-accent hover:text-foreground flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium disabled:opacity-40"
+        className="flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40"
       >
         {deliver.isPending ? (
           <Loader2 className="size-3 animate-spin" />
@@ -183,7 +183,7 @@ export function SocialDeliveryControl({
           }
         }}
         disabled={busy}
-        className="border-border text-muted-foreground hover:bg-accent hover:text-foreground flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium disabled:opacity-40"
+        className="flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40"
       >
         <Send className="size-3" /> Publish now
       </button>

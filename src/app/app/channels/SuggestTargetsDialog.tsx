@@ -66,7 +66,7 @@ export function SuggestTargetsDialog({
       appliedAny.current = false;
       suggest.mutate({ brandId });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
   }, [open, brandId]);
 
   const apply = async (s: Suggestion, idx: number) => {
@@ -106,13 +106,13 @@ export function SuggestTargetsDialog({
         </DialogHeader>
 
         {suggest.isPending && (
-          <p className="text-muted-foreground text-sm">
+          <p className="text-sm text-muted-foreground">
             Reading your performance data and peer cadences…
           </p>
         )}
 
         {ev && (
-          <p className="text-muted-foreground -mt-2 text-xs">
+          <p className="-mt-2 text-xs text-muted-foreground">
             Evidence: {ev.ownPosts} own posts · {ev.peerPosts} peer posts across{" "}
             {ev.peerBrands} tracked brands · last {ev.windowDays} days.
             {ev.peerDataAgeDays != null && ev.peerDataAgeDays > 14 && (
@@ -126,7 +126,7 @@ export function SuggestTargetsDialog({
         )}
 
         {result?.suggestions.length === 0 && (
-          <p className="text-muted-foreground text-sm">
+          <p className="text-sm text-muted-foreground">
             No changes proposed — the evidence supports the current targets.
           </p>
         )}
@@ -140,7 +140,7 @@ export function SuggestTargetsDialog({
                   <span className="flex items-center gap-1.5 text-sm font-medium">
                     <ChannelLogo platform={s.platform!} className="size-3.5" />
                     {s.archetype}
-                    <span className="text-muted-foreground text-xs">
+                    <span className="text-xs text-muted-foreground">
                       /{s.period}
                     </span>
                   </span>
@@ -155,7 +155,7 @@ export function SuggestTargetsDialog({
                       }}
                     />
                     {PILLAR_BY_SLUG[s.pillar!]?.name ?? s.pillar}
-                    <span className="text-muted-foreground text-xs">mix %</span>
+                    <span className="text-xs text-muted-foreground">mix %</span>
                   </span>
                 );
               return (
@@ -166,7 +166,7 @@ export function SuggestTargetsDialog({
                       <span className="text-muted-foreground">
                         {s.current ?? "—"}
                       </span>
-                      <ArrowRight className="text-muted-foreground size-3.5" />
+                      <ArrowRight className="size-3.5 text-muted-foreground" />
                       <span className="font-semibold text-emerald-400">
                         {s.proposed}
                       </span>
@@ -215,7 +215,7 @@ export function SuggestTargetsDialog({
                       )}
                     </span>
                   </div>
-                  <p className="text-muted-foreground mt-1.5 text-xs">
+                  <p className="mt-1.5 text-xs text-muted-foreground">
                     {s.rationale}
                   </p>
                 </div>
@@ -227,7 +227,7 @@ export function SuggestTargetsDialog({
         <div className="flex justify-end">
           <button
             onClick={() => close(false)}
-            className="border-border hover:bg-accent rounded-full border px-4 py-1.5 text-sm"
+            className="rounded-full border border-border px-4 py-1.5 text-sm hover:bg-accent"
           >
             Done
           </button>

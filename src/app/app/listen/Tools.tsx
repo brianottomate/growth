@@ -10,12 +10,12 @@ export function Tools() {
           <h2 className="text-lg font-semibold tracking-tight">
             LLM listening
           </h2>
-          <p className="text-muted-foreground mt-1 text-sm">
+          <p className="mt-1 text-sm text-muted-foreground">
             Track how Wander appears in AI search results — ChatGPT, Perplexity,
             Gemini, AI Overviews. Coming soon.
           </p>
         </div>
-        <div className="bg-card text-muted-foreground rounded-lg border border-dashed p-6 text-center text-sm">
+        <div className="rounded-lg border border-dashed bg-card p-6 text-center text-sm text-muted-foreground">
           <p className="font-medium">🤖 AI Search visibility tracking</p>
           <p className="mt-2">
             Monitor how AI models mention and recommend Wander in their
@@ -55,7 +55,7 @@ export function Tools() {
           <h2 className="text-lg font-semibold tracking-tight">
             Social listening tools
           </h2>
-          <p className="text-muted-foreground mt-1 text-sm">
+          <p className="mt-1 text-sm text-muted-foreground">
             External SoMe listening services to evaluate or integrate.
           </p>
         </div>
@@ -127,19 +127,19 @@ function ToolCard({
       href={href}
       target="_blank"
       rel="noreferrer noopener"
-      className={`group bg-card hover:bg-accent rounded-lg border p-3 text-sm transition-colors ${
+      className={`group rounded-lg border bg-card p-3 text-sm transition-colors hover:bg-accent ${
         dimmed ? "opacity-60" : ""
       }`}
     >
       <div className="flex items-center justify-between">
-        <span className="text-foreground font-medium group-hover:underline">
+        <span className="font-medium text-foreground group-hover:underline">
           {name} ↗
         </span>
-        <span className="text-muted-foreground rounded-full border px-2 py-0.5 text-[10px] font-medium">
+        <span className="rounded-full border px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
           {tag}
         </span>
       </div>
-      <p className="text-muted-foreground mt-1 text-xs">{description}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{description}</p>
     </a>
   );
 }

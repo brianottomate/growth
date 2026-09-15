@@ -96,7 +96,10 @@ export const compositionRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        return await directComposition({ userId: ctx.session.user.id, spec: input });
+        return await directComposition({
+          userId: ctx.session.user.id,
+          spec: input,
+        });
       } catch (error) {
         rethrowAccess(error);
       }

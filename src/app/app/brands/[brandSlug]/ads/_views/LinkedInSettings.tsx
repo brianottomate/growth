@@ -77,7 +77,7 @@ export function LinkedInSettings({
   }
 
   return (
-    <div className="border-border bg-surface-secondary/30 w-full space-y-3 rounded-xl border p-3">
+    <div className="w-full space-y-3 rounded-xl border border-border bg-surface-secondary/30 p-3">
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="li-org">Company Page id</Label>
@@ -86,9 +86,9 @@ export function LinkedInSettings({
             value={organizationId}
             onChange={(event) => setOrganizationId(event.target.value)}
             placeholder="78563329 or urn:li:organization:78563329"
-            className="text-xs"
+            textSize="xs"
           />
-          <p className="text-muted-foreground text-[11px]">
+          <p className="text-[11px] text-muted-foreground">
             Authors the dark posts. Leave empty when the ad account belongs to
             the Page; Zernio infers it.
           </p>
@@ -101,7 +101,7 @@ export function LinkedInSettings({
             onChange={(event) =>
               setCallToAction(event.target.value as LinkedInCallToAction | "")
             }
-            className="border-input bg-background h-8 w-full rounded-md border px-2 text-xs"
+            className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
           >
             <option value="">Default (Learn more)</option>
             {LINKEDIN_CALL_TO_ACTIONS.map((value) => (
@@ -119,7 +119,7 @@ export function LinkedInSettings({
             onChange={(event) =>
               setCostType(event.target.value as LinkedInCostType | "")
             }
-            className="border-input bg-background h-8 w-full rounded-md border px-2 text-xs"
+            className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
           >
             <option value="">Automated (LinkedIn picks)</option>
             {LINKEDIN_COST_TYPES.map((value) => (
@@ -138,7 +138,7 @@ export function LinkedInSettings({
             disabled={costType === ""}
             onChange={(event) => setUnitCost(event.target.value)}
             placeholder="2.50"
-            className="text-xs"
+            textSize="xs"
           />
         </div>
       </div>

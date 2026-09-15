@@ -283,7 +283,8 @@ export function CampaignDialog({
                 value={fromDateInput(start) ?? undefined}
                 onChange={(d) => setStart(d ? toDateInput(d) : "")}
                 placeholder="Start date"
-                className="w-full justify-start py-1.5 text-sm"
+                density="form"
+                className="w-full justify-start"
               />
             </div>
             <div className="space-y-1.5">
@@ -293,7 +294,8 @@ export function CampaignDialog({
                 value={fromDateInput(end) ?? undefined}
                 onChange={(d) => setEnd(d ? toDateInput(d) : "")}
                 placeholder="End date"
-                className="w-full justify-start py-1.5 text-sm"
+                density="form"
+                className="w-full justify-start"
               />
             </div>
             <div className="space-y-1.5">
@@ -329,7 +331,7 @@ export function CampaignDialog({
                   aria-label={`color ${c}`}
                   className={`size-6 rounded-full transition-transform ${
                     color === c
-                      ? "ring-ring ring-offset-background scale-110 ring-2 ring-offset-2"
+                      ? "scale-110 ring-2 ring-ring ring-offset-2 ring-offset-background"
                       : "hover:scale-105"
                   }`}
                   style={{ background: c }}

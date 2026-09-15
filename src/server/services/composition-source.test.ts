@@ -56,13 +56,20 @@ describe("brand mark sources", () => {
         "https://www.chaletshh.com/i/width=32,height=32,fit=contain,format=png?src=https%3A%2F%2Fassets-websites.wander.com%2F1%2Ffavicon-abc.png",
       ),
     ).toBe("https://assets-websites.wander.com/1/favicon-abc.png");
-    expect(unwrapImageProxy("https://assets/logo.png")).toBe("https://assets/logo.png");
+    expect(unwrapImageProxy("https://assets/logo.png")).toBe(
+      "https://assets/logo.png",
+    );
     expect(unwrapImageProxy("not a url")).toBe("not a url");
   });
 
   test("traces a flat shape's alpha to a single-colour SVG", async () => {
     const disc = await sharp({
-      create: { width: 64, height: 64, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+      create: {
+        width: 64,
+        height: 64,
+        channels: 4,
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      },
     })
       .composite([
         {
@@ -90,14 +97,21 @@ describe("brand mark sources", () => {
 describe("dominant colour", () => {
   const shape = (svg: string) =>
     sharp({
-      create: { width: 64, height: 64, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+      create: {
+        width: 64,
+        height: 64,
+        channels: 4,
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      },
     })
       .composite([{ input: Buffer.from(svg) }])
       .png()
       .toBuffer();
 
   test("names the ink of a one-colour mark", async () => {
-    const red = await shape('<svg width="64" height="64"><circle cx="32" cy="32" r="24" fill="#ee3322"/></svg>');
+    const red = await shape(
+      '<svg width="64" height="64"><circle cx="32" cy="32" r="24" fill="#ee3322"/></svg>',
+    );
     expect(await dominantColor(red)).toBe("#ee3322");
   });
 

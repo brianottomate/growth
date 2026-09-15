@@ -118,7 +118,7 @@ export default async function LifecyclePage() {
           return (
             <span
               key={s}
-              className="border-border flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs"
+              className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs"
             >
               <span className={`size-1.5 rounded-full ${meta.dot}`} />
               <span className={meta.cls}>{meta.label}</span>
@@ -129,7 +129,7 @@ export default async function LifecyclePage() {
       </div>
 
       {campaigns.length === 0 && (
-        <p className="text-muted-foreground mt-10 text-sm">
+        <p className="mt-10 text-sm text-muted-foreground">
           No lifecycle automations yet. Run{" "}
           <code className="font-mono">bun run scripts/import-cio.ts</code>.
         </p>
@@ -141,7 +141,7 @@ export default async function LifecyclePage() {
         const meta = RUN_STATE[s];
         return (
           <section key={s} className="mt-8">
-            <h2 className="text-muted-foreground mb-3 flex items-center gap-2 text-xs font-semibold tracking-wider uppercase">
+            <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
               <span className={`size-1.5 rounded-full ${meta.dot}`} />
               {meta.label} · {list.length}
             </h2>
@@ -157,14 +157,14 @@ export default async function LifecyclePage() {
                     href={c.externalUrl ?? "#"}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="bg-card hover:bg-accent/40 flex items-center gap-3 rounded-xl border p-3.5 transition-colors"
+                    className="flex items-center gap-3 rounded-xl border bg-card p-3.5 transition-colors hover:bg-accent/40"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="truncate text-sm font-medium">
                           {c.name}
                         </span>
-                        <span className="border-border text-muted-foreground rounded-full border px-1.5 py-0.5 text-[10px] font-medium">
+                        <span className="rounded-full border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
                           {KIND_LABEL[c.kind] ?? c.kind}
                         </span>
                         {cleanup && (
@@ -173,7 +173,7 @@ export default async function LifecyclePage() {
                           </span>
                         )}
                       </div>
-                      <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-2 text-[11px]">
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
                         {c.triggerEvent && <span>⚡ {c.triggerEvent}</span>}
                         {c.touchpoints.length > 0 && (
                           <span>
@@ -195,12 +195,12 @@ export default async function LifecyclePage() {
                         <div className="text-sm font-semibold tabular-nums">
                           {fmt(matched)}
                         </div>
-                        <div className="text-muted-foreground text-[10px] tracking-wide uppercase">
+                        <div className="text-[10px] tracking-wide text-muted-foreground uppercase">
                           reached
                         </div>
                       </div>
                     )}
-                    <span className="text-muted-foreground text-xs">↗</span>
+                    <span className="text-xs text-muted-foreground">↗</span>
                   </a>
                 );
               })}
@@ -216,7 +216,7 @@ export default async function LifecyclePage() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Lifecycle</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
+          <p className="mt-1 text-sm text-muted-foreground">
             What we want vs. what runs in Customer.io &amp; Outreach ·{" "}
             <span className="text-amber-300">{cleanupCount} cleanup</span>{" "}
             candidates

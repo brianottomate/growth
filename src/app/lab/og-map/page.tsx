@@ -858,7 +858,7 @@ function OgImagePreview({ url }: { url: string | null }) {
     );
   }
   return (
-    // eslint-disable-next-line @next/next/no-img-element
+    // oxlint-disable-next-line nextjs/no-img-element
     <img
       src={url}
       alt="OG preview"

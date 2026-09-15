@@ -32,7 +32,7 @@ export default async function OAuthWorkspacePage() {
     .where(eq(memberTable.userId, session.user.id));
 
   return (
-    <div className="bg-muted flex min-h-svh items-center justify-center p-6">
+    <div className="flex min-h-svh items-center justify-center bg-muted p-6">
       <WorkspaceSelector organizations={organizations} />
     </div>
   );

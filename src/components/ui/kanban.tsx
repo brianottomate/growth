@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-enum-comparison */
+/* oxlint-disable typescript/no-unsafe-enum-comparison */
 "use client";
 
 import * as React from "react";
@@ -83,7 +83,7 @@ const coordinateGetter: KeyboardCoordinateGetter = (event, { context }) => {
       if (data) {
         const { type, children } = data;
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        // oxlint-disable-next-line typescript/no-unsafe-member-access
         if (type === "container" && children?.length > 0) {
           if (active.data.current?.type !== "container") {
             return;
@@ -990,7 +990,7 @@ const KanbanItem = React.forwardRef<HTMLDivElement, KanbanItemProps>(
           ref={composedRef}
           style={composedStyle}
           className={cn(
-            "focus-visible:ring-ring focus-visible:ring-1 focus-visible:ring-offset-1 focus-visible:outline-hidden",
+            "focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:outline-hidden",
             {
               "touch-none select-none": asHandle,
               "cursor-default": context.flatCursor,

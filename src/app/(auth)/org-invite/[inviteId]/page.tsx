@@ -119,7 +119,7 @@ export default async function InvitePage({ params }: InvitePageProps) {
       <div className="flex flex-col gap-4 p-6 md:p-10">
         <div className="flex justify-center gap-2 md:justify-start">
           <Link href="/" className="flex items-center gap-2">
-            <div className="bg-primary text-primary-foreground flex size-6 items-center justify-center rounded-md">
+            <div className="flex size-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
               <Building2 className="size-4" />
             </div>
             <span className="text-xl font-bold">Wander Growth</span>
@@ -139,7 +139,7 @@ export default async function InvitePage({ params }: InvitePageProps) {
       </div>
 
       {/* Right column - Branding image */}
-      <div className="bg-muted relative hidden lg:block">
+      <div className="relative hidden bg-muted lg:block">
         <Image
           src="/auth-hero.jpg"
           alt="A Wander home at golden hour"

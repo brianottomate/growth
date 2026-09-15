@@ -159,7 +159,7 @@ export function SettingsCard({
         </div>
       </div>
 
-      <p className="text-muted-foreground text-[11px]">
+      <p className="text-[11px] text-muted-foreground">
         {settings?.updatedAt
           ? `Last set ${new Date(settings.updatedAt).toLocaleDateString([], { month: "short", day: "numeric" })}${
               settings.updatedFrom === "intake"
@@ -213,7 +213,7 @@ function Tile({
           {label}
         </SectionLabel>
         {from ? (
-          <span className="text-muted-foreground/70 text-[9.5px]">{from}</span>
+          <span className="text-[9.5px] text-muted-foreground/70">{from}</span>
         ) : null}
       </div>
       {href ? (

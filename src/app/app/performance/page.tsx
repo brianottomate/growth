@@ -168,7 +168,7 @@ export default async function PerformanceDashboardPage() {
                 <p
                   className={cn(
                     panel,
-                    "text-muted-foreground px-4 py-6 text-center text-xs",
+                    "px-4 py-6 text-center text-xs text-muted-foreground",
                   )}
                 >
                   Nothing live.
@@ -234,7 +234,7 @@ export default async function PerformanceDashboardPage() {
                 <p
                   className={cn(
                     panel,
-                    "text-muted-foreground px-4 py-6 text-center text-xs",
+                    "px-4 py-6 text-center text-xs text-muted-foreground",
                   )}
                 >
                   No drafts.
@@ -262,7 +262,7 @@ export default async function PerformanceDashboardPage() {
               <p
                 className={cn(
                   panel,
-                  "text-muted-foreground px-4 py-6 text-center text-xs",
+                  "px-4 py-6 text-center text-xs text-muted-foreground",
                 )}
               >
                 Nothing waiting.
@@ -280,14 +280,14 @@ export default async function PerformanceDashboardPage() {
                         {hand.brand.name}
                       </span>
                     </div>
-                    <p className="text-muted-foreground mt-2 text-xs leading-relaxed">
+                    <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                       {hand.reason}
                     </p>
                     <Link
                       href={hand.href}
                       className={cn(
                         pill,
-                        "border-border/80 hover:bg-muted/60 mt-2.5 inline-flex items-center border px-3 py-1 text-[11.5px] font-semibold",
+                        "mt-2.5 inline-flex items-center border border-border/80 px-3 py-1 text-[11.5px] font-semibold hover:bg-muted/60",
                       )}
                     >
                       {hand.action}
@@ -297,7 +297,7 @@ export default async function PerformanceDashboardPage() {
                 {hands.length > 6 ? (
                   <Link
                     href="/app/performance/campaigns"
-                    className="text-muted-foreground text-[11.5px] hover:underline"
+                    className="text-[11.5px] text-muted-foreground hover:underline"
                   >
                     {hands.length - 6} more on Campaigns
                   </Link>
@@ -349,8 +349,8 @@ function Figure({
   );
   const frame = cn(
     "block rounded-2xl border p-4 text-left",
-    tone === "amber" ? "bg-card border-amber-500/35" : "bg-card",
-    href && "hover:border-foreground/25 transition-colors",
+    tone === "amber" ? "border-amber-500/35 bg-card" : "bg-card",
+    href && "transition-colors hover:border-foreground/25",
   );
   return href ? (
     <Link href={href} className={frame}>

@@ -69,7 +69,10 @@ export async function GET(
       !build.previewUrl ||
       !["GENERATING", "READY"].includes(build.status ?? "")
     ) {
-      return NextResponse.json({ error: "not_found" }, { status: 404, headers });
+      return NextResponse.json(
+        { error: "not_found" },
+        { status: 404, headers },
+      );
     }
     return NextResponse.json(
       {
@@ -122,7 +125,10 @@ export async function GET(
       extractedProperties: build?.extractedProperties ?? [],
       // Null when PREGEN_PREVIEW_HOST_ZONE is unset; consumers fall back to
       // their own derivation (native labels are cosmetic, the token decides).
-      previewUrl: pregenPreviewUrl({ domain: prospect.domain, previewToken: token }),
+      previewUrl: pregenPreviewUrl({
+        domain: prospect.domain,
+        previewToken: token,
+      }),
     },
     { headers },
   );

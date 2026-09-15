@@ -98,7 +98,9 @@ export function DraftFromHomesButton({
     });
 
   const showRun = draft.isPending || live?.status === "running";
-  const pickedUrls = homes.filter((home) => selection.has(home.url)).map((home) => home.url);
+  const pickedUrls = homes
+    .filter((home) => selection.has(home.url))
+    .map((home) => home.url);
 
   return (
     <>
@@ -118,26 +120,27 @@ export function DraftFromHomesButton({
             <DialogTitle>Ads from their homes</DialogTitle>
             <DialogDescription>
               One card per home from its hero photo, judged by the art director,
-              then one static ad and one carousel. Drafts only; nothing reaches a
-              platform until you push.
+              then one static ad and one carousel. Drafts only; nothing reaches
+              a platform until you push.
             </DialogDescription>
           </DialogHeader>
 
           {showRun && live ? (
             <RunProgress run={live} />
           ) : samples.isLoading ? (
-            <div className="text-muted-foreground flex h-40 items-center justify-center gap-2 text-xs">
+            <div className="flex h-40 items-center justify-center gap-2 text-xs text-muted-foreground">
               <Loader2 className="size-4 animate-spin" />
               Reading their listings
             </div>
           ) : samples.error ? (
             <p className="text-xs text-red-300">{samples.error.message}</p>
           ) : !samples.data?.hasSite ? (
-            <p className="text-muted-foreground text-sm">
-              This brand has no website on record, so there are no homes to read.
+            <p className="text-sm text-muted-foreground">
+              This brand has no website on record, so there are no homes to
+              read.
             </p>
           ) : homes.length === 0 ? (
-            <p className="text-muted-foreground text-sm">
+            <p className="text-sm text-muted-foreground">
               No listings with photos on their site. Check the website is a
               WanderOS site.
             </p>
@@ -146,7 +149,9 @@ export function DraftFromHomesButton({
               <div className="grid max-h-[50vh] grid-cols-3 gap-2 overflow-y-auto pr-1 sm:grid-cols-4">
                 {homes.map((home) => {
                   const on = selection.has(home.url);
-                  const previous = lastRun?.steps.find((step) => step.url === home.url);
+                  const previous = lastRun?.steps.find(
+                    (step) => step.url === home.url,
+                  );
                   return (
                     <button
                       key={home.id}
@@ -155,11 +160,13 @@ export function DraftFromHomesButton({
                       aria-pressed={on}
                       className={cn(
                         "group relative overflow-hidden rounded-lg border text-left transition",
-                        on ? "ring-primary ring-2" : "opacity-80 hover:opacity-100",
+                        on
+                          ? "ring-2 ring-primary"
+                          : "opacity-80 hover:opacity-100",
                       )}
                       title={home.name}
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      {/* oxlint-disable-next-line nextjs/no-img-element */}
                       <img
                         src={home.thumbUrl}
                         alt={home.name}
@@ -167,13 +174,15 @@ export function DraftFromHomesButton({
                         loading="lazy"
                       />
                       <div className="space-y-0.5 p-2">
-                        <div className="truncate text-xs font-medium">{home.name}</div>
-                        <div className="text-muted-foreground truncate text-[11px]">
+                        <div className="truncate text-xs font-medium">
+                          {home.name}
+                        </div>
+                        <div className="truncate text-[11px] text-muted-foreground">
                           {previous?.assetId ? "Has a card" : home.place}
                         </div>
                       </div>
                       {on ? (
-                        <span className="bg-primary text-primary-foreground absolute top-1.5 right-1.5 flex size-5 items-center justify-center rounded-full">
+                        <span className="absolute top-1.5 right-1.5 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
                           <Check className="size-3" />
                         </span>
                       ) : null}
@@ -183,7 +192,7 @@ export function DraftFromHomesButton({
               </div>
               {lastRun && lastRun.status !== "running" ? (
                 <details className="text-xs">
-                  <summary className="text-muted-foreground cursor-pointer">
+                  <summary className="cursor-pointer text-muted-foreground">
                     Last run · {new Date(lastRun.startedAt).toLocaleString()} ·{" "}
                     {lastRun.steps.filter((step) => step.assetId).length} cards
                   </summary>
@@ -196,24 +205,31 @@ export function DraftFromHomesButton({
           )}
 
           <DialogFooter className="flex items-center justify-between gap-2 sm:justify-between">
-            <span className="text-muted-foreground text-xs">
+            <span className="text-xs text-muted-foreground">
               {showRun
                 ? "Rendering. You can close this; the run keeps going."
                 : `${selection.size} of ${homes.length} homes · up to 10`}
             </span>
             <div className="flex items-center gap-2">
               {showRun ? (
-                <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setOpen(false)}
+                >
                   Close
                 </Button>
               ) : (
                 <Button
                   size="sm"
                   disabled={pickedUrls.length === 0 || draft.isPending}
-                  onClick={() => draft.mutate({ campaignId, listingUrls: pickedUrls })}
+                  onClick={() =>
+                    draft.mutate({ campaignId, listingUrls: pickedUrls })
+                  }
                 >
                   <Sparkles className="size-3.5" />
-                  Draft {pickedUrls.length} card{pickedUrls.length === 1 ? "" : "s"}
+                  Draft {pickedUrls.length} card
+                  {pickedUrls.length === 1 ? "" : "s"}
                 </Button>
               )}
             </div>
@@ -239,15 +255,21 @@ function RunProgress({ run }: { run: HomesRun }) {
       <ul className="divide-y rounded-lg border">
         {run.steps.map((step) => (
           <li key={step.url} className="flex items-start gap-3 px-3 py-2">
-            <div className="bg-muted size-12 shrink-0 overflow-hidden rounded-md">
+            <div className="size-12 shrink-0 overflow-hidden rounded-md bg-muted">
               {step.cardUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={step.cardUrl} alt="" className="size-full object-cover" />
+                // oxlint-disable-next-line nextjs/no-img-element
+                <img
+                  src={step.cardUrl}
+                  alt=""
+                  className="size-full object-cover"
+                />
               ) : null}
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className="truncate text-sm font-medium">{step.name}</span>
+                <span className="truncate text-sm font-medium">
+                  {step.name}
+                </span>
                 <span
                   className={cn(
                     "rounded-full px-1.5 py-0.5 text-[10px] font-medium",
@@ -271,11 +293,13 @@ function RunProgress({ run }: { run: HomesRun }) {
                 </span>
               </div>
               {step.changes && step.changes.length > 0 ? (
-                <p className="text-muted-foreground mt-0.5 text-xs">
+                <p className="mt-0.5 text-xs text-muted-foreground">
                   Art director: {step.changes.join("; ")}.
                 </p>
               ) : step.note ? (
-                <p className="text-muted-foreground mt-0.5 text-xs">{step.note}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {step.note}
+                </p>
               ) : null}
             </div>
           </li>
@@ -283,16 +307,19 @@ function RunProgress({ run }: { run: HomesRun }) {
       </ul>
       {run.error ? <p className="text-xs text-red-300">{run.error}</p> : null}
       {run.status !== "running" && run.notes.length > 0 ? (
-        <ul className="text-muted-foreground space-y-0.5 text-[11px]">
+        <ul className="space-y-0.5 text-[11px] text-muted-foreground">
           {run.notes
-            .filter((note) => !run.steps.some((step) => note.startsWith(`${step.name}:`)))
+            .filter(
+              (note) =>
+                !run.steps.some((step) => note.startsWith(`${step.name}:`)),
+            )
             .map((note) => (
               <li key={note}>{note}</li>
             ))}
         </ul>
       ) : null}
       {run.status === "running" ? (
-        <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
+        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Home className="size-3.5" />
           Each card is an import, a render and a look from the art director. A
           minute or two for six homes.

@@ -21,7 +21,11 @@ import type { AdPreviewCard } from "@/server/services/brand-ad-previews.service"
 import { useTRPC } from "@/trpc/react";
 
 import { OnDemandTile } from "./OnDemandTile";
-import { type PickerHome, type PickerImage, PreviewSourcePicker } from "./PreviewSourcePicker";
+import {
+  type PickerHome,
+  type PickerImage,
+  PreviewSourcePicker,
+} from "./PreviewSourcePicker";
 
 /**
  * One home drawn on the two ad families straight from the listing feed, in a
@@ -42,14 +46,12 @@ export type OnDemandPreview = {
 };
 
 /** The canvas each placement's on-demand card is drawn on. */
-const SURFACE_FORMAT: Record<AdMockSurface, "landscape" | "square" | "story"> = {
-  facebook: "landscape",
-  instagram: "square",
-  story: "story",
-};
-
-
-
+const SURFACE_FORMAT: Record<AdMockSurface, "landscape" | "square" | "story"> =
+  {
+    facebook: "landscape",
+    instagram: "square",
+    story: "story",
+  };
 
 // The section's label and panel match `_components.tsx`, which cannot be
 // imported here: it reads the desk service, and this is a client component.
@@ -57,7 +59,7 @@ const panel = "bg-card overflow-hidden rounded-2xl border";
 const pill = "rounded-full";
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-muted-foreground text-[10.5px] font-semibold tracking-[0.09em] uppercase">
+    <p className="text-[10.5px] font-semibold tracking-[0.09em] text-muted-foreground uppercase">
       {children}
     </p>
   );
@@ -92,7 +94,11 @@ export function AdPreviewsSection({
   picker?: {
     homes: PickerHome[];
     images: PickerImage[];
-    current: { sourceUrl: string | null; label: string; thumbUrl: string | null };
+    current: {
+      sourceUrl: string | null;
+      label: string;
+      thumbUrl: string | null;
+    };
   };
 }) {
   const [surface, setSurface] = useState<AdMockSurface>("facebook");
@@ -101,7 +107,10 @@ export function AdPreviewsSection({
   // The Studio works from a library copy of the photo, so opening an
   // on-demand card imports its hero first (or finds the earlier import).
   const drawn = onDemand ?? null;
-  const specFor = (row: "awareness" | "listing", surface: AdMockSurface): PreviewSpec | null => {
+  const specFor = (
+    row: "awareness" | "listing",
+    surface: AdMockSurface,
+  ): PreviewSpec | null => {
     if (!drawn) return null;
     const base = {
       brandId,
@@ -109,7 +118,12 @@ export function AdPreviewsSection({
       source: { url: drawn.sourceUrl },
     };
     return row === "awareness"
-      ? { ...base, templateId: "hero-overlay", title: drawn.headline, cta: drawn.cta }
+      ? {
+          ...base,
+          templateId: "hero-overlay",
+          title: drawn.headline,
+          cta: drawn.cta,
+        }
       : {
           ...base,
           templateId: "catalog-place",
@@ -135,7 +149,8 @@ export function AdPreviewsSection({
     <Button
       size="sm"
       variant="outline"
-      className="h-7 rounded-full px-3 text-[11.5px]"
+      shape="round"
+      density="editorial"
       onClick={() =>
         sendAssistantIntent({
           type: "design_ad_preview",
@@ -177,7 +192,7 @@ export function AdPreviewsSection({
                     pill,
                     "px-2.5 py-0.5 text-[11px] transition-colors",
                     surface === option.id
-                      ? "bg-foreground text-background font-medium"
+                      ? "bg-foreground font-medium text-background"
                       : "text-muted-foreground hover:text-foreground",
                   )}
                 >
@@ -212,7 +227,7 @@ export function AdPreviewsSection({
                   surface === "story" ? "w-full max-w-60" : "w-full max-w-80"
                 }
               />
-              <div className="text-muted-foreground flex w-full max-w-80 items-center justify-between gap-2 text-[11px]">
+              <div className="flex w-full max-w-80 items-center justify-between gap-2 text-[11px] text-muted-foreground">
                 <span className="truncate">
                   {card.templateLabel} · {card.formatLabel}
                   {card.judged ? " · judged" : ""}
@@ -230,7 +245,7 @@ export function AdPreviewsSection({
                       remove.mutate({ id: brandId, assetId: card.assetId })
                     }
                     disabled={remove.isPending}
-                    className="hover:text-foreground inline-flex items-center gap-0.5 disabled:opacity-50"
+                    className="inline-flex items-center gap-0.5 hover:text-foreground disabled:opacity-50"
                     aria-label="Remove from the previews"
                     title="Remove from the previews. The card stays in the library."
                   >
@@ -246,7 +261,9 @@ export function AdPreviewsSection({
       {drawn ? (
         <div className="space-y-4">
           {cards.length > 0 ? (
-            <p className="text-muted-foreground text-[11px]">Drawn from {drawn.homeName}, not kept</p>
+            <p className="text-[11px] text-muted-foreground">
+              Drawn from {drawn.homeName}, not kept
+            </p>
           ) : null}
           {/* The two families in the placement the toggle is on, rather than
               every family in every placement: six mocks of one home was a wall,
@@ -261,7 +278,7 @@ export function AdPreviewsSection({
               const spec = specFor(group.row, surface);
               return spec ? (
                 <div key={group.row} className="space-y-2">
-                  <p className="text-muted-foreground text-[11px]">
+                  <p className="text-[11px] text-muted-foreground">
                     {group.label}
                   </p>
                   <ul className="flex">
@@ -272,7 +289,11 @@ export function AdPreviewsSection({
                       brandLogo={brandLogo}
                       surface={surface}
                       spec={spec}
-                      home={{ name: drawn.homeName, url: drawn.homeUrl, imageUrl: drawn.imageUrl }}
+                      home={{
+                        name: drawn.homeName,
+                        url: drawn.homeUrl,
+                        imageUrl: drawn.imageUrl,
+                      }}
                     />
                   </ul>
                 </div>
@@ -280,11 +301,12 @@ export function AdPreviewsSection({
             })}
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-muted-foreground text-[11px]">
+            <p className="text-[11px] text-muted-foreground">
               {drawn.picked
                 ? `${drawn.homeName}, the featured home, drawn as it would run in each placement.`
                 : `${drawn.homeName}, the first home on their site. Feature a home below to draw that one instead.`}{" "}
-              Direct asks the art director to judge and adjust a card; Keep freezes it into the previews.
+              Direct asks the art director to judge and adjust a card; Keep
+              freezes it into the previews.
             </p>
             {cards.length === 0 ? designInChat : null}
           </div>

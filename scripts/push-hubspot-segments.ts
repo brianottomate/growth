@@ -80,7 +80,9 @@ async function main() {
   for (const seg of SEGMENTS) {
     const rows = await db.execute(seg.query);
     const ids = rows.rows
-      .map((r) => String((r as { hubspot_record_id: string }).hubspot_record_id))
+      .map((r) =>
+        String((r as { hubspot_record_id: string }).hubspot_record_id),
+      )
       .filter(Boolean);
     console.log(`\n▸ ${seg.name}: ${ids.length} companies`);
     if (DRY) continue;

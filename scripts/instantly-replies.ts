@@ -21,14 +21,27 @@ console.log(`Unread in Unibox: ${unread?.count ?? "(n/a)"}\n`);
 
 const replies = platformCampaignId
   ? await getCampaignReplies(platformCampaignId)
-  : (await listEmails({ email_type: "received", preview_only: false, limit: 20 })).items;
+  : (
+      await listEmails({
+        email_type: "received",
+        preview_only: false,
+        limit: 20,
+      })
+    ).items;
 
-console.log(`${replies.length} received email(s)${platformCampaignId ? ` for campaign ${platformCampaignId}` : " (workspace-wide, latest 20)"}:\n`);
+console.log(
+  `${replies.length} received email(s)${platformCampaignId ? ` for campaign ${platformCampaignId}` : " (workspace-wide, latest 20)"}:\n`,
+);
 
 for (const e of replies) {
   const when = e.timestamp_created?.slice(0, 16).replace("T", " ");
-  const snippet = (e.body?.text ?? "").replace(/\s+/g, " ").trim().slice(0, 160);
-  console.log(`• ${when} | from ${e.from_address_email ?? e.lead ?? "?"} → ${e.eaccount ?? "?"}`);
+  const snippet = (e.body?.text ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 160);
+  console.log(
+    `• ${when} | from ${e.from_address_email ?? e.lead ?? "?"} → ${e.eaccount ?? "?"}`,
+  );
   console.log(`  subj: ${e.subject ?? "(none)"}`);
   if (snippet) console.log(`  ${snippet}${snippet.length >= 160 ? "…" : ""}`);
 }

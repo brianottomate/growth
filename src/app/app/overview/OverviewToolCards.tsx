@@ -328,12 +328,12 @@ export function ProductionPacketCard({
         <div>
           <p className="text-sm font-medium">{output.title}</p>
           {output.purpose && (
-            <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
               {output.purpose}
             </p>
           )}
         </div>
-        <div className="bg-muted/40 max-h-40 overflow-y-auto rounded-md border p-2.5 text-xs whitespace-pre-wrap">
+        <div className="max-h-40 overflow-y-auto rounded-md border bg-muted/40 p-2.5 text-xs whitespace-pre-wrap">
           {output.prompt}
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -375,7 +375,7 @@ export function ProductionPacketCard({
           </Button>
         </div>
         {canStartNewRun && (
-          <p className="text-muted-foreground text-[10px]">
+          <p className="text-[10px] text-muted-foreground">
             {
               CREATIVE_IMAGE_MODELS.find((model) => model.id === modelProfile)
                 ?.description
@@ -383,13 +383,13 @@ export function ProductionPacketCard({
           </p>
         )}
         {!configuration.isLoading && !selectedModelConfigured && (
-          <p className="text-muted-foreground text-[10px]">
+          <p className="text-[10px] text-muted-foreground">
             This model is not configured here. The packet is still ready for
             Claude, ChatGPT, or another production tool.
           </p>
         )}
         {activeRun && ["queued", "processing"].includes(activeRun.status) && (
-          <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <ThinkingOrb
               state="composing"
               size={20}
@@ -400,18 +400,18 @@ export function ProductionPacketCard({
           </p>
         )}
         {activeRun?.status === "error" && (
-          <p className="text-destructive text-xs">{activeRun.error}</p>
+          <p className="text-xs text-destructive">{activeRun.error}</p>
         )}
         {candidate && (
           <div className="overflow-hidden rounded-lg border">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {/* oxlint-disable-next-line nextjs/no-img-element */}
             <img
               src={candidate.url}
               alt="Fal image candidate"
               className="max-h-80 w-full object-cover"
             />
             <div className="flex items-center justify-between gap-2 p-2.5">
-              <p className="text-muted-foreground text-[10px]">
+              <p className="text-[10px] text-muted-foreground">
                 Preview only until accepted
               </p>
               <Button
@@ -457,12 +457,12 @@ export function MediaSuggestionsCard({
     .slice(0, 3);
 
   return (
-    <div className="bg-card overflow-hidden rounded-xl border">
+    <div className="overflow-hidden rounded-xl border bg-card">
       <div className="flex items-center gap-2 border-b px-3.5 py-2.5">
-        <Sparkles className="text-primary size-3.5" />
+        <Sparkles className="size-3.5 text-primary" />
         <div>
           <p className="text-xs font-semibold">Media candidates</p>
-          <p className="text-muted-foreground text-[10px]">
+          <p className="text-[10px] text-muted-foreground">
             Library now · archive recovery · generate if needed
           </p>
         </div>
@@ -470,25 +470,25 @@ export function MediaSuggestionsCard({
 
       {library.length > 0 && (
         <div className="border-b p-3">
-          <div className="text-muted-foreground mb-2 flex items-center gap-1.5 text-[10px] font-semibold tracking-wide uppercase">
+          <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
             <ImageIcon className="size-3" /> Ready in library
           </div>
           <div className="grid grid-cols-3 gap-2">
             {library.map((asset) => (
               <div
                 key={asset.mediaAssetId}
-                className="bg-background overflow-hidden rounded-lg border"
+                className="overflow-hidden rounded-lg border bg-background"
               >
-                <div className="bg-muted aspect-[4/3] overflow-hidden">
+                <div className="aspect-[4/3] overflow-hidden bg-muted">
                   {(asset.thumbnailUrl ?? asset.url) ? (
-                    // eslint-disable-next-line @next/next/no-img-element
+                    // oxlint-disable-next-line nextjs/no-img-element
                     <img
                       src={asset.thumbnailUrl ?? asset.url ?? undefined}
                       alt={asset.alt ?? asset.title ?? "Library candidate"}
                       className="size-full object-cover"
                     />
                   ) : (
-                    <div className="text-muted-foreground grid size-full place-items-center">
+                    <div className="grid size-full place-items-center text-muted-foreground">
                       <ImageIcon className="size-5" />
                     </div>
                   )}
@@ -505,7 +505,7 @@ export function MediaSuggestionsCard({
                         `Attach the library asset “${asset.title ?? asset.alt ?? asset.mediaAssetId}” (${asset.mediaAssetId}) to this content pool.`,
                       )
                     }
-                    className="text-primary disabled:text-muted-foreground mt-1 text-[10px] font-medium hover:underline disabled:no-underline"
+                    className="mt-1 text-[10px] font-medium text-primary hover:underline disabled:text-muted-foreground disabled:no-underline"
                   >
                     {asset.alreadyAttached ? "Already attached" : "Use this"}
                   </button>
@@ -518,23 +518,23 @@ export function MediaSuggestionsCard({
 
       {archive.length > 0 && (
         <div className="p-3">
-          <div className="text-muted-foreground mb-2 flex items-center gap-1.5 text-[10px] font-semibold tracking-wide uppercase">
+          <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
             <ArchiveRestore className="size-3" /> Found in archive
           </div>
           <div className="space-y-2">
             {archive.map((candidate) => (
               <div
                 key={`${candidate.platformPostId}-${candidate.media.mediaIndex}`}
-                className="bg-background flex items-start gap-2 rounded-lg border p-2"
+                className="flex items-start gap-2 rounded-lg border bg-background p-2"
               >
-                <div className="bg-muted text-muted-foreground grid size-9 shrink-0 place-items-center rounded-md">
+                <div className="grid size-9 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground">
                   <ArchiveRestore className="size-4" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[11px] font-medium">
                     {candidate.text ?? "Archived post media"}
                   </p>
-                  <p className="text-muted-foreground text-[10px]">
+                  <p className="text-[10px] text-muted-foreground">
                     {candidate.platform} · {candidate.media.type}
                     {candidate.publishedAt
                       ? ` · ${fmtDate(candidate.publishedAt)}`
@@ -548,7 +548,7 @@ export function MediaSuggestionsCard({
                       `Recover media ${candidate.media.mediaIndex + 1} from the archived ${candidate.platform} post ${candidate.platformPostId} and attach it to this content pool.`,
                     )
                   }
-                  className="text-primary shrink-0 text-[10px] font-medium hover:underline"
+                  className="shrink-0 text-[10px] font-medium text-primary hover:underline"
                 >
                   Recover
                 </button>
@@ -559,7 +559,7 @@ export function MediaSuggestionsCard({
       )}
 
       {output.libraryAssetsWithoutSemanticMetadata > 0 && (
-        <p className="text-muted-foreground border-t px-3 py-2 text-[10px]">
+        <p className="border-t px-3 py-2 text-[10px] text-muted-foreground">
           {output.libraryAssetsWithoutSemanticMetadata} more library asset
           {output.libraryAssetsWithoutSemanticMetadata === 1 ? "" : "s"} need
           analysis before Growth can recommend them confidently.
@@ -731,7 +731,7 @@ export function ToolCallPending({
   state?: OrbState;
 }) {
   return (
-    <div className="text-muted-foreground flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-xs">
+    <div className="flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">
       <ThinkingOrb state={state} size={20} aria-label={label} />
       {label}
     </div>
@@ -753,21 +753,21 @@ function ToolCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-card text-card-foreground overflow-hidden rounded-lg border">
+    <div className="overflow-hidden rounded-lg border bg-card text-card-foreground">
       <div className="flex items-center justify-between gap-2 border-b px-3.5 py-2.5">
         <div className="flex items-center gap-2">
-          <span className="bg-primary/10 text-primary grid size-6 shrink-0 place-items-center rounded-md">
+          <span className="grid size-6 shrink-0 place-items-center rounded-md bg-primary/10 text-primary">
             <Icon className="h-3.5 w-3.5" />
           </span>
           <span className="text-sm font-medium">{title}</span>
           {hint && (
-            <span className="text-muted-foreground text-xs">{hint}</span>
+            <span className="text-xs text-muted-foreground">{hint}</span>
           )}
         </div>
         {href && (
           <Link
             href={href}
-            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5 text-xs"
+            className="inline-flex items-center gap-0.5 text-xs text-muted-foreground hover:text-foreground"
           >
             View
             <ArrowUpRight className="h-3 w-3" />
@@ -795,7 +795,7 @@ function Stat({
 }) {
   const body = (
     <>
-      <p className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
+      <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
         {label}
       </p>
       <p className="mt-0.5 text-xl font-semibold tabular-nums">{value}</p>
@@ -815,7 +815,7 @@ function Stat({
   );
   const className = cn(
     "rounded-lg border px-3 py-2.5",
-    href && "hover:border-foreground/20 hover:bg-muted/40 transition-colors",
+    href && "transition-colors hover:border-foreground/20 hover:bg-muted/40",
   );
   return href ? (
     <Link href={href} className={cn(className, "block")}>
@@ -972,7 +972,7 @@ export function BrandsCard({ output }: { output: ListBrandsOutput }) {
       hint={`${brands.length}`}
     >
       {brands.length === 0 ? (
-        <p className="text-muted-foreground text-sm">No brands yet.</p>
+        <p className="text-sm text-muted-foreground">No brands yet.</p>
       ) : (
         <ul className="divide-y">
           {brands.map((b) => (
@@ -982,7 +982,7 @@ export function BrandsCard({ output }: { output: ListBrandsOutput }) {
             >
               <span className="text-sm font-medium">{b.name}</span>
               {b.tagline && (
-                <span className="text-muted-foreground truncate text-xs">
+                <span className="truncate text-xs text-muted-foreground">
                   {b.tagline}
                 </span>
               )}
@@ -1009,9 +1009,9 @@ export function AudienceTargetsCard({
       hint={`${targets.length} target${targets.length === 1 ? "" : "s"}`}
     >
       {output.error ? (
-        <p className="text-destructive text-sm">{output.error}</p>
+        <p className="text-sm text-destructive">{output.error}</p>
       ) : targets.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
+        <p className="text-sm text-muted-foreground">
           No strategic audience targets yet.
         </p>
       ) : (
@@ -1036,7 +1036,7 @@ export function AudienceTargetsCard({
                   {target.coverage}
                 </span>
               </div>
-              <p className="text-muted-foreground mt-0.5 text-xs">
+              <p className="mt-0.5 text-xs text-muted-foreground">
                 {[
                   target.brandName,
                   target.profileScope?.replaceAll("_", " "),
@@ -1046,7 +1046,7 @@ export function AudienceTargetsCard({
                   .filter(Boolean)
                   .join(" · ")}
               </p>
-              <p className="text-muted-foreground mt-0.5 text-[11px]">
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
                 {target.geography == null
                   ? "Geography not established"
                   : target.geography.mode === "global"
@@ -1059,12 +1059,12 @@ export function AudienceTargetsCard({
                   : ""}
               </p>
               {target.description && (
-                <p className="text-muted-foreground mt-1 line-clamp-2 text-xs">
+                <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
                   {target.description}
                 </p>
               )}
               {(target.intendedChannels?.length ?? 0) > 0 && (
-                <p className="text-muted-foreground mt-1 text-[11px]">
+                <p className="mt-1 text-[11px] text-muted-foreground">
                   Intended: {target.intendedChannels!.join(", ")}
                   {target.missingChannels.length > 0 &&
                     ` · Missing: ${target.missingChannels.join(", ")}`}
@@ -1075,7 +1075,7 @@ export function AudienceTargetsCard({
         </ul>
       )}
       {unmappedPlatformAudiences.length > 0 && (
-        <p className="text-muted-foreground mt-2 border-t pt-2 text-xs">
+        <p className="mt-2 border-t pt-2 text-xs text-muted-foreground">
           {unmappedPlatformAudiences.length} platform audience
           {unmappedPlatformAudiences.length === 1 ? " is" : "s are"} not linked
           to a target.
@@ -1096,9 +1096,9 @@ export function WebSearchCard({ output }: { output: WebSearchOutput }) {
     >
       <p className="mb-2 text-sm font-medium">{output.query}</p>
       {output.error ? (
-        <p className="text-destructive text-sm">{output.error}</p>
+        <p className="text-sm text-destructive">{output.error}</p>
       ) : results.length === 0 ? (
-        <p className="text-muted-foreground text-sm">No sources found.</p>
+        <p className="text-sm text-muted-foreground">No sources found.</p>
       ) : (
         <ul className="divide-y">
           {results.map((result) => (
@@ -1107,20 +1107,20 @@ export function WebSearchCard({ output }: { output: WebSearchOutput }) {
                 href={result.url}
                 target="_blank"
                 rel="noreferrer"
-                className="hover:text-primary flex items-start gap-1 text-sm font-medium"
+                className="flex items-start gap-1 text-sm font-medium hover:text-primary"
               >
                 <span className="line-clamp-2">{result.title}</span>
                 <ArrowUpRight className="mt-0.5 h-3 w-3 shrink-0" />
               </a>
               {(result.author || result.publishedDate) && (
-                <p className="text-muted-foreground mt-0.5 text-[11px]">
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
                   {[result.author, result.publishedDate?.slice(0, 10)]
                     .filter(Boolean)
                     .join(" · ")}
                 </p>
               )}
               {result.highlights[0] && (
-                <p className="text-muted-foreground mt-1 line-clamp-3 text-xs">
+                <p className="mt-1 line-clamp-3 text-xs text-muted-foreground">
                   {result.highlights[0]}
                 </p>
               )}
@@ -1137,20 +1137,20 @@ export function ReadWebPageCard({ output }: { output: ReadWebPageOutput }) {
   return (
     <ToolCard icon={Globe2} title="Page read" hint={output.provider}>
       {output.error ? (
-        <p className="text-destructive text-sm">{output.error}</p>
+        <p className="text-sm text-destructive">{output.error}</p>
       ) : (
         <>
           <a
             href={output.url}
             target="_blank"
             rel="noreferrer"
-            className="hover:text-primary inline-flex items-start gap-1 text-sm font-medium"
+            className="inline-flex items-start gap-1 text-sm font-medium hover:text-primary"
           >
             <span className="line-clamp-2">{output.title ?? output.url}</span>
             <ArrowUpRight className="mt-0.5 h-3 w-3 shrink-0" />
           </a>
           {output.text && (
-            <p className="text-muted-foreground mt-1.5 line-clamp-4 text-xs">
+            <p className="mt-1.5 line-clamp-4 text-xs text-muted-foreground">
               {output.text}
             </p>
           )}
@@ -1176,12 +1176,12 @@ export function ContentPipelineCard({
       hint={`${fmtNum(total)} ideas · ${fmtNum(standaloneTotal)} native drafts`}
     >
       {total === 0 && standaloneTotal === 0 ? (
-        <p className="text-muted-foreground text-sm">Pipeline is empty.</p>
+        <p className="text-sm text-muted-foreground">Pipeline is empty.</p>
       ) : (
         <>
           {total > 0 && (
             <>
-              <div className="bg-muted flex h-2 w-full overflow-hidden rounded-full">
+              <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted">
                 {sorted.map((s) => (
                   <div
                     key={s.status}
@@ -1213,7 +1213,7 @@ export function ContentPipelineCard({
             </>
           )}
           {standaloneTotal > 0 && (
-            <p className="text-muted-foreground mt-3 text-xs">
+            <p className="mt-3 text-xs text-muted-foreground">
               {standaloneTotal} platform-first draft
               {standaloneTotal === 1 ? "" : "s"} are still intentionally
               ungrouped.
@@ -1242,7 +1242,7 @@ export function ContentStrategyCard({
     >
       <div className="space-y-3">
         <div>
-          <p className="text-muted-foreground mb-1.5 text-[10px] font-medium tracking-wide uppercase">
+          <p className="mb-1.5 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
             Pillars
           </p>
           {output.pillars.length ? (
@@ -1250,7 +1250,7 @@ export function ContentStrategyCard({
               {output.pillars.map((pillar) => (
                 <span
                   key={pillar.slug}
-                  className="bg-muted/50 inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[11px]"
+                  className="inline-flex items-center gap-1.5 rounded-full border bg-muted/50 px-2 py-1 text-[11px]"
                   title={pillar.description}
                 >
                   <span
@@ -1266,14 +1266,14 @@ export function ContentStrategyCard({
               ))}
             </div>
           ) : (
-            <p className="text-muted-foreground text-xs">
+            <p className="text-xs text-muted-foreground">
               No pillars defined yet.
             </p>
           )}
         </div>
 
         <div className="border-t pt-2.5">
-          <p className="text-muted-foreground mb-1.5 text-[10px] font-medium tracking-wide uppercase">
+          <p className="mb-1.5 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
             Series
           </p>
           {output.series.length ? (
@@ -1284,7 +1284,7 @@ export function ContentStrategyCard({
                     {series.name}
                   </span>
                   {series.pillarSlug && (
-                    <span className="text-muted-foreground max-w-32 truncate">
+                    <span className="max-w-32 truncate text-muted-foreground">
                       {series.pillarSlug}
                     </span>
                   )}
@@ -1296,7 +1296,7 @@ export function ContentStrategyCard({
               ))}
             </ul>
           ) : (
-            <p className="text-muted-foreground text-xs">
+            <p className="text-xs text-muted-foreground">
               No series defined yet.
             </p>
           )}
@@ -1326,7 +1326,7 @@ export function ContentStructureMutationCard({
   output: ContentStructureMutationOutput;
 }) {
   if (output.error) {
-    return <p className="text-destructive text-xs">{output.error}</p>;
+    return <p className="text-xs text-destructive">{output.error}</p>;
   }
   const label =
     output.change === "pillar"
@@ -1358,7 +1358,7 @@ export function ContentStructureMutationCard({
       </div>
       {title && <p className="mt-1 text-sm font-medium">{title}</p>}
       {(output.pillarSlug || affected != null) && (
-        <p className="text-muted-foreground mt-0.5 text-xs">
+        <p className="mt-0.5 text-xs text-muted-foreground">
           {[
             output.pillarSlug ? `Pillar: ${output.pillarSlug}` : null,
             affected != null
@@ -1372,7 +1372,7 @@ export function ContentStructureMutationCard({
       {output.url && (
         <Link
           href={output.url}
-          className="text-primary mt-2 inline-flex items-center gap-1 text-xs font-medium hover:underline"
+          className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
         >
           Inspect structure
           <ArrowUpRight className="size-3" />
@@ -1407,7 +1407,7 @@ export function UpcomingContentCard({
       hint={`${rows.length}`}
     >
       {rows.length === 0 ? (
-        <p className="text-muted-foreground text-sm">Nothing planned ahead.</p>
+        <p className="text-sm text-muted-foreground">Nothing planned ahead.</p>
       ) : (
         <ul className="divide-y">
           {rows.map((p) => (
@@ -1415,7 +1415,7 @@ export function UpcomingContentCard({
               key={p.id}
               className="flex items-center gap-3 py-2 first:pt-0 last:pb-0"
             >
-              <span className="text-muted-foreground w-12 shrink-0 text-xs tabular-nums">
+              <span className="w-12 shrink-0 text-xs text-muted-foreground tabular-nums">
                 {fmtDate(p.at)}
               </span>
               <span className="min-w-0 flex-1 truncate text-sm">
@@ -1423,12 +1423,12 @@ export function UpcomingContentCard({
                   <span className="text-muted-foreground italic">Untitled</span>
                 )}
                 {p.pillar && (
-                  <span className="text-muted-foreground ml-1.5 text-xs">
+                  <span className="ml-1.5 text-xs text-muted-foreground">
                     · {p.pillar}
                   </span>
                 )}
                 {p.platform && (
-                  <span className="text-muted-foreground ml-1.5 text-xs">
+                  <span className="ml-1.5 text-xs text-muted-foreground">
                     · {p.platform}
                   </span>
                 )}
@@ -1453,7 +1453,7 @@ function ProductionQueueRows({
 
   if (visible.length === 0) {
     return (
-      <p className="text-muted-foreground text-sm">
+      <p className="text-sm text-muted-foreground">
         No canonical content items are planned in this window.
       </p>
     );
@@ -1467,19 +1467,19 @@ function ProductionQueueRows({
           return (
             <li key={item.id} className="py-2.5 first:pt-0 last:pb-0">
               <div className="flex items-start gap-3">
-                <span className="text-muted-foreground w-12 shrink-0 pt-0.5 text-xs tabular-nums">
+                <span className="w-12 shrink-0 pt-0.5 text-xs text-muted-foreground tabular-nums">
                   {fmtDate(item.plannedAt)}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{title}</p>
-                  <p className="text-muted-foreground mt-0.5 text-xs">
+                  <p className="mt-0.5 text-xs text-muted-foreground">
                     {item.completed}/{item.total} steps complete
                     {item.next
                       ? ` · Next: ${item.next.detail}`
                       : " · Ready for review"}
                   </p>
                   {item.platforms.length > 0 && (
-                    <p className="text-muted-foreground mt-0.5 truncate text-[11px]">
+                    <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
                       {[...new Set(item.platforms)].join(" · ")}
                     </p>
                   )}
@@ -1488,7 +1488,7 @@ function ProductionQueueRows({
               <div className="mt-2 flex items-center justify-end gap-2">
                 <Link
                   href={item.url}
-                  className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium"
+                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:text-foreground"
                 >
                   Open
                   <ArrowUpRight className="size-3" />
@@ -1505,7 +1505,7 @@ function ProductionQueueRows({
                       visibleText: `Help me work on “${title}”. Start with the next incomplete production step.`,
                     })
                   }
-                  className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
+                  className="inline-flex items-center gap-1.5 rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                 >
                   <MessageCircle className="size-3" />
                   Work in chat
@@ -1516,7 +1516,7 @@ function ProductionQueueRows({
         })}
       </ul>
       {output.items.length > visible.length && (
-        <p className="text-muted-foreground mt-2 border-t pt-2 text-xs">
+        <p className="mt-2 border-t pt-2 text-xs text-muted-foreground">
           {output.items.length - visible.length} more item
           {output.items.length - visible.length === 1 ? "" : "s"} in the
           look-ahead.
@@ -1561,7 +1561,7 @@ export function NextForBrandCard({
     >
       <p className="text-sm">{output.recommendation}</p>
       {output.readiness.gaps.length > 0 && (
-        <p className="text-muted-foreground mt-1.5 text-xs">
+        <p className="mt-1.5 text-xs text-muted-foreground">
           Planning context still needs: {output.readiness.gaps.join(", ")}.
         </p>
       )}
@@ -1614,7 +1614,7 @@ export function LeadsSummaryCard({ output }: { output: LeadsSummaryOutput }) {
       </div>
       {topPms.length > 0 && (
         <div className="mt-3 border-t pt-3">
-          <p className="text-muted-foreground mb-2 text-[11px] font-medium tracking-wide uppercase">
+          <p className="mb-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
             Top PMS platforms
           </p>
           <div className="space-y-1.5">
@@ -1626,9 +1626,9 @@ export function LeadsSummaryCard({ output }: { output: LeadsSummaryOutput }) {
                 <span className="w-24 shrink-0 truncate">
                   {p.pms ?? "Unknown"}
                 </span>
-                <div className="bg-muted h-1.5 flex-1 overflow-hidden rounded-full">
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
                   <div
-                    className="bg-primary/60 h-full rounded-full"
+                    className="h-full rounded-full bg-primary/60"
                     style={{ width: `${(p.count / pmsMax) * 100}%` }}
                   />
                 </div>
@@ -1655,7 +1655,7 @@ export function MentionsCard({ output }: { output: MentionsOutput }) {
       hint={`${count}`}
     >
       {mentions.length === 0 ? (
-        <p className="text-muted-foreground text-sm">Nothing in the queue.</p>
+        <p className="text-sm text-muted-foreground">Nothing in the queue.</p>
       ) : (
         <ul className="divide-y">
           {mentions.map((m) => {
@@ -1668,7 +1668,7 @@ export function MentionsCard({ output }: { output: MentionsOutput }) {
             const where = m.subreddit ? `r/${m.subreddit}` : m.source;
             const Row = (
               <div className="flex items-start gap-2 py-2 first:pt-0 last:pb-0">
-                <MessageCircle className="text-muted-foreground mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <MessageCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm">
                     {m.title?.trim() || (
@@ -1677,7 +1677,7 @@ export function MentionsCard({ output }: { output: MentionsOutput }) {
                       </span>
                     )}
                   </p>
-                  <p className="text-muted-foreground mt-0.5 flex flex-wrap items-center gap-1.5 text-xs">
+                  <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                     <span className="uppercase">{where}</span>
                     {m.author && <span>· {m.author}</span>}
                     <span>· {fmtDate(m.receivedAt)}</span>
@@ -1710,7 +1710,7 @@ export function MentionsCard({ output }: { output: MentionsOutput }) {
                     href={m.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="hover:bg-muted/40 -mx-1 block rounded px-1"
+                    className="-mx-1 block rounded px-1 hover:bg-muted/40"
                   >
                     {Row}
                   </a>
@@ -1794,13 +1794,13 @@ function BreakdownBars({
       {rows.map((r) => (
         <div key={r.key} className="flex items-center gap-2 text-xs">
           <span className="w-32 shrink-0 truncate">{label(r.key)}</span>
-          <div className="bg-muted h-1.5 flex-1 overflow-hidden rounded-full">
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
             <div
-              className="bg-primary/60 h-full rounded-full"
+              className="h-full rounded-full bg-primary/60"
               style={{ width: `${(r.impressions / max) * 100}%` }}
             />
           </div>
-          <span className="text-muted-foreground w-28 shrink-0 text-right tabular-nums">
+          <span className="w-28 shrink-0 text-right text-muted-foreground tabular-nums">
             {fmtNum(r.impressions)} · {fmtPct(r.ctr)}
           </span>
         </div>
@@ -1841,7 +1841,7 @@ export function AdsScopeCard({ output }: { output: AdsScopeOutput }) {
 
       {byDestination.length > 0 && (
         <div className="mt-3 border-t pt-3">
-          <p className="text-muted-foreground mb-2 text-[11px] font-medium tracking-wide uppercase">
+          <p className="mb-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
             By destination · impressions · CTR
           </p>
           <BreakdownBars
@@ -1854,7 +1854,7 @@ export function AdsScopeCard({ output }: { output: AdsScopeOutput }) {
 
       {byObjective.length > 0 && (
         <div className="mt-3 border-t pt-3">
-          <p className="text-muted-foreground mb-2 text-[11px] font-medium tracking-wide uppercase">
+          <p className="mb-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
             By objective
           </p>
           <BreakdownBars
@@ -1867,7 +1867,7 @@ export function AdsScopeCard({ output }: { output: AdsScopeOutput }) {
 
       {byMonth.length > 1 && (
         <div className="mt-3 border-t pt-3">
-          <p className="text-muted-foreground mb-2 text-[11px] font-medium tracking-wide uppercase">
+          <p className="mb-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
             Impressions by launch month
           </p>
           <div className="flex items-end gap-1" style={{ height: 40 }}>
@@ -1878,7 +1878,7 @@ export function AdsScopeCard({ output }: { output: AdsScopeOutput }) {
                 title={`${fmtMonth(m.month)}: ${fmtNum(m.impressions)} impr · ${fmtUsd(m.spend)}`}
               >
                 <div
-                  className="bg-primary/50 w-full rounded-sm"
+                  className="w-full rounded-sm bg-primary/50"
                   style={{
                     height: `${Math.max(2, (m.impressions / monthMax) * 32)}px`,
                   }}
@@ -1906,15 +1906,15 @@ function RankedAdRow({ ad }: { ad: RankedAd }) {
   return (
     <li className="flex gap-3 py-2.5 first:pt-0 last:pb-0">
       {ad.thumbnailUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
+        // oxlint-disable-next-line nextjs/no-img-element
         <img
           src={ad.thumbnailUrl}
           alt=""
-          className="bg-muted size-12 shrink-0 rounded-md object-cover"
+          className="size-12 shrink-0 rounded-md bg-muted object-cover"
         />
       ) : (
-        <div className="bg-muted grid size-12 shrink-0 place-items-center rounded-md">
-          <Megaphone className="text-muted-foreground h-4 w-4" />
+        <div className="grid size-12 shrink-0 place-items-center rounded-md bg-muted">
+          <Megaphone className="h-4 w-4 text-muted-foreground" />
         </div>
       )}
       <div className="min-w-0 flex-1">
@@ -1934,7 +1934,7 @@ function RankedAdRow({ ad }: { ad: RankedAd }) {
           )}
           <span className={DEST_CHIP}>{destinationLabel(ad.destination)}</span>
         </div>
-        <p className="text-muted-foreground mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] tabular-nums">
+        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground tabular-nums">
           <span>{fmtNum(ad.impressions)} impr</span>
           <span>· {fmtNum(ad.clicks)} clicks</span>
           <span>· {ad.ctr}% CTR</span>
@@ -1943,7 +1943,7 @@ function RankedAdRow({ ad }: { ad: RankedAd }) {
           {ad.created && <span>· {ad.created}</span>}
         </p>
         {ad.body && (
-          <p className="text-muted-foreground/90 mt-1 line-clamp-2 text-xs italic">
+          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground/90 italic">
             “{ad.body}”
           </p>
         )}
@@ -2008,7 +2008,7 @@ function MiniSelect({
       title={title}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="border-border bg-background text-foreground h-7 rounded-md border px-1.5 text-[11px]"
+      className="h-7 rounded-md border border-border bg-background px-1.5 text-[11px] text-foreground"
     >
       {children}
     </select>
@@ -2101,7 +2101,7 @@ export function AdsRankedCard({ output }: { output: AdsRankedOutput }) {
           ))}
         </MiniSelect>
         {isFetching && (
-          <Loader2 className="text-muted-foreground h-3.5 w-3.5 animate-spin" />
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
         )}
         <span className="ml-auto">
           {ads.length > 0 && (
@@ -2109,12 +2109,12 @@ export function AdsRankedCard({ output }: { output: AdsRankedOutput }) {
           )}
         </span>
       </div>
-      <p className="text-muted-foreground mb-1 flex items-center gap-1 text-[11px]">
+      <p className="mb-1 flex items-center gap-1 text-[11px] text-muted-foreground">
         <Target className="h-3 w-3" />
         {fmtWindow(window)}
       </p>
       {ads.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
+        <p className="text-sm text-muted-foreground">
           No ads match this scope.
         </p>
       ) : (
@@ -2141,8 +2141,8 @@ export function GenericToolCard({
   output: unknown;
 }) {
   return (
-    <details className="bg-card rounded-lg border px-3.5 py-2.5">
-      <summary className="text-muted-foreground cursor-pointer text-xs font-medium">
+    <details className="rounded-lg border bg-card px-3.5 py-2.5">
+      <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
         <span className="text-foreground">{label ?? action ?? name}</span>
         {action && (
           <span className="ml-2 font-mono text-[10px] font-normal opacity-60">
@@ -2228,7 +2228,7 @@ export function ProductCapabilityCard({
           : "Product workspace updated";
 
   return (
-    <div className="bg-card rounded-lg border px-3.5 py-2.5">
+    <div className="rounded-lg border bg-card px-3.5 py-2.5">
       <div className="flex items-center gap-2">
         <CircleDot className="h-3.5 w-3.5 text-emerald-500" />
         <p className="text-xs font-medium">
@@ -2237,16 +2237,16 @@ export function ProductCapabilityCard({
         {href && (
           <Link
             href={href}
-            className="text-primary ml-auto flex items-center gap-1 text-xs hover:underline"
+            className="ml-auto flex items-center gap-1 text-xs text-primary hover:underline"
           >
             Open
             <ArrowUpRight className="h-3 w-3" />
           </Link>
         )}
       </div>
-      <p className="text-muted-foreground mt-1 text-xs">{summary}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{summary}</p>
       <details className="mt-2">
-        <summary className="text-muted-foreground cursor-pointer text-[11px]">
+        <summary className="cursor-pointer text-[11px] text-muted-foreground">
           Inspect data
         </summary>
         <pre className="mt-2 max-h-80 overflow-auto text-xs">

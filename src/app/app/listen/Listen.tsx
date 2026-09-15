@@ -53,14 +53,14 @@ export function Listen({
   if (isLoading) return <Skeleton label="listening strategy" />;
   if (isError) {
     return (
-      <div className="border-destructive/30 bg-destructive/10 text-destructive rounded-lg border p-4 text-sm">
+      <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
         {error.message}
       </div>
     );
   }
   if (!data?.brand) {
     return (
-      <div className="bg-card text-muted-foreground rounded-lg border p-4 text-sm">
+      <div className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
         Add an owned brand on the{" "}
         <Link href="/app/brands" className="text-foreground underline">
           Brands page
@@ -77,10 +77,10 @@ export function Listen({
       onValueChange={onTabChange}
       className="space-y-6"
     >
-      <div className="bg-card flex flex-wrap items-center justify-between gap-4 rounded-xl border p-4">
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border bg-card p-4">
         <div>
           <p className="text-sm font-medium">Listening for</p>
-          <p className="text-muted-foreground mt-0.5 text-xs">
+          <p className="mt-0.5 text-xs text-muted-foreground">
             Sources and reply guidance are configured independently for each
             owned brand.
           </p>
@@ -130,7 +130,7 @@ export function Listen({
         <section className="space-y-4">
           <div>
             <h2 className="text-lg font-semibold tracking-tight">Live scan</h2>
-            <p className="text-muted-foreground mt-1 text-sm">
+            <p className="mt-1 text-sm text-muted-foreground">
               On-demand AI scan over the configured subreddits — scored for
               intent, with draft replies. Results are not saved to the queue
               yet.
@@ -151,7 +151,7 @@ export function Listen({
         <section className="space-y-4">
           <div>
             <h2 className="text-lg font-semibold tracking-tight">Live scan</h2>
-            <p className="text-muted-foreground mt-1 text-sm">
+            <p className="mt-1 text-sm text-muted-foreground">
               On-demand scan over the watchlist terms, straight against the X
               API. Results live in this browser only — the queue above is the
               persisted one, fed by the 6-hourly cron.
@@ -180,7 +180,7 @@ export function Listen({
 
 function Skeleton({ label }: { label: string }) {
   return (
-    <div className="bg-card text-muted-foreground rounded-lg border p-4 text-sm">
+    <div className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
       Loading {label}…
     </div>
   );

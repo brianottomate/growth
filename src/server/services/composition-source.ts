@@ -13,7 +13,8 @@ export function unwrapImageProxy(url: string): string {
   try {
     const parsed = new URL(url);
     const src = parsed.searchParams.get("src");
-    if (parsed.pathname.startsWith("/i/") && src) return new URL(src).toString();
+    if (parsed.pathname.startsWith("/i/") && src)
+      return new URL(src).toString();
   } catch {
     // Not a URL we can read; the caller's fetch will say so.
   }
@@ -36,7 +37,8 @@ export async function dominantColor(png: Buffer): Promise<string | null> {
     if (data[i + 3]! < 128) continue;
     opaque += 1;
     // 4 bits per channel: anti-aliased edges fall into the same bucket.
-    const key = ((data[i]! >> 4) << 8) | ((data[i + 1]! >> 4) << 4) | (data[i + 2]! >> 4);
+    const key =
+      ((data[i]! >> 4) << 8) | ((data[i + 1]! >> 4) << 4) | (data[i + 2]! >> 4);
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   if (opaque < 16) return null;
@@ -68,7 +70,9 @@ export async function traceSilhouette(
   const { hasAlpha } = await sharp(png).metadata();
   if (!hasAlpha) return null;
   const { width, height, alpha } = await silhouetteAlpha(png);
-  const [r, g, b] = [1, 3, 5].map((i) => Number.parseInt(color.slice(i, i + 2), 16));
+  const [r, g, b] = [1, 3, 5].map((i) =>
+    Number.parseInt(color.slice(i, i + 2), 16),
+  );
   // Two colours only: the shape in `color`, everything else transparent, so
   // the tracer has one clean boundary to follow.
   const pixels = new Uint8ClampedArray(width * height * 4);
@@ -229,13 +233,15 @@ export async function silhouetteAlpha(
     alpha[p] = a;
     if (a < 128) continue;
     opaque += 1;
-    const key = ((data[i]! >> 4) << 8) | ((data[i + 1]! >> 4) << 4) | (data[i + 2]! >> 4);
+    const key =
+      ((data[i]! >> 4) << 8) | ((data[i + 1]! >> 4) << 4) | (data[i + 2]! >> 4);
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   if (opaque < 64) return { width, height, alpha };
   let bestKey = 0;
   let best = 0;
-  for (const [key, count] of counts) if (count > best) [bestKey, best] = [key, count];
+  for (const [key, count] of counts)
+    if (count > best) [bestKey, best] = [key, count];
   const share = best / opaque;
   // Above 0.97 the mark is one colour already; below 0.45 there is no badge to
   // speak of and the glyph rule would eat half the mark.
@@ -245,7 +251,10 @@ export async function silhouetteAlpha(
   const bb = (bestKey & 15) * 17 + 8;
   for (let i = 0, p = 0; i < data.length; i += 4, p++) {
     if (alpha[p] === 0) continue;
-    const d = Math.abs(data[i]! - br) + Math.abs(data[i + 1]! - bg) + Math.abs(data[i + 2]! - bb);
+    const d =
+      Math.abs(data[i]! - br) +
+      Math.abs(data[i + 1]! - bg) +
+      Math.abs(data[i + 2]! - bb);
     // Badge pixels sit within ~60 of the badge colour; glyph pixels are far
     // off. Between the two the edge fades, which keeps the knock-out smooth.
     const keep = d <= 60 ? 1 : d >= 150 ? 0 : (150 - d) / 90;
@@ -254,7 +263,10 @@ export async function silhouetteAlpha(
   return { width, height, alpha };
 }
 
-export async function tintSilhouette(png: Buffer, color: string): Promise<Buffer> {
+export async function tintSilhouette(
+  png: Buffer,
+  color: string,
+): Promise<Buffer> {
   const { width, height, alpha } = await silhouetteAlpha(png);
   return sharp({ create: { width, height, channels: 3, background: color } })
     .joinChannel(alpha, { raw: { width, height, channels: 1 } })

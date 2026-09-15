@@ -63,13 +63,16 @@ export function DeleteCampaignButton({
       {compact ? (
         <DropdownMenu>
           <DropdownMenuTrigger
-            className="text-muted-foreground hover:text-foreground hover:bg-muted/60 rounded-full p-1.5"
+            appearance="icon"
             aria-label={`More for ${campaignName}`}
           >
             <MoreHorizontal className="size-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuItem variant="destructive" onClick={() => setOpen(true)}>
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={() => setOpen(true)}
+            >
               Delete campaign…
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -78,7 +81,7 @@ export function DeleteCampaignButton({
         <Button
           size="sm"
           variant="ghost"
-          className="text-muted-foreground"
+          tone="muted"
           onClick={() => setOpen(true)}
         >
           <Trash2 className="size-3.5" />

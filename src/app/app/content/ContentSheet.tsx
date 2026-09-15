@@ -113,13 +113,13 @@ export function ContentSheet({
   return (
     <div className="mt-5 flex h-[calc(100vh-13rem)] flex-col">
       {/* Grid */}
-      <div className="border-border flex-1 overflow-auto rounded-t-xl border">
+      <div className="flex-1 overflow-auto rounded-t-xl border border-border">
         {isLoading && rows.length === 0 ? (
-          <div className="text-muted-foreground px-3 py-12 text-center text-sm">
+          <div className="px-3 py-12 text-center text-sm text-muted-foreground">
             Loading…
           </div>
         ) : months.length === 0 ? (
-          <div className="text-muted-foreground px-3 py-12 text-center text-sm">
+          <div className="px-3 py-12 text-center text-sm text-muted-foreground">
             No dated content yet — give an idea a plan date or schedule a spot
             and it shows up here.
           </div>
@@ -152,9 +152,9 @@ export function ContentSheet({
       </div>
 
       {/* Month "workbooks" — the spreadsheet tab strip. */}
-      <div className="border-border bg-muted/30 flex items-center gap-1 overflow-x-auto rounded-b-xl border border-t-0 px-2 py-1.5">
+      <div className="flex items-center gap-1 overflow-x-auto rounded-b-xl border border-t-0 border-border bg-muted/30 px-2 py-1.5">
         {months.length === 0 ? (
-          <span className="text-muted-foreground px-2 text-xs">
+          <span className="px-2 text-xs text-muted-foreground">
             No workbooks
           </span>
         ) : (
@@ -165,7 +165,7 @@ export function ContentSheet({
               className={cn(
                 "rounded-md px-3 py-1 text-xs font-medium whitespace-nowrap transition-colors",
                 ym === month
-                  ? "bg-background text-foreground border-border border shadow-sm"
+                  ? "border border-border bg-background text-foreground shadow-sm"
                   : "text-muted-foreground hover:bg-accent",
               )}
             >
@@ -174,7 +174,7 @@ export function ContentSheet({
           ))
         )}
         {month && (
-          <span className="text-muted-foreground ml-auto px-2 text-xs tabular-nums">
+          <span className="ml-auto px-2 text-xs text-muted-foreground tabular-nums">
             {monthRows.length} {monthRows.length === 1 ? "row" : "rows"}
           </span>
         )}
@@ -201,13 +201,13 @@ function SheetRow({
       onKeyDown={(e) => {
         if (e.key === "Enter") onOpen(r.id);
       }}
-      className="group hover:bg-accent/40 cursor-pointer"
+      className="group cursor-pointer hover:bg-accent/40"
     >
       {/* Day — pinned left */}
       <td
         className={cn(
           cellCls,
-          "bg-background group-hover:bg-accent/40 sticky left-0 z-10 font-medium whitespace-nowrap tabular-nums",
+          "sticky left-0 z-10 bg-background font-medium whitespace-nowrap tabular-nums group-hover:bg-accent/40",
         )}
       >
         {fmtDay(r.at)}
@@ -268,7 +268,7 @@ function SheetRow({
         title={r.title ?? ""}
       >
         {r.title ?? (
-          <span className="text-muted-foreground font-normal">Untitled</span>
+          <span className="font-normal text-muted-foreground">Untitled</span>
         )}
       </td>
 
@@ -360,7 +360,7 @@ function LongCell({
   return (
     <td className={cn(cellCls, "max-w-[280px] min-w-[220px]")}>
       {value ? (
-        <span className="text-muted-foreground line-clamp-4 whitespace-pre-wrap">
+        <span className="line-clamp-4 whitespace-pre-wrap text-muted-foreground">
           {value}
         </span>
       ) : (
@@ -394,14 +394,14 @@ function LinkCell({
               href={url}
               target="_blank"
               rel="noopener noreferrer"
-              className="border-border text-muted-foreground hover:text-foreground hover:bg-accent rounded-md border px-1.5 py-0.5 text-xs transition-colors"
+              className="rounded-md border border-border px-1.5 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
               ↗ {label}
               {urls.length > 1 ? ` ${i + 1}` : ""}
             </a>
           ))}
           {urls.length > 3 && (
-            <span className="text-muted-foreground text-xs">
+            <span className="text-xs text-muted-foreground">
               +{urls.length - 3}
             </span>
           )}

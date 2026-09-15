@@ -22,7 +22,7 @@ export default async function ProspectPage({
     <div className="mx-auto max-w-5xl p-4 sm:p-6">
       <Link
         href="/app/leads"
-        className="text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-1.5 text-sm"
+        className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-3.5 w-3.5" /> Leads
       </Link>

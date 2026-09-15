@@ -107,7 +107,10 @@ export function applyDirection(
     if (subtitle.length === 0 && spec.subtitle) {
       delete next.subtitle;
       changes.push("dropped the facts line");
-    } else if (subtitle.length > 0 && subtitle.length < (spec.subtitle ?? "").length) {
+    } else if (
+      subtitle.length > 0 &&
+      subtitle.length < (spec.subtitle ?? "").length
+    ) {
       next.subtitle = subtitle;
       changes.push(`shortened the facts line to “${subtitle}”`);
     }
@@ -123,7 +126,10 @@ export function applyDirection(
     );
   }
 
-  if (direction.scrim && direction.scrim.toLowerCase() !== spec.scrim?.toLowerCase()) {
+  if (
+    direction.scrim &&
+    direction.scrim.toLowerCase() !== spec.scrim?.toLowerCase()
+  ) {
     next.scrim = direction.scrim.toLowerCase();
     changes.push(`tinted the darkening toward ${next.scrim}`);
   }
@@ -142,7 +148,8 @@ async function forTheModel(bytes: Buffer, width: number) {
 
 async function download(url: string): Promise<Buffer> {
   const response = await fetch(url, { signal: AbortSignal.timeout(20_000) });
-  if (!response.ok) throw new Error(`Download failed (${response.status}) for ${url}`);
+  if (!response.ok)
+    throw new Error(`Download failed (${response.status}) for ${url}`);
   return Buffer.from(await response.arrayBuffer());
 }
 
@@ -254,7 +261,8 @@ export async function extendSource(input: {
     ),
     columns: { id: true, url: true },
   });
-  if (existing?.url) return { id: existing.id, url: existing.url, reused: true };
+  if (existing?.url)
+    return { id: existing.id, url: existing.url, reused: true };
 
   const where =
     input.axis === "vertical"
@@ -417,15 +425,14 @@ export async function renderDirectedCard(input: {
     }
   }
 
-  const base =
-    found?.url
-      ? { id: found.id, url: found.url }
-      : await freezeComposition({ userId: input.userId, spec: input.spec }).then(
-          (asset) => {
-            if (!asset.url) throw new Error("The rendered card has no URL yet.");
-            return { id: asset.id, url: asset.url };
-          },
-        );
+  const base = found?.url
+    ? { id: found.id, url: found.url }
+    : await freezeComposition({ userId: input.userId, spec: input.spec }).then(
+        (asset) => {
+          if (!asset.url) throw new Error("The rendered card has no URL yet.");
+          return { id: asset.id, url: asset.url };
+        },
+      );
 
   // The card exists by now; a director that cannot be reached, or bytes that
   // cannot be fetched for it, leave the card as rendered rather than losing it.
@@ -478,7 +485,9 @@ export async function renderDirectedCard(input: {
         );
       } catch (error) {
         console.error("photo extension failed", input.home.name, error);
-        changes.push("wanted the photo extended, which failed, so the crop stands");
+        changes.push(
+          "wanted the photo extended, which failed, so the crop stands",
+        );
       }
     } else {
       changes.push("wanted the photo extended, which is not configured here");
@@ -500,5 +509,11 @@ export async function renderDirectedCard(input: {
     direction: { verdict: "adjust", note, changes, directedFrom: base.id },
   });
   if (!rendered.url) throw new Error("The re-rendered card has no URL yet.");
-  return { id: rendered.id, url: rendered.url, reused: false, changes, note: note || null };
+  return {
+    id: rendered.id,
+    url: rendered.url,
+    reused: false,
+    changes,
+    note: note || null,
+  };
 }

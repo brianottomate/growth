@@ -44,22 +44,29 @@ export function MediaLightbox({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[90vh] w-[94vw] max-w-[94vw] flex-col overflow-hidden border-white/10 bg-black/95 p-0 text-white sm:max-w-[94vw]">
-        <DialogHeader className="shrink-0 border-b border-white/10 px-5 py-3 pr-12 text-left">
-          <DialogTitle className="flex items-center gap-3 text-sm text-white">
+      <DialogContent
+        tone="media"
+        className="flex h-[90vh] w-[94vw] max-w-[94vw] flex-col overflow-hidden p-0 sm:max-w-[94vw]"
+      >
+        <DialogHeader
+          divider="media"
+          className="shrink-0 px-5 py-3 pr-12 text-left"
+        >
+          <DialogTitle tone="media" className="flex items-center gap-3 text-sm">
             <span className="truncate">{title}</span>
             {studioHref ? (
               <ButtonLink
                 href={studioHref}
                 size="sm"
                 variant="outline"
-                className="h-7 border-white/20 bg-transparent text-white hover:bg-white/10"
+                tone="media-outline"
+                className="h-7"
               >
                 <PenLine className="size-3.5" /> Open in Studio
               </ButtonLink>
             ) : null}
           </DialogTitle>
-          <DialogDescription className="text-xs text-white/55">
+          <DialogDescription tone="media" className="text-xs">
             {[
               asset.folder?.name,
               `${asset.width ?? "?"}×${asset.height ?? "?"}`,
@@ -81,7 +88,7 @@ export function MediaLightbox({
           ) : imageUrl ? (
             // External thumbnails may come from hosts that are intentionally
             // not part of the Next Image allowlist.
-            // eslint-disable-next-line @next/next/no-img-element
+            // oxlint-disable-next-line nextjs/no-img-element
             <img
               src={imageUrl}
               alt={asset.alt ?? title}

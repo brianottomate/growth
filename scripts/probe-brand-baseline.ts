@@ -95,7 +95,13 @@ const FRESH_MS = 24 * 3_600_000;
 
 // ---- report plumbing --------------------------------------------------------
 
-type StageName = "state" | "enrich" | "discover" | "accept" | "scrape" | "synth";
+type StageName =
+  | "state"
+  | "enrich"
+  | "discover"
+  | "accept"
+  | "scrape"
+  | "synth";
 type Stage = {
   stage: StageName;
   status: "ok" | "skipped" | "error";
@@ -133,15 +139,26 @@ async function stage<T>(
       save();
       return undefined;
     }
-    report.stages.push({ stage: name, status: "ok", ms, note: r.note, result: r.result });
-    console.log(`— ok in ${(ms / 1000).toFixed(1)}s${r.note ? ` (${r.note})` : ""}`);
+    report.stages.push({
+      stage: name,
+      status: "ok",
+      ms,
+      note: r.note,
+      result: r.result,
+    });
+    console.log(
+      `— ok in ${(ms / 1000).toFixed(1)}s${r.note ? ` (${r.note})` : ""}`,
+    );
     save();
     return r.result;
   } catch (err) {
     const ms = Math.round(performance.now() - t0);
-    const message = err instanceof Error ? `${err.message}\n${err.stack ?? ""}` : String(err);
+    const message =
+      err instanceof Error ? `${err.message}\n${err.stack ?? ""}` : String(err);
     report.stages.push({ stage: name, status: "error", ms, error: message });
-    console.log(`— ERROR in ${(ms / 1000).toFixed(1)}s\n   ${message.split("\n")[0]}`);
+    console.log(
+      `— ERROR in ${(ms / 1000).toFixed(1)}s\n   ${message.split("\n")[0]}`,
+    );
     save();
     return undefined;
   }
@@ -156,7 +173,9 @@ if (!brand) {
   console.error(`no brand with slug "${slug}"`);
   process.exit(1);
 }
-console.log(`Brand: ${brand.name} (${brand.id}) ${brand.website ?? "— no website"}`);
+console.log(
+  `Brand: ${brand.name} (${brand.id}) ${brand.website ?? "— no website"}`,
+);
 console.log(`Report: ${OUT}`);
 
 async function readState() {
@@ -171,7 +190,13 @@ async function readState() {
       connectionStatus: channelTable.connectionStatus,
     })
     .from(channelTable)
-    .where(and(eq(channelTable.brandId, brand!.id), eq(channelTable.isActive, true), isNull(channelTable.deletedAt)));
+    .where(
+      and(
+        eq(channelTable.brandId, brand!.id),
+        eq(channelTable.isActive, true),
+        isNull(channelTable.deletedAt),
+      ),
+    );
   const suggestions = await db
     .select({
       id: channelSuggestionTable.id,
@@ -192,7 +217,9 @@ async function readState() {
     .select({
       platform: platformPostTable.platform,
       n: sql<number>`count(*)::int`,
-      latestPublished: sql<string | null>`max(${platformPostTable.publishedAt})`,
+      latestPublished: sql<
+        string | null
+      >`max(${platformPostTable.publishedAt})`,
       latestScraped: sql<string | null>`max(${platformPostTable.scrapedAt})`,
     })
     .from(platformPostTable)
@@ -222,8 +249,15 @@ let state = (await stage("state", async () => {
 
 await stage("enrich", async () => {
   if (!brand.website) return { skip: "no website" };
-  if (!FORCE_ENRICH && brand.brandIdentity && brand.tagline && brand.description) {
-    return { skip: `already enriched ${brand.websiteMeta?.scrapedAt ?? ""}; pass --enrich to refresh` };
+  if (
+    !FORCE_ENRICH &&
+    brand.brandIdentity &&
+    brand.tagline &&
+    brand.description
+  ) {
+    return {
+      skip: `already enriched ${brand.websiteMeta?.scrapedAt ?? ""}; pass --enrich to refresh`,
+    };
   }
   const r = await enrichBrandById(brand.id);
   if (!r) return { result: null, note: "site could not be read" };
@@ -244,7 +278,9 @@ await stage("enrich", async () => {
 await stage("discover", async () => {
   if (NO_DISCOVER) return { skip: "--no-discover" };
   if (!FORCE_DISCOVER && state.suggestions.length) {
-    return { skip: `${state.suggestions.length} suggestions already exist; pass --force-discover to re-run` };
+    return {
+      skip: `${state.suggestions.length} suggestions already exist; pass --force-discover to re-run`,
+    };
   }
   const r = await discoverAndSaveSuggestions(brand.id, { verify: VERIFY });
   const rows = r.suggestions
@@ -263,12 +299,31 @@ await stage("discover", async () => {
     }));
   console.log();
   for (const s of rows) {
-    const ver = s.verified == null ? "unverified" : s.verified ? `✓ ${s.followerCount?.toLocaleString() ?? "?"} followers` : `✗ ${s.verifyError ?? "unresolved"}`;
-    console.log(`   ${s.platform.padEnd(10)} @${s.handle.padEnd(24)} ${((s.confidence ?? 0) * 100).toFixed(0).padStart(3)}%  ${ver}`);
-    console.log(`   ${"".padEnd(10)} ${s.profileUrl}  [${(s.sources ?? []).join(", ")}]`);
+    const ver =
+      s.verified == null
+        ? "unverified"
+        : s.verified
+          ? `✓ ${s.followerCount?.toLocaleString() ?? "?"} followers`
+          : `✗ ${s.verifyError ?? "unresolved"}`;
+    console.log(
+      `   ${s.platform.padEnd(10)} @${s.handle.padEnd(24)} ${((s.confidence ?? 0) * 100).toFixed(0).padStart(3)}%  ${ver}`,
+    );
+    console.log(
+      `   ${"".padEnd(10)} ${s.profileUrl}  [${(s.sources ?? []).join(", ")}]`,
+    );
   }
   return {
-    result: { counts: { discovered: r.discovered, inserted: r.inserted, updated: r.updated, skippedRejected: r.skippedRejected, verified: r.verified, enrichedBrand: r.enrichedBrand }, suggestions: rows },
+    result: {
+      counts: {
+        discovered: r.discovered,
+        inserted: r.inserted,
+        updated: r.updated,
+        skippedRejected: r.skippedRejected,
+        verified: r.verified,
+        enrichedBrand: r.enrichedBrand,
+      },
+      suggestions: rows,
+    },
     note: `${r.discovered} found, ${r.verified} verified`,
   };
 });
@@ -278,13 +333,25 @@ state = (await readState()) as typeof state;
 // ---- 4. accept ---------------------------------------------------------------
 
 await stage("accept", async () => {
-  if (ACCEPT_MIN == null) return { skip: "pass --accept=<minConfidence> to promote suggestions" };
+  if (ACCEPT_MIN == null)
+    return { skip: "pass --accept=<minConfidence> to promote suggestions" };
   const pending = state.suggestions.filter(
-    (s) => s.status === "pending" && (s.confidence ?? 0) >= ACCEPT_MIN && s.verified !== false,
+    (s) =>
+      s.status === "pending" &&
+      (s.confidence ?? 0) >= ACCEPT_MIN &&
+      s.verified !== false,
   );
-  if (!pending.length) return { skip: `no pending suggestions at >= ${ACCEPT_MIN} that survived verification` };
+  if (!pending.length)
+    return {
+      skip: `no pending suggestions at >= ${ACCEPT_MIN} that survived verification`,
+    };
   const now = new Date();
-  const accepted: Array<{ platform: string; handle: string; channelId: string; created: boolean }> = [];
+  const accepted: Array<{
+    platform: string;
+    handle: string;
+    channelId: string;
+    created: boolean;
+  }> = [];
   for (const s of pending) {
     let channel = await db.query.channelTable.findFirst({
       where: and(
@@ -306,17 +373,30 @@ await stage("accept", async () => {
           profileUrl: s.profileUrl,
           connectionStatus: "disconnected",
           followerCount: s.followerCount ?? null,
-          followerHistory: s.followerCount ? [{ count: s.followerCount, capturedAt: now.toISOString() }] : [],
+          followerHistory: s.followerCount
+            ? [{ count: s.followerCount, capturedAt: now.toISOString() }]
+            : [],
         })
         .returning();
       created = true;
     }
     await db
       .update(channelSuggestionTable)
-      .set({ status: "accepted", acceptedChannelId: channel!.id, reviewedAt: now })
+      .set({
+        status: "accepted",
+        acceptedChannelId: channel!.id,
+        reviewedAt: now,
+      })
       .where(eq(channelSuggestionTable.id, s.id));
-    accepted.push({ platform: s.platform, handle: s.handle, channelId: channel!.id, created });
-    console.log(`\n   accepted ${s.platform} @${s.handle}${created ? " (new channel)" : " (existing channel)"}`);
+    accepted.push({
+      platform: s.platform,
+      handle: s.handle,
+      channelId: channel!.id,
+      created,
+    });
+    console.log(
+      `\n   accepted ${s.platform} @${s.handle}${created ? " (new channel)" : " (existing channel)"}`,
+    );
   }
   return { result: accepted, note: `${accepted.length} accepted` };
 });
@@ -326,15 +406,26 @@ state = (await readState()) as typeof state;
 // ---- 5. scrape ---------------------------------------------------------------
 
 await stage("scrape", async () => {
-  if (!SCRAPE) return { skip: "pass --scrape to pull posts (Bright Data / Apify cost per record; X API is free)" };
-  const social = state.channels.filter((c) => c.kind === "social" && (SCRAPABLE as string[]).includes(c.platform));
-  if (!social.length) return { skip: "no social channels on a scrapable platform (linkedin, x, instagram, facebook)" };
+  if (!SCRAPE)
+    return {
+      skip: "pass --scrape to pull posts (Bright Data / Apify cost per record; X API is free)",
+    };
+  const social = state.channels.filter(
+    (c) => c.kind === "social" && (SCRAPABLE as string[]).includes(c.platform),
+  );
+  if (!social.length)
+    return {
+      skip: "no social channels on a scrapable platform (linkedin, x, instagram, facebook)",
+    };
 
   const perPlatform: Record<string, unknown> = {};
   for (const c of social) {
     const platform = c.platform as ScrapePlatform;
     const recent = state.posts.find((p) => p.platform === platform);
-    if (recent?.latestScraped && Date.now() - new Date(recent.latestScraped).getTime() < FRESH_MS) {
+    if (
+      recent?.latestScraped &&
+      Date.now() - new Date(recent.latestScraped).getTime() < FRESH_MS
+    ) {
       perPlatform[platform] = { skipped: `scraped ${recent.latestScraped}` };
       console.log(`\n   ${platform}: skipped, scraped within 24h`);
       continue;
@@ -345,7 +436,11 @@ await stage("scrape", async () => {
       let provider: string;
       if (platform === "x" && env.X_BEARER_TOKEN && c.handle) {
         provider = "x_api";
-        result = await ingestXViaApi({ brandId: brand.id, handle: c.handle, maxPages: 3 });
+        result = await ingestXViaApi({
+          brandId: brand.id,
+          handle: c.handle,
+          maxPages: 3,
+        });
       } else {
         const r = await scrapeBrandChannel({
           brandId: brand.id,
@@ -358,12 +453,16 @@ await stage("scrape", async () => {
       }
       const ms = Math.round(performance.now() - t0);
       perPlatform[platform] = { provider, ms, ...(result as object) };
-      console.log(`\n   ${platform} via ${provider} in ${(ms / 1000).toFixed(1)}s: ${JSON.stringify(result)}`);
+      console.log(
+        `\n   ${platform} via ${provider} in ${(ms / 1000).toFixed(1)}s: ${JSON.stringify(result)}`,
+      );
     } catch (err) {
       const ms = Math.round(performance.now() - t0);
       const message = err instanceof Error ? err.message : String(err);
       perPlatform[platform] = { error: message, ms };
-      console.log(`\n   ${platform}: ERROR after ${(ms / 1000).toFixed(1)}s — ${message}`);
+      console.log(
+        `\n   ${platform}: ERROR after ${(ms / 1000).toFixed(1)}s — ${message}`,
+      );
     }
   }
   return { result: perPlatform };
@@ -377,19 +476,61 @@ const BASELINE = z.object({
   voice: z.object({
     tone: z.string(),
     energy: z.string(),
-    pointOfView: z.string().describe("first-person plural, host voice, concierge, etc."),
+    pointOfView: z
+      .string()
+      .describe("first-person plural, host voice, concierge, etc."),
     recurringPhrases: z.array(z.string()).max(8),
   }),
-  themes: z.array(z.object({ theme: z.string(), share: z.number().min(0).max(1), evidence: z.array(z.string()).max(3).describe("post URLs or ids") })).max(8),
-  audienceSignals: z.array(z.object({ signal: z.string(), evidence: z.array(z.string()).max(3) })).max(8),
+  themes: z
+    .array(
+      z.object({
+        theme: z.string(),
+        share: z.number().min(0).max(1),
+        evidence: z.array(z.string()).max(3).describe("post URLs or ids"),
+      }),
+    )
+    .max(8),
+  audienceSignals: z
+    .array(
+      z.object({ signal: z.string(), evidence: z.array(z.string()).max(3) }),
+    )
+    .max(8),
   competitors: z.array(z.object({ name: z.string(), why: z.string() })).max(6),
-  gaps: z.array(z.string()).max(6).describe("what the evidence does NOT tell us; what a human should confirm"),
-  proposedPillars: z.array(z.object({ name: z.string(), description: z.string(), evidence: z.array(z.string()).max(3) })).min(3).max(5),
-  proposedPersonas: z.array(z.object({ name: z.string(), description: z.string(), ageRanges: z.array(z.string()).max(3), geographies: z.array(z.string()).max(4), evidence: z.array(z.string()).max(3) })).min(2).max(3),
+  gaps: z
+    .array(z.string())
+    .max(6)
+    .describe(
+      "what the evidence does NOT tell us; what a human should confirm",
+    ),
+  proposedPillars: z
+    .array(
+      z.object({
+        name: z.string(),
+        description: z.string(),
+        evidence: z.array(z.string()).max(3),
+      }),
+    )
+    .min(3)
+    .max(5),
+  proposedPersonas: z
+    .array(
+      z.object({
+        name: z.string(),
+        description: z.string(),
+        ageRanges: z.array(z.string()).max(3),
+        geographies: z.array(z.string()).max(4),
+        evidence: z.array(z.string()).max(3),
+      }),
+    )
+    .min(2)
+    .max(3),
 });
 
 await stage("synth", async () => {
-  if (!SYNTH) return { skip: "pass --synth to draft the baseline with Claude (no DB writes)" };
+  if (!SYNTH)
+    return {
+      skip: "pass --synth to draft the baseline with Claude (no DB writes)",
+    };
   if (!env.ANTHROPIC_API_KEY) return { skip: "ANTHROPIC_API_KEY missing" };
 
   const since = new Date(Date.now() - SINCE_DAYS * 86_400_000);
@@ -404,29 +545,60 @@ await stage("synth", async () => {
       media: platformPostTable.media,
     })
     .from(platformPostTable)
-    .where(and(eq(platformPostTable.brandId, brand.id), gte(platformPostTable.publishedAt, since)))
+    .where(
+      and(
+        eq(platformPostTable.brandId, brand.id),
+        gte(platformPostTable.publishedAt, since),
+      ),
+    )
     .orderBy(desc(platformPostTable.publishedAt))
     .limit(300);
 
   // Deterministic parts: cadence and top posts. The model should not do arithmetic.
   const weeks = Math.max(1, SINCE_DAYS / 7);
-  const cadence: Record<string, { posts: number; perWeek: number; lastPost: string | null; daysSinceLast: number | null }> = {};
+  const cadence: Record<
+    string,
+    {
+      posts: number;
+      perWeek: number;
+      lastPost: string | null;
+      daysSinceLast: number | null;
+    }
+  > = {};
   for (const p of posts) {
-    const c = (cadence[p.platform] ??= { posts: 0, perWeek: 0, lastPost: null, daysSinceLast: null });
+    const c = (cadence[p.platform] ??= {
+      posts: 0,
+      perWeek: 0,
+      lastPost: null,
+      daysSinceLast: null,
+    });
     c.posts += 1;
     const iso = p.publishedAt?.toISOString() ?? null;
     if (iso && (!c.lastPost || iso > c.lastPost)) c.lastPost = iso;
   }
   for (const c of Object.values(cadence)) {
     c.perWeek = Number((c.posts / weeks).toFixed(2));
-    c.daysSinceLast = c.lastPost ? Math.round((Date.now() - new Date(c.lastPost).getTime()) / 86_400_000) : null;
+    c.daysSinceLast = c.lastPost
+      ? Math.round((Date.now() - new Date(c.lastPost).getTime()) / 86_400_000)
+      : null;
   }
-  const score = (s: PostStats | null) => (s?.likes ?? 0) + 2 * (s?.comments ?? 0) + 3 * (s?.shares ?? 0) + (s?.saves ?? 0);
+  const score = (s: PostStats | null) =>
+    (s?.likes ?? 0) +
+    2 * (s?.comments ?? 0) +
+    3 * (s?.shares ?? 0) +
+    (s?.saves ?? 0);
   const topPosts = posts
     .slice()
     .sort((a, b) => score(b.stats) - score(a.stats))
     .slice(0, 8)
-    .map((p) => ({ platform: p.platform, url: p.externalUrl, score: score(p.stats), stats: p.stats, text: p.text?.slice(0, 200), publishedAt: p.publishedAt }));
+    .map((p) => ({
+      platform: p.platform,
+      url: p.externalUrl,
+      score: score(p.stats),
+      stats: p.stats,
+      text: p.text?.slice(0, 200),
+      publishedAt: p.publishedAt,
+    }));
 
   const identity = brand.brandIdentity;
   const evidence =
@@ -436,7 +608,10 @@ await stage("synth", async () => {
     `CADENCE (computed over last ${SINCE_DAYS} days)\n${JSON.stringify(cadence)}\n\n` +
     `POSTS (${posts.length}, newest first; id | platform | date | stats | text)\n` +
     posts
-      .map((p) => `${p.externalUrl ?? p.id} | ${p.platform} | ${p.publishedAt?.toISOString().slice(0, 10)} | ${JSON.stringify(p.stats ?? {})} | ${(p.text ?? "").replace(/\s+/g, " ").slice(0, 400)}`)
+      .map(
+        (p) =>
+          `${p.externalUrl ?? p.id} | ${p.platform} | ${p.publishedAt?.toISOString().slice(0, 10)} | ${JSON.stringify(p.stats ?? {})} | ${(p.text ?? "").replace(/\s+/g, " ").slice(0, 400)}`,
+      )
       .join("\n");
 
   const { output, usage } = await generateText({
@@ -452,16 +627,26 @@ await stage("synth", async () => {
       evidence,
   });
 
-  const baseline = { cadence, topPosts, postsConsidered: posts.length, ...output };
+  const baseline = {
+    cadence,
+    topPosts,
+    postsConsidered: posts.length,
+    ...output,
+  };
   console.log("\n" + JSON.stringify(baseline, null, 2));
-  return { result: { baseline, usage }, note: `${posts.length} posts, ${usage?.totalTokens ?? "?"} tokens` };
+  return {
+    result: { baseline, usage },
+    note: `${posts.length} posts, ${usage?.totalTokens ?? "?"} tokens`,
+  };
 });
 
 // ---- summary -----------------------------------------------------------------
 
 console.log("\n=== summary ===");
 for (const s of report.stages) {
-  console.log(`${s.stage.padEnd(9)} ${s.status.padEnd(8)} ${(s.ms / 1000).toFixed(1).padStart(6)}s  ${s.note ?? s.error?.split("\n")[0] ?? ""}`);
+  console.log(
+    `${s.stage.padEnd(9)} ${s.status.padEnd(8)} ${(s.ms / 1000).toFixed(1).padStart(6)}s  ${s.note ?? s.error?.split("\n")[0] ?? ""}`,
+  );
 }
 console.log(`\nreport: ${OUT}`);
 process.exit(0);

@@ -85,14 +85,14 @@ export function CompetitorNewsletters({
       <h2 className="flex items-center gap-2 text-sm font-semibold">
         <Mail className="size-4" /> Competitor newsletters
       </h2>
-      <p className="text-muted-foreground mt-1 text-xs">
+      <p className="mt-1 text-xs text-muted-foreground">
         Subscribe to a tracked competitor&apos;s newsletter with its capture
         address; forwarded issues land here as inspiration. Confirm the double
         opt-in once from the Resend inbox.
       </p>
 
       {rows.length === 0 ? (
-        <p className="text-muted-foreground mt-4 text-sm">
+        <p className="mt-4 text-sm text-muted-foreground">
           No tracked competitors yet — track a brand on the Brands page to start
           capturing its newsletter.
         </p>
@@ -103,20 +103,20 @@ export function CompetitorNewsletters({
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2.5">
                   {row.logo ? (
-                    // eslint-disable-next-line @next/next/no-img-element
+                    // oxlint-disable-next-line nextjs/no-img-element
                     <img
                       src={row.logo}
                       alt=""
                       className="size-7 shrink-0 rounded-md object-cover"
                     />
                   ) : (
-                    <div className="bg-muted size-7 shrink-0 rounded-md" />
+                    <div className="size-7 shrink-0 rounded-md bg-muted" />
                   )}
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium">
                       {row.name}
                     </div>
-                    <div className="text-muted-foreground truncate text-xs">
+                    <div className="truncate text-xs text-muted-foreground">
                       {row.tracked
                         ? `${row.issueCount} issue${row.issueCount === 1 ? "" : "s"}${
                             row.lastReceivedAt
@@ -134,7 +134,7 @@ export function CompetitorNewsletters({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-muted-foreground"
+                      tone="muted"
                       loading={busy === row.brandId}
                       onClick={() => onUntrack(row)}
                     >
@@ -145,7 +145,7 @@ export function CompetitorNewsletters({
                   <Button
                     variant="outline"
                     size="sm"
-                    className="shrink-0 gap-1.5"
+                    className="shrink-0"
                     loading={busy === row.brandId}
                     onClick={() => onTrack(row)}
                   >
@@ -156,7 +156,7 @@ export function CompetitorNewsletters({
 
               {row.tracked && (
                 <div className="mt-2.5 space-y-2">
-                  <code className="bg-muted text-muted-foreground block w-full truncate rounded-md px-2 py-1 font-mono text-xs">
+                  <code className="block w-full truncate rounded-md bg-muted px-2 py-1 font-mono text-xs text-muted-foreground">
                     {row.address}
                   </code>
                   {row.recentIssues.length > 0 && (
@@ -165,9 +165,9 @@ export function CompetitorNewsletters({
                         <a
                           key={issue.id}
                           href={`/app/newsletters/${issue.id}`}
-                          className="hover:bg-accent/40 -mx-1 flex items-center gap-2 rounded-md px-1 py-1.5 text-xs"
+                          className="-mx-1 flex items-center gap-2 rounded-md px-1 py-1.5 text-xs hover:bg-accent/40"
                         >
-                          <span className="text-muted-foreground w-10 shrink-0 tabular-nums">
+                          <span className="w-10 shrink-0 text-muted-foreground tabular-nums">
                             {issue.receivedAt ? fmtDate(issue.receivedAt) : "—"}
                           </span>
                           <span className="min-w-0 flex-1 truncate">
@@ -176,7 +176,7 @@ export function CompetitorNewsletters({
                           {issue.themes.slice(0, 2).map((t) => (
                             <span
                               key={t}
-                              className="bg-muted text-muted-foreground hidden shrink-0 rounded-full px-2 py-0.5 sm:inline"
+                              className="hidden shrink-0 rounded-full bg-muted px-2 py-0.5 text-muted-foreground sm:inline"
                             >
                               {t}
                             </span>

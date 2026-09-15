@@ -66,7 +66,7 @@ export function DatePickerField<
           {label && (
             <FormLabel>
               {label}
-              {required && <span className="text-destructive ml-1">*</span>}
+              {required && <span className="ml-1 text-destructive">*</span>}
             </FormLabel>
           )}
           <Popover>
@@ -252,7 +252,7 @@ export function NaturalDatePickerField<
           {label && (
             <FormLabel>
               {label}
-              {required && <span className="text-destructive ml-1">*</span>}
+              {required && <span className="ml-1 text-destructive">*</span>}
             </FormLabel>
           )}
           <NaturalDatePickerInput
@@ -342,7 +342,7 @@ export function Calendar29() {
           </PopoverContent>
         </Popover>
       </div>
-      <div className="text-muted-foreground px-1 text-sm">
+      <div className="px-1 text-sm text-muted-foreground">
         Your post will be published on{" "}
         <span className="font-medium">{formatDate(date)}</span>.
       </div>

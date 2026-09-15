@@ -38,7 +38,11 @@ const FORCE = process.argv.includes("--force");
 //   B — HTML, link, no image.   C — HTML, link + image.
 // (Plaintext bodies that contain a raw https URL get stripped by Instantly, so B
 // uses HTML like C. Bonus: B-vs-C now isolates exactly the image effect.)
-const VARIANT_TEXT_ONLY: Record<string, boolean> = { A: true, B: false, C: false };
+const VARIANT_TEXT_ONLY: Record<string, boolean> = {
+  A: true,
+  B: false,
+  C: false,
+};
 
 /**
  * Render our stored markdown-ish body to Instantly-compatible HTML. Instantly's
@@ -79,7 +83,15 @@ const schedule = {
       // value (it rejects "America/New_York").
       name: "Always on (test)",
       timing: { from: "00:00", to: "23:59" },
-      days: { "0": true, "1": true, "2": true, "3": true, "4": true, "5": true, "6": true },
+      days: {
+        "0": true,
+        "1": true,
+        "2": true,
+        "3": true,
+        "4": true,
+        "5": true,
+        "6": true,
+      },
       timezone: "America/Detroit",
     },
   ],
@@ -191,7 +203,9 @@ for (const program of programs) {
       ],
     });
     const leadId = res.created_leads?.[0]?.id ?? null;
-    console.log(`  pushed ${email} → lead ${leadId ?? "(check response)"} (uploaded ${res.leads_uploaded})`);
+    console.log(
+      `  pushed ${email} → lead ${leadId ?? "(check response)"} (uploaded ${res.leads_uploaded})`,
+    );
     await db
       .update(leadContactTable)
       .set({

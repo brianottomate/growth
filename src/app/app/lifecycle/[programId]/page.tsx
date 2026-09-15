@@ -42,7 +42,7 @@ export default async function ProgramFlowPage({
         <div>
           <Link
             href="/app/lifecycle"
-            className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs"
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="size-3" />
             Lifecycle
@@ -50,7 +50,7 @@ export default async function ProgramFlowPage({
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">
             {program.name}
           </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
+          <p className="mt-1 text-sm text-muted-foreground">
             {WORKSPACE_LABEL[program.workspace] ?? program.workspace} ·{" "}
             {program.steps.length} step
             {program.steps.length === 1 ? "" : "s"}

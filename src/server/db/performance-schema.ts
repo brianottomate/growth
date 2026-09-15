@@ -263,10 +263,10 @@ export type PerformanceCycleInsert = typeof performanceCycleTable.$inferInsert;
 
 // ---- REPORT (customer-facing snapshot for one cycle) ------------------------
 
-export const performanceReportStatusEnum = pgEnum(
-  "performance_report_status",
-  ["draft", "published"],
-);
+export const performanceReportStatusEnum = pgEnum("performance_report_status", [
+  "draft",
+  "published",
+]);
 export type PerformanceReportStatus =
   (typeof performanceReportStatusEnum.enumValues)[number];
 
@@ -368,7 +368,6 @@ export type PerformanceIntakeAnswers = {
   accountsConnected?: boolean;
   [key: string]: unknown;
 };
-
 
 /**
  * A completed Performance+ intake: the RECEIPT, not the state.

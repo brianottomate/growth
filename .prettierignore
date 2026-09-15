@@ -1,5 +1,0 @@
-# Preserved-byte fixtures: real provider responses and immutable run records.
-fixtures/blog/seo-engine-response.json
-fixtures/blog/runs/
-fixtures/blog/grounding/
-fixtures/pregen/

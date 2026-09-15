@@ -33,37 +33,60 @@ type EnrichResult = {
   company: string | null;
 };
 
-const DISQUALIFYING = /not a (property manager|pm)|marketplace|aggregator|dead|parked|single listing|software|saas/i;
+const DISQUALIFYING =
+  /not a (property manager|pm)|marketplace|aggregator|dead|parked|single listing|software|saas/i;
 
 function rankKey(r: EnrichResult): number {
   // Fit leads but portfolio size matters: a 1-unit host is not worth a pregen
   // site even at high fit, and the campaign skews enterprise.
   const units = Math.min(r.unitEstimate ?? 0, 500);
-  const conf = r.unitConfidence === "high" ? 1 : r.unitConfidence === "medium" ? 0.5 : 0;
+  const conf =
+    r.unitConfidence === "high" ? 1 : r.unitConfidence === "medium" ? 0.5 : 0;
   const tinyPenalty = r.unitEstimate != null && r.unitEstimate <= 3 ? 400 : 0;
-  return r.pregenFit * 10 + Math.log10(1 + units) * 80 + conf * 10 - tinyPenalty;
+  return (
+    r.pregenFit * 10 + Math.log10(1 + units) * 80 + conf * 10 - tinyPenalty
+  );
 }
 
-const FREEMAIL = /@(gmail|yahoo|hotmail|aol|outlook|msn|icloud|rediffmail|aim|cox|pacbell|comcast|att|cfl\.rr)\./i;
+const FREEMAIL =
+  /@(gmail|yahoo|hotmail|aol|outlook|msn|icloud|rediffmail|aim|cox|pacbell|comcast|att|cfl\.rr)\./i;
 
-function titleScore(title: string | null, email: string, companyDomain: string): number {
+function titleScore(
+  title: string | null,
+  email: string,
+  companyDomain: string,
+): number {
   let s = 0;
   if (title) {
     if (/owner|founder|ceo|president|principal|partner/i.test(title)) s += 30;
-    else if (/director|vp|vice|general manager|\bgm\b|coo|cmo|head of/i.test(title)) s += 20;
+    else if (
+      /director|vp|vice|general manager|\bgm\b|coo|cmo|head of/i.test(title)
+    )
+      s += 20;
     else s += 10;
   }
   if (email.endsWith(`@${companyDomain}`)) s += 15; // corporate email beats stale freemail
-  if (/^(info|hello|contact|admin|office|support|reservations|bookings|stay|frontdesk|sales)@/i.test(email)) s -= 25;
+  if (
+    /^(info|hello|contact|admin|office|support|reservations|bookings|stay|frontdesk|sales)@/i.test(
+      email,
+    )
+  )
+    s -= 25;
   return s;
 }
 
 /** Drop contacts with no name AND a freemail address — unverifiable junk. */
-function isCredible(c: { firstName: string | null; lastName: string | null; email: string }): boolean {
+function isCredible(c: {
+  firstName: string | null;
+  lastName: string | null;
+  email: string;
+}): boolean {
   return !!(c.firstName ?? c.lastName) || !FREEMAIL.test(c.email);
 }
 
-async function createLeadList(name: string): Promise<{ id: string; name: string }> {
+async function createLeadList(
+  name: string,
+): Promise<{ id: string; name: string }> {
   const res = await fetch("https://api.instantly.ai/api/v2/lead-lists", {
     method: "POST",
     headers: {
@@ -72,7 +95,10 @@ async function createLeadList(name: string): Promise<{ id: string; name: string 
     },
     body: JSON.stringify({ name }),
   });
-  if (!res.ok) throw new Error(`lead-list create failed: ${res.status} ${await res.text()}`);
+  if (!res.ok)
+    throw new Error(
+      `lead-list create failed: ${res.status} ${await res.text()}`,
+    );
   return (await res.json()) as { id: string; name: string };
 }
 
@@ -86,7 +112,9 @@ async function main() {
   const clean = results.filter(
     (r) => !r.error && !r.redFlags.some((f) => DISQUALIFYING.test(f)),
   );
-  console.log(`results=${results.length} errored=${errored.length} clean=${clean.length} → picking top ${TOP_N}\n`);
+  console.log(
+    `results=${results.length} errored=${errored.length} clean=${clean.length} → picking top ${TOP_N}\n`,
+  );
 
   // Pull contacts for the winning domains.
   const rows = await db
@@ -102,10 +130,16 @@ async function main() {
       pregenSiteUrl: leadDomainTable.pregenSiteUrl,
     })
     .from(leadContactTable)
-    .innerJoin(leadDomainTable, eq(leadDomainTable.id, leadContactTable.domainId))
+    .innerJoin(
+      leadDomainTable,
+      eq(leadDomainTable.id, leadContactTable.domainId),
+    )
     .where(
       and(
-        inArray(leadContactTable.domain, clean.map((t) => t.domain)),
+        inArray(
+          leadContactTable.domain,
+          clean.map((t) => t.domain),
+        ),
         isNull(leadContactTable.deletedAt),
       ),
     );
@@ -125,7 +159,11 @@ async function main() {
     if (picks.length >= TOP_N) break;
     const contacts = (byDomain.get(r.domain) ?? [])
       .filter(isCredible)
-      .sort((a, b) => titleScore(b.jobTitle, b.email, r.domain) - titleScore(a.jobTitle, a.email, r.domain))
+      .sort(
+        (a, b) =>
+          titleScore(b.jobTitle, b.email, r.domain) -
+          titleScore(a.jobTitle, a.email, r.domain),
+      )
       .slice(0, MAX_CONTACTS_PER_DOMAIN);
     if (!contacts.length) continue;
     picks.push({ result: r, contacts });
@@ -136,7 +174,9 @@ async function main() {
       `${r.domain.padEnd(36)} fit=${String(r.pregenFit).padStart(3)} units=${String(r.unitEstimate ?? "?").padStart(5)} (${r.unitConfidence}) ${r.tier.padEnd(9)} ${r.company ?? ""}`,
     );
     for (const c of contacts) {
-      console.log(`    ${c.email.padEnd(44)} ${[c.firstName, c.lastName].filter(Boolean).join(" ").padEnd(24)} ${c.jobTitle ?? ""}`);
+      console.log(
+        `    ${c.email.padEnd(44)} ${[c.firstName, c.lastName].filter(Boolean).join(" ").padEnd(24)} ${c.jobTitle ?? ""}`,
+      );
     }
   }
 
@@ -185,12 +225,16 @@ async function main() {
         console.log(`  ✓ ${c.email} → ${lead.id}`);
       } catch (e) {
         failed++;
-        console.log(`  ✗ ${c.email} → ${e instanceof Error ? e.message : String(e)}`);
+        console.log(
+          `  ✗ ${c.email} → ${e instanceof Error ? e.message : String(e)}`,
+        );
       }
     }
   }
 
-  console.log(`\nDone. uploaded=${uploaded} failed=${failed} list="${LIST_NAME}"`);
+  console.log(
+    `\nDone. uploaded=${uploaded} failed=${failed} list="${LIST_NAME}"`,
+  );
   process.exit(0);
 }
 

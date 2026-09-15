@@ -92,7 +92,11 @@ describe("assertMetaAdPayload", () => {
   it("accepts a conversions goal backed by a custom conversion on its own, never beside a pixel", () => {
     expect(() =>
       assertMetaAdPayload(
-        { ...base, goal: "conversions", promotedObject: { customConversionId: "cc_1" } },
+        {
+          ...base,
+          goal: "conversions",
+          promotedObject: { customConversionId: "cc_1" },
+        },
         account,
       ),
     ).not.toThrow();
@@ -475,7 +479,9 @@ describe("connectionRunsAsBrandPage", () => {
   });
 
   it("refuses an unreadable identity rather than assuming", () => {
-    expect(connectionRunsAsBrandPage(winterPark, { platformUserId: undefined })).toBe(false);
+    expect(
+      connectionRunsAsBrandPage(winterPark, { platformUserId: undefined }),
+    ).toBe(false);
   });
 
   it("passes any connection while the brand has no Page bound", () => {
@@ -529,7 +535,11 @@ describe("what a Meta ad set optimises toward", () => {
 
   it("keeps Wander's own brands on the raw event", async () => {
     const result = await metaPromotedObjectFor({
-      brand: { name: "Wander", relationship: "internal", website: "https://www.wander.com" },
+      brand: {
+        name: "Wander",
+        relationship: "internal",
+        website: "https://www.wander.com",
+      },
       meta: purchase,
       validateOnly: false,
       ensureCustomConversion: neverCalled,

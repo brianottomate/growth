@@ -109,16 +109,30 @@ async function main() {
   });
   if (!org) throw new Error("No 'wander' org — run the seed first.");
   const wander = await db.query.brandTable.findFirst({
-    where: and(eq(brandTable.slug, "wander"), eq(brandTable.organizationId, org.id)),
+    where: and(
+      eq(brandTable.slug, "wander"),
+      eq(brandTable.organizationId, org.id),
+    ),
   });
   if (!wander) throw new Error("No 'wander' brand.");
   const dispatch = await db.query.channelTable.findFirst({
-    where: and(eq(channelTable.brandId, wander.id), eq(channelTable.kind, "newsletter")),
+    where: and(
+      eq(channelTable.brandId, wander.id),
+      eq(channelTable.kind, "newsletter"),
+    ),
   });
-  console.log(`✓ target: brand=${wander.id} newsletterChannel=${dispatch?.id ?? "—"}`);
+  console.log(
+    `✓ target: brand=${wander.id} newsletterChannel=${dispatch?.id ?? "—"}`,
+  );
 
   // ---- 1. Newsletters (broadcasts) → platform_post --------------------
-  const all: { id: number; name: string; sent_at?: number; created?: number; updated?: number }[] = [];
+  const all: {
+    id: number;
+    name: string;
+    sent_at?: number;
+    created?: number;
+    updated?: number;
+  }[] = [];
   let start: string | undefined;
   do {
     const data = await cio<{ newsletters?: typeof all; next?: string }>(
@@ -131,7 +145,9 @@ async function main() {
   const in2026 = all.filter(
     (n) => num(n.sent_at) >= Y2026 || (!n.sent_at && num(n.updated) >= Y2026),
   );
-  const sent2026 = in2026.filter((n) => n.sent_at).sort((a, b) => num(b.sent_at) - num(a.sent_at));
+  const sent2026 = in2026
+    .filter((n) => n.sent_at)
+    .sort((a, b) => num(b.sent_at) - num(a.sent_at));
   const drafts2026 = in2026.filter((n) => !n.sent_at);
   // Bound metric calls: enrich the most recent sends only.
   const enrich = new Set(sent2026.slice(0, 60).map((n) => n.id));
@@ -141,7 +157,12 @@ async function main() {
 
   await db
     .delete(platformPostTable)
-    .where(and(eq(platformPostTable.brandId, wander.id), eq(platformPostTable.externalKind, "broadcast")));
+    .where(
+      and(
+        eq(platformPostTable.brandId, wander.id),
+        eq(platformPostTable.externalKind, "broadcast"),
+      ),
+    );
 
   const ppRows: (typeof platformPostTable.$inferInsert)[] = [];
   for (const n of in2026) {
@@ -154,7 +175,8 @@ async function main() {
           `/newsletters/${n.id}/metrics?period=months&steps=12`,
         );
         const series = m.metric?.series ?? {};
-        const sum = (k: string) => (series[k] ?? []).reduce((a, b) => a + (b || 0), 0);
+        const sum = (k: string) =>
+          (series[k] ?? []).reduce((a, b) => a + (b || 0), 0);
         stats = {
           sent: sum("sent"),
           delivered: sum("delivered"),
@@ -236,7 +258,12 @@ async function main() {
 
   await db
     .delete(lifecycleCampaignTable)
-    .where(and(eq(lifecycleCampaignTable.brandId, wander.id), eq(lifecycleCampaignTable.provider, "customerio")));
+    .where(
+      and(
+        eq(lifecycleCampaignTable.brandId, wander.id),
+        eq(lifecycleCampaignTable.provider, "customerio"),
+      ),
+    );
 
   // Campaigns (journeys)
   const campaigns =
@@ -261,7 +288,9 @@ async function main() {
       externalId: String(c.id),
       externalUrl: `${UI}/campaigns/${c.id}`,
       ...carried("campaign", String(c.id), draftish ? "candidate" : "keep"),
-      startedAt: c.first_started ? new Date(num(c.first_started) * 1000) : undefined,
+      startedAt: c.first_started
+        ? new Date(num(c.first_started) * 1000)
+        : undefined,
       metadata: { type, active: c.active },
     });
     const actions = c.actions ?? [];
@@ -279,11 +308,14 @@ async function main() {
       touchpointCount += msgs.length;
     }
   }
-  console.log(`✓ inserted ${campaigns.length} campaigns + ${touchpointCount} touchpoints`);
+  console.log(
+    `✓ inserted ${campaigns.length} campaigns + ${touchpointCount} touchpoints`,
+  );
 
   // Transactional messages
   const tx =
-    (await cio<{ messages?: CioTransactional[] }>(`/transactional`)).messages ?? [];
+    (await cio<{ messages?: CioTransactional[] }>(`/transactional`)).messages ??
+    [];
   for (const m of tx) {
     const name = m.name || "Untitled";
     const draftish = DUP_RX.test(name);
@@ -301,7 +333,11 @@ async function main() {
       provider: "customerio",
       externalId: String(m.id),
       externalUrl: `${UI}/transactional/${m.id}`,
-      ...carried("transactional", String(m.id), draftish ? "candidate" : "keep"),
+      ...carried(
+        "transactional",
+        String(m.id),
+        draftish ? "candidate" : "keep",
+      ),
     });
   }
   console.log(`✓ inserted ${tx.length} transactional as lifecycle_campaign`);

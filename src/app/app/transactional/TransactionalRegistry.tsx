@@ -146,9 +146,9 @@ export function TransactionalRegistry({
 
   return (
     <div className="mt-6">
-      <div className="text-muted-foreground flex flex-wrap gap-x-5 gap-y-1 border-b pb-4 text-sm">
+      <div className="flex flex-wrap gap-x-5 gap-y-1 border-b pb-4 text-sm text-muted-foreground">
         <span>
-          <span className="text-foreground font-medium">{counts.total}</span>{" "}
+          <span className="font-medium text-foreground">{counts.total}</span>{" "}
           live messages
         </span>
         <span>
@@ -162,11 +162,11 @@ export function TransactionalRegistry({
           code-owned
         </span>
         <span>
-          <span className="text-foreground font-medium">{counts.matched}</span>{" "}
+          <span className="font-medium text-foreground">{counts.matched}</span>{" "}
           matched to a design-system template
         </span>
         <span>
-          <span className="text-foreground font-medium">{counts.dead}</span>{" "}
+          <span className="font-medium text-foreground">{counts.dead}</span>{" "}
           dead env vars
         </span>
       </div>
@@ -175,7 +175,7 @@ export function TransactionalRegistry({
         <section key={domain} className="mt-8">
           <h2 className="text-sm font-semibold tracking-wide uppercase">
             {DOMAIN_LABEL[domain] ?? domain}
-            <span className="text-muted-foreground ml-2 font-normal">
+            <span className="ml-2 font-normal text-muted-foreground">
               {rows.length}
             </span>
           </h2>
@@ -187,7 +187,7 @@ export function TransactionalRegistry({
                   key={m.id}
                   type="button"
                   onClick={() => setSelectedId(m.id)}
-                  className="hover:bg-muted/40 flex w-full items-center gap-3 px-4 py-3 text-left"
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted/40"
                 >
                   <span
                     className={`size-1.5 shrink-0 rounded-full ${meta.dot}`}
@@ -196,7 +196,7 @@ export function TransactionalRegistry({
                     <span className="block truncate text-sm font-medium">
                       {m.name}
                     </span>
-                    <span className="text-muted-foreground block truncate text-xs">
+                    <span className="block truncate text-xs text-muted-foreground">
                       {m.subject ?? triggerSummary(m)}
                     </span>
                   </span>
@@ -215,7 +215,8 @@ export function TransactionalRegistry({
                   ) : m.status !== "dead" ? (
                     <Badge
                       variant="outline"
-                      className="text-muted-foreground hidden md:inline-flex"
+                      tone="muted"
+                      className="hidden md:inline-flex"
                     >
                       template gap
                     </Badge>
@@ -290,7 +291,7 @@ function MessageSheet({
 
         <div className="space-y-6 px-4 pb-8">
           {message.description && (
-            <p className="text-muted-foreground text-sm">
+            <p className="text-sm text-muted-foreground">
               {message.description}
             </p>
           )}
@@ -320,7 +321,7 @@ function MessageSheet({
             <span>
               {message.provider}
               {provider?.envVar && (
-                <span className="text-muted-foreground block font-mono text-xs">
+                <span className="block font-mono text-xs text-muted-foreground">
                   {provider.envVar}
                   {provider.defaultId ? ` (default ${provider.defaultId})` : ""}
                 </span>
@@ -351,7 +352,7 @@ function MessageSheet({
           <section>
             <h3 className="text-sm font-semibold">Trigger</h3>
             <p className="mt-1 text-sm">{triggerSummary(message)}</p>
-            <p className="text-muted-foreground mt-1 text-xs">
+            <p className="mt-1 text-xs text-muted-foreground">
               {message.triggerKind === "event" &&
                 "Fires at the moment of the product event."}
               {message.triggerKind === "anchored" &&
@@ -368,7 +369,11 @@ function MessageSheet({
                 {message.codeRefs.map((ref) => (
                   <li key={`${ref.role}:${ref.path}:${ref.line ?? 0}`}>
                     {ref.role && (
-                      <Badge variant="outline" className="mr-2 text-[10px]">
+                      <Badge
+                        variant="outline"
+                        textSize="caption"
+                        className="mr-2"
+                      >
                         {ref.role}
                       </Badge>
                     )}
@@ -382,7 +387,7 @@ function MessageSheet({
                       {ref.line ? `:${ref.line}` : ""}
                     </a>
                     {ref.note && (
-                      <span className="text-muted-foreground ml-2 text-xs">
+                      <span className="ml-2 text-xs text-muted-foreground">
                         {ref.note}
                       </span>
                     )}
@@ -396,7 +401,7 @@ function MessageSheet({
             <section>
               <h3 className="text-sm font-semibold">
                 Data contract{" "}
-                <span className="text-muted-foreground font-normal">
+                <span className="font-normal text-muted-foreground">
                   (keys must stay stable across template/provider swaps)
                 </span>
               </h3>
@@ -424,7 +429,7 @@ function MessageSheet({
             {message.templateKey ? (
               <p className="mt-1 font-mono text-xs">{message.templateKey}</p>
             ) : (
-              <p className="text-muted-foreground mt-1 text-sm">
+              <p className="mt-1 text-sm text-muted-foreground">
                 No design-system template matched — build one in
                 design-system/packages/emails.
               </p>
@@ -432,7 +437,7 @@ function MessageSheet({
             {message.templateSource === "cio_ui" &&
               message.templateKey &&
               message.status === "live_legacy" && (
-                <p className="text-muted-foreground mt-1 text-xs">
+                <p className="mt-1 text-xs text-muted-foreground">
                   Live HTML is still authored in the Customer.io UI; the key
                   above is the candidate react-email replacement.
                 </p>
@@ -443,12 +448,12 @@ function MessageSheet({
             <section>
               <h3 className="text-sm font-semibold">
                 Preview{" "}
-                <span className="text-muted-foreground font-normal">
+                <span className="font-normal text-muted-foreground">
                   (react-email, placeholder data)
                 </span>
               </h3>
               {previewLoading && (
-                <p className="text-muted-foreground mt-1 text-sm">Rendering…</p>
+                <p className="mt-1 text-sm text-muted-foreground">Rendering…</p>
               )}
               {preview && !preview.ok && (
                 <p className="mt-1 text-sm text-amber-300">{preview.error}</p>
@@ -458,7 +463,7 @@ function MessageSheet({
                   title={`${message.key} preview`}
                   srcDoc={preview.html}
                   sandbox=""
-                  className="bg-background mt-2 h-[480px] w-full rounded-md border"
+                  className="mt-2 h-[480px] w-full rounded-md border bg-background"
                 />
               )}
             </section>
@@ -467,7 +472,8 @@ function MessageSheet({
           <section>
             <h3 className="text-sm font-semibold">Notes</h3>
             <Textarea
-              className="mt-1 text-sm"
+              textSize="sm"
+              className="mt-1"
               rows={3}
               value={notesDraft ?? message.notes ?? ""}
               onChange={(e) => setNotesDraft(e.target.value)}

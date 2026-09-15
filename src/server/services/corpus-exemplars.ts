@@ -20,9 +20,7 @@ import { salesEmailCorpusTable } from "@/server/db/leads-schema";
  * text — a model reading "please stop emailing me" under an exemplar treats it
  * accordingly, where a bare thumbs-up label would mislead.
  */
-export async function winningExemplarsBlock(
-  count = 3,
-): Promise<string | null> {
+export async function winningExemplarsBlock(count = 3): Promise<string | null> {
   try {
     const winners = await db
       .select()

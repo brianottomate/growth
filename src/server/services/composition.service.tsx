@@ -236,7 +236,9 @@ async function loadChosenMark(mark: BrandMark): Promise<LogoImage | null> {
   return {
     ...color,
     src: mark.vector?.color ? svg(mark.vector.color) : color.src,
-    inverse: mark.vector ? svg(mark.vector.white) : (white?.src ?? color.inverse),
+    inverse: mark.vector
+      ? svg(mark.vector.white)
+      : (white?.src ?? color.inverse),
     dark: mark.vector ? svg(mark.vector.dark) : (dark?.src ?? color.dark),
     small: false,
   };
@@ -310,9 +312,7 @@ function BrandMark({
     // carries the name. Only a favicon-sized icon gets the name beside it.
     const alone = !logo.small;
     const wide = logo.width / logo.height > 2;
-    const height = alone
-      ? Math.round(markSize * (wide ? 1.2 : 2.4))
-      : markSize;
+    const height = alone ? Math.round(markSize * (wide ? 1.2 : 2.4)) : markSize;
     const width = Math.round((height * logo.width) / logo.height);
     return (
       <div
@@ -326,7 +326,7 @@ function BrandMark({
           letterSpacing: "-0.02em",
         }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {/* oxlint-disable-next-line nextjs/no-img-element */}
         <img
           src={
             tone === "white" || (tone === "auto" && inverse)
@@ -499,7 +499,8 @@ function renderInputs(
   return {
     ...getCompositionIdentity(spec),
     brandName: context.brand.name,
-    brandLogo: context.brand.brandMark?.variants.color ?? context.brand.logo ?? null,
+    brandLogo:
+      context.brand.brandMark?.variants.color ?? context.brand.logo ?? null,
     fontFamily: brandFontFamily(context.brand.brandIdentity),
     renderedAccent: resolveAccent(spec, context),
   };
@@ -519,8 +520,24 @@ export function catalogHeadline(
 
 /** Where a hook hands over to the place: the word that goes down with the place. */
 const HOOK_PREPOSITIONS = new Set([
-  "in", "at", "on", "near", "by", "above", "below", "beside", "overlooking",
-  "outside", "inside", "from", "of", "for", "to", "off", "along", "across",
+  "in",
+  "at",
+  "on",
+  "near",
+  "by",
+  "above",
+  "below",
+  "beside",
+  "overlooking",
+  "outside",
+  "inside",
+  "from",
+  "of",
+  "for",
+  "to",
+  "off",
+  "along",
+  "across",
 ]);
 
 /**
@@ -531,7 +548,8 @@ const HOOK_PREPOSITIONS = new Set([
  * its own line. Exported so the art director is told the same breaks.
  */
 export function placeStatement(
-  spec: Pick<CompositionSpec, "title" | "formatId"> & Partial<Pick<CompositionSpec, "eyebrow">>,
+  spec: Pick<CompositionSpec, "title" | "formatId"> &
+    Partial<Pick<CompositionSpec, "eyebrow">>,
 ) {
   const perLine = spec.formatId === "square" ? 24 : 28;
   const place = clamp(spec.title.trim(), 40);
@@ -541,7 +559,10 @@ export function placeStatement(
   const last = words.at(-1)?.toLowerCase() ?? "";
   const handover = HOOK_PREPOSITIONS.has(last) ? words.pop()! : null;
   const placeLine = handover ? `${handover} ${place}` : place;
-  return [...wrapText(words.join(" "), perLine), ...wrapText(placeLine, perLine)].slice(0, 3);
+  return [
+    ...wrapText(words.join(" "), perLine),
+    ...wrapText(placeLine, perLine),
+  ].slice(0, 3);
 }
 
 export function renderComposition(
@@ -590,7 +611,7 @@ export function renderComposition(
           background: "#111111",
         }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {/* oxlint-disable-next-line nextjs/no-img-element */}
         <img
           src={context.sourceImage!}
           alt=""
@@ -640,7 +661,13 @@ export function renderComposition(
             }}
           >
             {headlineLines.map((line, index) => (
-              <div key={index} style={{ display: "flex", justifyContent: story ? "center" : "flex-start" }}>
+              <div
+                key={index}
+                style={{
+                  display: "flex",
+                  justifyContent: story ? "center" : "flex-start",
+                }}
+              >
                 {line}
               </div>
             ))}
@@ -649,7 +676,15 @@ export function renderComposition(
             story ? (
               // Stories and Reels lay their own UI over the bottom fifth of
               // the frame, so the line sits above that band.
-              <div style={{ display: "flex", color: "#ffffff", fontSize: 34, fontWeight: 600, marginBottom: 300 }}>
+              <div
+                style={{
+                  display: "flex",
+                  color: "#ffffff",
+                  fontSize: 34,
+                  fontWeight: 600,
+                  marginBottom: 300,
+                }}
+              >
                 {button}
               </div>
             ) : (
@@ -685,7 +720,7 @@ export function renderComposition(
           background: "#111111",
         }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {/* oxlint-disable-next-line nextjs/no-img-element */}
         <img
           src={context.sourceImage!}
           alt=""
@@ -717,7 +752,12 @@ export function renderComposition(
             padding,
           }}
         >
-          <BrandMark brandName={context.brand.name} logo={context.logo} tone={spec.mark} inverse />
+          <BrandMark
+            brandName={context.brand.name}
+            logo={context.logo}
+            tone={spec.mark}
+            inverse
+          />
           <div style={{ display: "flex", maxWidth: portrait ? "92%" : "64%" }}>
             <Message spec={spec} color="#ffffff" titleSize={titleSize} />
           </div>
@@ -747,7 +787,11 @@ export function renderComposition(
             height: portrait ? "43%" : "100%",
           }}
         >
-          <BrandMark brandName={context.brand.name} logo={context.logo} tone={spec.mark} />
+          <BrandMark
+            brandName={context.brand.name}
+            logo={context.logo}
+            tone={spec.mark}
+          />
           <Message spec={spec} color="#111111" titleSize={portrait ? 72 : 62} />
         </div>
         <div
@@ -760,7 +804,7 @@ export function renderComposition(
             boxShadow: "0 24px 60px rgba(0,0,0,0.24)",
           }}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {/* oxlint-disable-next-line nextjs/no-img-element */}
           <img
             src={context.sourceImage!}
             alt=""
@@ -788,7 +832,7 @@ export function renderComposition(
           background: "#111111",
         }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {/* oxlint-disable-next-line nextjs/no-img-element */}
         <img
           src={context.sourceImage!}
           alt=""
@@ -820,7 +864,12 @@ export function renderComposition(
             padding,
           }}
         >
-          <BrandMark brandName={context.brand.name} logo={context.logo} tone={spec.mark} inverse />
+          <BrandMark
+            brandName={context.brand.name}
+            logo={context.logo}
+            tone={spec.mark}
+            inverse
+          />
           <div style={{ display: "flex", flexDirection: "column" }}>
             <div
               style={{
@@ -874,7 +923,9 @@ export function renderComposition(
           }}
         >
           <BrandMark
-            brandName={context.brand.name} logo={context.logo} tone={spec.mark}
+            brandName={context.brand.name}
+            logo={context.logo}
+            tone={spec.mark}
             markSize={square ? 48 : 42}
             textSize={square ? 30 : 27}
           />
@@ -970,7 +1021,7 @@ export function renderComposition(
             boxShadow: "0 28px 70px rgba(24,24,27,0.16)",
           }}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {/* oxlint-disable-next-line nextjs/no-img-element */}
           <img
             src={context.sourceImage!}
             alt=""
@@ -1009,7 +1060,7 @@ export function renderComposition(
           background: "#000000",
         }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {/* oxlint-disable-next-line nextjs/no-img-element */}
         <img
           src={context.sourceImage!}
           alt=""
@@ -1055,7 +1106,12 @@ export function renderComposition(
             left: pad,
           }}
         >
-          <BrandMark brandName={context.brand.name} logo={context.logo} tone={spec.mark} inverse />
+          <BrandMark
+            brandName={context.brand.name}
+            logo={context.logo}
+            tone={spec.mark}
+            inverse
+          />
         </div>
         <div
           style={{
@@ -1124,7 +1180,7 @@ export function renderComposition(
           background: "#000000",
         }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {/* oxlint-disable-next-line nextjs/no-img-element */}
         <img
           src={context.sourceImage!}
           alt=""
@@ -1206,7 +1262,9 @@ export function renderComposition(
                 }}
               >
                 <Stars count={1} size={Math.round(26 * scale)} />
-                <div style={{ display: "flex" }}>{`${rating.toFixed(1)} guest rating`}</div>
+                <div
+                  style={{ display: "flex" }}
+                >{`${rating.toFixed(1)} guest rating`}</div>
               </div>
             </div>
           ) : null}
@@ -1236,7 +1294,7 @@ export function renderComposition(
           background: "#000000",
         }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {/* oxlint-disable-next-line nextjs/no-img-element */}
         <img
           src={context.sourceImage!}
           alt=""
@@ -1287,7 +1345,9 @@ export function renderComposition(
           }}
         >
           <BrandMark
-            brandName={context.brand.name} logo={context.logo} tone={spec.mark}
+            brandName={context.brand.name}
+            logo={context.logo}
+            tone={spec.mark}
             inverse
             markSize={40}
             textSize={26}
@@ -1342,7 +1402,14 @@ export function renderComposition(
             }}
           >
             {centred ? (
-              <div style={{ display: "flex", color: "#ffffff", fontSize: 28, fontWeight: 600 }}>
+              <div
+                style={{
+                  display: "flex",
+                  color: "#ffffff",
+                  fontSize: 28,
+                  fontWeight: 600,
+                }}
+              >
                 {clamp(spec.cta, 60)}
               </div>
             ) : (
@@ -1375,7 +1442,7 @@ export function renderComposition(
           background: "#000000",
         }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {/* oxlint-disable-next-line nextjs/no-img-element */}
         <img
           src={context.sourceImage!}
           alt=""
@@ -1418,7 +1485,12 @@ export function renderComposition(
             opacity: 0.22,
           }}
         />
-        <BrandMark brandName={context.brand.name} logo={context.logo} tone={spec.mark} inverse />
+        <BrandMark
+          brandName={context.brand.name}
+          logo={context.logo}
+          tone={spec.mark}
+          inverse
+        />
         <div
           style={{
             display: "flex",
@@ -1458,7 +1530,9 @@ export function renderComposition(
   const fontFamily = context.fonts?.[0]?.name;
   return new ImageResponse(
     fontFamily ? (
-      <div style={{ display: "flex", width: "100%", height: "100%", fontFamily }}>
+      <div
+        style={{ display: "flex", width: "100%", height: "100%", fontFamily }}
+      >
         {content}
       </div>
     ) : (
@@ -1640,8 +1714,9 @@ export async function openComposition(input: {
     ),
     columns: { id: true, brandId: true, title: true, metadata: true },
   });
-  const stored = (asset?.metadata as { composition?: Record<string, unknown> } | null)
-    ?.composition;
+  const stored = (
+    asset?.metadata as { composition?: Record<string, unknown> } | null
+  )?.composition;
   if (!asset?.brandId || !stored) {
     throw new CompositionAccessError("That asset is not a composition", 404);
   }

@@ -127,7 +127,7 @@ export function NewCampaignButton({
               onChange={(event) => setName(event.target.value)}
               placeholder="WANDER_PROSPECTING_PURCHASES"
             />
-            <p className="text-muted-foreground text-xs">
+            <p className="text-xs text-muted-foreground">
               {isClient
                 ? "META_PERF+BRAND_SALES_PURCHASE_YYYYMM. Finance filters client spend on PERF+, so it leads."
                 : "BRAND_STRATEGY_OBJECTIVE, upper snake case. Change the strategy or objective to match the campaign."}
@@ -176,7 +176,7 @@ export function NewCampaignButton({
               onChange={(event) => setLandingUrl(event.target.value)}
               placeholder="https://…"
             />
-            <p className="text-muted-foreground text-xs">
+            <p className="text-xs text-muted-foreground">
               Where the ads send people. A property or offer page converts far
               better than the homepage.
             </p>
@@ -195,7 +195,7 @@ export function NewCampaignButton({
                 }}
                 placeholder={String(DEFAULT_BUDGET_USD)}
               />
-              <p className="text-muted-foreground text-xs">
+              <p className="text-xs text-muted-foreground">
                 {prefilled?.mediaBudgetDollars != null
                   ? `From their intake: $${prefilled.mediaBudgetDollars.toLocaleString()}/mo`
                   : `Defaults to $${DEFAULT_BUDGET_USD.toLocaleString()}. Advisory; each platform draft sets its own.`}
@@ -216,7 +216,7 @@ export function NewCampaignButton({
             (prefilled.allProperties ||
               prefilled.propertyUrls.length > 0 ||
               geoSummary) && (
-              <p className="text-muted-foreground text-xs">
+              <p className="text-xs text-muted-foreground">
                 Also from their intake:{" "}
                 {[
                   prefilled.allProperties

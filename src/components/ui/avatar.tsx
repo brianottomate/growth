@@ -1,14 +1,28 @@
 "use client";
+import { cva, type VariantProps } from "class-variance-authority";
 
 import type * as React from "react";
 import * as AvatarPrimitive from "@radix-ui/react-avatar";
 
 import { cn } from "./index";
 
+const avatarStyleVariants = cva("", {
+  variants: {
+    frame: {
+      light: "border-2 border-white",
+      surface: "border-2 bg-background shadow-sm",
+    },
+  },
+});
+
 function Avatar({
-  className,
+  className: customClassName,
+  frame,
   ...props
-}: React.ComponentProps<typeof AvatarPrimitive.Root>) {
+}: React.ComponentProps<typeof AvatarPrimitive.Root> &
+  VariantProps<typeof avatarStyleVariants>) {
+  const className = cn(avatarStyleVariants({ frame }), customClassName);
+
   return (
     <AvatarPrimitive.Root
       data-slot="avatar"
@@ -34,15 +48,35 @@ function AvatarImage({
   );
 }
 
+const avatarFallbackStyleVariants = cva("", {
+  variants: {
+    tone: {
+      primary: "bg-primary text-primary-foreground",
+      foreground: "text-foreground",
+    },
+    textSize: { xs: "text-xs", lg: "text-lg" },
+    weight: { semibold: "font-semibold" },
+  },
+});
+
 function AvatarFallback({
-  className,
+  className: customClassName,
+  tone,
+  textSize,
+  weight,
   ...props
-}: React.ComponentProps<typeof AvatarPrimitive.Fallback>) {
+}: React.ComponentProps<typeof AvatarPrimitive.Fallback> &
+  VariantProps<typeof avatarFallbackStyleVariants>) {
+  const className = cn(
+    avatarFallbackStyleVariants({ tone, textSize, weight }),
+    customClassName,
+  );
+
   return (
     <AvatarPrimitive.Fallback
       data-slot="avatar-fallback"
       className={cn(
-        "bg-muted flex size-full items-center justify-center rounded-full",
+        "flex size-full items-center justify-center rounded-full bg-muted",
         className,
       )}
       {...props}

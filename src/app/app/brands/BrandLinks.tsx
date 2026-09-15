@@ -132,13 +132,13 @@ export function BrandLinksDialog({
                 return (
                   <div
                     key={`${l.label}-${i}`}
-                    className="hover:bg-accent group flex items-center gap-2 rounded px-2 py-1.5 text-sm"
+                    className="group flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-accent"
                   >
-                    <Icon className="text-muted-foreground size-3.5 shrink-0" />
+                    <Icon className="size-3.5 shrink-0 text-muted-foreground" />
                     <span className="min-w-0 flex-1 truncate">
                       {l.label}
                       {!l.url && (
-                        <span className="text-muted-foreground ml-1.5 text-[11px]">
+                        <span className="ml-1.5 text-[11px] text-muted-foreground">
                           no URL yet
                         </span>
                       )}
@@ -167,7 +167,7 @@ export function BrandLinksDialog({
               })}
             </div>
           ) : (
-            <p className="text-muted-foreground text-xs">No links yet.</p>
+            <p className="text-xs text-muted-foreground">No links yet.</p>
           )}
 
           <div className="grid grid-cols-[1fr_1.6fr_auto] items-end gap-2">

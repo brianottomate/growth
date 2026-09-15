@@ -5,8 +5,7 @@ import type {
   GrowthCapabilityId,
 } from "@/lib/growth-capabilities";
 
-export type GrowthSurface =
-  "overview-chat" | "mcp" | "invoke-growth" | "test";
+export type GrowthSurface = "overview-chat" | "mcp" | "invoke-growth" | "test";
 export type GrowthToolConsequence =
   | "local-read"
   | "provider-read"

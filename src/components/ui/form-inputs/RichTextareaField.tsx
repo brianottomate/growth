@@ -133,7 +133,7 @@ export function RichTextareaField<
             {label && (
               <FormLabel>
                 {label}
-                {required && <span className="text-destructive ml-1">*</span>}
+                {required && <span className="ml-1 text-destructive">*</span>}
               </FormLabel>
             )}
             <FormControl>
@@ -160,7 +160,7 @@ export function RichTextareaField<
             <div className="flex items-center justify-between">
               <FormMessage />
               {maxLength && (
-                <span className="text-muted-foreground text-xs">
+                <span className="text-xs text-muted-foreground">
                   {characterCount}/{maxLength} characters
                 </span>
               )}

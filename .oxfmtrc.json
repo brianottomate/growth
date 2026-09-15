@@ -1,0 +1,41 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  // Same options the old prettier.config.js set explicitly. oxfmt's own
+  // default printWidth is 100; 80 keeps parity with Prettier.
+  "semi": true,
+  "singleQuote": false,
+  "tabWidth": 2,
+  "trailingComma": "all",
+  "printWidth": 80,
+  "bracketSpacing": true,
+  "arrowParens": "always",
+  "endOfLine": "lf",
+  "sortPackageJson": false,
+  // Replaces prettier-plugin-tailwindcss. Tailwind v4 needs the entry
+  // stylesheet to recognise @plugin/@import-provided utilities and the
+  // design-system tokens; without it they sort as unknown classes.
+  "sortTailwindcss": {
+    "stylesheet": "./src/styles/globals.css",
+    "functions": ["cn", "clsx", "cva", "twMerge"]
+  },
+  "ignorePatterns": [
+    // Prettier only ever ran on ts/tsx/js/jsx/mdx/json here. Keep that scope,
+    // plus .mjs/.cjs which oxfmt picks up by default.
+    "**/*.md",
+    "**/*.yml",
+    "**/*.yaml",
+    "**/*.css",
+    "**/*.html",
+    "**/*.toml",
+    "agents/**",
+    ".worktrees/**",
+    // drizzle-kit rewrites these on every `db:generate` in its own layout.
+    "drizzle/meta/**",
+    "scripts/amplitude-taxonomy/**",
+    // Preserved-byte fixtures: real provider responses and immutable run records.
+    "fixtures/blog/seo-engine-response.json",
+    "fixtures/blog/runs/**",
+    "fixtures/blog/grounding/**",
+    "fixtures/pregen/**"
+  ]
+}

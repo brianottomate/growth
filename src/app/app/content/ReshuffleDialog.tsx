@@ -60,7 +60,7 @@ export function ReshuffleDialog({
       setProposal(null);
       generate.mutate({ brandId, year });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
   }, [open]);
 
   const toggle = (
@@ -86,13 +86,13 @@ export function ReshuffleDialog({
       scrollable
     >
       {generate.isPending && (
-        <div className="text-muted-foreground flex items-center gap-2 py-8 text-sm">
+        <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" /> Looking at spacing, key
           dates, and gaps…
         </div>
       )}
       {generate.isError && (
-        <p className="text-destructive py-6 text-sm">
+        <p className="py-6 text-sm text-destructive">
           Couldn&apos;t generate suggestions. {generate.error.message}
         </p>
       )}
@@ -100,21 +100,21 @@ export function ReshuffleDialog({
       {proposal && !generate.isPending && (
         <div className="flex flex-col gap-5">
           {nothing && (
-            <p className="text-muted-foreground py-6 text-sm">
+            <p className="py-6 text-sm text-muted-foreground">
               Your calendar already looks well-spaced — no changes suggested.
             </p>
           )}
 
           {proposal.moves.length > 0 && (
             <div>
-              <h3 className="text-muted-foreground mb-2 text-xs font-semibold tracking-wider uppercase">
+              <h3 className="mb-2 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                 Moves · {proposal.moves.length}
               </h3>
               <div className="flex flex-col gap-1.5">
                 {proposal.moves.map((m, i) => (
                   <label
                     key={i}
-                    className="hover:bg-accent/40 flex cursor-pointer items-start gap-2.5 rounded-lg border p-2.5"
+                    className="flex cursor-pointer items-start gap-2.5 rounded-lg border p-2.5 hover:bg-accent/40"
                   >
                     <input
                       type="checkbox"
@@ -130,12 +130,12 @@ export function ReshuffleDialog({
                       <div className="truncate text-sm font-medium">
                         {m.title ?? "Untitled"}
                       </div>
-                      <div className="text-muted-foreground text-xs">
+                      <div className="text-xs text-muted-foreground">
                         <span className="tabular-nums">
                           {fmtDate(m.fromDate)}
                         </span>
                         {" → "}
-                        <span className="text-foreground font-medium tabular-nums">
+                        <span className="font-medium text-foreground tabular-nums">
                           {fmtDate(m.toDate)}
                         </span>
                         {" · "}
@@ -150,7 +150,7 @@ export function ReshuffleDialog({
 
           {proposal.slots.length > 0 && (
             <div>
-              <h3 className="text-muted-foreground mb-2 text-xs font-semibold tracking-wider uppercase">
+              <h3 className="mb-2 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                 New slots · {proposal.slots.length}
               </h3>
               <div className="flex flex-col gap-1.5">
@@ -159,7 +159,7 @@ export function ReshuffleDialog({
                   return (
                     <label
                       key={i}
-                      className="hover:bg-accent/40 flex cursor-pointer items-start gap-2.5 rounded-lg border border-dashed p-2.5"
+                      className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-dashed p-2.5 hover:bg-accent/40"
                     >
                       <input
                         type="checkbox"
@@ -175,13 +175,13 @@ export function ReshuffleDialog({
                         <div className="text-sm font-medium">
                           {fmtDate(s.date)} · {platformLabel(s.platform)}
                           {pillar && (
-                            <span className="text-muted-foreground font-normal">
+                            <span className="font-normal text-muted-foreground">
                               {" "}
                               · {pillar.name}
                             </span>
                           )}
                         </div>
-                        <div className="text-muted-foreground text-xs">
+                        <div className="text-xs text-muted-foreground">
                           {s.rationale}
                         </div>
                       </div>
@@ -196,7 +196,7 @@ export function ReshuffleDialog({
             <div className="flex items-center justify-end gap-2 border-t pt-3">
               <button
                 onClick={onClose}
-                className="border-border hover:bg-accent rounded-md border px-3 py-1.5 text-sm font-medium"
+                className="rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-accent"
               >
                 Cancel
               </button>
@@ -217,7 +217,7 @@ export function ReshuffleDialog({
                   })
                 }
                 disabled={selectedCount === 0 || apply.isPending}
-                className="bg-foreground text-background rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+                className="rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background disabled:opacity-50"
               >
                 {apply.isPending
                   ? "Applying…"

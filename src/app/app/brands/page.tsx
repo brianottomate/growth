@@ -1,6 +1,15 @@
 import { redirect } from "next/navigation";
 import { ExternalLink } from "lucide-react";
-import { and, count, eq, inArray, isNotNull, isNull, max, sql } from "drizzle-orm";
+import {
+  and,
+  count,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  max,
+  sql,
+} from "drizzle-orm";
 
 import { db } from "@/server/db";
 import {
@@ -78,18 +87,18 @@ function PeerBrandCard({
   return (
     <div
       id={`tracked-brand-${brand.id}`}
-      className="bg-card scroll-mt-24 rounded-2xl border p-4 shadow-sm"
+      className="scroll-mt-24 rounded-2xl border bg-card p-4 shadow-sm"
     >
       <div className="flex items-start gap-3.5">
         {brand.logo ? (
-          // eslint-disable-next-line @next/next/no-img-element
+          // oxlint-disable-next-line nextjs/no-img-element
           <img
             src={brand.logo}
             alt=""
             className="size-10 shrink-0 rounded-xl object-cover"
           />
         ) : (
-          <div className="bg-muted text-foreground flex size-10 shrink-0 items-center justify-center rounded-xl text-sm font-semibold">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-sm font-semibold text-foreground">
             {brand.name.slice(0, 2)}
           </div>
         )}
@@ -101,22 +110,22 @@ function PeerBrandCard({
                 href={brand.website}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-muted-foreground hover:text-foreground text-xs"
+                className="text-xs text-muted-foreground hover:text-foreground"
               >
                 {brand.website.replace(/^https?:\/\//, "")}
               </a>
             )}
-            <span className="text-muted-foreground text-[11px]">
+            <span className="text-[11px] text-muted-foreground">
               {trackedByLabel}
             </span>
           </div>
           {brand.tagline && (
-            <p className="text-muted-foreground mt-0.5 text-xs">
+            <p className="mt-0.5 text-xs text-muted-foreground">
               {brand.tagline}
             </p>
           )}
           {scrapeSummary && (
-            <p className="text-muted-foreground mt-1 text-xs">
+            <p className="mt-1 text-xs text-muted-foreground">
               {scrapeSummary}
             </p>
           )}
@@ -152,7 +161,7 @@ function PeerBrandCard({
                     {platformLabel(c.platform)}
                   </span>
                   {(c.handle || c.followerCount != null || posts > 0) && (
-                    <span className="text-muted-foreground text-[11px]">
+                    <span className="text-[11px] text-muted-foreground">
                       {c.handle}
                       {c.handle && c.followerCount != null && " · "}
                       {c.followerCount != null &&
@@ -168,7 +177,7 @@ function PeerBrandCard({
                     target="_blank"
                     rel="noopener noreferrer"
                     title="Open page"
-                    className="text-muted-foreground hover:text-foreground hover:bg-background ml-0.5 rounded p-1"
+                    className="ml-0.5 rounded p-1 text-muted-foreground hover:bg-background hover:text-foreground"
                   >
                     <ExternalLink className="size-3.5" />
                   </a>
@@ -199,7 +208,7 @@ export default async function BrandsPage() {
   const org = membership?.organization;
   if (!org) {
     return (
-      <div className="text-muted-foreground p-8">No organization found.</div>
+      <div className="p-8 text-muted-foreground">No organization found.</div>
     );
   }
 
@@ -297,7 +306,8 @@ export default async function BrandsPage() {
       access: intake?.zernioVerifiedAt != null,
       page: intake?.verifiedPageId != null,
       adAccount: intake?.verifiedAdAccountId != null,
-      homes: perfProperties.filter((row) => row.accountId === account.id).length,
+      homes: perfProperties.filter((row) => row.accountId === account.id)
+        .length,
       budget: cycle?.mediaBudget ?? intake?.mediaBudgetDollars ?? null,
       creative: Boolean(intake?.answers?.creativeDriveUrl),
     });
@@ -348,7 +358,12 @@ export default async function BrandsPage() {
           isNull(personaTable.deletedAt),
         ),
         orderBy: (t, { asc }) => asc(t.createdAt),
-        columns: { brandId: true, name: true, description: true, ageRanges: true },
+        columns: {
+          brandId: true,
+          name: true,
+          description: true,
+          ageRanges: true,
+        },
       })
     : [];
   const personaByBrand = new Map<string, PersonaLite>();
@@ -394,7 +409,10 @@ export default async function BrandsPage() {
           .from(mediaAssetTable)
           .where(usableMedia)
           .groupBy(mediaAssetTable.brandId),
-        db.select().from(rankedMedia).where(sql`${rankedMedia.rn} <= 6`),
+        db
+          .select()
+          .from(rankedMedia)
+          .where(sql`${rankedMedia.rn} <= 6`),
         db
           .select({
             brandId: platformAdTable.brandId,
@@ -406,10 +424,16 @@ export default async function BrandsPage() {
           .where(inArray(platformAdTable.brandId, brandIds)),
       ])
     : [[], [], []];
-  const liveAdsByBrand = new Map<string, { count: number; urls: Set<string> }>();
+  const liveAdsByBrand = new Map<
+    string,
+    { count: number; urls: Set<string> }
+  >();
   for (const ad of adRows) {
     if (!ad.brandId || ad.status?.toLowerCase() !== "active") continue;
-    const entry = liveAdsByBrand.get(ad.brandId) ?? { count: 0, urls: new Set() };
+    const entry = liveAdsByBrand.get(ad.brandId) ?? {
+      count: 0,
+      urls: new Set(),
+    };
     entry.count += 1;
     for (const m of ad.media ?? []) {
       entry.urls.add(m.url);
@@ -625,7 +649,7 @@ export default async function BrandsPage() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Brands</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
+          <p className="mt-1 text-sm text-muted-foreground">
             {clients.length} client{clients.length === 1 ? "" : "s"} ·{" "}
             {prospects.length} prospect{prospects.length === 1 ? "" : "s"} ·{" "}
             {ours.length} ours · {distinctTracked} tracked
@@ -638,7 +662,7 @@ export default async function BrandsPage() {
       </div>
 
       {brands.length === 0 && (
-        <p className="text-muted-foreground mt-10 text-sm">
+        <p className="mt-10 text-sm text-muted-foreground">
           No brands yet. Create your first one to get started.
         </p>
       )}

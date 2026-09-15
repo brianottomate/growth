@@ -48,7 +48,7 @@ type MappingRow = typeof conversionMappingTable.$inferSelect & {
 /** One platform's mapping(s) for one event, or an empty cell. */
 function Cell({ mappings }: { mappings: MappingRow[] }) {
   if (mappings.length === 0) {
-    return <span className="text-muted-foreground/40 text-xs">—</span>;
+    return <span className="text-xs text-muted-foreground/40">—</span>;
   }
   return (
     <div className="flex flex-col gap-1.5">
@@ -66,15 +66,15 @@ function Cell({ mappings }: { mappings: MappingRow[] }) {
                 {m.platformEventName}
               </span>
               {m.sources.length > 1 && (
-                <span className="text-muted-foreground rounded border px-1 text-[9px]">
+                <span className="rounded border px-1 text-[9px] text-muted-foreground">
                   shared
                 </span>
               )}
             </div>
-            <div className="text-muted-foreground flex items-center gap-1.5 text-[10px]">
+            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
               {m.externalConversionId ? (
                 <code
-                  className="bg-muted max-w-[160px] truncate rounded px-1 py-0.5 font-mono"
+                  className="max-w-[160px] truncate rounded bg-muted px-1 py-0.5 font-mono"
                   title={m.externalConversionId}
                 >
                   {m.externalConversionId}
@@ -182,12 +182,12 @@ export default async function ConversionsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">
             Ads · Conversions
           </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
+          <p className="mt-1 text-sm text-muted-foreground">
             What each ad platform should receive for every Wander funnel event —
             the intent, with its real-world status. Status is maintained by an
             AI pass against the wander.com / tracking code.
           </p>
-          <p className="text-muted-foreground mt-2 text-xs">
+          <p className="mt-2 text-xs text-muted-foreground">
             {events.length} events · {mappings.length} platform conversions ·{" "}
             {totalMapped} verified
           </p>
@@ -198,18 +198,18 @@ export default async function ConversionsPage() {
       </div>
 
       {brands.length === 0 && (
-        <p className="text-muted-foreground mt-8 text-sm">No brands yet.</p>
+        <p className="mt-8 text-sm text-muted-foreground">No brands yet.</p>
       )}
 
       {brands.map((brand) => {
         const brandEvents = eventsByBrand.get(brand.id) ?? [];
         return (
           <section key={brand.id} className="mt-8">
-            <h2 className="text-muted-foreground mb-3 text-xs font-semibold tracking-wider uppercase">
+            <h2 className="mb-3 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
               {brand.name}
             </h2>
             {brandEvents.length === 0 ? (
-              <p className="text-muted-foreground text-sm">
+              <p className="text-sm text-muted-foreground">
                 No conversion events yet.
               </p>
             ) : (
@@ -268,13 +268,13 @@ function FunnelGroup({
 }) {
   return (
     <>
-      <tr className="bg-muted/40 border-b">
+      <tr className="border-b bg-muted/40">
         <td
           colSpan={1 + AD_PLATFORMS.length}
           className="px-3 py-1.5 text-[11px] font-semibold tracking-wide uppercase"
         >
           {label}{" "}
-          <span className="text-muted-foreground font-normal tracking-normal normal-case">
+          <span className="font-normal tracking-normal text-muted-foreground normal-case">
             · {sub}
           </span>
         </td>
@@ -290,7 +290,7 @@ function FunnelGroup({
                 </span>
               )}
             </div>
-            <div className="text-muted-foreground mt-0.5 text-[11px]">
+            <div className="mt-0.5 text-[11px] text-muted-foreground">
               {e.canonicalEvent ? (
                 <code className="font-mono">{e.canonicalEvent}</code>
               ) : (

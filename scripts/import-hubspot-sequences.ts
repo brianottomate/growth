@@ -170,16 +170,14 @@ const PROGRAM_SEEDS: Array<{
     name: "WanderOS Re-engage",
     kind: "reactivation",
     priority: "should_have",
-    description:
-      "Re-engagement of previously-touched leads that went quiet.",
+    description: "Re-engagement of previously-touched leads that went quiet.",
   },
   {
     sequenceId: "306515803",
     name: "WanderOS Inbound — Standard (non-listed)",
     kind: "behavioral",
     priority: "must_have",
-    description:
-      "Follow-up cadence for standard (non-listed) inbound leads.",
+    description: "Follow-up cadence for standard (non-listed) inbound leads.",
   },
 ];
 

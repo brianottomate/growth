@@ -121,7 +121,7 @@ function Pill({
       onClick={onClick}
       className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
         active
-          ? "bg-foreground text-background border-foreground"
+          ? "border-foreground bg-foreground text-background"
           : "border-border text-muted-foreground hover:bg-accent"
       }`}
     >
@@ -129,7 +129,6 @@ function Pill({
     </button>
   );
 }
-
 
 export function LeadsClient() {
   const trpc = useTRPC();
@@ -339,7 +338,7 @@ export function LeadsClient() {
   return (
     <div>
       <h1 className="text-2xl font-semibold tracking-tight">Leads</h1>
-      <p className="text-muted-foreground mt-1 text-sm">
+      <p className="mt-1 text-sm text-muted-foreground">
         Domain-centric prospecting universe · BuiltWith + HubSpot + Instantly,
         deduped on domain
       </p>
@@ -372,14 +371,14 @@ export function LeadsClient() {
         </span>
         <button
           onClick={() => setShowCohortDetail(!showCohortDetail)}
-          className="text-muted-foreground hover:text-foreground underline underline-offset-2"
+          className="text-muted-foreground underline underline-offset-2 hover:text-foreground"
         >
           {showCohortDetail ? "hide cohort detail" : "cohort detail"}
         </button>
       </div>
 
       {showCohortDetail && (
-        <div className="border-border mt-2 grid gap-2 rounded-lg border p-3 text-xs lg:grid-cols-2">
+        <div className="mt-2 grid gap-2 rounded-lg border border-border p-3 text-xs lg:grid-cols-2">
           {(
             Object.entries(HUBSPOT_PREGEN_LISTS) as Array<
               [
@@ -408,7 +407,7 @@ export function LeadsClient() {
                   href={hubspotListUrl(config.company.id)}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-muted-foreground inline-flex items-center gap-1 hover:underline"
+                  className="inline-flex items-center gap-1 text-muted-foreground hover:underline"
                 >
                   HubSpot <ExternalLink className="size-3" />
                 </a>
@@ -420,7 +419,7 @@ export function LeadsClient() {
 
       {/* Population — one answer to "who am I looking at", then density. */}
       <div className="mt-6 flex flex-wrap items-center gap-2">
-        <span className="text-muted-foreground mr-1 text-xs">Population</span>
+        <span className="mr-1 text-xs text-muted-foreground">Population</span>
         {POPULATION_KEYS.map((key) => (
           <Pill
             key={key}
@@ -435,7 +434,7 @@ export function LeadsClient() {
           </Pill>
         ))}
         <span className="flex-1" />
-        <span className="text-muted-foreground mr-1 text-xs">View</span>
+        <span className="mr-1 text-xs text-muted-foreground">View</span>
         <Pill
           active={view === "compact"}
           onClick={() => void setView("compact")}
@@ -446,7 +445,7 @@ export function LeadsClient() {
           Review cards
         </Pill>
       </div>
-      <p className="text-muted-foreground mt-1.5 text-xs">
+      <p className="mt-1.5 text-xs text-muted-foreground">
         {POPULATIONS[population].hint}
       </p>
 
@@ -459,7 +458,7 @@ export function LeadsClient() {
             resetPage();
           }}
           placeholder="Search domain or company…"
-          className="border-border bg-background focus:ring-ring w-64 rounded-md border px-3 py-1.5 text-sm focus:ring-1 focus:outline-none"
+          className="w-64 rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
         />
         <select
           value={source ?? ""}
@@ -467,7 +466,7 @@ export function LeadsClient() {
             void setSource((event.target.value || null) as typeof source);
             resetPage();
           }}
-          className="border-border bg-background rounded-md border px-2 py-1.5 text-xs"
+          className="rounded-md border border-border bg-background px-2 py-1.5 text-xs"
         >
           <option value="">All sources</option>
           {(["builtwith", "hubspot", "instantly"] as SourceKey[]).map((sk) => (
@@ -482,7 +481,7 @@ export function LeadsClient() {
             void setOwner(event.target.value || null);
             resetPage();
           }}
-          className="border-border bg-background rounded-md border px-2 py-1.5 text-xs"
+          className="rounded-md border border-border bg-background px-2 py-1.5 text-xs"
         >
           <option value="">All BDRs</option>
           {ownerOptions.data?.map((o) => (
@@ -497,7 +496,7 @@ export function LeadsClient() {
             void setPms(e.target.value || null);
             resetPage();
           }}
-          className="border-border bg-background rounded-md border px-2 py-1.5 text-xs"
+          className="rounded-md border border-border bg-background px-2 py-1.5 text-xs"
         >
           <option value="">All PMS</option>
           {pmsOptions.data?.map((p) => (
@@ -573,7 +572,7 @@ export function LeadsClient() {
                 void setVerdict((e.target.value || null) as typeof verdict);
                 resetPage();
               }}
-              className="border-border bg-background rounded-md border px-2 py-1 text-xs"
+              className="rounded-md border border-border bg-background px-2 py-1 text-xs"
             >
               <option value="">Any verdict</option>
               <option value="send">send</option>
@@ -587,7 +586,7 @@ export function LeadsClient() {
                 void setRoute((e.target.value || null) as typeof route);
                 resetPage();
               }}
-              className="border-border bg-background rounded-md border px-2 py-1 text-xs"
+              className="rounded-md border border-border bg-background px-2 py-1 text-xs"
             >
               <option value="">Any route</option>
               <option value="instantly">instantly</option>
@@ -603,7 +602,7 @@ export function LeadsClient() {
             void setSort(e.target.value as typeof sort);
             resetPage();
           }}
-          className="border-border bg-background rounded-md border px-2 py-1.5 text-xs"
+          className="rounded-md border border-border bg-background px-2 py-1.5 text-xs"
         >
           <option value="units">Sort: units</option>
           <option value="composite">Sort: score</option>
@@ -615,7 +614,7 @@ export function LeadsClient() {
       {/* result count. A scored facet (verdict/route) is applied per page after
           the scorer runs, so there is no total to quote — say what is on screen
           instead of printing a number the rows cannot account for. */}
-      <div className="text-muted-foreground mt-3 text-xs">
+      <div className="mt-3 text-xs text-muted-foreground">
         {list.data
           ? `${
               list.data.total == null
@@ -633,7 +632,7 @@ export function LeadsClient() {
           "0 matching" over a cohort reads as "we don't have this domain" when
           the truth is usually "wrong population" or "a filter you forgot". */}
       {list.data?.items.length === 0 && filtersActive && (
-        <div className="border-border mt-3 flex flex-wrap items-center gap-3 rounded-md border border-dashed p-3 text-sm">
+        <div className="mt-3 flex flex-wrap items-center gap-3 rounded-md border border-dashed border-border p-3 text-sm">
           {emptyWithQuery && (elsewhere.data?.total ?? 0) > 0 ? (
             <>
               <span className="text-muted-foreground">
@@ -678,7 +677,7 @@ export function LeadsClient() {
         <div className="mt-2 overflow-x-auto">
           <table className="w-full border-separate border-spacing-0 text-sm">
             <thead>
-              <tr className="text-muted-foreground text-left text-xs">
+              <tr className="text-left text-xs text-muted-foreground">
                 <th className="border-b py-2 pr-3 font-medium">Domain</th>
                 <th className="border-b px-3 py-2 font-medium">Company</th>
                 <th className="border-b px-3 py-2 font-medium">PMS</th>
@@ -704,14 +703,14 @@ export function LeadsClient() {
                     setEnrichLead(d);
                     void setLeadParam(d.domain);
                   }}
-                  className="hover:bg-accent/30 cursor-pointer"
+                  className="cursor-pointer hover:bg-accent/30"
                 >
                   <td className="border-b py-2 pr-3 font-medium">
                     <div className="flex items-center gap-2">
                       {/* The prospect's current site, captured by the ranker.
                         Only ranked domains have one. */}
                       {d.siteScreenshotUrl && (
-                        <div className="border-border bg-muted relative h-8 w-12 shrink-0 overflow-hidden rounded border">
+                        <div className="relative h-8 w-12 shrink-0 overflow-hidden rounded border border-border bg-muted">
                           <Image
                             src={d.siteScreenshotUrl}
                             alt=""
@@ -738,13 +737,13 @@ export function LeadsClient() {
                       <Link
                         href={`/app/leads/${encodeURIComponent(d.domain)}`}
                         onClick={(e) => e.stopPropagation()}
-                        className="text-muted-foreground hover:text-foreground text-xs underline underline-offset-2"
+                        className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
                       >
                         open
                       </Link>
                     </div>
                   </td>
-                  <td className="text-muted-foreground border-b px-3 py-2">
+                  <td className="border-b px-3 py-2 text-muted-foreground">
                     <span className="line-clamp-1 max-w-[16rem]">
                       {d.companyName ?? "—"}
                     </span>
@@ -776,7 +775,7 @@ export function LeadsClient() {
                       {d.contactCount}
                     </span>
                   </td>
-                  <td className="text-muted-foreground border-b px-3 py-2 text-xs">
+                  <td className="border-b px-3 py-2 text-xs text-muted-foreground">
                     {d.sourceTier ?? "—"}
                   </td>
                   <td className="border-b px-3 py-2">
@@ -830,7 +829,7 @@ export function LeadsClient() {
           </table>
 
           {list.data?.items.length === 0 && (
-            <div className="text-muted-foreground py-12 text-center text-sm">
+            <div className="py-12 text-center text-sm text-muted-foreground">
               No domains match these filters.
             </div>
           )}
@@ -843,7 +842,7 @@ export function LeadsClient() {
           cannot account for. */}
       {list.data && (list.data.total == null || list.data.total > limit) && (
         <div className="mt-4 flex items-center justify-between text-sm">
-          <span className="text-muted-foreground text-xs">
+          <span className="text-xs text-muted-foreground">
             {list.data.total == null ? (
               <>
                 {list.data.items.length} on this page
@@ -861,14 +860,14 @@ export function LeadsClient() {
             <button
               disabled={page === 0}
               onClick={() => void setPage((p) => Math.max(0, p - 1))}
-              className="border-border rounded-md border px-3 py-1 text-xs disabled:opacity-40"
+              className="rounded-md border border-border px-3 py-1 text-xs disabled:opacity-40"
             >
               Previous
             </button>
             <button
               disabled={!list.data.hasMore}
               onClick={() => void setPage((p) => p + 1)}
-              className="border-border rounded-md border px-3 py-1 text-xs disabled:opacity-40"
+              className="rounded-md border border-border px-3 py-1 text-xs disabled:opacity-40"
             >
               Next
             </button>
@@ -1109,7 +1108,7 @@ function ReviewCardList({
         );
       })}
       {items.length === 0 && (
-        <p className="text-muted-foreground py-8 text-center text-sm">
+        <p className="py-8 text-center text-sm text-muted-foreground">
           Nothing in this population matches those facets.
         </p>
       )}

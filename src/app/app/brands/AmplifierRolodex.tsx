@@ -95,10 +95,10 @@ export function AmplifierRolodex() {
     <section className="mt-10">
       <div className="mb-3 flex items-center justify-between">
         <div>
-          <h2 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+          <h2 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
             Amplifiers · {amplifiers?.length ?? 0}
           </h2>
-          <p className="text-muted-foreground/80 mt-1 text-xs">
+          <p className="mt-1 text-xs text-muted-foreground/80">
             Friends-of-the-company, investors, press &amp; creators you recruit
             to boost launches. Shared across every brand — recruit them onto a
             moment from a campaign.
@@ -110,8 +110,8 @@ export function AmplifierRolodex() {
         </Button>
       </div>
 
-      <div className="border-border/60 bg-muted/30 text-muted-foreground mb-3 rounded-xl border border-dashed px-4 py-3 text-xs">
-        <span className="text-foreground/80 font-medium">Worth adding</span> —
+      <div className="mb-3 rounded-xl border border-dashed border-border/60 bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
+        <span className="font-medium text-foreground/80">Worth adding</span> —
         recruit real named contacts, not roles (discovery only resolves actual
         people/accounts):
         <ul className="mt-1.5 list-disc space-y-0.5 pl-4">
@@ -122,16 +122,16 @@ export function AmplifierRolodex() {
       </div>
 
       {isLoading ? (
-        <div className="text-muted-foreground flex items-center gap-2 text-sm">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" /> Loading…
         </div>
       ) : !amplifiers || amplifiers.length === 0 ? (
-        <div className="bg-card text-muted-foreground rounded-2xl border p-5 text-sm shadow-sm">
+        <div className="rounded-2xl border bg-card p-5 text-sm text-muted-foreground shadow-sm">
           No amplifiers yet. Add the people who can repost for you — like a
           friend of the company who could retweet a launch.
         </div>
       ) : (
-        <div className="bg-card divide-y rounded-2xl border shadow-sm">
+        <div className="divide-y rounded-2xl border bg-card shadow-sm">
           {amplifiers.map((a) => {
             const isDiscovering =
               discover.isPending && discover.variables?.amplifierId === a.id;
@@ -142,25 +142,25 @@ export function AmplifierRolodex() {
               >
                 <span className="shrink-0 text-sm font-semibold">{a.name}</span>
                 {a.type && (
-                  <span className="border-border text-muted-foreground shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] capitalize">
+                  <span className="shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground capitalize">
                     {a.type}
                   </span>
                 )}
                 {a.slackUserId ? (
-                  <span className="border-border text-muted-foreground shrink-0 rounded-full border px-1.5 py-0.5 text-[10px]">
+                  <span className="shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
                     Slack {a.slackUserId}
                   </span>
                 ) : null}
                 <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
                   {(a.handles ?? []).length === 0 ? (
-                    <span className="text-muted-foreground/60 text-[11px] italic">
+                    <span className="text-[11px] text-muted-foreground/60 italic">
                       no handles
                     </span>
                   ) : (
                     (a.handles ?? []).map((h) => (
                       <span
                         key={`${h.platform}:${h.handle}`}
-                        className="text-muted-foreground flex items-center gap-1 text-[11px]"
+                        className="flex items-center gap-1 text-[11px] text-muted-foreground"
                         title={`${platformLabel(h.platform)}: @${h.handle}`}
                       >
                         <ChannelLogo
@@ -358,7 +358,7 @@ function AmplifierDialog({
               {handles.map((h) => (
                 <span
                   key={`${h.platform}:${h.handle}`}
-                  className="bg-muted flex items-center gap-1 rounded-md px-2 py-1 text-xs"
+                  className="flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs"
                 >
                   <ChannelLogo platform={h.platform} className="size-3.5" />@
                   {h.handle}
@@ -394,7 +394,7 @@ function AmplifierDialog({
               aria-label="Platform"
             />
             <div className="relative flex-1">
-              <span className="text-muted-foreground absolute top-1/2 left-2.5 -translate-y-1/2 text-sm">
+              <span className="absolute top-1/2 left-2.5 -translate-y-1/2 text-sm text-muted-foreground">
                 @
               </span>
               <Input
@@ -407,7 +407,7 @@ function AmplifierDialog({
                   }
                 }}
                 placeholder="handle"
-                className="pl-6"
+                leading="handle"
               />
             </div>
             <Button type="button" variant="outline" onClick={addHandle}>

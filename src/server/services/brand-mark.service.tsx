@@ -8,7 +8,11 @@ import sharp from "sharp";
 import { z } from "zod";
 
 import { db } from "@/server/db";
-import { brandTable, mediaAssetTable, type BrandMark } from "@/server/db/schema";
+import {
+  brandTable,
+  mediaAssetTable,
+  type BrandMark,
+} from "@/server/db/schema";
 import {
   brandFontFamily,
   loadGoogleFont,
@@ -27,7 +31,12 @@ export type MarkTone = "color" | "white" | "dark";
 
 export type MarkTuning = NonNullable<BrandMark["tuning"]>;
 
-const NO_TUNING: MarkTuning = { iconScale: 1, iconShift: 0, gapScale: 1, note: "" };
+const NO_TUNING: MarkTuning = {
+  iconScale: 1,
+  iconShift: 0,
+  gapScale: 1,
+  note: "",
+};
 
 const CritiqueSchema = z.object({
   verdict: z.enum(["balanced", "adjust"]),
@@ -144,7 +153,8 @@ export async function resolveMarkIconUrl(
   recipe: BrandMarkRecipe,
   brand: MarkBrand,
 ): Promise<string | null> {
-  const favicon = brand.brandIdentity?.favicon ?? brand.websiteMeta?.favicon ?? null;
+  const favicon =
+    brand.brandIdentity?.favicon ?? brand.websiteMeta?.favicon ?? null;
   // Same fallback shape as the favicon above, and for the same reason. The
   // `logo` COLUMN is whatever selectBrandLogo could offer at the time the
   // brand was last enriched, which falls through to the OG image when no
@@ -176,7 +186,11 @@ export async function resolveMarkIconUrl(
  * BMP form is not worth decoding by hand, so the caller says so plainly.
  */
 function pngInsideIco(body: Buffer): Buffer | null {
-  if (body.length < 6 || body.readUInt16LE(0) !== 0 || body.readUInt16LE(2) !== 1) {
+  if (
+    body.length < 6 ||
+    body.readUInt16LE(0) !== 0 ||
+    body.readUInt16LE(2) !== 1
+  ) {
     return null;
   }
   const count = body.readUInt16LE(4);
@@ -209,7 +223,8 @@ async function fetchPng(url: string): Promise<Buffer> {
       Accept: "image/*",
     },
   });
-  if (!response.ok) throw new Error(`Icon download failed (${response.status}).`);
+  if (!response.ok)
+    throw new Error(`Icon download failed (${response.status}).`);
   const raw = Buffer.from(await response.arrayBuffer());
   const body = pngInsideIco(raw) ?? raw;
   const meta = await sharp(body)
@@ -221,7 +236,8 @@ async function fetchPng(url: string): Promise<Buffer> {
           : "That icon is not an image format this can read.",
       );
     });
-  const image = meta.format === "svg" ? sharp(body, { density: 288 }) : sharp(body);
+  const image =
+    meta.format === "svg" ? sharp(body, { density: 288 }) : sharp(body);
   const png = await image
     .resize({ height: 1024, withoutEnlargement: meta.format !== "svg" })
     .png()
@@ -252,8 +268,14 @@ async function iconAtHeight(
   height: number,
 ): Promise<Buffer> {
   const color =
-    tone === "white" ? "#ffffff" : tone === "dark" ? "#111111" : await dominantColor(png);
-  const svg = color ? await traceSilhouette(png, color).catch(() => null) : null;
+    tone === "white"
+      ? "#ffffff"
+      : tone === "dark"
+        ? "#111111"
+        : await dominantColor(png);
+  const svg = color
+    ? await traceSilhouette(png, color).catch(() => null)
+    : null;
   if (svg) {
     // A trace of an intricate mark can be too much for the rasteriser; the
     // bitmap below is always there.
@@ -331,25 +353,23 @@ function renderTextLayer(input: {
   fonts: LoadedFont[] | null;
 }) {
   return new ImageResponse(
-    (
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-start",
-          width: "100%",
-          height: "100%",
-          color: input.color,
-          fontSize: input.fontSize,
-          fontWeight: 700,
-          lineHeight: 1,
-          letterSpacing: "-0.02em",
-          whiteSpace: "nowrap",
-          ...(input.fonts?.length ? { fontFamily: input.fonts[0]!.name } : {}),
-        }}
-      >
-        <div style={{ display: "flex" }}>{input.text}</div>
-      </div>
-    ),
+    <div
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        width: "100%",
+        height: "100%",
+        color: input.color,
+        fontSize: input.fontSize,
+        fontWeight: 700,
+        lineHeight: 1,
+        letterSpacing: "-0.02em",
+        whiteSpace: "nowrap",
+        ...(input.fonts?.length ? { fontFamily: input.fonts[0]!.name } : {}),
+      }}
+    >
+      <div style={{ display: "flex" }}>{input.text}</div>
+    </div>,
     {
       // Sized to the line: a fixed wide canvas costs memory on every render
       // and buys nothing. 0.8em per character clears the widest faces.
@@ -471,7 +491,12 @@ export async function previewBrandMark(input: {
   tuning?: MarkTuning | null;
 }): Promise<Buffer> {
   const brand = await loadMarkBrand(input.brandId);
-  return renderBrandMark(input.recipe, brand, input.tone, input.tuning ?? NO_TUNING);
+  return renderBrandMark(
+    input.recipe,
+    brand,
+    input.tone,
+    input.tuning ?? NO_TUNING,
+  );
 }
 
 /**
@@ -485,7 +510,10 @@ export async function critiqueBrandMark(input: {
 }): Promise<MarkTuning> {
   const brand = await loadMarkBrand(input.brandId);
   const colorRender = await renderBrandMark(input.recipe, brand, "color");
-  const read = await critiqueLockup({ png: colorRender, brandName: brand.name });
+  const read = await critiqueLockup({
+    png: colorRender,
+    brandName: brand.name,
+  });
   const note = read.iconIsWordmark
     ? `The icon already carries the brand name; a lockup repeats it. ${read.note}`.trim()
     : read.note;
@@ -510,12 +538,18 @@ export async function setBrandMark(input: {
   tuning?: MarkTuning | null;
 }): Promise<BrandMark> {
   const brand = await loadMarkBrand(input.brandId);
-  const tuning = input.recipe.source === "lockup" ? (input.tuning ?? null) : null;
+  const tuning =
+    input.recipe.source === "lockup" ? (input.tuning ?? null) : null;
   const tones: MarkTone[] = ["color", "white", "dark"];
   const ids: Partial<Record<MarkTone, string>> = {};
   let vector: BrandMark["vector"] = null;
   for (const tone of tones) {
-    const body = await renderBrandMark(input.recipe, brand, tone, tuning ?? NO_TUNING);
+    const body = await renderBrandMark(
+      input.recipe,
+      brand,
+      tone,
+      tuning ?? NO_TUNING,
+    );
     // An icon-only mark may come from a small file; a lockup is rendered
     // large already. Trace the mono icons so cards draw them at any size.
     if (tone === "color" && input.recipe.source !== "lockup") {
@@ -558,10 +592,16 @@ export async function setBrandMark(input: {
     tuning,
     updatedAt: new Date().toISOString(),
   };
-  await db.update(brandTable).set({ brandMark: mark }).where(eq(brandTable.id, brand.id));
+  await db
+    .update(brandTable)
+    .set({ brandMark: mark })
+    .where(eq(brandTable.id, brand.id));
   return mark;
 }
 
 export async function clearBrandMark(brandId: string): Promise<void> {
-  await db.update(brandTable).set({ brandMark: null }).where(eq(brandTable.id, brandId));
+  await db
+    .update(brandTable)
+    .set({ brandMark: null })
+    .where(eq(brandTable.id, brandId));
 }

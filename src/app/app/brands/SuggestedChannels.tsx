@@ -58,7 +58,7 @@ export function SuggestedChannels({
     <Button
       variant="ghost"
       size="sm"
-      className="text-muted-foreground gap-1.5"
+      tone="muted"
       onClick={() => {
         setError(null);
         discoverM.mutate({ brandId });
@@ -74,7 +74,7 @@ export function SuggestedChannels({
     return (
       <div className="flex items-center gap-2">
         {discoverButton}
-        {error && <p className="text-destructive text-[11px]">{error}</p>}
+        {error && <p className="text-[11px] text-destructive">{error}</p>}
       </div>
     );
   }
@@ -84,17 +84,17 @@ export function SuggestedChannels({
   return (
     <div className="mt-3 border-t pt-3">
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
+        <span className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
           Suggested handles
           {suggestions.length > 0 && ` · ${suggestions.length}`}
         </span>
         {variant === "full" && discoverButton}
       </div>
 
-      {error && <p className="text-destructive mb-2 text-[11px]">{error}</p>}
+      {error && <p className="mb-2 text-[11px] text-destructive">{error}</p>}
 
       {suggestions.length === 0 ? (
-        <p className="text-muted-foreground text-[11px]">
+        <p className="text-[11px] text-muted-foreground">
           {discoverM.isPending
             ? "Searching the web for profiles…"
             : "No pending suggestions. Run discovery to find this brand's social profiles."}
@@ -117,17 +117,17 @@ export function SuggestedChannels({
                         href={s.profileUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-muted-foreground hover:text-foreground ml-1.5 font-normal"
+                        className="ml-1.5 font-normal text-muted-foreground hover:text-foreground"
                       >
                         @{s.handle}
                       </a>
                     ) : (
-                      <span className="text-muted-foreground ml-1.5 font-normal">
+                      <span className="ml-1.5 font-normal text-muted-foreground">
                         @{s.handle}
                       </span>
                     )}
                   </span>
-                  <span className="text-muted-foreground text-[11px]">
+                  <span className="text-[11px] text-muted-foreground">
                     {s.confidence != null &&
                       `${Math.round(s.confidence * 100)}% confidence`}
                     {s.verified === true &&
@@ -139,7 +139,8 @@ export function SuggestedChannels({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="text-muted-foreground hover:text-destructive size-7"
+                  tone="muted-danger"
+                  className="size-7"
                   title="Reject"
                   disabled={rowBusy}
                   onClick={() => rejectM.mutate({ id: s.id })}
@@ -148,7 +149,7 @@ export function SuggestedChannels({
                 </Button>
                 <Button
                   size="sm"
-                  className="h-7 gap-1"
+                  className="h-7"
                   title="Accept — create channel"
                   loading={rowBusy && acceptM.isPending}
                   disabled={rowBusy}

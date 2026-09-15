@@ -58,7 +58,7 @@ export function TypographyP({ children, className = "" }: TypographyProps) {
 
 export function TypographyLead({ children, className = "" }: TypographyProps) {
   return (
-    <p className={`text-muted-foreground text-xl ${className}`}>
+    <p className={`text-xl text-muted-foreground ${className}`}>
       {children ||
         "A modal dialog that interrupts the user with important content and expects a response."}
     </p>
@@ -83,7 +83,7 @@ export function TypographySmall({ children, className = "" }: TypographyProps) {
 
 export function TypographyMuted({ children, className = "" }: TypographyProps) {
   return (
-    <p className={`text-muted-foreground text-sm ${className}`}>
+    <p className={`text-sm text-muted-foreground ${className}`}>
       {children || "Enter your email address."}
     </p>
   );
@@ -108,7 +108,7 @@ export function TypographyInlineCode({
 }: TypographyProps) {
   return (
     <code
-      className={`bg-muted relative rounded px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold ${className}`}
+      className={`relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold ${className}`}
     >
       {children || "@radix-ui/react-alert-dialog"}
     </code>
@@ -177,7 +177,7 @@ export function TypographyTable({
     <div className={`my-6 w-full overflow-y-auto ${className}`}>
       <table className="w-full">
         <thead>
-          <tr className="even:bg-muted m-0 border-t p-0">
+          <tr className="m-0 border-t p-0 even:bg-muted">
             <th className="border px-4 py-2 text-left font-bold [&[align=center]]:text-center [&[align=right]]:text-right">
               {tableHeaders.col1}
             </th>
@@ -188,7 +188,7 @@ export function TypographyTable({
         </thead>
         <tbody>
           {tableRows.map((row, index) => (
-            <tr key={index} className="even:bg-muted m-0 border-t p-0">
+            <tr key={index} className="m-0 border-t p-0 even:bg-muted">
               <td className="border px-4 py-2 text-left [&[align=center]]:text-center [&[align=right]]:text-right">
                 {row.col1}
               </td>

@@ -71,7 +71,7 @@ export function BrandRowMenu({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger
-          className="text-muted-foreground hover:text-foreground hover:bg-muted/60 rounded-full p-1.5"
+          appearance="icon"
           aria-label={`More for ${brandName}`}
         >
           <MoreHorizontal className="size-4" />

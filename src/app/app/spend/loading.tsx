@@ -17,7 +17,7 @@ export default function Loading() {
           <Skeleton className="h-7 w-28" />
           <Skeleton className="h-4 w-72 max-w-full" />
         </div>
-        <Skeleton className="h-9 w-40 rounded-lg" />
+        <Skeleton shape="soft" className="h-9 w-40" />
       </div>
 
       {/* KPI grid — matches grid-cols-2 md:grid-cols-3 lg:grid-cols-4 */}
@@ -41,7 +41,7 @@ export default function Loading() {
             key={i}
             className="flex items-center gap-4 border-b px-4 py-3.5 last:border-0"
           >
-            <Skeleton className="size-2.5 shrink-0 rounded-full" />
+            <Skeleton shape="round" className="size-2.5 shrink-0" />
             <Skeleton className="h-4 w-32" />
             <div className="ml-auto flex gap-6 sm:gap-8">
               {Array.from({ length: 6 }).map((_, j) => (

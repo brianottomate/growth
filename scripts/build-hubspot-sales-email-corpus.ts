@@ -255,7 +255,11 @@ async function hubspotSearch(
   const filters =
     direction === "outbound"
       ? [
-          { propertyName: "hs_email_direction", operator: "EQ", value: "EMAIL" },
+          {
+            propertyName: "hs_email_direction",
+            operator: "EQ",
+            value: "EMAIL",
+          },
           { propertyName: "hs_email_status", operator: "EQ", value: "SENT" },
         ]
       : [
@@ -365,8 +369,7 @@ function toRow(
   const ownerId = props.hubspot_owner_id ?? "";
   const rep =
     direction === "outbound"
-      ? (HS_OWNER_NAMES[ownerId] ??
-        hash(headers.from.email, "rep"))
+      ? (HS_OWNER_NAMES[ownerId] ?? hash(headers.from.email, "rep"))
       : null;
 
   return {

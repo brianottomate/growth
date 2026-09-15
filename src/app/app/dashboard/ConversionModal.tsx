@@ -200,10 +200,10 @@ export function ConversionModal({
         <div className="space-y-3">
           {BENEFITS.map((benefit, index) => (
             <div key={index} className="flex items-center gap-3">
-              <div className="bg-primary/10 text-primary flex h-8 w-8 items-center justify-center rounded-full">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
                 <benefit.icon className="h-4 w-4" />
               </div>
-              <span className="text-muted-foreground text-sm">
+              <span className="text-sm text-muted-foreground">
                 {benefit.text}
               </span>
             </div>
@@ -225,16 +225,16 @@ export function ConversionModal({
             <form onSubmit={handleCreateAccount} className="space-y-4">
               {/* Username field with availability indicator */}
               <div className="space-y-2">
-                <Label htmlFor="username" className="flex items-center gap-2">
+                <Label htmlFor="username" className="flex items-center">
                   Username
                   {checkingUsername && (
-                    <span className="text-muted-foreground flex items-center gap-1 text-xs">
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Loader2 className="h-3 w-3 animate-spin" />
                       Checking...
                     </span>
                   )}
                   {!checkingUsername && usernameAvailable === false && (
-                    <span className="text-destructive flex items-center gap-1 text-xs">
+                    <span className="flex items-center gap-1 text-xs text-destructive">
                       <XCircle className="h-3 w-3" />
                       Not available
                     </span>
@@ -257,12 +257,12 @@ export function ConversionModal({
                   placeholder="cooluser123"
                   disabled={isLoading}
                   aria-invalid={usernameAvailable === false}
-                  className={
+                  tone={
                     usernameAvailable === false
-                      ? "border-destructive focus-visible:ring-destructive"
+                      ? "error"
                       : usernameAvailable === true
-                        ? "border-green-600 focus-visible:ring-green-600"
-                        : ""
+                        ? "success"
+                        : undefined
                   }
                 />
               </div>
@@ -284,7 +284,7 @@ export function ConversionModal({
 
               {/* Name field (optional) */}
               <div className="space-y-2">
-                <Label htmlFor="name" className="text-muted-foreground">
+                <Label htmlFor="name" tone="muted">
                   Name <span className="text-xs">(optional)</span>
                 </Label>
                 <Input
@@ -299,7 +299,7 @@ export function ConversionModal({
 
               {/* Email field (collapsible) */}
               {!showEmailField ? (
-                <div className="text-muted-foreground text-sm">
+                <div className="text-sm text-muted-foreground">
                   <button
                     type="button"
                     onClick={() => setShowEmailField(true)}
@@ -314,9 +314,9 @@ export function ConversionModal({
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-sm">
+                  <Label htmlFor="email">
                     Email{" "}
-                    <span className="text-muted-foreground text-xs">
+                    <span className="text-xs text-muted-foreground">
                       (for password reset)
                     </span>
                   </Label>
@@ -327,7 +327,7 @@ export function ConversionModal({
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="your.email@example.com"
                     disabled={isLoading}
-                    className="text-sm"
+                    textSize="sm"
                   />
                   <button
                     type="button"
@@ -335,7 +335,7 @@ export function ConversionModal({
                       setShowEmailField(false);
                       setEmail(generateUniqueAnonymousEmail());
                     }}
-                    className="text-muted-foreground text-xs hover:underline"
+                    className="text-xs text-muted-foreground hover:underline"
                   >
                     Use temporary email instead
                   </button>
@@ -394,7 +394,7 @@ export function ConversionModal({
         {/* Skip option */}
         <button
           onClick={handleClose}
-          className="text-muted-foreground hover:text-foreground w-full text-center text-sm underline-offset-4 hover:underline"
+          className="w-full text-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
         >
           Maybe later
         </button>

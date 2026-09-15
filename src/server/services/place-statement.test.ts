@@ -18,12 +18,18 @@ describe("the place card's statement", () => {
 
   test("a hook that ends without a preposition keeps the place alone on its line", () => {
     expect(
-      placeStatement({ formatId: "portrait", eyebrow: "Arcade games & firepit", title: "Winter Park, CO" }),
+      placeStatement({
+        formatId: "portrait",
+        eyebrow: "Arcade games & firepit",
+        title: "Winter Park, CO",
+      }),
     ).toEqual(["Arcade games & firepit", "Winter Park, CO"]);
   });
 
   test("no hook is just the place", () => {
-    expect(placeStatement({ formatId: "portrait", title: "Winter Park, CO" })).toEqual(["Winter Park, CO"]);
+    expect(
+      placeStatement({ formatId: "portrait", title: "Winter Park, CO" }),
+    ).toEqual(["Winter Park, CO"]);
   });
 
   test("a long hook wraps before the place and never runs past three lines", () => {

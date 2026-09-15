@@ -99,25 +99,25 @@ export function NewsletterCard({
 
   if (wasSubscribedOnMount || justSubscribed) {
     return (
-      <section className="border-secondary bg-surface-secondary not-prose relative my-8 overflow-hidden rounded-xl border shadow-sm">
+      <section className="not-prose relative my-8 overflow-hidden rounded-xl border border-secondary bg-surface-secondary shadow-sm">
         <div className="relative z-10 p-6 sm:p-8">
           <div className="flex items-start gap-4">
-            <div className="bg-surface-tertiary flex h-12 w-12 flex-none items-center justify-center rounded-full">
+            <div className="flex h-12 w-12 flex-none items-center justify-center rounded-full bg-surface-tertiary">
               <Check className="h-6 w-6 text-emerald-500" strokeWidth={2.5} />
             </div>
             <div className="flex-1">
-              <h3 className="text-primary text-xl font-bold">
+              <h3 className="text-xl font-bold text-primary">
                 {wasSubscribedOnMount && !justSubscribed
                   ? "You're already subscribed!"
                   : "Thanks for subscribing!"}
               </h3>
-              <p className="text-secondary mt-2">
+              <p className="mt-2 text-secondary">
                 You&apos;ve been added to our mailing list. Watch your inbox for
                 great content!
                 {subscribedEmail && (
                   <>
                     <br />
-                    <span className="text-tertiary mt-2 inline-block text-sm">
+                    <span className="mt-2 inline-block text-sm text-tertiary">
                       ({subscribedEmail})
                     </span>
                   </>
@@ -131,13 +131,13 @@ export function NewsletterCard({
   }
 
   return (
-    <section className="border-secondary bg-surface-secondary not-prose relative my-8 overflow-hidden rounded-xl border shadow-sm transition-shadow hover:shadow-md">
+    <section className="not-prose relative my-8 overflow-hidden rounded-xl border border-secondary bg-surface-secondary shadow-sm transition-shadow hover:shadow-md">
       <div className="relative z-10 p-6 sm:p-8">
-        <h2 className="text-primary text-[1.75rem] leading-[110%] font-bold tracking-tight">
+        <h2 className="text-[1.75rem] leading-[110%] font-bold tracking-tight text-primary">
           {title}
         </h2>
 
-        <p className="text-secondary mt-3 text-lg leading-[160%]">
+        <p className="mt-3 text-lg leading-[160%] text-secondary">
           {description}
         </p>
 
@@ -148,7 +148,7 @@ export function NewsletterCard({
                 <Check className="size-5 text-emerald-500" strokeWidth={2.5} />
               </span>
               <span className="block flex-1 text-[15px] leading-relaxed">
-                <span className="text-primary font-semibold">
+                <span className="font-semibold text-primary">
                   {feature.label}
                   {feature.description && ": "}
                 </span>
@@ -181,7 +181,7 @@ export function NewsletterCard({
                     : "Enter your email"
                 }
                 required={userState === "logged-out"}
-                className="border-secondary bg-surface-input text-primary placeholder:text-tertiary focus:border-primary flex-1 rounded-md border px-3 py-2.5 text-sm shadow-xs transition-colors focus:ring-2 focus:ring-current/20 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex-1 rounded-md border border-secondary bg-surface-input px-3 py-2.5 text-sm text-primary shadow-xs transition-colors placeholder:text-tertiary focus:border-primary focus:ring-2 focus:ring-current/20 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                 {...form.register("email", {
                   required: userState === "logged-out",
                 })}

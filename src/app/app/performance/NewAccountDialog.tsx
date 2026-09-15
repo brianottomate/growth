@@ -95,7 +95,7 @@ export function NewAccountDialog() {
                 );
                 if (picked && name.trim() === "") setName(picked.name);
               }}
-              className="border-border bg-background focus:ring-ring w-full rounded-md border px-3 py-1.5 text-sm focus:ring-1 focus:outline-none"
+              className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
             >
               <option value="">No brand yet</option>
               {(brands.data ?? []).map((row) => (
@@ -105,7 +105,7 @@ export function NewAccountDialog() {
                 </option>
               ))}
             </select>
-            <p className="text-muted-foreground text-xs">
+            <p className="text-xs text-muted-foreground">
               The pitch, intake and connect links all hang off the brand, so an
               account without one cannot be sent to the customer.
             </p>
@@ -146,7 +146,7 @@ export function NewAccountDialog() {
                 id="perf-plan"
                 value={plan}
                 onChange={(event) => setPlan(event.target.value)}
-                className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
               >
                 {PLANS.map((value) => (
                   <option key={value} value={value}>
@@ -171,10 +171,7 @@ export function NewAccountDialog() {
           )}
         </div>
         <DialogFooter>
-          <Button
-            onClick={submit}
-            disabled={!name.trim() || create.isPending}
-          >
+          <Button onClick={submit} disabled={!name.trim() || create.isPending}>
             {create.isPending ? "Creating…" : "Create"}
           </Button>
         </DialogFooter>

@@ -45,7 +45,9 @@ if (!domains.length) {
   );
 }
 if (apply && !isWanderApiConfigured) {
-  throw new Error("WANDER_API_URL and WANDER_API_KEY must both be set to apply");
+  throw new Error(
+    "WANDER_API_URL and WANDER_API_KEY must both be set to apply",
+  );
 }
 
 type Outcome = {

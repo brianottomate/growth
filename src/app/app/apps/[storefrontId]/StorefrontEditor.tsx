@@ -148,7 +148,7 @@ export function StorefrontEditor({
     <main className="space-y-6">
       <Link
         href="/app/apps"
-        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs"
+        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="size-3.5" /> Apps & storefronts
       </Link>
@@ -156,7 +156,7 @@ export function StorefrontEditor({
       <header className="space-y-4 border-b pb-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="text-muted-foreground text-xs">
+            <p className="text-xs text-muted-foreground">
               {storefront.product.brand.name} ·{" "}
               {surface.family.replaceAll("_", " ")}
             </p>
@@ -204,7 +204,7 @@ export function StorefrontEditor({
 
       <section className="grid gap-3 sm:grid-cols-2">
         <label className="text-xs">
-          <span className="text-muted-foreground mb-1 block">Manager</span>
+          <span className="mb-1 block text-muted-foreground">Manager</span>
           <select
             value={storefront.managerUserId ?? ""}
             onChange={(event) =>
@@ -213,7 +213,7 @@ export function StorefrontEditor({
                 managerUserId: event.target.value || null,
               })
             }
-            className="bg-background w-full rounded-lg border px-3 py-2"
+            className="w-full rounded-lg border bg-background px-3 py-2"
           >
             <option value="">No manager</option>
             {editors.map((editor) => (
@@ -224,7 +224,7 @@ export function StorefrontEditor({
           </select>
         </label>
         <label className="text-xs">
-          <span className="text-muted-foreground mb-1 block">
+          <span className="mb-1 block text-muted-foreground">
             Listing status
           </span>
           <select
@@ -235,7 +235,7 @@ export function StorefrontEditor({
                   .value as (typeof storefrontListingStatuses)[number],
               )
             }
-            className="bg-background w-full rounded-lg border px-3 py-2"
+            className="w-full rounded-lg border bg-background px-3 py-2"
           >
             {storefrontListingStatuses.map((status) => (
               <option key={status} value={status}>
@@ -264,7 +264,7 @@ export function StorefrontEditor({
               "border-b-2 px-3 py-2 text-xs font-medium capitalize",
               tab === item
                 ? "border-foreground"
-                : "text-muted-foreground border-transparent",
+                : "border-transparent text-muted-foreground",
             )}
           >
             {item}
@@ -319,7 +319,7 @@ export function StorefrontEditor({
             value={rawJson}
             onChange={(event) => setRawJson(event.target.value)}
             spellCheck={false}
-            className="bg-muted/30 min-h-[520px] w-full rounded-xl border p-4 font-mono text-xs"
+            className="min-h-[520px] w-full rounded-xl border bg-muted/30 p-4 font-mono text-xs"
           />
           <button
             onClick={() => {
@@ -346,18 +346,18 @@ export function StorefrontEditor({
           {[...storefront.changelog].reverse().map((entry, index) => (
             <div
               key={`${entry.at}-${index}`}
-              className="bg-card rounded-xl border p-4"
+              className="rounded-xl border bg-card p-4"
             >
               <div className="flex items-center justify-between gap-3">
                 <p className="text-xs font-medium">
                   {entry.action.replaceAll("_", " ")}
                 </p>
-                <time className="text-muted-foreground text-[10px]">
+                <time className="text-[10px] text-muted-foreground">
                   {new Date(entry.at).toLocaleString()}
                 </time>
               </div>
               {entry.note && <p className="mt-2 text-sm">{entry.note}</p>}
-              <p className="text-muted-foreground mt-2 text-[10px]">
+              <p className="mt-2 text-[10px] text-muted-foreground">
                 {entry.actorName ?? entry.actorKind}
               </p>
             </div>
@@ -374,14 +374,14 @@ export function StorefrontEditor({
             value={staleNote}
             onChange={(event) => setStaleNote(event.target.value)}
             placeholder="Describe the copy, asset, or link change an employee or agent must make."
-            className="bg-background min-h-20 w-full rounded-xl border px-3 py-2 text-sm"
+            className="min-h-20 w-full rounded-xl border bg-background px-3 py-2 text-sm"
           />
         </label>
         <div className="flex flex-wrap gap-2">
           <button
             onClick={save}
             disabled={updateMutation.isPending}
-            className="bg-foreground text-background inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium"
+            className="inline-flex items-center gap-2 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background"
           >
             <Save className="size-4" /> Save and mark stale
           </button>
@@ -407,7 +407,7 @@ export function StorefrontEditor({
             <input
               value={confirmNote}
               onChange={(event) => setConfirmNote(event.target.value)}
-              className="bg-background w-full rounded-lg border px-3 py-2"
+              className="w-full rounded-lg border bg-background px-3 py-2"
               placeholder="Updated screenshots and description in the store UI."
             />
           </label>
@@ -428,13 +428,13 @@ export function StorefrontEditor({
         {siblings.length > 0 && (
           <div className="flex flex-wrap items-end gap-2 rounded-xl border p-4">
             <label className="min-w-52 flex-1 text-xs">
-              <span className="text-muted-foreground mb-1 block">
+              <span className="mb-1 block text-muted-foreground">
                 Copy content from sibling surface
               </span>
               <select
                 value={siblingId}
                 onChange={(event) => setSiblingId(event.target.value)}
-                className="bg-background w-full rounded-lg border px-3 py-2"
+                className="w-full rounded-lg border bg-background px-3 py-2"
               >
                 {siblings.map((sibling) => (
                   <option key={sibling.id} value={sibling.id}>
@@ -745,7 +745,7 @@ function AssetFields({
                         ),
                       })
                     }
-                    className="bg-background rounded border px-2 py-1 text-[10px]"
+                    className="rounded border bg-background px-2 py-1 text-[10px]"
                   >
                     <option value="product_ui">Product UI</option>
                     <option value="marketing_composite">
@@ -774,7 +774,7 @@ function AssetFields({
                           ),
                         })
                       }
-                      className="bg-background min-w-0 rounded border px-2 py-1 text-[10px]"
+                      className="min-w-0 rounded border bg-background px-2 py-1 text-[10px]"
                     />
                   ))}
                 </div>
@@ -819,7 +819,7 @@ function AssetFields({
                       ),
                     })
                   }
-                  className="bg-background mt-2 w-full rounded border px-2 py-1 text-[10px]"
+                  className="mt-2 w-full rounded border bg-background px-2 py-1 text-[10px]"
                 />
               }
             />
@@ -858,7 +858,7 @@ function AssetFields({
                       ),
                     })
                   }
-                  className="bg-background mt-2 w-full rounded border px-2 py-1 text-[10px]"
+                  className="mt-2 w-full rounded border bg-background px-2 py-1 text-[10px]"
                 />
               }
             />
@@ -885,11 +885,11 @@ function AssetPicker({
   );
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="bg-background max-h-[80vh] w-full max-w-3xl overflow-auto rounded-2xl border p-5 shadow-xl">
+      <div className="max-h-[80vh] w-full max-w-3xl overflow-auto rounded-2xl border bg-background p-5 shadow-xl">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="font-semibold">Choose from Media Library</h2>
-            <p className="text-muted-foreground text-xs">
+            <p className="text-xs text-muted-foreground">
               Ready assets owned by this product&apos;s brand.
             </p>
           </div>
@@ -898,7 +898,7 @@ function AssetPicker({
           </button>
         </div>
         {visible.length === 0 ? (
-          <p className="text-muted-foreground py-12 text-center text-sm">
+          <p className="py-12 text-center text-sm text-muted-foreground">
             No compatible ready assets found.
           </p>
         ) : (
@@ -907,18 +907,18 @@ function AssetPicker({
               <button
                 key={asset.id}
                 onClick={() => onPick(asset.id)}
-                className="hover:border-foreground/30 overflow-hidden rounded-xl border text-left"
+                className="overflow-hidden rounded-xl border text-left hover:border-foreground/30"
               >
-                <div className="bg-muted aspect-square">
+                <div className="aspect-square bg-muted">
                   {asset.thumbnailUrl || asset.url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
+                    // oxlint-disable-next-line nextjs/no-img-element
                     <img
                       src={asset.thumbnailUrl ?? asset.url ?? ""}
                       alt={asset.alt ?? asset.title ?? ""}
                       className="size-full object-cover"
                     />
                   ) : (
-                    <ImageIcon className="text-muted-foreground m-auto size-5" />
+                    <ImageIcon className="m-auto size-5 text-muted-foreground" />
                   )}
                 </div>
                 <p className="truncate p-2 text-[10px]">
@@ -948,7 +948,7 @@ function AssetSection({
         <h2 className="text-sm font-semibold">{title}</h2>
         <button
           onClick={onAdd}
-          className="text-primary inline-flex items-center gap-1 text-xs"
+          className="inline-flex items-center gap-1 text-xs text-primary"
         >
           <Plus className="size-3" /> Add from library
         </button>
@@ -974,22 +974,22 @@ function AssetRow({
   extra?: React.ReactNode;
 }) {
   return (
-    <div className="bg-card flex items-center gap-3 rounded-xl border p-2">
-      <div className="bg-muted size-14 shrink-0 overflow-hidden rounded-lg">
+    <div className="flex items-center gap-3 rounded-xl border bg-card p-2">
+      <div className="size-14 shrink-0 overflow-hidden rounded-lg bg-muted">
         {asset?.thumbnailUrl || asset?.url ? (
-          // eslint-disable-next-line @next/next/no-img-element
+          // oxlint-disable-next-line nextjs/no-img-element
           <img
             src={asset.thumbnailUrl ?? asset.url ?? ""}
             alt={asset.alt ?? asset.title ?? ""}
             className="size-full object-cover"
           />
         ) : (
-          <ImageIcon className="text-muted-foreground m-5 size-4" />
+          <ImageIcon className="m-5 size-4 text-muted-foreground" />
         )}
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-xs font-medium">{label}</p>
-        <p className="text-muted-foreground truncate text-[10px]">
+        <p className="truncate text-[10px] text-muted-foreground">
           {asset?.title ?? asset?.id ?? "Missing Media Library item"}
         </p>
         {extra}
@@ -1006,7 +1006,7 @@ function AssetRow({
       )}
       <button
         onClick={onRemove}
-        className="text-muted-foreground hover:text-destructive rounded border p-1.5"
+        className="rounded border p-1.5 text-muted-foreground hover:text-destructive"
       >
         <Trash2 className="size-3" />
       </button>
@@ -1016,7 +1016,7 @@ function AssetRow({
 
 function EmptyAsset() {
   return (
-    <div className="text-muted-foreground rounded-xl border border-dashed p-5 text-center text-xs">
+    <div className="rounded-xl border border-dashed p-5 text-center text-xs text-muted-foreground">
       Nothing selected.
     </div>
   );
@@ -1054,10 +1054,10 @@ function TextField({
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="bg-background w-full rounded-lg border px-3 py-2"
+        className="w-full rounded-lg border bg-background px-3 py-2"
       />
       {hint && (
-        <span className="text-muted-foreground mt-1 block text-[10px]">
+        <span className="mt-1 block text-[10px] text-muted-foreground">
           {hint}
         </span>
       )}
@@ -1083,7 +1083,7 @@ function TextArea({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className={cn(
-          "bg-background w-full rounded-lg border px-3 py-2",
+          "w-full rounded-lg border bg-background px-3 py-2",
           tall ? "min-h-44" : "min-h-24",
         )}
       />

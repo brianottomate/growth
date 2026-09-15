@@ -7,7 +7,10 @@ const brand = {
   name: "Chalets in Hocking Hills",
   logo: "https://assets/logo.png",
   organizationId: "org_01",
-  brandIdentity: { colors: { primary: "#243735" }, favicon: "https://site/favicon.png" },
+  brandIdentity: {
+    colors: { primary: "#243735" },
+    favicon: "https://site/favicon.png",
+  },
   websiteMeta: null,
 };
 
@@ -20,9 +23,18 @@ describe("brand mark", () => {
   });
 
   test("the icon comes from the source the recipe names", async () => {
-    expect(await resolveMarkIconUrl({ source: "logo" }, brand)).toBe(brand.logo);
-    expect(await resolveMarkIconUrl({ source: "favicon" }, brand)).toBe("https://site/favicon.png");
-    expect(await resolveMarkIconUrl({ source: "lockup", iconFrom: "favicon" }, brand)).toBe("https://site/favicon.png");
+    expect(await resolveMarkIconUrl({ source: "logo" }, brand)).toBe(
+      brand.logo,
+    );
+    expect(await resolveMarkIconUrl({ source: "favicon" }, brand)).toBe(
+      "https://site/favicon.png",
+    );
+    expect(
+      await resolveMarkIconUrl(
+        { source: "lockup", iconFrom: "favicon" },
+        brand,
+      ),
+    ).toBe("https://site/favicon.png");
     // A text-only lockup has no icon and that is allowed.
     expect(await resolveMarkIconUrl({ source: "lockup" }, brand)).toBeNull();
   });

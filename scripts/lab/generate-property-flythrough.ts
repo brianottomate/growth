@@ -113,13 +113,11 @@ async function exists(filePath: string) {
 await mkdir(VIDEO_ROOT, { recursive: true });
 const ledger = await readFile(RECEIPT_PATH, "utf8")
   .then((value) => JSON.parse(value) as ReceiptFile)
-  .catch(
-    (): ReceiptFile => ({
-      schemaVersion: 1,
-      capUsd: MAX_SPEND_USD,
-      receipts: [],
-    }),
-  );
+  .catch((): ReceiptFile => ({
+    schemaVersion: 1,
+    capUsd: MAX_SPEND_USD,
+    receipts: [],
+  }));
 const selected = requestedJobIds();
 const selectedJobs = jobs.filter((job) => selected.has(job.id));
 if (selectedJobs.length !== selected.size) {

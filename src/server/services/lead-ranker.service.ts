@@ -12,10 +12,7 @@ import {
 import { scrapeForEnrichment } from "@/server/clients/firecrawl.client";
 import { summarizeCorrespondence } from "@/server/services/lead-correspondence";
 import { db } from "@/server/db";
-import {
-  leadContactTable,
-  leadDomainTable,
-} from "@/server/db/leads-schema";
+import { leadContactTable, leadDomainTable } from "@/server/db/leads-schema";
 import { detectLeadDataDrift } from "@/server/services/lead-data-drift";
 import {
   formatCompanyActivityHistoryForModel,

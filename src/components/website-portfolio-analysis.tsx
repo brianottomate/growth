@@ -57,14 +57,14 @@ export function WebsitePortfolioAnalysisPanel({
             <Sparkles className="size-4" />
             <h2 className="text-sm font-semibold">Website-system analysis</h2>
           </div>
-          <p className="text-muted-foreground mt-1 text-xs">
+          <p className="mt-1 text-xs text-muted-foreground">
             Compare {pageCount.toLocaleString()} mapped page records in{" "}
             {scopeLabel} using their inventory, metadata, and up to eight actual
             OG images.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <label className="text-muted-foreground flex items-center gap-2 text-xs">
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
             <Switch
               checked={includeSaved}
               onCheckedChange={setIncludeSaved}
@@ -98,8 +98,8 @@ export function WebsitePortfolioAnalysisPanel({
           <p className="text-sm leading-relaxed">{analysis.summary}</p>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             {Object.entries(analysis.health).map(([key, value]) => (
-              <div key={key} className="bg-muted/50 rounded-lg p-3">
-                <h3 className="text-muted-foreground text-[10px] font-semibold tracking-wider uppercase">
+              <div key={key} className="rounded-lg bg-muted/50 p-3">
+                <h3 className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
                   {key === "visualConsistency" ? "Visual system" : key}
                 </h3>
                 <p className="mt-1.5 text-xs leading-relaxed">{value}</p>
@@ -116,7 +116,7 @@ export function WebsitePortfolioAnalysisPanel({
           </div>
 
           <div>
-            <h3 className="text-muted-foreground text-[10px] font-semibold tracking-wider uppercase">
+            <h3 className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
               Priorities
             </h3>
             <div className="mt-2 space-y-2">
@@ -126,19 +126,19 @@ export function WebsitePortfolioAnalysisPanel({
                   className="rounded-lg border p-3"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="bg-muted rounded-full px-2 py-0.5 text-[10px] font-medium uppercase">
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase">
                       {item.priority}
                     </span>
                     <span className="text-sm font-medium">{item.title}</span>
                   </div>
-                  <p className="text-muted-foreground mt-2 text-xs leading-relaxed">
+                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                     {item.rationale}
                   </p>
                   <p className="mt-2 text-xs leading-relaxed">
                     {item.recommendedAction}
                   </p>
                   {item.affectedPages.length > 0 && (
-                    <p className="text-muted-foreground mt-2 text-[10px]">
+                    <p className="mt-2 text-[10px] text-muted-foreground">
                       {item.affectedPages.join(" · ")}
                     </p>
                   )}
@@ -160,7 +160,7 @@ export function WebsitePortfolioAnalysisPanel({
                 {analysis.pageFindings.map((finding) => (
                   <div key={`${finding.path}-${finding.finding}`}>
                     <div className="font-mono text-[10px]">{finding.path}</div>
-                    <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                       {finding.finding}
                     </p>
                     <p className="mt-1 text-xs leading-relaxed">
@@ -207,7 +207,7 @@ export function WebsitePortfolioAnalysisPanel({
               )}
               Copy coding-agent prompt
             </Button>
-            <span className="text-muted-foreground text-[10px]">
+            <span className="text-[10px] text-muted-foreground">
               {analysis.scope.pagesAnalyzed} pages ·{" "}
               {analysis.scope.imagesAnalyzed} images ·{" "}
               {analysis.scope.includedSavedPageAnalyses
@@ -225,7 +225,7 @@ export function WebsitePortfolioAnalysisPanel({
 function AnalysisList({ title, items }: { title: string; items: string[] }) {
   return (
     <div>
-      <h3 className="text-muted-foreground text-[10px] font-semibold tracking-wider uppercase">
+      <h3 className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
         {title}
       </h3>
       <ul className="mt-2 list-disc space-y-1.5 pl-4 text-xs leading-relaxed">

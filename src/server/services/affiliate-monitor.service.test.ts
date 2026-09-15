@@ -5,9 +5,7 @@ import type { ImpactDayPerformance } from "@/server/clients/impact.client";
 import { evaluateTrackingHealth } from "./affiliate-monitor.service";
 
 // Newest-first series builder: [date, clicks, actions].
-function series(
-  rows: Array<[string, number, number]>,
-): ImpactDayPerformance[] {
+function series(rows: Array<[string, number, number]>): ImpactDayPerformance[] {
   return rows.map(([date, clicks, actions]) => ({
     date,
     clicks,

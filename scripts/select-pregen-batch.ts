@@ -154,7 +154,10 @@ function summarize(label: string, rows: Candidate[], poolSize: number) {
   for (const row of rows) {
     const owner = row.owner ?? "(unassigned)";
     byOwner.set(owner, (byOwner.get(owner) ?? 0) + 1);
-    byPms.set(row.pms ?? "(unknown)", (byPms.get(row.pms ?? "(unknown)") ?? 0) + 1);
+    byPms.set(
+      row.pms ?? "(unknown)",
+      (byPms.get(row.pms ?? "(unknown)") ?? 0) + 1,
+    );
   }
   return {
     label,
@@ -179,7 +182,11 @@ console.log(
       batch: BATCH,
       seed: SEED,
       mode: apply ? "apply" : "dry",
-      untouched: summarize("untouched", untouchedPick, untouchedEligible.length),
+      untouched: summarize(
+        "untouched",
+        untouchedPick,
+        untouchedEligible.length,
+      ),
       recycled: summarize("recycled", recycledPick, recycledPool.length),
     },
     null,

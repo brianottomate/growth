@@ -47,13 +47,23 @@ async function main() {
   console.log("=== ACCOUNTS (connected social accounts) ===");
   const accounts = await listZernioAccounts();
   for (const a of accounts) console.log("  •", accountLabel(a));
-  console.log(`  (${accounts.length} accounts; keys:`, fieldKeys(accounts[0]), ")\n");
+  console.log(
+    `  (${accounts.length} accounts; keys:`,
+    fieldKeys(accounts[0]),
+    ")\n",
+  );
 
   console.log("=== PROFILES (workspace groupings) ===");
   const profiles = await listZernioProfiles({ includeOverLimit: true });
   for (const p of profiles)
-    console.log(`  • ${p.name ?? "?"} (${p._id ?? "?"})${p.isDefault ? " [default]" : ""}`);
-  console.log(`  (${profiles.length} profiles; keys:`, fieldKeys(profiles[0]), ")\n");
+    console.log(
+      `  • ${p.name ?? "?"} (${p._id ?? "?"})${p.isDefault ? " [default]" : ""}`,
+    );
+  console.log(
+    `  (${profiles.length} profiles; keys:`,
+    fieldKeys(profiles[0]),
+    ")\n",
+  );
 
   // Platforms to probe = connected platforms (deduped), or the --platform arg.
   const platforms = platformArg
@@ -68,7 +78,9 @@ async function main() {
         limit: 5,
         sortBy: "created-desc",
       });
-      console.log(`  total=${pagination.total} pages=${pagination.pages} (showing ${posts.length})`);
+      console.log(
+        `  total=${pagination.total} pages=${pagination.pages} (showing ${posts.length})`,
+      );
 
       const first = posts[0];
       if (!first) {

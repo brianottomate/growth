@@ -126,7 +126,7 @@ export function ComingSoonWrapper({
               ? "You're already subscribed! 🎉"
               : "Thank you for subscribing! 🙌"}
           </h2>
-          <p className="text-md">
+          <p className="text-base">
             {isAlreadySubscribed && !justSubscribed
               ? "We'll notify you when this feature is ready."
               : "You've successfully been added to our mailing list."}

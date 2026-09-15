@@ -104,7 +104,7 @@ export function CitySelect<
       {label && (
         <FormLabel>
           {label}
-          {required && <span className="text-destructive ml-1">*</span>}
+          {required && <span className="ml-1 text-destructive">*</span>}
         </FormLabel>
       )}
       <FormControl>
@@ -120,7 +120,7 @@ export function CitySelect<
         />
       </FormControl>
       {selectedCity && (
-        <div className="text-muted-foreground mt-1 text-xs">
+        <div className="mt-1 text-xs text-muted-foreground">
           {selectedCity.region}, {selectedCity.countryName} •{" "}
           {selectedCity.currency.toUpperCase()}
         </div>

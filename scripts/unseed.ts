@@ -17,10 +17,14 @@ const sql = postgres(url);
 
 // platform_post first — it FKs content_post (onDelete set null, but delete the
 // children explicitly so we don't orphan demo spots under a deleted idea).
-const [pp] = await sql`DELETE FROM platform_post WHERE is_seed = true RETURNING 1`
-  .then((rows) => [rows.length]);
-const [cp] = await sql`DELETE FROM content_post WHERE is_seed = true RETURNING 1`
-  .then((rows) => [rows.length]);
+const [pp] =
+  await sql`DELETE FROM platform_post WHERE is_seed = true RETURNING 1`.then(
+    (rows) => [rows.length],
+  );
+const [cp] =
+  await sql`DELETE FROM content_post WHERE is_seed = true RETURNING 1`.then(
+    (rows) => [rows.length],
+  );
 
 await sql.end();
 console.log(`✓ unseeded: ${pp} platform_post, ${cp} content_post rows removed`);

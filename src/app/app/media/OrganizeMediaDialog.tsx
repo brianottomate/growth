@@ -192,7 +192,7 @@ export function OrganizeMediaDialog({
               />
               {/* Uploading to the wrong brand is a two-click mistake, and the
                   pickers are brand-scoped, so the asset just seems to vanish. */}
-              <p className="text-muted-foreground text-xs">
+              <p className="text-xs text-muted-foreground">
                 Moving clears the folder and tags, which belong to the old
                 brand. The file itself is not re-uploaded.
               </p>
@@ -221,7 +221,7 @@ export function OrganizeMediaDialog({
                     <span className="min-w-0">
                       <span>{tag.name}</span>
                       {aiTagIds.has(tag.id) && (
-                        <span className="text-muted-foreground ml-1 inline-flex items-center gap-0.5 text-[10px]">
+                        <span className="ml-1 inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
                           <Sparkles className="size-2.5" /> AI
                         </span>
                       )}
@@ -230,20 +230,20 @@ export function OrganizeMediaDialog({
                 ))}
               </div>
             ) : (
-              <p className="text-muted-foreground text-xs">
+              <p className="text-xs text-muted-foreground">
                 Create a managed tag from the library’s Organize menu first.
               </p>
             )}
           </div>
 
           {(asset.kind === "image" || asset.kind === "video") && (
-            <div className="bg-muted/30 grid gap-2 rounded-lg border p-3">
+            <div className="grid gap-2 rounded-lg border bg-muted/30 p-3">
               <div className="flex items-center gap-2">
                 <Sparkles className="size-4" />
                 <span className="text-sm font-medium">AI analysis</span>
                 {analysis?.evidence === "poster" && (
                   <span
-                    className="text-muted-foreground text-[11px]"
+                    className="text-[11px] text-muted-foreground"
                     title="No storyboard was cut for this clip, so only one frame was read. Re-upload it to get the full teardown."
                   >
                     · from the poster frame only
@@ -251,7 +251,7 @@ export function OrganizeMediaDialog({
                 )}
               </div>
               {(analysis?.summary ?? analysis?.description) && (
-                <p className="text-muted-foreground text-xs">
+                <p className="text-xs text-muted-foreground">
                   {analysis?.summary ?? analysis?.description}
                 </p>
               )}
@@ -262,14 +262,14 @@ export function OrganizeMediaDialog({
                 </p>
               )}
               {analysis && analysis.lessons.length > 0 && (
-                <ul className="text-muted-foreground list-disc space-y-0.5 pl-4 text-xs">
+                <ul className="list-disc space-y-0.5 pl-4 text-xs text-muted-foreground">
                   {analysis.lessons.slice(0, 4).map((lesson, index) => (
                     <li key={index}>{lesson}</li>
                   ))}
                 </ul>
               )}
               {analysis?.transcriptError && (
-                <p className="text-muted-foreground text-[11px]">
+                <p className="text-[11px] text-muted-foreground">
                   No transcript: {analysis.transcriptError}
                 </p>
               )}

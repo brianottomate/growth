@@ -46,7 +46,7 @@ export default async function PerformanceBrandLayout({
               />
             ) : null}
           </div>
-          <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 text-xs">
+          <div className="flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
             {brand.website ? (
               <a
                 href={brand.website}

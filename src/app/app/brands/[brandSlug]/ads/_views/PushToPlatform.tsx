@@ -133,7 +133,7 @@ export function PushToPlatform({
               id="push-destination"
               value={chosen?.key ?? ""}
               onChange={(event) => setDestinationKey(event.target.value)}
-              className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
             >
               <option value="" disabled>
                 {destinations.isPending
@@ -155,7 +155,7 @@ export function PushToPlatform({
               id="push-goal"
               value={goal}
               onChange={(event) => setGoal(event.target.value as typeof goal)}
-              className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
             >
               {goals.map((value) => (
                 <option key={value} value={value}>

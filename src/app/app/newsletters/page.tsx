@@ -300,7 +300,7 @@ export default async function NewslettersPage({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Newsletters</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
+          <p className="mt-1 text-sm text-muted-foreground">
             {ownedEmails.filter((email) => email.status !== "published").length}{" "}
             in editorial production · {tagged.length} sent issues ·{" "}
             {fmt(totalReach)} reached ·{" "}
@@ -326,7 +326,7 @@ export default async function NewslettersPage({
         <section className="mt-6 rounded-2xl border p-4">
           <div>
             <h2 className="font-semibold">Editorial pipeline</h2>
-            <p className="text-muted-foreground mt-1 text-xs">
+            <p className="mt-1 text-xs text-muted-foreground">
               Broadcasts and blasts share the same authoring workspace. Only
               recurring broadcasts count toward newsletter cadence.
             </p>
@@ -339,7 +339,7 @@ export default async function NewslettersPage({
                     <h3 className="text-xs font-semibold tracking-wide uppercase">
                       {bucket.label} · {bucket.items.length}
                     </h3>
-                    <p className="text-muted-foreground mt-0.5 text-[11px]">
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
                       {bucket.description}
                     </p>
                   </div>
@@ -349,7 +349,7 @@ export default async function NewslettersPage({
                     <Link
                       key={email.id}
                       href={`/app/newsletters/${email.id}`}
-                      className="hover:bg-accent/40 block rounded-lg border p-3 transition-colors"
+                      className="block rounded-lg border p-3 transition-colors hover:bg-accent/40"
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className="min-w-0 truncate text-sm font-medium">
@@ -357,13 +357,13 @@ export default async function NewslettersPage({
                             email.text ||
                             "Untitled email"}
                         </span>
-                        <span className="bg-muted text-muted-foreground shrink-0 rounded-full px-1.5 py-0.5 text-[10px]">
+                        <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
                           {email.format === "newsletter.blast"
                             ? "Blast"
                             : "Issue"}
                         </span>
                       </div>
-                      <div className="text-muted-foreground mt-1 text-[11px]">
+                      <div className="mt-1 text-[11px] text-muted-foreground">
                         {email.scheduledAt
                           ? email.scheduledAt.toLocaleString()
                           : "No calendar date"}
@@ -409,7 +409,7 @@ export default async function NewslettersPage({
                 />
                 {meta.label}
               </div>
-              <div className="text-muted-foreground mt-0.5">
+              <div className="mt-0.5 text-muted-foreground">
                 {a.count} · {meta.cadence}
               </div>
               <div className="text-muted-foreground tabular-nums">
@@ -422,7 +422,7 @@ export default async function NewslettersPage({
         })}
       </div>
 
-      <p className="text-muted-foreground mt-3 text-xs">
+      <p className="mt-3 text-xs text-muted-foreground">
         Topics (General · Destinations · Location Recommendations) — coming
         soon, from Customer.io subscription topics.
       </p>
@@ -435,7 +435,7 @@ export default async function NewslettersPage({
             href={newsletterHref({ view: v, kind: kindFilter })}
             className={`rounded-full border px-3 py-1 text-xs font-medium capitalize transition-colors ${
               view === v
-                ? "bg-foreground text-background border-foreground"
+                ? "border-foreground bg-foreground text-background"
                 : "border-border text-muted-foreground hover:bg-accent"
             }`}
           >
@@ -443,7 +443,7 @@ export default async function NewslettersPage({
           </Link>
         ))}
         {truncated && (
-          <span className="text-muted-foreground text-xs">
+          <span className="text-xs text-muted-foreground">
             showing latest {cap} of {visible.length}
           </span>
         )}
@@ -464,7 +464,7 @@ export default async function NewslettersPage({
       {view === "list" &&
         months.map((m) => (
           <section key={m.key} className="mt-8">
-            <h2 className="text-muted-foreground mb-2 text-xs font-semibold tracking-wider uppercase">
+            <h2 className="mb-2 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
               {m.key} · {m.items.length}
             </h2>
             <div className="flex flex-col">
@@ -475,9 +475,9 @@ export default async function NewslettersPage({
                   <Link
                     key={issue.id}
                     href={`/app/newsletters/${issue.id}`}
-                    className="hover:bg-accent/40 -mx-2 flex items-center gap-3 rounded-lg border-b px-2 py-3 text-sm transition-colors last:border-0"
+                    className="-mx-2 flex items-center gap-3 rounded-lg border-b px-2 py-3 text-sm transition-colors last:border-0 hover:bg-accent/40"
                   >
-                    <span className="text-muted-foreground w-12 shrink-0 text-xs tabular-nums">
+                    <span className="w-12 shrink-0 text-xs text-muted-foreground tabular-nums">
                       {issue.publishedAt!.toLocaleDateString([], {
                         month: "short",
                         day: "numeric",
@@ -491,15 +491,15 @@ export default async function NewslettersPage({
                     <span className="min-w-0 flex-1 truncate">
                       {issue.text}
                     </span>
-                    <span className="text-muted-foreground hidden w-28 shrink-0 text-right text-xs tabular-nums sm:block">
+                    <span className="hidden w-28 shrink-0 text-right text-xs text-muted-foreground tabular-nums sm:block">
                       {s?.sent ? `${fmt(s.sent)} sent` : "—"}
                     </span>
-                    <span className="text-muted-foreground w-16 shrink-0 text-right text-xs tabular-nums">
+                    <span className="w-16 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
                       {openRate != null
                         ? pct(s?.opened ?? 0, s?.delivered ?? 0)
                         : "—"}
                     </span>
-                    <span className="text-muted-foreground w-4 shrink-0 text-right text-xs">
+                    <span className="w-4 shrink-0 text-right text-xs text-muted-foreground">
                       ↗
                     </span>
                   </Link>
@@ -510,7 +510,7 @@ export default async function NewslettersPage({
         ))}
 
       {visible.length === 0 && (
-        <p className="text-muted-foreground mt-10 text-sm">
+        <p className="mt-10 text-sm text-muted-foreground">
           No issues for this filter.
         </p>
       )}

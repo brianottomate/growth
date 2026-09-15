@@ -130,30 +130,30 @@ export function PhotoPickerField({
           type="button"
           onClick={() => fileRef.current?.click()}
           className={cn(
-            "bg-muted flex shrink-0 items-center justify-center overflow-hidden border",
+            "flex shrink-0 items-center justify-center overflow-hidden border bg-muted",
             variant === "banner"
               ? "h-20 w-40 rounded-lg"
               : "size-14 rounded-full",
-            "hover:border-primary transition-colors",
+            "transition-colors hover:border-primary",
           )}
         >
           {picker.preview ? (
-            // eslint-disable-next-line @next/next/no-img-element
+            // oxlint-disable-next-line nextjs/no-img-element
             <img
               src={picker.preview}
               alt=""
               className="size-full object-cover"
             />
           ) : (
-            <ImagePlus className="text-muted-foreground size-5" />
+            <ImagePlus className="size-5 text-muted-foreground" />
           )}
         </button>
-        <div className="text-muted-foreground text-xs">
+        <div className="text-xs text-muted-foreground">
           {label} · {help}
           <br />
           <button
             type="button"
-            className="hover:text-foreground underline underline-offset-2 transition-colors"
+            className="underline underline-offset-2 transition-colors hover:text-foreground"
             onClick={picker.toggleUrlMode}
           >
             {picker.urlMode

@@ -99,7 +99,7 @@ export async function PlatformCampaignView({
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6 p-6">
       <header className="space-y-3">
-        <div className="text-muted-foreground flex items-center gap-2 text-sm">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Link href="/app/brands" className="hover:underline">
             Brands
           </Link>
@@ -133,7 +133,7 @@ export async function PlatformCampaignView({
                 {platformCampaign.status}
               </span>
             </div>
-            <p className="text-muted-foreground mt-1 text-sm">
+            <p className="mt-1 text-sm text-muted-foreground">
               {platformLabel(platformCampaign.platform)}
               {platformCampaign.objective
                 ? ` · ${platformCampaign.objective}`
@@ -156,7 +156,7 @@ export async function PlatformCampaignView({
                 href={platformCampaign.manageUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:bg-accent rounded-md border px-3 py-1.5 text-sm font-medium"
+                className="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-accent"
               >
                 Open in platform ↗
               </a>
@@ -184,8 +184,8 @@ export async function PlatformCampaignView({
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {statCards.map((card) => (
-          <div key={card.label} className="bg-card rounded-xl border p-3">
-            <p className="text-muted-foreground text-xs">{card.label}</p>
+          <div key={card.label} className="rounded-xl border bg-card p-3">
+            <p className="text-xs text-muted-foreground">{card.label}</p>
             <p className="mt-1 text-lg font-semibold tabular-nums">
               {card.value}
             </p>
@@ -196,12 +196,12 @@ export async function PlatformCampaignView({
       <section className="space-y-3">
         <h2 className="text-base font-semibold">
           Ads{" "}
-          <span className="text-muted-foreground text-sm font-normal">
+          <span className="text-sm font-normal text-muted-foreground">
             {spots.length}
           </span>
         </h2>
         {spots.length === 0 ? (
-          <div className="text-muted-foreground space-y-1 text-sm">
+          <div className="space-y-1 text-sm text-muted-foreground">
             <p>
               No ads on this campaign yet. Add one from the brand&apos;s{" "}
               <Link href="/app/media" className="underline">
@@ -219,11 +219,11 @@ export async function PlatformCampaignView({
             {sortedSpots.map((spot) => (
               <div
                 key={spot.id}
-                className="bg-card overflow-hidden rounded-xl border"
+                className="overflow-hidden rounded-xl border bg-card"
               >
-                <div className="bg-muted relative aspect-video">
+                <div className="relative aspect-video bg-muted">
                   <ImportCreativeButton platformAdId={spot.id} />
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {/* oxlint-disable-next-line nextjs/no-img-element */}
                   <img
                     src={
                       posterForMedia(spot.media?.[0]) ??
@@ -242,11 +242,11 @@ export async function PlatformCampaignView({
                     {spot.name ?? "Untitled ad"}
                   </p>
                   {spot.body && (
-                    <p className="text-muted-foreground line-clamp-2 text-xs">
+                    <p className="line-clamp-2 text-xs text-muted-foreground">
                       {spot.body}
                     </p>
                   )}
-                  <p className="text-muted-foreground text-xs tabular-nums">
+                  <p className="text-xs text-muted-foreground tabular-nums">
                     {spot.stats?.spend != null
                       ? `${money(spot.stats.spend)} spent`
                       : "no spend yet"}

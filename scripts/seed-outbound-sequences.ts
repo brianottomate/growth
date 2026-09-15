@@ -275,7 +275,9 @@ const retired = await db
   )
   .returning({ id: lifecycleProgramTable.id });
 if (retired.length) {
-  console.log(`Retired old Emily program ${OLD_EMILY_PROGRAM_ID} (soft-delete).`);
+  console.log(
+    `Retired old Emily program ${OLD_EMILY_PROGRAM_ID} (soft-delete).`,
+  );
 }
 
 // 2. Idempotent: drop any prior version of these three programs (steps cascade).
@@ -366,11 +368,17 @@ await db.insert(leadContactTable).values(testContacts);
 // 5. Summary.
 console.log("\nSeeded outbound sequence programs:");
 for (const c of created) {
-  console.log(`  ${c.variant}: ${c.id} (${c.steps} steps) → /app/lifecycle/${c.id}`);
+  console.log(
+    `  ${c.variant}: ${c.id} (${c.steps} steps) → /app/lifecycle/${c.id}`,
+  );
 }
 console.log("\nTest recipients (all land in Kristian's gmail):");
 for (const c of testContacts) console.log(`  ${c.email}`);
-console.log("\nNext: create the matching campaigns in Instantly, push these test");
-console.log("contacts, turn link-tracking OFF, and confirm before any real send.");
+console.log(
+  "\nNext: create the matching campaigns in Instantly, push these test",
+);
+console.log(
+  "contacts, turn link-tracking OFF, and confirm before any real send.",
+);
 
 process.exit(0);

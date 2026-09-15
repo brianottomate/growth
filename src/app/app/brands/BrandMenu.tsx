@@ -95,7 +95,9 @@ export function BrandMenu({
   const syncM = useMutation(
     trpc.zernio.syncHistory.mutationOptions({
       onSuccess: (r) => {
-        toast.success(`History synced · ${r.inserted} new, ${r.updated} refreshed`);
+        toast.success(
+          `History synced · ${r.inserted} new, ${r.updated} refreshed`,
+        );
         refresh();
       },
       onError: (e) => toast.error(e.message),
@@ -164,7 +166,8 @@ export function BrandMenu({
           <Button
             variant="ghost"
             size="icon"
-            className="text-muted-foreground size-7"
+            tone="muted"
+            className="size-7"
             loading={busy}
             disabled={deleteM.isPending}
             aria-label="Brand actions"
@@ -173,7 +176,7 @@ export function BrandMenu({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-60">
-          <DropdownMenuLabel className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
+          <DropdownMenuLabel tone="muted" textSize="eyebrow">
             Channels
           </DropdownMenuLabel>
           <DropdownMenuItem
@@ -229,7 +232,7 @@ export function BrandMenu({
           )}
 
           <DropdownMenuSeparator />
-          <DropdownMenuLabel className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
+          <DropdownMenuLabel tone="muted" textSize="eyebrow">
             Links
           </DropdownMenuLabel>
           {linked.map((l) => (

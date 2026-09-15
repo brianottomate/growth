@@ -122,13 +122,13 @@ export function NumberField<
       {label && (
         <FormLabel>
           {label}
-          {required && <span className="text-destructive ml-1">*</span>}
+          {required && <span className="ml-1 text-destructive">*</span>}
         </FormLabel>
       )}
       <FormControl>
         <div className="relative">
           {currency && (
-            <div className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 -translate-y-1/2">
+            <div className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground">
               {currency}
             </div>
           )}

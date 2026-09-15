@@ -119,7 +119,7 @@ export function ChannelsClient({
   return (
     <div>
       <h1 className="text-2xl font-semibold tracking-tight">Channels</h1>
-      <p className="text-muted-foreground mt-1 text-sm">
+      <p className="mt-1 text-sm text-muted-foreground">
         Each brand&apos;s channels — voice, cadence, and content mix.{" "}
         <span className="text-muted-foreground/70">
           Observed = last {windowDays} days; targets from cadence &amp; mix when
@@ -129,35 +129,35 @@ export function ChannelsClient({
 
       <div className="mt-6 flex flex-col gap-5">
         {brands.length === 0 && (
-          <p className="text-muted-foreground text-sm">No brands yet.</p>
+          <p className="text-sm text-muted-foreground">No brands yet.</p>
         )}
         {brands.map((b) => (
           <section key={b.id} className="overflow-hidden rounded-xl border">
-            <div className="bg-muted/30 flex items-center gap-3 border-b px-4 py-2.5">
+            <div className="flex items-center gap-3 border-b bg-muted/30 px-4 py-2.5">
               <h2 className="text-sm font-semibold">{b.name}</h2>
               <button
                 onClick={() => setSuggestFor({ id: b.id, name: b.name })}
-                className="border-border text-muted-foreground hover:bg-accent hover:text-foreground flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors"
+                className="flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               >
                 <Sparkles className="size-3" /> Suggest updates
               </button>
-              <span className="text-muted-foreground ml-auto text-xs tabular-nums">
+              <span className="ml-auto text-xs text-muted-foreground tabular-nums">
                 {b.mixTotal} posts · {b.channels.length} channels
               </span>
             </div>
 
             {/* Pillar content mix (observed vs target) */}
             <div className="border-b px-4 py-3">
-              <div className="text-muted-foreground mb-1.5 text-[11px] font-medium tracking-wide uppercase">
+              <div className="mb-1.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
                 Content mix
               </div>
               {b.mixTotal === 0 ? (
-                <p className="text-muted-foreground text-xs">
+                <p className="text-xs text-muted-foreground">
                   No posts in window.
                 </p>
               ) : (
                 <>
-                  <div className="bg-muted/40 flex h-2.5 overflow-hidden rounded-full">
+                  <div className="flex h-2.5 overflow-hidden rounded-full bg-muted/40">
                     {b.mixRows.map((m) =>
                       m.pct > 0 ? (
                         <span
@@ -212,7 +212,7 @@ export function ChannelsClient({
             {/* Channels */}
             <div className="grid gap-3 p-3 md:grid-cols-2">
               {b.channels.length === 0 && (
-                <p className="text-muted-foreground text-xs md:col-span-2">
+                <p className="text-xs text-muted-foreground md:col-span-2">
                   No connected channels.
                 </p>
               )}
@@ -222,18 +222,18 @@ export function ChannelsClient({
                 return (
                   <article
                     key={c.id}
-                    className="bg-background/50 overflow-hidden rounded-lg border"
+                    className="overflow-hidden rounded-lg border bg-background/50"
                   >
-                    <div className="bg-muted relative h-16">
+                    <div className="relative h-16 bg-muted">
                       {c.bannerImageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
+                        // oxlint-disable-next-line nextjs/no-img-element
                         <img
                           src={c.bannerImageUrl}
                           alt=""
                           className="size-full object-cover"
                         />
                       ) : (
-                        <div className="from-muted to-muted/30 flex size-full items-center justify-center bg-gradient-to-br">
+                        <div className="flex size-full items-center justify-center bg-gradient-to-br from-muted to-muted/30">
                           <ChannelLogo
                             platform={c.platform}
                             className="size-7 opacity-15"
@@ -241,7 +241,10 @@ export function ChannelsClient({
                         </div>
                       )}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/35 to-transparent" />
-                      <Avatar className="bg-background absolute -bottom-5 left-3 size-11 border-2 shadow-sm">
+                      <Avatar
+                        frame="surface"
+                        className="absolute -bottom-5 left-3 size-11"
+                      >
                         {c.profileImageUrl && (
                           <AvatarImage
                             src={c.profileImageUrl}
@@ -258,7 +261,8 @@ export function ChannelsClient({
                       <Button
                         variant="secondary"
                         size="icon"
-                        className="absolute top-2 right-2 size-7 bg-black/45 text-white backdrop-blur hover:bg-black/65"
+                        tone="media-subtle"
+                        className="absolute top-2 right-2 size-7"
                         title={`Edit ${platformLabel(c.platform)} channel`}
                         onClick={() =>
                           setEditChannel({ ...c, brandName: b.name })
@@ -275,7 +279,7 @@ export function ChannelsClient({
                             href={publicUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="hover:text-primary focus-visible:ring-ring inline-flex items-center gap-1.5 rounded-sm text-sm font-medium transition-colors outline-none focus-visible:ring-2"
+                            className="inline-flex items-center gap-1.5 rounded-sm text-sm font-medium transition-colors outline-none hover:text-primary focus-visible:ring-2 focus-visible:ring-ring"
                             title={`Open ${platformLabel(c.platform)} profile`}
                           >
                             <ChannelLogo
@@ -294,7 +298,7 @@ export function ChannelsClient({
                             {platformLabel(c.platform)}
                           </div>
                         )}
-                        <div className="text-muted-foreground truncate text-[11px]">
+                        <div className="truncate text-[11px] text-muted-foreground">
                           {c.handle ?? "—"}
                           {c.followerCount
                             ? ` · ${fmt(c.followerCount)} followers`
@@ -304,11 +308,11 @@ export function ChannelsClient({
 
                       {/* cadence chips */}
                       <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t pt-3">
-                        <span className="text-muted-foreground text-[11px] tabular-nums">
+                        <span className="text-[11px] text-muted-foreground tabular-nums">
                           {(c.postsInWindow / (windowDays / 7)).toFixed(1)}/wk
                         </span>
                         {c.archetypes.length === 0 && (
-                          <span className="text-muted-foreground/60 text-[11px]">
+                          <span className="text-[11px] text-muted-foreground/60">
                             nothing in window
                           </span>
                         )}
@@ -340,7 +344,7 @@ export function ChannelsClient({
                       {/* per-channel mix override (what the slot generator uses) */}
                       {c.mixTargets.length > 0 && (
                         <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                          <span className="text-muted-foreground/60 text-[10px] font-medium tracking-wide uppercase">
+                          <span className="text-[10px] font-medium tracking-wide text-muted-foreground/60 uppercase">
                             Mix target
                           </span>
                           {c.mixTargets.map((m) => (
@@ -364,7 +368,7 @@ export function ChannelsClient({
                       )}
                       {/* voice fingerprint */}
                       {c.fingerprint && (
-                        <p className="text-muted-foreground mt-1.5 line-clamp-2 text-[11px] italic">
+                        <p className="mt-1.5 line-clamp-2 text-[11px] text-muted-foreground italic">
                           {c.fingerprint}
                         </p>
                       )}
@@ -467,7 +471,8 @@ function EditChannelDialog({
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-muted-foreground justify-self-start"
+                tone="muted"
+                className="justify-self-start"
                 onClick={() => setRemoveBanner((current) => !current)}
               >
                 {removeBanner ? "Keep current banner" : "Remove banner"}
@@ -532,7 +537,7 @@ function EditChannelDialog({
               </SelectContent>
             </Select>
           </div>
-          {error && <p className="text-destructive text-sm">{error}</p>}
+          {error && <p className="text-sm text-destructive">{error}</p>}
         </div>
 
         <DialogFooter>

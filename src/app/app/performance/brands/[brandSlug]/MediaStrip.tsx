@@ -71,7 +71,10 @@ export function MediaStrip({
     <>
       <ul className="grid grid-cols-3 gap-2 @xl:grid-cols-6 @4xl:grid-cols-9">
         {images.map((image, index) => (
-          <li key={image.id} className="bg-muted aspect-square overflow-hidden rounded-xl border">
+          <li
+            key={image.id}
+            className="aspect-square overflow-hidden rounded-xl border bg-muted"
+          >
             <button
               type="button"
               onClick={() => setOpenIndex(index)}
@@ -79,7 +82,7 @@ export function MediaStrip({
               title={image.title ?? undefined}
               aria-label={image.title ? `Open ${image.title}` : "Open image"}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {/* oxlint-disable-next-line nextjs/no-img-element */}
               <img
                 src={image.thumbnailUrl ?? image.url}
                 alt={image.alt ?? image.title ?? ""}
@@ -99,31 +102,52 @@ export function MediaStrip({
         ))}
       </ul>
 
-      <Dialog open={open !== null} onOpenChange={(next) => !next && setOpenIndex(null)}>
+      <Dialog
+        open={open !== null}
+        onOpenChange={(next) => !next && setOpenIndex(null)}
+      >
         {open ? (
-          <DialogContent className="flex h-[92vh] w-[96vw] max-w-[96vw] flex-col overflow-hidden border-white/10 bg-black/95 p-0 text-white sm:max-w-[96vw]">
-            <DialogHeader className="shrink-0 border-b border-white/10 px-5 py-3 pr-12 text-left">
-              <DialogTitle className="flex items-center gap-3 text-sm text-white">
+          <DialogContent
+            tone="media"
+            className="flex h-[92vh] w-[96vw] max-w-[96vw] flex-col overflow-hidden p-0 sm:max-w-[96vw]"
+          >
+            <DialogHeader
+              divider="media"
+              className="shrink-0 px-5 py-3 pr-12 text-left"
+            >
+              <DialogTitle
+                tone="media"
+                className="flex items-center gap-3 text-sm"
+              >
                 <span className="truncate">{open.title ?? "Image"}</span>
                 <ButtonLink
                   href={
                     open.isCard
                       ? reopenCardHref({ brandId, brandSlug, assetId: open.id })
-                      : adPreviewStudioHref({ brandId, brandSlug, sourceAssetId: open.id })
+                      : adPreviewStudioHref({
+                          brandId,
+                          brandSlug,
+                          sourceAssetId: open.id,
+                        })
                   }
                   size="sm"
                   variant="outline"
-                  className="h-7 shrink-0 border-white/20 bg-transparent text-white hover:bg-white/10"
+                  tone="media-outline"
+                  className="h-7 shrink-0"
                 >
                   <PenLine className="size-3.5" />
-                  {open.isCard ? "Open in Studio" : "Design an ad from this photo"}
+                  {open.isCard
+                    ? "Open in Studio"
+                    : "Design an ad from this photo"}
                 </ButtonLink>
               </DialogTitle>
-              <DialogDescription className="text-xs text-white/55">
+              <DialogDescription tone="media" className="text-xs">
                 {[
                   `${(openIndex ?? 0) + 1} of ${images.length}`,
                   open.isCard ? "Rendered card" : "Photo",
-                  open.width && open.height ? `${open.width}×${open.height}` : null,
+                  open.width && open.height
+                    ? `${open.width}×${open.height}`
+                    : null,
                 ]
                   .filter(Boolean)
                   .join(" · ")}
@@ -131,7 +155,7 @@ export function MediaStrip({
             </DialogHeader>
             <div className="relative flex min-h-0 flex-1 items-center justify-center p-4">
               {/* The full-size file, not the tile: this is the surface for looking closely. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {/* oxlint-disable-next-line nextjs/no-img-element */}
               <img
                 key={open.id}
                 src={open.url}

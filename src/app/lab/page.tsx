@@ -5,6 +5,11 @@ import Link from "next/link";
 
 const PAGES: { name: string; href: string; note?: string }[] = [
   {
+    name: "Design contracts",
+    href: "/lab/design-contracts",
+    note: "shared component style review",
+  },
+  {
     name: "Property showcase",
     href: "/lab/property-showcase",
     note: "North Topsail scroll-world storyboard",
@@ -67,7 +72,7 @@ export default function LabIndexPage() {
     <div className="mx-auto max-w-3xl space-y-10 p-8">
       <div>
         <h1 className="text-2xl font-semibold">Lab</h1>
-        <p className="text-muted-foreground mt-1 text-sm">
+        <p className="mt-1 text-sm text-muted-foreground">
           Internal workspace — prototypes, workbenches, system maps, and
           integration diagnostics. Open to any signed-in teammate; API routes
           also accept <code>Authorization: Bearer &lt;ADMIN_TOKEN&gt;</code> for
@@ -77,7 +82,7 @@ export default function LabIndexPage() {
       </div>
 
       <section>
-        <h2 className="text-muted-foreground mb-3 text-xs font-semibold tracking-wide uppercase">
+        <h2 className="mb-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
           Pages
         </h2>
         <ul className="space-y-2">
@@ -87,7 +92,7 @@ export default function LabIndexPage() {
                 {p.name}
               </Link>
               {p.note && (
-                <span className="text-muted-foreground ml-2 text-xs">
+                <span className="ml-2 text-xs text-muted-foreground">
                   {p.note}
                 </span>
               )}
@@ -97,7 +102,7 @@ export default function LabIndexPage() {
       </section>
 
       <section>
-        <h2 className="text-muted-foreground mb-3 text-xs font-semibold tracking-wide uppercase">
+        <h2 className="mb-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
           Integration diagnostics (JSON)
         </h2>
         <ul className="space-y-2">
@@ -107,7 +112,7 @@ export default function LabIndexPage() {
                 {d.name}
               </Link>
               {d.note && (
-                <span className="text-muted-foreground ml-2 text-xs">
+                <span className="ml-2 text-xs text-muted-foreground">
                   {d.note}
                 </span>
               )}

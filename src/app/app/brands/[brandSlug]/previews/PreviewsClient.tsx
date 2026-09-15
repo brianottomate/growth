@@ -67,7 +67,7 @@ function SpotMock({
 }) {
   return (
     <div className="min-w-0 space-y-2">
-      <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <ChannelLogo platform={spot.platform} className="size-3.5" />
         <span className="font-medium">{platformLabel(spot.platform)}</span>
         <span>· {spot.format?.split(".")[1] ?? "post"}</span>
@@ -117,23 +117,23 @@ function Picker({ ideas }: { ideas: PreviewIdea[] }) {
               <button
                 type="button"
                 onClick={() => toggle(idea.id)}
-                className="hover:bg-muted/50 flex w-full items-center gap-3 px-4 py-3 text-left"
+                className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted/50"
               >
                 <span
                   className={cn(
                     "flex size-5 items-center justify-center rounded border",
-                    on && "bg-foreground text-background border-foreground",
+                    on && "border-foreground bg-foreground text-background",
                   )}
                 >
                   {on && <Check className="size-3.5" />}
                 </span>
-                <span className="text-muted-foreground w-24 flex-none text-xs">
+                <span className="w-24 flex-none text-xs text-muted-foreground">
                   {dayLabel(idea.plannedAt)}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-sm">
                   {idea.title}
                 </span>
-                <span className="text-muted-foreground flex-none text-xs">
+                <span className="flex-none text-xs text-muted-foreground">
                   {idea.spots
                     .map((spot) => platformLabel(spot.platform))
                     .join(" · ")}
@@ -143,7 +143,7 @@ function Picker({ ideas }: { ideas: PreviewIdea[] }) {
           );
         })}
         {ideas.length === 0 && (
-          <li className="text-muted-foreground px-4 py-6 text-sm">
+          <li className="px-4 py-6 text-sm text-muted-foreground">
             No planned ideas for this brand yet.
           </li>
         )}
@@ -159,7 +159,7 @@ function Picker({ ideas }: { ideas: PreviewIdea[] }) {
           <button
             type="button"
             onClick={all}
-            className="text-muted-foreground hover:text-foreground text-sm"
+            className="text-sm text-muted-foreground hover:text-foreground"
           >
             {chosen.length === ideas.length ? "Clear" : "Select all"}
           </button>
@@ -197,14 +197,14 @@ export function PreviewsClient({
     <div className="mx-auto w-full max-w-7xl space-y-10 p-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-1">
-          <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+          <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
             {brand.name}
           </p>
           <h1 className="text-2xl font-semibold tracking-tight">
             {picking ? "Pick ideas to preview" : "Planned posts"}
           </h1>
           {!picking && (
-            <p className="text-muted-foreground text-sm">
+            <p className="text-sm text-muted-foreground">
               {ideas.length} {ideas.length === 1 ? "idea" : "ideas"}
               {range ? ` · ${range}` : ""}
             </p>
@@ -214,7 +214,7 @@ export function PreviewsClient({
           <div className="flex items-center gap-2">
             <Link
               href={pathname}
-              className="text-muted-foreground hover:text-foreground text-sm"
+              className="text-sm text-muted-foreground hover:text-foreground"
             >
               Change selection
             </Link>
@@ -241,7 +241,7 @@ export function PreviewsClient({
             <section key={idea.id} className="space-y-4">
               <div className="space-y-1.5">
                 <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-                  <span className="bg-muted rounded-full px-2.5 py-0.5 text-xs font-medium">
+                  <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium">
                     {dayLabel(idea.plannedAt)}
                   </span>
                   <h2 className="text-lg font-semibold">
@@ -253,13 +253,13 @@ export function PreviewsClient({
                     </Link>
                   </h2>
                   {idea.pillar && (
-                    <span className="text-muted-foreground text-xs">
+                    <span className="text-xs text-muted-foreground">
                       {idea.pillar}
                     </span>
                   )}
                 </div>
                 {idea.hook && (
-                  <p className="text-muted-foreground max-w-3xl text-sm">
+                  <p className="max-w-3xl text-sm text-muted-foreground">
                     {idea.hook}
                   </p>
                 )}
@@ -280,7 +280,7 @@ export function PreviewsClient({
                   />
                 ))}
                 {idea.spots.length === 0 && (
-                  <p className="text-muted-foreground text-sm">
+                  <p className="text-sm text-muted-foreground">
                     No platform posts yet.
                   </p>
                 )}
@@ -288,7 +288,7 @@ export function PreviewsClient({
             </section>
           ))}
           {ideas.length === 0 && (
-            <p className="text-muted-foreground text-sm">
+            <p className="text-sm text-muted-foreground">
               None of the requested ideas belong to this brand.
             </p>
           )}

@@ -111,7 +111,7 @@ export function SparPanel({
         side="right"
         className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-md"
       >
-        <SheetHeader className="border-b">
+        <SheetHeader divided>
           <SheetTitle className="text-sm">Spar — should we engage?</SheetTitle>
           <SheetDescription className="line-clamp-2 text-xs">
             {mentionTitle}
@@ -121,7 +121,7 @@ export function SparPanel({
         <div className="min-w-0 flex-1 space-y-4 overflow-x-hidden overflow-y-auto p-4">
           {messages.length === 0 ? (
             <div className="space-y-3 pt-2">
-              <p className="text-muted-foreground text-sm">
+              <p className="text-sm text-muted-foreground">
                 I can see this mention, its score, and the subreddit&apos;s
                 profile. Let&apos;s think it through — engage, how, or pass.
               </p>
@@ -131,7 +131,7 @@ export function SparPanel({
                     key={p}
                     type="button"
                     onClick={() => send(p)}
-                    className="border-border text-muted-foreground hover:bg-muted rounded-lg border px-3 py-1.5 text-left text-xs"
+                    className="rounded-lg border border-border px-3 py-1.5 text-left text-xs text-muted-foreground hover:bg-muted"
                   >
                     {p}
                   </button>
@@ -150,7 +150,7 @@ export function SparPanel({
 
               return (
                 <div key={m.id} className="min-w-0 space-y-2">
-                  <div className="text-muted-foreground text-[10px] font-medium tracking-wide uppercase">
+                  <div className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
                     {m.role === "user" ? "You" : "Spar"}
                   </div>
                   {m.parts.map((part, i) => {
@@ -195,7 +195,7 @@ export function SparPanel({
             })
           )}
           {status === "submitted" && (
-            <p className="text-muted-foreground text-sm">Thinking…</p>
+            <p className="text-sm text-muted-foreground">Thinking…</p>
           )}
           <div ref={endRef} />
         </div>
@@ -218,7 +218,7 @@ export function SparPanel({
             }}
             rows={2}
             placeholder="Ask, or push back…"
-            className="border-border bg-background flex-1 rounded-md border px-3 py-2 text-sm"
+            className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm"
           />
           <Button type="submit" size="sm" disabled={busy || !input.trim()}>
             Send
@@ -261,7 +261,7 @@ function ToolCard({
           ) : null}
         </p>
         {superseded ? (
-          <p className="text-muted-foreground mt-2 text-xs">
+          <p className="mt-2 text-xs text-muted-foreground">
             Superseded by a later message. Ask for a fresh approval.
           </p>
         ) : (
@@ -286,7 +286,7 @@ function ToolCard({
 
   if (part.state === "output-denied") {
     return (
-      <p className="text-muted-foreground text-xs">Decision not recorded.</p>
+      <p className="text-xs text-muted-foreground">Decision not recorded.</p>
     );
   }
 
@@ -300,7 +300,7 @@ function ToolCard({
 
   if (part.state !== "output-available") {
     return (
-      <div className="text-muted-foreground flex items-center gap-1.5 rounded-md border border-dashed px-3 py-2 text-xs">
+      <div className="flex items-center gap-1.5 rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">
         {name === "draftReply" ? (
           <PenLine className="size-3.5" />
         ) : (
@@ -320,8 +320,8 @@ function ToolCard({
     const out = part.output as { draft?: string } | undefined;
     if (out?.draft) {
       return (
-        <div className="bg-card rounded-lg border p-3">
-          <div className="text-muted-foreground mb-1 flex items-center gap-1.5 text-[10px] font-medium tracking-wide uppercase">
+        <div className="rounded-lg border bg-card p-3">
+          <div className="mb-1 flex items-center gap-1.5 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
             <PenLine className="size-3" />
             Draft reply
           </div>
@@ -342,8 +342,8 @@ function ToolCard({
   }
 
   return (
-    <details className="bg-card rounded-md border px-3 py-2">
-      <summary className="text-muted-foreground cursor-pointer text-[10px] font-medium tracking-wide uppercase">
+    <details className="rounded-md border bg-card px-3 py-2">
+      <summary className="cursor-pointer text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
         {name}
       </summary>
       <pre className="mt-1 overflow-x-auto text-xs">

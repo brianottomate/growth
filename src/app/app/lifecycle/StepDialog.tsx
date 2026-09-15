@@ -314,7 +314,8 @@ export function StepDialog({
                 "The actual email copy. Merge tags like {{firstName}} / {{companyName}} render in Instantly."
               }
               rows={6}
-              className="font-mono text-xs"
+              textSize="xs"
+              monospace
             />
           </div>
 
@@ -392,7 +393,7 @@ export function StepDialog({
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-muted-foreground text-[11px]">
+            <p className="text-[11px] text-muted-foreground">
               Optional — just a signal this step exists in Customer.io.
             </p>
           </div>

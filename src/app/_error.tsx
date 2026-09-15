@@ -54,11 +54,11 @@ export default function ErrorBoundary({
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
-      <div className="border-primary bg-surface-primary w-full max-w-md space-y-6 rounded-2xl border p-8 shadow-lg">
+      <div className="w-full max-w-md space-y-6 rounded-2xl border border-primary bg-surface-primary p-8 shadow-lg">
         {/* Header with Icon */}
         <div className="flex items-start gap-4">
-          <div className="bg-surface-secondary flex size-12 shrink-0 items-center justify-center rounded-full">
-            <AlertCircle className="text-primary size-6" />
+          <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-surface-secondary">
+            <AlertCircle className="size-6 text-primary" />
           </div>
           <div className="space-y-2">
             <Heading variant="headline-sm" as="h1">

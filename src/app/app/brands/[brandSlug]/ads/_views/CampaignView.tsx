@@ -175,7 +175,7 @@ export async function CampaignView({
   return (
     <div className="space-y-8">
       <header className="space-y-3">
-        <div className="text-muted-foreground flex items-center gap-2 text-sm">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Link href="/app/brands" className="hover:underline">
             Brands
           </Link>
@@ -210,7 +210,7 @@ export async function CampaignView({
                 {anyLive ? "live" : anyPushed ? "pushed, paused" : "draft"}
               </span>
             </div>
-            <p className="text-muted-foreground mt-1 flex flex-wrap items-center gap-2 text-sm">
+            <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
               {plannedPlatforms.length === 0 ? (
                 <span>No platform planned yet</span>
               ) : (
@@ -229,7 +229,7 @@ export async function CampaignView({
               ) : null}
             </p>
             {campaign.description ? (
-              <p className="text-muted-foreground mt-2 max-w-2xl text-sm">
+              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
                 {campaign.description}
               </p>
             ) : null}
@@ -283,7 +283,7 @@ export async function CampaignView({
               {ads.length > 0 ? (
                 <Link
                   href={`/app/brands/${brandSlug}/ads/${campaign.id}/by-home`}
-                  className="text-muted-foreground hover:text-foreground px-2 text-xs"
+                  className="px-2 text-xs text-muted-foreground hover:text-foreground"
                 >
                   By home
                 </Link>
@@ -474,7 +474,7 @@ function Step({
   return (
     <li className="space-y-3">
       <div className="flex flex-wrap items-end justify-between gap-2">
-        <p className="text-muted-foreground text-[10.5px] font-semibold tracking-[0.09em] uppercase">
+        <p className="text-[10.5px] font-semibold tracking-[0.09em] text-muted-foreground uppercase">
           {title}
           {meta ? (
             <span className="ml-1.5 font-medium tracking-normal normal-case">
@@ -502,10 +502,10 @@ function Stat({
   sub?: string;
 }) {
   return (
-    <div className="bg-card rounded-xl border p-3">
-      <p className="text-muted-foreground text-xs">{label}</p>
+    <div className="rounded-xl border bg-card p-3">
+      <p className="text-xs text-muted-foreground">{label}</p>
       <p className="mt-1 text-lg font-semibold tabular-nums">{value}</p>
-      {sub ? <p className="text-muted-foreground text-[11px]">{sub}</p> : null}
+      {sub ? <p className="text-[11px] text-muted-foreground">{sub}</p> : null}
     </div>
   );
 }

@@ -32,10 +32,10 @@ export function StickyCtaCard({
   ],
 }: StickyCtaCardProps) {
   return (
-    <div className="border-secondary bg-surface-secondary rounded-xl border p-6 shadow-sm">
-      <h3 className="text-primary text-lg font-bold">{title}</h3>
+    <div className="rounded-xl border border-secondary bg-surface-secondary p-6 shadow-sm">
+      <h3 className="text-lg font-bold text-primary">{title}</h3>
 
-      <p className="text-secondary mt-3 text-sm leading-relaxed">
+      <p className="mt-3 text-sm leading-relaxed text-secondary">
         {description}
       </p>
 
@@ -60,11 +60,11 @@ export function StickyCtaCard({
         </Button>
       </div>
 
-      <div className="border-secondary mt-6 space-y-2 border-t pt-4">
+      <div className="mt-6 space-y-2 border-t border-secondary pt-4">
         {features.map((feature, index) => (
           <div
             key={index}
-            className="text-secondary flex items-start gap-2 text-xs"
+            className="flex items-start gap-2 text-xs text-secondary"
           >
             <Check
               className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500"

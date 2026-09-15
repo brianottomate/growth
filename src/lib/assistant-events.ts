@@ -119,7 +119,12 @@ export type AssistantIntent =
  * The step of the campaign page the operator asked from. The chat gets a hint
  * so it starts on that step rather than reading the whole campaign back.
  */
-export type CampaignFocus = "photos" | "ads" | "audiences" | "platforms" | "live";
+export type CampaignFocus =
+  | "photos"
+  | "ads"
+  | "audiences"
+  | "platforms"
+  | "live";
 
 export type WorkAdCampaignIntent = {
   type: "work_ad_campaign";

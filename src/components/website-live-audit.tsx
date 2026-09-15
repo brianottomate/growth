@@ -80,7 +80,7 @@ export function WebsiteLiveAudit({
               Live OG and metadata audit
             </h2>
           </div>
-          <p className="text-muted-foreground mt-1 text-xs">
+          <p className="mt-1 text-xs text-muted-foreground">
             Fetch every URL in {brandName}&apos;s sitemap without changing the
             stored Website wall.
           </p>
@@ -107,7 +107,7 @@ export function WebsiteLiveAudit({
       </div>
 
       {!result && (
-        <p className="text-muted-foreground mt-4 border-t pt-4 text-xs">
+        <p className="mt-4 border-t pt-4 text-xs text-muted-foreground">
           Unlike Sync sitemap, this checks rolled-up articles and other bulk
           routes individually. The result is a fresh diagnostic, not stored
           content.
@@ -119,13 +119,13 @@ export function WebsiteLiveAudit({
           <AuditSummary result={result} />
 
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="text-muted-foreground text-xs">
+            <div className="text-xs text-muted-foreground">
               {result.audited.toLocaleString()} of{" "}
               {result.totalDiscovered.toLocaleString()} discovered URLs checked
               {result.truncated ? " · audit capped at 500 URLs" : ""} ·{" "}
               {new Date(result.auditedAt).toLocaleString()}
             </div>
-            <label className="text-muted-foreground flex items-center gap-2 text-xs">
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
               <Switch
                 checked={onlyIssues}
                 onCheckedChange={setOnlyIssues}
@@ -139,7 +139,7 @@ export function WebsiteLiveAudit({
             <div className="space-y-3">
               {groups.map(([group, entries]) => (
                 <details key={group} open className="rounded-lg border">
-                  <summary className="hover:bg-muted/40 flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-xs font-medium">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-xs font-medium hover:bg-muted/40">
                     <span>{group}</span>
                     <span className="text-muted-foreground">
                       {entries.length} page{entries.length === 1 ? "" : "s"}
@@ -177,9 +177,9 @@ function AuditSummary({ result }: { result: WebsiteAuditResult }) {
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
       {stats.map(([label, value]) => (
-        <div key={label} className="bg-muted/40 rounded-lg p-3">
+        <div key={label} className="rounded-lg bg-muted/40 p-3">
           <div className="text-xl font-semibold tabular-nums">{value}</div>
-          <div className="text-muted-foreground mt-0.5 text-[10px]">
+          <div className="mt-0.5 text-[10px] text-muted-foreground">
             {label}
           </div>
         </div>
@@ -221,7 +221,7 @@ function AuditEntryRow({ entry }: { entry: WebsiteAuditEntry }) {
       </div>
 
       {entry.fetchError ? (
-        <p className="text-muted-foreground mt-3 text-xs">{entry.fetchError}</p>
+        <p className="mt-3 text-xs text-muted-foreground">{entry.fetchError}</p>
       ) : (
         <div className="mt-3 grid gap-2 text-xs lg:grid-cols-2">
           <MetadataLine
@@ -270,8 +270,8 @@ function MetadataLine({
   max: number;
 }) {
   return (
-    <div className="bg-muted/30 rounded-md px-3 py-2">
-      <div className="text-muted-foreground flex items-center justify-between gap-2 text-[10px] font-medium uppercase">
+    <div className="rounded-md bg-muted/30 px-3 py-2">
+      <div className="flex items-center justify-between gap-2 text-[10px] font-medium text-muted-foreground uppercase">
         <span>{label}</span>
         <span className={(value?.length ?? 0) > max ? "text-red-500" : ""}>
           {value?.length ?? 0}/{max}

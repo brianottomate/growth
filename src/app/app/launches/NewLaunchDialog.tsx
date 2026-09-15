@@ -65,7 +65,7 @@ export function NewLaunchDialog({
               id="launch-product"
               value={productId}
               onChange={(e) => setProductId(e.target.value)}
-              className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
             >
               {products.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -80,11 +80,12 @@ export function NewLaunchDialog({
               id="launch-tier"
               value={tier}
               onChange={(e) => setTier(Number(e.target.value) as LaunchTier)}
-              className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
             >
               {([1, 2, 3] as const).map((t) => (
                 <option key={t} value={t}>
-                  {launchTierGuidance[t].label} ({launchTierGuidance[t].leadTime})
+                  {launchTierGuidance[t].label} (
+                  {launchTierGuidance[t].leadTime})
                 </option>
               ))}
             </select>
@@ -99,7 +100,7 @@ export function NewLaunchDialog({
             />
           </div>
           {create.error && (
-            <p className="text-destructive text-sm">{create.error.message}</p>
+            <p className="text-sm text-destructive">{create.error.message}</p>
           )}
           <Button
             className="w-full"

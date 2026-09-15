@@ -56,7 +56,7 @@ export default async function ConnectPage({
           <h1 className="text-xl font-semibold">
             This link is no longer active
           </h1>
-          <p className="text-muted-foreground mt-2 text-sm">
+          <p className="mt-2 text-sm text-muted-foreground">
             Ask your Wander contact for a fresh connection link.
           </p>
         </div>
@@ -101,7 +101,7 @@ export default async function ConnectPage({
             <br />
             run by Wander.
           </h2>
-          <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
             Wander&apos;s growth team plans and runs paid campaigns for{" "}
             {brand.name} across Facebook, Instagram, Google and ChatGPT. Your ad
             accounts are what that runs on. Connecting them is how we build,
@@ -114,7 +114,7 @@ export default async function ConnectPage({
               "Your Wander contact confirms once everything's flowing",
             ].map((line, index) => (
               <li key={line} className="flex gap-3">
-                <span className="border-border text-muted-foreground grid size-6 shrink-0 place-items-center rounded-full border text-[11px] font-medium">
+                <span className="grid size-6 shrink-0 place-items-center rounded-full border border-border text-[11px] font-medium text-muted-foreground">
                   {index + 1}
                 </span>
                 <span className="text-sm leading-relaxed">{line}</span>
@@ -122,27 +122,27 @@ export default async function ConnectPage({
             ))}
           </ol>
         </div>
-        <p className="text-muted-foreground text-xs">Find your happy place ®</p>
+        <p className="text-xs text-muted-foreground">Find your happy place ®</p>
       </aside>
 
       <section className="order-1 px-6 py-10 lg:order-2 lg:px-12 lg:py-16">
         <div className="mx-auto w-full max-w-lg">
           <div className="flex items-center gap-2.5">
             {brand.logo ? (
-              // eslint-disable-next-line @next/next/no-img-element
+              // oxlint-disable-next-line nextjs/no-img-element
               <img
                 src={brand.logo}
                 alt=""
                 className="size-8 rounded-lg border object-cover"
               />
             ) : (
-              <span className="bg-muted grid size-8 place-items-center rounded-lg text-xs font-semibold">
+              <span className="grid size-8 place-items-center rounded-lg bg-muted text-xs font-semibold">
                 {brand.name.slice(0, 2)}
               </span>
             )}
             <span className="text-sm font-medium">{brand.name}</span>
             {contactName && (
-              <span className="text-muted-foreground truncate text-sm">
+              <span className="truncate text-sm text-muted-foreground">
                 · invited by {contactName} at Wander
               </span>
             )}
@@ -152,7 +152,7 @@ export default async function ConnectPage({
             Connect your accounts
           </h1>
 
-          <div className="border-border mt-6 divide-y divide-white/5 rounded-xl border">
+          <div className="mt-6 divide-y divide-white/5 rounded-xl border border-border">
             {status.map((row) => (
               <div
                 key={row.key}
@@ -160,7 +160,7 @@ export default async function ConnectPage({
               >
                 <div className="min-w-0">
                   <p className="text-sm font-medium">{row.label}</p>
-                  <p className="text-muted-foreground truncate text-xs">
+                  <p className="truncate text-xs text-muted-foreground">
                     {row.connected
                       ? [
                           row.accounts.filter(Boolean).length > 0
@@ -182,7 +182,7 @@ export default async function ConnectPage({
             ))}
           </div>
 
-          <div className="text-muted-foreground mt-5 flex flex-wrap gap-x-5 gap-y-1.5 text-xs">
+          <div className="mt-5 flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-muted-foreground">
             {[
               "No password shared",
               "Revoke anytime",
@@ -195,7 +195,7 @@ export default async function ConnectPage({
             ))}
           </div>
 
-          <p className="text-muted-foreground mt-6 text-xs leading-relaxed">
+          <p className="mt-6 text-xs leading-relaxed text-muted-foreground">
             {allDone
               ? `All set. ${contactName ?? "Your Wander contact"} takes it from here.`
               : "Takes about two minutes. Stuck on one? Skip it and get in touch."}

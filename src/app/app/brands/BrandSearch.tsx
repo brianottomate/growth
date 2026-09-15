@@ -45,7 +45,10 @@ export function BrandSearch({ groups }: { groups: BrandSearchGroup[] }) {
     }));
   }, [shown, query]);
 
-  const total = matched.reduce((count, group) => count + group.entries.length, 0);
+  const total = matched.reduce(
+    (count, group) => count + group.entries.length,
+    0,
+  );
 
   const toggle = (label: string) =>
     setHidden((current) =>
@@ -62,30 +65,31 @@ export function BrandSearch({ groups }: { groups: BrandSearchGroup[] }) {
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search brands by name, URL or handle…"
           aria-label="Search brands"
-          className="border-border bg-background focus:ring-ring w-72 rounded-md border px-3 py-1.5 text-sm focus:ring-1 focus:outline-none"
+          className="w-72 rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
         />
-        {groups.length > 1 && groups.map((group) => {
-          const on = !hidden.includes(group.label);
-          return (
-            <button
-              key={group.label}
-              type="button"
-              onClick={() => toggle(group.label)}
-              aria-pressed={on}
-              className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                on
-                  ? "border-foreground bg-foreground text-background"
-                  : "border-border text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {group.label} {group.entries.length}
-            </button>
-          );
-        })}
+        {groups.length > 1 &&
+          groups.map((group) => {
+            const on = !hidden.includes(group.label);
+            return (
+              <button
+                key={group.label}
+                type="button"
+                onClick={() => toggle(group.label)}
+                aria-pressed={on}
+                className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                  on
+                    ? "border-foreground bg-foreground text-background"
+                    : "border-border text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {group.label} {group.entries.length}
+              </button>
+            );
+          })}
       </div>
 
       {query.trim() !== "" && total === 0 && (
-        <p className="text-muted-foreground mt-10 text-sm">
+        <p className="mt-10 text-sm text-muted-foreground">
           No brands match “{query}” in the groups you have on.
         </p>
       )}
@@ -93,7 +97,7 @@ export function BrandSearch({ groups }: { groups: BrandSearchGroup[] }) {
       {matched.map((group) =>
         group.entries.length === 0 ? null : (
           <Fragment key={group.label}>
-            <h2 className="text-muted-foreground mt-8 mb-3 text-xs font-semibold tracking-wider uppercase">
+            <h2 className="mt-8 mb-3 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
               {group.label}
             </h2>
             <div className="flex flex-col gap-4">

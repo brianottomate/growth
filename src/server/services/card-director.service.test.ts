@@ -35,7 +35,11 @@ describe("applying the art director's read", () => {
     expect(longer.spec.title).toBe(spec.title);
     expect(longer.changes).toEqual([]);
 
-    const blank = applyDirection(spec, { ...KEEP, verdict: "adjust", title: "   " });
+    const blank = applyDirection(spec, {
+      ...KEEP,
+      verdict: "adjust",
+      title: "   ",
+    });
     expect(blank.spec.title).toBe(spec.title);
 
     const shorter = applyDirection(spec, {
@@ -50,11 +54,19 @@ describe("applying the art director's read", () => {
   });
 
   test("an empty facts line drops it; null leaves it", () => {
-    const dropped = applyDirection(spec, { ...KEEP, verdict: "adjust", subtitle: "" });
+    const dropped = applyDirection(spec, {
+      ...KEEP,
+      verdict: "adjust",
+      subtitle: "",
+    });
     expect(dropped.spec.subtitle).toBeUndefined();
     expect(dropped.changes).toEqual(["dropped the facts line"]);
 
-    const kept = applyDirection(spec, { ...KEEP, verdict: "adjust", subtitle: null });
+    const kept = applyDirection(spec, {
+      ...KEEP,
+      verdict: "adjust",
+      subtitle: null,
+    });
     expect(kept.spec.subtitle).toBe(spec.subtitle);
   });
 
@@ -69,7 +81,11 @@ describe("applying the art director's read", () => {
   });
 
   test("a tint is recorded lower-case so identical reads match on reuse", () => {
-    const result = applyDirection(spec, { ...KEEP, verdict: "adjust", scrim: "#1B3A5C" });
+    const result = applyDirection(spec, {
+      ...KEEP,
+      verdict: "adjust",
+      scrim: "#1B3A5C",
+    });
     expect(result.spec.scrim).toBe("#1b3a5c");
   });
 });

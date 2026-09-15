@@ -62,7 +62,7 @@ export function ClientConnectCard({ brandId }: { brandId: string }) {
     <section className="space-y-3">
       <div>
         <h2 className="text-base font-semibold">Client connect</h2>
-        <p className="text-muted-foreground mt-0.5 text-sm">
+        <p className="mt-0.5 text-sm text-muted-foreground">
           Four client-facing surfaces for one brand: the pitch a rep sends
           before anything is signed, the intake form the client fills in, the
           Leadsie grant that hands us their ad accounts, and the connect page
@@ -74,14 +74,14 @@ export function ClientConnectCard({ brandId }: { brandId: string }) {
         </p>
       </div>
 
-      <div className="border-border rounded-xl border p-4">
+      <div className="rounded-xl border border-border p-4">
         {pitchUrl && (
           <div className="mb-3">
-            <p className="text-muted-foreground mb-1.5 text-xs font-medium tracking-wide uppercase">
+            <p className="mb-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase">
               Sales pitch
             </p>
             <div className="flex flex-wrap items-center gap-2">
-              <code className="bg-surface-secondary/50 min-w-0 flex-1 truncate rounded-md px-2.5 py-1.5 font-mono text-xs">
+              <code className="min-w-0 flex-1 truncate rounded-md bg-surface-secondary/50 px-2.5 py-1.5 font-mono text-xs">
                 {pitchUrl}
               </code>
               <Button
@@ -100,7 +100,7 @@ export function ClientConnectCard({ brandId }: { brandId: string }) {
                 href={pitchUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-muted-foreground hover:text-foreground text-xs"
+                className="text-xs text-muted-foreground hover:text-foreground"
               >
                 Open ↗
               </a>
@@ -110,11 +110,11 @@ export function ClientConnectCard({ brandId }: { brandId: string }) {
 
         {intakeUrl && (
           <div className="mb-3">
-            <p className="text-muted-foreground mb-1.5 text-xs font-medium tracking-wide uppercase">
+            <p className="mb-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase">
               Intake form
             </p>
             <div className="flex flex-wrap items-center gap-2">
-              <code className="bg-surface-secondary/50 min-w-0 flex-1 truncate rounded-md px-2.5 py-1.5 font-mono text-xs">
+              <code className="min-w-0 flex-1 truncate rounded-md bg-surface-secondary/50 px-2.5 py-1.5 font-mono text-xs">
                 {intakeUrl}
               </code>
               <Button
@@ -133,7 +133,7 @@ export function ClientConnectCard({ brandId }: { brandId: string }) {
                 href={intakeUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-muted-foreground hover:text-foreground text-xs"
+                className="text-xs text-muted-foreground hover:text-foreground"
               >
                 Open ↗
               </a>
@@ -142,11 +142,11 @@ export function ClientConnectCard({ brandId }: { brandId: string }) {
         )}
 
         <div className="mb-3">
-          <p className="text-muted-foreground mb-1.5 text-xs font-medium tracking-wide uppercase">
+          <p className="mb-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase">
             Access grant (Leadsie)
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            <code className="bg-surface-secondary/50 min-w-0 flex-1 truncate rounded-md px-2.5 py-1.5 font-mono text-xs">
+            <code className="min-w-0 flex-1 truncate rounded-md bg-surface-secondary/50 px-2.5 py-1.5 font-mono text-xs">
               {LEADSIE_URL}
             </code>
             <Button
@@ -165,25 +165,25 @@ export function ClientConnectCard({ brandId }: { brandId: string }) {
               href={LEADSIE_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-muted-foreground hover:text-foreground text-xs"
+              className="text-xs text-muted-foreground hover:text-foreground"
             >
               Open ↗
             </a>
           </div>
-          <p className="text-muted-foreground mt-1 text-xs">
+          <p className="mt-1 text-xs text-muted-foreground">
             Requests: {LEADSIE_SCOPES}. Not brand-specific and not revoked by
             regenerating the token.
           </p>
         </div>
 
         {url && (
-          <p className="text-muted-foreground mb-1.5 text-xs font-medium tracking-wide uppercase">
+          <p className="mb-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase">
             Connect page
           </p>
         )}
         {url ? (
           <div className="flex flex-wrap items-center gap-2">
-            <code className="bg-surface-secondary/50 min-w-0 flex-1 truncate rounded-md px-2.5 py-1.5 font-mono text-xs">
+            <code className="min-w-0 flex-1 truncate rounded-md bg-surface-secondary/50 px-2.5 py-1.5 font-mono text-xs">
               {url}
             </code>
             <Button
@@ -233,7 +233,7 @@ export function ClientConnectCard({ brandId }: { brandId: string }) {
         )}
 
         {visible.length > 0 && (
-          <ul className="border-border mt-4 border-t text-sm">
+          <ul className="mt-4 border-t border-border text-sm">
             {/* A parked channel is hidden from the client but not from us, and
                 only while nothing is connected on it. One a brand already has
                 still shows, because it is still syncing. */}
@@ -245,7 +245,7 @@ export function ClientConnectCard({ brandId }: { brandId: string }) {
                 <span className="flex items-baseline gap-1.5 whitespace-nowrap">
                   <span>{row.label}</span>
                   {!row.offered && (
-                    <span className="text-muted-foreground/60 text-xs">
+                    <span className="text-xs text-muted-foreground/60">
                       hidden from client
                     </span>
                   )}

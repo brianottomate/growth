@@ -31,9 +31,9 @@ describe("treeIsCompleteEnoughToReconcile", () => {
     ["a spend floor", { minSpend: 10 }],
     ["a status filter", { statuses: ["active"] }],
   ])("refuses to reconcile after %s", (_label, override) => {
-    expect(
-      treeIsCompleteEnoughToReconcile({ ...complete, ...override }),
-    ).toBe(false);
+    expect(treeIsCompleteEnoughToReconcile({ ...complete, ...override })).toBe(
+      false,
+    );
   });
 });
 
@@ -51,25 +51,45 @@ describe("campaignBelongsToBrand", () => {
 
   it("keeps a campaign the brand already claims, shared account or not", () => {
     expect(
-      campaignBelongsToBrand({ brandId: "me", accountShared: true, claimants: mine }),
+      campaignBelongsToBrand({
+        brandId: "me",
+        accountShared: true,
+        claimants: mine,
+      }),
     ).toBe(true);
     expect(
-      campaignBelongsToBrand({ brandId: "me", accountShared: false, claimants: mine }),
+      campaignBelongsToBrand({
+        brandId: "me",
+        accountShared: false,
+        claimants: mine,
+      }),
     ).toBe(true);
   });
 
   it("never takes a campaign another brand claims", () => {
     expect(
-      campaignBelongsToBrand({ brandId: "me", accountShared: false, claimants: theirs }),
+      campaignBelongsToBrand({
+        brandId: "me",
+        accountShared: false,
+        claimants: theirs,
+      }),
     ).toBe(false);
   });
 
   it("gives unclaimed campaigns to the owner only", () => {
     expect(
-      campaignBelongsToBrand({ brandId: "me", accountShared: false, claimants: undefined }),
+      campaignBelongsToBrand({
+        brandId: "me",
+        accountShared: false,
+        claimants: undefined,
+      }),
     ).toBe(true);
     expect(
-      campaignBelongsToBrand({ brandId: "me", accountShared: true, claimants: new Set() }),
+      campaignBelongsToBrand({
+        brandId: "me",
+        accountShared: true,
+        claimants: new Set(),
+      }),
     ).toBe(false);
   });
 });

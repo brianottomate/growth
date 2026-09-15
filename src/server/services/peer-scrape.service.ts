@@ -48,7 +48,12 @@ import {
 // ---- raw record + mapping ------------------------------------------
 
 /** Platforms with a Bright Data dataset mapper wired into this pipeline. */
-export const SCRAPE_PLATFORMS = ["linkedin", "x", "instagram", "facebook"] as const;
+export const SCRAPE_PLATFORMS = [
+  "linkedin",
+  "x",
+  "instagram",
+  "facebook",
+] as const;
 export type ScrapePlatform = (typeof SCRAPE_PLATFORMS)[number];
 export type PeerScrapeProvider = "brightdata" | "apify";
 
@@ -853,7 +858,9 @@ export async function scrapeBrandChannel(opts: {
   }
 
   const requestedTo = new Date();
-  const requestedFrom = new Date(requestedTo.getTime() - sinceDays * 86_400_000);
+  const requestedFrom = new Date(
+    requestedTo.getTime() - sinceDays * 86_400_000,
+  );
   const runId = await startContentIngestRun({
     brandId: opts.brandId,
     requestedById: opts.requestedById,
@@ -975,7 +982,9 @@ export async function backfillStateForBrand(
         completedAt: contentIngestRunTable.completedAt,
         error: contentIngestRunTable.error,
         result: contentIngestRunTable.result,
-        platform: sql<string | null>`${contentIngestRunTable.result} ->> 'platform'`,
+        platform: sql<
+          string | null
+        >`${contentIngestRunTable.result} ->> 'platform'`,
       })
       .from(contentIngestRunTable)
       .where(eq(contentIngestRunTable.brandId, brandId))

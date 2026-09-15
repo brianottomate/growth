@@ -11,10 +11,7 @@ export type ChartDataKey = string;
 
 export type ChartDataPoint = {
   xDataKey: string;
-  // eslint-disable-next-line @typescript-eslint/consistent-indexed-object-style
-} & {
-  [key: string]: number | string;
-};
+} & Record<string, number | string>;
 
 type FileEvent =
   | "File reading Initialized"

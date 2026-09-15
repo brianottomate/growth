@@ -58,11 +58,11 @@ export function PurgeBrandCard({
 
   if (!open) {
     return (
-      <section className="border-destructive/30 rounded-xl border p-4">
+      <section className="rounded-xl border border-destructive/30 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-base font-semibold">Offboarding</h2>
-            <p className="text-muted-foreground mt-0.5 text-sm">
+            <p className="mt-0.5 text-sm text-muted-foreground">
               Permanently remove {brandName} and everything under it. Use this
               when a client leaves and asks for their data to be deleted.
             </p>
@@ -76,12 +76,12 @@ export function PurgeBrandCard({
   }
 
   return (
-    <section className="border-destructive/40 space-y-3 rounded-xl border p-4">
+    <section className="space-y-3 rounded-xl border border-destructive/40 p-4">
       <div className="flex items-start gap-2">
         <TriangleAlert className="mt-0.5 size-4 shrink-0 text-red-400" />
         <div>
           <h2 className="text-base font-semibold">Purge {brandName}</h2>
-          <p className="text-muted-foreground mt-0.5 text-sm">
+          <p className="mt-0.5 text-sm text-muted-foreground">
             This deletes the rows below, the media bytes in storage, the
             ad-account allowlist, and the client&apos;s Zernio profile with its
             connected accounts. It cannot be undone.
@@ -90,7 +90,7 @@ export function PurgeBrandCard({
       </div>
 
       {preview.isPending ? (
-        <div className="text-muted-foreground flex items-center gap-2 text-sm">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" /> Counting what would go…
         </div>
       ) : preview.error ? (
@@ -114,7 +114,7 @@ export function PurgeBrandCard({
                 Blocked, and deliberately so
               </p>
               {blockers.map((blocker) => (
-                <p key={blocker} className="text-muted-foreground text-xs">
+                <p key={blocker} className="text-xs text-muted-foreground">
                   {blocker}
                 </p>
               ))}
@@ -125,7 +125,8 @@ export function PurgeBrandCard({
                 value={typed}
                 onChange={(event) => setTyped(event.target.value)}
                 placeholder={`Type ${brandName} to confirm`}
-                className="h-8 w-64 text-xs"
+                textSize="xs"
+                className="h-8 w-64"
               />
               <Button
                 size="sm"

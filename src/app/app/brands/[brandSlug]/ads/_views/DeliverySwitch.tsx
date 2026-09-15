@@ -48,7 +48,7 @@ export function DeliverySwitch({
   if (!hasExternalId) {
     return (
       <span
-        className="text-muted-foreground/70 text-xs"
+        className="text-xs text-muted-foreground/70"
         title="Add ads, then push the draft to Meta. Launch appears once the campaign exists on the platform."
       >
         draft — push it to Meta to launch
@@ -108,7 +108,9 @@ export function DeliverySwitch({
             <Button
               size="sm"
               loading={toggle.isPending}
-              onClick={() => toggle.mutate({ platformCampaignId, status: "active" })}
+              onClick={() =>
+                toggle.mutate({ platformCampaignId, status: "active" })
+              }
             >
               Launch
             </Button>

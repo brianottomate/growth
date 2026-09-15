@@ -80,7 +80,7 @@ function RecipientStrip({
   ].filter(Boolean);
 
   return (
-    <div className="text-muted-foreground mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+    <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
       {contact ? (
         <span className="text-foreground">
           {name || "(no name)"}
@@ -207,7 +207,7 @@ export default async function PregenReviewPage({
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h1 className="text-lg font-semibold">Pregen review</h1>
-            <p className="text-muted-foreground text-sm">
+            <p className="text-sm text-muted-foreground">
               {previews.length} preview{previews.length === 1 ? "" : "s"}
               {requested?.length
                 ? " (explicit list)"
@@ -217,28 +217,28 @@ export default async function PregenReviewPage({
           </div>
           <Link
             href="/app/pregen"
-            className="text-muted-foreground hover:text-foreground text-sm"
+            className="text-sm text-muted-foreground hover:text-foreground"
           >
             All builds
           </Link>
         </div>
 
         {previews.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
+          <p className="text-sm text-muted-foreground">
             Nothing to review. Every READY build is sent, judged or excluded.
           </p>
         ) : (
           <div className="space-y-10">
             {previews.map((row, index) => (
               <section key={row.domain}>
-                <div className="bg-background/95 border-border sticky top-0 z-10 mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b py-2 backdrop-blur">
-                  <span className="text-muted-foreground text-sm tabular-nums">
+                <div className="sticky top-0 z-10 mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-border bg-background/95 py-2 backdrop-blur">
+                  <span className="text-sm text-muted-foreground tabular-nums">
                     {index + 1}/{previews.length}
                   </span>
                   <h2 className="font-medium">
                     {row.businessName ?? row.companyName ?? row.domain}
                   </h2>
-                  <span className="text-muted-foreground text-sm">
+                  <span className="text-sm text-muted-foreground">
                     {row.domain}
                   </span>
                   {row.sendScheduledFor ? (
@@ -272,7 +272,7 @@ export default async function PregenReviewPage({
                   src={row.previewUrl!}
                   title={`Preview for ${row.domain}`}
                   loading="lazy"
-                  className="border-border h-[80vh] w-full rounded border bg-white"
+                  className="h-[80vh] w-full rounded border border-border bg-white"
                 />
               </section>
             ))}

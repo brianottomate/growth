@@ -74,13 +74,13 @@ export default async function PerformanceProspectsPage() {
                         href={brand.website}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-muted-foreground text-[11.5px] hover:underline"
+                        className="text-[11.5px] text-muted-foreground hover:underline"
                       >
                         {host(brand.website)}
                       </a>
                     ) : null}
                   </div>
-                  <div className="text-muted-foreground flex items-center gap-2 text-[11px]">
+                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                     {brand.campaigns.length > 0 ? (
                       <Link
                         href={brandAdsHref(brand)}
@@ -112,7 +112,7 @@ export default async function PerformanceProspectsPage() {
           </ul>
         </section>
       ) : (
-        <p className="text-muted-foreground text-center text-xs">
+        <p className="text-center text-xs text-muted-foreground">
           No prospects yet.
         </p>
       )}

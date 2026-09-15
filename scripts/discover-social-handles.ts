@@ -23,7 +23,10 @@ import { generateText, Output } from "ai";
 import { anthropic } from "@ai-sdk/anthropic";
 import { z } from "zod";
 
-import { scrapeUrl, isFirecrawlConfigured } from "@/server/clients/firecrawl.client";
+import {
+  scrapeUrl,
+  isFirecrawlConfigured,
+} from "@/server/clients/firecrawl.client";
 import {
   tavilySearch,
   parallelSearch,
@@ -39,8 +42,15 @@ import { isClaudeConfigured } from "@/server/clients/claude.client";
 
 // Platforms we model (subset of channelPlatformEnum that has public profiles).
 const PLATFORMS = [
-  "linkedin", "instagram", "x", "facebook", "youtube", "tiktok", "threads",
-  "reddit", "pinterest",
+  "linkedin",
+  "instagram",
+  "x",
+  "facebook",
+  "youtube",
+  "tiktok",
+  "threads",
+  "reddit",
+  "pinterest",
 ] as const;
 
 // One configured-provider attempt, wrapped so failure is isolated.
@@ -48,12 +58,22 @@ async function envelope<T>(
   name: string,
   enabled: boolean,
   fn: () => Promise<T>,
-): Promise<{ name: string; ok: boolean; value?: T; error?: string; skipped?: boolean }> {
+): Promise<{
+  name: string;
+  ok: boolean;
+  value?: T;
+  error?: string;
+  skipped?: boolean;
+}> {
   if (!enabled) return { name, ok: false, skipped: true };
   try {
     return { name, ok: true, value: await fn() };
   } catch (e) {
-    return { name, ok: false, error: e instanceof Error ? e.message : String(e) };
+    return {
+      name,
+      ok: false,
+      error: e instanceof Error ? e.message : String(e),
+    };
   }
 }
 
@@ -68,7 +88,9 @@ function formatTavily(r: TavilyResult): string {
   const head = r.answer ? `answer: ${r.answer}\n` : "";
   return (
     head +
-    r.results.map((x) => `- ${x.title} — ${x.url}\n  ${clip(x.content, 500)}`).join("\n")
+    r.results
+      .map((x) => `- ${x.title} — ${x.url}\n  ${clip(x.content, 500)}`)
+      .join("\n")
   );
 }
 
@@ -90,13 +112,23 @@ const SUGGESTION_SCHEMA = z.object({
     z.object({
       platform: z.enum(PLATFORMS),
       handle: z.string().describe("the account handle/slug, no @ and no URL"),
-      profileUrl: z.string().describe("canonical public profile URL, exactly as it appears in the evidence"),
+      profileUrl: z
+        .string()
+        .describe(
+          "canonical public profile URL, exactly as it appears in the evidence",
+        ),
       confidence: z.number().min(0).max(1),
-      isOfficial: z.boolean().describe("the brand's own primary account (not a fan/regional/employee page)"),
+      isOfficial: z
+        .boolean()
+        .describe(
+          "the brand's own primary account (not a fan/regional/employee page)",
+        ),
       reasoning: z.string().describe("one short sentence"),
       sources: z
         .array(z.string())
-        .describe("which labelled sources (website/tavily/parallel/perplexity) the handle appears in"),
+        .describe(
+          "which labelled sources (website/tavily/parallel/perplexity) the handle appears in",
+        ),
     }),
   ),
 });
@@ -110,19 +142,30 @@ async function main() {
   const skipped: string[] = [];
 
   // --- Stage 1: website scrape ---
-  const site = await envelope("firecrawl(website)", isFirecrawlConfigured, async () => {
-    const r = await scrapeUrl({ url: website, formats: ["markdown"] });
-    return r?.markdown ?? "";
-  });
+  const site = await envelope(
+    "firecrawl(website)",
+    isFirecrawlConfigured,
+    async () => {
+      const r = await scrapeUrl({ url: website, formats: ["markdown"] });
+      return r?.markdown ?? "";
+    },
+  );
   if (site.skipped) skipped.push("firecrawl");
-  if (site.ok && site.value) blocks.push(sourceBlock("website", clip(site.value, 8_000)));
+  if (site.ok && site.value)
+    blocks.push(sourceBlock("website", clip(site.value, 8_000)));
 
   // --- Stage 2: search providers (fan out) ---
   const query = `Official social media profile URLs for "${name}" (${website}): LinkedIn, Instagram, X/Twitter, Facebook, TikTok, YouTube, Threads. Give full profile URLs.`;
   const [tav, par, perp] = await Promise.all([
-    envelope("tavily", isTavilyConfigured, () => tavilySearch(`${name} official social media accounts`)),
-    envelope("parallel", isParallelConfigured, () => parallelSearch(query, [`${name} official social profiles`])),
-    envelope("perplexity", isPerplexityConfigured, () => perplexitySearch(query)),
+    envelope("tavily", isTavilyConfigured, () =>
+      tavilySearch(`${name} official social media accounts`),
+    ),
+    envelope("parallel", isParallelConfigured, () =>
+      parallelSearch(query, [`${name} official social profiles`]),
+    ),
+    envelope("perplexity", isPerplexityConfigured, () =>
+      perplexitySearch(query),
+    ),
   ]);
 
   if (tav.skipped) skipped.push("tavily");
@@ -134,7 +177,8 @@ async function main() {
   else blocks.push(sourceBlock("parallel", formatParallel(par.value)));
 
   if (perp.skipped) skipped.push("perplexity");
-  else if (!perp.ok || !perp.value) console.log(`  ⚠ perplexity: ${perp.error}`);
+  else if (!perp.ok || !perp.value)
+    console.log(`  ⚠ perplexity: ${perp.error}`);
   else blocks.push(sourceBlock("perplexity", formatPerplexity(perp.value)));
 
   console.log(`Evidence gathered from ${blocks.length} source(s):`);
@@ -142,7 +186,8 @@ async function main() {
     const label = /=== SOURCE: (.+?) ===/.exec(b)?.[1] ?? "?";
     console.log(`  ${label.padEnd(18)} ${b.length} chars`);
   }
-  if (skipped.length) console.log(`\nskipped (unconfigured): ${skipped.join(", ")}`);
+  if (skipped.length)
+    console.log(`\nskipped (unconfigured): ${skipped.join(", ")}`);
   if (!blocks.length) {
     console.log("\nNo evidence gathered — nothing to consolidate.");
     return;
@@ -172,15 +217,26 @@ async function main() {
   });
 
   console.log("\n=== SUGGESTIONS (for review → confirm → create channel) ===");
-  for (const s of output.suggestions.sort((a, b) => b.confidence - a.confidence)) {
+  for (const s of output.suggestions.sort(
+    (a, b) => b.confidence - a.confidence,
+  )) {
     const flag = s.isOfficial ? "✓" : "?";
-    console.log(`  ${flag} ${s.platform.padEnd(10)} @${s.handle.padEnd(22)} ${(s.confidence * 100).toFixed(0)}%  ${s.profileUrl}`);
+    console.log(
+      `  ${flag} ${s.platform.padEnd(10)} @${s.handle.padEnd(22)} ${(s.confidence * 100).toFixed(0)}%  ${s.profileUrl}`,
+    );
     console.log(`      ${s.reasoning}  [${s.sources.join(", ")}]`);
   }
 
   const fs = await import("node:fs");
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-  fs.writeFileSync(`scripts/.social-handles-${slug}.json`, JSON.stringify({ name, website, evidence: blocks, suggestions: output.suggestions }, null, 2));
+  fs.writeFileSync(
+    `scripts/.social-handles-${slug}.json`,
+    JSON.stringify(
+      { name, website, evidence: blocks, suggestions: output.suggestions },
+      null,
+      2,
+    ),
+  );
   console.log(`\nWritten to scripts/.social-handles-${slug}.json`);
 }
 

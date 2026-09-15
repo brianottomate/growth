@@ -94,10 +94,10 @@ function CampaignRow({
 }) {
   const thumbnail = c.heroThumbnailUrl ?? spots.map(spotImage).find(Boolean);
   return (
-    <div className="bg-card flex flex-col gap-2 rounded-xl border p-3">
+    <div className="flex flex-col gap-2 rounded-xl border bg-card p-3">
       <div className="flex items-center gap-3">
         {thumbnail ? (
-          // eslint-disable-next-line @next/next/no-img-element
+          // oxlint-disable-next-line nextjs/no-img-element
           <img
             src={thumbnail}
             alt=""
@@ -122,7 +122,7 @@ function CampaignRow({
                 rel="noopener noreferrer"
                 title={`Open in ${platformLabel(c.platform)}`}
                 aria-label={`Open in ${platformLabel(c.platform)}`}
-                className="text-muted-foreground hover:text-foreground shrink-0"
+                className="shrink-0 text-muted-foreground hover:text-foreground"
               >
                 <ExternalLink className="size-3.5" />
               </a>
@@ -136,7 +136,7 @@ function CampaignRow({
               {platformLabel(c.platform)} · {c.status}
             </span>
           </div>
-          <div className="text-muted-foreground mt-0.5 text-[11px]">
+          <div className="mt-0.5 text-[11px] text-muted-foreground">
             {platformLabel(c.platform)} ·{" "}
             {c.startAt && c.endAt
               ? `${fmtDate(c.startAt)}–${fmtDate(c.endAt)}`
@@ -154,7 +154,7 @@ function CampaignRow({
             {c.spend ? money(c.spend) : "—"}
           </div>
           {c.budget != null && (
-            <div className="text-muted-foreground text-[11px]">
+            <div className="text-[11px] text-muted-foreground">
               of {money(c.budget)}
             </div>
           )}
@@ -164,7 +164,7 @@ function CampaignRow({
             href={c.manageUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="hover:bg-accent ml-1 rounded-full border px-2.5 py-1 text-xs font-medium"
+            className="ml-1 rounded-full border px-2.5 py-1 text-xs font-medium hover:bg-accent"
           >
             Open ↗
           </a>
@@ -184,14 +184,14 @@ function CampaignRow({
           {spots.map((s) => (
             <div
               key={s.id}
-              className="bg-background w-28 shrink-0 overflow-hidden rounded-lg border"
+              className="w-28 shrink-0 overflow-hidden rounded-lg border bg-background"
             >
-              <div className="bg-muted relative grid h-16 place-items-center">
+              <div className="relative grid h-16 place-items-center bg-muted">
                 {spotImage(s) && <ImportCreativeButton platformAdId={s.id} />}
                 {/* Ads we authored carry their creative in `media`; ads mirrored
                     from the platform carry it on `thumbnailUrl` instead. */}
                 {spotImage(s) ? (
-                  // eslint-disable-next-line @next/next/no-img-element
+                  // oxlint-disable-next-line nextjs/no-img-element
                   <img
                     src={spotImage(s)}
                     alt=""
@@ -216,7 +216,7 @@ function CampaignRow({
                   </p>
                 )}
                 {s.stats?.spend != null && (
-                  <div className="text-muted-foreground mt-0.5 text-[9px] tabular-nums">
+                  <div className="mt-0.5 text-[9px] text-muted-foreground tabular-nums">
                     {money(s.stats.spend)}
                     {s.stats.ctr != null ? ` · ${s.stats.ctr}% CTR` : ""}
                   </div>
@@ -402,23 +402,23 @@ export default async function BrandAdsPage({
       {/* header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Link href="/app/brands" className="hover:text-foreground">
               Brands
             </Link>
             <span>/</span>
-            <span className="text-foreground font-medium">{brand.name}</span>
+            <span className="font-medium text-foreground">{brand.name}</span>
             <span>/</span>
-            <span className="text-foreground font-medium">ads</span>
+            <span className="font-medium text-foreground">ads</span>
           </div>
           <h1 className="mt-3 text-2xl font-semibold tracking-tight">
             {brand.name} · Ads
           </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
+          <p className="mt-1 text-sm text-muted-foreground">
             Ad channels, campaigns &amp; audiences — a launchpad. Management
             happens in each platform&apos;s portal.
           </p>
-          <p className="text-muted-foreground mt-2 text-xs">
+          <p className="mt-2 text-xs text-muted-foreground">
             {plural(campaigns.length, "campaign")} ·{" "}
             {plural(channels.length, "ad channel")} ·{" "}
             {plural(platformCampaigns.length, "platform campaign")} ·{" "}
@@ -437,7 +437,7 @@ export default async function BrandAdsPage({
       </div>
 
       {/* campaigns → per-channel campaigns */}
-      <h2 className="text-muted-foreground mt-10 mb-3 text-xs font-semibold tracking-wider uppercase">
+      <h2 className="mt-10 mb-3 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
         Campaigns · {campaigns.length} · one push, verified across its channels
       </h2>
       <div className="flex flex-col gap-4">
@@ -460,11 +460,11 @@ export default async function BrandAdsPage({
             // while downloading the whole file to get there.
             init.creativePool?.map(posterForMedia).find(Boolean);
           return (
-            <div key={init.id} className="bg-card rounded-2xl border p-4">
+            <div key={init.id} className="rounded-2xl border bg-card p-4">
               {/* campaign header */}
               <div className="flex items-start gap-3">
                 {hero ? (
-                  // eslint-disable-next-line @next/next/no-img-element
+                  // oxlint-disable-next-line nextjs/no-img-element
                   <img
                     src={hero}
                     alt=""
@@ -492,7 +492,7 @@ export default async function BrandAdsPage({
                       {init.status}
                     </span>
                   </div>
-                  <div className="text-muted-foreground mt-0.5 text-xs">
+                  <div className="mt-0.5 text-xs text-muted-foreground">
                     {init.goal ? (
                       <span className="capitalize">{init.goal}</span>
                     ) : (
@@ -506,11 +506,11 @@ export default async function BrandAdsPage({
                 <div className="w-40 text-right">
                   <div className="text-sm font-semibold tabular-nums">
                     {money(spend)}{" "}
-                    <span className="text-muted-foreground font-normal">
+                    <span className="font-normal text-muted-foreground">
                       / {money(init.budget)}
                     </span>
                   </div>
-                  <div className="bg-muted mt-1 h-1.5 overflow-hidden rounded-full">
+                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
                     <div
                       className="h-full rounded-full"
                       style={{ width: `${pct * 100}%`, background: color }}
@@ -521,7 +521,9 @@ export default async function BrandAdsPage({
                   campaignId={init.id}
                   campaignName={init.name}
                   brandSlug={brandSlug}
-                  livePlatformCampaigns={initCampaigns.filter((row) => row.externalId).length}
+                  livePlatformCampaigns={
+                    initCampaigns.filter((row) => row.externalId).length
+                  }
                   compact
                   afterDelete="refresh"
                 />
@@ -529,11 +531,11 @@ export default async function BrandAdsPage({
 
               {/* platforms: planned drafts vs pushed reality */}
               <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                <span className="text-muted-foreground mr-1 text-[10px] tracking-wide uppercase">
+                <span className="mr-1 text-[10px] tracking-wide text-muted-foreground uppercase">
                   Platforms
                 </span>
                 {initCampaigns.length === 0 && (
-                  <span className="text-muted-foreground text-[11px]">
+                  <span className="text-[11px] text-muted-foreground">
                     none planned
                   </span>
                 )}
@@ -566,7 +568,7 @@ export default async function BrandAdsPage({
               {/* nested per-channel campaigns */}
               <div className="mt-3 flex flex-col gap-2 border-t pt-3">
                 {initCampaigns.length === 0 ? (
-                  <p className="text-muted-foreground text-xs">
+                  <p className="text-xs text-muted-foreground">
                     Not on any platform yet.
                   </p>
                 ) : (
@@ -587,10 +589,10 @@ export default async function BrandAdsPage({
 
       {ungroupedPlatformCampaigns.length > 0 && (
         <>
-          <h3 className="text-muted-foreground mt-6 mb-1 text-xs font-semibold tracking-wider uppercase">
+          <h3 className="mt-6 mb-1 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
             Not in a campaign yet · {ungroupedPlatformCampaigns.length}
           </h3>
-          <p className="text-muted-foreground mb-2 text-xs">
+          <p className="mb-2 text-xs text-muted-foreground">
             Pulled from the ad account. They are fine unattached; attaching one
             just groups its spend under a campaign you author.
           </p>
@@ -609,17 +611,17 @@ export default async function BrandAdsPage({
       )}
 
       {/* personas */}
-      <h2 className="text-muted-foreground mt-10 mb-1 text-xs font-semibold tracking-wider uppercase">
+      <h2 className="mt-10 mb-1 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
         Personas · {personas.length} · who {brand.name} talks to
       </h2>
-      <p className="text-muted-foreground mb-3 text-xs">
+      <p className="mb-3 text-xs text-muted-foreground">
         The stable brand-level layer. A campaign narrows a persona into a
         buyable audience — age window, geography, budget — on its own page.
       </p>
       {personas.length === 0 ? (
-        <div className="bg-card rounded-xl border p-6 text-center">
+        <div className="rounded-xl border bg-card p-6 text-center">
           <p className="text-sm font-medium">No personas yet</p>
-          <p className="text-muted-foreground mx-auto mt-1 max-w-md text-xs">
+          <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
             A persona is the durable &ldquo;who&rdquo; — &ldquo;remote workers
             who travel&rdquo; — that inspires campaign audiences and content
             alike. Few and stable, like pillars.
@@ -635,9 +637,9 @@ export default async function BrandAdsPage({
               (aud) => aud.personaId === persona.id,
             );
             return (
-              <div key={persona.id} className="bg-card rounded-xl border p-3.5">
+              <div key={persona.id} className="rounded-xl border bg-card p-3.5">
                 <div className="text-sm font-medium">{persona.name}</div>
-                <div className="text-muted-foreground mt-0.5 text-[11px]">
+                <div className="mt-0.5 text-[11px] text-muted-foreground">
                   {[
                     persona.ageRanges?.join(", "),
                     persona.geographies?.join(", "),
@@ -645,7 +647,7 @@ export default async function BrandAdsPage({
                     .filter(Boolean)
                     .join(" · ") || "No planning metadata yet"}
                 </div>
-                <div className="text-muted-foreground mt-2 text-[11px]">
+                <div className="mt-2 text-[11px] text-muted-foreground">
                   {derived.length > 0
                     ? `${plural(derived.length, "campaign audience")} derived from this`
                     : "No campaign audience derived yet"}
@@ -658,10 +660,10 @@ export default async function BrandAdsPage({
 
       {unmappedAudiences.length > 0 && (
         <>
-          <h3 className="text-muted-foreground mt-6 mb-1 text-xs font-semibold tracking-wider uppercase">
+          <h3 className="mt-6 mb-1 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
             In an ad account, not mapped yet · {unmappedAudiences.length}
           </h3>
-          <p className="text-muted-foreground mb-2 text-xs">
+          <p className="mb-2 text-xs text-muted-foreground">
             Mirrored from the platform. They target fine as they are; mapping
             one to an audience is what makes it count as coverage above.
           </p>
@@ -669,11 +671,11 @@ export default async function BrandAdsPage({
             {unmappedAudiences.map((a) => (
               <div
                 key={a.name}
-                className="bg-card flex items-start justify-between rounded-xl border p-3.5"
+                className="flex items-start justify-between rounded-xl border bg-card p-3.5"
               >
                 <div>
                   <div className="text-sm font-medium">{a.name}</div>
-                  <div className="text-muted-foreground mt-1 flex items-center gap-2 text-[11px]">
+                  <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
                     <span className="tabular-nums">{a.sizeLabel ?? "—"}</span>
                     <span>·</span>
                     <div className="flex items-center gap-1.5">
@@ -686,7 +688,7 @@ export default async function BrandAdsPage({
                     </div>
                   </div>
                 </div>
-                <span className="border-border text-muted-foreground rounded-full border px-2 py-0.5 text-[11px] font-medium">
+                <span className="rounded-full border border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
                   {AUDIENCE_LABEL[a.type] ?? a.type}
                 </span>
               </div>
@@ -695,7 +697,7 @@ export default async function BrandAdsPage({
         </>
       )}
 
-      <p className="text-muted-foreground mt-6 text-[11px]">
+      <p className="mt-6 text-[11px] text-muted-foreground">
         Campaigns are created and managed in each platform&apos;s portal, then
         mirrored here read-only. Audiences are authored here and activated per
         platform; the same one on multiple platforms is shown once with all its

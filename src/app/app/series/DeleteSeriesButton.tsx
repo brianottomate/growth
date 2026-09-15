@@ -54,11 +54,7 @@ export function DeleteSeriesButton({
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-muted-foreground hover:text-destructive gap-1.5 text-xs"
-        >
+        <Button variant="ghost" size="sm" tone="muted-danger" textSize="xs">
           <Trash2 className="size-3.5" />
           Delete series
         </Button>
@@ -79,7 +75,7 @@ export function DeleteSeriesButton({
           <AlertDialogAction
             onClick={() => purge.mutate({ seriesId })}
             disabled={purge.isPending}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            tone="destructive"
           >
             {purge.isPending ? "Deleting..." : "Delete"}
           </AlertDialogAction>

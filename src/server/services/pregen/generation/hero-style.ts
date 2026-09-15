@@ -63,7 +63,9 @@ export function heroFaults(hero: {
   if (description) {
     const fault = heroCopyFault(description, HERO_DESCRIPTION_MAX_WORDS);
     if (fault) {
-      faults.push(`The hero description "${description}" is no good: ${fault}.`);
+      faults.push(
+        `The hero description "${description}" is no good: ${fault}.`,
+      );
     }
   }
   return faults;

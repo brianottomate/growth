@@ -76,16 +76,15 @@ export function HomePicker({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-7 rounded-full px-3 text-[11.5px]"
-        >
+        <Button size="sm" variant="outline" shape="round" density="editorial">
           {label}
         </Button>
       </DialogTrigger>
       <DialogContent className="flex max-h-[85vh] w-[96vw] max-w-4xl flex-col overflow-hidden p-0">
-        <DialogHeader className="shrink-0 border-b px-5 py-3 pr-12 text-left">
+        <DialogHeader
+          divider="default"
+          className="shrink-0 px-5 py-3 pr-12 text-left"
+        >
           <DialogTitle className="text-sm">
             {title}
             {single ? "" : ` · ${picked.length}/${max}`}
@@ -93,18 +92,18 @@ export function HomePicker({
         </DialogHeader>
         <div className="shrink-0 px-5 pt-3">
           <label className="relative block">
-            <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" />
+            <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={`Search ${homes.length} homes`}
-              className="bg-muted/40 h-8 w-full rounded-full border pr-3 pl-8 text-xs outline-none focus:ring-2 focus:ring-sky-400/40"
+              className="h-8 w-full rounded-full border bg-muted/40 pr-3 pl-8 text-xs outline-none focus:ring-2 focus:ring-sky-400/40"
             />
           </label>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
           {filtered.length === 0 ? (
-            <p className="text-muted-foreground py-8 text-center text-xs">
+            <p className="py-8 text-center text-xs text-muted-foreground">
               No home matches “{query}”.
             </p>
           ) : (
@@ -133,7 +132,7 @@ export function HomePicker({
                         full && "opacity-40",
                       )}
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      {/* oxlint-disable-next-line nextjs/no-img-element */}
                       <img
                         src={home.thumbUrl ?? home.imageUrl}
                         alt={home.name}
@@ -154,7 +153,7 @@ export function HomePicker({
                         <span className="block truncate text-[11.5px] font-medium">
                           {home.name}
                         </span>
-                        <span className="text-muted-foreground block truncate text-[10.5px]">
+                        <span className="block truncate text-[10.5px] text-muted-foreground">
                           {[
                             home.bedrooms ? `${home.bedrooms} bd` : null,
                             home.guests ? `${home.guests} guests` : null,
@@ -174,7 +173,7 @@ export function HomePicker({
           )}
         </div>
         <div className="flex shrink-0 items-center justify-between gap-3 border-t px-5 py-3">
-          <span className="text-muted-foreground text-[11.5px]">
+          <span className="text-[11.5px] text-muted-foreground">
             {single
               ? picked.length
                 ? "1 chosen"
@@ -183,7 +182,8 @@ export function HomePicker({
           </span>
           <Button
             size="sm"
-            className="h-7 rounded-full px-3 text-[11.5px]"
+            shape="round"
+            density="editorial"
             onClick={() => setOpen(false)}
           >
             Done

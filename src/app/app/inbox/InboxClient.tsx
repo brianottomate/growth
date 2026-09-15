@@ -149,7 +149,7 @@ export function InboxClient({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <p className="text-muted-foreground text-sm">
+          <p className="text-sm text-muted-foreground">
             {visibleItems.length} conversation
             {visibleItems.length === 1 ? "" : "s"}
             {platform !== "all" ? ` · ${platform}` : ""}
@@ -173,7 +173,7 @@ export function InboxClient({
             href={LINKEDIN_INBOX_URL}
             target="_blank"
             rel="noreferrer noopener"
-            className="text-muted-foreground hover:text-primary text-xs"
+            className="text-xs text-muted-foreground hover:text-primary"
           >
             LinkedIn DMs ↗
           </a>
@@ -182,7 +182,7 @@ export function InboxClient({
           type="button"
           disabled={triage.isPending}
           onClick={() => triage.mutate()}
-          className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg px-3 py-1.5 text-sm font-semibold shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {triage.isPending ? "Triaging…" : "Triage now"}
         </button>
@@ -214,13 +214,13 @@ export function InboxClient({
       ) : null}
 
       {triage.isError && (
-        <p className="bg-destructive/10 text-destructive rounded-md px-3 py-2 text-sm">
+        <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {triage.error.message}
         </p>
       )}
 
       {visibleItems.length === 0 ? (
-        <div className="bg-card text-muted-foreground rounded-lg border p-4 text-sm">
+        <div className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
           No conversations.
         </div>
       ) : (
@@ -284,15 +284,15 @@ function ConversationCard({
   const replyUrl = conversationReplyUrl(c);
 
   return (
-    <article className="bg-card rounded-xl border p-4">
+    <article className="rounded-xl border bg-card p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-            <span className="text-foreground text-sm font-medium">
+            <span className="text-sm font-medium text-foreground">
               {c.participantName ?? c.participantUsername ?? "Unknown"}
             </span>
             {c.participantUsername ? (
-              <span className="text-muted-foreground text-xs">
+              <span className="text-xs text-muted-foreground">
                 @{c.participantUsername}
               </span>
             ) : null}
@@ -300,7 +300,7 @@ function ConversationCard({
               <BadgeCheck className="h-3.5 w-3.5 text-sky-400" />
             ) : null}
             {typeof followers === "number" ? (
-              <span className="text-muted-foreground text-xs">
+              <span className="text-xs text-muted-foreground">
                 ·{" "}
                 {Intl.NumberFormat("en", { notation: "compact" }).format(
                   followers,
@@ -308,7 +308,7 @@ function ConversationCard({
                 followers
               </span>
             ) : null}
-            <span className="text-muted-foreground text-xs">
+            <span className="text-xs text-muted-foreground">
               · {ageLabel(c.updatedTime)}
             </span>
             {needsReply ? (
@@ -317,7 +317,7 @@ function ConversationCard({
               </span>
             ) : null}
             {c.unreadCount ? (
-              <span className="bg-primary/15 text-primary rounded px-1.5 py-0.5 text-xs">
+              <span className="rounded bg-primary/15 px-1.5 py-0.5 text-xs text-primary">
                 {c.unreadCount} unread
               </span>
             ) : null}
@@ -330,23 +330,23 @@ function ConversationCard({
               >
                 {style.label}
               </span>
-              <span className="bg-muted text-muted-foreground rounded px-2 py-0.5 font-mono text-xs">
+              <span className="rounded bg-muted px-2 py-0.5 font-mono text-xs text-muted-foreground">
                 {score!.relevance}/10
               </span>
-              <span className="bg-muted text-muted-foreground rounded px-2 py-0.5 font-mono text-xs">
+              <span className="rounded bg-muted px-2 py-0.5 font-mono text-xs text-muted-foreground">
                 {score!.intentTag}
               </span>
             </div>
           ) : null}
 
           {score?.rationale ? (
-            <p className="text-muted-foreground mt-1 text-xs">
+            <p className="mt-1 text-xs text-muted-foreground">
               {score.rationale}
             </p>
           ) : null}
 
           {messages.length === 0 ? (
-            <p className="text-foreground/90 mt-1.5 text-sm">
+            <p className="mt-1.5 text-sm text-foreground/90">
               {(c.lastMessage ?? "").trim() || (
                 <span className="text-muted-foreground italic">
                   (no preview)
@@ -359,7 +359,7 @@ function ConversationCard({
                 <button
                   type="button"
                   onClick={() => setShowFullThread(true)}
-                  className="text-muted-foreground hover:text-foreground text-xs"
+                  className="text-xs text-muted-foreground hover:text-foreground"
                 >
                   Show {hiddenCount} earlier message
                   {hiddenCount === 1 ? "" : "s"}
@@ -393,7 +393,7 @@ function ConversationCard({
             ) : null}
           </div>
         </div>
-        <span className="bg-muted text-muted-foreground shrink-0 rounded px-2 py-0.5 font-mono text-xs">
+        <span className="shrink-0 rounded bg-muted px-2 py-0.5 font-mono text-xs text-muted-foreground">
           {c.platform ?? "?"}
         </span>
       </div>
@@ -402,8 +402,8 @@ function ConversationCard({
         <div className="mt-3 border-t pt-3">
           <ListenItemActions context={context} />
 
-          <div className="bg-muted/40 mt-3 rounded-lg border border-dashed p-3">
-            <p className="text-foreground text-xs font-semibold">
+          <div className="mt-3 rounded-lg border border-dashed bg-muted/40 p-3">
+            <p className="text-xs font-semibold text-foreground">
               Draft a reply
             </p>
             <div className="mt-2 flex flex-wrap gap-1.5">
@@ -432,7 +432,7 @@ function ConversationCard({
               }
               placeholder="Optional: extra instructions"
               rows={2}
-              className="bg-background text-foreground placeholder:text-muted-foreground focus:ring-ring mt-2 w-full rounded-md border px-2.5 py-1.5 text-xs focus:ring-1 focus:outline-none"
+              className="mt-2 w-full rounded-md border bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:ring-1 focus:ring-ring focus:outline-none"
             />
             <button
               type="button"
@@ -448,7 +448,7 @@ function ConversationCard({
                   customInstructions: customInstructions.trim() || undefined,
                 })
               }
-              className="bg-background text-foreground hover:bg-accent mt-2 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              className="mt-2 rounded-md border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
             >
               {draft.isPending
                 ? "Drafting…"
@@ -458,7 +458,7 @@ function ConversationCard({
             </button>
 
             {draft.isError && (
-              <p className="bg-destructive/10 text-destructive mt-2 rounded-md px-3 py-2 text-xs">
+              <p className="mt-2 rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
                 {draft.error.message}
               </p>
             )}
@@ -485,7 +485,7 @@ function MessageBubble({ message: m }: { message: ThreadMessage }) {
         }`}
       >
         {!outgoing && m.senderName ? (
-          <span className="text-muted-foreground mr-1 text-xs font-medium">
+          <span className="mr-1 text-xs font-medium text-muted-foreground">
             {m.senderName}:
           </span>
         ) : null}
@@ -498,9 +498,9 @@ function MessageBubble({ message: m }: { message: ThreadMessage }) {
 function DraftBlock({ draft }: { draft: string }) {
   const [copied, setCopied] = useState(false);
   return (
-    <div className="bg-background mt-3 rounded-lg border p-3">
+    <div className="mt-3 rounded-lg border bg-background p-3">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-foreground text-xs font-semibold">Draft reply</p>
+        <p className="text-xs font-semibold text-foreground">Draft reply</p>
         <button
           type="button"
           onClick={() => {
@@ -509,15 +509,15 @@ function DraftBlock({ draft }: { draft: string }) {
               setTimeout(() => setCopied(false), 1500);
             });
           }}
-          className="text-muted-foreground hover:text-primary text-xs"
+          className="text-xs text-muted-foreground hover:text-primary"
         >
           {copied ? "Copied" : "Copy"}
         </button>
       </div>
-      <p className="text-foreground/90 mt-2 text-sm leading-relaxed whitespace-pre-wrap">
+      <p className="mt-2 text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">
         {draft}
       </p>
-      <p className="text-muted-foreground mt-3 text-xs">
+      <p className="mt-3 text-xs text-muted-foreground">
         Draft only — review and send from Zernio / the native app.
       </p>
     </div>

@@ -69,7 +69,9 @@ export function ClearSeriesButton({
         <Button
           variant="ghost"
           size="sm"
-          className="text-muted-foreground hover:text-destructive h-7 gap-1.5 text-xs"
+          tone="muted-danger"
+          textSize="xs"
+          className="h-7"
         >
           <Trash2 className="size-3.5" />
           Clear all
@@ -108,7 +110,7 @@ export function ClearSeriesButton({
           <AlertDialogAction
             onClick={() => clear.mutate({ brandId })}
             disabled={confirmText !== brandName || clear.isPending}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            tone="destructive"
           >
             {clear.isPending ? "Deleting..." : `Delete ${count} series`}
           </AlertDialogAction>

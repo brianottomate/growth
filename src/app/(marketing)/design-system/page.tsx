@@ -77,9 +77,9 @@ export default function DesignSystemPage() {
         {/* Header */}
         <div>
           <h1 className="mb-4 text-4xl font-bold">Wander Design System</h1>
-          <p className="text-muted-foreground text-lg">
+          <p className="text-lg text-muted-foreground">
             A showcase of components from{" "}
-            <code className="bg-muted rounded px-2 py-1 text-sm">
+            <code className="rounded bg-muted px-2 py-1 text-sm">
               @wandercom/design-system-web
             </code>
           </p>
@@ -91,43 +91,43 @@ export default function DesignSystemPage() {
           <div className="space-y-8">
             {/* Headings */}
             <div>
-              <h3 className="text-muted-foreground mb-4 text-sm font-medium">
+              <h3 className="mb-4 text-sm font-medium text-muted-foreground">
                 Heading Variants (using Instrument Sans)
               </h3>
               <div className="space-y-4">
                 <div>
                   <Heading variant="display-lg">Display Large Heading</Heading>
-                  <code className="text-muted-foreground text-xs">
+                  <code className="text-xs text-muted-foreground">
                     variant=&quot;display-lg&quot;
                   </code>
                 </div>
                 <div>
                   <Heading variant="display">Display Heading</Heading>
-                  <code className="text-muted-foreground text-xs">
+                  <code className="text-xs text-muted-foreground">
                     variant=&quot;display&quot;
                   </code>
                 </div>
                 <div>
                   <Heading variant="display-sm">Display Small Heading</Heading>
-                  <code className="text-muted-foreground text-xs">
+                  <code className="text-xs text-muted-foreground">
                     variant=&quot;display-sm&quot;
                   </code>
                 </div>
                 <div>
                   <Heading variant="headline-lg">Headline Large</Heading>
-                  <code className="text-muted-foreground text-xs">
+                  <code className="text-xs text-muted-foreground">
                     variant=&quot;headline-lg&quot;
                   </code>
                 </div>
                 <div>
                   <Heading variant="headline">Headline</Heading>
-                  <code className="text-muted-foreground text-xs">
+                  <code className="text-xs text-muted-foreground">
                     variant=&quot;headline&quot;
                   </code>
                 </div>
                 <div>
                   <Heading variant="headline-sm">Headline Small</Heading>
-                  <code className="text-muted-foreground text-xs">
+                  <code className="text-xs text-muted-foreground">
                     variant=&quot;headline-sm&quot;
                   </code>
                 </div>
@@ -138,7 +138,7 @@ export default function DesignSystemPage() {
 
             {/* Text Variants */}
             <div>
-              <h3 className="text-muted-foreground mb-4 text-sm font-medium">
+              <h3 className="mb-4 text-sm font-medium text-muted-foreground">
                 Text Variants (using Instrument Sans)
               </h3>
               <div className="space-y-4">
@@ -147,7 +147,7 @@ export default function DesignSystemPage() {
                     Body Large Long - Perfect for longer paragraphs that need
                     increased line height for better readability.
                   </Text>
-                  <code className="text-muted-foreground text-xs">
+                  <code className="text-xs text-muted-foreground">
                     variant=&quot;body-lg-long&quot;
                   </code>
                 </div>
@@ -156,7 +156,7 @@ export default function DesignSystemPage() {
                     Body Large - Great for prominent body text and
                     introductions.
                   </Text>
-                  <code className="text-muted-foreground text-xs">
+                  <code className="text-xs text-muted-foreground">
                     variant=&quot;body-lg&quot;
                   </code>
                 </div>
@@ -165,7 +165,7 @@ export default function DesignSystemPage() {
                     Body Long - Standard body text with increased line height
                     for comfortable reading of longer content.
                   </Text>
-                  <code className="text-muted-foreground text-xs">
+                  <code className="text-xs text-muted-foreground">
                     variant=&quot;body-long&quot;
                   </code>
                 </div>
@@ -173,7 +173,7 @@ export default function DesignSystemPage() {
                   <Text variant="body">
                     Body - Default body text for general content.
                   </Text>
-                  <code className="text-muted-foreground text-xs">
+                  <code className="text-xs text-muted-foreground">
                     variant=&quot;body&quot;
                   </code>
                 </div>
@@ -182,7 +182,7 @@ export default function DesignSystemPage() {
                     Body Small - Smaller text for captions and secondary
                     content.
                   </Text>
-                  <code className="text-muted-foreground text-xs">
+                  <code className="text-xs text-muted-foreground">
                     variant=&quot;body-sm&quot;
                   </code>
                 </div>
@@ -193,7 +193,7 @@ export default function DesignSystemPage() {
 
             {/* Text Weights & Colors */}
             <div>
-              <h3 className="text-muted-foreground mb-4 text-sm font-medium">
+              <h3 className="mb-4 text-sm font-medium text-muted-foreground">
                 Text Weights & Colors
               </h3>
               <div className="space-y-6">
@@ -221,7 +221,7 @@ export default function DesignSystemPage() {
                 </div>
 
                 {/* Practical Secondary Text Examples */}
-                <div className="border-primary space-y-4 rounded-lg border p-4">
+                <div className="space-y-4 rounded-lg border border-primary p-4">
                   <div className="space-y-1">
                     <Text variant="body-lg" weight="medium" color="primary">
                       Property Title
@@ -276,7 +276,7 @@ export default function DesignSystemPage() {
                   </div>
                 </div>
 
-                <div className="bg-surface-secondary rounded-lg p-4">
+                <div className="rounded-lg bg-surface-secondary p-4">
                   <Text variant="body-sm" color="tertiary" weight="medium">
                     💡 TIP: Use secondary for descriptions, metadata, captions,
                     and supporting information. Use tertiary for even more
@@ -290,7 +290,7 @@ export default function DesignSystemPage() {
 
             {/* Responsive Typography */}
             <div>
-              <h3 className="text-muted-foreground mb-4 text-sm font-medium">
+              <h3 className="mb-4 text-sm font-medium text-muted-foreground">
                 Responsive Typography
               </h3>
               <div className="space-y-4">
@@ -304,7 +304,7 @@ export default function DesignSystemPage() {
                   >
                     Responsive Heading (resize to see)
                   </Heading>
-                  <code className="text-muted-foreground text-xs">
+                  <code className="text-xs text-muted-foreground">
                     variant=&#123;&#123; base: &quot;headline-sm&quot;, md:
                     &quot;headline&quot;, lg: &quot;display&quot; &#125;&#125;
                   </code>
@@ -316,7 +316,7 @@ export default function DesignSystemPage() {
                     Responsive text that scales from small to large across
                     breakpoints.
                   </Text>
-                  <code className="text-muted-foreground text-xs">
+                  <code className="text-xs text-muted-foreground">
                     variant=&#123;&#123; base: &quot;body-sm&quot;, md:
                     &quot;body&quot;, lg: &quot;body-lg&quot; &#125;&#125;
                   </code>
@@ -333,7 +333,7 @@ export default function DesignSystemPage() {
           <h2 className="mb-6 text-2xl font-semibold">Buttons</h2>
           <div className="space-y-6">
             <div>
-              <h3 className="text-muted-foreground mb-3 text-sm font-medium">
+              <h3 className="mb-3 text-sm font-medium text-muted-foreground">
                 Variants
               </h3>
               <div className="flex flex-wrap gap-3">
@@ -347,7 +347,7 @@ export default function DesignSystemPage() {
             </div>
 
             <div>
-              <h3 className="text-muted-foreground mb-3 text-sm font-medium">
+              <h3 className="mb-3 text-sm font-medium text-muted-foreground">
                 Sizes
               </h3>
               <div className="flex flex-wrap items-center gap-3">
@@ -359,7 +359,7 @@ export default function DesignSystemPage() {
             </div>
 
             <div>
-              <h3 className="text-muted-foreground mb-3 text-sm font-medium">
+              <h3 className="mb-3 text-sm font-medium text-muted-foreground">
                 Icon Buttons
               </h3>
               <div className="flex flex-wrap items-center gap-3">
@@ -401,7 +401,7 @@ export default function DesignSystemPage() {
           <h2 className="mb-6 text-2xl font-semibold">Icons</h2>
           <div className="space-y-4">
             <div>
-              <h3 className="text-muted-foreground mb-3 text-sm font-medium">
+              <h3 className="mb-3 text-sm font-medium text-muted-foreground">
                 Sizes
               </h3>
               <div className="flex flex-wrap items-center gap-4">
@@ -411,7 +411,7 @@ export default function DesignSystemPage() {
               </div>
             </div>
             <div>
-              <h3 className="text-muted-foreground mb-3 text-sm font-medium">
+              <h3 className="mb-3 text-sm font-medium text-muted-foreground">
                 Colors
               </h3>
               <div className="flex flex-wrap items-center gap-4">
@@ -487,17 +487,17 @@ export default function DesignSystemPage() {
 
           <div className="mt-8 space-y-3">
             <Label>Thinking orbs</Label>
-            <p className="text-muted-foreground max-w-2xl text-sm">
+            <p className="max-w-2xl text-sm text-muted-foreground">
               Nine canvas states from thinking-orbs. Growth picks one by what
-              the work is: a read scans, a write orbits, an authoring
-              capability composes. Two tuned sizes ship, 64 and 20, which are
-              separate designs rather than one scaled.
+              the work is: a read scans, a write orbits, an authoring capability
+              composes. Two tuned sizes ship, 64 and 20, which are separate
+              designs rather than one scaled.
             </p>
             <div className="flex flex-wrap gap-6">
               {ORB_STATES.map((state) => (
                 <div key={state} className="flex flex-col items-center gap-2">
                   <ThinkingOrb state={state} size={64} />
-                  <span className="text-muted-foreground font-mono text-xs">
+                  <span className="font-mono text-xs text-muted-foreground">
                     {state}
                   </span>
                 </div>
@@ -507,7 +507,7 @@ export default function DesignSystemPage() {
               {ORB_STATES.map((state) => (
                 <span
                   key={state}
-                  className="text-muted-foreground flex items-center gap-1.5 text-xs"
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground"
                 >
                   <ThinkingOrb state={state} size={20} />
                   {state}
@@ -600,7 +600,7 @@ export default function DesignSystemPage() {
           <h2 className="mb-6 text-2xl font-semibold">Toggle Components</h2>
           <div className="space-y-6">
             <div>
-              <h3 className="text-muted-foreground mb-3 text-sm font-medium">
+              <h3 className="mb-3 text-sm font-medium text-muted-foreground">
                 Single Toggle (different from Switch)
               </h3>
               <Toggle
@@ -613,7 +613,7 @@ export default function DesignSystemPage() {
             </div>
 
             <div>
-              <h3 className="text-muted-foreground mb-3 text-sm font-medium">
+              <h3 className="mb-3 text-sm font-medium text-muted-foreground">
                 Toggle Group (Text Alignment)
               </h3>
               <ToggleGroup
@@ -643,7 +643,7 @@ export default function DesignSystemPage() {
           <div className="space-y-6">
             {/* Modal */}
             <div>
-              <h3 className="text-muted-foreground mb-3 text-sm font-medium">
+              <h3 className="mb-3 text-sm font-medium text-muted-foreground">
                 Modal Dialog
               </h3>
               <ModalRoot open={modalOpen} onOpenChange={setModalOpen}>
@@ -684,7 +684,7 @@ export default function DesignSystemPage() {
 
             {/* Tooltip */}
             <div>
-              <h3 className="text-muted-foreground mb-3 text-sm font-medium">
+              <h3 className="mb-3 text-sm font-medium text-muted-foreground">
                 Tooltip
               </h3>
               <TooltipProvider>
@@ -702,14 +702,14 @@ export default function DesignSystemPage() {
         </section>
 
         {/* Footer */}
-        <div className="bg-muted rounded-lg p-6 text-center">
-          <p className="text-muted-foreground text-sm">
+        <div className="rounded-lg bg-muted p-6 text-center">
+          <p className="text-sm text-muted-foreground">
             Visit{" "}
             <a
               href="https://wander-ds.vercel.app"
               target="_blank"
               rel="noopener noreferrer"
-              className="hover:text-foreground font-medium underline underline-offset-4"
+              className="font-medium underline underline-offset-4 hover:text-foreground"
             >
               wander-ds.vercel.app
             </a>{" "}

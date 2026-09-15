@@ -346,10 +346,10 @@ export function ImageUpload({
               </>
             ) : (
               <>
-                <Camera className="text-muted-foreground h-8 w-8" />
+                <Camera className="h-8 w-8 text-muted-foreground" />
                 <div className="space-y-1">
                   <p className="text-sm font-medium">{placeholder}</p>
-                  <p className="text-muted-foreground text-xs">
+                  <p className="text-xs text-muted-foreground">
                     {images.length}/{maxImages} images • Max{" "}
                     {formatFileSize(maxSize)} each
                     <br />

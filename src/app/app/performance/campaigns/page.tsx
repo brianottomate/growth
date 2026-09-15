@@ -37,17 +37,26 @@ export default async function PerformanceCampaignsPage() {
     with: { organization: true },
   });
   const org = membership?.organization;
-  if (!org) return <div className="text-muted-foreground">No organization found.</div>;
+  if (!org)
+    return <div className="text-muted-foreground">No organization found.</div>;
 
   const desk = narrowDesk(await loadPerformanceDesk(org.id), "client");
   const brandById = new Map(desk.brands.map((brand) => [brand.id, brand]));
 
   if (desk.campaigns.length === 0) {
-    return <EmptyState icon={Megaphone} title="No campaigns yet" description="Start one from a client." />;
+    return (
+      <EmptyState
+        icon={Megaphone}
+        title="No campaigns yet"
+        description="Start one from a client."
+      />
+    );
   }
 
   const groups: CampaignGroup[] = GROUPS.flatMap((group) => {
-    const rows = desk.campaigns.filter((campaign) => campaign.state === group.state);
+    const rows = desk.campaigns.filter(
+      (campaign) => campaign.state === group.state,
+    );
     if (rows.length === 0) return [];
     return [
       {
@@ -58,7 +67,13 @@ export default async function PerformanceCampaignsPage() {
         node: (
           <ul className={cn(panel, "divide-y")}>
             {rows.map((campaign) => (
-              <CampaignRow key={campaign.id} brand={brandById.get(campaign.brandId)!} campaign={campaign} showBrand deletable />
+              <CampaignRow
+                key={campaign.id}
+                brand={brandById.get(campaign.brandId)!}
+                campaign={campaign}
+                showBrand
+                deletable
+              />
             ))}
           </ul>
         ),

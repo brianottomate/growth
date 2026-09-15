@@ -32,7 +32,7 @@ export default function SignUpPage() {
           </div>
         </div>
       </div>
-      <div className="bg-muted relative hidden lg:block">
+      <div className="relative hidden bg-muted lg:block">
         <Image
           src="/auth-hero.jpg"
           alt="A Wander home at golden hour"

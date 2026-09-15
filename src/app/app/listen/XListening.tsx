@@ -171,7 +171,7 @@ function Btn({
       className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
         primary
           ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
-          : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground bg-transparent"
+          : "border-border bg-transparent text-muted-foreground hover:border-foreground/30 hover:text-foreground"
       }`}
     >
       {children}
@@ -277,7 +277,7 @@ export function XListening() {
           <h2 className="text-lg font-semibold tracking-tight">
             X — listening
           </h2>
-          <p className="text-muted-foreground mt-1 text-sm">
+          <p className="mt-1 text-sm text-muted-foreground">
             {stored
               ? `Last scan ${relTime(stored.scannedAt)} · 7-day window · ${stored.totalFetched} fetched → ${aboveNoise} above noise`
               : "No scan yet · 7-day window over the watchlist terms"}
@@ -287,13 +287,13 @@ export function XListening() {
           type="button"
           disabled={scan.isPending}
           onClick={runScan}
-          className="bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 rounded-lg px-3 py-1.5 text-sm font-semibold shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+          className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {scan.isPending ? "Scanning…" : "Scan now"}
         </button>
       </div>
 
-      <p className="text-muted-foreground max-w-[760px] text-sm text-pretty">
+      <p className="max-w-[760px] text-sm text-pretty text-muted-foreground">
         The X channel gets its own room: watchlist groups drive the scan,
         matched terms highlight in the tweet, velocity shows what&rsquo;s
         moving, and the composer enforces the 270-char cap with the disclosure
@@ -302,14 +302,14 @@ export function XListening() {
       </p>
 
       {scan.isError && (
-        <p className="bg-destructive/10 text-destructive rounded-md px-3 py-2 text-sm">
+        <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {scan.error.message}
         </p>
       )}
 
       <div className="grid items-start gap-6 lg:grid-cols-[248px_1fr]">
         <div className="flex flex-col gap-2.5 lg:sticky lg:top-6">
-          <span className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+          <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
             Watchlist
           </span>
           {X_WATCHLIST.map((g) => {
@@ -329,10 +329,10 @@ export function XListening() {
                   <span
                     className={`h-1.5 w-1.5 shrink-0 rounded-full ${g.dotClass}`}
                   />
-                  <span className="text-foreground text-xs font-medium">
+                  <span className="text-xs font-medium text-foreground">
                     {g.name}
                   </span>
-                  <span className="text-muted-foreground ml-auto text-[11px] tabular-nums">
+                  <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">
                     {matchCounts[g.id] ?? 0}
                   </span>
                 </span>
@@ -340,7 +340,7 @@ export function XListening() {
                   {g.terms.map((t) => (
                     <span
                       key={t}
-                      className="bg-muted text-muted-foreground rounded px-1.5 py-px text-[11px]"
+                      className="rounded bg-muted px-1.5 py-px text-[11px] text-muted-foreground"
                     >
                       {t}
                     </span>
@@ -349,7 +349,7 @@ export function XListening() {
               </button>
             );
           })}
-          <span className="text-muted-foreground text-[11px] leading-relaxed">
+          <span className="text-[11px] leading-relaxed text-muted-foreground">
             Terms kept aligned with the Reddit filter. Click a group to filter
             the stream; click again to clear.
           </span>
@@ -357,7 +357,7 @@ export function XListening() {
             <button
               type="button"
               onClick={() => setShowSkipped((v) => !v)}
-              className="text-muted-foreground hover:text-foreground self-start text-[11px] underline-offset-2 hover:underline"
+              className="self-start text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
             >
               {showSkipped ? "Hide skipped" : `Show skipped (${skippedTotal})`}
             </button>
@@ -366,7 +366,7 @@ export function XListening() {
 
         <div>
           {!hydrated ? null : !stored ? (
-            <div className="bg-card text-muted-foreground rounded-xl border p-6 text-sm">
+            <div className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">
               Run a scan to pull the last 7 days of watchlist matches from X and
               score them for intent.
             </div>
@@ -387,7 +387,7 @@ export function XListening() {
                 </QueueGroup>
               )}
               {visible.length === 0 && (
-                <p className="text-muted-foreground py-6 text-sm">
+                <p className="py-6 text-sm text-muted-foreground">
                   No tweets match this filter.
                 </p>
               )}
@@ -433,11 +433,11 @@ function QueueGroup({
         >
           {label}
         </span>
-        <span className="text-muted-foreground text-xs tabular-nums">
+        <span className="text-xs text-muted-foreground tabular-nums">
           {count}
         </span>
       </div>
-      <div className="bg-card divide-y rounded-xl border">{children}</div>
+      <div className="divide-y rounded-xl border bg-card">{children}</div>
     </div>
   );
 }
@@ -481,17 +481,18 @@ function TweetCard({
         onClick={() => setOpen((v) => !v)}
         className="flex cursor-pointer gap-2.5 p-3.5"
       >
-        <span className="bg-muted text-muted-foreground inline-flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full text-[11px] font-medium">
+        <span className="inline-flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-medium text-muted-foreground">
           {initials}
         </span>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="flex flex-wrap items-center gap-1.5">
             <span className="text-sm font-medium">{t.authorName}</span>
-            <span className="text-muted-foreground text-xs">
+            <span className="text-xs text-muted-foreground">
               @{t.authorUsername}
               {t.authorFollowers > 0 && (
                 <> · {compact(t.authorFollowers)}</>
-              )} · {dayLabel(t.createdAt)}
+              )} ·{" "}
+              {dayLabel(t.createdAt)}
             </span>
             <span className="ml-auto inline-flex shrink-0 items-center gap-1.5">
               <span
@@ -502,7 +503,7 @@ function TweetCard({
                 />
                 {intent.label}
               </span>
-              <span className="text-muted-foreground text-[11px] tabular-nums">
+              <span className="text-[11px] text-muted-foreground tabular-nums">
                 {scored.relevance}/10
               </span>
             </span>
@@ -515,7 +516,7 @@ function TweetCard({
             />
           </span>
           <span className="flex flex-wrap items-center gap-x-3.5 gap-y-1">
-            <span className="text-muted-foreground text-[11px] tabular-nums">
+            <span className="text-[11px] text-muted-foreground tabular-nums">
               {t.replyCount} replies · {t.retweetCount} reposts · {t.likeCount}{" "}
               likes{t.viewCount > 0 && <> · {compact(t.viewCount)} views</>}
             </span>
@@ -531,7 +532,7 @@ function TweetCard({
 
       {open && (
         <div className="flex flex-col gap-2.5 px-3.5 pb-3.5 pl-[54px]">
-          <span className="text-muted-foreground text-xs italic">
+          <span className="text-xs text-muted-foreground italic">
             {scored.rationale}
           </span>
           <span className="flex flex-wrap items-center gap-1.5">
@@ -550,7 +551,7 @@ function TweetCard({
               target="_blank"
               rel="noreferrer noopener"
               onClick={(e) => e.stopPropagation()}
-              className="text-muted-foreground hover:border-foreground/30 hover:text-foreground rounded-full border px-3 py-1 text-xs font-medium transition-colors"
+              className="rounded-full border px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
             >
               Open tweet ↗
             </a>
@@ -609,10 +610,10 @@ function DraftComposer({ scored }: { scored: ScannedTweet }) {
   return (
     <div
       onClick={(e) => e.stopPropagation()}
-      className="bg-muted/60 flex flex-col gap-2 rounded-[10px] p-3"
+      className="flex flex-col gap-2 rounded-[10px] bg-muted/60 p-3"
     >
       <span className="flex flex-wrap items-center gap-1.5">
-        <span className="text-muted-foreground shrink-0 text-[10px] font-medium tracking-wide uppercase">
+        <span className="shrink-0 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
           Draft · Claude
         </span>
         {COMPOSER_PILLS.map((p) => {
@@ -625,7 +626,7 @@ function DraftComposer({ scored }: { scored: ScannedTweet }) {
               className={`rounded-full border px-2.5 py-0.5 text-[10px] font-medium transition-colors ${
                 on
                   ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border text-muted-foreground hover:text-foreground bg-transparent"
+                  : "border-border bg-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
               {p.label}
@@ -644,7 +645,7 @@ function DraftComposer({ scored }: { scored: ScannedTweet }) {
       </span>
 
       {draft.isError && (
-        <span className="text-destructive text-xs">{draft.error.message}</span>
+        <span className="text-xs text-destructive">{draft.error.message}</span>
       )}
       {text && <span className="text-xs leading-relaxed">{text}</span>}
 

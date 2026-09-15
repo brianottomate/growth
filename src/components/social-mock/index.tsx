@@ -65,7 +65,11 @@ export type SocialMockPost = {
 };
 
 export type SocialMockCrop =
-  "auto" | "square" | "portrait" | "landscape" | "story";
+  | "auto"
+  | "square"
+  | "portrait"
+  | "landscape"
+  | "story";
 
 const CROP_CLASS: Record<Exclude<SocialMockCrop, "auto">, string> = {
   square: "aspect-square",
@@ -143,7 +147,7 @@ export function Avatar({
     );
   }
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- avatars live on provider hosts
+    // oxlint-disable-next-line nextjs/no-img-element -- avatars live on provider hosts
     <img
       src={current.url}
       alt=""
@@ -178,7 +182,7 @@ function Frame({ item, play }: { item: SocialMockMedia; play: boolean }) {
         preload="metadata"
       />
     ) : poster ? (
-      // eslint-disable-next-line @next/next/no-img-element -- library and provider hosts vary
+      // oxlint-disable-next-line nextjs/no-img-element -- library and provider hosts vary
       <img src={poster} alt="" className={fill} />
     ) : (
       <div className={cn(fill, "grid place-items-center bg-neutral-900")}>
@@ -189,7 +193,7 @@ function Frame({ item, play }: { item: SocialMockMedia; play: boolean }) {
     );
   } else {
     inner = (
-      // eslint-disable-next-line @next/next/no-img-element -- library and provider hosts vary
+      // oxlint-disable-next-line nextjs/no-img-element -- library and provider hosts vary
       <img src={item.url} alt="" className={fill} />
     );
   }

@@ -32,7 +32,7 @@ const PLATFORM_LABEL: Record<string, string> = {
 
 function Avatar({ name }: { name: string }) {
   return (
-    <span className="bg-accent text-foreground/80 flex size-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold">
+    <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-accent text-[11px] font-semibold text-foreground/80">
       {name
         .split(" ")
         .map((part) => part[0])
@@ -46,7 +46,7 @@ function ArticleCard({ card }: { card: LinkCard }) {
   return (
     <div className="overflow-hidden rounded-xl border">
       {card.image && (
-        // eslint-disable-next-line @next/next/no-img-element -- external og:image hosts aren't in remotePatterns
+        // oxlint-disable-next-line nextjs/no-img-element -- external og:image hosts aren't in remotePatterns
         <img
           src={card.image}
           alt=""
@@ -54,10 +54,10 @@ function ArticleCard({ card }: { card: LinkCard }) {
         />
       )}
       <div className="px-3 py-2">
-        <div className="text-muted-foreground text-[11px]">{card.domain}</div>
+        <div className="text-[11px] text-muted-foreground">{card.domain}</div>
         <div className="truncate text-xs font-medium">{card.title}</div>
         {card.description && (
-          <div className="text-muted-foreground line-clamp-2 text-[11px]">
+          <div className="line-clamp-2 text-[11px] text-muted-foreground">
             {card.description}
           </div>
         )}
@@ -75,12 +75,12 @@ function QuoteEmbed({
     <div className="flex gap-2.5 rounded-xl border px-3 py-2">
       <div className="min-w-0 flex-1">
         <div className="text-xs font-medium">{embed.authorName}</div>
-        <div className="text-muted-foreground line-clamp-3 text-[11px] whitespace-pre-line">
+        <div className="line-clamp-3 text-[11px] whitespace-pre-line text-muted-foreground">
           {embed.text ?? "…"}
         </div>
       </div>
       {embed.thumb && (
-        // eslint-disable-next-line @next/next/no-img-element
+        // oxlint-disable-next-line nextjs/no-img-element
         <img
           src={embed.thumb}
           alt=""
@@ -99,9 +99,9 @@ export function RepostSimulation({ sims }: { sims: RepostSim[] }) {
       {sims.map((sim) => (
         <div
           key={sim.linkId}
-          className="bg-card/50 rounded-lg border px-3 py-2"
+          className="rounded-lg border bg-card/50 px-3 py-2"
         >
-          <div className="text-muted-foreground mb-1.5 text-[10px]">
+          <div className="mb-1.5 text-[10px] text-muted-foreground">
             ↻ how it unfolds on {PLATFORM_LABEL[sim.platform] ?? sim.platform} —
             planned repost
           </div>
@@ -111,11 +111,11 @@ export function RepostSimulation({ sims }: { sims: RepostSim[] }) {
               <div className="text-xs font-medium">
                 {sim.actorName}
                 {sim.actorHandle && (
-                  <span className="text-muted-foreground ml-1 font-normal">
+                  <span className="ml-1 font-normal text-muted-foreground">
                     @{sim.actorHandle}
                   </span>
                 )}
-                <span className="text-muted-foreground font-normal">
+                <span className="font-normal text-muted-foreground">
                   {" "}
                   · reposts
                 </span>

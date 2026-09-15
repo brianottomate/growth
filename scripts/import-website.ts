@@ -43,7 +43,11 @@ import {
   type WebPageRollupMeta,
 } from "@/lib/website-pages";
 import { db } from "@/server/db";
-import { brandTable, organizationTable, webPageTable } from "@/server/db/schema";
+import {
+  brandTable,
+  organizationTable,
+  webPageTable,
+} from "@/server/db/schema";
 import type { WebPageType } from "@/server/db/website-schema";
 
 const strArg = (name: string, fallback: string) =>
@@ -62,7 +66,12 @@ const ENRICH = process.argv.includes("--enrich");
 const AI_SPEC = process.argv.includes("--ai-spec");
 const MAX_URLS = intArg("--max-urls", 25_000);
 const ROLLUP_OVER = intArg("--rollup-over", 20); // 0 = never roll up
-const ENRICHABLE: WebPageType[] = ["home", "brand", "seo_landing", "location_hub"];
+const ENRICHABLE: WebPageType[] = [
+  "home",
+  "brand",
+  "seo_landing",
+  "location_hub",
+];
 const ENRICH_CONCURRENCY = 6;
 const ENRICH_CAP = 200;
 const LOCATION_TYPES: WebPageType[] = [
@@ -75,7 +84,9 @@ type SitemapEntry = { path: string; lastmod: Date | null };
 type PageRow = typeof webPageTable.$inferInsert;
 
 async function fetchText(url: string): Promise<string> {
-  const r = await fetch(url, { headers: { "user-agent": "wander-growth-sitemap-sync" } });
+  const r = await fetch(url, {
+    headers: { "user-agent": "wander-growth-sitemap-sync" },
+  });
   if (!r.ok) throw new Error(`sitemap fetch ${r.status}: ${url}`);
   return r.text();
 }
@@ -89,7 +100,8 @@ function parseUrlset(xml: string, byPath: Map<string, SitemapEntry>): boolean {
     const loc = m[1]!.trim();
     if (!loc.startsWith(BASE_URL)) continue;
     const path = normalizePath(loc.slice(BASE_URL.length) || "/");
-    if (!byPath.has(path)) byPath.set(path, { path, lastmod: m[2] ? new Date(m[2]) : null });
+    if (!byPath.has(path))
+      byPath.set(path, { path, lastmod: m[2] ? new Date(m[2]) : null });
   }
   return false;
 }
@@ -97,8 +109,8 @@ function parseUrlset(xml: string, byPath: Map<string, SitemapEntry>): boolean {
 async function fetchSitemap(): Promise<SitemapEntry[]> {
   const root = await fetchText(SITEMAP_URL);
   // Sitemap index (big sites split into child files) vs plain urlset.
-  const children = [...root.matchAll(/<sitemap>\s*<loc>([^<]+)<\/loc>/g)].map((m) =>
-    m[1]!.trim(),
+  const children = [...root.matchAll(/<sitemap>\s*<loc>([^<]+)<\/loc>/g)].map(
+    (m) => m[1]!.trim(),
   );
   const byPath = new Map<string, SitemapEntry>();
   let truncated = false;
@@ -136,7 +148,9 @@ const SPEC_SCHEMA = z.object({
           .describe("path prefixes that select this group, e.g. ['/rooms/']"),
         isTemplate: z
           .boolean()
-          .describe("true = stamped-out template pages, false = hand-built static"),
+          .describe(
+            "true = stamped-out template pages, false = hand-built static",
+          ),
       }),
     )
     .describe("ordered, first match wins; cover the whole site"),
@@ -189,7 +203,8 @@ function classifyWithSpec(
   for (const [key, group] of byGroup) {
     const g = spec.groups.find((x) => x.key === key);
     const roll =
-      ROLLUP_OVER > 0 && ((g?.isTemplate ?? false) || group.length > ROLLUP_OVER);
+      ROLLUP_OVER > 0 &&
+      ((g?.isTemplate ?? false) || group.length > ROLLUP_OVER);
     if (roll) {
       const metadata: WebPageRollupMeta = {
         rollup: true,
@@ -215,7 +230,9 @@ function classifyWithSpec(
           brandId,
           path: e.path,
           url: `${BASE_URL}${e.path === "/" ? "" : e.path}`,
-          title: humanizeSlug(e.path.split("/").filter(Boolean).pop() ?? "home"),
+          title: humanizeSlug(
+            e.path.split("/").filter(Boolean).pop() ?? "home",
+          ),
           pageType: "other",
           lastmodAt: e.lastmod,
           lastSeenAt: now,
@@ -234,7 +251,9 @@ function classifyWithSpec(
 async function fetchOg(
   url: string,
 ): Promise<{ ogImage: string | null; description: string | null }> {
-  const r = await fetch(url, { headers: { "user-agent": "wander-growth-sitemap-sync" } });
+  const r = await fetch(url, {
+    headers: { "user-agent": "wander-growth-sitemap-sync" },
+  });
   if (!r.ok) throw new Error(`${r.status}`);
   const html = (await r.text()).slice(0, 200_000);
   const meta = (attr: "name" | "property", val: string) =>
@@ -247,7 +266,8 @@ async function fetchOg(
       .find(Boolean) ?? null;
   return {
     ogImage: meta("property", "og:image"),
-    description: meta("name", "description") ?? meta("property", "og:description"),
+    description:
+      meta("name", "description") ?? meta("property", "og:description"),
   };
 }
 
@@ -259,7 +279,10 @@ async function main() {
   });
   if (!org) throw new Error("No 'wander' org — run the seed first.");
   const brand = await db.query.brandTable.findFirst({
-    where: and(eq(brandTable.slug, BRAND_SLUG), eq(brandTable.organizationId, org.id)),
+    where: and(
+      eq(brandTable.slug, BRAND_SLUG),
+      eq(brandTable.organizationId, org.id),
+    ),
   });
   if (!brand) throw new Error(`No '${BRAND_SLUG}' brand.`);
   console.log(`✓ target: brand=${brand.id} sitemap=${SITEMAP_URL}`);
@@ -275,7 +298,9 @@ async function main() {
     console.log(
       "✓ AI site spec:",
       spec.groups
-        .map((g) => `${g.key}${g.isTemplate ? "*" : ""}(${g.prefixes.join(",")})`)
+        .map(
+          (g) => `${g.key}${g.isTemplate ? "*" : ""}(${g.prefixes.join(",")})`,
+        )
         .join(" "),
     );
     ({ rows, rollups } = classifyWithSpec(spec, entries, brand.id, now));
@@ -310,7 +335,9 @@ async function main() {
     // Static vs template: types over the threshold become one rollup row.
     const rolledTypes = new Set(
       ROLLUP_OVER > 0
-        ? [...typeCounts.entries()].filter(([, n]) => n > ROLLUP_OVER).map(([t]) => t)
+        ? [...typeCounts.entries()]
+            .filter(([, n]) => n > ROLLUP_OVER)
+            .map(([t]) => t)
         : [],
     );
     if (rolledTypes.size)
@@ -356,16 +383,17 @@ async function main() {
         eq(webPageTable.brandId, brand.id),
         notInArray(webPageTable.path, keptPaths),
         rollups.length
-          ? inArray(
-              webPageTable.pageType,
-              [...new Set(rollups.map((r) => r.pageType))],
-            )
+          ? inArray(webPageTable.pageType, [
+              ...new Set(rollups.map((r) => r.pageType)),
+            ])
           : like(webPageTable.path, "%/*"),
       ),
     )
     .returning({ path: webPageTable.path });
   if (pruned.length)
-    console.log(`✓ pruned ${pruned.length} rows superseded by the current mode`);
+    console.log(
+      `✓ pruned ${pruned.length} rows superseded by the current mode`,
+    );
 
   for (const r of rollups) {
     await db
@@ -418,7 +446,8 @@ async function main() {
       ),
     )
     .returning({ path: webPageTable.path });
-  if (gone.length) console.log(`✓ deactivated ${gone.length} pages no longer in sitemap`);
+  if (gone.length)
+    console.log(`✓ deactivated ${gone.length} pages no longer in sitemap`);
 
   if (ENRICH) {
     const enrichable = AI_SPEC
@@ -426,7 +455,9 @@ async function main() {
       : rows.filter((r) => ENRICHABLE.includes(r.pageType));
     const targets = enrichable.slice(0, ENRICH_CAP);
     if (enrichable.length > targets.length)
-      console.warn(`⚠️  enrichment capped at ${ENRICH_CAP} of ${enrichable.length}`);
+      console.warn(
+        `⚠️  enrichment capped at ${ENRICH_CAP} of ${enrichable.length}`,
+      );
     console.log(`… enriching ${targets.length} static pages (og tags)`);
     let done = 0;
     let failed = 0;
@@ -442,7 +473,10 @@ async function main() {
               .update(webPageTable)
               .set({ ogImage: og.ogImage, description: og.description })
               .where(
-                and(eq(webPageTable.brandId, t.brandId), eq(webPageTable.path, t.path)),
+                and(
+                  eq(webPageTable.brandId, t.brandId),
+                  eq(webPageTable.path, t.path),
+                ),
               );
             done++;
           } catch {
@@ -451,7 +485,9 @@ async function main() {
         }
       }),
     );
-    console.log(`✓ enriched ${done} pages${failed ? ` (${failed} failed)` : ""}`);
+    console.log(
+      `✓ enriched ${done} pages${failed ? ` (${failed} failed)` : ""}`,
+    );
   }
 
   console.log("\n🗺️  Website import complete.");

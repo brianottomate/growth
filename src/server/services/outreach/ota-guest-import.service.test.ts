@@ -53,7 +53,9 @@ describe("parseOtaGuestCsv", () => {
   });
 
   it("fails loudly when the export is missing a required column", () => {
-    expect(() => parseOtaGuestCsv("guest_email\na@b.com\n")).toThrow(/missing required column/i);
+    expect(() => parseOtaGuestCsv("guest_email\na@b.com\n")).toThrow(
+      /missing required column/i,
+    );
   });
 });
 
@@ -64,17 +66,36 @@ describe("skipReason", () => {
 
   it("drops rows we must never push to Outreach", () => {
     expect(skipReason(row({ guestEmail: "" }))).toBe("no email");
-    expect(skipReason(row({ guestEmail: "blocks@wander.com" }))).toBe("placeholder guest account");
-    expect(skipReason(row({ guestEmail: "kristian@wander.com" }))).toBe("internal employee");
-    expect(skipReason(row({ guestEmail: "not-an-email" }))).toBe("malformed email");
+    expect(skipReason(row({ guestEmail: "blocks@wander.com" }))).toBe(
+      "placeholder guest account",
+    );
+    expect(skipReason(row({ guestEmail: "kristian@wander.com" }))).toBe(
+      "internal employee",
+    );
+    expect(skipReason(row({ guestEmail: "not-an-email" }))).toBe(
+      "malformed email",
+    );
   });
 });
 
 describe("dedupeByEmail", () => {
   it("merges the same guest across channels into one prospect payload", () => {
     const { guests, skipped } = dedupeByEmail([
-      row({ otaChannels: "airbnb", otaBookings: 2, totalBookingValue: 1000, lastCheckin: "2024-06-01", properties: "Wander Ponte Vedra" }),
-      row({ otaChannels: "vrbo", otaBookings: 1, totalBookingValue: 500, firstCheckin: "2023-01-01", lastCheckin: "2025-07-04", properties: "Wander Dunes" }),
+      row({
+        otaChannels: "airbnb",
+        otaBookings: 2,
+        totalBookingValue: 1000,
+        lastCheckin: "2024-06-01",
+        properties: "Wander Ponte Vedra",
+      }),
+      row({
+        otaChannels: "vrbo",
+        otaBookings: 1,
+        totalBookingValue: 500,
+        firstCheckin: "2023-01-01",
+        lastCheckin: "2025-07-04",
+        properties: "Wander Dunes",
+      }),
       row({ guestEmail: "adapt@wander.com" }),
     ]);
 
@@ -85,7 +106,10 @@ describe("dedupeByEmail", () => {
     expect(guests[0]?.totalBookingValue).toBe(1500);
     expect(guests[0]?.firstCheckin).toBe("2023-01-01");
     expect(guests[0]?.lastCheckin).toBe("2025-07-04");
-    expect(guests[0]?.properties).toEqual(["Wander Ponte Vedra", "Wander Dunes"]);
+    expect(guests[0]?.properties).toEqual([
+      "Wander Ponte Vedra",
+      "Wander Dunes",
+    ]);
   });
 });
 
@@ -126,7 +150,10 @@ describe("prospect payload", () => {
   it("normalizes phones and names", () => {
     expect(cleanPhone("+1 (407) 756-4991")).toBe("+14077564991");
     expect(cleanPhone("N/A")).toBeNull();
-    expect(splitName("Maria Del Rio")).toEqual({ firstName: "Maria", lastName: "Del Rio" });
+    expect(splitName("Maria Del Rio")).toEqual({
+      firstName: "Maria",
+      lastName: "Del Rio",
+    });
     expect(splitName("")).toEqual({ firstName: null, lastName: null });
   });
 });

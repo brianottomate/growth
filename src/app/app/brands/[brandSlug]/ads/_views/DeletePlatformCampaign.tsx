@@ -53,7 +53,7 @@ export function DeletePlatformCampaign({
       <Button
         size="sm"
         variant="ghost"
-        className="text-muted-foreground"
+        tone="muted"
         onClick={() => setOpen(true)}
       >
         <Trash2 className="size-3.5" />
@@ -63,10 +63,12 @@ export function DeletePlatformCampaign({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete “{campaignName}” from the platform?</DialogTitle>
+            <DialogTitle>
+              Delete “{campaignName}” from the platform?
+            </DialogTitle>
             <DialogDescription>
-              This deletes the campaign on the ad account itself, along with
-              its ad sets and ads. It cannot be undone from here.
+              This deletes the campaign on the ad account itself, along with its
+              ad sets and ads. It cannot be undone from here.
               {isLive
                 ? " This campaign is currently LIVE — pausing it may be what you want instead."
                 : ""}

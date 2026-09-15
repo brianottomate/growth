@@ -54,9 +54,11 @@ const execute = argv.includes("--execute");
 const tagFlagIdx = argv.indexOf("--tag");
 const tagOverride = tagFlagIdx >= 0 ? argv[tagFlagIdx + 1] : undefined;
 const limitFlagIdx = argv.indexOf("--limit");
-const limit = limitFlagIdx >= 0 ? parseInt(argv[limitFlagIdx + 1] ?? "", 10) : undefined;
+const limit =
+  limitFlagIdx >= 0 ? parseInt(argv[limitFlagIdx + 1] ?? "", 10) : undefined;
 const csvPath = argv.find(
-  (a, i) => !a.startsWith("--") && argv[i - 1] !== "--tag" && argv[i - 1] !== "--limit",
+  (a, i) =>
+    !a.startsWith("--") && argv[i - 1] !== "--tag" && argv[i - 1] !== "--limit",
 );
 
 if (!csvPath) {
@@ -129,8 +131,11 @@ function parseRows(csv: string): CartRow[] {
   const header = records[0];
   if (!header) throw new Error("empty CSV");
   const col = (name: string) => {
-    const idx = header.findIndex((h) => h.trim().toLowerCase() === name.toLowerCase());
-    if (idx === -1) throw new Error(`missing expected column "${name}" in CSV header`);
+    const idx = header.findIndex(
+      (h) => h.trim().toLowerCase() === name.toLowerCase(),
+    );
+    if (idx === -1)
+      throw new Error(`missing expected column "${name}" in CSV header`);
     return idx;
   };
   const idx = {
@@ -204,7 +209,10 @@ function buildCartNote(row: CartRow): string {
 function rowTags(row: CartRow): string[] {
   const csvTags = tagOverride
     ? [tagOverride]
-    : row.tags.split(";").map((t) => t.trim()).filter(Boolean);
+    : row.tags
+        .split(";")
+        .map((t) => t.trim())
+        .filter(Boolean);
   return Array.from(new Set([BASE_TAG, ...csvTags]));
 }
 
@@ -255,13 +263,18 @@ async function main() {
   let rows = Array.from(byEmail.values());
   if (limit && Number.isFinite(limit)) {
     rows = rows.slice(0, limit);
-    console.log(`✂️  --limit ${limit}: processing first ${rows.length} guests only`);
+    console.log(
+      `✂️  --limit ${limit}: processing first ${rows.length} guests only`,
+    );
   }
-  console.log(`\n🎯 ${rows.length} distinct guests to sync (${skipped.length} skipped)\n`);
+  console.log(
+    `\n🎯 ${rows.length} distinct guests to sync (${skipped.length} skipped)\n`,
+  );
 
   if (!execute) {
     for (const row of rows) {
-      const name = [row.firstName, row.lastName].filter(Boolean).join(" ") || "(no name)";
+      const name =
+        [row.firstName, row.lastName].filter(Boolean).join(" ") || "(no name)";
       console.log(
         `DRY RUN — ${name} <${row.email}>${row.phone ? " 📞" : ""} tags=[${rowTags(row).join(", ")}]`,
       );
@@ -284,7 +297,9 @@ async function main() {
     const note = buildCartNote(row);
     const tags = rowTags(row);
 
-    const existing = await withRateLimitRetry(() => searchProspectByEmail(row.email));
+    const existing = await withRateLimitRetry(() =>
+      searchProspectByEmail(row.email),
+    );
 
     if (existing) {
       const mergedTags = Array.from(
@@ -298,7 +313,8 @@ async function main() {
       updated++;
       console.log(`✅ updated #${result.id} ${row.email} (owner untouched)`);
     } else {
-      const bdr = (await getNextBdrFromOutreachLoad(!!phone)) ?? getNextBdr(!!phone);
+      const bdr =
+        (await getNextBdrFromOutreachLoad(!!phone)) ?? getNextBdr(!!phone);
       const result = await withRateLimitRetry(() =>
         createProspect({
           attributes: {
@@ -323,7 +339,9 @@ async function main() {
     await sleep(DELAY_MS);
   }
 
-  console.log(`\n📊 done: ${created} created, ${updated} updated, ${skipped.length} skipped`);
+  console.log(
+    `\n📊 done: ${created} created, ${updated} updated, ${skipped.length} skipped`,
+  );
   if (ownerCounts.size > 0) {
     console.log("👥 new-prospect BDR distribution:");
     for (const [owner, count] of ownerCounts) {

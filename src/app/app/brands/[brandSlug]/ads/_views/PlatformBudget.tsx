@@ -82,9 +82,9 @@ export function PlatformBudget({
           ))}
         </div>
         {type === "lifetime" && (
-          <p className="text-muted-foreground text-xs">
-            A lifetime budget needs an end date on the campaign — it is the
-            date the spend stops.
+          <p className="text-xs text-muted-foreground">
+            A lifetime budget needs an end date on the campaign — it is the date
+            the spend stops.
           </p>
         )}
         {save.error && (

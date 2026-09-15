@@ -68,7 +68,10 @@ const prospect =
     await db
       .insert(pregenNativeProspectTable)
       .values({ domain, name, sourceUrl, status: "preview_ready" })
-      .returning({ id: pregenNativeProspectTable.id, previewToken: pregenNativeProspectTable.previewToken })
+      .returning({
+        id: pregenNativeProspectTable.id,
+        previewToken: pregenNativeProspectTable.previewToken,
+      })
   )[0]!;
 
 const now = new Date();
@@ -116,6 +119,10 @@ const [artifact] = await db
 const label = domain.replace(/\.[a-z.]+$/, "").replace(/[^a-z0-9-]+/gi, "-");
 console.log(`prospect  ${prospect.id} (${domain})`);
 console.log(`build     ${build!.id}`);
-console.log(`artifact  ${artifact!.id} — ${pages.length} pages, ${data.extractedProperties.length} units`);
+console.log(
+  `artifact  ${artifact!.id} — ${pages.length} pages, ${data.extractedProperties.length} units`,
+);
 console.log(`monolith  websiteId ${data.websiteId}`);
-console.log(`preview   https://${label}.swot.cloud/?t=${prospect.previewToken}`);
+console.log(
+  `preview   https://${label}.swot.cloud/?t=${prospect.previewToken}`,
+);

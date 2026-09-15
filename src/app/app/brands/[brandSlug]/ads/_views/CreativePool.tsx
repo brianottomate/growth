@@ -99,8 +99,14 @@ export function CreativePool({
 
   const addImported = (assets: { id: string; url: string | null }[]) => {
     const fresh = assets
-      .filter((asset) => asset.url && !pool.some((item) => item.assetId === asset.id))
-      .map((asset) => ({ url: asset.url!, type: "image" as const, assetId: asset.id }));
+      .filter(
+        (asset) => asset.url && !pool.some((item) => item.assetId === asset.id),
+      )
+      .map((asset) => ({
+        url: asset.url!,
+        type: "image" as const,
+        assetId: asset.id,
+      }));
     if (fresh.length === 0) return;
     setPool.mutate({ campaignId, media: [...pool, ...fresh] });
   };
@@ -111,7 +117,11 @@ export function CreativePool({
         <div className="flex items-center justify-end gap-2">
           <ListingSamplesDialog brandId={brandId} onImported={addImported} />
           <SiteImagesDialog brandId={brandId} onImported={addImported} />
-          <Button size="sm" variant="outline" onClick={() => setPickerOpen(true)}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setPickerOpen(true)}
+          >
             <ImagePlus className="size-3.5" />
             From the library
           </Button>
@@ -126,9 +136,16 @@ export function CreativePool({
           description="From their listings, the library, or the Studio."
           actions={
             <>
-              <ListingSamplesDialog brandId={brandId} onImported={addImported} />
+              <ListingSamplesDialog
+                brandId={brandId}
+                onImported={addImported}
+              />
               <SiteImagesDialog brandId={brandId} onImported={addImported} />
-              <Button size="sm" variant="outline" onClick={() => setPickerOpen(true)}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setPickerOpen(true)}
+              >
                 <ImagePlus className="size-3.5" />
                 From the library
               </Button>
@@ -159,10 +176,10 @@ export function CreativePool({
             return (
               <div
                 key={item.url}
-                className="bg-card group relative w-40 shrink-0 overflow-hidden rounded-lg border"
+                className="group relative w-40 shrink-0 overflow-hidden rounded-lg border bg-card"
                 title={asset?.alt ?? name}
               >
-                <div className="bg-muted relative h-24">
+                <div className="relative h-24 bg-muted">
                   {/* A video's `thumbnail` can be the clip itself when no poster
                 was ever cut, and an <img> pointed at an .mp4 is a blank tile
                 that still downloads the whole file. Let <video> paint its own
@@ -181,7 +198,7 @@ export function CreativePool({
                       preload="metadata"
                     />
                   ) : (
-                    // eslint-disable-next-line @next/next/no-img-element
+                    // oxlint-disable-next-line nextjs/no-img-element
                     <img
                       src={item.thumbnail ?? item.url}
                       alt=""
@@ -199,7 +216,7 @@ export function CreativePool({
                   <p className="truncate text-xs font-medium" title={name}>
                     {name}
                   </p>
-                  <div className="text-muted-foreground flex flex-wrap items-center gap-x-1.5 text-[10px]">
+                  <div className="flex flex-wrap items-center gap-x-1.5 text-[10px] text-muted-foreground">
                     {facts.length > 0 ? <span>{facts.join(" · ")}</span> : null}
                     {/* Not in the library means no tags, no analysis, and
                       nothing reusable on another campaign — worth saying on
@@ -216,13 +233,13 @@ export function CreativePool({
                       {asset.tags.slice(0, 3).map((tag) => (
                         <span
                           key={tag}
-                          className="bg-muted rounded px-1 py-0.5 text-[10px]"
+                          className="rounded bg-muted px-1 py-0.5 text-[10px]"
                         >
                           {tag}
                         </span>
                       ))}
                       {asset.tags.length > 3 && (
-                        <span className="text-muted-foreground text-[10px]">
+                        <span className="text-[10px] text-muted-foreground">
                           +{asset.tags.length - 3}
                         </span>
                       )}

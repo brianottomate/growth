@@ -34,7 +34,7 @@ export default async function CalendarPage({
   const org = membership?.organization;
   if (!org) {
     return (
-      <div className="text-muted-foreground p-8">No organization found.</div>
+      <div className="p-8 text-muted-foreground">No organization found.</div>
     );
   }
 

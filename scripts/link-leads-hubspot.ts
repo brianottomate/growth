@@ -115,7 +115,9 @@ async function main() {
     await sleep(THROTTLE_MS);
   }
 
-  console.log(`✓ matched ${matches.length}/${pool.length} domains — writing back…`);
+  console.log(
+    `✓ matched ${matches.length}/${pool.length} domains — writing back…`,
+  );
   await bulkApplyMatches(matches);
 
   // Truth-refresh the negatives (only rows with no trusted link).
@@ -141,7 +143,8 @@ async function main() {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 12);
   console.log(`lead-status distribution (top):`);
-  for (const [status, n] of topStatuses) console.log(`  ${n.toString().padStart(6)}  ${status}`);
+  for (const [status, n] of topStatuses)
+    console.log(`  ${n.toString().padStart(6)}  ${status}`);
   process.exit(0);
 }
 

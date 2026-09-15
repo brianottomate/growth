@@ -14,11 +14,7 @@ import { z } from "zod";
 export const launchTiers = [1, 2, 3] as const;
 export type LaunchTier = (typeof launchTiers)[number];
 
-export const launchMaturities = [
-  "private_preview",
-  "beta",
-  "ga",
-] as const;
+export const launchMaturities = ["private_preview", "beta", "ga"] as const;
 export type LaunchMaturity = (typeof launchMaturities)[number];
 
 export const launchStatuses = [
@@ -165,12 +161,7 @@ export const launchTierGuidance: Record<
   2: {
     label: "Tier 2 — email, enablement, social",
     leadTime: "2 weeks",
-    surfaces: [
-      "changelog",
-      "email",
-      "sales_enablement",
-      "blog_or_social",
-    ],
+    surfaces: ["changelog", "email", "sales_enablement", "blog_or_social"],
   },
   3: {
     label: "Tier 3 — changelog and email",

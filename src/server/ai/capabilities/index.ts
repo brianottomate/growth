@@ -40,4 +40,3 @@ export const MCP_TOOLS = Object.fromEntries(
     capabilityAllowsSurface(name, "mcp"),
   ),
 ) as ToolSet;
-
