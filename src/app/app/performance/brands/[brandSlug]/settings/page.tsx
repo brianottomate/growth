@@ -39,7 +39,12 @@ export default async function PerformanceBrandSettingsPage({
       ? db.query.performanceCycleTable.findFirst({
           where: (t, { eq }) => eq(t.accountId, deskBrand.account!.id),
           orderBy: (t, { desc }) => desc(t.period),
-          columns: { billedAmount: true, mediaBudget: true },
+          columns: {
+            billedAmount: true,
+            mediaBudget: true,
+            feePaidAt: true,
+            mediaPaidAt: true,
+          },
         })
       : Promise.resolve(null),
     campaignIds.length
@@ -56,6 +61,8 @@ export default async function PerformanceBrandSettingsPage({
 
   const derived: SettingsDerived = {
     paidFee: cycle?.billedAmount ?? null,
+    feePaidAt: cycle?.feePaidAt ?? null,
+    mediaPaidAt: cycle?.mediaPaidAt ?? null,
     // The intake's figure stands in until a cycle is opened, as on the checklist.
     mediaBudget: cycle?.mediaBudget ?? intake?.budget ?? null,
     actualSpend: Math.round(

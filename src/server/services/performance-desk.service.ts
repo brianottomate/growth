@@ -10,6 +10,7 @@ import {
   type BusinessStage,
   type DeliveryStage,
 } from "@/lib/performance-stage";
+import { type BillingSummary } from "@/lib/performance-billing";
 import { db } from "@/server/db";
 import {
   brandIntakeUrl,
@@ -72,6 +73,8 @@ export type DeskBrand = {
   /** The pitch page on wander.com a rep sends before anything is signed. Slug only. */
   pitchUrl: string | null;
   account: { id: string; status: string; plan: string | null } | null;
+  /** This month's fee and media lines, from the newest cycle. Null before the first payment. */
+  billing: BillingSummary | null;
   campaigns: DeskCampaign[];
   /** The furthest along any of this brand's campaigns is. */
   best: DeskCampaignState | null;
@@ -225,6 +228,28 @@ export async function loadPerformanceDesk(
   const accountByBrand = new Map(
     accounts.map((account) => [account.brandId, account]),
   );
+  const accountIds = accounts.map((account) => account.id);
+  const cycleRows = accountIds.length
+    ? await db.query.performanceCycleTable.findMany({
+        where: inArray(performanceCycleTable.accountId, accountIds),
+        orderBy: (cycle, { desc }) => [desc(cycle.period)],
+        columns: {
+          accountId: true,
+          period: true,
+          billedAmount: true,
+          mediaBudget: true,
+          feePaidAt: true,
+          mediaPaidAt: true,
+          actualSpendCents: true,
+        },
+      })
+    : [];
+  // Newest first, so the first row seen per account is the current cycle.
+  const cycleByAccount = new Map<string, (typeof cycleRows)[number]>();
+  for (const cycle of cycleRows) {
+    if (!cycleByAccount.has(cycle.accountId))
+      cycleByAccount.set(cycle.accountId, cycle);
+  }
 
   const campaigns: DeskCampaign[] = campaignRows.map((campaign) => {
     const rows = rowsByCampaign.get(campaign.id) ?? [];
@@ -273,6 +298,18 @@ export async function loadPerformanceDesk(
     .map((brand) => {
       const own = campaignsByBrand.get(brand.id) ?? [];
       const account = accountByBrand.get(brand.id);
+      const cycle = account ? cycleByAccount.get(account.id) : undefined;
+      const billing: BillingSummary | null = cycle
+        ? {
+            period: cycle.period,
+            fee: { amount: cycle.billedAmount, paidAt: cycle.feePaidAt },
+            media: { amount: cycle.mediaBudget, paidAt: cycle.mediaPaidAt },
+            spend:
+              cycle.actualSpendCents != null
+                ? Math.round(cycle.actualSpendCents / 100)
+                : own.reduce((sum, campaign) => sum + campaign.spend, 0),
+          }
+        : null;
       const business: BusinessStage =
         brand.businessStage ??
         (brand.relationship === "client" ? "signed" : "prospect");
@@ -298,6 +335,7 @@ export async function loadPerformanceDesk(
           ? { id: account.id, status: account.status, plan: account.plan }
           : null,
         campaigns: own,
+        billing,
         best: own.reduce<DeskCampaignState | null>(
           (acc, campaign) =>
             acc === null || RANK[campaign.state] < RANK[acc]

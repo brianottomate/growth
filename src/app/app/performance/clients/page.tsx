@@ -8,6 +8,7 @@ import { db } from "@/server/db";
 import { memberTable } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { EmptyState } from "@/components/ui/empty-state";
+import { isSettled, lineLabel, periodLabel } from "@/lib/performance-billing";
 import { BUSINESS_LABEL, DELIVERY_LABEL } from "@/lib/performance-stage";
 import {
   BrandSearch,
@@ -75,6 +76,9 @@ export default async function PerformanceClientsPage() {
       brand.relationship,
       BUSINESS_LABEL[brand.business],
       DELIVERY_LABEL[brand.delivery],
+      brand.billing
+        ? `fee ${brand.billing.fee.paidAt ? "paid" : "open"} ads ${brand.billing.media.paidAt ? "paid" : "open"}`
+        : null,
     ]
       .filter(Boolean)
       .join(" ")
@@ -152,6 +156,7 @@ function ClientRow({
             {brand.website ? " · " : ""}
             {meta.join(" · ")}
           </p>
+          {brand.billing ? <BillingLine billing={brand.billing} /> : null}
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           {brand.pitchUrl ? (
@@ -165,6 +170,7 @@ function ClientRow({
             brandName={brand.name}
             business={brand.business}
             delivery={brand.delivery}
+            billing={brand.billing}
           />
         </div>
       </div>
@@ -349,5 +355,31 @@ function IntakeFacts({
         </p>
       ) : null}
     </div>
+  );
+}
+
+/** This month's two invoices and the spend against them, one quiet line. */
+function BillingLine({
+  billing,
+}: {
+  billing: NonNullable<DeskBrand["billing"]>;
+}) {
+  const settled = isSettled(billing);
+  return (
+    <p
+      className={cn(
+        "mt-1 flex flex-wrap items-center gap-x-3 text-xs",
+        settled ? "text-muted-foreground" : "text-amber-300",
+      )}
+    >
+      <span className="text-muted-foreground">
+        {periodLabel(billing.period)}
+      </span>
+      <span>Fee {lineLabel(billing.fee)}</span>
+      <span>Ads {lineLabel(billing.media)}</span>
+      <span className="text-muted-foreground">
+        ${billing.spend.toLocaleString("en-US")} spent
+      </span>
+    </p>
   );
 }

@@ -43,6 +43,7 @@ import {
   setBrandStages,
 } from "@/server/services/brand-relationship.service";
 import { BUSINESS_STAGES, DELIVERY_STAGES } from "@/lib/performance-stage";
+import { markCycleLinePaid } from "@/server/services/performance-billing.service";
 
 import { protectedProcedure } from "../trpc";
 
@@ -227,8 +228,30 @@ export const performanceRouter = {
         delivery: z.enum(DELIVERY_STAGES).optional(),
       }),
     )
+    .mutation(async ({ ctx, input }) => {
+      const actor = await actorFor(ctx);
+      // "Paid" on the brand means the fee cleared, so it lands on the cycle too.
+      if (input.business === "paid") {
+        await markCycleLinePaid(actor, {
+          brandId: input.brandId,
+          line: "fee",
+          paid: true,
+        });
+      }
+      return setBrandStages(actor, input);
+    }),
+
+  /** One line of this month's cycle: the fee or the media, paid or reopened. */
+  markLinePaid: protectedProcedure
+    .input(
+      z.object({
+        brandId: z.string().min(1),
+        line: z.enum(["fee", "media"]),
+        paid: z.boolean(),
+      }),
+    )
     .mutation(async ({ ctx, input }) =>
-      setBrandStages(await actorFor(ctx), input),
+      markCycleLinePaid(await actorFor(ctx), input),
     ),
 
   setBrandRelationship: protectedProcedure

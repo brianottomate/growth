@@ -117,6 +117,9 @@ export const SETTINGS_FIELDS: SettingsField[] = [
 export type SettingsDerived = {
   /** Whole dollars the client pays a month, from the newest cycle. */
   paidFee: number | null;
+  /** When this month's fee and media invoices cleared; null while open. */
+  feePaidAt: Date | null;
+  mediaPaidAt: Date | null;
   /** Whole dollars of media a month, from the newest cycle or the intake. */
   mediaBudget: number | null;
   /** What Meta reports spent across the brand's campaigns, in dollars. */

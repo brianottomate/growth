@@ -106,6 +106,7 @@ export default async function PerformanceProspectsPage() {
                   brandName={brand.name}
                   business={brand.business}
                   delivery={brand.delivery}
+                  billing={brand.billing}
                 />
               </li>
             ))}

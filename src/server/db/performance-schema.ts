@@ -235,6 +235,14 @@ export const performanceCycleTable = pgTable(
     actualSpendCents: t.integer(),
     actualSpendAt: t.timestamp({ withTimezone: true }),
 
+    /**
+     * The two things a client pays for a month, settled separately: Wander's
+     * fee (`billedAmount`) and the media that reaches the platforms
+     * (`mediaBudget`). Null means the invoice is still open.
+     */
+    feePaidAt: t.timestamp({ withTimezone: true }),
+    mediaPaidAt: t.timestamp({ withTimezone: true }),
+
     status: performanceCycleStatusEnum().default("planned").notNull(),
     notes: t.text(),
 

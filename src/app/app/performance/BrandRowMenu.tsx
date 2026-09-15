@@ -23,35 +23,41 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "@/components/ui/toast";
+import type { BillingSummary } from "@/lib/performance-billing";
 import type { BusinessStage, DeliveryStage } from "@/lib/performance-stage";
 import { useTRPC } from "@/trpc/react";
 
 import { StageDialog } from "./StageDialog";
 
 /**
- * The quiet menu on a client or prospect row: mark the invoice paid in one
- * click, set either stage by hand, or delete the brand behind a confirmation.
- * Delete is a soft delete; the brand page's purge is the destructive one.
+ * The quiet menu on a client or prospect row: settle this month's fee or
+ * media in one click, set either stage by hand, or delete the brand behind a
+ * confirmation. Delete is a soft delete; the brand page's purge is the
+ * destructive one.
  */
 export function BrandRowMenu({
   brandId,
   brandName,
   business,
   delivery,
+  billing,
 }: {
   brandId: string;
   brandName: string;
   business: BusinessStage;
   delivery: DeliveryStage;
+  billing: BillingSummary | null;
 }) {
   const trpc = useTRPC();
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
   const [staging, setStaging] = useState(false);
-  const markPaid = useMutation(
-    trpc.performance.setStage.mutationOptions({
-      onSuccess: () => {
-        toast.success(`${brandName}: Paid`);
+  const markLine = useMutation(
+    trpc.performance.markLinePaid.mutationOptions({
+      onSuccess: (_cycle, input) => {
+        toast.success(
+          `${brandName}: ${input.line === "fee" ? "fee" : "ads"} ${input.paid ? "paid" : "reopened"}`,
+        );
         router.refresh();
       },
       onError: (error) => toast.error(error.message),
@@ -67,6 +73,11 @@ export function BrandRowMenu({
       onError: (error) => toast.error(error.message),
     }),
   );
+  // Money items only once there is a contract to bill against.
+  const billable =
+    business === "signed" || business === "paid" || business === "paused";
+  const feePaid = Boolean(billing?.fee.paidAt);
+  const mediaPaid = Boolean(billing?.media.paidAt);
   return (
     <>
       <DropdownMenu>
@@ -76,14 +87,27 @@ export function BrandRowMenu({
         >
           <MoreHorizontal className="size-4" />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-48">
-          {business === "signed" ? (
-            <DropdownMenuItem
-              disabled={markPaid.isPending}
-              onClick={() => markPaid.mutate({ brandId, business: "paid" })}
-            >
-              Mark paid
-            </DropdownMenuItem>
+        <DropdownMenuContent align="end" className="w-52">
+          {billable ? (
+            <>
+              <DropdownMenuItem
+                disabled={markLine.isPending}
+                onClick={() =>
+                  markLine.mutate({ brandId, line: "fee", paid: !feePaid })
+                }
+              >
+                {feePaid ? "Reopen fee" : "Mark fee paid"}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={markLine.isPending}
+                onClick={() =>
+                  markLine.mutate({ brandId, line: "media", paid: !mediaPaid })
+                }
+              >
+                {mediaPaid ? "Reopen ads" : "Mark ads paid"}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
           ) : null}
           <DropdownMenuItem onClick={() => setStaging(true)}>
             Set stages…

@@ -12,6 +12,10 @@ import type { PerformanceSettings } from "@/server/db/brand-schema";
 import { tile, SectionLabel } from "../../../_components";
 
 const money = (n: number) => `$${n.toLocaleString("en-US")}`;
+const paidOn = (d: Date | null) =>
+  d
+    ? `paid ${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+    : "open";
 const host = (url: string) => {
   try {
     return new URL(url).hostname.replace(/^www\./, "");
@@ -42,7 +46,10 @@ export function SettingsCard({
     switch (key) {
       case "paidFee":
         return derived.paidFee != null
-          ? { text: `${money(derived.paidFee)}/mo`, tone: "ok" }
+          ? {
+              text: `${money(derived.paidFee)}/mo · ${paidOn(derived.feePaidAt)}`,
+              tone: derived.feePaidAt ? "ok" : "warn",
+            }
           : { text: "No cycle yet", tone: "muted" };
       case "paidAdSpend": {
         if (derived.mediaBudget == null && derived.actualSpend === 0) {
@@ -57,8 +64,10 @@ export function SettingsCard({
             ? `${money(derived.actualSpend)} spent`
             : null;
         return {
-          text: [planned, spent].filter(Boolean).join(" · "),
-          tone: "ok",
+          text: [planned, planned ? paidOn(derived.mediaPaidAt) : null, spent]
+            .filter(Boolean)
+            .join(" · "),
+          tone: planned && !derived.mediaPaidAt ? "warn" : "ok",
         };
       }
       case "onboardingLink":
