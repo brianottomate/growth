@@ -4,10 +4,17 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import {
+  addAdShell,
+  attachAdSet,
   buildAdSet,
+  createAdsFromAssets,
+  deleteAd,
+  editAdCards,
   setAdCopy,
+  setAdHome,
   setAdStatus,
 } from "@/server/services/ad-set.service";
+import { HAND_MADE_AD_FORMATS, MAX_SET_HOMES } from "@/lib/performance-ads";
 
 import {
   AD_PUSH_GOALS,
@@ -173,12 +180,17 @@ export const adsRouter = {
 
   // Experiment: build a static and a carousel from the client's own homes.
   // Drafts only; the push is still what decides whether any of it runs.
-  /** Draw the brand's whole set from the homes given. One model call. */
+  /**
+   * Draw the brand's whole set: from the homes named, or from a count when
+   * none are, in which case the homes on their record come first. One model
+   * call for the words.
+   */
   buildAdSet: protectedProcedure
     .input(
       z.object({
         brandId: z.string().min(1),
-        propertyIds: z.array(z.string().min(1)).min(1).max(10),
+        propertyIds: z.array(z.string().min(1)).max(MAX_SET_HOMES).optional(),
+        count: z.number().int().min(1).max(MAX_SET_HOMES).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) =>
@@ -186,8 +198,100 @@ export const adsRouter = {
         brandId: input.brandId,
         orgId: await organizationIdFor(ctx),
         propertyIds: input.propertyIds,
+        count: input.count,
         userId: ctx.session.user.id,
       }),
+    ),
+
+  /** An empty ad of a declared format, waiting for its creative. */
+  addAdShell: protectedProcedure
+    .input(
+      z.object({
+        brandId: z.string().min(1),
+        format: z.enum(HAND_MADE_AD_FORMATS),
+        propertyId: z.string().min(1).nullish(),
+        name: z.string().trim().max(300).nullish(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      addAdShell({ ...input, orgId: await organizationIdFor(ctx) }),
+    ),
+
+  /** Finished creatives from the library, as one static each or one carousel. */
+  createAdsFromAssets: protectedProcedure
+    .input(
+      z.object({
+        brandId: z.string().min(1),
+        mediaAssetIds: z.array(z.string().min(1)).min(1).max(50),
+        as: z.enum(["statics", "carousel"]),
+        propertyId: z.string().min(1).nullish(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      createAdsFromAssets({ ...input, orgId: await organizationIdFor(ctx) }),
+    ),
+
+  /** Bind an ad to one of their homes, or unbind it. */
+  setAdHome: protectedProcedure
+    .input(
+      z.object({
+        adId: z.string().min(1),
+        propertyId: z.string().min(1).nullable(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      setAdHome({ ...input, orgId: await organizationIdFor(ctx) }),
+    ),
+
+  /** One change to an ad's cards; uploads arrive as library assets. */
+  editAdCards: protectedProcedure
+    .input(
+      z.object({
+        adId: z.string().min(1),
+        edit: z.discriminatedUnion("op", [
+          z.object({
+            op: z.literal("replace"),
+            index: z.number().int().min(0).max(9),
+            mediaAssetId: z.string().min(1),
+          }),
+          z.object({
+            op: z.literal("append"),
+            mediaAssetId: z.string().min(1),
+          }),
+          z.object({
+            op: z.literal("remove"),
+            index: z.number().int().min(0).max(9),
+          }),
+          z.object({
+            op: z.literal("move"),
+            index: z.number().int().min(0).max(9),
+            to: z.number().int().min(0).max(9),
+          }),
+        ]),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      editAdCards({ ...input, orgId: await organizationIdFor(ctx) }),
+    ),
+
+  /** Put the approved drafts, or the named ones, into a campaign. */
+  attachAdSet: protectedProcedure
+    .input(
+      z.object({
+        brandId: z.string().min(1),
+        campaignId: z.string().min(1),
+        adIds: z.array(z.string().min(1)).max(100).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      attachAdSet({ ...input, orgId: await organizationIdFor(ctx) }),
+    ),
+
+  /** Remove one ad, drafted or in a campaign. */
+  deleteAd: protectedProcedure
+    .input(z.object({ adId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) =>
+      deleteAd({ ...input, orgId: await organizationIdFor(ctx) }),
     ),
 
   /** Production state on one drafted ad. Touches no platform. */

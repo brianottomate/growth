@@ -34,6 +34,11 @@ import {
   buildAdSetAction,
   setAdStatusAction,
   setAdCopyAction,
+  addAdShellAction,
+  createAdsFromAssetsAction,
+  setAdHomeAction,
+  editAdCardsAction,
+  attachAdSetAction,
   replaceAdCardAction,
 } from "./ads";
 import { diagnoseAlignment } from "./alignment";
@@ -408,6 +413,11 @@ export const adsWrite = growthDomainTool({
     buildAdSet: buildAdSetAction,
     setAdStatus: setAdStatusAction,
     setAdCopy: setAdCopyAction,
+    addAdShell: addAdShellAction,
+    createAdsFromAssets: createAdsFromAssetsAction,
+    setAdHome: setAdHomeAction,
+    editAdCards: editAdCardsAction,
+    attachAdSet: attachAdSetAction,
     replaceAdCard: replaceAdCardAction,
     addAudience: addAudienceAction,
     updateAudience: updateAudienceAction,

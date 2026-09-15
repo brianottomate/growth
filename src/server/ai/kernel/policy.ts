@@ -272,6 +272,13 @@ export const growthActionPolicies = {
     buildAdSet: write({ idempotent: true, consequence: "model-write" }),
     setAdStatus: write({ idempotent: true }),
     setAdCopy: write({ idempotent: true }),
+    // Shells, bindings and cards: local ad rows, no provider call.
+    addAdShell: write(),
+    createAdsFromAssets: write(),
+    setAdHome: write({ idempotent: true }),
+    editAdCards: write(),
+    // Sets one field on local rows; the push is still the provider step.
+    attachAdSet: write({ idempotent: true }),
     // Swaps one card slot on a local draft for a library asset.
     replaceAdCard: write({ idempotent: true }),
     addAudience: write(),

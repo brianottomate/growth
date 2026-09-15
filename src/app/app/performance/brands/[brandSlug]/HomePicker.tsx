@@ -39,12 +39,17 @@ export function HomePicker({
   max,
   onChange,
   label = "Add homes",
+  title = "Homes for the ads",
+  single = false,
 }: {
   homes: PickableHome[];
   picked: string[];
   max: number;
   onChange: (next: string[]) => void;
   label?: string;
+  title?: string;
+  /** One home at a time: picking another replaces it, and picking closes. */
+  single?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -56,6 +61,11 @@ export function HomePicker({
   }, [homes, query]);
 
   const toggle = (id: string) => {
+    if (single) {
+      onChange(picked.includes(id) ? [] : [id]);
+      setOpen(false);
+      return;
+    }
     if (picked.includes(id)) {
       return onChange(picked.filter((key) => key !== id));
     }
@@ -66,14 +76,19 @@ export function HomePicker({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" variant="outline" className="h-7 rounded-full px-3 text-[11.5px]">
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 rounded-full px-3 text-[11.5px]"
+        >
           {label}
         </Button>
       </DialogTrigger>
       <DialogContent className="flex max-h-[85vh] w-[96vw] max-w-4xl flex-col overflow-hidden p-0">
         <DialogHeader className="shrink-0 border-b px-5 py-3 pr-12 text-left">
           <DialogTitle className="text-sm">
-            Homes for the ads · {picked.length}/{max}
+            {title}
+            {single ? "" : ` · ${picked.length}/${max}`}
           </DialogTitle>
         </DialogHeader>
         <div className="shrink-0 px-5 pt-3">
@@ -96,7 +111,7 @@ export function HomePicker({
             <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
               {filtered.map((home) => {
                 const on = picked.includes(home.id);
-                const full = !on && picked.length >= max;
+                const full = !single && !on && picked.length >= max;
                 return (
                   <li key={home.id}>
                     <button
@@ -143,7 +158,9 @@ export function HomePicker({
                           {[
                             home.bedrooms ? `${home.bedrooms} bd` : null,
                             home.guests ? `${home.guests} guests` : null,
-                            home.nightlyFrom ? `${money(home.nightlyFrom)}/nt` : null,
+                            home.nightlyFrom
+                              ? `${money(home.nightlyFrom)}/nt`
+                              : null,
                           ]
                             .filter(Boolean)
                             .join(" · ")}
@@ -158,9 +175,17 @@ export function HomePicker({
         </div>
         <div className="flex shrink-0 items-center justify-between gap-3 border-t px-5 py-3">
           <span className="text-muted-foreground text-[11.5px]">
-            {picked.length}/{max} chosen
+            {single
+              ? picked.length
+                ? "1 chosen"
+                : "None chosen"
+              : `${picked.length}/${max} chosen`}
           </span>
-          <Button size="sm" className="h-7 rounded-full px-3 text-[11.5px]" onClick={() => setOpen(false)}>
+          <Button
+            size="sm"
+            className="h-7 rounded-full px-3 text-[11.5px]"
+            onClick={() => setOpen(false)}
+          >
             Done
           </Button>
         </div>

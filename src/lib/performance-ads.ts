@@ -244,13 +244,18 @@ export function performanceConversionName(input: {
   event: string;
 }): string {
   return [
-    performanceNamePrefix({ brandName: input.customer, isClient: input.isClient ?? true }),
+    performanceNamePrefix({
+      brandName: input.customer,
+      isClient: input.isClient ?? true,
+    }),
     input.event.trim().toUpperCase(),
   ].join("_");
 }
 
 /** Meta conversion rule: any URL on the host, in Meta's own grammar. */
-export function hostScopedConversionRule(host: string): Record<string, unknown> {
+export function hostScopedConversionRule(
+  host: string,
+): Record<string, unknown> {
   return { url: { i_contains: host } };
 }
 
@@ -373,4 +378,211 @@ export function buildPerformanceAdPlan(input: {
       linkUrl: null,
     },
   ];
+}
+
+// ---- THE SET AS A WALL --------------------------------------------------
+//
+// An ad declares what it is. Reading the format off the media worked while
+// every ad was born with its cards, but a shell waiting for an upload has no
+// cards yet, and a one-card carousel and a static look the same. The
+// declared format is the truth; the media-based read remains for ads drawn
+// before the field existed.
+
+export const AD_FORMATS = [
+  "static",
+  "carousel",
+  "video",
+  "portfolio",
+  "catalog",
+] as const;
+export type AdFormat = (typeof AD_FORMATS)[number];
+
+export const AD_FORMAT_LABEL: Record<AdFormat, string> = {
+  static: "Static",
+  carousel: "Carousel",
+  video: "Video",
+  portfolio: "Portfolio carousel",
+  catalog: "Catalog",
+};
+
+/**
+ * Formats an operator makes by hand. The catalog ad is Meta's to render from
+ * the product set once live; as a placeholder it holds one card per home so
+ * the wall can show the shape before the feed exists. The portfolio carousel
+ * comes from a build alone, since it is the homes in a chosen order.
+ */
+export const HAND_MADE_AD_FORMATS = [
+  "static",
+  "carousel",
+  "catalog",
+  "video",
+] as const;
+
+/** How many cards a format holds; Meta's carousel ceiling is ten. */
+export function cardCapacity(format: AdFormat): number {
+  return format === "static" || format === "video" ? 1 : 10;
+}
+
+export type FormatReadable = {
+  format?: AdFormat;
+  media: { type: string }[];
+  propertyName?: string;
+};
+
+/**
+ * What an ad is: declared when it says so, otherwise read off its cards the
+ * way the push always has. A multi-card ad about one home is that home's
+ * carousel; one about no home in particular is the portfolio.
+ */
+export function adFormatOf(content: FormatReadable): AdFormat {
+  if (content.format) return content.format;
+  if (content.media.some((item) => item.type === "video")) return "video";
+  if (content.media.length > 1) {
+    return content.propertyName ? "carousel" : "portfolio";
+  }
+  return "static";
+}
+
+/** The format the naming convention spells; every multi-card shape is a carousel there. */
+export function performanceFormatFor(format: AdFormat): PerformanceAdFormat {
+  if (format === "video") return "Video";
+  if (format === "static") return "Static";
+  return "Carousel";
+}
+
+/**
+ * The home a finished creative is about, read off its filename.
+ *
+ * Brooke's exports follow the ad naming, brand first and the property after
+ * the format or in second place: `LegacyRnR_Sonoma Glass House_CarouselA_
+ * Slide01_1080x1350.png`. A file that does not read that way gives nothing,
+ * and the ad waits for someone to bind a home rather than guessing one.
+ */
+export function homeNameFromFilename(filename: string): string | null {
+  const stem = filename.replace(/\.[a-z0-9]+$/i, "").trim();
+  const parts = stem
+    .split("_")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (parts.length < 3) return null;
+  const isFormat = (part: string) =>
+    /^(static|carousel|video)[a-z]?$/i.test(part);
+  // Sizes, slide numbers and the brand prefix are not homes.
+  const isHome = (part: string | undefined): part is string =>
+    Boolean(part) &&
+    !isFormat(part!) &&
+    !/^(slide\s*\d+|\d+x\d+|meta|perf\+.*)$/i.test(part!);
+  const formatAt = parts.findIndex(isFormat);
+  // The property sits beside the format: after it in the ad convention,
+  // before it in an export that carries slide and size after.
+  // The segment right after the brand is the only one before the format
+  // that can be a home; at index 1 the format follows the brand itself.
+  const candidates =
+    formatAt > 0
+      ? [parts[formatAt + 1], formatAt >= 2 ? parts[formatAt - 1] : undefined]
+      : [parts[1]];
+  return candidates.find(isHome) ?? null;
+}
+
+export type CardEdit<Item> =
+  | { op: "replace"; index: number; item: Item }
+  | { op: "append"; item: Item }
+  | { op: "remove"; index: number }
+  | { op: "move"; index: number; to: number };
+
+/**
+ * One change to an ad's cards, checked against what its format can hold.
+ *
+ * The rules are Meta's and the format's own: a video stands alone, a static
+ * holds one card, a carousel holds two to ten and can be built up one card
+ * at a time, so a single card in a carousel is allowed while it is being
+ * filled. Throws with the reason rather than silently doing less.
+ */
+export function applyCardEdit<Item extends { type: string }>(
+  content: { format?: AdFormat; media: Item[]; propertyName?: string },
+  edit: CardEdit<Item>,
+): Item[] {
+  const format = adFormatOf(content);
+  const media = [...content.media];
+  const capacity = cardCapacity(format);
+  const label = AD_FORMAT_LABEL[format].toLowerCase();
+
+  const inRange = (index: number) => {
+    if (index < 0 || index >= media.length) {
+      throw new Error(
+        `This ${label} has ${media.length} card${media.length === 1 ? "" : "s"}; there is no card ${index + 1}`,
+      );
+    }
+  };
+  const admits = (item: Item, replacing: boolean) => {
+    if (item.type === "video" && format !== "video") {
+      throw new Error(`A video goes on a video ad, not a ${label}`);
+    }
+    if (item.type !== "video" && format === "video") {
+      throw new Error("A video ad takes a clip, not an image");
+    }
+    if (!replacing && media.length >= capacity) {
+      throw new Error(
+        capacity === 1
+          ? `A ${label} holds one card; replace it instead`
+          : `A ${label} holds ${capacity} cards`,
+      );
+    }
+  };
+
+  switch (edit.op) {
+    case "replace":
+      inRange(edit.index);
+      admits(edit.item, true);
+      media[edit.index] = edit.item;
+      return media;
+    case "append":
+      admits(edit.item, false);
+      media.push(edit.item);
+      return media;
+    case "remove":
+      inRange(edit.index);
+      media.splice(edit.index, 1);
+      return media;
+    case "move": {
+      inRange(edit.index);
+      inRange(edit.to);
+      const [moved] = media.splice(edit.index, 1);
+      media.splice(edit.to, 0, moved!);
+      return media;
+    }
+  }
+}
+
+/**
+ * Which homes a set built by count runs on, in order.
+ *
+ * The homes the client named on their Performance record come first, in the
+ * order they named them, because those are the ones they agreed to pay for.
+ * The rest of their site fills the remaining places in the site's own order.
+ * Homes with no photo cannot be a card and are skipped.
+ */
+export function orderHomesForSet<
+  Home extends { url: string; imageUrl?: string | null },
+>(listings: Home[], onRecordUrls: string[], count: number): Home[] {
+  const key = (url: string) => url.trim().toLowerCase().replace(/\/+$/, "");
+  const withPhoto = listings.filter((home) => home.imageUrl);
+  const byUrl = new Map(withPhoto.map((home) => [key(home.url), home]));
+  const picked: Home[] = [];
+  const seen = new Set<string>();
+  for (const url of onRecordUrls) {
+    const home = byUrl.get(key(url));
+    if (home && !seen.has(key(home.url))) {
+      picked.push(home);
+      seen.add(key(home.url));
+    }
+  }
+  for (const home of withPhoto) {
+    if (picked.length >= count) break;
+    if (!seen.has(key(home.url))) {
+      picked.push(home);
+      seen.add(key(home.url));
+    }
+  }
+  return picked.slice(0, count);
 }

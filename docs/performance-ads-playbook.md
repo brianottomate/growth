@@ -134,3 +134,37 @@ Neither is large. Both are out of scope for the schema PR that introduced
 - The four Away & Stay homes were already products in catalog
   `Catalog_2026_Listed_NewHomes`, and their `retailer_id`s are the monolith
   property ids — so the catalog is the wander.com-URL-to-property-id resolver.
+
+## The wall (2026-09-15)
+
+The Ads tab under a Performance brand is the set as it will run: every drafted
+ad filed under the home it is about, the portfolio and catalog ads as the slice
+at the foot, each tile a real `ad` row with no campaign yet.
+
+Two ways onto the wall, and they meet in the middle:
+
+- **Build.** From the homes picked, or from a count when none are: the homes on
+  the client's Performance record come first, their site's order fills the
+  rest, and the homes chosen become the pick. `adsWrite.buildAdSet` takes
+  `propertyIds` or `count`.
+- **By hand.** *Add ad* makes an empty ad of a declared format (static,
+  carousel, video), bound to a home or not. *Drop finished creatives* puts
+  files in the library and asks one question: one static each, or one
+  carousel. The home is read off the filename when it follows the export
+  convention (`Brand_Home_Format_…`) and matches a home on their site.
+
+The home is the unit an ad is bound to, not a gate. An ad can be made first
+and bound afterwards (*Bind a home* on the tile, `adsWrite.setAdHome`); the
+link, the house name and the tile's place on the wall follow the binding. An
+ad about no home is allowed and says so on its tile.
+
+Cards are edited on the tile: drop a file onto an empty slot, replace or
+remove a card, add one from the library (`adsWrite.editAdCards`). A static
+holds one card, a carousel two to ten and one while it is being filled.
+
+`AdCreativeContent.format` declares what an ad is. Ads drawn before the field
+existed read their shape off `media`, as the push always has (`adFormatOf`).
+
+Approved ads go to a campaign with *Attach* (`adsWrite.attachAdSet`); the push
+refuses a campaign holding an ad with no creative, so a forgotten shell cannot
+ship a set with a hole in it.

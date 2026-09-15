@@ -3,6 +3,8 @@ import { index, pgEnum, pgTable, uniqueIndex } from "drizzle-orm/pg-core";
 
 import { brandTable, personaTable } from "./brand-schema";
 import { channelPlatformEnum, channelTable } from "./channel-schema";
+import type { AdFormat } from "@/lib/performance-ads";
+
 import type { MediaItem } from "./content-schema";
 import { homeTable } from "./home-schema";
 import { launchTable } from "./launch-schema";
@@ -117,6 +119,12 @@ export type AudienceGeographyPlan = {
 
 /** Content of a `creative` ad: one image/carousel plus its copy. */
 export type AdCreativeContent = {
+  /**
+   * What the ad is, declared. Absent on ads drawn before the field existed,
+   * which read their shape off `media` (see `adFormatOf`). Declared so a
+   * shell with no cards yet still knows how many it will hold.
+   */
+  format?: AdFormat;
   headline: string;
   body: string;
   /** Falls back to the campaign's landing URL. */
@@ -124,7 +132,7 @@ export type AdCreativeContent = {
   callToAction?: string;
   /** The home the ad is about, as the onboarding list names it; the push names the ad by it. */
   propertyName?: string;
-  /** One item = static image; several = carousel, in this order. */
+  /** One item = static image; several = carousel, in this order. Empty on a shell awaiting its creative. */
   media: MediaItem[];
 };
 

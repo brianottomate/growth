@@ -25,9 +25,10 @@ import { PlatformSection } from "./PlatformSection";
 import { WorkInChatButton } from "./WorkInChatButton";
 
 /**
- * The campaign, read top to bottom as the work happens: photos, then the ads
- * made from them, who sees them, where they run, and what they are doing once
- * live. Each step shows its content when it has some and one clear way to
+ * The campaign, read top to bottom as the work happens: the ads, the photos
+ * they can draw from, who sees them, where they run, and what they are doing
+ * once live. Ads come first because the set is drawn on the brand's Ads tab
+ * and attached here; the pool is a source, not a step someone must fill. Each step shows its content when it has some and one clear way to
  * fill it when it does not, and each step can be handed to the assistant.
  *
  * Underneath it is still one plan compiled onto platforms: the platform rows
@@ -53,10 +54,12 @@ export async function CampaignView({
 
   // A read that fails is logged before it becomes a 404, so a broken query
   // never masquerades as a missing campaign.
-  const draft = await getDraftCampaign(org.id, campaignId).catch((error: unknown) => {
-    console.error("campaign page could not load", campaignId, error);
-    return null;
-  });
+  const draft = await getDraftCampaign(org.id, campaignId).catch(
+    (error: unknown) => {
+      console.error("campaign page could not load", campaignId, error);
+      return null;
+    },
+  );
   if (draft?.brand.slug !== brandSlug) notFound();
 
   const { campaign, audiences, ads, platformCampaigns, personas } = draft;
@@ -68,9 +71,10 @@ export async function CampaignView({
   // brands this would be a query that can only answer "nothing".
   const prefill =
     brand.relationship === "client"
-      ? await campaignPrefillFromIntake({ orgId: org.id }, { brandId: brand.id }).catch(
-          () => null,
-        )
+      ? await campaignPrefillFromIntake(
+          { orgId: org.id },
+          { brandId: brand.id },
+        ).catch(() => null)
       : null;
 
   const planned = [...platformCampaigns].sort((a, b) =>
@@ -84,17 +88,24 @@ export async function CampaignView({
   // Where each ad stands, from the platform rows that point back at it.
   const states: Record<string, AdState> = {};
   if (pushed.length > 0) {
-    const liveIds = new Set(pushed.filter((row) => row.status === "live").map((row) => row.id));
+    const liveIds = new Set(
+      pushed.filter((row) => row.status === "live").map((row) => row.id),
+    );
     const rows = await db.query.platformAdTable.findMany({
       where: and(
-        inArray(platformAdTable.platformCampaignId, pushed.map((row) => row.id)),
+        inArray(
+          platformAdTable.platformCampaignId,
+          pushed.map((row) => row.id),
+        ),
         isNotNull(platformAdTable.adId),
       ),
       columns: { adId: true, platformCampaignId: true },
     });
     for (const row of rows) {
       if (!row.adId) continue;
-      const state: AdState = liveIds.has(row.platformCampaignId) ? "live" : "pushed";
+      const state: AdState = liveIds.has(row.platformCampaignId)
+        ? "live"
+        : "pushed";
       if (states[row.adId] !== "live") states[row.adId] = state;
     }
   }
@@ -116,7 +127,10 @@ export async function CampaignView({
 
   const pool = campaign.creativePool ?? [];
   const homesRun = campaign.homesRun ?? null;
-  const ask = (focus: "photos" | "ads" | "audiences" | "platforms" | "live", text: string) => (
+  const ask = (
+    focus: "photos" | "ads" | "audiences" | "platforms" | "live",
+    text: string,
+  ) => (
     <AskAssistantButton
       brandId={brand.id}
       brandName={brandName}
@@ -140,14 +154,19 @@ export async function CampaignView({
             {brandName}
           </Link>
           <span>/</span>
-          <Link href={`/app/brands/${brandSlug}/ads`} className="hover:underline">
+          <Link
+            href={`/app/brands/${brandSlug}/ads`}
+            className="hover:underline"
+          >
             Ads
           </Link>
         </div>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2.5">
-              <h1 className="truncate text-xl font-semibold tracking-tight">{campaign.name}</h1>
+              <h1 className="truncate text-xl font-semibold tracking-tight">
+                {campaign.name}
+              </h1>
               <span
                 className={cn(
                   "rounded-full px-2 py-0.5 text-[11px] font-medium",
@@ -172,13 +191,17 @@ export async function CampaignView({
                   </span>
                 ))
               )}
-              {campaign.budget != null ? <span>· {money(campaign.budget)} planned</span> : null}
+              {campaign.budget != null ? (
+                <span>· {money(campaign.budget)} planned</span>
+              ) : null}
               {campaign.landingUrl ? (
                 <span className="truncate">· {campaign.landingUrl}</span>
               ) : null}
             </p>
             {campaign.description ? (
-              <p className="text-muted-foreground mt-2 max-w-2xl text-sm">{campaign.description}</p>
+              <p className="text-muted-foreground mt-2 max-w-2xl text-sm">
+                {campaign.description}
+              </p>
             ) : null}
           </div>
           <div className="flex items-center gap-2">
@@ -200,18 +223,6 @@ export async function CampaignView({
       </header>
 
       <ol className="space-y-8">
-        <Step
-          title="Photos"
-          meta={pool.length > 0 ? `${pool.length} in the pool` : undefined}
-        >
-          <CreativePool
-            campaignId={campaign.id}
-            brandId={brand.id}
-            pool={pool}
-            askAssistant={ask("photos", `Find photos for “${campaign.name}”`)}
-          />
-        </Step>
-
         <Step
           title="Ads"
           meta={
@@ -274,15 +285,38 @@ export async function CampaignView({
         </Step>
 
         <Step
+          title="Sources"
+          meta={
+            pool.length > 0
+              ? `${pool.length} photos the ads can draw from`
+              : "optional"
+          }
+        >
+          <CreativePool
+            campaignId={campaign.id}
+            brandId={brand.id}
+            pool={pool}
+            askAssistant={ask("photos", `Find photos for “${campaign.name}”`)}
+          />
+        </Step>
+
+        <Step
           title="Audiences"
-          meta={audiences.length > 0 ? `${audiences.length} ad set${audiences.length === 1 ? "" : "s"}` : "broad"}
+          meta={
+            audiences.length > 0
+              ? `${audiences.length} ad set${audiences.length === 1 ? "" : "s"}`
+              : "broad"
+          }
         >
           <Audiences
             campaignId={campaign.id}
             audiences={audiences}
             personas={personas}
             geoPrefill={prefill?.geography ?? null}
-            emptyActions={ask("audiences", `Suggest audiences for “${campaign.name}”`)}
+            emptyActions={ask(
+              "audiences",
+              `Suggest audiences for “${campaign.name}”`,
+            )}
           />
         </Step>
 
@@ -295,7 +329,10 @@ export async function CampaignView({
           }
           actions={
             planned.length > 0 ? (
-              <PlanPlatformButton campaignId={campaign.id} planned={plannedPlatforms} />
+              <PlanPlatformButton
+                campaignId={campaign.id}
+                planned={plannedPlatforms}
+              />
             ) : null
           }
         >
@@ -307,8 +344,14 @@ export async function CampaignView({
               description="Plan one to set its budget. Nothing reaches the platform until you push."
               actions={
                 <>
-                  <PlanPlatformButton campaignId={campaign.id} planned={plannedPlatforms} />
-                  {ask("platforms", `Plan the platforms for “${campaign.name}”`)}
+                  <PlanPlatformButton
+                    campaignId={campaign.id}
+                    planned={plannedPlatforms}
+                  />
+                  {ask(
+                    "platforms",
+                    `Plan the platforms for “${campaign.name}”`,
+                  )}
                 </>
               }
             />
@@ -339,13 +382,22 @@ export async function CampaignView({
               <Stat
                 label="Spend"
                 value={money(totals.spend)}
-                sub={campaign.budget != null ? `of ${money(campaign.budget)} planned` : undefined}
+                sub={
+                  campaign.budget != null
+                    ? `of ${money(campaign.budget)} planned`
+                    : undefined
+                }
               />
               <Stat
                 label="Impressions"
-                value={totals.impressions ? totals.impressions.toLocaleString() : "—"}
+                value={
+                  totals.impressions ? totals.impressions.toLocaleString() : "—"
+                }
               />
-              <Stat label="Clicks" value={totals.clicks ? totals.clicks.toLocaleString() : "—"} />
+              <Stat
+                label="Clicks"
+                value={totals.clicks ? totals.clicks.toLocaleString() : "—"}
+              />
               <Stat label="CTR" value={ctr} />
             </div>
           </Step>
@@ -372,9 +424,15 @@ function Step({
       <div className="flex flex-wrap items-end justify-between gap-2">
         <p className="text-muted-foreground text-[10.5px] font-semibold tracking-[0.09em] uppercase">
           {title}
-          {meta ? <span className="ml-1.5 font-medium normal-case tracking-normal">· {meta}</span> : null}
+          {meta ? (
+            <span className="ml-1.5 font-medium tracking-normal normal-case">
+              · {meta}
+            </span>
+          ) : null}
         </p>
-        {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
+        {actions ? (
+          <div className="flex items-center gap-2">{actions}</div>
+        ) : null}
       </div>
       {children}
     </li>
@@ -382,7 +440,15 @@ function Step({
 }
 
 /** One figure in the live strip. */
-function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function Stat({
+  label,
+  value,
+  sub,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+}) {
   return (
     <div className="bg-card rounded-xl border p-3">
       <p className="text-muted-foreground text-xs">{label}</p>

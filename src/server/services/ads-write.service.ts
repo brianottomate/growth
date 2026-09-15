@@ -1971,6 +1971,20 @@ export async function pushDraftToPlatform(
   if (ads.length === 0) {
     throw new Error("This campaign has no drafted ads — add ads first");
   }
+  // A shell is an ad someone meant to fill and did not. Sending the rest
+  // around it would ship a set with a hole nobody chose.
+  const shells = ads.filter(
+    (ad) =>
+      ad.type === "creative" &&
+      ((ad.content as AdCreativeContent).media?.length ?? 0) === 0,
+  );
+  if (shells.length > 0) {
+    throw new Error(
+      `${shells.length} ad${shells.length === 1 ? " has" : "s have"} no creative yet: ${shells
+        .map((ad) => ad.name)
+        .join(", ")}. Add the cards or delete the shells before pushing.`,
+    );
+  }
 
   const startDate = (draft.startAt ?? campaign.startAt)?.toISOString();
   const endDate = (draft.endAt ?? campaign.endAt)?.toISOString();

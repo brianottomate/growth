@@ -38,7 +38,6 @@ import {
   attachPlatformCampaign,
   createDraftCampaign,
   deleteAudience,
-  deleteDraftAd,
   deleteDraftCampaign,
   getDraftCampaign,
   importPlatformAdCreative,
@@ -60,10 +59,17 @@ import { campaignDraftName } from "@/lib/performance-ads";
 import { db } from "@/server/db";
 import { brandTable, type MediaItem } from "@/server/db/schema";
 import {
+  addAdShell,
+  attachAdSet,
   buildAdSet,
+  createAdsFromAssets,
+  deleteAd,
+  editAdCards,
   setAdCopy,
+  setAdHome,
   setAdStatus,
 } from "@/server/services/ad-set.service";
+import { HAND_MADE_AD_FORMATS, MAX_SET_HOMES } from "@/lib/performance-ads";
 
 import { growthAction } from "./types";
 
@@ -1117,10 +1123,10 @@ export const deleteAudienceAction = growthAction({
 
 export const deleteAdDraftAction = growthAction({
   description:
-    "Delete a drafted ad. Local only — the platform ads it compiled to keep running and keep their history.",
+    "Delete a drafted ad, whether it sits on the brand's set or in a campaign. Local only — the platform ads it compiled to keep running and keep their history.",
   inputSchema: z.object({ adId: z.string().trim().min(1) }),
   execute: async (input, ctx) =>
-    deleteDraftAd({ ...input, organizationId: ctx.orgId }),
+    deleteAd({ adId: input.adId, orgId: ctx.orgId }),
 });
 
 export const pushDraftAction = growthAction({
@@ -1175,20 +1181,133 @@ export const deletePlatformCampaignAction = growthAction({
 
 export const buildAdSetAction = growthAction({
   description:
-    "Draw a Performance client's whole ad set from the homes given: a static and a carousel per home, then BOTH a portfolio carousel and a catalog ad, which is the house plan and is not negotiable. Writes the captions in one pass from each home's own amenities and description, walks each home's carousel through its real room photos, and lands every ad as a draft against the brand with no campaign. Rebuilding replaces the last set and leaves anything already approved alone. propertyIds are WanderOS listing ids in the order the portfolio carousel should run.",
-  inputSchema: z.object({
-    brandId: z.string().min(1),
-    propertyIds: z.array(z.string().min(1)).min(1).max(10),
-  }),
+    "Draw a Performance client's whole ad set: a static and a carousel per home, then BOTH a portfolio carousel and a catalog ad, which is the house plan and is not negotiable. Name the homes (propertyIds, WanderOS listing ids in portfolio order) or name a count ('build me five statics and five carousels' is count 5): the homes on the client's Performance record come first and their site's own order fills the rest, and the result says which were chosen. Writes the captions in one pass from each home's own amenities and description, walks each home's carousel through its real room photos, and lands every ad as a draft against the brand with no campaign. Rebuilding replaces the last set and leaves anything already approved alone. Bind or swap a home afterwards with setAdHome.",
+  inputSchema: z
+    .object({
+      brandId: z.string().min(1),
+      propertyIds: z.array(z.string().min(1)).max(MAX_SET_HOMES).optional(),
+      count: z
+        .number()
+        .int()
+        .min(1)
+        .max(MAX_SET_HOMES)
+        .optional()
+        .describe(
+          "How many homes to choose when none are named; 3 to 10 is the product, 5 the default.",
+        ),
+    })
+    .refine((value) => !(value.propertyIds?.length && value.count), {
+      message: "Name the homes or a count, not both.",
+    }),
+  examples: [
+    { brandId: "brand_01", count: 5 },
+    { brandId: "brand_01", propertyIds: ["1234567890123", "1234567890124"] },
+  ],
   execute: async (input, ctx) => {
     const result = await buildAdSet({
       brandId: input.brandId,
       orgId: ctx.orgId,
       propertyIds: input.propertyIds,
+      count: input.count,
       userId: ctx.userId,
     });
     return { ok: true as const, ...result };
   },
+});
+
+export const addAdShellAction = growthAction({
+  description:
+    "Add one empty ad of a declared format (static, carousel or video) to a brand's drafted set, optionally bound to one of their homes by WanderOS listing id. The creative comes afterwards with editAdCards, by upload into the library or from it. Use this when the operator wants the ads to exist first and fill them in, or wants an ad the build does not make.",
+  inputSchema: z.object({
+    brandId: z.string().min(1),
+    format: z.enum(HAND_MADE_AD_FORMATS),
+    propertyId: z
+      .string()
+      .min(1)
+      .optional()
+      .describe("WanderOS listing id; omit for a brand ad about no home."),
+    name: z
+      .string()
+      .trim()
+      .max(300)
+      .optional()
+      .describe("Omit for the house name."),
+  }),
+  examples: [
+    { brandId: "brand_01", format: "static", propertyId: "1234567890123" },
+  ],
+  execute: (input, ctx) => addAdShell({ ...input, orgId: ctx.orgId }),
+});
+
+export const createAdsFromAssetsAction = growthAction({
+  description:
+    "Turn finished creatives already in the media library into drafted ads in one go: 'statics' makes one static per asset, 'carousel' makes one carousel of them all in the order given (2 to 10). The home each ad is about is read off the filename when it follows the export convention (Brand_Home_Format_...) and matches a home on their site; pass propertyId to bind them all to one home instead. Files that name no home make ads that wait to be bound.",
+  inputSchema: z.object({
+    brandId: z.string().min(1),
+    mediaAssetIds: z.array(z.string().min(1)).min(1).max(50),
+    as: z.enum(["statics", "carousel"]),
+    propertyId: z.string().min(1).optional(),
+  }),
+  examples: [
+    {
+      brandId: "brand_01",
+      mediaAssetIds: ["media_01", "media_02"],
+      as: "statics",
+    },
+  ],
+  execute: (input, ctx) => createAdsFromAssets({ ...input, orgId: ctx.orgId }),
+});
+
+export const setAdHomeAction = growthAction({
+  description:
+    "Bind a drafted ad to one of the client's homes (WanderOS listing id), or unbind it with null. The link moves to that home's page unless someone typed one by hand, a name in the house convention follows the home, and the wall files the ad under it. This is how an ad is retrofitted onto a different home.",
+  inputSchema: z.object({
+    adId: z.string().min(1),
+    propertyId: z.string().min(1).nullable(),
+  }),
+  examples: [{ adId: "ad_01", propertyId: "1234567890123" }],
+  execute: (input, ctx) => setAdHome({ ...input, orgId: ctx.orgId }),
+});
+
+export const editAdCardsAction = growthAction({
+  description:
+    "One change to a drafted ad's cards, with a library asset: replace the card at an index, append a card, remove one, or move one. A static holds one card, a carousel two to ten (one while it is being filled), a video ad one clip. Works on ads in the brand's set and on ads in a campaign that has not been pushed.",
+  inputSchema: z.object({
+    adId: z.string().min(1),
+    edit: z.discriminatedUnion("op", [
+      z.object({
+        op: z.literal("replace"),
+        index: z.number().int().min(0).max(9),
+        mediaAssetId: z.string().min(1),
+      }),
+      z.object({ op: z.literal("append"), mediaAssetId: z.string().min(1) }),
+      z.object({
+        op: z.literal("remove"),
+        index: z.number().int().min(0).max(9),
+      }),
+      z.object({
+        op: z.literal("move"),
+        index: z.number().int().min(0).max(9),
+        to: z.number().int().min(0).max(9),
+      }),
+    ]),
+  }),
+  examples: [
+    { adId: "ad_01", edit: { op: "append", mediaAssetId: "media_01" } },
+  ],
+  execute: (input, ctx) => editAdCards({ ...input, orgId: ctx.orgId }),
+});
+
+export const attachAdSetAction = growthAction({
+  description:
+    "Put the brand's approved drafted ads, or the ones named, into a campaign so the push can send them. Refuses an ad with no creative. Local only; nothing reaches a platform until adsWrite.push.",
+  inputSchema: z.object({
+    brandId: z.string().min(1),
+    campaignId: z.string().min(1),
+    adIds: z.array(z.string().min(1)).max(100).optional(),
+  }),
+  examples: [{ brandId: "brand_01", campaignId: "camp_01" }],
+  execute: (input, ctx) => attachAdSet({ ...input, orgId: ctx.orgId }),
 });
 
 export const setAdStatusAction = growthAction({

@@ -2,18 +2,38 @@ import "server-only";
 
 import { and, eq, inArray, isNull } from "drizzle-orm";
 
-import { adTable, brandTable } from "@/server/db/schema";
+import {
+  adTable,
+  brandTable,
+  campaignTable,
+  mediaAssetTable,
+  performanceAccountTable,
+  performancePropertyTable,
+} from "@/server/db/schema";
 import type { AdCreativeContent } from "@/server/db/ads-schema";
 import type { MediaItem } from "@/server/db/content-schema";
 import { db } from "@/server/db";
 import {
+  adFormatOf,
+  applyCardEdit,
   buildPerformanceAdPlan,
+  homeNameFromFilename,
+  MAX_SET_HOMES,
+  orderHomesForSet,
+  performanceAdName,
+  performanceFormatFor,
   PERFORMANCE_AD_DEFAULTS,
+  type AdFormat,
+  type CardEdit,
 } from "@/lib/performance-ads";
 import { homeCatalogPreviewUrl } from "@/lib/home-ad-previews";
-import { fetchWanderOsListingDetail } from "@/server/clients/wanderos-site.client";
+import {
+  fetchWanderOsListingDetail,
+  type WanderOsListing,
+} from "@/server/clients/wanderos-site.client";
 
 import { writeAdSetCopy, type CopyHome } from "./ad-set-copy.service";
+import { deleteDraftAd } from "./ads-draft.service";
 import { ensureHome } from "./homes.service";
 import { brandListings, brandWebsiteId } from "./wanderos-listings.service";
 
@@ -28,9 +48,16 @@ import { brandListings, brandWebsiteId } from "./wanderos-listings.service";
 // Every ad lands as a row with no campaign. That is the point: the set is
 // reviewed and adjusted against the brand, and attached to the month it runs
 // in only once someone is happy with it.
+//
+// The home is the unit an ad is bound to, not the input someone must pick
+// first. A set can be asked for by naming the homes or by naming a count, and
+// an ad made by hand can be bound to a home afterwards; either way the static,
+// the carousel and the catalog slot for that home follow from the binding.
 
 /** How many photos of one home its own carousel walks through. */
 const HOME_CAROUSEL_CARDS = 6;
+/** Three to ten homes is the product; five is the middle of it. */
+const DEFAULT_SET_SIZE = 5;
 
 export class AdSetError extends Error {
   constructor(
@@ -49,44 +76,232 @@ export type BuiltAd = {
   cards: number;
 };
 
-/**
- * Draw the whole set for a brand from the homes given, words and all.
- *
- * One model call writes every caption together so the homes do not repeat
- * each other. Cards are composition URLs rather than frozen files: they
- * redraw when a template improves, and nothing is committed to bytes until
- * the set is approved or pushed.
- */
-export async function buildAdSet(input: {
+const KIND_FORMAT: Record<BuiltAd["kind"], AdFormat> = {
+  static: "static",
+  carousel: "carousel",
+  all_properties_carousel: "portfolio",
+  catalog: "catalog",
+};
+
+type OwnedBrand = {
+  id: string;
+  name: string;
+  website: string | null;
+  relationship: string | null;
+};
+
+async function requireOwnedBrand(input: {
   brandId: string;
   orgId: string;
-  /** WanderOS listing ids, in the order the portfolio carousel should run. */
-  propertyIds: string[];
-  userId?: string | null;
-}): Promise<{ brandId: string; ads: BuiltAd[]; replaced: number }> {
-  if (input.propertyIds.length === 0) {
-    throw new AdSetError(422, "An ad set needs at least one home");
-  }
+}): Promise<OwnedBrand> {
   const brand = await db.query.brandTable.findFirst({
     where: and(
       eq(brandTable.id, input.brandId),
       eq(brandTable.organizationId, input.orgId),
       isNull(brandTable.deletedAt),
     ),
-    columns: { id: true, name: true, website: true },
+    columns: { id: true, name: true, website: true, relationship: true },
   });
   if (!brand) throw new AdSetError(404, "Brand not found");
+  return brand;
+}
 
+/** An ad with its brand, or 404 when it is not this organization's. */
+async function requireOwnedAd(input: { adId: string; orgId: string }) {
+  const ad = await db.query.adTable.findFirst({
+    where: eq(adTable.id, input.adId),
+    with: {
+      brand: {
+        columns: {
+          id: true,
+          name: true,
+          website: true,
+          relationship: true,
+          organizationId: true,
+        },
+      },
+    },
+  });
+  if (!ad || ad.brand?.organizationId !== input.orgId) {
+    throw new AdSetError(404, "Ad not found");
+  }
+  return ad;
+}
+
+function creativeContent(ad: { content: unknown }): AdCreativeContent {
+  const content = ad.content as AdCreativeContent;
+  if (!("media" in content) || !Array.isArray(content.media)) {
+    throw new AdSetError(422, "That ad is a text ad and has no cards");
+  }
+  return content;
+}
+
+/**
+ * The homes the client named on their Performance record, by listing URL and
+ * in their order. Empty for a brand with no account, or one that asked for
+ * every home.
+ */
+async function onRecordHomeUrls(brandId: string): Promise<string[]> {
+  const account = await db.query.performanceAccountTable.findFirst({
+    where: and(
+      eq(performanceAccountTable.brandId, brandId),
+      isNull(performanceAccountTable.deletedAt),
+    ),
+    columns: { id: true },
+  });
+  if (!account) return [];
+  const rows = await db.query.performancePropertyTable.findMany({
+    where: and(
+      eq(performancePropertyTable.accountId, account.id),
+      isNull(performancePropertyTable.deletedAt),
+    ),
+    columns: { siteUrl: true },
+    orderBy: (t, { asc }) => asc(t.createdAt),
+  });
+  return rows.flatMap((row) => (row.siteUrl ? [row.siteUrl] : []));
+}
+
+/** The listing behind a WanderOS id, or 422 when it is not on their site. */
+async function listingFor(brand: OwnedBrand, propertyId: string) {
   const listings = await brandListings({
     id: brand.id,
     website: brand.website,
   });
-  const chosen = input.propertyIds.flatMap((id) => {
-    const listing = listings.find((row) => row.id === id);
-    return listing ? [listing] : [];
+  const listing = listings.find((row) => row.id === propertyId);
+  if (!listing) throw new AdSetError(422, "That home is not on their site");
+  return listing;
+}
+
+/** The library asset as a card, or 422 when it is not this brand's to use. */
+async function cardFromAsset(brandId: string, mediaAssetId: string) {
+  const asset = await db.query.mediaAssetTable.findFirst({
+    where: and(
+      eq(mediaAssetTable.id, mediaAssetId),
+      eq(mediaAssetTable.brandId, brandId),
+      eq(mediaAssetTable.status, "ready"),
+      isNull(mediaAssetTable.deletedAt),
+    ),
+    columns: {
+      id: true,
+      url: true,
+      thumbnailUrl: true,
+      width: true,
+      height: true,
+      kind: true,
+      filename: true,
+      title: true,
+      metadata: true,
+    },
   });
-  if (chosen.length === 0) {
-    throw new AdSetError(422, "None of those homes are on their site");
+  if (!asset?.url) {
+    throw new AdSetError(
+      422,
+      "That library asset is not available for this brand",
+    );
+  }
+  const derivedFrom =
+    (
+      asset.metadata as {
+        composition?: { sourceMediaAssetId?: string | null };
+      } | null
+    )?.composition?.sourceMediaAssetId ?? undefined;
+  const item: MediaItem = {
+    url: asset.url,
+    type: asset.kind === "video" ? "video" : "image",
+    assetId: asset.id,
+    ...(asset.thumbnailUrl ? { thumbnail: asset.thumbnailUrl } : {}),
+    ...(asset.width && asset.height
+      ? { width: asset.width, height: asset.height }
+      : {}),
+    ...(derivedFrom ? { derivedFrom } : {}),
+  };
+  return { item, name: asset.title ?? asset.filename ?? null };
+}
+
+/** The house name for one ad, from its format and the home it is about. */
+function adName(
+  brand: OwnedBrand,
+  format: AdFormat,
+  propertyName: string | null,
+) {
+  return performanceAdName({
+    customer: brand.name,
+    isClient: brand.relationship === "client",
+    format: performanceFormatFor(format),
+    propertyName: propertyName ?? brand.name,
+  });
+}
+
+/**
+ * Draw the whole set for a brand, words and all.
+ *
+ * Asked for by naming the homes (`propertyIds`, in portfolio order) or by
+ * naming a count, in which case the homes on the client's record come first
+ * and their site's own order fills the rest. One model call writes every
+ * caption together so the homes do not repeat each other. Cards are
+ * composition URLs rather than frozen files: they redraw when a template
+ * improves, and nothing is committed to bytes until the set is approved or
+ * pushed.
+ */
+export async function buildAdSet(input: {
+  brandId: string;
+  orgId: string;
+  /** WanderOS listing ids, in the order the portfolio carousel should run. */
+  propertyIds?: string[];
+  /** How many homes to choose when none are named. */
+  count?: number;
+  userId?: string | null;
+}): Promise<{
+  brandId: string;
+  ads: BuiltAd[];
+  replaced: number;
+  /** The homes the set was drawn from, in order. */
+  homes: { id: string; name: string; url: string }[];
+  /** How the homes were chosen, for the operator to read. */
+  note: string | null;
+}> {
+  const brand = await requireOwnedBrand(input);
+  const listings = await brandListings({
+    id: brand.id,
+    website: brand.website,
+  });
+
+  let chosen: WanderOsListing[];
+  let note: string | null = null;
+  if (input.propertyIds?.length) {
+    chosen = input.propertyIds.flatMap((id) => {
+      const listing = listings.find((row) => row.id === id);
+      return listing ? [listing] : [];
+    });
+    if (chosen.length === 0) {
+      throw new AdSetError(422, "None of those homes are on their site");
+    }
+  } else {
+    const count = Math.min(
+      Math.max(input.count ?? DEFAULT_SET_SIZE, 1),
+      MAX_SET_HOMES,
+    );
+    const onRecord = await onRecordHomeUrls(brand.id);
+    chosen = orderHomesForSet(listings, onRecord, count);
+    if (chosen.length === 0) {
+      throw new AdSetError(
+        422,
+        listings.length === 0
+          ? "No homes on their site to draw from"
+          : "None of their homes have a photo to draw on",
+      );
+    }
+    const fromRecord = chosen.filter((home) =>
+      onRecord.some(
+        (url) =>
+          url.trim().toLowerCase().replace(/\/+$/, "") ===
+          home.url.trim().toLowerCase().replace(/\/+$/, ""),
+      ),
+    ).length;
+    note =
+      fromRecord > 0
+        ? `${fromRecord} of ${chosen.length} homes are the ones on their Performance record; the rest follow their site's order.`
+        : `Chose the first ${chosen.length} homes with a photo in their site's own order.`;
   }
 
   // The detail endpoint is what carries amenities and the full gallery; the
@@ -179,10 +394,12 @@ export async function buildAdSet(input: {
     const index = item.propertyIndex;
     const home = index != null ? usable[index] : null;
     const homeCopy = index != null ? copy.homes[index] : null;
+    const format = KIND_FORMAT[item.kind];
 
     let content: AdCreativeContent;
     if (item.kind === "static" && home && homeCopy) {
       content = {
+        format,
         headline: homeCopy.headline,
         body: homeCopy.primaryText,
         linkUrl: home.listing.url,
@@ -195,6 +412,7 @@ export async function buildAdSet(input: {
       // shape a listing carousel takes and which needs the full gallery.
       const photos = home.photos.slice(0, HOME_CAROUSEL_CARDS);
       content = {
+        format,
         headline: homeCopy.headline,
         body: homeCopy.primaryText,
         linkUrl: home.listing.url,
@@ -206,6 +424,7 @@ export async function buildAdSet(input: {
       };
     } else if (item.kind === "all_properties_carousel") {
       content = {
+        format,
         headline: copy.portfolioHeadline,
         body: copy.portfolioPrimaryText,
         callToAction: PERFORMANCE_AD_DEFAULTS.callToAction,
@@ -217,6 +436,7 @@ export async function buildAdSet(input: {
       // The catalog ad's cards are Meta's to render from the product set; the
       // set's own cards stand in so the review shows what it will look like.
       content = {
+        format,
         headline: copy.catalogHeadline,
         body: copy.catalogPrimaryText,
         callToAction: PERFORMANCE_AD_DEFAULTS.callToAction,
@@ -248,25 +468,352 @@ export async function buildAdSet(input: {
     });
   }
 
-  return { brandId: brand.id, ads: built, replaced: replaceable.length };
+  return {
+    brandId: brand.id,
+    ads: built,
+    replaced: replaceable.length,
+    homes: usable.map(({ home }) => ({
+      id: home.externalId,
+      name: home.name,
+      url: home.url,
+    })),
+    note,
+  };
 }
 
 /** The brand's drafted set, newest build first. */
 export async function listAdSet(input: { brandId: string; orgId: string }) {
-  const brand = await db.query.brandTable.findFirst({
-    where: and(
-      eq(brandTable.id, input.brandId),
-      eq(brandTable.organizationId, input.orgId),
-      isNull(brandTable.deletedAt),
-    ),
-    columns: { id: true },
-  });
-  if (!brand) throw new AdSetError(404, "Brand not found");
+  const brand = await requireOwnedBrand(input);
   return db.query.adTable.findMany({
     where: and(eq(adTable.brandId, brand.id), isNull(adTable.campaignId)),
     orderBy: (t, { asc }) => asc(t.createdAt),
-    with: { home: { columns: { id: true, name: true, externalId: true } } },
+    with: {
+      home: { columns: { id: true, name: true, externalId: true, url: true } },
+    },
   });
+}
+
+/**
+ * An ad with no cards yet: the format is decided, the creative comes later,
+ * by upload or from the library, one card at a time. Bound to a home when one
+ * is named, which gives it its link, its name and its place on the wall.
+ */
+export async function addAdShell(input: {
+  brandId: string;
+  orgId: string;
+  format: Extract<AdFormat, "static" | "carousel" | "catalog" | "video">;
+  propertyId?: string | null;
+  name?: string | null;
+}) {
+  const brand = await requireOwnedBrand(input);
+  const listing = input.propertyId
+    ? await listingFor(brand, input.propertyId)
+    : null;
+  const home = listing
+    ? await ensureHome({ brandId: brand.id, listing })
+    : null;
+  const content: AdCreativeContent = {
+    format: input.format,
+    headline: listing?.name ?? brand.name,
+    body: "",
+    ...(listing ? { linkUrl: listing.url, propertyName: listing.name } : {}),
+    callToAction: PERFORMANCE_AD_DEFAULTS.callToAction,
+    media: [],
+  };
+  const [row] = await db
+    .insert(adTable)
+    .values({
+      brandId: brand.id,
+      campaignId: null,
+      homeId: home?.id ?? null,
+      name:
+        input.name?.trim() ||
+        adName(brand, input.format, listing?.name ?? null),
+      type: "creative",
+      status: "drawn",
+      content,
+    })
+    .returning({ id: adTable.id, name: adTable.name });
+  return { adId: row!.id, name: row!.name, homeName: listing?.name ?? null };
+}
+
+/**
+ * Finished creatives, already in the library, made into ads in one go: one
+ * static per file, or one carousel of them all in the order given.
+ *
+ * The home each ad is about is read off the filename when it follows the
+ * export convention and matches a home on their site; a file that names no
+ * home makes an ad that waits to be bound, rather than one bound to a guess.
+ */
+export async function createAdsFromAssets(input: {
+  brandId: string;
+  orgId: string;
+  mediaAssetIds: string[];
+  as: "statics" | "carousel";
+  /** Bind every ad made here to this home instead of reading the filenames. */
+  propertyId?: string | null;
+}) {
+  const brand = await requireOwnedBrand(input);
+  if (input.mediaAssetIds.length === 0) {
+    throw new AdSetError(422, "Pick at least one file");
+  }
+  if (input.as === "carousel" && input.mediaAssetIds.length > 10) {
+    throw new AdSetError(422, "A carousel holds ten cards");
+  }
+  const cards = [];
+  for (const id of input.mediaAssetIds) {
+    cards.push(await cardFromAsset(brand.id, id));
+  }
+  const listings = await brandListings({
+    id: brand.id,
+    website: brand.website,
+  });
+  const byName = new Map(
+    listings.map((row) => [row.name.trim().toLowerCase(), row] as const),
+  );
+  const pinned = input.propertyId
+    ? (listings.find((row) => row.id === input.propertyId) ?? null)
+    : null;
+  if (input.propertyId && !pinned) {
+    throw new AdSetError(422, "That home is not on their site");
+  }
+  // The home a file names, as a listing when their site has it, else as a
+  // name alone: a brand off WanderOS still gets its ads filed under the home
+  // the filename says, and a file that names none falls back to its own stem
+  // so five uploads are not five ads with one name.
+  const homeFor = (filename: string | null) => {
+    if (pinned) return { listing: pinned, label: pinned.name };
+    const guess = filename ? homeNameFromFilename(filename) : null;
+    const listing = guess
+      ? (byName.get(guess.trim().toLowerCase()) ?? null)
+      : null;
+    const stem = filename?.replace(/\.[a-z0-9]+$/i, "").trim() || null;
+    return { listing, label: listing?.name ?? guess ?? stem };
+  };
+
+  const groups =
+    input.as === "statics"
+      ? cards.map((card) => ({ format: "static" as const, cards: [card] }))
+      : [{ format: "carousel" as const, cards }];
+
+  const created: { adId: string; name: string; homeName: string | null }[] = [];
+  for (const group of groups) {
+    const { listing, label } = homeFor(group.cards[0]?.name ?? null);
+    const home = listing
+      ? await ensureHome({ brandId: brand.id, listing })
+      : null;
+    // A video is its own format; a still in the same batch stays what it was.
+    const format =
+      group.cards.length === 1 && group.cards[0]!.item.type === "video"
+        ? ("video" as const)
+        : group.format;
+    const guessedHome = !listing && label && label !== group.cards[0]?.name;
+    const content: AdCreativeContent = {
+      format,
+      headline: label ?? brand.name,
+      body: "",
+      ...(listing ? { linkUrl: listing.url, propertyName: listing.name } : {}),
+      // A home named by the file but not on any feed we can read still files
+      // the ad under that name on the wall.
+      ...(guessedHome ? { propertyName: label } : {}),
+      callToAction: PERFORMANCE_AD_DEFAULTS.callToAction,
+      media: group.cards.map((card) => card.item),
+    };
+    const [row] = await db
+      .insert(adTable)
+      .values({
+        brandId: brand.id,
+        campaignId: null,
+        homeId: home?.id ?? null,
+        name: adName(brand, format, label),
+        type: "creative",
+        status: "drawn",
+        content,
+      })
+      .returning({ id: adTable.id, name: adTable.name });
+    created.push({
+      adId: row!.id,
+      name: row!.name,
+      homeName: listing?.name ?? (guessedHome ? label : null),
+    });
+  }
+  return { brandId: brand.id, ads: created };
+}
+
+/**
+ * Bind an ad to a home, or unbind it.
+ *
+ * The binding is what the rest follows from: the link goes to that home's
+ * page, the name carries the home, and the wall files the ad under it. A
+ * link someone typed by hand is kept; one that pointed at the previous home
+ * moves with the binding.
+ */
+export async function setAdHome(input: {
+  adId: string;
+  orgId: string;
+  propertyId: string | null;
+}) {
+  const ad = await requireOwnedAd(input);
+  const content = creativeContent(ad);
+  const brand = ad.brand;
+  const listing = input.propertyId
+    ? await listingFor(brand, input.propertyId)
+    : null;
+  const home = listing
+    ? await ensureHome({ brandId: brand.id, listing })
+    : null;
+
+  const previousHome = ad.homeId
+    ? await db.query.homeTable.findFirst({
+        where: (t, { eq }) => eq(t.id, ad.homeId!),
+        columns: { url: true },
+      })
+    : null;
+  const linkWasHome = !content.linkUrl || content.linkUrl === previousHome?.url;
+  const format = adFormatOf(content);
+  const next: AdCreativeContent = { ...content };
+  if (listing) next.propertyName = listing.name;
+  else delete next.propertyName;
+  if (linkWasHome) {
+    if (listing) next.linkUrl = listing.url;
+    else delete next.linkUrl;
+  }
+  // A name in the convention follows the home; a hand-typed one is kept.
+  const name = ad.name.startsWith("META_")
+    ? adName(brand, format, listing?.name ?? null)
+    : ad.name;
+
+  await db
+    .update(adTable)
+    .set({ homeId: home?.id ?? null, name, content: next })
+    .where(eq(adTable.id, ad.id));
+  return { adId: ad.id, name, homeName: listing?.name ?? null };
+}
+
+/**
+ * One change to an ad's cards: a library asset into a slot, onto the end,
+ * or a card out or moved. Uploads reach here as library assets, so nothing
+ * an ad shows is ever outside the library.
+ */
+export async function editAdCards(input: {
+  adId: string;
+  orgId: string;
+  edit:
+    | { op: "replace"; index: number; mediaAssetId: string }
+    | { op: "append"; mediaAssetId: string }
+    | { op: "remove"; index: number }
+    | { op: "move"; index: number; to: number };
+}) {
+  const ad = await requireOwnedAd(input);
+  const content = creativeContent(ad);
+  const brand = ad.brand;
+  let edit: CardEdit<MediaItem>;
+  switch (input.edit.op) {
+    case "replace":
+      edit = {
+        op: "replace",
+        index: input.edit.index,
+        item: (await cardFromAsset(brand.id, input.edit.mediaAssetId)).item,
+      };
+      break;
+    case "append":
+      edit = {
+        op: "append",
+        item: (await cardFromAsset(brand.id, input.edit.mediaAssetId)).item,
+      };
+      break;
+    default:
+      edit = input.edit;
+  }
+  let media: MediaItem[];
+  try {
+    media = applyCardEdit(content, edit);
+  } catch (error) {
+    throw new AdSetError(
+      422,
+      error instanceof Error ? error.message : "That change is not allowed",
+    );
+  }
+  await db
+    .update(adTable)
+    .set({ content: { ...content, media } })
+    .where(eq(adTable.id, ad.id));
+  return { adId: ad.id, cards: media.length };
+}
+
+/**
+ * Put drafted ads into a campaign: the named ones, or every approved draft
+ * of the brand. This is the one field that turns a reviewed set into
+ * something the push can send.
+ */
+export async function attachAdSet(input: {
+  brandId: string;
+  orgId: string;
+  campaignId: string;
+  adIds?: string[];
+}) {
+  const brand = await requireOwnedBrand(input);
+  const campaign = await db.query.campaignTable.findFirst({
+    where: and(
+      eq(campaignTable.id, input.campaignId),
+      eq(campaignTable.brandId, brand.id),
+      isNull(campaignTable.deletedAt),
+    ),
+    columns: { id: true, name: true },
+  });
+  if (!campaign) throw new AdSetError(404, "Campaign not found on this brand");
+  const drafts = await db.query.adTable.findMany({
+    where: and(eq(adTable.brandId, brand.id), isNull(adTable.campaignId)),
+    columns: { id: true, status: true, content: true, name: true },
+  });
+  const wanted = input.adIds?.length
+    ? drafts.filter((ad) => input.adIds!.includes(ad.id))
+    : drafts.filter((ad) => ad.status === "approved");
+  if (wanted.length === 0) {
+    throw new AdSetError(
+      422,
+      input.adIds?.length
+        ? "None of those ads are drafts on this brand"
+        : "No approved drafts to attach. Approve the ads that should run first.",
+    );
+  }
+  const empty = wanted.filter(
+    (ad) =>
+      "media" in (ad.content as object) &&
+      (ad.content as AdCreativeContent).media.length === 0,
+  );
+  if (empty.length > 0) {
+    throw new AdSetError(
+      422,
+      `${empty.length} ad${empty.length === 1 ? " has" : "s have"} no creative yet: ${empty
+        .map((ad) => ad.name)
+        .join(", ")}`,
+    );
+  }
+  await db
+    .update(adTable)
+    .set({ campaignId: campaign.id })
+    .where(
+      inArray(
+        adTable.id,
+        wanted.map((ad) => ad.id),
+      ),
+    );
+  return {
+    campaignId: campaign.id,
+    campaignName: campaign.name,
+    attached: wanted.length,
+  };
+}
+
+/** Remove one ad: a draft outright, a campaign ad through its own guard. */
+export async function deleteAd(input: { adId: string; orgId: string }) {
+  const ad = await requireOwnedAd(input);
+  if (ad.campaignId) {
+    return deleteDraftAd({ adId: ad.id, organizationId: input.orgId });
+  }
+  await db.delete(adTable).where(eq(adTable.id, ad.id));
+  return { deleted: true };
 }
 
 /** Approve one ad, or put it back. Approved is what survives a rebuild. */
@@ -275,14 +822,7 @@ export async function setAdStatus(input: {
   orgId: string;
   status: "drawn" | "approved";
 }) {
-  const ad = await db.query.adTable.findFirst({
-    where: eq(adTable.id, input.adId),
-    columns: { id: true, brandId: true },
-    with: { brand: { columns: { organizationId: true } } },
-  });
-  if (!ad || ad.brand?.organizationId !== input.orgId) {
-    throw new AdSetError(404, "Ad not found");
-  }
+  const ad = await requireOwnedAd(input);
   await db
     .update(adTable)
     .set({ status: input.status })
@@ -297,17 +837,8 @@ export async function setAdCopy(input: {
   headline?: string;
   body?: string;
 }) {
-  const ad = await db.query.adTable.findFirst({
-    where: eq(adTable.id, input.adId),
-    columns: { id: true, content: true },
-    with: { brand: { columns: { organizationId: true } } },
-  });
-  if (!ad || ad.brand?.organizationId !== input.orgId) {
-    throw new AdSetError(404, "Ad not found");
-  }
-  const content = ad.content;
-  if (!("media" in content))
-    throw new AdSetError(422, "That ad has no creative copy");
+  const ad = await requireOwnedAd(input);
+  const content = creativeContent(ad);
   await db
     .update(adTable)
     .set({

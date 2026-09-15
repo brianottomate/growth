@@ -6,18 +6,19 @@ import { listAdSet } from "@/server/services/ad-set.service";
 
 import { brandAvatarUrl, loadPerformanceBrand } from "../_data";
 
-import { MAX_SET_HOMES } from "@/lib/performance-ads";
+import { adFormatOf, MAX_SET_HOMES } from "@/lib/performance-ads";
 
 import { AdPreviewsWorkspace, type WorkspaceHome } from "./AdPreviewsWorkspace";
+import type { WallAd } from "./AdWall";
 
 export const metadata: Metadata = { title: "Ads · Wander Performance" };
 export const dynamic = "force-dynamic";
 
 /**
- * The client's ad draft space: a pick of homes from their WanderOS catalog and
- * the ads that pick would make. The pick is carried in `?homes=` so a link
- * opens on the same set, and otherwise reflects what the drafted set was
- * built from.
+ * The client's ad wall: every drafted ad, filed under the home it is about,
+ * with the portfolio and catalog ads as a slice at the foot. A set can be
+ * drawn from a pick of homes (carried in `?homes=` so a link opens on it) or
+ * from a count, and any ad can be made by hand and filled by upload.
  */
 export default async function PerformanceBrandAdsPage({
   params,
@@ -27,7 +28,8 @@ export default async function PerformanceBrandAdsPage({
   searchParams: Promise<{ homes?: string }>;
 }) {
   const [{ brandSlug }, query] = await Promise.all([params, searchParams]);
-  const { session, org, brand } = await loadPerformanceBrand(brandSlug);
+  const { session, org, brand, deskBrand } =
+    await loadPerformanceBrand(brandSlug);
   if (!session) redirect("/signin");
   if (!org)
     return <div className="text-muted-foreground">No organization found.</div>;
@@ -38,9 +40,9 @@ export default async function PerformanceBrandAdsPage({
     brandAvatarUrl(brand),
     listAdSet({ brandId: brand.id, orgId: org.id }),
   ]);
-  // The mock needs the words and the cards; everything else about an ad row
-  // is either derivable or not the reviewer's business.
-  const ads = drafted.flatMap((ad) => {
+  // The wall needs the words, the cards and the home; everything else about
+  // an ad row is either derivable or not the reviewer's business.
+  const ads: WallAd[] = drafted.flatMap((ad) => {
     const content = ad.content;
     if (!("media" in content)) return [];
     return [
@@ -48,15 +50,21 @@ export default async function PerformanceBrandAdsPage({
         id: ad.id,
         name: ad.name,
         // `kept` is a retired middle state; anything not approved is a draft.
-        status: ad.status === "approved" ? ("approved" as const) : ("drawn" as const),
+        status:
+          ad.status === "approved" ? ("approved" as const) : ("drawn" as const),
+        format: adFormatOf(content),
         headline: content.headline,
         body: content.body,
         callToAction: content.callToAction ?? null,
         linkUrl: content.linkUrl ?? null,
+        homeId: ad.home?.externalId ?? null,
         homeName: ad.home?.name ?? content.propertyName ?? null,
+        homeUrl: ad.home?.url ?? null,
         cards: content.media.map((item) => ({
           url: item.url,
           thumbnail: item.thumbnail ?? null,
+          assetId: item.assetId ?? null,
+          type: item.type,
         })),
       },
     ];
@@ -102,24 +110,27 @@ export default async function PerformanceBrandAdsPage({
     MAX_SET_HOMES,
   );
 
-  if (listings.length === 0) {
-    return (
-      <p className="bg-card text-muted-foreground rounded-2xl border px-4 py-8 text-center text-xs">
-        {brand.website
-          ? "Not a WanderOS site, so there is no catalog to draw from."
-          : "No website on record, so there is no catalog to draw from."}
-      </p>
-    );
-  }
+  // Where approved ads can go. Only a campaign nothing has been pushed for
+  // can still take ads; a live one is Meta's to edit.
+  const campaigns = (deskBrand?.campaigns ?? [])
+    .filter((campaign) =>
+      campaign.platforms.every((row) => row.status === "draft"),
+    )
+    .map((campaign) => ({ id: campaign.id, name: campaign.name }));
+
   return (
     <AdPreviewsWorkspace
       brandId={brand.id}
+      brandSlug={brand.slug ?? brand.id}
       brandName={brand.name}
       brandLogo={avatarUrl}
       homes={homes}
       withoutPhoto={withoutPhoto}
       initialPicked={initialPicked}
       ads={ads}
+      campaigns={campaigns}
+      hasSite={listings.length > 0}
+      website={brand.website}
     />
   );
 }
