@@ -159,38 +159,41 @@ export function Avatar({
 
 /** A frame of media. Video plays in place (this is where an operator checks it); a poster stands in when it cannot. */
 function Frame({ item, play }: { item: SocialMockMedia; play: boolean }) {
+  // Absolutely positioned inside a fill wrapper: the image's intrinsic size
+  // then never drives a grid track, so a layout's aspect box is the truth.
+  const fill = "absolute inset-0 size-full object-cover";
+  let inner: React.ReactNode;
   if (isVideo(item)) {
     const poster =
       item.thumbnail && item.thumbnail !== item.url
         ? item.thumbnail
         : undefined;
-    if (play) {
-      return (
-        <video
-          src={item.url}
-          poster={poster}
-          className="size-full bg-black object-cover"
-          controls
-          playsInline
-          preload="metadata"
-        />
-      );
-    }
-    return poster ? (
+    inner = play ? (
+      <video
+        src={item.url}
+        poster={poster}
+        className={cn(fill, "bg-black")}
+        controls
+        playsInline
+        preload="metadata"
+      />
+    ) : poster ? (
       // eslint-disable-next-line @next/next/no-img-element -- library and provider hosts vary
-      <img src={poster} alt="" className="size-full object-cover" />
+      <img src={poster} alt="" className={fill} />
     ) : (
-      <div className="grid size-full place-items-center bg-neutral-900">
+      <div className={cn(fill, "grid place-items-center bg-neutral-900")}>
         <span className="grid size-10 place-items-center rounded-full bg-white/90 text-black">
           <Play className="ml-0.5 size-4 fill-current" />
         </span>
       </div>
     );
+  } else {
+    inner = (
+      // eslint-disable-next-line @next/next/no-img-element -- library and provider hosts vary
+      <img src={item.url} alt="" className={fill} />
+    );
   }
-  return (
-    // eslint-disable-next-line @next/next/no-img-element -- library and provider hosts vary
-    <img src={item.url} alt="" className="size-full object-cover" />
-  );
+  return <div className="relative size-full min-h-0 min-w-0">{inner}</div>;
 }
 
 /** One frame at a time with arrows, dots and the 1/N pill. Controlled when `onCard` is given. */
@@ -272,7 +275,12 @@ export function Carousel({
   );
 }
 
-/** Facebook multi-photo layout: 1 full, 2 side by side, 3 one over two, 4 grid, 5+ two over three with +N. */
+/**
+ * Facebook multi-photo layout. A landscape lead gets one photo over a row.
+ * A portrait lead is drawn large on the left at its own 4:5 with the rest
+ * stacked beside it, the way Facebook keeps a portrait creative whole; that
+ * matters here because composed cards carry their copy in the image.
+ */
 function FacebookPhotos({
   media,
   crop,
@@ -284,6 +292,16 @@ function FacebookPhotos({
 }) {
   const n = media.length;
   const frame = (i: number) => <Frame key={i} item={media[i]!} play={play} />;
+  const more = (i: number, rest: number) => (
+    <div key={i} className="relative">
+      {frame(i)}
+      {rest > 0 && (
+        <span className="absolute inset-0 grid place-items-center bg-black/50 text-2xl font-semibold text-white">
+          +{rest}
+        </span>
+      )}
+    </div>
+  );
   if (n <= 1) {
     return (
       <div className={cn("w-full overflow-hidden bg-neutral-100", crop)}>
@@ -297,9 +315,39 @@ function FacebookPhotos({
       </div>
     );
   }
+  const lead = media[0]!;
+  const portrait = Boolean(
+    lead.width && lead.height && lead.height / lead.width > 1.1,
+  );
+  if (portrait) {
+    if (n === 2) {
+      return (
+        <div className="grid aspect-[8/5] min-h-0 grid-cols-2 grid-rows-1 gap-0.5 bg-black">
+          {frame(0)}
+          {frame(1)}
+        </div>
+      );
+    }
+    // 4:3 over 3fr:2fr columns leaves the left cell at exactly 4:5.
+    const side = Math.min(n - 1, 3);
+    const rest = n - 1 - side;
+    return (
+      <div className="grid aspect-[4/3] min-h-0 grid-cols-[minmax(0,3fr)_minmax(0,2fr)] grid-rows-1 gap-0.5 bg-black">
+        {frame(0)}
+        <div
+          className="grid min-h-0 gap-0.5"
+          style={{ gridTemplateRows: `repeat(${side}, minmax(0, 1fr))` }}
+        >
+          {Array.from({ length: side }, (_, j) =>
+            j === side - 1 ? more(j + 1, rest) : frame(j + 1),
+          )}
+        </div>
+      </div>
+    );
+  }
   if (n === 2) {
     return (
-      <div className="grid aspect-[4/3] grid-cols-2 gap-0.5 bg-black">
+      <div className="grid aspect-[4/3] min-h-0 grid-cols-2 grid-rows-1 gap-0.5 bg-black">
         {frame(0)}
         {frame(1)}
       </div>
@@ -307,9 +355,9 @@ function FacebookPhotos({
   }
   if (n === 3) {
     return (
-      <div className="grid aspect-[4/5] grid-rows-[3fr_2fr] gap-0.5 bg-black">
+      <div className="grid aspect-[4/5] min-h-0 grid-rows-[minmax(0,3fr)_minmax(0,2fr)] gap-0.5 bg-black">
         {frame(0)}
-        <div className="grid grid-cols-2 gap-0.5">
+        <div className="grid min-h-0 grid-cols-2 grid-rows-1 gap-0.5">
           {frame(1)}
           {frame(2)}
         </div>
@@ -318,29 +366,21 @@ function FacebookPhotos({
   }
   if (n === 4) {
     return (
-      <div className="grid aspect-square grid-cols-2 grid-rows-2 gap-0.5 bg-black">
+      <div className="grid aspect-square min-h-0 grid-cols-2 grid-rows-2 gap-0.5 bg-black">
         {media.map((_, i) => frame(i))}
       </div>
     );
   }
-  const rest = n - 5;
   return (
-    <div className="grid aspect-[4/5] grid-rows-[3fr_2fr] gap-0.5 bg-black">
-      <div className="grid grid-cols-2 gap-0.5">
+    <div className="grid aspect-[4/5] min-h-0 grid-rows-[minmax(0,3fr)_minmax(0,2fr)] gap-0.5 bg-black">
+      <div className="grid min-h-0 grid-cols-2 grid-rows-1 gap-0.5">
         {frame(0)}
         {frame(1)}
       </div>
-      <div className="grid grid-cols-3 gap-0.5">
+      <div className="grid min-h-0 grid-cols-3 grid-rows-1 gap-0.5">
         {frame(2)}
         {frame(3)}
-        <div className="relative">
-          {frame(4)}
-          {rest > 0 && (
-            <span className="absolute inset-0 grid place-items-center bg-black/50 text-2xl font-semibold text-white">
-              +{rest}
-            </span>
-          )}
-        </div>
+        {more(4, n - 5)}
       </div>
     </div>
   );
