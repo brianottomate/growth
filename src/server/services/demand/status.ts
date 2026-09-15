@@ -1,34 +1,17 @@
 /**
- * Rollout health for the demand-sales HubSpot sync, read from the two tables
- * the pipeline already writes: `demand_crm_link` (one row per guest, with
- * the last error) and `hubspot_webhook_event` (the `demand__bdr` parity
- * events). No logs required — this is what to look at after merging.
+ * Rollout health for the demand-sales `demand__bdr` parity webhook, read from
+ * `hubspot_webhook_event` (the raw event log). Per-lead sync success/failure
+ * is not tracked in a table — it is on the `[DemandSync]` log line — so this
+ * covers only the webhook path.
  */
-import { and, desc, eq, gte, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, gte, sql } from "drizzle-orm";
 
 import { db } from "@/server/db";
-import { demandCrmLinkTable } from "@/server/db/demand-schema";
 import { hubspotWebhookEventTable } from "@/server/db/leads-schema";
 import { DEMAND_BDR_PROPERTY } from "./owner-parity";
 
 export interface DemandSyncStatus {
   window: { hours: number; since: string };
-  link: {
-    /** Guests the sync has ever touched. */
-    totalContacts: number;
-    /** Guests with a HubSpot contact id on file. */
-    linkedContacts: number;
-    /** Successful HubSpot writes in the window. */
-    syncedInWindow: number;
-    /** Guests whose most recent attempt failed (any time). */
-    currentlyFailing: number;
-    /** Failures whose last attempt fell in the window. */
-    failedInWindow: number;
-    lastSyncedAt: string | null;
-    lastErrorAt: string | null;
-    /** Most common current failure messages — the thing to fix first. */
-    topErrors: { error: string; count: number; sampleEmail: string }[];
-  };
   parity: {
     /** `demand__bdr` webhook events received in the window. */
     eventsInWindow: number;
@@ -43,32 +26,6 @@ export async function getDemandSyncStatus(
   hoursBack = 24,
 ): Promise<DemandSyncStatus> {
   const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000);
-
-  const [totals] = await db
-    .select({
-      totalContacts: sql<number>`count(*)::int`,
-      linkedContacts: sql<number>`count(${demandCrmLinkTable.hubspotContactId})::int`,
-      currentlyFailing: sql<number>`count(*) filter (where ${demandCrmLinkTable.lastError} is not null)::int`,
-      syncedInWindow: sql<number>`count(*) filter (where ${demandCrmLinkTable.lastSyncedAt} >= ${since})::int`,
-      failedInWindow: sql<number>`count(*) filter (where ${demandCrmLinkTable.lastError} is not null and ${demandCrmLinkTable.updatedAt} >= ${since})::int`,
-      lastSyncedAt: sql<string | null>`max(${demandCrmLinkTable.lastSyncedAt})`,
-      lastErrorAt: sql<
-        string | null
-      >`max(${demandCrmLinkTable.updatedAt}) filter (where ${demandCrmLinkTable.lastError} is not null)`,
-    })
-    .from(demandCrmLinkTable);
-
-  const topErrors = await db
-    .select({
-      error: demandCrmLinkTable.lastError,
-      count: sql<number>`count(*)::int`,
-      sampleEmail: sql<string>`min(${demandCrmLinkTable.email})`,
-    })
-    .from(demandCrmLinkTable)
-    .where(isNotNull(demandCrmLinkTable.lastError))
-    .groupBy(demandCrmLinkTable.lastError)
-    .orderBy(desc(sql`count(*)`))
-    .limit(5);
 
   const parityWhere = and(
     eq(hubspotWebhookEventTable.propertyName, DEMAND_BDR_PROPERTY),
@@ -98,24 +55,6 @@ export async function getDemandSyncStatus(
 
   return {
     window: { hours: hoursBack, since: since.toISOString() },
-    link: {
-      totalContacts: totals?.totalContacts ?? 0,
-      linkedContacts: totals?.linkedContacts ?? 0,
-      syncedInWindow: totals?.syncedInWindow ?? 0,
-      currentlyFailing: totals?.currentlyFailing ?? 0,
-      failedInWindow: totals?.failedInWindow ?? 0,
-      lastSyncedAt: totals?.lastSyncedAt
-        ? new Date(totals.lastSyncedAt).toISOString()
-        : null,
-      lastErrorAt: totals?.lastErrorAt
-        ? new Date(totals.lastErrorAt).toISOString()
-        : null,
-      topErrors: topErrors.map((row) => ({
-        error: row.error ?? "",
-        count: row.count,
-        sampleEmail: row.sampleEmail,
-      })),
-    },
     parity: {
       eventsInWindow: parityTotals?.eventsInWindow ?? 0,
       pending: parityTotals?.pending ?? 0,

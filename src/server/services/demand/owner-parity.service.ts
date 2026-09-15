@@ -12,8 +12,6 @@
  * Called from the HubSpot webhook receiver for `contact.propertyChange`
  * events on `demand__bdr`. The loop guard lives in ./owner-parity.ts.
  */
-import { eq } from "drizzle-orm";
-
 import { updateBdrAssignment } from "@/server/clients/customerio.client";
 import {
   getContactProperties,
@@ -25,8 +23,6 @@ import {
   searchProspectByEmail,
   updateProspect,
 } from "@/server/clients/outreach.client";
-import { db } from "@/server/db";
-import { demandCrmLinkTable } from "@/server/db/demand-schema";
 
 import { findDemandBdrByOwnerId } from "./bdr-assignment.service";
 import { shouldMirrorDemandBdrChange } from "./owner-parity";
@@ -61,26 +57,29 @@ export async function applyDemandBdrChange(params: {
 
   // The property is portal-wide, but the mirror is for guests only: a rep
   // setting DEMAND - BDR on a property-manager contact must not create a
-  // Customer.io person. "Guest" = the demand sync has written this contact.
-  const [link] = await db
-    .select({ email: demandCrmLinkTable.email })
-    .from(demandCrmLinkTable)
-    .where(eq(demandCrmLinkTable.hubspotContactId, contactId))
-    .limit(1);
-  if (!link) {
+  // Customer.io person. "Guest" = the demand sync has written this contact,
+  // which stamps `demand_last_sync_at` on every write (never a human) — so its
+  // presence is the guest marker, read in this same call.
+  const contact = await getContactProperties(contactId, [
+    "email",
+    "demand__bdr",
+    "demand_bdr_email",
+    "demand_last_sync_at",
+  ]);
+  if (!contact) {
+    return {
+      mirrored: false,
+      note: "classified: demand__bdr change on a contact that is no longer readable",
+    };
+  }
+  if (!contact.values.demand_last_sync_at) {
     return {
       mirrored: false,
       note: "classified: demand__bdr change on a contact the demand sync never wrote; not mirrored",
     };
   }
-
-  const contact = await getContactProperties(contactId, [
-    "email",
-    "demand__bdr",
-    "demand_bdr_email",
-  ]);
-  const email = contact?.values.email?.trim().toLowerCase() ?? null;
-  if (!contact || !email) {
+  const email = contact.values.email?.trim().toLowerCase() ?? null;
+  if (!email) {
     return {
       mirrored: false,
       note: "classified: demand__bdr change on a contact with no readable email",

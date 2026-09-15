@@ -32,7 +32,6 @@ import {
 } from "@/server/services/demand/bdr-assignment.service";
 import {
   lookupDemandContact,
-  recordDemandLinkError,
   writeDemandContact,
   type DemandContactState,
 } from "@/server/services/demand/hubspot-sink.service";
@@ -70,8 +69,8 @@ export interface SyncResult {
 /**
  * Both CRMs are written on every sync — there is no switch. Outreach is the
  * system BDRs work in today, so its owner is authoritative and a HubSpot
- * failure never fails a lead while Outreach is configured; it is recorded on
- * `demand_crm_link.last_error` instead (docs/demand-sales-hubspot.md).
+ * failure never fails a lead while Outreach is configured; it is logged on the
+ * `[DemandSync]` line instead (docs/demand-sales-hubspot.md).
  */
 export function resolveDemandCrms(): {
   useOutreach: boolean;
@@ -417,8 +416,7 @@ export async function processLead(params: {
 
     // In shadow mode a HubSpot lookup failure must not cost the Outreach
     // write; in hubspot mode it is the write, so let it fail the lead. Either
-    // way it lands on demand_crm_link.last_error so a dark shadow period is
-    // visible without reading logs.
+    // way the reason is logged on the `[DemandSync]` line below.
     let existingContact: DemandContactState | null = null;
     let hubspotError: string | undefined;
     if (useHubspot) {
@@ -428,17 +426,6 @@ export async function processLead(params: {
         if (hubspotFatal) throw error;
         hubspotError = `lookup: ${error instanceof Error ? error.message : String(error)}`;
         console.error(`⚠️ [Sync] HubSpot lookup failed for ${email}:`, error);
-        await recordDemandLinkError({
-          email,
-          userId: leadData.id_user ?? null,
-          eventType,
-          error,
-        }).catch((linkError) => {
-          console.error(
-            "⚠️ [Sync] Could not record HubSpot lookup error",
-            linkError,
-          );
-        });
       }
     }
     const hubspotWritable = useHubspot && hubspotError === undefined;
@@ -588,7 +575,6 @@ export async function processLead(params: {
         const written = await writeDemandContact({
           email,
           lead: leadData,
-          eventType,
           existing: existingContact,
           bdr: assignedBdr,
           newlyAssigned,

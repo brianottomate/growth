@@ -18,7 +18,6 @@
     "db:apply:brand-ad-previews": "bun --conditions=react-server scripts/apply-brand-ad-previews-schema.ts",
     "db:apply:launch": "bun --conditions=react-server scripts/apply-launch-schema.ts",
     "db:apply:pregen-verdict": "bun --conditions=react-server scripts/apply-pregen-verdict-schema.ts",
-    "db:apply:demand-crm-link": "bun --conditions=react-server scripts/apply-demand-crm-link-schema.ts",
     "hubspot:import:companies": "bun --conditions=react-server scripts/import-hubspot-company-export.ts",
     "hubspot:process:webhooks": "bun --conditions=react-server scripts/process-hubspot-webhook-backlog.ts",
     "hubspot:build:sales-email-corpus": "bun --conditions=react-server scripts/build-hubspot-sales-email-corpus.ts",

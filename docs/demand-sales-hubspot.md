@@ -17,7 +17,8 @@ never written from here; the `DemandContactProperties` type only admits
 - **Phase 2 (later, once Phase 1 is boring)**: a "User Events" custom object,
   one record per abandonment/signup episode keyed on
   `funnel_send_log (userId, stage, windowKey)`, associated to the contact.
-  The `demand_crm_link` table already records the contact id it will need.
+  The contact it associates to is found the same way the sink finds it —
+  search by email.
 
 Everything upstream of the CRM write is unchanged: Amplitude →
 `funnel_state` → sweep → `funnel_send_log` ledger → `processLead()`
@@ -37,9 +38,9 @@ credentials are absent). Outreach is the system the BDRs work in today, so:
   ownerless. `findExistingDemandBdr` in
   `src/server/services/demand/bdr-assignment.service.ts` is the pure, tested rule.
 - **A HubSpot failure never fails a lead while Outreach is configured.** It is
-  recorded on `demand_crm_link.last_error` and `SyncResult.hubspotError`; the
-  sweep counts it separately. HubSpot errors become fatal only if Outreach is
-  unconfigured (HubSpot is then the only sink).
+  logged on the `[DemandSync]` line (`hubspot=FAILED … hubspotError=…`) and
+  returned as `SyncResult.hubspotError`; nothing is persisted. HubSpot errors
+  become fatal only if Outreach is unconfigured (HubSpot is then the only sink).
 - **Reassigning in HubSpot sticks.** A person changing DEMAND - BDR fires the
   webhook, which mirrors the rep to Customer.io and moves the Outreach
   prospect's owner too — so the next sync sees the same owner in both. It
@@ -58,12 +59,10 @@ Rollback of the HubSpot half is a release rollback (re-run the last good
 | ------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
 | `src/server/services/demand/field-mapping.ts`                | `LeadData` → `demand_*` payload; the property manifest                                |
 | `src/server/services/demand/bdr-assignment.service.ts`       | roster (HubSpot owner ids), rotation, precedence                                      |
-| `src/server/services/demand/hubspot-sink.service.ts`         | lookup (link table → search) and force-write (`updateContact`, never `upsertContact`) |
+| `src/server/services/demand/hubspot-sink.service.ts`         | lookup (search by email) and force-write (`updateContact`, never `upsertContact`) |
 | `src/server/services/demand/owner-parity.ts` / `.service.ts` | `demand__bdr` change in HubSpot → Customer.io, with the `changeSource` loop guard     |
-| `src/server/db/demand-schema.ts`                             | `demand_crm_link` — email ↔ HubSpot contact id, last error                            |
 | `src/app/api/lab/cio-to-hubspot/route.ts`                    | dry-run harness + live roster check                                                   |
 | `scripts/setup-demand-hubspot-properties.ts`                 | creates the property group + properties from the manifest                             |
-| `scripts/apply-demand-crm-link-schema.ts`                    | idempotent DDL for the link table                                                     |
 
 ## Cutover
 
@@ -75,21 +74,19 @@ Rollback of the HubSpot half is a release rollback (re-run the last good
    without the flag. Needs `crm.schemas.contacts.write` on the Operated app.
    Then subscribe the app's webhook to `contact.propertyChange` on
    `demand__bdr`.
-3. **DB.** `bun run db:apply:demand-crm-link` — or, without local secrets,
-   `GET /api/lab/cio-to-hubspot?applySchema=1` on any deployment (same
-   idempotent DDL). Production releases also create it via `drizzle-kit push`.
-4. **Confirm the CIO attribute.** Templates read `assigned_bdr_email` /
+   No database step — the sink is stateless (search by email, then write).
+3. **Confirm the CIO attribute.** Templates read `assigned_bdr_email` /
    `assigned_bdr_name` / `assigned_bdr_outreach_id`. The last keeps its name
    and carries the HubSpot owner id once Outreach is gone; if a template
-   renders it, rename or re-point that template before step 6.
-5. **Verify.** On canary, run
+   renders it, rename or re-point that template before step 5.
+4. **Verify.** On canary, run
    `/api/lab/cio-to-hubspot?email=…` on a few known guests, then let the
    sweep run. Compare `demand_*` on the contact against the Outreach
-   prospect for the same `funnel_send_log` rows. Watch `demand_crm_link`
-   for `last_error`.
-6. **Prod.** `both` for a week, then `hubspot`. Delete the registered
+   prospect for the same `funnel_send_log` rows. Watch the `[DemandSync]`
+   logs for `hubspot=FAILED`.
+5. **Prod.** `both` for a week, then `hubspot`. Delete the registered
    Outreach webhooks (`/api/outreach/webhooks`).
-7. **Retire** (separate PR): the three CSV importers under `scripts/`
+6. **Retire** (separate PR): the three CSV importers under `scripts/`
    (`import-abandoned-cart`, `import-checkout-incident`, `import-ota-guests`
    — port to the sink or delete), `webhooks/outreach-to-cio`,
    `outreach.router.ts` + its `root.ts` mount, `api/outreach/*`,
@@ -101,18 +98,12 @@ Rollback of the HubSpot half is a release rollback (re-run the last good
 
 ## Monitoring after the merge
 
-The release itself starts writing HubSpot. Three places tell you how it is
+The release itself starts writing HubSpot. Two places tell you how it is
 going, in order of effort:
 
 1. **`GET /api/lab/cio-to-hubspot?status=1&hours=24`** (signed in, or
-   `Bearer ADMIN_TOKEN`). One JSON document, no logs:
-   - `link.syncedInWindow` — HubSpot writes in the window. Should track the
-     sweep's Outreach `synced` totals; near zero with Outreach busy means the
-     HubSpot half is dark.
-   - `link.currentlyFailing` / `topErrors` — guests whose last attempt failed
-     and the messages, most common first. Healthy is zero; a handful of 429s
-     that clear on the next sweep is fine; anything mentioning a property
-     name means the portal and manifest disagree.
+   `Bearer ADMIN_TOKEN`). One JSON document covering the `demand__bdr`
+   parity webhook (per-lead sync health is on the logs, below):
    - `parity.outcomes` — how each `demand__bdr` webhook event was classified:
      mirrored, dropped as our own write, stale, off-roster rep, or not a guest.
    - `parity.pending` — should be 0 or draining; the hourly retry rail
@@ -159,15 +150,16 @@ the Note 1 / Note 2 decision, are written by nothing, and can be deleted.
 - Our own `demand__bdr` writes echo back through the webhook with
   `changeSource` = `API` / `INTEGRATION` and are dropped; a rep's change
   (`CRM_UI`) or a HubSpot workflow's (`WORKFLOWS`) is mirrored to Customer.io.
-- Repeat syncs go link table → `getById`, not CRM search, which is the shared
-  5 req/s revenue-path budget (`docs/hubspot-gateway-plan.md`).
+- Every sync finds the contact by email search (the Outreach
+  `searchProspectByEmail` equivalent) — the sink is stateless, no id cache.
 - Idempotent HubSpot calls (reads, updates) retry on 429/5xx inside the sink;
   creates never retry — a duplicate-contact 409 is turned into an update of
   the existing contact, recomputed against its real stage and rep.
 - The HubSpot → Customer.io mirror only fires for contacts the demand sync has
-  written (a `demand_crm_link` row exists), so setting DEMAND - BDR on a
-  property-manager contact never creates a Customer.io person; and it applies
-  the contact's _current_ picker value, so a replayed stale event cannot roll
-  an assignment back.
-- A HubSpot error (lookup or write) is recorded on `demand_crm_link.last_error`
-  and the lead still counts while Outreach is configured.
+  written — it gates on `demand_last_sync_at` being present (stamped on every
+  write, never by a human), so setting DEMAND - BDR on a property-manager
+  contact never creates a Customer.io person; and it applies the contact's
+  _current_ picker value, so a replayed stale event cannot roll an assignment
+  back.
+- A HubSpot error (lookup or write) is logged on the `[DemandSync]` line and
+  the lead still counts while Outreach is configured.

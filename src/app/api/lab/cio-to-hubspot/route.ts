@@ -16,10 +16,6 @@ import {
   writeDemandContact,
   type DemandContactState,
 } from "@/server/services/demand/hubspot-sink.service";
-import {
-  applyDemandCrmLinkSchema,
-  demandCrmLinkTableExists,
-} from "@/server/services/demand/schema-apply";
 import { getDemandSyncStatus } from "@/server/services/demand/status";
 import { searchProspectByEmail } from "@/server/clients/outreach.client";
 import {
@@ -47,19 +43,13 @@ interface StepResult {
  *   GET /api/lab/cio-to-hubspot?email=user@example.com
  *   GET /api/lab/cio-to-hubspot?email=user@example.com&event=abandoned_cart&property=Wander+Broken+Bow
  *   GET /api/lab/cio-to-hubspot?roster=1          (owner check only)
- *   GET /api/lab/cio-to-hubspot?applySchema=1     (create demand_crm_link)
- *   GET /api/lab/cio-to-hubspot?status=1&hours=24 (rollout health, no logs)
+ *   GET /api/lab/cio-to-hubspot?status=1&hours=24 (webhook parity health)
  *
  * Runs every stage — enrichment, HubSpot lookup, BDR precedence (the same
  * rule production applies, Outreach owner included), the exact `demand_*`
  * payload — and writes nothing to HubSpot, Outreach or Customer.io. The
  * roster step resolves each BDR in DEMAND_BDR_ROSTER against live HubSpot
  * owners so the "who is actually assignable" question has a URL.
- *
- * `applySchema=1` is the one thing here that changes state: it runs the
- * idempotent DDL for the link table, so a preview deployment (which never
- * pushes schema) can be smoke-tested before the first production release.
- * Dev, preview and prod share the database, so it need only run once.
  */
 export async function GET(request: Request) {
   const denied = await assertLabAccess(request);
@@ -69,7 +59,6 @@ export async function GET(request: Request) {
   const eventType = searchParams.get("event") ?? "checkout_started";
   const propertyName = searchParams.get("property") ?? undefined;
   const rosterOnly = searchParams.get("roster") === "1";
-  const applySchema = searchParams.get("applySchema") === "1";
   const statusOnly = searchParams.get("status") === "1";
 
   if (statusOnly) {
@@ -80,7 +69,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ crms: resolveDemandCrms(), ...status });
   }
 
-  if (!email && !rosterOnly && !applySchema) {
+  if (!email && !rosterOnly) {
     return NextResponse.json(
       {
         error: "Missing ?email= parameter (or ?roster=1 for the owner check)",
@@ -104,39 +93,6 @@ export async function GET(request: Request) {
   const totalStartMs = Date.now();
   const steps: StepResult[] = [];
   const crm = resolveDemandCrms();
-
-  // -----------------------------------------------
-  // Link table: does demand_crm_link exist yet?
-  // -----------------------------------------------
-  {
-    const stepStart = Date.now();
-    try {
-      let existed = await demandCrmLinkTableExists();
-      if (!existed && applySchema) {
-        await applyDemandCrmLinkSchema();
-        existed = await demandCrmLinkTableExists();
-      }
-      steps.push({
-        step: "0_link_table",
-        status: existed ? "ok" : "warning",
-        durationMs: Date.now() - stepStart,
-        data: existed
-          ? { table: "demand_crm_link", exists: true, applied: applySchema }
-          : {
-              table: "demand_crm_link",
-              exists: false,
-              hint: "add ?applySchema=1 to create it (idempotent), or wait for the next production release",
-            },
-      });
-    } catch (error) {
-      steps.push({
-        step: "0_link_table",
-        status: "failed",
-        durationMs: Date.now() - stepStart,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
 
   // -----------------------------------------------
   // Roster: is every BDR a live HubSpot owner?
@@ -207,7 +163,7 @@ export async function GET(request: Request) {
     }
   }
 
-  if (rosterOnly || applySchema || !email) {
+  if (rosterOnly || !email) {
     return NextResponse.json({
       dryRun: true,
       crms: crm,
@@ -385,7 +341,6 @@ export async function GET(request: Request) {
     const preview = await writeDemandContact({
       email,
       lead,
-      eventType,
       existing,
       bdr,
       newlyAssigned,
