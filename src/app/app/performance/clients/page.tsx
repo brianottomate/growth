@@ -8,6 +8,7 @@ import { db } from "@/server/db";
 import { memberTable } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { EmptyState } from "@/components/ui/empty-state";
+import { BUSINESS_LABEL, DELIVERY_LABEL } from "@/lib/performance-stage";
 import {
   BrandSearch,
   type BrandSearchGroup,
@@ -34,7 +35,7 @@ import {
   tile,
 } from "../_components";
 import { ReadinessChecklist } from "../ReadinessChecklist";
-import { StageChip } from "../StageChip";
+import { StageChips } from "../StageChip";
 import { StartCampaignInChat } from "../StartCampaignInChat";
 import { BrandRowMenu } from "../BrandRowMenu";
 import { SendLink } from "../SendLink";
@@ -72,7 +73,8 @@ export default async function PerformanceClientsPage() {
       brand.slug,
       brand.website,
       brand.relationship,
-      brand.account?.status,
+      BUSINESS_LABEL[brand.business],
+      DELIVERY_LABEL[brand.delivery],
     ]
       .filter(Boolean)
       .join(" ")
@@ -81,8 +83,16 @@ export default async function PerformanceClientsPage() {
       <ClientRow brand={brand} readiness={readiness.get(brand.id) ?? null} />
     ),
   });
+  // Unpaid first: that is the list someone asks about in Slack.
+  const unpaid = desk.brands.filter((brand) => brand.business === "signed");
+  const paid = desk.brands.filter((brand) => brand.business === "paid");
+  const paused = desk.brands.filter((brand) => brand.business === "paused");
   const groups: BrandSearchGroup[] = [
-    { label: "Clients", entries: desk.brands.map(entry) },
+    ...(unpaid.length
+      ? [{ label: "Signed, not paid", entries: unpaid.map(entry) }]
+      : []),
+    ...(paid.length ? [{ label: "Paid", entries: paid.map(entry) }] : []),
+    ...(paused.length ? [{ label: "Paused", entries: paused.map(entry) }] : []),
   ];
 
   return (
@@ -126,7 +136,7 @@ function ClientRow({
             >
               {brand.name}
             </Link>
-            <StageChip stage={brand.stage} />
+            <StageChips business={brand.business} delivery={brand.delivery} />
           </div>
           <p className="text-muted-foreground mt-0.5 truncate text-xs">
             {brand.website ? (
@@ -153,7 +163,8 @@ function ClientRow({
           <BrandRowMenu
             brandId={brand.id}
             brandName={brand.name}
-            stage={brand.stage}
+            business={brand.business}
+            delivery={brand.delivery}
           />
         </div>
       </div>

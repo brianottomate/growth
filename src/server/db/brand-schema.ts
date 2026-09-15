@@ -21,21 +21,27 @@ export type BrandType = (typeof brandTypeEnum.enumValues)[number];
 // the brand IS (`type`). Wander's own brands, paying Performance clients,
 // targets a rep is pitching, and competitors we merely watch all belong in
 // one table and none of them belong in the same list.
-/** Where a Performance brand is on its way from lead to live. See lib/performance-stage. */
-export const performanceStageEnum = pgEnum("performance_stage", [
-  "ready_to_pitch",
+/** The money and the relationship. See lib/performance-stage. */
+export const businessStageEnum = pgEnum("business_stage", [
+  "prospect",
   "pitch_sent",
   "meeting_booked",
-  "ready_for_intake",
-  "intake_sent",
   "signed",
+  "paid",
+  "paused",
+  "lost",
+  "churned",
+]);
+
+/** The production line, from intake to live ads. See lib/performance-stage. */
+export const deliveryStageEnum = pgEnum("delivery_stage", [
+  "not_started",
+  "intake_sent",
   "intake_submitted",
   "access_verified",
   "ads_review",
   "live",
   "paused",
-  "lost",
-  "churned",
 ]);
 
 export const brandRelationshipEnum = pgEnum("brand_relationship", [
@@ -284,11 +290,14 @@ export const brandTable = pgTable(
     relationship: brandRelationshipEnum().default("internal").notNull(),
 
     /**
-     * The Performance journey stage. Null for brands that are not on the
-     * desk. Workflows only move it forward; the ⋯ dialog can set anything.
+     * The two Performance lifecycles. Null for brands that are not on the
+     * desk. Business is set by a person; delivery mostly by workflows, which
+     * only move it forward. The ⋯ dialog can set either to anything.
      */
-    performanceStage: performanceStageEnum(),
-    performanceStageAt: t.timestamp({ withTimezone: true }),
+    businessStage: businessStageEnum(),
+    businessStageAt: t.timestamp({ withTimezone: true }),
+    deliveryStage: deliveryStageEnum(),
+    deliveryStageAt: t.timestamp({ withTimezone: true }),
 
     /**
      * The brand's WanderOS site, when they have one.

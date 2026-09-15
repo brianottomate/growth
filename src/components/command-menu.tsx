@@ -18,7 +18,7 @@ import {
   CommandSeparator,
   CommandShortcut,
 } from "@/components/ui/command";
-import { STAGE_LABEL } from "@/lib/performance-stage";
+import { BUSINESS_LABEL, DELIVERY_LABEL } from "@/lib/performance-stage";
 import { useTRPC } from "@/trpc/react";
 
 export const OPEN_COMMAND_MENU_EVENT = "growth-command-menu:open";
@@ -104,7 +104,8 @@ export function CommandMenu() {
                       client.name,
                       client.website,
                       client.relationship,
-                      client.stage ? STAGE_LABEL[client.stage] : null,
+                      client.business ? BUSINESS_LABEL[client.business] : null,
+                      client.delivery ? DELIVERY_LABEL[client.delivery] : null,
                       "performance",
                     ]
                       .filter(Boolean)
@@ -116,7 +117,16 @@ export function CommandMenu() {
                       {client.name}
                     </span>
                     <CommandShortcut className="max-w-32 truncate tracking-normal">
-                      {client.stage ? STAGE_LABEL[client.stage] : client.relationship}
+                      {client.business
+                        ? [
+                            BUSINESS_LABEL[client.business],
+                            client.delivery && client.delivery !== "not_started"
+                              ? DELIVERY_LABEL[client.delivery]
+                              : null,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")
+                        : client.relationship}
                     </CommandShortcut>
                   </CommandItem>
                 ))}

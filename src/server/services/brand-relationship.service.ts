@@ -11,16 +11,16 @@ import {
   type BrandRelationship,
 } from "@/server/db/schema";
 import {
+  BUSINESS_STAGES,
+  DELIVERY_STAGES,
   isClientStage,
   isClosedStage,
   laterStage,
-  type PerformanceStage,
+  type BusinessStage,
+  type DeliveryStage,
 } from "@/lib/performance-stage";
 import { createOwnedBrand, normalizeWebsiteUrl } from "./brand-ops.service";
-import {
-  PerformanceError,
-  type PerformanceActor,
-} from "./performance.service";
+import { PerformanceError, type PerformanceActor } from "./performance.service";
 
 // ---- RELATIONSHIP TRANSITIONS ---------------------------------------------
 //
@@ -81,57 +81,100 @@ export async function createProspectFromLead(input: {
     relationship: "prospect",
     leadDomain: lead.domain,
   });
-  await advanceBrandStage(brand.id, "ready_to_pitch");
-  return { brand: { ...brand, performanceStage: "ready_to_pitch" as const }, created: true };
+  await advanceBusinessStage(brand.id, "prospect");
+  return {
+    brand: { ...brand, businessStage: "prospect" as const },
+    created: true,
+  };
 }
 
 /**
- * Set the stage from the ⋯ dialog: any stage, including backwards. The
- * relationship follows it, so the tabs and everything gated on `client` agree
- * with what the person just said.
+ * Set either lifecycle from the ⋯ dialog: any stage, including backwards.
+ * The relationship follows the business stage, so the tabs and everything
+ * gated on `client` agree with what the person just said.
  */
-export async function setBrandStage(
+export async function setBrandStages(
   actor: PerformanceActor,
-  input: { brandId: string; stage: PerformanceStage },
+  input: {
+    brandId: string;
+    business?: BusinessStage;
+    delivery?: DeliveryStage;
+  },
 ): Promise<Brand> {
   const brand = await requireBrand(actor, input.brandId);
+  const now = new Date();
+  const business = input.business;
   const relationship =
-    brand.relationship === "internal" || brand.relationship === "reference"
+    !business ||
+    brand.relationship === "internal" ||
+    brand.relationship === "reference"
       ? brand.relationship
-      : isClientStage(input.stage)
+      : isClientStage(business)
         ? "client"
-        : isClosedStage(input.stage)
+        : isClosedStage(business)
           ? brand.relationship
           : "prospect";
   const [updated] = await db
     .update(brandTable)
-    .set({ performanceStage: input.stage, performanceStageAt: new Date(), relationship })
+    .set({
+      relationship,
+      ...(business && business !== brand.businessStage
+        ? { businessStage: business, businessStageAt: now }
+        : {}),
+      ...(input.delivery && input.delivery !== brand.deliveryStage
+        ? { deliveryStage: input.delivery, deliveryStageAt: now }
+        : {}),
+    })
     .where(eq(brandTable.id, brand.id))
     .returning();
   return updated!;
 }
 
 /**
- * A workflow reached a stage: move the brand there if it is further along
- * than where it stands, never backwards, never out of a closed stage.
+ * A workflow reached a business stage: move the brand there if it is further
+ * along than where it stands, never backwards, never out of a closed stage.
  */
-export async function advanceBrandStage(brandId: string, stage: PerformanceStage) {
+export async function advanceBusinessStage(
+  brandId: string,
+  stage: BusinessStage,
+) {
   const brand = await db.query.brandTable.findFirst({
     where: eq(brandTable.id, brandId),
-    columns: { id: true, performanceStage: true, relationship: true },
+    columns: { id: true, businessStage: true, relationship: true },
   });
   if (!brand) return;
-  const current = brand.performanceStage;
+  const current = brand.businessStage;
   if (current && isClosedStage(current)) return;
-  const next = laterStage(current, stage);
+  const next = laterStage(BUSINESS_STAGES, current, stage);
   if (next === current) return;
   await db
     .update(brandTable)
     .set({
-      performanceStage: next,
-      performanceStageAt: new Date(),
-      ...(brand.relationship === "prospect" && isClientStage(next) ? { relationship: "client" as const } : {}),
+      businessStage: next,
+      businessStageAt: new Date(),
+      ...(brand.relationship === "prospect" && isClientStage(next)
+        ? { relationship: "client" as const }
+        : {}),
     })
+    .where(eq(brandTable.id, brand.id));
+}
+
+/** Same for delivery. Closed brands keep whatever delivery stage they ended on. */
+export async function advanceDeliveryStage(
+  brandId: string,
+  stage: DeliveryStage,
+) {
+  const brand = await db.query.brandTable.findFirst({
+    where: eq(brandTable.id, brandId),
+    columns: { id: true, businessStage: true, deliveryStage: true },
+  });
+  if (!brand) return;
+  if (brand.businessStage && isClosedStage(brand.businessStage)) return;
+  const next = laterStage(DELIVERY_STAGES, brand.deliveryStage, stage);
+  if (next === brand.deliveryStage) return;
+  await db
+    .update(brandTable)
+    .set({ deliveryStage: next, deliveryStageAt: new Date() })
     .where(eq(brandTable.id, brand.id));
 }
 
@@ -148,8 +191,10 @@ export async function setBrandRelationship(
     .returning();
   // A brand that becomes a prospect starts its journey; one that becomes a
   // client without a stage is at least past the intake line.
-  if (input.relationship === "prospect") await advanceBrandStage(brand!.id, "ready_to_pitch");
-  if (input.relationship === "client") await advanceBrandStage(brand!.id, "signed");
+  if (input.relationship === "prospect")
+    await advanceBusinessStage(brand!.id, "prospect");
+  if (input.relationship === "client")
+    await advanceBusinessStage(brand!.id, "signed");
   return brand!;
 }
 
@@ -175,6 +220,7 @@ export async function promoteBrandToClient(
     .update(brandTable)
     .set({ relationship: "client" })
     .where(eq(brandTable.id, brand.id));
+  await advanceBusinessStage(brand.id, "signed");
 
   const existing = await db.query.performanceAccountTable.findFirst({
     where: and(

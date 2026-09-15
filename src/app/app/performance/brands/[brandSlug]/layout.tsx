@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { ExternalLink } from "lucide-react";
 
 import { BrandLogo } from "../../_components";
-import { StageChip } from "../../StageChip";
+import { StageChips } from "../../StageChip";
 
 import { BrandTabs } from "./BrandTabs";
 import { loadPerformanceBrand } from "./_data";
@@ -39,7 +39,12 @@ export default async function PerformanceBrandLayout({
             <h2 className="text-lg font-semibold tracking-tight">
               {brand.name}
             </h2>
-            {deskBrand ? <StageChip stage={deskBrand.stage} /> : null}
+            {deskBrand ? (
+              <StageChips
+                business={deskBrand.business}
+                delivery={deskBrand.delivery}
+              />
+            ) : null}
           </div>
           <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 text-xs">
             {brand.website ? (

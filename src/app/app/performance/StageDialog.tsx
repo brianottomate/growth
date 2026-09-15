@@ -15,34 +15,43 @@ import {
 import { cn } from "@/components/ui/lib/utils";
 import { toast } from "@/components/ui/toast";
 import {
-  AUTO_STAGES,
-  PERFORMANCE_STAGES,
-  STAGE_LABEL,
-  type PerformanceStage,
+  AUTO_DELIVERY_STAGES,
+  BUSINESS_LABEL,
+  BUSINESS_STAGES,
+  DELIVERY_LABEL,
+  DELIVERY_STAGES,
+  type BusinessStage,
+  type DeliveryStage,
 } from "@/lib/performance-stage";
 import { useTRPC } from "@/trpc/react";
 
-/** Set a brand's stage by hand: any stage, the tabs follow. */
+/** Set a brand's two stages by hand: any value in either, the tabs follow. */
 export function StageDialog({
   brandId,
   brandName,
-  stage,
+  business,
+  delivery,
   open,
   onOpenChange,
 }: {
   brandId: string;
   brandName: string;
-  stage: PerformanceStage;
+  business: BusinessStage;
+  delivery: DeliveryStage;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const trpc = useTRPC();
   const router = useRouter();
-  const [picked, setPicked] = useState<PerformanceStage>(stage);
+  const [pickedBusiness, setPickedBusiness] = useState<BusinessStage>(business);
+  const [pickedDelivery, setPickedDelivery] = useState<DeliveryStage>(delivery);
+  const dirty = pickedBusiness !== business || pickedDelivery !== delivery;
   const save = useMutation(
     trpc.performance.setStage.mutationOptions({
       onSuccess: () => {
-        toast.success(`${brandName}: ${STAGE_LABEL[picked]}`);
+        toast.success(
+          `${brandName}: ${BUSINESS_LABEL[pickedBusiness]} · ${DELIVERY_LABEL[pickedDelivery]}`,
+        );
         onOpenChange(false);
         router.refresh();
       },
@@ -51,39 +60,113 @@ export function StageDialog({
   );
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Stage for {brandName}</DialogTitle>
+          <DialogTitle>Stages for {brandName}</DialogTitle>
         </DialogHeader>
-        <div role="radiogroup" className="grid gap-1">
-          {PERFORMANCE_STAGES.map((option) => (
-            <button
-              key={option}
-              type="button"
-              role="radio"
-              aria-checked={picked === option}
-              onClick={() => setPicked(option)}
-              className={cn(
-                "flex items-center justify-between rounded-lg border px-3 py-2 text-left text-sm",
-                picked === option ? "border-foreground" : "border-border/70 hover:bg-muted/50",
-              )}
-            >
-              <span>{STAGE_LABEL[option]}</span>
-              {AUTO_STAGES.includes(option) ? (
-                <span className="text-muted-foreground text-[10px] uppercase tracking-wide">auto</span>
-              ) : null}
-            </button>
-          ))}
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Group label="Business">
+            {BUSINESS_STAGES.map((option) => (
+              <Option
+                key={option}
+                label={BUSINESS_LABEL[option]}
+                checked={pickedBusiness === option}
+                onClick={() => setPickedBusiness(option)}
+              />
+            ))}
+          </Group>
+          <Group label="Delivery">
+            {DELIVERY_STAGES.map((option) => (
+              <Option
+                key={option}
+                label={DELIVERY_LABEL[option]}
+                checked={pickedDelivery === option}
+                auto={AUTO_DELIVERY_STAGES.includes(option)}
+                onClick={() => setPickedDelivery(option)}
+              />
+            ))}
+          </Group>
         </div>
         <DialogFooter>
-          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onOpenChange(false)}
+          >
             Cancel
           </Button>
-          <Button size="sm" disabled={save.isPending || picked === stage} onClick={() => save.mutate({ brandId, stage: picked })}>
+          <Button
+            size="sm"
+            disabled={save.isPending || !dirty}
+            onClick={() =>
+              save.mutate({
+                brandId,
+                ...(pickedBusiness !== business
+                  ? { business: pickedBusiness }
+                  : {}),
+                ...(pickedDelivery !== delivery
+                  ? { delivery: pickedDelivery }
+                  : {}),
+              })
+            }
+          >
             Save
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function Group({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label={label}
+      className="grid content-start gap-1"
+    >
+      <p className="text-muted-foreground mb-1 text-[10.5px] font-semibold tracking-[0.07em] uppercase">
+        {label}
+      </p>
+      {children}
+    </div>
+  );
+}
+
+function Option({
+  label,
+  checked,
+  auto,
+  onClick,
+}: {
+  label: string;
+  checked: boolean;
+  auto?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={checked}
+      onClick={onClick}
+      className={cn(
+        "flex items-center justify-between rounded-lg border px-3 py-2 text-left text-sm",
+        checked ? "border-foreground" : "border-border/70 hover:bg-muted/50",
+      )}
+    >
+      <span>{label}</span>
+      {auto ? (
+        <span className="text-muted-foreground text-[10px] tracking-wide uppercase">
+          auto
+        </span>
+      ) : null}
+    </button>
   );
 }

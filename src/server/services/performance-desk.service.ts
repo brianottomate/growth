@@ -3,13 +3,18 @@ import "server-only";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 
 import {
+  DELIVERY_STAGES,
   isClientStage,
   isClosedStage,
   laterStage,
-  type PerformanceStage,
+  type BusinessStage,
+  type DeliveryStage,
 } from "@/lib/performance-stage";
 import { db } from "@/server/db";
-import { brandIntakeUrl, brandPitchUrl } from "@/server/services/brand-connect.service";
+import {
+  brandIntakeUrl,
+  brandPitchUrl,
+} from "@/server/services/brand-connect.service";
 import {
   brandTable,
   campaignTable,
@@ -52,13 +57,15 @@ export type DeskBrand = {
   logo: string | null;
   website: string | null;
   relationship: "internal" | "client" | "prospect" | "reference";
+  /** The money and the relationship, as a person last set it. */
+  business: BusinessStage;
+  businessAt: Date | null;
   /**
-   * Where the brand is on its way to live: the stored stage, or further along
-   * when the campaigns say so (ads ready to review, live, paused). Closed
-   * stages stay as set.
+   * The production line: the stored stage, or further along when the
+   * campaigns say so (ads ready to review, live, paused).
    */
-  stage: PerformanceStage;
-  stageAt: Date | null;
+  delivery: DeliveryStage;
+  deliveryAt: Date | null;
   hasMark: boolean;
   /** The client-facing intake form on wander.com, by slug or by connect token. */
   intakeUrl: string | null;
@@ -80,7 +87,12 @@ export type PerformanceDesk = {
   prospects: number;
 };
 
-const RANK: Record<DeskCampaignState, number> = { live: 0, pushed: 1, draft: 2, ended: 3 };
+const RANK: Record<DeskCampaignState, number> = {
+  live: 0,
+  pushed: 1,
+  draft: 2,
+  ended: 3,
+};
 
 function stateOf(rows: PlatformCampaign[]): DeskCampaignState {
   if (rows.some((row) => row.status === "live")) return "live";
@@ -102,7 +114,8 @@ function paceOf(rows: PlatformCampaign[], spend: number): DeskCampaign["pace"] {
   const expected = dated.reduce((sum, row) => {
     const start = row.startAt!.getTime();
     const end = row.endAt!.getTime();
-    const fraction = end > start ? Math.min(1, Math.max(0, (now - start) / (end - start))) : 1;
+    const fraction =
+      end > start ? Math.min(1, Math.max(0, (now - start) / (end - start))) : 1;
     return sum + fraction * (row.budget ?? 0);
   }, 0);
   if (expected <= 0) return null;
@@ -116,9 +129,14 @@ function paceOf(rows: PlatformCampaign[], spend: number): DeskCampaign["pace"] {
  * Wander's own brands are not on the desk at all; their campaigns live on the
  * brand pages.
  */
-export async function loadPerformanceDesk(organizationId: string): Promise<PerformanceDesk> {
+export async function loadPerformanceDesk(
+  organizationId: string,
+): Promise<PerformanceDesk> {
   const brandRows = await db.query.brandTable.findMany({
-    where: and(eq(brandTable.organizationId, organizationId), isNull(brandTable.deletedAt)),
+    where: and(
+      eq(brandTable.organizationId, organizationId),
+      isNull(brandTable.deletedAt),
+    ),
     columns: {
       id: true,
       name: true,
@@ -128,19 +146,32 @@ export async function loadPerformanceDesk(organizationId: string): Promise<Perfo
       relationship: true,
       brandMark: true,
       connectToken: true,
-      performanceStage: true,
-      performanceStageAt: true,
+      businessStage: true,
+      businessStageAt: true,
+      deliveryStage: true,
+      deliveryStageAt: true,
     },
     orderBy: (brand, { asc }) => [asc(brand.name)],
   });
   const brandIds = brandRows.map((brand) => brand.id);
   if (brandIds.length === 0) {
-    return { brands: [], campaigns: [], live: [], liveSpend: 0, liveBudget: 0, clients: 0, prospects: 0 };
+    return {
+      brands: [],
+      campaigns: [],
+      live: [],
+      liveSpend: 0,
+      liveBudget: 0,
+      clients: 0,
+      prospects: 0,
+    };
   }
 
   const [campaignRows, accounts] = await Promise.all([
     db.query.campaignTable.findMany({
-      where: and(inArray(campaignTable.brandId, brandIds), isNull(campaignTable.deletedAt)),
+      where: and(
+        inArray(campaignTable.brandId, brandIds),
+        isNull(campaignTable.deletedAt),
+      ),
       columns: {
         id: true,
         brandId: true,
@@ -186,21 +217,36 @@ export async function loadPerformanceDesk(organizationId: string): Promise<Perfo
   const rowsByCampaign = new Map<string, PlatformCampaign[]>();
   for (const row of platformRows) {
     if (!row.campaignId) continue;
-    rowsByCampaign.set(row.campaignId, [...(rowsByCampaign.get(row.campaignId) ?? []), row]);
+    rowsByCampaign.set(row.campaignId, [
+      ...(rowsByCampaign.get(row.campaignId) ?? []),
+      row,
+    ]);
   }
-  const accountByBrand = new Map(accounts.map((account) => [account.brandId, account]));
+  const accountByBrand = new Map(
+    accounts.map((account) => [account.brandId, account]),
+  );
 
   const campaigns: DeskCampaign[] = campaignRows.map((campaign) => {
     const rows = rowsByCampaign.get(campaign.id) ?? [];
-    const spend = rows.reduce((sum, row) => sum + (row.stats?.spend ?? row.spend ?? 0), 0);
-    const platformBudget = rows.reduce((sum, row) => sum + (row.budget ?? 0), 0);
+    const spend = rows.reduce(
+      (sum, row) => sum + (row.stats?.spend ?? row.spend ?? 0),
+      0,
+    );
+    const platformBudget = rows.reduce(
+      (sum, row) => sum + (row.budget ?? 0),
+      0,
+    );
     return {
       id: campaign.id,
       name: campaign.name,
       brandId: campaign.brandId,
       createdAt: campaign.createdAt,
       state: stateOf(rows),
-      platforms: rows.map((row) => ({ id: row.id, platform: row.platform, status: row.status })),
+      platforms: rows.map((row) => ({
+        id: row.id,
+        platform: row.platform,
+        status: row.status,
+      })),
       spend,
       budget: platformBudget > 0 ? platformBudget : (campaign.budget ?? 0),
       pace: paceOf(rows, spend),
@@ -220,13 +266,21 @@ export async function loadPerformanceDesk(organizationId: string): Promise<Perfo
   }
 
   const brands: DeskBrand[] = brandRows
-    .filter((brand) => brand.relationship === "client" || brand.relationship === "prospect")
+    .filter(
+      (brand) =>
+        brand.relationship === "client" || brand.relationship === "prospect",
+    )
     .map((brand) => {
       const own = campaignsByBrand.get(brand.id) ?? [];
       const account = accountByBrand.get(brand.id);
+      const business: BusinessStage =
+        brand.businessStage ??
+        (brand.relationship === "client" ? "signed" : "prospect");
       return {
-        stage: effectiveStage(brand.performanceStage, brand.relationship, own),
-        stageAt: brand.performanceStageAt,
+        business,
+        businessAt: brand.businessStageAt,
+        delivery: effectiveDelivery(brand.deliveryStage, business, own),
+        deliveryAt: brand.deliveryStageAt,
         id: brand.id,
         name: brand.name,
         slug: brand.slug,
@@ -240,10 +294,15 @@ export async function loadPerformanceDesk(organizationId: string): Promise<Perfo
             ? brandIntakeUrl(brand.connectToken)
             : null,
         pitchUrl: brand.slug ? brandPitchUrl(brand.slug) : null,
-        account: account ? { id: account.id, status: account.status, plan: account.plan } : null,
+        account: account
+          ? { id: account.id, status: account.status, plan: account.plan }
+          : null,
         campaigns: own,
         best: own.reduce<DeskCampaignState | null>(
-          (acc, campaign) => (acc === null || RANK[campaign.state] < RANK[acc] ? campaign.state : acc),
+          (acc, campaign) =>
+            acc === null || RANK[campaign.state] < RANK[acc]
+              ? campaign.state
+              : acc,
           null,
         ),
       };
@@ -252,12 +311,15 @@ export async function loadPerformanceDesk(organizationId: string): Promise<Perfo
       const ra = a.best ? RANK[a.best] : 4;
       const rb = b.best ? RANK[b.best] : 4;
       if (ra !== rb) return ra - rb;
-      if (a.relationship !== b.relationship) return a.relationship === "client" ? -1 : 1;
+      if (a.relationship !== b.relationship)
+        return a.relationship === "client" ? -1 : 1;
       return a.name.localeCompare(b.name);
     });
 
   const onDesk = new Set(brands.map((brand) => brand.id));
-  const deskCampaigns = campaigns.filter((campaign) => onDesk.has(campaign.brandId));
+  const deskCampaigns = campaigns.filter((campaign) =>
+    onDesk.has(campaign.brandId),
+  );
   const live = deskCampaigns.filter((campaign) => campaign.state === "live");
   return {
     brands,
@@ -265,38 +327,47 @@ export async function loadPerformanceDesk(organizationId: string): Promise<Perfo
     live,
     liveSpend: live.reduce((sum, campaign) => sum + campaign.spend, 0),
     liveBudget: live.reduce((sum, campaign) => sum + campaign.budget, 0),
-    clients: brands.filter((brand) => !isClosedStage(brand.stage) && isClientStage(brand.stage)).length,
-    prospects: brands.filter((brand) => !isClosedStage(brand.stage) && !isClientStage(brand.stage)).length,
+    clients: brands.filter((brand) => isClientStage(brand.business)).length,
+    prospects: brands.filter(
+      (brand) =>
+        !isClosedStage(brand.business) && !isClientStage(brand.business),
+    ).length,
   };
 }
 
 /**
- * What the campaigns say about a brand's stage, laid over what is stored. A
- * stored stage never moves backwards here, and a closed stage is left alone.
+ * What the campaigns say about a brand's delivery, laid over what is stored.
+ * A stored stage never moves backwards here, and a closed brand is left alone.
  */
-function effectiveStage(
-  stored: PerformanceStage | null,
-  relationship: "internal" | "client" | "prospect" | "reference",
+function effectiveDelivery(
+  stored: DeliveryStage | null,
+  business: BusinessStage,
   campaigns: DeskCampaign[],
-): PerformanceStage {
-  const base: PerformanceStage =
-    stored ?? (relationship === "client" ? "signed" : "ready_to_pitch");
-  if (isClosedStage(base)) return base;
-  let derived: PerformanceStage | null = null;
+): DeliveryStage {
+  const base: DeliveryStage = stored ?? "not_started";
+  if (isClosedStage(business)) return base;
+  let derived: DeliveryStage | null = null;
   if (campaigns.some((campaign) => campaign.state === "live")) derived = "live";
-  else if (campaigns.some((campaign) => campaign.state === "pushed" || campaign.state === "ended")) {
+  else if (
+    campaigns.some(
+      (campaign) => campaign.state === "pushed" || campaign.state === "ended",
+    )
+  ) {
     derived = "paused";
   } else if (
     campaigns.some(
-      (campaign) => campaign.state === "draft" && campaign.adCount > 0 && campaign.platforms.length > 0,
+      (campaign) =>
+        campaign.state === "draft" &&
+        campaign.adCount > 0 &&
+        campaign.platforms.length > 0,
     )
   ) {
     derived = "ads_review";
   }
   // Live and paused are only meaningful once the brand is a client; a
   // prospect with a test draft does not become "ads ready for review".
-  if (derived && !isClientStage(base)) return base;
-  return derived ? laterStage(base, derived) : base;
+  if (derived && !isClientStage(business)) return base;
+  return derived ? laterStage(DELIVERY_STAGES, base, derived) : base;
 }
 
 /** The desk for one side of the client line; closed brands leave both. */
@@ -306,11 +377,15 @@ export function narrowDesk(
 ): PerformanceDesk {
   const brands = desk.brands.filter(
     (brand) =>
-      !isClosedStage(brand.stage) &&
-      (relationship === "client" ? isClientStage(brand.stage) : !isClientStage(brand.stage)),
+      !isClosedStage(brand.business) &&
+      (relationship === "client"
+        ? isClientStage(brand.business)
+        : !isClientStage(brand.business)),
   );
   const ids = new Set(brands.map((brand) => brand.id));
-  const campaigns = desk.campaigns.filter((campaign) => ids.has(campaign.brandId));
+  const campaigns = desk.campaigns.filter((campaign) =>
+    ids.has(campaign.brandId),
+  );
   const live = campaigns.filter((campaign) => campaign.state === "live");
   return {
     brands,
@@ -325,5 +400,9 @@ export function narrowDesk(
 
 /** Whole dollars as the desk writes them. */
 export function deskMoney(n: number | null | undefined) {
-  return n == null ? "—" : n >= 1000 ? `$${(n / 1000).toFixed(1)}K` : `$${Math.round(n)}`;
+  return n == null
+    ? "—"
+    : n >= 1000
+      ? `$${(n / 1000).toFixed(1)}K`
+      : `$${Math.round(n)}`;
 }

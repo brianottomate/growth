@@ -23,29 +23,40 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "@/components/ui/toast";
-import type { PerformanceStage } from "@/lib/performance-stage";
+import type { BusinessStage, DeliveryStage } from "@/lib/performance-stage";
 import { useTRPC } from "@/trpc/react";
 
 import { StageDialog } from "./StageDialog";
 
 /**
- * The quiet menu on a client or prospect row: set the stage by hand, or
- * delete the brand behind a confirmation. Delete is a soft delete; the brand
- * page's purge is the destructive one.
+ * The quiet menu on a client or prospect row: mark the invoice paid in one
+ * click, set either stage by hand, or delete the brand behind a confirmation.
+ * Delete is a soft delete; the brand page's purge is the destructive one.
  */
 export function BrandRowMenu({
   brandId,
   brandName,
-  stage,
+  business,
+  delivery,
 }: {
   brandId: string;
   brandName: string;
-  stage: PerformanceStage;
+  business: BusinessStage;
+  delivery: DeliveryStage;
 }) {
   const trpc = useTRPC();
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
   const [staging, setStaging] = useState(false);
+  const markPaid = useMutation(
+    trpc.performance.setStage.mutationOptions({
+      onSuccess: () => {
+        toast.success(`${brandName}: Paid`);
+        router.refresh();
+      },
+      onError: (error) => toast.error(error.message),
+    }),
+  );
   const remove = useMutation(
     trpc.brand.delete.mutationOptions({
       onSuccess: () => {
@@ -66,9 +77,22 @@ export function BrandRowMenu({
           <MoreHorizontal className="size-4" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
-          <DropdownMenuItem onClick={() => setStaging(true)}>Set stage…</DropdownMenuItem>
+          {business === "signed" ? (
+            <DropdownMenuItem
+              disabled={markPaid.isPending}
+              onClick={() => markPaid.mutate({ brandId, business: "paid" })}
+            >
+              Mark paid
+            </DropdownMenuItem>
+          ) : null}
+          <DropdownMenuItem onClick={() => setStaging(true)}>
+            Set stages…
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem variant="destructive" onClick={() => setConfirming(true)}>
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => setConfirming(true)}
+          >
             Delete brand…
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -76,7 +100,8 @@ export function BrandRowMenu({
       <StageDialog
         brandId={brandId}
         brandName={brandName}
-        stage={stage}
+        business={business}
+        delivery={delivery}
         open={staging}
         onOpenChange={setStaging}
       />

@@ -40,9 +40,9 @@ import {
 import {
   promoteBrandToClient,
   setBrandRelationship,
-  setBrandStage,
+  setBrandStages,
 } from "@/server/services/brand-relationship.service";
-import { PERFORMANCE_STAGES } from "@/lib/performance-stage";
+import { BUSINESS_STAGES, DELIVERY_STAGES } from "@/lib/performance-stage";
 
 import { protectedProcedure } from "../trpc";
 
@@ -197,9 +197,7 @@ export const performanceRouter = {
     ),
 
   setIntakeVerifiedPage: protectedProcedure
-    .input(
-      z.object({ intakeId: z.string().min(1), pageId: z.string().min(1) }),
-    )
+    .input(z.object({ intakeId: z.string().min(1), pageId: z.string().min(1) }))
     .mutation(async ({ ctx, input }) =>
       setIntakeVerifiedPage(await actorFor(ctx), input),
     ),
@@ -220,10 +218,18 @@ export const performanceRouter = {
       promoteBrandToClient(await actorFor(ctx), input),
     ),
 
-  /** The ⋯ dialog: any stage, the relationship follows. */
+  /** The ⋯ dialog: either lifecycle, any stage; the relationship follows business. */
   setStage: protectedProcedure
-    .input(z.object({ brandId: z.string().min(1), stage: z.enum(PERFORMANCE_STAGES) }))
-    .mutation(async ({ ctx, input }) => setBrandStage(await actorFor(ctx), input)),
+    .input(
+      z.object({
+        brandId: z.string().min(1),
+        business: z.enum(BUSINESS_STAGES).optional(),
+        delivery: z.enum(DELIVERY_STAGES).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      setBrandStages(await actorFor(ctx), input),
+    ),
 
   setBrandRelationship: protectedProcedure
     .input(
