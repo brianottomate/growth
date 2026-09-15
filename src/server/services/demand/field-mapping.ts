@@ -54,7 +54,7 @@ export interface DemandPropertyDefinition {
   name: `demand_${string}`;
   label: string;
   type: "string" | "number" | "date" | "datetime" | "enumeration";
-  fieldType: "text" | "textarea" | "number" | "date" | "select";
+  fieldType: "text" | "textarea" | "number" | "date" | "select" | "checkbox";
   description?: string;
   options?: { label: string; value: string }[];
   /** HubSpot user picker — the value written is a HubSpot owner id. */
@@ -106,6 +106,30 @@ export const DEMAND_PROPERTY_DEFINITIONS = [
     fieldType: "text",
     description:
       "Highest-priority activity: Completed Purchase, Abandoned Payment, Abandoned Cart, Abandoned Wishlist, Abandoned Search, New Signup.",
+  },
+  {
+    // Multi-select: every signal the guest has ever shown, accumulated across
+    // syncs (union, never overwrite). demand_activity_tag is the single
+    // highest-priority signal; this is the whole set for list segmentation.
+    // Values match the raw funnel events (see EVENT_SIGNAL_MAP); created by
+    // hand in portal 22480390, verified 2026-09-14.
+    name: "demand_signals",
+    label: "DEMAND - Signals",
+    type: "enumeration",
+    fieldType: "checkbox",
+    description:
+      "Every behavioral signal the guest has shown; accumulates across syncs.",
+    options: [
+      { label: "New Signup", value: "new_signup" },
+      { label: "Abandoned Search", value: "abandoned_search" },
+      { label: "Wishlisted", value: "wishlisted" },
+      { label: "Abandoned Wishlist", value: "abandoned_wishlist" },
+      { label: "Started Checkout", value: "checkout_started" },
+      { label: "Abandoned Cart", value: "abandoned_cart" },
+      { label: "Entered Payment", value: "payment_entered" },
+      { label: "Abandoned Payment", value: "abandoned_payment" },
+      { label: "Completed Purchase", value: "completed_purchase" },
+    ],
   },
   {
     name: "demand_last_event_type",
@@ -285,6 +309,9 @@ export const DEMAND_STATE_PROPERTIES = [
   "demand__bdr",
   "demand_bdr_email",
   "demand_sync_count",
+  // demand_signals accumulates, so the current set has to be read back and
+  // unioned with the new event rather than overwritten.
+  "demand_signals",
 ] as const satisfies readonly DemandPropertyName[];
 
 /**
@@ -316,7 +343,54 @@ export interface DemandMappingContext {
   existingStage?: string | null;
   /** Current `demand_sync_count` on the contact. */
   existingSyncCount?: number | null;
+  /** Signals already on `demand_signals`; the new event is unioned into this. */
+  existingSignals?: string[] | null;
   now?: Date;
+}
+
+/**
+ * Raw funnel event → `demand_signals` option value. The five identity
+ * mappings and four renames match the picker the field was created with
+ * (portal 22480390). Keyed on the full event token so `.includes` on an
+ * aggregated `event_types` string can never conflate two events.
+ */
+export const EVENT_SIGNAL_MAP: Record<string, string> = {
+  user_signed_up: "new_signup",
+  abandoned_search: "abandoned_search",
+  product_added_to_wishlist: "wishlisted",
+  abandoned_wishlist: "abandoned_wishlist",
+  checkout_started: "checkout_started",
+  abandoned_cart: "abandoned_cart",
+  payment_info_entered: "payment_entered",
+  abandoned_payment: "abandoned_payment",
+  order_completed: "completed_purchase",
+};
+
+/**
+ * The accumulated signal set: everything already on the contact, plus every
+ * known event named in this lead's aggregated `event_types` and its
+ * triggering `webhook_event_type`. Union — a BDR's manual pick and past
+ * signals are preserved; the same event twice does not duplicate. Order is
+ * the manifest's so lists read consistently.
+ */
+export function resolveDemandSignals(
+  lead: LeadData,
+  existingSignals?: string[] | null,
+): string[] {
+  const set = new Set(existingSignals ?? []);
+  const haystack =
+    `${lead.event_types ?? ""} ${lead.webhook_event_type ?? ""}`.toLowerCase();
+  for (const [event, signal] of Object.entries(EVENT_SIGNAL_MAP)) {
+    if (haystack.includes(event)) set.add(signal);
+  }
+  const order = Object.values(EVENT_SIGNAL_MAP);
+  return [...set].sort((a, b) => {
+    const ia = order.indexOf(a);
+    const ib = order.indexOf(b);
+    // Unknown values (a BDR's manual pick outside our map) sort to the end,
+    // stable among themselves, so they are preserved rather than dropped.
+    return (ia === -1 ? order.length : ia) - (ib === -1 ? order.length : ib);
+  });
 }
 
 /**
@@ -355,6 +429,11 @@ export function mapLeadToDemandProps(
     "demand_activity_tag",
     getActivityTag(lead.event_types ?? lead.webhook_event_type ?? null),
   );
+  // Accumulated multi-select. Written as the HubSpot `;`-delimited set; only
+  // set when non-empty so a lead with no known event never clears a BDR's
+  // manual picks.
+  const signals = resolveDemandSignals(lead, context.existingSignals);
+  if (signals.length > 0) props.demand_signals = signals.join(";");
   set("demand_last_event_type", safeString(eventType));
   set("demand_last_event_at", toIsoDateTime(lead.last_activity_ts));
   set("demand_last_sync_at", now.toISOString());

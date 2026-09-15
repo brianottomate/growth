@@ -156,6 +156,54 @@ describe("demand field mapping", () => {
     expect(props.demand_activity_tag).toBe("Abandoned Cart");
   });
 
+  test("demand_signals maps the event and accumulates without duplicating", () => {
+    // A single triggering event → its signal value.
+    expect(mapLeadToDemandProps(lead(), { now: NOW }).demand_signals).toBe(
+      "abandoned_cart",
+    );
+    // Renamed events map to the picker value, not the raw event token.
+    expect(
+      mapLeadToDemandProps(lead({ webhook_event_type: "user_signed_up" }), {
+        now: NOW,
+      }).demand_signals,
+    ).toBe("new_signup");
+
+    // The new event is unioned into the existing set; order follows the
+    // manifest and an already-present signal is not duplicated.
+    const props = mapLeadToDemandProps(lead(), {
+      existingSignals: ["new_signup", "abandoned_cart"],
+      now: NOW,
+    });
+    expect(props.demand_signals).toBe("new_signup;abandoned_cart");
+
+    // An aggregated event_types string seeds every known signal at once.
+    expect(
+      mapLeadToDemandProps(
+        lead({
+          event_types: "user_signed_up,abandoned_search,checkout_started",
+          webhook_event_type: "checkout_started",
+        }),
+        { now: NOW },
+      ).demand_signals,
+    ).toBe("new_signup;abandoned_search;checkout_started");
+  });
+
+  test("demand_signals preserves a BDR's manual pick and never clears on an eventless lead", () => {
+    // A signal outside our map (a BDR ticked a box) survives, sorted last.
+    const props = mapLeadToDemandProps(lead(), {
+      existingSignals: ["manual_bdr_signal"],
+      now: NOW,
+    });
+    expect(props.demand_signals).toBe("abandoned_cart;manual_bdr_signal");
+
+    // No known event and no existing set → the property is omitted, so the
+    // force-update can never wipe a set that is already on the contact.
+    const empty = mapLeadToDemandProps(lead({ webhook_event_type: null }), {
+      now: NOW,
+    });
+    expect(empty.demand_signals).toBeUndefined();
+  });
+
   test("abandoned search carries destination and a date range", () => {
     const props = mapLeadToDemandProps(
       lead({

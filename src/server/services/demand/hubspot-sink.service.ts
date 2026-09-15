@@ -42,6 +42,8 @@ export interface DemandContactState {
   bdrOwnerId: string | null;
   bdrEmail: string | null;
   syncCount: number | null;
+  /** Current `demand_signals` set, parsed from the `;`-delimited value. */
+  signals: string[];
   /** How the record was found — the link table is the cheap path. */
   foundVia: "link" | "search";
 }
@@ -63,6 +65,10 @@ function toState(
     bdrOwnerId: found.values.demand__bdr,
     bdrEmail: found.values.demand_bdr_email,
     syncCount: Number.isFinite(count) ? count : null,
+    signals: (found.values.demand_signals ?? "")
+      .split(";")
+      .map((value) => value.trim())
+      .filter(Boolean),
     foundVia,
   };
 }
@@ -106,6 +112,7 @@ export async function lookupDemandContact(
         demand__bdr: found.values.demand__bdr,
         demand_bdr_email: found.values.demand_bdr_email,
         demand_sync_count: found.values.demand_sync_count,
+        demand_signals: found.values.demand_signals,
       },
     },
     "search",
@@ -148,6 +155,7 @@ export async function writeDemandContact(
     newlyAssigned,
     existingStage: existing ? existing.stage : undefined,
     existingSyncCount: existing?.syncCount ?? null,
+    existingSignals: existing?.signals ?? null,
   });
 
   if (params.dryRun) {
@@ -193,6 +201,7 @@ export async function writeDemandContact(
           newlyAssigned: alreadyOwned ? false : newlyAssigned,
           existingStage: state ? state.stage : undefined,
           existingSyncCount: state?.syncCount ?? null,
+          existingSignals: state?.signals ?? null,
         });
         await withHubspotRetry("updateContact", () =>
           updateContact(existingId, recomputed),
