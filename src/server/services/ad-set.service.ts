@@ -275,8 +275,10 @@ async function cardFromAsset(brandId: string, mediaAssetId: string) {
   return {
     item,
     name: asset.title ?? asset.filename ?? null,
-    /** The name the file arrived with, which is what the export convention is read from. */
-    filename: asset.filename ?? asset.title ?? null,
+    // The name the file arrived with, which is what the export convention
+    // is read from. The stored filename is slugified for the object key, so
+    // the title is where the original spelling survives.
+    filename: asset.title ?? asset.filename ?? null,
   };
 }
 
