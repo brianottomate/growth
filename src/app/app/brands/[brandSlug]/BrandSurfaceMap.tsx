@@ -40,16 +40,18 @@ function fact(count: number, singular: string, plural = `${singular}s`) {
 
 export function BrandSurfaceMap({
   brandId,
+  brandSlug,
   summary,
 }: {
   brandId: string;
+  brandSlug: string;
   summary: BrandSurfaceSummary;
 }) {
   const surfaces: Surface[] = [
     {
       title: "Strategy",
       description: "The intended mix and cadence AI should plan against.",
-      href: "#strategy",
+      href: `/app/brands/${brandSlug}/strategy`,
       icon: Target,
       facts: [
         summary.hasStrategyTargets ? "Targets set" : "No targets yet",
@@ -69,7 +71,7 @@ export function BrandSurfaceMap({
       title: "Personas",
       description:
         "Who the brand talks to — the stable layer campaigns narrow.",
-      href: "/app/audiences",
+      href: `/app/brands/${brandSlug}/strategy`,
       icon: Target,
       facts: [fact(summary.personas, "persona")],
       state: summary.personas > 0 ? "mapped" : "partial",

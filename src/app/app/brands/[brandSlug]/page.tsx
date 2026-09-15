@@ -15,14 +15,13 @@ import { getSession } from "@/server/better-auth/server";
 import { getBrandStrategy } from "@/server/services/cadence.service";
 import { backfillStateForBrand } from "@/server/services/peer-scrape.service";
 import { getBrandSurfaceSummary } from "@/server/services/brand-map.service";
-import { PILLARS } from "@/lib/pillars";
 import { ContentStructureAssistantButton } from "@/components/content-structure-assistant-button";
 
 import { BrandBrandingCard } from "./BrandBrandingCard";
 import { BrandMarkCard } from "./BrandMarkCard";
 import { mediaAssetTable } from "@/server/db/schema";
 import { inArray } from "drizzle-orm";
-import { BrandStrategyClient } from "./BrandStrategyClient";
+import { BrandCadence } from "./BrandStrategyClient";
 import { BrandSurfaceMap } from "./BrandSurfaceMap";
 
 export const dynamic = "force-dynamic";
@@ -133,11 +132,6 @@ export default async function BrandPage({
       : [];
   const campaignName = new Map(spotCampaigns.map((row) => [row.id, row.name]));
 
-  // Pillars available to target for this brand (by slug), for the "add" menu.
-  const pillars = PILLARS.filter(
-    (p) => p.brandSlug === brand.slug || p.brandSlug === "wander",
-  ).map((p) => ({ slug: p.slug, name: p.name }));
-
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6 p-6">
       <header className="space-y-1">
@@ -164,6 +158,12 @@ export default async function BrandPage({
               brandName={brand.name}
               source="brand"
             />
+            <Link
+              href={`/app/brands/${brand.slug}/strategy`}
+              className="text-muted-foreground hover:underline"
+            >
+              Strategy
+            </Link>
             <Link
               href={`/app/brands/${brand.slug}/ads`}
               className="text-muted-foreground hover:underline"
@@ -209,7 +209,11 @@ export default async function BrandPage({
         </p>
       </header>
 
-      <BrandSurfaceMap brandId={brand.id} summary={surfaceSummary} />
+      <BrandSurfaceMap
+        brandId={brand.id}
+        brandSlug={brand.slug ?? brandSlug}
+        summary={surfaceSummary}
+      />
 
       <BrandBrandingCard
         brandId={brand.id}
@@ -290,19 +294,26 @@ export default async function BrandPage({
         </section>
       )}
 
-      <section id="strategy" className="scroll-mt-6 space-y-3">
-        <div>
-          <h2 className="text-base font-semibold">Strategy and cadence</h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Compare observed behavior with the structure the team wants AI to
-            plan against.
-          </p>
+      <section id="cadence" className="scroll-mt-6 space-y-3">
+        <div className="flex items-end justify-between">
+          <div>
+            <h2 className="text-base font-semibold">Channel cadence</h2>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              How often each channel actually posts, against its target and
+              tracked peers.
+            </p>
+          </div>
+          <Link
+            href={`/app/brands/${brand.slug}/strategy`}
+            className="text-sm text-muted-foreground hover:underline"
+          >
+            Strategy ↗
+          </Link>
         </div>
-        <BrandStrategyClient
+        <BrandCadence
           brandId={brand.id}
           brandName={brand.name}
           strategy={strategy}
-          pillars={pillars}
           backfill={backfill}
         />
       </section>

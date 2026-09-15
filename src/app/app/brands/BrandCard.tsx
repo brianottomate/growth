@@ -153,7 +153,7 @@ export function BrandCard({
         <nav className="flex flex-wrap items-center gap-1 border-t px-3 py-1.5 text-[13px]">
           {detailHref && (
             <>
-              <Link href={detailHref} className={TAB}>
+              <Link href={`${detailHref}/strategy`} className={TAB}>
                 Strategy
               </Link>
               <Link href={`${detailHref}/content`} className={TAB}>
@@ -196,7 +196,7 @@ export function BrandCard({
               Pillars{pillars.length > 0 && ` · ${pillars.length}`}
             </span>
             {detailHref && (
-              <Link href={`${detailHref}#strategy`} className={QUIET_LINK}>
+              <Link href={`${detailHref}/strategy`} className={QUIET_LINK}>
                 Strategy ↗
               </Link>
             )}

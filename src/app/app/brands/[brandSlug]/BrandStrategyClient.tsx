@@ -606,11 +606,14 @@ function MixCard({
   strategy,
   editing,
   onSetMix,
+  onToggleEdit,
   pending,
 }: {
   strategy: BrandStrategy;
   editing: boolean;
   onSetMix: (args: { pillar: string; targetPct: number }) => void;
+  /** When set, MixCard owns its edit toggle (the standalone Strategy page). */
+  onToggleEdit?: () => void;
   pending: boolean;
 }) {
   const classified = strategy.mix.filter((m) => m.pillar !== "__unsorted");
@@ -664,7 +667,17 @@ function MixCard({
           Content mix{" "}
           <span className="font-normal text-muted-foreground">· by pillar</span>
         </span>
-        <GaugeLegend />
+        <span className="flex items-center gap-3">
+          <GaugeLegend />
+          {onToggleEdit && (
+            <button
+              onClick={onToggleEdit}
+              className={editing ? "lg-pill lg-pill-on" : "lg-pill"}
+            >
+              {editing ? "Done" : "Edit targets"}
+            </button>
+          )}
+        </span>
       </div>
       <div>
         {sorted.map((m, i) => {
@@ -733,7 +746,12 @@ function MixCard({
 }
 
 // ---- page ------------------------------------------------------------------
-export function BrandStrategyClient({
+/**
+ * The tactical monitoring view: a cadence verdict and the per-channel gauges.
+ * Lives on the brand-map cockpit. The strategic decisions (pillars, personas)
+ * are their own page — see BrandContentMix and /app/brands/[slug]/strategy.
+ */
+export function BrandCadence({
   brandId,
   brandName,
   strategy,
@@ -742,7 +760,6 @@ export function BrandStrategyClient({
   brandId: string;
   brandName: string;
   strategy: BrandStrategy;
-  pillars: { slug: string; name: string }[];
   /** Per-platform ingest facts + pull controls (see ChannelBackfill). */
   backfill?: Record<string, ChannelBackfillState>;
 }) {
@@ -753,9 +770,6 @@ export function BrandStrategyClient({
   const [sort, setSort] = useState<"attention" | "volume">("attention");
   const [editing, setEditing] = useState(false);
 
-  const setMix = useMutation(
-    trpc.cadence.setMixTarget.mutationOptions({ onSuccess: refresh }),
-  );
   const setCadence = useMutation(
     trpc.cadence.setCadenceTarget.mutationOptions({ onSuccess: refresh }),
   );
@@ -781,15 +795,6 @@ export function BrandStrategyClient({
   return (
     <div className="space-y-5">
       <Verdict strategy={strategy} />
-
-      <MixCard
-        strategy={strategy}
-        editing={editing}
-        pending={setMix.isPending}
-        onSetMix={({ pillar, targetPct }) =>
-          setMix.mutate({ brandId, pillar, targetPct, period: "week" })
-        }
-      />
 
       <div className="flex items-center gap-3">
         <h2 className="text-[15px] font-semibold">Channel cadence</h2>
@@ -839,5 +844,39 @@ export function BrandStrategyClient({
         ))}
       </div>
     </div>
+  );
+}
+
+/**
+ * The strategic decision: the content mix by pillar with its target sliders.
+ * Owns its own edit toggle so it can stand alone on the Strategy page.
+ */
+export function BrandContentMix({
+  brandId,
+  strategy,
+}: {
+  brandId: string;
+  strategy: BrandStrategy;
+}) {
+  const trpc = useTRPC();
+  const router = useRouter();
+  const [editing, setEditing] = useState(false);
+
+  const setMix = useMutation(
+    trpc.cadence.setMixTarget.mutationOptions({
+      onSuccess: () => router.refresh(),
+    }),
+  );
+
+  return (
+    <MixCard
+      strategy={strategy}
+      editing={editing}
+      onToggleEdit={() => setEditing((e) => !e)}
+      pending={setMix.isPending}
+      onSetMix={({ pillar, targetPct }) =>
+        setMix.mutate({ brandId, pillar, targetPct, period: "week" })
+      }
+    />
   );
 }
