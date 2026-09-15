@@ -42,7 +42,15 @@ const EMPTY: PersonaForm = {
  * counterpart of content pillars. Loose planning metadata only; the strict,
  * buyable narrowing lives on each campaign's audiences.
  */
-export function PersonasClient({ brands }: { brands: Brand[] }) {
+export function PersonasClient({
+  brands,
+  embedded = false,
+}: {
+  brands: Brand[];
+  /** Rendered inside another page (the brand Strategy page): drop the page
+   * shell and the big header so it aligns with the surrounding sections. */
+  embedded?: boolean;
+}) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [brandId, setBrandId] = useState(brands[0]?.id ?? "");
@@ -102,16 +110,28 @@ export function PersonasClient({ brands }: { brands: Brand[] }) {
   const error = create.error ?? update.error ?? remove.error;
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-6 p-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Personas</h1>
-          <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-            Who each brand talks to — the people counterpart of pillars. Few and
-            stable. Campaigns narrow a persona into a buyable audience with real
-            targeting and budget.
-          </p>
-        </div>
+    <div
+      className={
+        embedded ? "space-y-6" : "mx-auto w-full max-w-4xl space-y-6 p-6"
+      }
+    >
+      <header
+        className={
+          embedded
+            ? "flex flex-wrap items-center justify-end gap-3"
+            : "flex flex-wrap items-end justify-between gap-3"
+        }
+      >
+        {!embedded && (
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Personas</h1>
+            <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+              Who each brand talks to — the people counterpart of pillars. Few
+              and stable. Campaigns narrow a persona into a buyable audience
+              with real targeting and budget.
+            </p>
+          </div>
+        )}
         <div className="flex items-center gap-2">
           {brands.length > 1 && (
             <select

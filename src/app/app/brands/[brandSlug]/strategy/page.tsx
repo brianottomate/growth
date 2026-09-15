@@ -90,30 +90,18 @@ export default async function BrandStrategyPage({
             Channel cadence ↗
           </Link>
         </div>
-        <p className="text-sm text-muted-foreground">
-          What this brand is trying to do and who it talks to. The plan the team
-          wants AI to work against.
-        </p>
       </header>
 
-      <section className="space-y-3">
-        <div>
-          <h2 className="text-base font-semibold">Content mix</h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            The pillar mix, and the target share the team is planning toward.
-          </p>
-        </div>
+      <section>
         <BrandContentMix brandId={brand.id} strategy={strategy} />
       </section>
 
       <section className="space-y-3">
-        <div>
-          <h2 className="text-base font-semibold">Audiences</h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            The personas this brand speaks to, from the baseline.
-          </p>
-        </div>
-        <PersonasClient brands={[{ id: brand.id, name: brand.name }]} />
+        <h2 className="text-base font-semibold">Audiences</h2>
+        <PersonasClient
+          brands={[{ id: brand.id, name: brand.name }]}
+          embedded
+        />
       </section>
     </div>
   );
