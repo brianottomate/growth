@@ -109,6 +109,35 @@ function Frames({ spot }: { spot: PreviewSpot }) {
   );
 }
 
+/** Provider avatars carry signed, expiring URLs; fall back to the brand logo, then an initial. */
+function Avatar({
+  sources,
+  initial,
+}: {
+  sources: (string | null)[];
+  initial: string;
+}) {
+  const candidates = sources.filter((s): s is string => Boolean(s));
+  const [index, setIndex] = useState(0);
+  const src = candidates[index];
+  if (!src) {
+    return (
+      <span className="bg-muted flex size-8 items-center justify-center rounded-full text-xs font-semibold">
+        {initial}
+      </span>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- channel avatars live on provider hosts
+    <img
+      src={src}
+      alt=""
+      onError={() => setIndex((i) => i + 1)}
+      className="bg-muted size-8 rounded-full border object-cover"
+    />
+  );
+}
+
 function SpotMock({
   spot,
   brandName,
@@ -122,22 +151,13 @@ function SpotMock({
   const handle = spot.channel.handle
     ? `@${spot.channel.handle.replace(/^@/, "")}`
     : null;
-  const avatar = spot.channel.profileImageUrl ?? logo;
   return (
     <article className="bg-background w-full max-w-sm overflow-hidden rounded-2xl border shadow-sm">
       <header className="flex items-center gap-2.5 px-3 py-2.5">
-        {avatar ? (
-          // eslint-disable-next-line @next/next/no-img-element -- channel avatars live on provider hosts
-          <img
-            src={avatar}
-            alt=""
-            className="bg-muted size-8 rounded-full border object-cover"
-          />
-        ) : (
-          <span className="bg-muted flex size-8 items-center justify-center rounded-full text-xs font-semibold">
-            {identity.slice(0, 1).toUpperCase()}
-          </span>
-        )}
+        <Avatar
+          sources={[spot.channel.profileImageUrl, logo]}
+          initial={identity.slice(0, 1).toUpperCase()}
+        />
         <div className="min-w-0 flex-1 leading-tight">
           <div className="truncate text-sm font-semibold">{identity}</div>
           <div className="text-muted-foreground truncate text-xs">
@@ -174,6 +194,10 @@ function Picker({ ideas }: { ideas: PreviewIdea[] }) {
   const router = useRouter();
   const pathname = usePathname();
   const [chosen, setChosen] = useState<string[]>([]);
+  const all = () =>
+    setChosen((current) =>
+      current.length === ideas.length ? [] : ideas.map((idea) => idea.id),
+    );
   const toggle = (id: string) =>
     setChosen((current) =>
       current.includes(id) ? current.filter((x) => x !== id) : [...current, id],
@@ -219,12 +243,23 @@ function Picker({ ideas }: { ideas: PreviewIdea[] }) {
           </li>
         )}
       </ul>
-      <Button
-        disabled={chosen.length === 0}
-        onClick={() => router.push(`${pathname}?ids=${chosen.join(",")}`)}
-      >
-        Preview {chosen.length || ""} {chosen.length === 1 ? "idea" : "ideas"}
-      </Button>
+      <div className="flex items-center gap-3">
+        <Button
+          disabled={chosen.length === 0}
+          onClick={() => router.push(`${pathname}?ids=${chosen.join(",")}`)}
+        >
+          Preview {chosen.length || ""} {chosen.length === 1 ? "idea" : "ideas"}
+        </Button>
+        {ideas.length > 0 && (
+          <button
+            type="button"
+            onClick={all}
+            className="text-muted-foreground hover:text-foreground text-sm"
+          >
+            {chosen.length === ideas.length ? "Clear" : "Select all"}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -247,6 +282,11 @@ export function PreviewsClient({
         : `${window.location.origin}${pathname}?${search.toString()}`,
     [pathname, search],
   );
+  const dated = ideas.filter((idea) => idea.plannedAt);
+  const range =
+    dated.length > 0
+      ? `${dayLabel(dated[0]!.plannedAt)} to ${dayLabel(dated[dated.length - 1]!.plannedAt)}`
+      : null;
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-10 p-6">
@@ -258,6 +298,12 @@ export function PreviewsClient({
           <h1 className="text-2xl font-semibold tracking-tight">
             {picking ? "Pick ideas to preview" : "Planned posts"}
           </h1>
+          {!picking && (
+            <p className="text-muted-foreground text-sm">
+              {ideas.length} {ideas.length === 1 ? "idea" : "ideas"}
+              {range ? ` · ${range}` : ""}
+            </p>
+          )}
         </div>
         {!picking && (
           <div className="flex items-center gap-2">
@@ -306,6 +352,11 @@ export function PreviewsClient({
                   </span>
                 )}
               </div>
+              {idea.hook && (
+                <p className="text-muted-foreground max-w-3xl text-sm">
+                  {idea.hook}
+                </p>
+              )}
               <div className="flex flex-wrap gap-5">
                 {idea.spots.map((spot) => (
                   <SpotMock

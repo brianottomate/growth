@@ -89,8 +89,12 @@ export default async function BrandPage({
           `data:image/svg+xml;base64,${Buffer.from(markup).toString("base64")}`;
         const vector = brand.brandMark!.vector;
         return {
-          color: vector?.color ? svg(vector.color) : url(brand.brandMark!.variants.color),
-          white: vector ? svg(vector.white) : url(brand.brandMark!.variants.white),
+          color: vector?.color
+            ? svg(vector.color)
+            : url(brand.brandMark!.variants.color),
+          white: vector
+            ? svg(vector.white)
+            : url(brand.brandMark!.variants.white),
           dark: vector ? svg(vector.dark) : url(brand.brandMark!.variants.dark),
         };
       })()
@@ -165,6 +169,12 @@ export default async function BrandPage({
               className="text-muted-foreground hover:underline"
             >
               Ads
+            </Link>
+            <Link
+              href={`/app/brands/${brand.slug}/previews`}
+              className="text-muted-foreground hover:underline"
+            >
+              Previews
             </Link>
             <Link
               href={`/app/brands/${brand.slug}/setup`}

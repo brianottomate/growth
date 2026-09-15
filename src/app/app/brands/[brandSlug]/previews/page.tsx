@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { and, desc, eq, inArray, isNull, notInArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, notInArray, or } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import { brandTable, contentPostTable, memberTable } from "@/server/db/schema";
@@ -34,9 +34,10 @@ export default async function BrandPreviewsPage({
   const org = membership?.organization;
   if (!org) notFound();
 
+  // The segment is the slug, or the brand id when a tool only has that.
   const brand = await db.query.brandTable.findFirst({
     where: and(
-      eq(brandTable.slug, brandSlug),
+      or(eq(brandTable.slug, brandSlug), eq(brandTable.id, brandSlug)),
       eq(brandTable.organizationId, org.id),
       isNull(brandTable.deletedAt),
     ),
@@ -112,12 +113,12 @@ export default async function BrandPreviewsPage({
       })),
   }));
 
-  // Keep the operator's order when they chose the set.
-  const ordered = ids.length
-    ? ids
-        .map((id) => ideas.find((idea) => idea.id === id))
-        .filter((idea): idea is PreviewIdea => Boolean(idea))
-    : ideas;
+  // Calendar order, undated last: the reader is checking a run of posts.
+  const ordered = [...ideas].sort((a, b) => {
+    if (!a.plannedAt) return b.plannedAt ? 1 : 0;
+    if (!b.plannedAt) return -1;
+    return a.plannedAt.localeCompare(b.plannedAt);
+  });
 
   return (
     <PreviewsClient
