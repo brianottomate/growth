@@ -9,7 +9,7 @@ import { listBrandHomes } from "@/server/services/homes.service";
 import { panel, SectionLabel } from "../../../_components";
 import { HomesStrip } from "../HomesStrip";
 import { AddHomesByHand } from "../AddHomesByHand";
-import { PickedBand } from "../PickedBand";
+import { PickedHomes, type PickedHome } from "../PickedHomes";
 import { brandTabHref, loadPerformanceBrand } from "../_data";
 
 export const metadata: Metadata = { title: "Homes · Wander Performance" };
@@ -39,34 +39,47 @@ export default async function PerformanceBrandHomesPage({
   ]);
   const withPhoto = homes.filter((home) => home.imageUrl);
   const slug = brand.slug ?? brand.id;
+  // The grid's tick toggle keys the set by feed id → home row id.
   const picked = committed.map((home) => ({
     externalId: home.externalId,
     homeId: home.id,
   }));
-  // The band shows the in-focus set with live photos; the ads link carries it.
-  const byId = new Map(homes.map((home) => [home.id, home]));
-  const bandHomes = committed.flatMap((home) => {
-    const listing = byId.get(home.externalId);
-    const imageUrl = listing?.imageUrl ?? home.heroSourceUrl;
-    return imageUrl
-      ? [
-          {
-            name: listing?.name ?? home.name,
-            imageUrl,
-            thumbUrl: listing?.thumbUrl ?? null,
-          },
-        ]
-      : [];
+  // The in-focus band shows each picked home enriched from its live listing:
+  // the gallery and fuller facts come free off the feed already read.
+  const byId = new Map(homes.map((listing) => [listing.id, listing]));
+  const pickedHomes: PickedHome[] = committed.map((home) => {
+    const listing = byId.get(home.externalId) ?? null;
+    const gallery = listing?.gallery ?? [];
+    const images = (
+      gallery.length > 0
+        ? gallery.map((photo) => photo.thumbUrl || photo.url)
+        : [listing?.imageUrl ?? home.heroSourceUrl].filter(
+            (url): url is string => Boolean(url),
+          )
+    ).slice(0, 5);
+    return {
+      id: home.id,
+      externalId: home.externalId,
+      source: home.source,
+      name: listing?.name ?? home.name,
+      hero: listing?.imageUrl ?? home.heroSourceUrl ?? images[0] ?? null,
+      images,
+      bedrooms: listing?.bedrooms ?? home.bedrooms,
+      bathrooms: listing?.bathrooms ?? home.bathrooms,
+      guests: listing?.guests ?? home.guests,
+      rating: listing?.rating ?? home.rating,
+      nightlyFrom: listing?.nightlyFrom ?? home.nightlyFrom,
+      city: listing?.city ?? home.city,
+      state: listing?.state ?? home.state,
+      offFeed: home.source === "wanderos" && !listing,
+    };
   });
-  const adsBase = brandTabHref(slug, "ads");
-  const adsHref =
-    picked.length > 0
-      ? `${adsBase}?homes=${encodeURIComponent(picked.map((p) => p.externalId).join(","))}`
-      : adsBase;
 
   return (
     <div className="space-y-4">
-      <PickedBand homes={bandHomes} count={picked.length} adsHref={adsHref} />
+      {committed.length > 0 ? (
+        <PickedHomes brandId={brand.id} brandSlug={slug} picked={pickedHomes} />
+      ) : null}
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <SectionLabel>
           Homes{homes.length ? ` · ${homes.length}` : ""}
