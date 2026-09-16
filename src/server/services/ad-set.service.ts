@@ -666,6 +666,10 @@ export async function buildAdSet(input: {
   // is the rooms themselves, clean (photo-only); the portfolio and catalog
   // are branded listing cards (catalog-place). A placement's own crop is a
   // later variation, drawn from the same blueprint.
+  // The pill drawn on the card is a marketing phrase, the way the reference
+  // sets read, not Meta's CTA enum. `SEE_DETAILS` stays the platform button
+  // the push sends (`content.callToAction`); the two are not the same thing.
+  const STAMP_CTA = "Find your next escape";
   const heroCard = (sourceUrl: string, title: string): MediaItem => ({
     url: compositionPreviewUrl({
       brandId: brand.id,
@@ -674,7 +678,7 @@ export async function buildAdSet(input: {
       source: { url: sourceUrl },
       title,
       eyebrow: brand.name,
-      cta: PERFORMANCE_AD_DEFAULTS.callToAction,
+      cta: STAMP_CTA,
     }),
     type: "image",
   });
