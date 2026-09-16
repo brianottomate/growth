@@ -67,11 +67,6 @@ export async function POST(request: NextRequest) {
   }
 
   const input = parsed.data;
-  // Defense in depth, the same rule the inbound route applies.
-  if (input.email.toLowerCase().endsWith("@wander.com")) {
-    return NextResponse.json({ success: true, skipped: "internal email" });
-  }
-
   const name =
     [input.firstName, input.lastName].filter(Boolean).join(" ").trim() || null;
 
