@@ -16,7 +16,7 @@ export type AdMockMedia = {
  * to the ad account first.
  */
 export const AD_MOCK_SURFACES = [
-  { id: "facebook", label: "Facebook feed", crop: "landscape" },
+  { id: "facebook", label: "Facebook feed", crop: "square" },
   { id: "instagram", label: "Instagram feed", crop: "square" },
   { id: "story", label: "Story / Reel", crop: "story" },
 ] as const;

@@ -104,7 +104,9 @@ export default async function PlacementMatrixPage({
   const homes = [...groups.values()];
 
   return (
-    <div className="space-y-4">
+    // Break out of the centered max-w-5xl column so all placements have room
+    // (the app layout's scroll div is the @container).
+    <div className="mx-[calc(((100cqw-min(100cqw,64rem))/2+2rem)*-1)] space-y-4 px-8">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <SectionLabel>
           Matrix{homes.length ? ` · ${homes.length} homes` : ""}

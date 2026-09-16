@@ -254,6 +254,7 @@ function CellCard({
   const router = useRouter();
   const trpc = useTRPC();
   const [editing, setEditing] = useState(false);
+  const [card, setCard] = useState(0);
   const [headline, setHeadline] = useState(cell.copy.headline);
   const [body, setBody] = useState(cell.copy.body);
 
@@ -310,6 +311,8 @@ function CellCard({
         link={null}
         callToAction={cell.copy.callToAction}
         media={cell.cards}
+        card={card}
+        onCard={setCard}
         className="w-full"
       />
       {cell.fitIssues.length > 0 ? (
