@@ -61,19 +61,23 @@ const facts = (home: CopyHome) =>
     .filter(Boolean)
     .join(" · ");
 
-/** Copy from the facts alone, for when the model is unreachable. */
-function fallback(homes: CopyHome[], brandName: string): AdSetCopy {
+/**
+ * Copy from the facts alone: the deterministic first pass, and the model's
+ * fallback. Home name as the headline and the on-card title, the body from
+ * the facts and amenities. No persuasion; that is the AI copy pass's job.
+ */
+export function deterministicSetCopy(
+  homes: CopyHome[],
+  brandName: string,
+): AdSetCopy {
   const where = homes[0]?.place ?? "";
   return {
     homes: homes.map((home) => ({
-      primaryText: [
-        `${home.name}${home.place ? ` in ${home.place}` : ""}.`,
-        facts(home),
-        home.amenities.slice(0, 5).join(" · "),
-        "Book direct.",
-      ]
-        .filter(Boolean)
-        .join("\n"),
+      // A shell's body is one factual line, under Meta's limit on purpose: it
+      // says what the home is and gets out of the way, so the copy pass has
+      // room to write the pitch. The old fact-dump overflowed and read broken.
+      primaryText:
+        [facts(home), home.place].filter(Boolean).join(" · ") || home.name,
       headline: home.name.slice(0, 60),
       cardTitle: home.name.slice(0, 52),
     })),
@@ -154,11 +158,11 @@ export async function writeAdSetCopy(input: {
         .join("\n"),
     });
     if (output?.homes.length !== input.homes.length) {
-      return fallback(input.homes, input.brandName);
+      return deterministicSetCopy(input.homes, input.brandName);
     }
     return output;
   } catch (error) {
     console.error("ad set copy failed", error);
-    return fallback(input.homes, input.brandName);
+    return deterministicSetCopy(input.homes, input.brandName);
   }
 }

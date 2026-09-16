@@ -49,18 +49,26 @@ import {
   type AdFormat,
   type CardEdit,
 } from "@/lib/performance-ads";
-import { homeCatalogPreviewUrl } from "@/lib/home-ad-previews";
+import {
+  compositionPreviewUrl,
+  homeCatalogPreviewUrl,
+} from "@/lib/home-ad-previews";
 import {
   fetchWanderOsListingDetail,
   type WanderOsListing,
 } from "@/server/clients/wanderos-site.client";
 
-import { writeAdSetCopy, type CopyHome } from "./ad-set-copy.service";
+import {
+  deterministicSetCopy,
+  writeAdSetCopy,
+  type CopyHome,
+} from "./ad-set-copy.service";
 import { deleteDraftAd } from "./ads-draft.service";
 import { extendToCanvas } from "./card-director.service";
 import { freezeComposition } from "./composition.service";
-import { ensureHome } from "./homes.service";
+import { ensureHome, setHomeHero } from "./homes.service";
 import { importImageBuffer } from "./media.service";
+import { pickHeroPhoto } from "./hero-pick.service";
 import { brandListings, brandWebsiteId } from "./wanderos-listings.service";
 
 // Building the set a Performance client actually runs.
@@ -498,6 +506,14 @@ export async function buildAdSet(input: {
   /** How many homes to choose when none are named. */
   count?: number;
   userId?: string | null;
+  /**
+   * "defer" (the first-pass default from the UI) draws the shells with copy
+   * from the facts alone — no model call, fast and re-runnable — and leaves the
+   * words for a later writeSetCopy pass. "ai" writes the captions in one model
+   * pass, which is what the agent action does. Either way the on-card title is
+   * the home's name, so a later copy pass never re-renders a card.
+   */
+  copy?: "ai" | "defer";
 }): Promise<{
   brandId: string;
   ads: BuiltAd[];
@@ -566,8 +582,23 @@ export async function buildAdSet(input: {
       const photos = detail.photos.length
         ? detail.photos.map((photo) => photo.url)
         : (listing.gallery ?? []).map((photo) => photo.url);
-      // A home's own hero wins over the feed's first photo when one is picked.
-      const hero = home.heroSourceUrl ?? photos[0] ?? listing.imageUrl ?? null;
+      // A home's own hero wins; otherwise a vision pass picks the best of the
+      // first few photos so the ad does not lead on an entrance sign or a
+      // floor plan. The pick is saved, so a rebuild reuses it and never asks
+      // twice.
+      let hero = home.heroSourceUrl ?? null;
+      if (!hero && photos.length > 0) {
+        const picked = await pickHeroPhoto(photos);
+        hero = picked.url || photos[0] || null;
+        if (hero) {
+          await setHomeHero({
+            homeId: home.id,
+            orgId: input.orgId,
+            sourceUrl: hero,
+          });
+        }
+      }
+      hero = hero ?? listing.imageUrl ?? null;
       return { listing, home, detail, photos, hero };
     }),
   );
@@ -576,19 +607,23 @@ export async function buildAdSet(input: {
     throw new AdSetError(422, "None of those homes have a photo to draw on");
   }
 
-  const copy = await writeAdSetCopy({
-    brandName: brand.name,
-    homes: usable.map(({ listing, detail }): CopyHome => ({
-      name: listing.name,
-      place: [listing.city, listing.state].filter(Boolean).join(", "),
-      bedrooms: listing.bedrooms ?? null,
-      bathrooms: listing.bathrooms ?? null,
-      guests: listing.guests ?? null,
-      nightlyFrom: listing.nightlyFrom ?? null,
-      amenities: detail.amenities,
-      description: detail.description,
-    })),
-  });
+  const copyHomes = usable.map(({ listing, detail }): CopyHome => ({
+    name: listing.name,
+    place: [listing.city, listing.state].filter(Boolean).join(", "),
+    bedrooms: listing.bedrooms ?? null,
+    bathrooms: listing.bathrooms ?? null,
+    guests: listing.guests ?? null,
+    nightlyFrom: listing.nightlyFrom ?? null,
+    amenities: detail.amenities,
+    description: detail.description,
+  }));
+  // The first pass defers copy: shells with factual words, no model call. The
+  // words come later, from writeSetCopy, once the compositions and placements
+  // look right.
+  const copy =
+    input.copy === "ai"
+      ? await writeAdSetCopy({ brandName: brand.name, homes: copyHomes })
+      : deterministicSetCopy(copyHomes, brand.name);
 
   const plan = buildPerformanceAdPlan({
     customer: brand.name,
@@ -616,7 +651,34 @@ export async function buildAdSet(input: {
   };
 
   /** A card: the composition that draws it, redrawn on read. */
-  const card = (
+  // One blueprint per ad kind, so a set reads as one system. The static
+  // leads on the photo with a single bold line (hero-overlay); the carousel
+  // is the rooms themselves, clean (photo-only); the portfolio and catalog
+  // are branded listing cards (catalog-place). A placement's own crop is a
+  // later variation, drawn from the same blueprint.
+  const heroCard = (sourceUrl: string, title: string): MediaItem => ({
+    url: compositionPreviewUrl({
+      brandId: brand.id,
+      templateId: "hero-overlay",
+      formatId: "square",
+      source: { url: sourceUrl },
+      title,
+      eyebrow: brand.name,
+      cta: PERFORMANCE_AD_DEFAULTS.callToAction,
+    }),
+    type: "image",
+  });
+  const photoCard = (sourceUrl: string): MediaItem => ({
+    url: compositionPreviewUrl({
+      brandId: brand.id,
+      templateId: "photo-only",
+      formatId: "square",
+      source: { url: sourceUrl },
+      title: "",
+    }),
+    type: "image",
+  });
+  const catalogCard = (
     sourceUrl: string,
     title: string,
     subtitle?: string,
@@ -671,7 +733,7 @@ export async function buildAdSet(input: {
         propertyName: home.listing.name,
         // The static is the one shape Meta takes a per-placement asset on,
         // so it is born with its 9:16: the same card on the story canvas.
-        media: [withStory(card(home.hero!, homeCopy.cardTitle))],
+        media: [withStory(heroCard(home.hero!, homeCopy.cardTitle))],
       };
     } else if (item.kind === "carousel" && home && homeCopy) {
       // One home's own carousel is a walk through its rooms, which is the
@@ -685,7 +747,7 @@ export async function buildAdSet(input: {
         callToAction: PERFORMANCE_AD_DEFAULTS.callToAction,
         propertyName: home.listing.name,
         media: (photos.length >= 2 ? photos : [home.hero!]).map((photo) =>
-          card(photo, homeCopy.cardTitle),
+          photoCard(photo),
         ),
       };
     } else if (item.kind === "all_properties_carousel") {
@@ -695,7 +757,7 @@ export async function buildAdSet(input: {
         body: copy.portfolioPrimaryText,
         callToAction: PERFORMANCE_AD_DEFAULTS.callToAction,
         media: usable.map(({ hero, listing }, i) =>
-          card(hero!, copy.homes[i]?.cardTitle ?? listing.name),
+          catalogCard(hero!, copy.homes[i]?.cardTitle ?? listing.name),
         ),
       };
     } else {
@@ -707,7 +769,7 @@ export async function buildAdSet(input: {
         body: copy.catalogPrimaryText,
         callToAction: PERFORMANCE_AD_DEFAULTS.callToAction,
         media: usable.map(({ hero, listing }, i) =>
-          card(hero!, copy.homes[i]?.cardTitle ?? listing.name),
+          catalogCard(hero!, copy.homes[i]?.cardTitle ?? listing.name),
         ),
       };
     }
@@ -1418,4 +1480,107 @@ export async function unfreezePlacement(input: {
   const next = withUnfrozen(asPlacements(ad.placements), input.placementKey);
   await savePlacements(ad.id, next);
   return { adId: ad.id, placementKey: input.placementKey };
+}
+
+// ---- The copy pass: AI words onto shells already drawn ---------------------
+//
+// The final pass of the split build. `buildAdSet` with copy:"defer" draws the
+// shells with factual words; this rewrites the persuasive text once the
+// compositions and placements look right. It touches ad-level headline/body
+// only — never the on-card title, so no card re-renders — and it leaves any
+// per-placement copy override in `placements` alone, since that was a
+// deliberate choice.
+
+export async function writeSetCopy(input: {
+  brandId: string;
+  orgId: string;
+}): Promise<{ brandId: string; updated: number }> {
+  const brand = await requireOwnedBrand(input);
+  const ads = await db.query.adTable.findMany({
+    where: and(eq(adTable.brandId, brand.id), isNull(adTable.campaignId)),
+    with: { home: { columns: { externalId: true, name: true, url: true } } },
+  });
+  const drafts = ads.filter(
+    (ad) => ad.status !== "approved" && ad.type === "creative",
+  );
+  if (drafts.length === 0) return { brandId: brand.id, updated: 0 };
+
+  // The homes the per-home ads are bound to, in first-seen order, with the
+  // detail the copy reads from.
+  const externalIds = [
+    ...new Set(
+      drafts.flatMap((ad) => (ad.home?.externalId ? [ad.home.externalId] : [])),
+    ),
+  ];
+  const listings = await brandListings({
+    id: brand.id,
+    website: brand.website,
+  });
+  const websiteId = await brandWebsiteId(brand.id);
+  const homeById = new Map<string, CopyHome>();
+  await Promise.all(
+    externalIds.map(async (externalId) => {
+      const listing = listings.find((row) => row.id === externalId);
+      if (!listing) return;
+      const detail = websiteId
+        ? await fetchWanderOsListingDetail({
+            websiteId,
+            propertyId: externalId,
+          })
+        : { photos: [], description: null, amenities: [] };
+      homeById.set(externalId, {
+        name: listing.name,
+        place: [listing.city, listing.state].filter(Boolean).join(", "),
+        bedrooms: listing.bedrooms ?? null,
+        bathrooms: listing.bathrooms ?? null,
+        guests: listing.guests ?? null,
+        nightlyFrom: listing.nightlyFrom ?? null,
+        amenities: detail.amenities,
+        description: detail.description,
+      });
+    }),
+  );
+
+  const orderedIds = externalIds.filter((id) => homeById.has(id));
+  const copy = await writeAdSetCopy({
+    brandName: brand.name,
+    homes: orderedIds.map((id) => homeById.get(id)!),
+  });
+  const copyByHome = new Map(
+    orderedIds.map((id, index) => [id, copy.homes[index]!]),
+  );
+
+  let updated = 0;
+  for (const ad of drafts) {
+    const content = ad.content as AdCreativeContent;
+    if (!Array.isArray(content.media)) continue;
+    let headline = content.headline;
+    let body = content.body;
+    const homeCopy = ad.home?.externalId
+      ? copyByHome.get(ad.home.externalId)
+      : null;
+    if (homeCopy) {
+      headline = homeCopy.headline;
+      body = homeCopy.primaryText;
+    } else {
+      // The portfolio and catalog ads carry no home; the format says which.
+      const format = adFormatOf(content);
+      if (format === "portfolio") {
+        headline = copy.portfolioHeadline;
+        body = copy.portfolioPrimaryText;
+      } else if (format === "catalog") {
+        headline = copy.catalogHeadline;
+        body = copy.catalogPrimaryText;
+      } else {
+        continue;
+      }
+    }
+    if (headline === content.headline && body === content.body) continue;
+    await db
+      .update(adTable)
+      .set({ content: { ...content, headline, body } })
+      .where(eq(adTable.id, ad.id));
+    updated += 1;
+  }
+  return { brandId: brand.id, updated };
 }

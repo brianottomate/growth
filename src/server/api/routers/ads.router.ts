@@ -12,6 +12,7 @@ import {
   setPlacementCopy,
   unfreezePlacement,
   buildAdSet,
+  writeSetCopy,
   createAdsFromAssets,
   deleteAd,
   editAdCards,
@@ -196,6 +197,7 @@ export const adsRouter = {
         brandId: z.string().min(1),
         propertyIds: z.array(z.string().min(1)).max(MAX_SET_HOMES).optional(),
         count: z.number().int().min(1).max(MAX_SET_HOMES).optional(),
+        copy: z.enum(["ai", "defer"]).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) =>
@@ -204,7 +206,18 @@ export const adsRouter = {
         orgId: await organizationIdFor(ctx),
         propertyIds: input.propertyIds,
         count: input.count,
+        copy: input.copy,
         userId: ctx.session.user.id,
+      }),
+    ),
+
+  /** The copy pass: AI words onto the drafts already drawn. Headline/body only. */
+  writeSetCopy: protectedProcedure
+    .input(z.object({ brandId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) =>
+      writeSetCopy({
+        brandId: input.brandId,
+        orgId: await organizationIdFor(ctx),
       }),
     ),
 

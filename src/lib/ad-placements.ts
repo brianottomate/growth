@@ -194,6 +194,23 @@ export function cellFor(
  * One cell, resolved: the base copy with the cell's overrides on top, and
  * per card the cell's own file or the base card to be shown in this crop.
  */
+/**
+ * A composition-preview card re-rendered at a placement's crop. The URL is the
+ * blueprint's recipe, so swapping `formatId` is the whole variation. Anything
+ * that is not a composition preview (an uploaded file, a raw asset) is returned
+ * untouched.
+ */
+export function withCompositionFormat(
+  url: string,
+  crop: AdPlacementCrop,
+): string {
+  if (!url.includes("/api/compositions/preview")) return url;
+  const [path, query = ""] = url.split("?");
+  const params = new URLSearchParams(query);
+  params.set("formatId", crop);
+  return `${path}?${params.toString()}`;
+}
+
 export function resolveCell(
   ad: PlaceableAd,
   spec: AdPlacementSpec,
@@ -210,7 +227,11 @@ export function resolveCell(
     const own = cell?.cards?.[index] ?? null;
     const shown = own ?? card;
     return {
-      url: shown.url,
+      // A composition card carries its recipe in the URL, so the placement's
+      // own crop is a formatId swap: the blueprint re-renders at 1.91:1, 1:1
+      // or 9:16 with its scrim in the right place, instead of a square
+      // cropped by CSS. A pinned upload or a raw asset is left as it is.
+      url: withCompositionFormat(shown.url, spec.crop),
       thumbnail: shown.thumbnail ?? null,
       type: card.type,
       assetId: shown.assetId ?? null,

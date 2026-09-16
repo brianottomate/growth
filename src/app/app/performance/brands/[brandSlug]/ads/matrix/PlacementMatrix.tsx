@@ -13,7 +13,9 @@ import {
   RotateCcw,
 } from "lucide-react";
 
-import { AdMock, type AdMockSurface } from "@/components/ad-mock";
+import Image from "next/image";
+
+import { type AdMockSurface } from "@/components/ad-mock";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -56,6 +58,13 @@ const STATE_CHIP: Record<CellState, string> = {
   rendered: "text-muted-foreground",
   overridden: "text-sky-400",
   frozen: "text-emerald-400",
+};
+
+/** The crop each placement shows, so a cell reads at the shape it will run. */
+const ASPECT: Record<AdMockSurface, string> = {
+  facebook: "aspect-[1.91/1]",
+  instagram: "aspect-square",
+  story: "aspect-[9/16]",
 };
 
 export function PlacementMatrix({
@@ -300,18 +309,32 @@ function CellCard({
           {cell.state}
         </span>
       </div>
-      <div className="flex justify-center rounded-lg border bg-muted/20 p-2">
-        <AdMock
-          surface={cell.surface}
-          brandName={brandName}
-          brandLogo={brandLogo}
-          headline={cell.copy.headline}
-          body={cell.copy.body}
-          callToAction={cell.copy.callToAction}
-          link={null}
-          media={cell.cards}
-          className="w-full max-w-[220px]"
-        />
+      <div className="overflow-hidden rounded-lg border bg-muted/20">
+        <div className={cn("relative w-full bg-muted", ASPECT[cell.surface])}>
+          {cell.cards[0]?.url ? (
+            <Image
+              src={cell.cards[0].url}
+              alt={cell.copy.headline}
+              fill
+              sizes="288px"
+              className="object-cover"
+              unoptimized
+            />
+          ) : null}
+          {cell.cards.length > 1 ? (
+            <span className="absolute right-1.5 bottom-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">
+              1/{cell.cards.length}
+            </span>
+          ) : null}
+        </div>
+        <div className="space-y-0.5 p-2">
+          <div className="line-clamp-1 text-[11px] font-medium">
+            {cell.copy.headline}
+          </div>
+          <div className="line-clamp-2 text-[10.5px] leading-snug text-muted-foreground">
+            {cell.copy.body}
+          </div>
+        </div>
       </div>
       {cell.fitIssues.length > 0 ? (
         <div className="flex flex-wrap gap-1">

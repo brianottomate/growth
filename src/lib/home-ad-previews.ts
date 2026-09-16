@@ -93,7 +93,7 @@ export function homePreviewRecipes(home: HomeForPreview): HomePreviewRecipe[] {
 /** Everything a preview tile needs to draw itself, and to be frozen as is. */
 export type PreviewSpec = {
   brandId: string;
-  templateId: "hero-overlay" | "catalog-place";
+  templateId: "hero-overlay" | "catalog-place" | "photo-only";
   formatId: CompositionFormatId;
   source: { assetId: string } | { url: string };
   title: string;

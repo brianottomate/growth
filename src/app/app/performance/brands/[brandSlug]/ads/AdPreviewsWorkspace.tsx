@@ -86,6 +86,19 @@ export function AdPreviewsWorkspace({
       onError: (error) => toast.error(error.message),
     }),
   );
+  const writeCopy = useMutation(
+    trpc.ads.writeSetCopy.mutationOptions({
+      onSuccess: (result) => {
+        toast.success(
+          result.updated > 0
+            ? `Wrote copy on ${result.updated} ad${result.updated === 1 ? "" : "s"}.`
+            : "Nothing to write copy on yet.",
+        );
+        router.refresh();
+      },
+      onError: (error) => toast.error(error.message),
+    }),
+  );
   const attach = useMutation(
     trpc.ads.attachAdSet.mutationOptions({
       onSuccess: (result) => {
@@ -188,8 +201,12 @@ export function AdPreviewsWorkspace({
                 onClick={() =>
                   build.mutate(
                     pickedHomes.length > 0
-                      ? { brandId, propertyIds: pickedHomes.map((h) => h.id) }
-                      : { brandId, count },
+                      ? {
+                          brandId,
+                          propertyIds: pickedHomes.map((h) => h.id),
+                          copy: "defer",
+                        }
+                      : { brandId, count, copy: "defer" },
                   )
                 }
                 shape="round"
@@ -200,7 +217,24 @@ export function AdPreviewsWorkspace({
                 ) : (
                   <Sparkles className="size-3" />
                 )}
-                {drafted ? "Rebuild the set" : "Build the set"}
+                {drafted ? "Rebuild the shells" : "Build the shells"}
+              </Button>
+            ) : null}
+            {hasSite && drafted ? (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={writeCopy.isPending}
+                onClick={() => writeCopy.mutate({ brandId })}
+                shape="round"
+                density="editorial"
+              >
+                {writeCopy.isPending ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <Sparkles className="size-3" />
+                )}
+                Write copy
               </Button>
             ) : null}
           </div>
