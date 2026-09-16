@@ -6,10 +6,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import {
+  Check,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
+  Loader2,
   PenLine,
+  Plus,
   Search,
   Star,
   ZoomIn,
@@ -46,26 +49,33 @@ export type StripHome = {
 
 const panel = "bg-card overflow-hidden rounded-2xl border";
 
+/** A set runs on three to ten homes. */
+const MIN_SET = 3;
+const MAX_SET = 10;
+
 /**
- * The homes on their WanderOS site, as their own photos. Each opens a lightbox
- * on the hero at full size. The hero lives on their site, not in our library,
- * so the way into the Studio imports it first: one click brings the photo in
- * (or finds the earlier import of the same URL) and opens the house card on it.
- * The catalog-card view of the same roster lives at the foot of the Ads tab.
+ * The homes on their WanderOS site. Browse them as photos, pick the three to
+ * ten a set runs on (a tick on each tile), feature the one that stands for the
+ * brand, or open a lightbox on the hero and design an ad from it. The
+ * catalog-card view of the same roster lives at the foot of the Ads tab.
  */
 export function HomesStrip({
   homes,
   brandId,
   brandSlug,
   featuredUrl,
+  picked,
 }: {
   homes: StripHome[];
   brandId: string;
   brandSlug: string | null;
   /** The home that stands for the brand; its tile and lightbox say so. */
   featuredUrl: string | null;
+  /** The committed set: feed id → its `home` row id. A tick toggles it. */
+  picked: { externalId: string; homeId: string }[];
 }) {
   const [query, setQuery] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return homes;
@@ -114,6 +124,44 @@ export function HomesStrip({
     }),
   );
 
+  // Picking commits (or drops) a `home` row for the set the ads run on.
+  const byExternal = new Map(picked.map((p) => [p.externalId, p.homeId]));
+  const count = picked.length;
+  const ready = count >= MIN_SET;
+  const adsBase = `/app/performance/brands/${brandSlug ?? brandId}/ads`;
+  const adsHref =
+    count > 0
+      ? `${adsBase}?homes=${encodeURIComponent(picked.map((p) => p.externalId).join(","))}`
+      : adsBase;
+  const add = useMutation(
+    trpc.brand.homesAddWanderOs.mutationOptions({
+      onSuccess: () => router.refresh(),
+      onError: (error) => toast.error(error.message),
+      onSettled: () => setBusyId(null),
+    }),
+  );
+  const drop = useMutation(
+    trpc.brand.homesRemove.mutationOptions({
+      onSuccess: () => router.refresh(),
+      onError: (error) => toast.error(error.message),
+      onSettled: () => setBusyId(null),
+    }),
+  );
+  const togglePick = (home: StripHome) => {
+    const homeId = byExternal.get(home.id);
+    if (homeId) {
+      setBusyId(home.id);
+      drop.mutate({ brandId, homeId });
+      return;
+    }
+    if (count >= MAX_SET) {
+      toast.error("Ten is the most a set runs on.");
+      return;
+    }
+    setBusyId(home.id);
+    add.mutate({ brandId, externalId: home.id });
+  };
+
   const step = useCallback(
     (delta: number) => {
       setOpenIndex((current) => {
@@ -136,6 +184,28 @@ export function HomesStrip({
 
   return (
     <>
+      <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 rounded-full border bg-muted/40 px-3 py-1.5 text-[11.5px]">
+        <span className="flex items-baseline gap-2">
+          <span className="font-medium tracking-wide text-muted-foreground uppercase">
+            Picked
+          </span>
+          <span
+            className={cn(ready ? "text-emerald-400" : "text-muted-foreground")}
+          >
+            {count}/{MAX_SET}
+            {count < MIN_SET ? " · pick at least three" : ""}
+          </span>
+        </span>
+        {ready ? (
+          <ButtonLink href={adsHref} size="sm" className="h-7">
+            Continue to Ads
+          </ButtonLink>
+        ) : (
+          <span className="text-muted-foreground">
+            Tick homes to build the set.
+          </span>
+        )}
+      </div>
       <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
         <label className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -161,52 +231,89 @@ export function HomesStrip({
         </p>
       ) : null}
       <ul className="grid grid-cols-2 gap-2.5 @xl:grid-cols-3 @4xl:grid-cols-6">
-        {shown.map((home, index) => (
-          <li key={home.id} className={cn(panel, "group relative")}>
-            {/* The card is the way in to the home. The photo is a detail of
+        {shown.map((home, index) => {
+          const isPicked = byExternal.has(home.id);
+          const busy = busyId === home.id;
+          return (
+            <li
+              key={home.id}
+              className={cn(
+                panel,
+                "group relative",
+                isPicked && "ring-1 ring-sky-400",
+              )}
+            >
+              {/* The card is the way in to the home. The photo is a detail of
                 it, so zooming is a control ON the card rather than the whole
                 point of it. Siblings, so no interactive nests in another. */}
-            <Link
-              href={`/app/performance/brands/${brandSlug ?? brandId}/homes/${home.id}`}
-              className="block"
-            >
-              <span className="relative block">
-                {/* oxlint-disable-next-line nextjs/no-img-element */}
-                <img
-                  src={home.thumbUrl ?? home.imageUrl}
-                  alt={home.name}
-                  loading="lazy"
-                  className="aspect-[4/3] w-full bg-black/20 object-cover transition-opacity group-hover:opacity-90"
-                />
-              </span>
-              <span className="block px-2.5 py-2">
-                <span className="flex items-center gap-1 text-xs font-semibold">
-                  {home.url === featuredUrl ? (
-                    <Star
-                      className="size-3 shrink-0 fill-amber-300 text-amber-300"
-                      aria-label="Featured"
-                    />
-                  ) : null}
-                  <span className="truncate group-hover:underline">
-                    {home.name}
+              <Link
+                href={`/app/performance/brands/${brandSlug ?? brandId}/homes/${home.id}`}
+                className="block"
+              >
+                <span className="relative block">
+                  {/* oxlint-disable-next-line nextjs/no-img-element */}
+                  <img
+                    src={home.thumbUrl ?? home.imageUrl}
+                    alt={home.name}
+                    loading="lazy"
+                    className="aspect-[4/3] w-full bg-black/20 object-cover transition-opacity group-hover:opacity-90"
+                  />
+                </span>
+                <span className="block px-2.5 py-2">
+                  <span className="flex items-center gap-1 text-xs font-semibold">
+                    {home.url === featuredUrl ? (
+                      <Star
+                        className="size-3 shrink-0 fill-amber-300 text-amber-300"
+                        aria-label="Featured"
+                      />
+                    ) : null}
+                    <span className="truncate group-hover:underline">
+                      {home.name}
+                    </span>
+                  </span>
+                  <span className="block truncate text-[11px] text-muted-foreground">
+                    {home.facts}
                   </span>
                 </span>
-                <span className="block truncate text-[11px] text-muted-foreground">
-                  {home.facts}
-                </span>
-              </span>
-            </Link>
-            <button
-              type="button"
-              onClick={() => setOpenIndex(index)}
-              aria-label={`See ${home.name} at full size`}
-              title="See the photo at full size"
-              className="absolute top-1.5 right-1.5 grid size-7 place-items-center rounded-full border border-white/50 bg-black/50 text-white opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100"
-            >
-              <ZoomIn className="size-3.5" />
-            </button>
-          </li>
-        ))}
+              </Link>
+              <button
+                type="button"
+                onClick={() => setOpenIndex(index)}
+                aria-label={`See ${home.name} at full size`}
+                title="See the photo at full size"
+                className="absolute top-1.5 right-1.5 grid size-7 place-items-center rounded-full border border-white/50 bg-black/50 text-white opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100"
+              >
+                <ZoomIn className="size-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => togglePick(home)}
+                disabled={busy || (!isPicked && count >= MAX_SET)}
+                aria-pressed={isPicked}
+                aria-label={
+                  isPicked
+                    ? `Drop ${home.name} from the set`
+                    : `Add ${home.name} to the set`
+                }
+                title={isPicked ? "In the set" : "Add to the set"}
+                className={cn(
+                  "absolute top-1.5 left-1.5 grid size-7 place-items-center rounded-full border text-white transition disabled:opacity-40",
+                  isPicked
+                    ? "border-sky-300 bg-sky-500 opacity-100"
+                    : "border-white/50 bg-black/50 opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
+                )}
+              >
+                {busy ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : isPicked ? (
+                  <Check className="size-3.5" />
+                ) : (
+                  <Plus className="size-3.5" />
+                )}
+              </button>
+            </li>
+          );
+        })}
       </ul>
       <Dialog
         open={open !== null}

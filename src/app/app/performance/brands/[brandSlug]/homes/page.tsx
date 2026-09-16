@@ -4,18 +4,21 @@ import { notFound, redirect } from "next/navigation";
 
 import { cn } from "@/components/ui/lib/utils";
 import { brandListings } from "@/server/services/wanderos-listings.service";
+import { listBrandHomes } from "@/server/services/homes.service";
 
 import { panel, SectionLabel } from "../../../_components";
 import { HomesStrip } from "../HomesStrip";
+import { AddHomesByHand } from "../AddHomesByHand";
 import { brandTabHref, loadPerformanceBrand } from "../_data";
 
 export const metadata: Metadata = { title: "Homes · Wander Performance" };
 export const dynamic = "force-dynamic";
 
 /**
- * Every home on the client's WanderOS site, as their own photos or as the
- * listing card a catalog ad would draw, with the featured home marked. This is
- * the catalog the ads read from; picking a set happens on the Ads tab.
+ * Every home on the client's WanderOS site: browse them, pick the set the ads
+ * run on, and feature the one that stands for the brand. A brand with no feed
+ * pastes its homes in by hand instead. This is where a signed client's homes
+ * are set up; the catalog cards live at the foot of Ads.
  */
 export default async function PerformanceBrandHomesPage({
   params,
@@ -29,9 +32,16 @@ export default async function PerformanceBrandHomesPage({
     return <div className="text-muted-foreground">No organization found.</div>;
   if (!brand) notFound();
 
-  const homes = await brandListings({ id: brand.id, website: brand.website });
+  const [homes, committed] = await Promise.all([
+    brandListings({ id: brand.id, website: brand.website }),
+    listBrandHomes(brand.id),
+  ]);
   const withPhoto = homes.filter((home) => home.imageUrl);
   const slug = brand.slug ?? brand.id;
+  const picked = committed.map((home) => ({
+    externalId: home.externalId,
+    homeId: home.id,
+  }));
 
   return (
     <div className="space-y-4">
@@ -59,16 +69,22 @@ export default async function PerformanceBrandHomesPage({
         </div>
       </div>
       {homes.length === 0 ? (
-        <p
-          className={cn(
-            panel,
-            "px-4 py-8 text-center text-xs text-muted-foreground",
-          )}
-        >
-          {brand.website
-            ? "Not a WanderOS site, so there is no listing feed to read."
-            : "No website on record."}
-        </p>
+        <AddHomesByHand
+          brandId={brand.id}
+          brandSlug={slug}
+          brandWebsite={brand.website}
+          homes={committed.map((home) => ({
+            id: home.id,
+            name: home.name,
+            facts: [
+              home.bedrooms ? `${home.bedrooms} bd` : null,
+              home.guests ? `${home.guests} guests` : null,
+              [home.city, home.state].filter(Boolean).join(", ") || null,
+            ]
+              .filter(Boolean)
+              .join(" · "),
+          }))}
+        />
       ) : (
         <>
           <HomesStrip
@@ -95,6 +111,7 @@ export default async function PerformanceBrandHomesPage({
             brandId={brand.id}
             brandSlug={brand.slug}
             featuredUrl={brand.featuredListingUrl}
+            picked={picked}
           />
           {homes.length > withPhoto.length ? (
             <p className="text-[11px] text-muted-foreground">

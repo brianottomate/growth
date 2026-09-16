@@ -7,7 +7,6 @@ import { cn } from "@/components/ui/lib/utils";
 
 const TABS = [
   { label: "Overview", tab: "", exact: true },
-  { label: "Setup", tab: "setup" },
   { label: "Homes", tab: "homes" },
   { label: "Ads", tab: "ads" },
   { label: "Campaigns", tab: "campaigns" },
