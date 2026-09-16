@@ -628,8 +628,17 @@ export function renderComposition(
           style={{
             display: "flex",
             position: "absolute",
-            inset: 0,
-            background: `linear-gradient(180deg, ${scrim(0.62)} 0%, ${scrim(0.28)} 30%, ${scrim(0)} 52%, ${scrim(0)} 72%, ${scrim(0.4)} 100%)`,
+            // Satori does not honour the `inset` shorthand, so an absolute box
+            // with only `inset: 0` collapses to nothing and paints no scrim.
+            // The other cards size their gradients with explicit edges; so must
+            // this one. A strong top band keeps white type legible even where
+            // the headline sits over a bright sky, fading by the middle and
+            // returning under the foot pill.
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            background: `linear-gradient(180deg, ${scrim(0.82)} 0%, ${scrim(0.62)} 24%, ${scrim(0.24)} 46%, ${scrim(0)} 60%, ${scrim(0)} 72%, ${scrim(0.46)} 100%)`,
           }}
         />
         <div
@@ -737,7 +746,10 @@ export function renderComposition(
           style={{
             display: "flex",
             position: "absolute",
-            inset: 0,
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
             background:
               "linear-gradient(90deg, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.54) 48%, rgba(0,0,0,0.08) 100%)",
           }}
@@ -748,7 +760,10 @@ export function renderComposition(
             flexDirection: "column",
             justifyContent: "space-between",
             position: "absolute",
-            inset: 0,
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
             padding,
           }}
         >
@@ -849,7 +864,10 @@ export function renderComposition(
           style={{
             display: "flex",
             position: "absolute",
-            inset: 0,
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
             background:
               "linear-gradient(0deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.08) 72%)",
           }}
@@ -860,7 +878,10 @@ export function renderComposition(
             flexDirection: "column",
             justifyContent: "space-between",
             position: "absolute",
-            inset: 0,
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
             padding,
           }}
         >
