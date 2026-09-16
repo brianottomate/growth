@@ -327,7 +327,12 @@ export const MAX_SET_HOMES = 10;
 
 export type PerformanceAdPlanItem = {
   name: string;
-  kind: "static" | "carousel" | "all_properties_carousel" | "catalog";
+  kind:
+    | "static"
+    | "carousel"
+    | "catalog_home"
+    | "all_properties_carousel"
+    | "catalog";
   propertyIndex: number | null;
   linkUrl: string | null;
 };
@@ -335,11 +340,12 @@ export type PerformanceAdPlanItem = {
 /**
  * The ad set a Performance+ build ships.
  *
- * Per property: one static and one carousel. Then two portfolio ads that are
- * NOT interchangeable — a hand-built carousel of the homes in a chosen order,
- * and an Advantage+ catalog ad where Meta renders and ranks the same homes from
- * the product set. Running both is deliberate: the first controls the story,
- * the second lets Meta pick per viewer.
+ * Per property: a static, a carousel, and a catalog card — the same hero drawn
+ * with the branded listing composition, so each home reads three ways. Then two
+ * portfolio ads that are NOT interchangeable — a hand-built carousel of the
+ * homes in a chosen order, and an Advantage+ catalog ad where Meta renders and
+ * ranks the same homes from the product set. Running both is deliberate: the
+ * first controls the story, the second lets Meta pick per viewer.
  */
 export function buildPerformanceAdPlan(input: {
   customer: string;
@@ -348,8 +354,8 @@ export function buildPerformanceAdPlan(input: {
   if (input.properties.length === 0) {
     throw new Error("A Performance+ plan needs at least one property");
   }
-  const perProperty = input.properties.flatMap((property, index) =>
-    (["Static", "Carousel"] as const).map((format) => ({
+  const perProperty = input.properties.flatMap((property, index) => [
+    ...(["Static", "Carousel"] as const).map((format) => ({
       name: performanceAdName({
         customer: input.customer,
         format,
@@ -359,7 +365,17 @@ export function buildPerformanceAdPlan(input: {
       propertyIndex: index,
       linkUrl: property.url,
     })),
-  );
+    {
+      name: performanceAdName({
+        customer: input.customer,
+        format: "Static",
+        propertyName: `${property.name} Catalog`,
+      }),
+      kind: "catalog_home" as const,
+      propertyIndex: index,
+      linkUrl: property.url,
+    },
+  ]);
   return [
     ...perProperty,
     {

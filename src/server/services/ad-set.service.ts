@@ -51,6 +51,7 @@ import {
 } from "@/lib/performance-ads";
 import {
   compositionPreviewUrl,
+  homeCatalogCopy,
   homeCatalogPreviewUrl,
 } from "@/lib/home-ad-previews";
 import {
@@ -105,7 +106,12 @@ export class AdSetError extends Error {
 export type BuiltAd = {
   id: string;
   name: string;
-  kind: "static" | "carousel" | "all_properties_carousel" | "catalog";
+  kind:
+    | "static"
+    | "carousel"
+    | "catalog_home"
+    | "all_properties_carousel"
+    | "catalog";
   homeName: string | null;
   cards: number;
 };
@@ -113,6 +119,9 @@ export type BuiltAd = {
 const KIND_FORMAT: Record<BuiltAd["kind"], AdFormat> = {
   static: "static",
   carousel: "carousel",
+  // A per-home catalog card is one image drawn with the listing composition;
+  // it reads as a catalog on the wall but pushes as the single static it is.
+  catalog_home: "catalog",
   all_properties_carousel: "portfolio",
   catalog: "catalog",
 };
@@ -660,7 +669,7 @@ export async function buildAdSet(input: {
     url: compositionPreviewUrl({
       brandId: brand.id,
       templateId: "hero-overlay",
-      formatId: "square",
+      formatId: "portrait",
       source: { url: sourceUrl },
       title,
       eyebrow: brand.name,
@@ -672,7 +681,7 @@ export async function buildAdSet(input: {
     url: compositionPreviewUrl({
       brandId: brand.id,
       templateId: "photo-only",
-      formatId: "square",
+      formatId: "portrait",
       source: { url: sourceUrl },
       title: "",
     }),
@@ -686,7 +695,7 @@ export async function buildAdSet(input: {
     url: homeCatalogPreviewUrl({
       brandId: brand.id,
       source: { url: sourceUrl },
-      formatId: "square",
+      formatId: "portrait",
       copy: {
         eyebrow: brand.name,
         title,
@@ -749,6 +758,36 @@ export async function buildAdSet(input: {
         media: (photos.length >= 2 ? photos : [home.hero!]).map((photo) =>
           photoCard(photo),
         ),
+      };
+    } else if (item.kind === "catalog_home" && home && homeCopy) {
+      // The home's hero drawn with the branded listing composition: the same
+      // photo as the static, read as a catalog card. Born with its 9:16 twin
+      // so the story placement has a card to show.
+      const catalog: MediaItem = {
+        url: homeCatalogPreviewUrl({
+          brandId: brand.id,
+          source: { url: home.hero! },
+          formatId: "portrait",
+          copy: homeCatalogCopy({
+            name: home.listing.name,
+            city: home.listing.city,
+            state: home.listing.state,
+            bedrooms: home.listing.bedrooms,
+            bathrooms: home.listing.bathrooms,
+            guests: home.listing.guests,
+            rating: home.listing.rating,
+          }),
+        }),
+        type: "image",
+      };
+      content = {
+        format,
+        headline: homeCopy.headline,
+        body: homeCopy.primaryText,
+        linkUrl: home.listing.url,
+        callToAction: PERFORMANCE_AD_DEFAULTS.callToAction,
+        propertyName: home.listing.name,
+        media: [withStory(catalog)],
       };
     } else if (item.kind === "all_properties_carousel") {
       content = {

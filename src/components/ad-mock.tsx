@@ -1,5 +1,6 @@
 import { SocialPostMock, ctaLabel, domainOf } from "@/components/social-mock";
 import { cn } from "@/components/ui/lib/utils";
+import { AD_PLACEMENT_SPECS } from "@/lib/ad-placements";
 
 export { ctaLabel, domainOf };
 
@@ -10,18 +11,27 @@ export type AdMockMedia = {
 };
 
 /**
- * Placements a creative can land in, with the crop each one applies. Local
- * previews render all three; Meta's own preview API renders the feed shapes
- * only from a pre-push draft, because story formats need the image uploaded
- * to the ad account first.
+ * Placements a creative can land in. Local previews render all three; Meta's
+ * own preview API renders the feed shapes only from a pre-push draft, because
+ * story formats need the image uploaded to the ad account first. The crop each
+ * one draws is the placement spec's, so the mock box and the composition render
+ * never disagree — one source of truth in `AD_PLACEMENT_SPECS`.
  */
 export const AD_MOCK_SURFACES = [
-  { id: "facebook", label: "Facebook feed", crop: "square" },
-  { id: "instagram", label: "Instagram feed", crop: "square" },
-  { id: "story", label: "Story / Reel", crop: "story" },
+  { id: "facebook", label: "Facebook feed" },
+  { id: "instagram", label: "Instagram feed" },
+  { id: "story", label: "Story / Reel" },
 ] as const;
 
 export type AdMockSurface = (typeof AD_MOCK_SURFACES)[number]["id"];
+
+/** The crop a surface draws, read off the placement it maps to. */
+function cropForSurface(surface: AdMockSurface) {
+  return (
+    AD_PLACEMENT_SPECS.find((spec) => spec.surface === surface)?.crop ??
+    "square"
+  );
+}
 
 /**
  * An ad as a feed would show it: the shared social mock with sponsored chrome,
@@ -55,12 +65,11 @@ export function AdMock({
   /** Replaces the default width; the mock keeps its own radius and chrome. */
   className?: string;
 }) {
-  const option = AD_MOCK_SURFACES.find((entry) => entry.id === surface)!;
   const isStory = surface === "story";
   return (
     <SocialPostMock
       className={cn("shadow-lg", className ?? (isStory ? "w-64" : "w-80"))}
-      crop={option.crop}
+      crop={cropForSurface(surface)}
       card={card}
       // Without a pager the ad shows its first card, as before.
       onCard={onCard}

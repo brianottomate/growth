@@ -125,8 +125,16 @@ export function homeGroupKey(group: Pick<HomeGroup, "homeId" | "homeName">) {
 export function groupWall(ads: WallAd[]) {
   const byFormat = (a: WallAd, b: WallAd) =>
     FORMAT_ORDER.indexOf(a.format) - FORMAT_ORDER.indexOf(b.format);
+  // The set slices are the home-less ones: the portfolio carousel and the
+  // Advantage+ catalog. A catalog card bound to a home is that home's third
+  // ad, not a set slice, so it stays in the home group below.
   const slices = ads
-    .filter((ad) => ad.format === "portfolio" || ad.format === "catalog")
+    .filter(
+      (ad) =>
+        (ad.format === "portfolio" || ad.format === "catalog") &&
+        !ad.homeId &&
+        !ad.homeName,
+    )
     .sort(byFormat);
   const rest = ads.filter((ad) => !slices.includes(ad));
   const homes: HomeGroup[] = [];

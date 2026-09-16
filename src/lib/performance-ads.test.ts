@@ -186,14 +186,16 @@ describe("ad plan", () => {
     },
   ];
 
-  it("produces the 10 ads the live build shipped for 4 properties", () => {
+  it("draws a static, a carousel and a catalog card per home, plus the two set slices", () => {
     const plan = buildPerformanceAdPlan({
       customer: "Away & Stay",
       properties,
     });
-    expect(plan).toHaveLength(10);
+    // 4 homes × 3 per-home ads + the portfolio carousel + the catalog ad.
+    expect(plan).toHaveLength(14);
     expect(plan.filter((ad) => ad.kind === "static")).toHaveLength(4);
     expect(plan.filter((ad) => ad.kind === "carousel")).toHaveLength(4);
+    expect(plan.filter((ad) => ad.kind === "catalog_home")).toHaveLength(4);
   });
 
   it("keeps the portfolio carousel and the catalog ad as separate ads", () => {
@@ -212,7 +214,7 @@ describe("ad plan", () => {
     }));
     expect(
       buildPerformanceAdPlan({ customer: "X", properties: many }),
-    ).toHaveLength(42);
+    ).toHaveLength(62);
   });
 
   it("refuses an empty portfolio", () => {

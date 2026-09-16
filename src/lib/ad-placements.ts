@@ -21,7 +21,7 @@ import type { AdFormat } from "./performance-ads";
 /** "<platform>:<placement>", the key of an ad's `placements` map. */
 export type AdPlacementKey = `${PlannableAdPlatform}:${string}`;
 
-export type AdPlacementCrop = "landscape" | "square" | "story";
+export type AdPlacementCrop = "landscape" | "square" | "portrait" | "story";
 
 /** The client mock that draws a placement. Ids match `AD_MOCK_SURFACES`. */
 export type AdPlacementSurface = "facebook" | "instagram" | "story";
@@ -56,7 +56,7 @@ export const AD_PLACEMENT_SPECS = [
     placement: "facebook_feed",
     label: "Facebook feed",
     shortLabel: "FB feed",
-    crop: "landscape",
+    crop: "portrait",
     surface: "facebook",
     copy: { headlineMax: 40, bodyMax: 125, ctaRequired: true },
     formats: ["static", "carousel", "video"],
@@ -67,7 +67,7 @@ export const AD_PLACEMENT_SPECS = [
     placement: "instagram_feed",
     label: "Instagram feed",
     shortLabel: "IG feed",
-    crop: "square",
+    crop: "portrait",
     surface: "instagram",
     copy: { headlineMax: 40, bodyMax: 125, ctaRequired: true },
     formats: ["static", "carousel", "video"],
