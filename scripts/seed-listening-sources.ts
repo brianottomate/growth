@@ -33,57 +33,83 @@ const INITIAL_SUBREDDITS = [
 // F5Bot alert terms — MIRRORED from the live F5Bot dashboard (the source of
 // truth). Keep this list in sync with F5Bot; `verifiedAt` is bumped whenever we
 // confirm alignment. F5Bot is one channel; if we move to Mentionkit the terms
-// move with us. Casing + flags match the F5Bot config exactly.
-const F5BOT_VERIFIED_AT = "2026-06-17";
+// move with us. Casing + flags match the F5Bot config exactly (F5Bot lowercases
+// and matches case-insensitively). The brand / location / intent terms were
+// added 2026-09-16 for the Colleen Barndt brand-monitoring request. F5Bot's free
+// plan has no boolean operators, so the requested `NOT lang:de` / `NOT WanderOn`
+// exclusions can't be expressed; relevance scoring filters that noise instead.
+const F5BOT_VERIFIED_AT = "2026-09-16";
+const WHOLE_REDDIT = ["whole", "only-reddit"];
+const WHOLE_REDDIT_NO_COMMENTS = ["whole", "only-reddit", "no-comments"];
+const alert = (term: string, flags: string[]): ListeningAlertTerm => ({
+  term,
+  flags,
+  enabled: true,
+  verifiedAt: F5BOT_VERIFIED_AT,
+});
 const F5BOT_ALERT_TERMS: ListeningAlertTerm[] = [
-  {
-    term: "airbnb alternatives",
-    flags: ["whole", "only-reddit", "no-comments"],
-    enabled: true,
-    verifiedAt: F5BOT_VERIFIED_AT,
-  },
-  {
-    term: "direct booking site",
-    flags: ["whole", "only-reddit"],
-    enabled: true,
-    verifiedAt: F5BOT_VERIFIED_AT,
-  },
-  {
-    term: "fire my property manager",
-    flags: ["whole", "only-reddit"],
-    enabled: true,
-    verifiedAt: F5BOT_VERIFIED_AT,
-  },
-  {
-    term: "wander listed",
-    flags: ["whole", "only-reddit"],
-    enabled: true,
-    verifiedAt: F5BOT_VERIFIED_AT,
-  },
-  {
-    term: "wander operated",
-    flags: ["whole", "only-reddit"],
-    enabled: true,
-    verifiedAt: F5BOT_VERIFIED_AT,
-  },
-  {
-    term: "wander sites",
-    flags: ["whole", "only-reddit"],
-    enabled: true,
-    verifiedAt: F5BOT_VERIFIED_AT,
-  },
-  {
-    term: "wander.com",
-    flags: [],
-    enabled: true,
-    verifiedAt: F5BOT_VERIFIED_AT,
-  },
-  {
-    term: "wanderos",
-    flags: ["whole", "only-reddit"],
-    enabled: true,
-    verifiedAt: F5BOT_VERIFIED_AT,
-  },
+  // STR-operator discovery terms
+  alert("airbnb alternatives", WHOLE_REDDIT_NO_COMMENTS),
+  alert("airbnb fees", WHOLE_REDDIT_NO_COMMENTS),
+  alert("vrbo alternatives", WHOLE_REDDIT_NO_COMMENTS),
+  alert("channel manager", WHOLE_REDDIT),
+  alert("direct booking", WHOLE_REDDIT),
+  alert("direct booking site", WHOLE_REDDIT),
+  alert("direct booking website", WHOLE_REDDIT),
+  alert("ditch airbnb", WHOLE_REDDIT),
+  alert("fire my property manager", WHOLE_REDDIT),
+  alert("guesty alternative", WHOLE_REDDIT),
+  alert("hostaway alternative", WHOLE_REDDIT),
+  alert("property management software", WHOLE_REDDIT),
+  alert("vacation rental software", WHOLE_REDDIT),
+  // Wander brand / product
+  alert("wander.com", []),
+  alert("wanderos", WHOLE_REDDIT),
+  alert("wander listed", WHOLE_REDDIT),
+  alert("wander operated", WHOLE_REDDIT),
+  alert("wander sites", WHOLE_REDDIT),
+  alert("wander for operators", WHOLE_REDDIT),
+  alert("wander app", WHOLE_REDDIT),
+  alert("wander membership", WHOLE_REDDIT),
+  alert("wander concierge", WHOLE_REDDIT),
+  alert("wander owned", WHOLE_REDDIT),
+  alert("wander branded", WHOLE_REDDIT),
+  // Wander property locations
+  alert("wander joshua tree", WHOLE_REDDIT),
+  alert("wander tahoe", WHOLE_REDDIT),
+  alert("wander lake tahoe", WHOLE_REDDIT),
+  alert("wander ponte vedra", WHOLE_REDDIT),
+  alert("wander hollywood hills", WHOLE_REDDIT),
+  alert("wander kure beach", WHOLE_REDDIT),
+  alert("wander atlantic city", WHOLE_REDDIT),
+  alert("wander st. george island", WHOLE_REDDIT),
+  alert("wander hudson valley", WHOLE_REDDIT),
+  alert("wander palm springs", WHOLE_REDDIT),
+  alert("wander yucca valley", WHOLE_REDDIT),
+  alert("wander malibu", WHOLE_REDDIT),
+  alert("wander kissimmee", WHOLE_REDDIT),
+  alert("wander sonoma", WHOLE_REDDIT),
+  alert("wander longboat", WHOLE_REDDIT),
+  // Booking / host-intent language
+  alert("wander rentals", WHOLE_REDDIT),
+  alert("wander vacation rental", WHOLE_REDDIT),
+  alert("wander vacation home", WHOLE_REDDIT),
+  alert("wander smart home rental", WHOLE_REDDIT),
+  alert("stayed at a wander", WHOLE_REDDIT),
+  alert("book a wander", WHOLE_REDDIT),
+  alert("wander property manager", WHOLE_REDDIT),
+  alert("wander host fee", WHOLE_REDDIT),
+  alert("wander homeowner", WHOLE_REDDIT),
+  alert("wander vs vrbo", WHOLE_REDDIT),
+  alert("wander vs airbnb", WHOLE_REDDIT),
+  alert("partnership with wander", WHOLE_REDDIT),
+  // Wander domains (whole-word so wander.co doesn't match every wander.com)
+  alert("wander.ca", WHOLE_REDDIT),
+  alert("wander.co", WHOLE_REDDIT),
+  alert("wander.io", WHOLE_REDDIT),
+  alert("wanderapp.com", WHOLE_REDDIT),
+  // Brand tagline
+  alert("not your typical vacation rental", WHOLE_REDDIT),
 ];
 
 const brand = await db.query.brandTable.findFirst({

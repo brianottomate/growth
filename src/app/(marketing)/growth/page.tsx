@@ -68,41 +68,10 @@ function KeywordMonitoringSection() {
           </a>
         </div>
 
-        <div className="mt-6">
-          <h4 className="text-sm font-semibold text-gray-900">
-            Alerts we&apos;re running
-          </h4>
-          <ul className="mt-3 divide-y divide-gray-200 rounded-lg border border-gray-200 bg-white">
-            {ALERTS.map((alert) => (
-              <li
-                key={alert.term}
-                className="flex items-start justify-between gap-4 px-4 py-3"
-              >
-                <div className="min-w-0">
-                  <p className="font-mono text-sm text-gray-900">
-                    {alert.term}
-                  </p>
-                  <p className="mt-1 text-sm text-gray-600">{alert.purpose}</p>
-                </div>
-                <div className="flex shrink-0 flex-wrap gap-1.5">
-                  {alert.flags.map((flag) => (
-                    <span
-                      key={flag}
-                      className="rounded bg-gray-100 px-2 py-0.5 font-mono text-xs text-gray-700"
-                    >
-                      {flag}
-                    </span>
-                  ))}
-                </div>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-3 text-xs text-gray-500">
-            <span className="font-mono">whole</span> = whole-word match ·{" "}
-            <span className="font-mono">only-reddit</span> = ignore HN/Lobsters
-            · <span className="font-mono">no-comments</span> = posts only
-          </p>
-        </div>
+        <p className="mt-6 text-sm text-gray-600">
+          The live keyword list is managed internally (F5Bot dashboard, mirrored
+          into the listening tooling), not published here.
+        </p>
       </div>
     </section>
   );
@@ -356,42 +325,3 @@ const SUBREDDITS = [
   "PropertyManagement",
 ];
 
-type Alert = {
-  term: string;
-  purpose: string;
-  flags: string[];
-};
-
-const ALERTS: Alert[] = [
-  {
-    term: "wander.com",
-    purpose: "URL mentions — direct brand signal.",
-    flags: [],
-  },
-  {
-    term: "Wander Sites",
-    purpose: "Discussion of the Wander Sites product.",
-    flags: ["whole", "only-reddit"],
-  },
-  {
-    term: "Wander Operated",
-    purpose: "Discussion of the full-management arm.",
-    flags: ["whole", "only-reddit"],
-  },
-  {
-    term: "direct booking site",
-    purpose:
-      "WanderOS positioning — natural insertion point for the marketing team.",
-    flags: ["whole", "only-reddit"],
-  },
-  {
-    term: "Airbnb alternatives",
-    purpose: "Top-of-funnel — operators evaluating their options.",
-    flags: ["whole", "only-reddit", "no-comments"],
-  },
-  {
-    term: "fire my property manager",
-    purpose: "High-intent pain moment — primed for Wander Operated.",
-    flags: ["whole", "only-reddit"],
-  },
-];
