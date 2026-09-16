@@ -49,8 +49,7 @@ export type StripHome = {
 
 const panel = "bg-card overflow-hidden rounded-2xl border";
 
-/** A set runs on three to ten homes. */
-const MIN_SET = 3;
+/** A set runs on at most ten homes. */
 const MAX_SET = 10;
 
 /**
@@ -127,12 +126,6 @@ export function HomesStrip({
   // Picking commits (or drops) a `home` row for the set the ads run on.
   const byExternal = new Map(picked.map((p) => [p.externalId, p.homeId]));
   const count = picked.length;
-  const ready = count >= MIN_SET;
-  const adsBase = `/app/performance/brands/${brandSlug ?? brandId}/ads`;
-  const adsHref =
-    count > 0
-      ? `${adsBase}?homes=${encodeURIComponent(picked.map((p) => p.externalId).join(","))}`
-      : adsBase;
   const add = useMutation(
     trpc.brand.homesAddWanderOs.mutationOptions({
       onSuccess: () => router.refresh(),
@@ -184,28 +177,6 @@ export function HomesStrip({
 
   return (
     <>
-      <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 rounded-full border bg-muted/40 px-3 py-1.5 text-[11.5px]">
-        <span className="flex items-baseline gap-2">
-          <span className="font-medium tracking-wide text-muted-foreground uppercase">
-            Picked
-          </span>
-          <span
-            className={cn(ready ? "text-emerald-400" : "text-muted-foreground")}
-          >
-            {count}/{MAX_SET}
-            {count < MIN_SET ? " · pick at least three" : ""}
-          </span>
-        </span>
-        {ready ? (
-          <ButtonLink href={adsHref} size="sm" className="h-7">
-            Continue to Ads
-          </ButtonLink>
-        ) : (
-          <span className="text-muted-foreground">
-            Tick homes to build the set.
-          </span>
-        )}
-      </div>
       <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
         <label className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
