@@ -1,4 +1,9 @@
-import { SocialPostMock, ctaLabel, domainOf } from "@/components/social-mock";
+import {
+  SocialPostMock,
+  ctaLabel,
+  domainOf,
+  type SocialMockCrop,
+} from "@/components/social-mock";
 import { cn } from "@/components/ui/lib/utils";
 import { AD_PLACEMENT_SPECS } from "@/lib/ad-placements";
 
@@ -40,6 +45,7 @@ function cropForSurface(surface: AdMockSurface) {
  */
 export function AdMock({
   surface,
+  crop,
   brandName,
   brandLogo,
   body,
@@ -52,6 +58,12 @@ export function AdMock({
   className,
 }: {
   surface: AdMockSurface;
+  /**
+   * The crop to draw, when it is not the surface's own — a placement whose
+   * shape differs from its surface's feed, like the 16:9 landscape on the
+   * Facebook chrome. Defaults to the surface's placement crop.
+   */
+  crop?: SocialMockCrop;
   brandName: string;
   brandLogo: string | null;
   body: string | null;
@@ -69,7 +81,7 @@ export function AdMock({
   return (
     <SocialPostMock
       className={cn("shadow-lg", className ?? (isStory ? "w-64" : "w-80"))}
-      crop={cropForSurface(surface)}
+      crop={crop ?? cropForSurface(surface)}
       card={card}
       // Without a pager the ad shows its first card, as before.
       onCard={onCard}

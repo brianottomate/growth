@@ -1,5 +1,6 @@
 import type { AdContent } from "@/server/db/ads-schema";
 
+import { withPhotoOnly } from "./ad-placements";
 import { adFormatOf, type AdFormat } from "./performance-ads";
 
 // The wall's view of an ad, and where an ad stands. Client-safe: the brand's
@@ -64,6 +65,10 @@ export function toWallAd(ad: {
   const content = ad.content;
   if (!("media" in content)) return null;
   const creative = content;
+  // Photo only drops every card's overlay here too, so the wall reads the same
+  // as the matrix and the push.
+  const bare = creative.photoOnly === true;
+  const cardUrl = (url: string) => (bare ? withPhotoOnly(url) : url);
   return {
     id: ad.id,
     name: ad.name,
@@ -78,13 +83,13 @@ export function toWallAd(ad: {
     homeName: ad.home?.name ?? creative.propertyName ?? null,
     homeUrl: ad.home?.url ?? null,
     cards: creative.media.map((item) => ({
-      url: item.url,
+      url: cardUrl(item.url),
       thumbnail: item.thumbnail ?? null,
       assetId: item.assetId ?? null,
       type: item.type,
       story: item.story
         ? {
-            url: item.story.url,
+            url: cardUrl(item.story.url),
             thumbnail: item.story.thumbnail ?? null,
             assetId: item.story.assetId ?? null,
             via: item.story.via,

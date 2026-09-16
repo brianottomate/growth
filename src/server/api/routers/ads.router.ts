@@ -17,6 +17,7 @@ import {
   deleteAd,
   editAdCards,
   setAdCopy,
+  setAdPhotoOnly,
   setAdHome,
   setAdStatus,
 } from "@/server/services/ad-set.service";
@@ -366,6 +367,16 @@ export const adsRouter = {
         orgId: await organizationIdFor(ctx),
         headline: input.headline,
         body: input.body,
+      }),
+    ),
+
+  setAdPhotoOnly: protectedProcedure
+    .input(z.object({ adId: z.string().min(1), photoOnly: z.boolean() }))
+    .mutation(async ({ ctx, input }) =>
+      setAdPhotoOnly({
+        adId: input.adId,
+        orgId: await organizationIdFor(ctx),
+        photoOnly: input.photoOnly,
       }),
     ),
 

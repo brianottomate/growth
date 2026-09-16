@@ -193,11 +193,11 @@ describe("coverage", () => {
     };
     const cover = coverage(resolveMatrix(ad));
     expect(cover).toEqual({
-      total: 3,
+      total: 4,
       frozen: 1,
       overridden: 2, // instagram by copy, story by the legacy slot
-      rendered: 0,
-      unfit: 3, // the long headline is inherited everywhere
+      rendered: 1, // the landscape cell has no decision
+      unfit: 4, // the long headline is inherited everywhere
     });
   });
 });

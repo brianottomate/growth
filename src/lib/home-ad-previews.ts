@@ -90,6 +90,41 @@ export function homePreviewRecipes(home: HomeForPreview): HomePreviewRecipe[] {
   ];
 }
 
+/**
+ * The headline drawn on each card of a home's own carousel, in order.
+ *
+ * A branded carousel is a walk through one home that tells a story, the way the
+ * reference sets do: the cover carries the hook (the static's line), then the
+ * facts, the place, and a closing line, each on its own photo. Cycles when
+ * there are more cards than angles, so a six-photo carousel never runs empty.
+ * `lead` is the cover line, usually the home's on-card title.
+ */
+export function carouselSlideTitles(
+  home: HomeForPreview,
+  slideCount: number,
+  lead?: string | null,
+): string[] {
+  const where = place(home);
+  const town = home.city?.trim();
+  const facts = [
+    count(home.bedrooms, "bedroom", "bedrooms"),
+    count(home.bathrooms, "bath", "baths"),
+    home.guests ? `Sleeps ${home.guests}.` : null,
+  ].filter((line): line is string => Boolean(line));
+  const rating = ratingOutOfFive(home.rating);
+  const angles = [
+    lead?.trim() || home.name,
+    facts.slice(0, 2).join(" ") || null,
+    town ? `Your ${town} escape awaits` : where ? `Set in ${where}` : null,
+    facts[2] ?? (rating ? `Rated ${rating.toFixed(1)} by guests` : null),
+    `Book your ${town ?? "next"} getaway`,
+  ].filter((line): line is string => Boolean(line));
+  return Array.from(
+    { length: Math.max(slideCount, 1) },
+    (_, index) => angles[index % angles.length]!,
+  );
+}
+
 /** Everything a preview tile needs to draw itself, and to be frozen as is. */
 export type PreviewSpec = {
   brandId: string;

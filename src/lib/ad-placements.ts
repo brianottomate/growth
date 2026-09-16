@@ -21,7 +21,12 @@ import type { AdFormat } from "./performance-ads";
 /** "<platform>:<placement>", the key of an ad's `placements` map. */
 export type AdPlacementKey = `${PlannableAdPlatform}:${string}`;
 
-export type AdPlacementCrop = "landscape" | "square" | "portrait" | "story";
+export type AdPlacementCrop =
+  | "landscape"
+  | "wide"
+  | "square"
+  | "portrait"
+  | "story";
 
 /** The client mock that draws a placement. Ids match `AD_MOCK_SURFACES`. */
 export type AdPlacementSurface = "facebook" | "instagram" | "story";
@@ -81,6 +86,20 @@ export const AD_PLACEMENT_SPECS = [
     crop: "story",
     surface: "story",
     copy: { headlineMax: 40, bodyMax: 125, ctaRequired: false },
+    formats: ["static", "carousel", "video"],
+  },
+  {
+    // The 16:9 cut Meta serves in right column, in-stream and search. The
+    // reference sets ship it beside the feed and story crops; the composition
+    // re-renders on the wide canvas from the same blueprint.
+    key: "meta_ads:landscape",
+    platform: "meta_ads",
+    placement: "landscape",
+    label: "Landscape",
+    shortLabel: "Landscape",
+    crop: "wide",
+    surface: "facebook",
+    copy: { headlineMax: 40, bodyMax: 125, ctaRequired: true },
     formats: ["static", "carousel", "video"],
   },
 ] as const satisfies readonly AdPlacementSpec[];
@@ -211,6 +230,24 @@ export function withCompositionFormat(
   return `${path}?${params.toString()}`;
 }
 
+/** The overlay fields a branded blueprint carries; dropped to fall back to the photo. */
+const OVERLAY_PARAMS = ["title", "subtitle", "eyebrow", "cta", "rating"];
+
+/**
+ * A composition card re-rendered as its bare photo: the blueprint swapped for
+ * `photo-only` and the overlay fields dropped, so the source shows with nothing
+ * on it. For a home whose photos are already stamped, so the ad does not double
+ * up. A pinned upload or a raw asset is not a composition and is returned as is.
+ */
+export function withPhotoOnly(url: string): string {
+  if (!url.includes("/api/compositions/preview")) return url;
+  const [path, query = ""] = url.split("?");
+  const params = new URLSearchParams(query);
+  params.set("templateId", "photo-only");
+  for (const key of OVERLAY_PARAMS) params.delete(key);
+  return `${path}?${params.toString()}`;
+}
+
 export function resolveCell(
   ad: PlaceableAd,
   spec: AdPlacementSpec,
@@ -223,15 +260,19 @@ export function resolveCell(
     callToAction: cell?.copy?.callToAction ?? base.callToAction ?? null,
     linkUrl: cell?.copy?.linkUrl ?? base.linkUrl ?? null,
   };
+  // When the ad is set to photo only, every card drops its overlay and shows
+  // the bare source, a card at a time, before the crop is applied.
+  const photoOnly = base.photoOnly === true;
   const cards: ResolvedCard[] = base.media.map((card, index) => {
     const own = cell?.cards?.[index] ?? null;
     const shown = own ?? card;
+    const shownUrl = photoOnly ? withPhotoOnly(shown.url) : shown.url;
     return {
       // A composition card carries its recipe in the URL, so the placement's
       // own crop is a formatId swap: the blueprint re-renders at 1.91:1, 1:1
       // or 9:16 with its scrim in the right place, instead of a square
       // cropped by CSS. A pinned upload or a raw asset is left as it is.
-      url: withCompositionFormat(shown.url, spec.crop),
+      url: withCompositionFormat(shownUrl, spec.crop),
       thumbnail: shown.thumbnail ?? null,
       type: card.type,
       assetId: shown.assetId ?? null,

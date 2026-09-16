@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronRight,
+  ImageOff,
   Loader2,
   Lock,
   LockOpen,
@@ -14,6 +15,7 @@ import {
 } from "lucide-react";
 
 import { AdMock, type AdMockSurface } from "@/components/ad-mock";
+import type { SocialMockCrop } from "@/components/social-mock";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -28,6 +30,7 @@ export type MatrixCell = {
   label: string;
   shortLabel: string;
   surface: AdMockSurface;
+  crop: SocialMockCrop;
   state: CellState;
   fitIssues: string[];
   frozenAt: string | null;
@@ -40,6 +43,7 @@ export type MatrixAd = {
   name: string;
   format: string;
   base: { headline: string; body: string; callToAction: string | null };
+  photoOnly: boolean;
   coverage: {
     total: number;
     frozen: number;
@@ -152,7 +156,15 @@ function AdRow({
   brandName: string;
   brandLogo: string | null;
 }) {
+  const router = useRouter();
+  const trpc = useTRPC();
   const [editingBase, setEditingBase] = useState(false);
+  const photoOnly = useMutation(
+    trpc.ads.setAdPhotoOnly.mutationOptions({
+      onSuccess: () => router.refresh(),
+      onError: (error) => toast.error(error.message),
+    }),
+  );
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-baseline gap-2">
@@ -166,6 +178,25 @@ function AdRow({
           className="text-[11px] text-sky-300 hover:underline"
         >
           {editingBase ? "Close" : "Edit base copy"}
+        </button>
+        <button
+          type="button"
+          disabled={photoOnly.isPending}
+          onClick={() =>
+            photoOnly.mutate({ adId: ad.id, photoOnly: !ad.photoOnly })
+          }
+          title="Drop the composition and show the bare photos"
+          className={cn(
+            "inline-flex items-center gap-1 text-[11px] hover:underline",
+            ad.photoOnly ? "text-amber-400" : "text-muted-foreground",
+          )}
+        >
+          {photoOnly.isPending ? (
+            <Loader2 className="size-3 animate-spin" />
+          ) : (
+            <ImageOff className="size-3" />
+          )}
+          Photo only
         </button>
       </div>
       {editingBase ? (
@@ -304,6 +335,7 @@ function CellCard({
       </div>
       <AdMock
         surface={cell.surface}
+        crop={cell.crop}
         brandName={brandName}
         brandLogo={brandLogo}
         body={cell.copy.body}

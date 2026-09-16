@@ -70,12 +70,14 @@ export type SocialMockCrop =
   | "square"
   | "portrait"
   | "landscape"
+  | "wide"
   | "story";
 
 const CROP_CLASS: Record<Exclude<SocialMockCrop, "auto">, string> = {
   square: "aspect-square",
   portrait: "aspect-[4/5]",
   landscape: "aspect-[1.91/1]",
+  wide: "aspect-video",
   story: "aspect-[9/16]",
 };
 

@@ -50,6 +50,7 @@ import {
   type CardEdit,
 } from "@/lib/performance-ads";
 import {
+  carouselSlideTitles,
   compositionPreviewUrl,
   homeCatalogCopy,
   homeCatalogPreviewUrl,
@@ -677,16 +678,6 @@ export async function buildAdSet(input: {
     }),
     type: "image",
   });
-  const photoCard = (sourceUrl: string): MediaItem => ({
-    url: compositionPreviewUrl({
-      brandId: brand.id,
-      templateId: "photo-only",
-      formatId: "portrait",
-      source: { url: sourceUrl },
-      title: "",
-    }),
-    type: "image",
-  });
   const catalogCard = (
     sourceUrl: string,
     title: string,
@@ -702,6 +693,31 @@ export async function buildAdSet(input: {
         subtitle: subtitle ?? "",
         rating: null,
       },
+    }),
+    type: "image",
+  });
+  // A listing's facts as the preview copy reads them, shared by the catalog
+  // card, the carousel's closing card, and the per-slide headlines.
+  const previewHome = (listing: WanderOsListing) => ({
+    name: listing.name,
+    city: listing.city,
+    state: listing.state,
+    bedrooms: listing.bedrooms,
+    bathrooms: listing.bathrooms,
+    guests: listing.guests,
+    rating: listing.rating,
+  });
+  // The branded listing card for one home: the full catalog-place composition
+  // (place, facts, guest-rating pill), drawn on this photo.
+  const listingCard = (
+    sourceUrl: string,
+    listing: WanderOsListing,
+  ): MediaItem => ({
+    url: homeCatalogPreviewUrl({
+      brandId: brand.id,
+      source: { url: sourceUrl },
+      formatId: "portrait",
+      copy: homeCatalogCopy(previewHome(listing)),
     }),
     type: "image",
   });
@@ -745,9 +761,17 @@ export async function buildAdSet(input: {
         media: [withStory(heroCard(home.hero!, homeCopy.cardTitle))],
       };
     } else if (item.kind === "carousel" && home && homeCopy) {
-      // One home's own carousel is a walk through its rooms, which is the
-      // shape a listing carousel takes and which needs the full gallery.
+      // One home's own carousel, branded like the reference sets but past their
+      // baseline: a weak set stamps one template on every slide. This varies
+      // the composition by the card's role — a hero cover and feature cards,
+      // each carrying its own line, closing on the branded listing card.
       const photos = home.photos.slice(0, HOME_CAROUSEL_CARDS);
+      const slides = photos.length >= 2 ? photos : [home.hero!];
+      const titles = carouselSlideTitles(
+        previewHome(home.listing),
+        slides.length,
+        homeCopy.cardTitle,
+      );
       content = {
         format,
         headline: homeCopy.headline,
@@ -755,31 +779,16 @@ export async function buildAdSet(input: {
         linkUrl: home.listing.url,
         callToAction: PERFORMANCE_AD_DEFAULTS.callToAction,
         propertyName: home.listing.name,
-        media: (photos.length >= 2 ? photos : [home.hero!]).map((photo) =>
-          photoCard(photo),
+        media: slides.map((photo, index) =>
+          index === slides.length - 1 && slides.length >= 3
+            ? listingCard(photo, home.listing)
+            : heroCard(photo, titles[index]!),
         ),
       };
     } else if (item.kind === "catalog_home" && home && homeCopy) {
       // The home's hero drawn with the branded listing composition: the same
       // photo as the static, read as a catalog card. Born with its 9:16 twin
       // so the story placement has a card to show.
-      const catalog: MediaItem = {
-        url: homeCatalogPreviewUrl({
-          brandId: brand.id,
-          source: { url: home.hero! },
-          formatId: "portrait",
-          copy: homeCatalogCopy({
-            name: home.listing.name,
-            city: home.listing.city,
-            state: home.listing.state,
-            bedrooms: home.listing.bedrooms,
-            bathrooms: home.listing.bathrooms,
-            guests: home.listing.guests,
-            rating: home.listing.rating,
-          }),
-        }),
-        type: "image",
-      };
       content = {
         format,
         headline: homeCopy.headline,
@@ -787,7 +796,7 @@ export async function buildAdSet(input: {
         linkUrl: home.listing.url,
         callToAction: PERFORMANCE_AD_DEFAULTS.callToAction,
         propertyName: home.listing.name,
-        media: [withStory(catalog)],
+        media: [withStory(listingCard(home.hero!, home.listing))],
       };
     } else if (item.kind === "all_properties_carousel") {
       content = {
@@ -1308,6 +1317,25 @@ export async function setAdStatus(input: {
     .set({ status: input.status })
     .where(eq(adTable.id, ad.id));
   return { adId: ad.id, status: input.status };
+}
+
+/**
+ * Turn an ad's cards to bare photos, or back. A render-time switch: the branded
+ * recipe stays in each card's URL, so clearing it brings the overlay back. For
+ * a home whose photos already carry a headline or a mark.
+ */
+export async function setAdPhotoOnly(input: {
+  adId: string;
+  orgId: string;
+  photoOnly: boolean;
+}) {
+  const ad = await requireOwnedAd(input);
+  const content = creativeContent(ad);
+  await db
+    .update(adTable)
+    .set({ content: { ...content, photoOnly: input.photoOnly } })
+    .where(eq(adTable.id, ad.id));
+  return { adId: ad.id, photoOnly: input.photoOnly };
 }
 
 /** Replace the words on one ad, leaving its cards alone. */

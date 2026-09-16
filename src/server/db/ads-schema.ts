@@ -190,6 +190,13 @@ export type AdCreativeContent = {
   callToAction?: string;
   /** The home the ad is about, as the onboarding list names it; the push names the ad by it. */
   propertyName?: string;
+  /**
+   * Draw every card as its bare photo, dropping the composition's overlay. For
+   * source photos already stamped with a headline or a mark, so the ad does not
+   * double up. Reversible: the branded recipe stays in each card's URL and the
+   * overlay returns when this is cleared.
+   */
+  photoOnly?: boolean;
   /** One item = static image; several = carousel, in this order. Empty on a shell awaiting its creative. */
   media: AdCard[];
 };
