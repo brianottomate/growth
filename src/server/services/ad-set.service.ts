@@ -678,24 +678,6 @@ export async function buildAdSet(input: {
     }),
     type: "image",
   });
-  const catalogCard = (
-    sourceUrl: string,
-    title: string,
-    subtitle?: string,
-  ): MediaItem => ({
-    url: homeCatalogPreviewUrl({
-      brandId: brand.id,
-      source: { url: sourceUrl },
-      formatId: "portrait",
-      copy: {
-        eyebrow: brand.name,
-        title,
-        subtitle: subtitle ?? "",
-        rating: null,
-      },
-    }),
-    type: "image",
-  });
   // A listing's facts as the preview copy reads them, shared by the catalog
   // card, the carousel's closing card, and the per-slide headlines.
   const previewHome = (listing: WanderOsListing) => ({
@@ -804,9 +786,7 @@ export async function buildAdSet(input: {
         headline: copy.portfolioHeadline,
         body: copy.portfolioPrimaryText,
         callToAction: PERFORMANCE_AD_DEFAULTS.callToAction,
-        media: usable.map(({ hero, listing }, i) =>
-          catalogCard(hero!, copy.homes[i]?.cardTitle ?? listing.name),
-        ),
+        media: usable.map(({ hero, listing }) => listingCard(hero!, listing)),
       };
     } else {
       // The catalog ad's cards are Meta's to render from the product set; the
@@ -816,9 +796,7 @@ export async function buildAdSet(input: {
         headline: copy.catalogHeadline,
         body: copy.catalogPrimaryText,
         callToAction: PERFORMANCE_AD_DEFAULTS.callToAction,
-        media: usable.map(({ hero, listing }, i) =>
-          catalogCard(hero!, copy.homes[i]?.cardTitle ?? listing.name),
-        ),
+        media: usable.map(({ hero, listing }) => listingCard(hero!, listing)),
       };
     }
 
