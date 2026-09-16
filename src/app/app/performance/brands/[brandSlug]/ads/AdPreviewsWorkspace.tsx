@@ -15,8 +15,8 @@ import { useTRPC } from "@/trpc/react";
 
 import { HomePicker } from "../HomePicker";
 import { AddAdDialog } from "./AddAdDialog";
-import { AdWall, type WallAd } from "./AdWall";
 import { CreativeDrop } from "./CreativeDrop";
+import { PlacementMatrix, type MatrixHome } from "./matrix/PlacementMatrix";
 
 export type WorkspaceHome = HotelFeedHome & {
   imageUrl: string;
@@ -48,7 +48,7 @@ export function AdPreviewsWorkspace({
   homes,
   withoutPhoto,
   initialPicked,
-  ads,
+  matrixHomes,
   campaigns,
   hasSite,
   website,
@@ -60,7 +60,7 @@ export function AdPreviewsWorkspace({
   homes: WorkspaceHome[];
   withoutPhoto: number;
   initialPicked: string[];
-  ads: WallAd[];
+  matrixHomes: MatrixHome[];
   /** Campaigns nothing has been pushed for yet, which can still take ads. */
   campaigns: { id: string; name: string }[];
   hasSite: boolean;
@@ -143,8 +143,9 @@ export function AdPreviewsWorkspace({
     commit([...picked, id]);
   };
 
-  const approved = ads.filter((ad) => ad.status === "approved").length;
-  const drafted = ads.length > 0;
+  const allAds = matrixHomes.flatMap((home) => home.ads);
+  const approved = allAds.filter((ad) => ad.status === "approved").length;
+  const drafted = allAds.length > 0;
 
   return (
     <div className="space-y-7">
@@ -322,16 +323,18 @@ export function AdPreviewsWorkspace({
         <CreativeDrop brandId={brandId} homes={homes} />
       </section>
 
-      {/* 3 · The wall */}
+      {/* 3 · The matrix: every home, every ad, every placement. */}
       {drafted ? (
-        <AdWall
-          brandId={brandId}
-          brandSlug={brandSlug}
-          brandName={brandName}
-          brandLogo={brandLogo}
-          homes={homes}
-          ads={ads}
-        />
+        // Break out of the centered column so all placements have room; the
+        // app layout's scroll div is the @container this measures against.
+        <div className="mx-[calc(((100cqw-min(100cqw,64rem))/2+2rem)*-1)] px-8">
+          <PlacementMatrix
+            homes={matrixHomes}
+            brandId={brandId}
+            brandName={brandName}
+            brandLogo={brandLogo}
+          />
+        </div>
       ) : (
         <p
           className={cn(
@@ -340,8 +343,8 @@ export function AdPreviewsWorkspace({
           )}
         >
           {hasSite
-            ? "Nothing on the wall yet. Build the set, add an ad, or drop finished creatives."
-            : "Nothing on the wall yet. Add an ad, or drop finished creatives."}
+            ? "Nothing here yet. Build the set, add an ad, or drop finished creatives."
+            : "Nothing here yet. Add an ad, or drop finished creatives."}
         </p>
       )}
     </div>

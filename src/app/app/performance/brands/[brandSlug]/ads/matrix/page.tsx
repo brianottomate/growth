@@ -1,28 +1,23 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
-import type { AdCreativeContent } from "@/server/db/ads-schema";
 import { listAdSet } from "@/server/services/ad-set.service";
 import { brandListings } from "@/server/services/wanderos-listings.service";
-import { adFormatOf, AD_FORMAT_LABEL } from "@/lib/performance-ads";
-import { coverage, resolveMatrix } from "@/lib/ad-placements";
 
 import { SectionLabel } from "../../../../_components";
 import { brandAvatarUrl, loadPerformanceBrand } from "../../_data";
-import {
-  PlacementMatrix,
-  type MatrixAd,
-  type MatrixHome,
-} from "./PlacementMatrix";
+import { PlacementMatrix } from "./PlacementMatrix";
+import { toMatrixHomes } from "./build";
 
 export const metadata: Metadata = { title: "Matrix · Wander Performance" };
 export const dynamic = "force-dynamic";
 
 /**
- * The confidence matrix: every home a row group, every placement a column,
- * every cell a live render of the base creative unless a decision was made on
- * it. Loaded from `?homes=` like the ads handoff. Reads renders; writes only
- * happen on an explicit override or freeze.
+ * The confidence matrix, full width: every home a row group, every placement a
+ * column, every cell a live render of the base creative unless a decision was
+ * made on it. Loaded from `?homes=` like the ads handoff. The Ads tab renders
+ * the same matrix inline; this is the room-to-breathe view a per-home link
+ * opens on.
  */
 export default async function PlacementMatrixPage({
   params,
@@ -50,60 +45,7 @@ export default async function PlacementMatrixPage({
       .map((id) => id.trim())
       .filter(Boolean),
   );
-
-  const groups = new Map<string, MatrixHome>();
-  for (const ad of ads) {
-    const content = ad.content as AdCreativeContent;
-    if (!Array.isArray(content.media) || content.media.length === 0) continue;
-    const homeKey = ad.home?.externalId ?? ad.homeId ?? "unbound";
-    if (wanted.size > 0 && !wanted.has(homeKey)) continue;
-
-    const resolved = resolveMatrix({ content, placements: ad.placements });
-    const matrixAd: MatrixAd = {
-      id: ad.id,
-      name: ad.name,
-      format: AD_FORMAT_LABEL[adFormatOf(content)],
-      base: {
-        headline: content.headline,
-        body: content.body,
-        callToAction: content.callToAction ?? null,
-      },
-      photoOnly: content.photoOnly ?? false,
-      coverage: coverage(resolved),
-      cells: resolved.map((cell) => ({
-        key: cell.key,
-        label: cell.spec.label,
-        shortLabel: cell.spec.shortLabel,
-        surface: cell.spec.surface,
-        crop: cell.spec.crop,
-        state: cell.state,
-        fitIssues: cell.fit.issues,
-        frozenAt: cell.frozenAt,
-        copy: {
-          headline: cell.copy.headline,
-          body: cell.copy.body,
-          callToAction: cell.copy.callToAction,
-        },
-        cards: cell.cards.map((card) => ({
-          url: card.url,
-          thumbnail: card.thumbnail,
-          type: card.type,
-        })),
-      })),
-    };
-
-    const group = groups.get(homeKey);
-    if (group) group.ads.push(matrixAd);
-    else {
-      groups.set(homeKey, {
-        key: homeKey,
-        name: ad.home?.name ?? "Not bound to a home",
-        ads: [matrixAd],
-      });
-    }
-  }
-
-  const homes = [...groups.values()];
+  const homes = toMatrixHomes(ads, wanted);
 
   return (
     // Break out of the centered max-w-5xl column so all placements have room
@@ -126,6 +68,7 @@ export default async function PlacementMatrixPage({
       ) : (
         <PlacementMatrix
           homes={homes}
+          brandId={brand.id}
           brandName={brand.name}
           brandLogo={avatarUrl}
         />

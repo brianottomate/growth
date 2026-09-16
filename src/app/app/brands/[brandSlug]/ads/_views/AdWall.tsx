@@ -42,7 +42,10 @@ import { AD_FORMAT_LABEL, cardCapacity } from "@/lib/performance-ads";
 import type { MediaItem } from "@/server/db/schema";
 import { useTRPC } from "@/trpc/react";
 
-import { HomePicker, type PickableHome } from "../HomePicker";
+import {
+  HomePicker,
+  type PickableHome,
+} from "@/app/app/performance/brands/[brandSlug]/HomePicker";
 
 export { groupWall } from "@/lib/ad-wall";
 export type { WallAd } from "@/lib/ad-wall";

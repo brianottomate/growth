@@ -1,22 +1,29 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import {
   AlertTriangle,
+  Check,
   ChevronDown,
   ChevronRight,
   ImageOff,
   Loader2,
   Lock,
   LockOpen,
+  Plus,
   RotateCcw,
+  Trash2,
 } from "lucide-react";
 
 import { AdMock, type AdMockSurface } from "@/components/ad-mock";
 import type { SocialMockCrop } from "@/components/social-mock";
+import { MediaPickerDialog } from "@/app/app/content/[contentId]/MediaPickerDialog";
+import type { MediaItem } from "@/server/db/content-schema";
 import { Button } from "@/components/ui/button";
+import { DeleteAlert } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/components/ui/lib/utils";
@@ -38,10 +45,18 @@ export type MatrixCell = {
   cards: { url: string; thumbnail: string | null; type: string }[];
 };
 
+export type MatrixSourceCard = {
+  assetId: string | null;
+  thumbnail: string | null;
+  url: string;
+  type: string;
+};
+
 export type MatrixAd = {
   id: string;
   name: string;
   format: string;
+  status: "drawn" | "approved";
   base: { headline: string; body: string; callToAction: string | null };
   photoOnly: boolean;
   coverage: {
@@ -51,6 +66,8 @@ export type MatrixAd = {
     rendered: number;
     unfit: number;
   };
+  /** The source photos behind the compositions, for swapping a card. */
+  sourceCards: MatrixSourceCard[];
   cells: MatrixCell[];
 };
 
@@ -65,10 +82,12 @@ const STATE_CHIP: Record<CellState, string> = {
 /** The crop each placement shows, so a cell reads at the shape it will run. */
 export function PlacementMatrix({
   homes,
+  brandId,
   brandName,
   brandLogo,
 }: {
   homes: MatrixHome[];
+  brandId: string;
   brandName: string;
   brandLogo: string | null;
 }) {
@@ -134,6 +153,7 @@ export function PlacementMatrix({
                   <AdRow
                     key={ad.id}
                     ad={ad}
+                    brandId={brandId}
                     brandName={brandName}
                     brandLogo={brandLogo}
                   />
@@ -149,25 +169,66 @@ export function PlacementMatrix({
 
 function AdRow({
   ad,
+  brandId,
   brandName,
   brandLogo,
 }: {
   ad: MatrixAd;
+  brandId: string;
   brandName: string;
   brandLogo: string | null;
 }) {
   const router = useRouter();
   const trpc = useTRPC();
   const [editingBase, setEditingBase] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  // Which card the library picker fills: an index to swap, or "append".
+  const [picking, setPicking] = useState<number | "append" | null>(null);
+  const refresh = () => router.refresh();
+  const onError = (error: { message: string }) => toast.error(error.message);
+
   const photoOnly = useMutation(
-    trpc.ads.setAdPhotoOnly.mutationOptions({
-      onSuccess: () => router.refresh(),
-      onError: (error) => toast.error(error.message),
+    trpc.ads.setAdPhotoOnly.mutationOptions({ onSuccess: refresh, onError }),
+  );
+  const approve = useMutation(
+    trpc.ads.setAdStatus.mutationOptions({ onSuccess: refresh, onError }),
+  );
+  const remove = useMutation(
+    trpc.ads.deleteAd.mutationOptions({
+      onSuccess: () => {
+        toast.success("Ad deleted.");
+        refresh();
+      },
+      onError,
     }),
   );
+  const editCards = useMutation(
+    trpc.ads.editAdCards.mutationOptions({ onSuccess: refresh, onError }),
+  );
+
+  const approved = ad.status === "approved";
+  // Statics and videos hold one card; every other shape is a carousel.
+  const multi = !/^(static|video)$/i.test(ad.format);
+  const picked = (item: MediaItem) => {
+    const assetId = item.assetId ?? null;
+    const slot = picking;
+    setPicking(null);
+    if (!assetId) {
+      toast.error("Pick something that is in the library");
+      return;
+    }
+    editCards.mutate({
+      adId: ad.id,
+      edit:
+        slot === "append" || slot === null
+          ? { op: "append", mediaAssetId: assetId }
+          : { op: "replace", index: slot, mediaAssetId: assetId },
+    });
+  };
+
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap items-baseline gap-2">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="text-xs font-medium">{ad.name}</span>
         <span className="text-[10.5px] text-muted-foreground uppercase">
           {ad.format}
@@ -198,7 +259,109 @@ function AdRow({
           )}
           Photo only
         </button>
+        <div className="ml-auto flex items-center gap-1.5">
+          <button
+            type="button"
+            disabled={approve.isPending}
+            onClick={() =>
+              approve.mutate({
+                adId: ad.id,
+                status: approved ? "drawn" : "approved",
+              })
+            }
+            title={
+              approved
+                ? "Approved. A rebuild leaves this one alone."
+                : "Approve. Keeps it through the next rebuild, and it can go to a campaign."
+            }
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px]",
+              approved
+                ? "border-emerald-500/40 text-emerald-400"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {approve.isPending ? (
+              <Loader2 className="size-3 animate-spin" />
+            ) : (
+              <Check className="size-3" />
+            )}
+            {approved ? "Approved" : "Approve"}
+          </button>
+          <button
+            type="button"
+            disabled={remove.isPending}
+            onClick={() => setConfirmingDelete(true)}
+            aria-label="Delete this ad"
+            title="Delete this ad"
+            className="flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+          >
+            {remove.isPending ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Trash2 className="size-3.5" />
+            )}
+          </button>
+        </div>
       </div>
+
+      {/* The source photos behind the compositions: swap one, drop one, add one. */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        {ad.sourceCards.map((card, index) => (
+          <div key={`${ad.id}-${index}`} className="group relative">
+            <button
+              type="button"
+              onClick={() => setPicking(index)}
+              disabled={editCards.isPending}
+              title={`Swap card ${index + 1}`}
+              className="relative block size-12 overflow-hidden rounded-md border bg-muted hover:border-sky-400"
+            >
+              {card.thumbnail || card.type !== "video" ? (
+                <Image
+                  src={card.thumbnail ?? card.url}
+                  alt=""
+                  fill
+                  sizes="48px"
+                  className="object-cover"
+                  unoptimized
+                />
+              ) : null}
+            </button>
+            {ad.sourceCards.length > 1 ? (
+              <button
+                type="button"
+                onClick={() =>
+                  editCards.mutate({
+                    adId: ad.id,
+                    edit: { op: "remove", index },
+                  })
+                }
+                disabled={editCards.isPending}
+                aria-label={`Remove card ${index + 1}`}
+                className="absolute -top-1.5 -right-1.5 hidden size-4 items-center justify-center rounded-full bg-background text-muted-foreground shadow group-hover:flex hover:text-destructive"
+              >
+                <Trash2 className="size-2.5" />
+              </button>
+            ) : null}
+          </div>
+        ))}
+        {multi && ad.sourceCards.length < 10 ? (
+          <button
+            type="button"
+            onClick={() => setPicking("append")}
+            disabled={editCards.isPending}
+            title="Add a card from the library"
+            className="flex size-12 items-center justify-center rounded-md border border-dashed text-muted-foreground hover:border-sky-400 hover:text-foreground"
+          >
+            {editCards.isPending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Plus className="size-4" />
+            )}
+          </button>
+        ) : null}
+      </div>
+
       {editingBase ? (
         <BaseCopyEditor ad={ad} onClose={() => setEditingBase(false)} />
       ) : null}
@@ -213,6 +376,29 @@ function AdRow({
           />
         ))}
       </div>
+
+      {picking !== null ? (
+        <MediaPickerDialog
+          brandId={brandId}
+          open
+          onOpenChange={(next) => !next && setPicking(null)}
+          existingAssetIds={ad.sourceCards.flatMap((card) =>
+            card.assetId ? [card.assetId] : [],
+          )}
+          onPick={picked}
+        />
+      ) : null}
+      <DeleteAlert
+        open={confirmingDelete}
+        onOpenChange={setConfirmingDelete}
+        onConfirm={() => {
+          setConfirmingDelete(false);
+          remove.mutate({ adId: ad.id });
+        }}
+        title="Delete this ad?"
+        description="This removes the drafted ad. You can rebuild the set or add it again."
+        isLoading={remove.isPending}
+      />
     </div>
   );
 }

@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { brandListings } from "@/server/services/wanderos-listings.service";
@@ -7,11 +6,11 @@ import { listAdSet } from "@/server/services/ad-set.service";
 
 import { brandAvatarUrl, loadPerformanceBrand } from "../_data";
 
-import { toWallAd, type WallAd } from "@/lib/ad-wall";
 import { MAX_SET_HOMES } from "@/lib/performance-ads";
 
 import { AdPreviewsWorkspace, type WorkspaceHome } from "./AdPreviewsWorkspace";
 import { CatalogCards } from "./CatalogCards";
+import { toMatrixHomes } from "./matrix/build";
 
 export const metadata: Metadata = { title: "Ads · Wander Performance" };
 export const dynamic = "force-dynamic";
@@ -42,12 +41,9 @@ export default async function PerformanceBrandAdsPage({
     brandAvatarUrl(brand),
     listAdSet({ brandId: brand.id, orgId: org.id }),
   ]);
-  // The wall needs the words, the cards and the home; everything else about
-  // an ad row is either derivable or not the reviewer's business.
-  const ads: WallAd[] = drafted.flatMap((ad) => {
-    const row = toWallAd(ad);
-    return row ? [row] : [];
-  });
+  // Every home a group, every ad its placement matrix. The reviewer reads and
+  // decides here; the same assembly feeds the full-width matrix route.
+  const matrixHomes = toMatrixHomes(drafted);
   const homes: WorkspaceHome[] = listings
     .filter((home) => home.imageUrl)
     .map((home) => ({
@@ -98,24 +94,9 @@ export default async function PerformanceBrandAdsPage({
     .map((campaign) => ({ id: campaign.id, name: campaign.name }));
 
   const slug = brand.slug ?? brand.id;
-  const matrixHref =
-    `/app/performance/brands/${slug}/ads/matrix` +
-    (initialPicked.length > 0
-      ? `?homes=${encodeURIComponent(initialPicked.join(","))}`
-      : "");
 
   return (
     <div className="space-y-3">
-      {ads.length > 0 ? (
-        <div className="flex justify-end">
-          <Link
-            href={matrixHref}
-            className="text-[11.5px] text-sky-300 hover:underline"
-          >
-            Open the placement matrix →
-          </Link>
-        </div>
-      ) : null}
       <AdPreviewsWorkspace
         brandId={brand.id}
         brandSlug={slug}
@@ -124,7 +105,7 @@ export default async function PerformanceBrandAdsPage({
         homes={homes}
         withoutPhoto={withoutPhoto}
         initialPicked={initialPicked}
-        ads={ads}
+        matrixHomes={matrixHomes}
         campaigns={campaigns}
         hasSite={listings.length > 0}
         website={brand.website}
