@@ -11,6 +11,7 @@ import { toWallAd, type WallAd } from "@/lib/ad-wall";
 import { MAX_SET_HOMES } from "@/lib/performance-ads";
 
 import { AdPreviewsWorkspace, type WorkspaceHome } from "./AdPreviewsWorkspace";
+import { CatalogCards } from "./CatalogCards";
 
 export const metadata: Metadata = { title: "Ads · Wander Performance" };
 export const dynamic = "force-dynamic";
@@ -127,6 +128,20 @@ export default async function PerformanceBrandAdsPage({
         campaigns={campaigns}
         hasSite={listings.length > 0}
         website={brand.website}
+      />
+      <CatalogCards
+        brandId={brand.id}
+        homes={homes.map((home) => ({
+          id: home.id,
+          name: home.name,
+          imageUrl: home.imageUrl,
+          city: home.city ?? null,
+          state: home.state ?? null,
+          bedrooms: home.bedrooms ?? null,
+          bathrooms: home.bathrooms ?? null,
+          guests: home.guests ?? null,
+          rating: home.rating ?? null,
+        }))}
       />
     </div>
   );
