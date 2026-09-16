@@ -171,7 +171,7 @@ function AdRow({
       {editingBase ? (
         <BaseCopyEditor ad={ad} onClose={() => setEditingBase(false)} />
       ) : null}
-      <div className="flex gap-3 overflow-x-auto pb-1">
+      <div className="grid [grid-template-columns:repeat(auto-fit,minmax(min(100%,20rem),1fr))] gap-3">
         {ad.cells.map((cell) => (
           <CellCard
             key={cell.key}
@@ -295,7 +295,7 @@ function CellCard({
   const frozen = cell.state === "frozen";
 
   return (
-    <div className="w-72 shrink-0 space-y-2">
+    <div className="min-w-0 space-y-2">
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-medium">{cell.label}</span>
         <span className={cn("text-[10.5px]", STATE_CHIP[cell.state])}>
