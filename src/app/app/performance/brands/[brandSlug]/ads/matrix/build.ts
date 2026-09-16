@@ -1,5 +1,5 @@
 import type { AdCreativeContent, AdPlacements } from "@/server/db/ads-schema";
-import { coverage, resolveMatrix } from "@/lib/ad-placements";
+import { compositionTitle, coverage, resolveMatrix } from "@/lib/ad-placements";
 import { adFormatOf, AD_FORMAT_LABEL } from "@/lib/performance-ads";
 
 import type { MatrixAd, MatrixHome } from "./PlacementMatrix";
@@ -45,12 +45,15 @@ export function toMatrixHomes(
       },
       photoOnly: content.photoOnly ?? false,
       coverage: coverage(resolved),
-      // The source photos behind the compositions, for the card editor.
+      // The source photos behind the compositions, and the line each draws,
+      // for the card editor.
       sourceCards: content.media.map((card) => ({
         assetId: card.assetId ?? null,
         thumbnail: card.thumbnail ?? null,
         url: card.url,
         type: card.type,
+        title: compositionTitle(card.url),
+        composed: card.url.includes("/api/compositions/preview"),
       })),
       cells: resolved.map((cell) => ({
         key: cell.key,

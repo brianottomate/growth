@@ -19,7 +19,7 @@ import type {
   AdPlacementVariant,
 } from "@/server/db/ads-schema";
 import type { MediaItem } from "@/server/db/content-schema";
-import { placementSpec, resolveCell } from "@/lib/ad-placements";
+import { placementSpec, resolveCell, withTitle } from "@/lib/ad-placements";
 import {
   asPlacements,
   type CopyPatch,
@@ -1318,6 +1318,43 @@ export async function setAdPhotoOnly(input: {
     .set({ content: { ...content, photoOnly: input.photoOnly } })
     .where(eq(adTable.id, ad.id));
   return { adId: ad.id, photoOnly: input.photoOnly };
+}
+
+/**
+ * Rewrite the line one card draws on the image, for a composition card. The
+ * same photo and recipe, a new headline; a blank one clears it. This is the
+ * on-card copy, drawn into every placement's crop, and it is separate from the
+ * ad's caption and Meta headline (`setAdCopy`) and from a cell's own copy
+ * (`setPlacementCopy`). A bare photo or an uploaded file has no line to write.
+ */
+export async function setCardCopy(input: {
+  adId: string;
+  orgId: string;
+  index: number;
+  title: string;
+}) {
+  const ad = await requireOwnedAd(input);
+  const content = creativeContent(ad);
+  const card = content.media[input.index];
+  if (!card) throw new AdSetError(422, `No card at ${input.index}`);
+  if (!card.url.includes("/api/compositions/preview")) {
+    throw new AdSetError(
+      422,
+      "That card is a photo or an upload; it has no drawn line to change",
+    );
+  }
+  const title = input.title.trim();
+  const next: AdCard = { ...card, url: withTitle(card.url, title) };
+  if (card.story) {
+    next.story = { ...card.story, url: withTitle(card.story.url, title) };
+  }
+  const media = [...content.media];
+  media[input.index] = next;
+  await db
+    .update(adTable)
+    .set({ content: { ...content, media } })
+    .where(eq(adTable.id, ad.id));
+  return { adId: ad.id, index: input.index };
 }
 
 /** Replace the words on one ad, leaving its cards alone. */

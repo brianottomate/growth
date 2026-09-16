@@ -16,6 +16,7 @@ import {
   Plus,
   RotateCcw,
   Trash2,
+  Type,
 } from "lucide-react";
 
 import { AdMock, type AdMockSurface } from "@/components/ad-mock";
@@ -50,6 +51,9 @@ export type MatrixSourceCard = {
   thumbnail: string | null;
   url: string;
   type: string;
+  /** The line this card draws on the image, editable when it is a composition. */
+  title: string;
+  composed: boolean;
 };
 
 export type MatrixAd = {
@@ -184,6 +188,9 @@ function AdRow({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   // Which card the library picker fills: an index to swap, or "append".
   const [picking, setPicking] = useState<number | "append" | null>(null);
+  // Which card's on-image line is being edited, and the working text.
+  const [editingText, setEditingText] = useState<number | null>(null);
+  const [text, setText] = useState("");
   const refresh = () => router.refresh();
   const onError = (error: { message: string }) => toast.error(error.message);
 
@@ -204,6 +211,15 @@ function AdRow({
   );
   const editCards = useMutation(
     trpc.ads.editAdCards.mutationOptions({ onSuccess: refresh, onError }),
+  );
+  const cardCopy = useMutation(
+    trpc.ads.setCardCopy.mutationOptions({
+      onSuccess: () => {
+        setEditingText(null);
+        refresh();
+      },
+      onError,
+    }),
   );
 
   const approved = ad.status === "approved";
@@ -327,6 +343,25 @@ function AdRow({
                 />
               ) : null}
             </button>
+            {card.composed ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingText(index);
+                  setText(card.title);
+                }}
+                aria-label={`Edit the line on card ${index + 1}`}
+                title="Edit the line drawn on this card"
+                className={cn(
+                  "absolute -bottom-1.5 -left-1.5 flex size-4 items-center justify-center rounded-full bg-background text-muted-foreground shadow hover:text-sky-400",
+                  editingText === index
+                    ? "flex text-sky-400"
+                    : "hidden group-hover:flex",
+                )}
+              >
+                <Type className="size-2.5" />
+              </button>
+            ) : null}
             {ad.sourceCards.length > 1 ? (
               <button
                 type="button"
@@ -362,6 +397,54 @@ function AdRow({
         ) : null}
       </div>
 
+      {editingText !== null ? (
+        <div className="space-y-1.5 rounded-lg border bg-muted/30 p-2">
+          <div className="text-[10.5px] text-muted-foreground">
+            The line drawn on card {editingText + 1}, in every placement.
+          </div>
+          <Input
+            value={text}
+            autoFocus
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter")
+                cardCopy.mutate({
+                  adId: ad.id,
+                  index: editingText,
+                  title: text,
+                });
+              if (e.key === "Escape") setEditingText(null);
+            }}
+            placeholder="Text on the card (blank clears it)"
+          />
+          <div className="flex gap-1.5">
+            <Button
+              size="sm"
+              disabled={cardCopy.isPending}
+              onClick={() =>
+                cardCopy.mutate({
+                  adId: ad.id,
+                  index: editingText,
+                  title: text,
+                })
+              }
+            >
+              {cardCopy.isPending ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                "Save the card"
+              )}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setEditingText(null)}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : null}
       {editingBase ? (
         <BaseCopyEditor ad={ad} onClose={() => setEditingBase(false)} />
       ) : null}

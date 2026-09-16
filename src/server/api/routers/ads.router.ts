@@ -18,6 +18,7 @@ import {
   editAdCards,
   setAdCopy,
   setAdPhotoOnly,
+  setCardCopy,
   setAdHome,
   setAdStatus,
 } from "@/server/services/ad-set.service";
@@ -377,6 +378,23 @@ export const adsRouter = {
         adId: input.adId,
         orgId: await organizationIdFor(ctx),
         photoOnly: input.photoOnly,
+      }),
+    ),
+
+  setCardCopy: protectedProcedure
+    .input(
+      z.object({
+        adId: z.string().min(1),
+        index: z.number().int().min(0),
+        title: z.string().max(120),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      setCardCopy({
+        adId: input.adId,
+        orgId: await organizationIdFor(ctx),
+        index: input.index,
+        title: input.title,
       }),
     ),
 

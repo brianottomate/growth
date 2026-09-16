@@ -230,6 +230,28 @@ export function withCompositionFormat(
   return `${path}?${params.toString()}`;
 }
 
+/** The line a composition card draws on the image, or "" when it is a bare photo. */
+export function compositionTitle(url: string): string {
+  if (!url.includes("/api/compositions/preview")) return "";
+  const [, query = ""] = url.split("?");
+  return new URLSearchParams(query).get("title") ?? "";
+}
+
+/**
+ * A composition card with its drawn line replaced: the same recipe, a new
+ * `title`. What "override the copy on the composition" writes. A blank title
+ * clears the line. A bare photo or an uploaded file has no line and is
+ * returned untouched.
+ */
+export function withTitle(url: string, title: string): string {
+  if (!url.includes("/api/compositions/preview")) return url;
+  const [path, query = ""] = url.split("?");
+  const params = new URLSearchParams(query);
+  if (title) params.set("title", title);
+  else params.delete("title");
+  return `${path}?${params.toString()}`;
+}
+
 /** The overlay fields a branded blueprint carries; dropped to fall back to the photo. */
 const OVERLAY_PARAMS = ["title", "subtitle", "eyebrow", "cta", "rating"];
 
