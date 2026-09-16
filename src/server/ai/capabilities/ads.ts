@@ -62,13 +62,18 @@ import {
   addAdShell,
   attachAdSet,
   buildAdSet,
+  clearPlacement,
   createAdsFromAssets,
   deleteAd,
   editAdCards,
+  freezePlacement,
   setAdCopy,
   setAdHome,
   setAdStatus,
+  setPlacementCopy,
+  unfreezePlacement,
 } from "@/server/services/ad-set.service";
+import { AD_PLACEMENT_SPECS } from "@/lib/ad-placements";
 import { HAND_MADE_AD_FORMATS, MAX_SET_HOMES } from "@/lib/performance-ads";
 
 import { growthAction } from "./types";
@@ -1389,5 +1394,85 @@ export const setAdCopyAction = growthAction({
       orgId: ctx.orgId,
       headline: input.headline,
       body: input.body,
+    }),
+});
+
+// ---- Placement cells: one platform x placement of one ad ------------------
+// The base creative is edited with setAdCopy/editAdCards; these touch one cell
+// that differs from the base. Singular by design: the model reads the matrix,
+// then fires one call per cell it wants to change, freeze or reset.
+
+const PLACEMENT_KEY_DESC =
+  "Which cell: '<platform>:<placement>'. Meta today: " +
+  AD_PLACEMENT_SPECS.map((s) => s.key).join(", ") +
+  ".";
+
+export const setPlacementCopyAction = growthAction({
+  description:
+    "Override the words for ONE placement of one ad, leaving the base and every other placement alone. Use for copy that should differ on, say, the story but not the feed. A field left out inherits the base; send an empty string to clear one override back to the base.",
+  inputSchema: z.object({
+    adId: z.string().min(1),
+    placementKey: z.string().min(1).describe(PLACEMENT_KEY_DESC),
+    headline: z.string().max(400).optional(),
+    body: z.string().max(2000).optional(),
+    callToAction: z.string().max(60).optional(),
+  }),
+  execute: (input, ctx) =>
+    setPlacementCopy({
+      adId: input.adId,
+      orgId: ctx.orgId,
+      placementKey: input.placementKey,
+      patch: {
+        headline: input.headline === "" ? null : input.headline,
+        body: input.body === "" ? null : input.body,
+        callToAction: input.callToAction === "" ? null : input.callToAction,
+      },
+      via: "ai",
+    }),
+});
+
+export const clearPlacementAction = growthAction({
+  description:
+    "Drop every override on ONE placement of one ad, back to a live render of the base. Refuses nothing; a cell that was already rendering is unchanged.",
+  inputSchema: z.object({
+    adId: z.string().min(1),
+    placementKey: z.string().min(1).describe(PLACEMENT_KEY_DESC),
+  }),
+  execute: (input, ctx) =>
+    clearPlacement({
+      adId: input.adId,
+      orgId: ctx.orgId,
+      placementKey: input.placementKey,
+    }),
+});
+
+export const freezePlacementAction = growthAction({
+  description:
+    "Freeze ONE placement of one ad: pin the copy and files the push will take for it, so a later base edit cannot move it. A story cell derives its 9:16; the feed shapes pin the base asset. Freezing does not push anything; it marks a cell decided. Read the returned fit before you freeze copy that is over a platform limit.",
+  inputSchema: z.object({
+    adId: z.string().min(1),
+    placementKey: z.string().min(1).describe(PLACEMENT_KEY_DESC),
+  }),
+  execute: (input, ctx) =>
+    freezePlacement({
+      adId: input.adId,
+      orgId: ctx.orgId,
+      userId: ctx.userId,
+      placementKey: input.placementKey,
+    }),
+});
+
+export const unfreezePlacementAction = growthAction({
+  description:
+    "Unfreeze ONE placement of one ad, keeping its pinned copy and files as an ordinary override so it can be edited again.",
+  inputSchema: z.object({
+    adId: z.string().min(1),
+    placementKey: z.string().min(1).describe(PLACEMENT_KEY_DESC),
+  }),
+  execute: (input, ctx) =>
+    unfreezePlacement({
+      adId: input.adId,
+      orgId: ctx.orgId,
+      placementKey: input.placementKey,
     }),
 });

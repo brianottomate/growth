@@ -280,6 +280,12 @@ export const growthActionPolicies = {
     attachAdSet: write({ idempotent: true }),
     // Swaps one card slot on a local draft for a library asset.
     replaceAdCard: write({ idempotent: true }),
+    // One cell of one ad: local rows only, no provider call. Freezing marks a
+    // cell decided (and derives a story crop into our own R2); it does not push.
+    setPlacementCopy: write({ idempotent: true }),
+    clearPlacement: write({ idempotent: true }),
+    freezePlacement: write({ idempotent: true }),
+    unfreezePlacement: write({ idempotent: true }),
     addAudience: write(),
     updateAudience: write({ idempotent: true }),
     planPlatform: write({ idempotent: true }),

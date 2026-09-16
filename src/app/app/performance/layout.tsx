@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { NewClientDialog } from "./NewClientDialog";
+import { HeaderNewClient } from "./HeaderNewClient";
 
 /**
  * Wander Performance: the paid-media desk for the people who run client
@@ -20,7 +20,7 @@ export default function PerformanceLayout({
         <h1 className="text-xl font-semibold tracking-tight">
           Wander Performance
         </h1>
-        <NewClientDialog />
+        <HeaderNewClient />
       </div>
       {children}
     </div>

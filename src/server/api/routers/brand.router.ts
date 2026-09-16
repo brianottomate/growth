@@ -24,6 +24,10 @@ import {
 import { createId } from "@/server/db/utils";
 import { type db } from "@/server/db";
 import {
+  addWanderOsHome,
+  createManualHomes,
+  parseHomeShells,
+  removeBrandHome,
   setHomeCarousel,
   setHomeHero,
   setHomeMedia,
@@ -1004,5 +1008,63 @@ export const brandRouter = createTRPCRouter({
         updated: results.reduce((sum, r) => sum + r.updated, 0),
         filteredOut: results.reduce((sum, r) => sum + r.filteredOut, 0),
       };
+    }),
+
+  /**
+   * Setup: commit one of the client's WanderOS listings as a home. Singular by
+   * design — a person picks a tile at a time, and an agent composes one pick
+   * per home. The feed is re-read server-side, so an id off a stale tab cannot
+   * write a listing that is not theirs.
+   */
+  homesAddWanderOs: protectedProcedure
+    .input(
+      z.object({
+        brandId: z.string().min(1),
+        externalId: z.string().min(1),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const brand = await assertBrandManageable(ctx, input.brandId);
+      const home = await addWanderOsHome({
+        brandId: brand.id,
+        website: brand.website,
+        externalId: input.externalId,
+      });
+      return { homeId: home.id, name: home.name };
+    }),
+
+  /**
+   * Setup: create home shells for a brand with no feed we can read. The agent
+   * pulls homes out of whatever the operator pastes; only stated facts land.
+   */
+  homesShellsFromText: protectedProcedure
+    .input(
+      z.object({
+        brandId: z.string().min(1),
+        text: z.string().trim().min(1).max(20_000),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const brand = await assertBrandManageable(ctx, input.brandId);
+      const shells = await parseHomeShells(input.text);
+      if (shells.length === 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "No homes found in that text.",
+        });
+      }
+      const rows = await createManualHomes({
+        brandId: brand.id,
+        homes: shells,
+      });
+      return { added: rows.length, homes: rows.map((row) => row.name) };
+    }),
+
+  /** Setup: drop a committed home. The feed still carries it; this un-picks it. */
+  homesRemove: protectedProcedure
+    .input(z.object({ brandId: z.string().min(1), homeId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const brand = await assertBrandManageable(ctx, input.brandId);
+      return removeBrandHome({ brandId: brand.id, homeId: input.homeId });
     }),
 });

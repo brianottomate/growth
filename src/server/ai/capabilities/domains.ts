@@ -40,6 +40,10 @@ import {
   editAdCardsAction,
   attachAdSetAction,
   replaceAdCardAction,
+  setPlacementCopyAction,
+  clearPlacementAction,
+  freezePlacementAction,
+  unfreezePlacementAction,
 } from "./ads";
 import { diagnoseAlignment } from "./alignment";
 import { AMPLIFICATION_TOOLS } from "./amplification";
@@ -419,6 +423,10 @@ export const adsWrite = growthDomainTool({
     editAdCards: editAdCardsAction,
     attachAdSet: attachAdSetAction,
     replaceAdCard: replaceAdCardAction,
+    setPlacementCopy: setPlacementCopyAction,
+    clearPlacement: clearPlacementAction,
+    freezePlacement: freezePlacementAction,
+    unfreezePlacement: unfreezePlacementAction,
     addAudience: addAudienceAction,
     updateAudience: updateAudienceAction,
     planPlatform: planPlatformAction,

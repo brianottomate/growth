@@ -11,20 +11,16 @@ import {
 } from "@/server/db/schema";
 import { BrandBrandingCard } from "@/app/app/brands/[brandSlug]/BrandBrandingCard";
 import { cn } from "@/components/ui/lib/utils";
-import { listBrandAdPreviews } from "@/server/services/brand-ad-previews.service";
 import { loadBrandContacts } from "@/server/services/brand-contacts.service";
 import { listMedia } from "@/server/services/media.service";
 import {
   loadBrandReadiness,
   readinessLinks,
 } from "@/server/services/performance-readiness.service";
-import { brandListings } from "@/server/services/wanderos-listings.service";
-import { homeCatalogCopy, homePreviewRecipes } from "@/lib/home-ad-previews";
 
 import { panel, SectionLabel } from "../../_components";
 import { ReadinessChecklist } from "../../ReadinessChecklist";
 
-import { AdPreviewsSection } from "./AdPreviewsSection";
 import { MediaStrip } from "./MediaStrip";
 import { brandAvatarUrl, loadPerformanceBrand } from "./_data";
 
@@ -50,25 +46,22 @@ export default async function PerformanceBrandPage({
     return <div className="text-muted-foreground">No organization found.</div>;
   if (!brand) notFound();
 
-  const [homes, media, account, adPreviews, people, avatarUrl, readiness] =
-    await Promise.all([
-      brandListings({ id: brand.id, website: brand.website }),
-      listMedia({ brandId: brand.id, kind: "image" }),
-      db.query.performanceAccountTable.findFirst({
-        where: and(
-          eq(performanceAccountTable.brandId, brand.id),
-          isNull(performanceAccountTable.deletedAt),
-        ),
-        columns: { id: true, contactName: true, contactEmail: true },
-      }),
-      listBrandAdPreviews(brand.id),
-      loadBrandContacts({
-        leadDomain: brand.leadDomain,
-        website: brand.website,
-      }),
-      brandAvatarUrl(brand),
-      deskBrand ? loadBrandReadiness([deskBrand]) : Promise.resolve(null),
-    ]);
+  const [media, account, people, avatarUrl, readiness] = await Promise.all([
+    listMedia({ brandId: brand.id, kind: "image" }),
+    db.query.performanceAccountTable.findFirst({
+      where: and(
+        eq(performanceAccountTable.brandId, brand.id),
+        isNull(performanceAccountTable.deletedAt),
+      ),
+      columns: { id: true, contactName: true, contactEmail: true },
+    }),
+    loadBrandContacts({
+      leadDomain: brand.leadDomain,
+      website: brand.website,
+    }),
+    brandAvatarUrl(brand),
+    deskBrand ? loadBrandReadiness([deskBrand]) : Promise.resolve(null),
+  ]);
   const intake = account
     ? await db.query.performanceIntakeTable.findFirst({
         where: eq(performanceIntakeTable.accountId, account.id),
@@ -136,59 +129,6 @@ export default async function PerformanceBrandPage({
       !superseded.has(asset.id),
   );
   const images = shown.slice(0, 18);
-  const withPhoto = homes.filter((home) => home.imageUrl);
-  // Until a card is frozen, the previews section draws ONE of their homes on
-  // the awareness card in each placement's own canvas, so the headline and
-  // the button survive the feed's crop. Nothing is saved.
-  const picked = brand.featuredListingUrl
-    ? (withPhoto.find((home) => home.url === brand.featuredListingUrl) ?? null)
-    : null;
-  const featured = picked ?? withPhoto[0] ?? null;
-  // The photo: an explicit choice (a home's hero or a library image), else the
-  // featured home's own hero.
-  const sourceUrl = brand.previewSourceUrl ?? featured?.imageUrl ?? null;
-  const sourceImage = brand.previewSourceUrl
-    ? (images.find((asset) => asset.url === brand.previewSourceUrl) ?? null)
-    : null;
-  const sourceHome = brand.previewSourceUrl
-    ? (withPhoto.find((home) => home.imageUrl === brand.previewSourceUrl) ??
-      null)
-    : featured;
-  const pickerCurrent = {
-    sourceUrl: brand.previewSourceUrl,
-    label: sourceHome
-      ? sourceHome.name
-      : sourceImage
-        ? (sourceImage.title ?? "Library image")
-        : featured
-          ? `${featured.name} (first on their site)`
-          : "Choose a photo",
-    thumbUrl:
-      sourceHome?.thumbUrl ??
-      sourceHome?.imageUrl ??
-      sourceImage?.thumbnailUrl ??
-      sourceImage?.url ??
-      null,
-  };
-  const onDemandPreview =
-    featured && sourceUrl
-      ? (() => {
-          const recipe = homePreviewRecipes(featured)[0]!;
-          const catalog = homeCatalogCopy(featured);
-          return {
-            homeId: featured.id,
-            homeName: featured.name,
-            homeUrl: featured.url,
-            imageUrl: featured.imageUrl!,
-            sourceUrl,
-            headline: recipe.title,
-            cta: recipe.cta,
-            /** False while the page is falling back to the first home on their feed. */
-            picked: picked !== null,
-            catalog,
-          };
-        })()
-      : null;
   const slug = brand.slug ?? brand.id;
   const brandReadiness = deskBrand
     ? (readiness?.get(deskBrand.id) ?? null)
@@ -205,36 +145,6 @@ export default async function PerformanceBrandPage({
           />
         </section>
       ) : null}
-
-      <AdPreviewsSection
-        brandId={brand.id}
-        brandSlug={slug}
-        brandName={brand.name}
-        brandLogo={avatarUrl}
-        website={brand.website}
-        cards={adPreviews}
-        onDemand={onDemandPreview}
-        picker={{
-          homes: withPhoto.slice(0, 48).map((home) => ({
-            url: home.url,
-            name: home.name,
-            imageUrl: home.imageUrl!,
-            thumbUrl: home.thumbUrl ?? null,
-          })),
-          images: shown
-            .filter((asset): asset is typeof asset & { url: string } =>
-              Boolean(asset.url),
-            )
-            .slice(0, 48)
-            .map((asset) => ({
-              id: asset.id,
-              url: asset.url,
-              thumbnailUrl: asset.thumbnailUrl ?? null,
-              title: asset.title ?? null,
-            })),
-          current: pickerCurrent,
-        }}
-      />
 
       <section className="space-y-2.5">
         <div className="flex items-baseline justify-between">

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { brandListings } from "@/server/services/wanderos-listings.service";
@@ -95,19 +96,38 @@ export default async function PerformanceBrandAdsPage({
     )
     .map((campaign) => ({ id: campaign.id, name: campaign.name }));
 
+  const slug = brand.slug ?? brand.id;
+  const matrixHref =
+    `/app/performance/brands/${slug}/ads/matrix` +
+    (initialPicked.length > 0
+      ? `?homes=${encodeURIComponent(initialPicked.join(","))}`
+      : "");
+
   return (
-    <AdPreviewsWorkspace
-      brandId={brand.id}
-      brandSlug={brand.slug ?? brand.id}
-      brandName={brand.name}
-      brandLogo={avatarUrl}
-      homes={homes}
-      withoutPhoto={withoutPhoto}
-      initialPicked={initialPicked}
-      ads={ads}
-      campaigns={campaigns}
-      hasSite={listings.length > 0}
-      website={brand.website}
-    />
+    <div className="space-y-3">
+      {ads.length > 0 ? (
+        <div className="flex justify-end">
+          <Link
+            href={matrixHref}
+            className="text-[11.5px] text-sky-300 hover:underline"
+          >
+            Open the placement matrix →
+          </Link>
+        </div>
+      ) : null}
+      <AdPreviewsWorkspace
+        brandId={brand.id}
+        brandSlug={slug}
+        brandName={brand.name}
+        brandLogo={avatarUrl}
+        homes={homes}
+        withoutPhoto={withoutPhoto}
+        initialPicked={initialPicked}
+        ads={ads}
+        campaigns={campaigns}
+        hasSite={listings.length > 0}
+        website={brand.website}
+      />
+    </div>
   );
 }

@@ -1,10 +1,13 @@
 import "server-only";
 
 import { and, asc, eq, isNull } from "drizzle-orm";
+import { anthropic } from "@ai-sdk/anthropic";
+import { generateText, Output } from "ai";
+import { z } from "zod";
 
 import { db } from "@/server/db";
 import { brandTable, homeMediaTable, homeTable } from "@/server/db/schema";
-import type { HomeMediaRole } from "@/server/db/home-schema";
+import type { HomeMediaRole, HomeSource } from "@/server/db/home-schema";
 import {
   listWanderOsListingPhotos,
   type WanderOsListing,
@@ -416,4 +419,226 @@ async function ownedHome(input: { homeId: string; orgId: string }) {
     throw new HomeError(404, "Home not found");
   }
   return home;
+}
+
+// ---- SETUP: committing a working set of homes -----------------------------
+//
+// The setup page turns a brand from "no homes yet" into a handful the ads run
+// on. Two sources, one table: the client's WanderOS feed (facts and geo come
+// for free, `ensureHome` owns that), or shells typed in when there is no feed
+// to read. Both write `home` rows; nothing here reaches an ad platform.
+
+/** A home for display on the setup page: the row's own facts, no photos. */
+export type BrandHome = {
+  id: string;
+  source: HomeSource;
+  externalId: string;
+  name: string;
+  url: string;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  guests: number | null;
+  rating: number | null;
+  nightlyFrom: number | null;
+  heroSourceUrl: string | null;
+};
+
+/** Every committed home for a brand, newest picks last, for the setup grid. */
+export async function listBrandHomes(brandId: string): Promise<BrandHome[]> {
+  const rows = await db.query.homeTable.findMany({
+    where: and(eq(homeTable.brandId, brandId), isNull(homeTable.deletedAt)),
+    orderBy: (home, { asc: a }) => [a(home.sortOrder), a(home.createdAt)],
+    columns: {
+      id: true,
+      source: true,
+      externalId: true,
+      name: true,
+      url: true,
+      city: true,
+      state: true,
+      country: true,
+      bedrooms: true,
+      bathrooms: true,
+      guests: true,
+      rating: true,
+      nightlyFrom: true,
+      heroSourceUrl: true,
+    },
+  });
+  return rows;
+}
+
+/**
+ * Commit one of the client's WanderOS listings as a home. Reads the feed
+ * itself rather than trusting an id off the page, so a stale tab cannot write
+ * a listing that is not theirs. Idempotent: re-picking a home refreshes it.
+ *
+ * One home per call on purpose: a person picks a tile at a time, and an agent
+ * lists the feed, reviews it, then fires one pick per home it wants — each its
+ * own observable, reversible act rather than one opaque batch.
+ */
+export async function addWanderOsHome(input: {
+  brandId: string;
+  website: string | null;
+  externalId: string;
+}) {
+  const listings = await brandListings({
+    id: input.brandId,
+    website: input.website,
+  });
+  const listing = listings.find((row) => row.id === input.externalId);
+  if (!listing) throw new HomeError(404, "That home is not on their feed");
+  return ensureHome({ brandId: input.brandId, listing });
+}
+
+/** One typed-in home, before it is a row. Only the name is required. */
+export type HomeShellInput = {
+  name: string;
+  url?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+  bedrooms?: number | null;
+  bathrooms?: number | null;
+  guests?: number | null;
+  nightlyFrom?: number | null;
+  heroSourceUrl?: string | null;
+};
+
+function shellSlug(name: string): string {
+  return (
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || "home"
+  );
+}
+
+/**
+ * Create shell homes for a brand with no feed we can read: a name, and
+ * whatever else the operator (or the agent parsing their paste) could pull
+ * out. A home with no URL gets a synthetic key so two of them never collide,
+ * and re-typing the same one refreshes it rather than doubling it.
+ */
+export async function createManualHomes(input: {
+  brandId: string;
+  homes: HomeShellInput[];
+}) {
+  const rows: Awaited<ReturnType<typeof ensureHome>>[] = [];
+  for (const shell of input.homes) {
+    const name = shell.name.trim();
+    if (!name) continue;
+    const typedUrl = shell.url?.trim() || null;
+    const url = typedUrl ?? `manual://${input.brandId}/${shellSlug(name)}`;
+    const externalId = typedUrl
+      ? normalizeListingUrl(typedUrl)
+      : `manual:${shellSlug(name)}`;
+    const facts = {
+      url,
+      urlKey: normalizeListingUrl(url),
+      name,
+      city: shell.city ?? null,
+      state: shell.state ?? null,
+      country: shell.country ?? null,
+      bedrooms: shell.bedrooms ?? null,
+      bathrooms: shell.bathrooms ?? null,
+      guests: shell.guests ?? null,
+      nightlyFrom: shell.nightlyFrom ?? null,
+      heroSourceUrl: shell.heroSourceUrl ?? null,
+      syncedAt: new Date(),
+    };
+    const [row] = await db
+      .insert(homeTable)
+      .values({
+        brandId: input.brandId,
+        source: "manual",
+        externalId,
+        ...facts,
+      })
+      .onConflictDoUpdate({
+        target: [homeTable.brandId, homeTable.externalId],
+        set: facts,
+      })
+      .returning();
+    rows.push(row!);
+  }
+  return rows;
+}
+
+/** Drop a committed home. The feed still carries it; this only un-picks it. */
+export async function removeBrandHome(input: {
+  brandId: string;
+  homeId: string;
+}) {
+  await db
+    .delete(homeTable)
+    .where(
+      and(eq(homeTable.id, input.homeId), eq(homeTable.brandId, input.brandId)),
+    );
+  return { homeId: input.homeId };
+}
+
+// ---- Parsing a paste into shells ------------------------------------------
+
+const homeShellSchema = z.object({
+  homes: z
+    .array(
+      z.object({
+        name: z.string().describe("The home's name, as a guest would see it."),
+        url: z
+          .string()
+          .nullable()
+          .describe("Listing URL if the text carries one, else null."),
+        city: z.string().nullable(),
+        state: z
+          .string()
+          .nullable()
+          .describe("Two-letter code when it is a US state, else the name."),
+        country: z.string().nullable(),
+        bedrooms: z.number().int().nullable(),
+        guests: z.number().int().nullable(),
+        nightlyFrom: z
+          .number()
+          .int()
+          .nullable()
+          .describe("Cheapest nightly rate in whole dollars, if stated."),
+      }),
+    )
+    .describe("One entry per distinct home the text names."),
+});
+
+/**
+ * Turn a copy-pasted blob (an email, a list, a table) into home shells. Pulls
+ * only what the text actually states and leaves the rest null; it never
+ * invents a location or a rate. This is the agent standing in for a feed we
+ * cannot read, so the operator can start before the client sends a thing.
+ */
+export async function parseHomeShells(text: string): Promise<HomeShellInput[]> {
+  const trimmed = text.trim();
+  if (!trimmed) return [];
+  const { output } = await generateText({
+    model: anthropic("claude-sonnet-5"),
+    output: Output.object({ name: "HomeShells", schema: homeShellSchema }),
+    system: [
+      "You extract vacation-rental homes from whatever an operator pastes.",
+      "Return one entry per distinct home. Use only facts the text states.",
+      "Never guess a location, rate, or count; leave anything unstated as null.",
+      "The name is what a guest would call the home, not a filename or slug.",
+    ].join(" "),
+    prompt: `Extract the homes from this text:\n\n${trimmed}`,
+  });
+  return output.homes.map((home) => ({
+    name: home.name,
+    url: home.url,
+    city: home.city,
+    state: home.state,
+    country: home.country,
+    bedrooms: home.bedrooms,
+    guests: home.guests,
+    nightlyFrom: home.nightlyFrom,
+  }));
 }

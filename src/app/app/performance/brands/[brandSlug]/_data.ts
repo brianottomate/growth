@@ -82,7 +82,7 @@ export const brandAvatarUrl = cache(
 /** The tab paths under one brand. */
 export function brandTabHref(
   slug: string,
-  tab: "" | "homes" | "ads" | "campaigns" | "settings",
+  tab: "" | "setup" | "homes" | "ads" | "campaigns" | "settings",
 ) {
   return `/app/performance/brands/${slug}${tab ? `/${tab}` : ""}`;
 }

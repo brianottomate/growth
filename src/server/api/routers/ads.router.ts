@@ -6,6 +6,11 @@ import { z } from "zod";
 import {
   addAdShell,
   attachAdSet,
+  clearPlacement,
+  freezePlacement,
+  setPlacementCard,
+  setPlacementCopy,
+  unfreezePlacement,
   buildAdSet,
   createAdsFromAssets,
   deleteAd,
@@ -812,6 +817,93 @@ export const adsRouter = {
       deleteDraftAd({
         ...input,
         organizationId: await organizationIdFor(ctx),
+      }),
+    ),
+  // ---- Placement cells: one platform × placement of one ad ----------------
+
+  setPlacementCopy: protectedProcedure
+    .input(
+      z.object({
+        adId: z.string().min(1),
+        placementKey: z.string().min(1),
+        patch: z.object({
+          headline: z.string().max(400).nullish(),
+          body: z.string().max(2000).nullish(),
+          callToAction: z.string().max(60).nullish(),
+          linkUrl: z.string().url().nullish(),
+        }),
+        via: z.enum(["manual", "ai", "director"]).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      setPlacementCopy({
+        adId: input.adId,
+        placementKey: input.placementKey,
+        patch: input.patch,
+        via: input.via,
+        orgId: await organizationIdFor(ctx),
+      }),
+    ),
+
+  setPlacementCard: protectedProcedure
+    .input(
+      z.object({
+        adId: z.string().min(1),
+        placementKey: z.string().min(1),
+        index: z.number().int().min(0).max(9),
+        source: z.union([
+          z.object({ mediaAssetId: z.string().min(1) }),
+          z.object({ derive: z.enum(["auto", "crop", "extend"]) }),
+        ]),
+        via: z.enum(["manual", "ai", "director"]).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      setPlacementCard({
+        adId: input.adId,
+        placementKey: input.placementKey,
+        index: input.index,
+        source: input.source,
+        via: input.via,
+        userId: ctx.session.user.id,
+        orgId: await organizationIdFor(ctx),
+      }),
+    ),
+
+  clearPlacement: protectedProcedure
+    .input(
+      z.object({ adId: z.string().min(1), placementKey: z.string().min(1) }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      clearPlacement({
+        adId: input.adId,
+        placementKey: input.placementKey,
+        orgId: await organizationIdFor(ctx),
+      }),
+    ),
+
+  freezePlacement: protectedProcedure
+    .input(
+      z.object({ adId: z.string().min(1), placementKey: z.string().min(1) }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      freezePlacement({
+        adId: input.adId,
+        placementKey: input.placementKey,
+        userId: ctx.session.user.id,
+        orgId: await organizationIdFor(ctx),
+      }),
+    ),
+
+  unfreezePlacement: protectedProcedure
+    .input(
+      z.object({ adId: z.string().min(1), placementKey: z.string().min(1) }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      unfreezePlacement({
+        adId: input.adId,
+        placementKey: input.placementKey,
+        orgId: await organizationIdFor(ctx),
       }),
     ),
 } satisfies TRPCRouterRecord;

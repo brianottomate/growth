@@ -15,9 +15,20 @@ import sharp from "sharp";
 import type {
   AdCard,
   AdCreativeContent,
+  AdPlacements,
   AdPlacementVariant,
 } from "@/server/db/ads-schema";
 import type { MediaItem } from "@/server/db/content-schema";
+import { placementSpec, resolveCell } from "@/lib/ad-placements";
+import {
+  asPlacements,
+  type CopyPatch,
+  withCard,
+  withCopy,
+  withFrozen,
+  withoutKey,
+  withUnfrozen,
+} from "@/lib/ad-placement-edits";
 import { db } from "@/server/db";
 import { isGeminiImageConfigured } from "@/server/clients/gemini-image.client";
 import {
@@ -1218,4 +1229,193 @@ export async function setAdCopy(input: {
     })
     .where(eq(adTable.id, ad.id));
   return { adId: ad.id };
+}
+
+// ---- PLACEMENT CELLS -------------------------------------------------------
+//
+// One ad across platform × placement. The base creative is `content`; a cell
+// keeps only what differs, in `placements`. These verbs each touch one cell
+// and are the composable unit the matrix and the agent both drive: a global
+// copy change is `setAdCopy` on `content`, a per-cell one is `setPlacementCopy`
+// here. All idempotent, none reach a platform.
+
+function requirePlacementSpec(key: string) {
+  const spec = placementSpec(key);
+  if (!spec) throw new AdSetError(422, `Unknown placement "${key}"`);
+  return spec;
+}
+
+async function savePlacements(adId: string, placements: AdPlacements) {
+  await db.update(adTable).set({ placements }).where(eq(adTable.id, adId));
+}
+
+/** Copy for one cell that differs from the base. A `null` field clears it. */
+export async function setPlacementCopy(input: {
+  adId: string;
+  orgId: string;
+  placementKey: string;
+  patch: CopyPatch;
+  via?: "manual" | "ai" | "director";
+}) {
+  const ad = await requireOwnedAd(input);
+  creativeContent(ad); // 422 on a text ad
+  requirePlacementSpec(input.placementKey);
+  const next = withCopy(
+    asPlacements(ad.placements),
+    input.placementKey,
+    input.patch,
+    { via: input.via ?? "manual" },
+  );
+  await savePlacements(ad.id, next);
+  return { adId: ad.id, placementKey: input.placementKey };
+}
+
+/**
+ * One card's own file for one cell: an uploaded library asset, a derived
+ * crop/outpaint for the placement's shape, or `null` to drop back to the base
+ * card. A story placement derives a 9:16; the others pin the chosen asset.
+ */
+export async function setPlacementCard(input: {
+  adId: string;
+  orgId: string;
+  placementKey: string;
+  index: number;
+  userId?: string;
+  source: { mediaAssetId: string } | { derive: "auto" | "crop" | "extend" };
+  via?: "manual" | "ai" | "director";
+}) {
+  const ad = await requireOwnedAd(input);
+  const content = creativeContent(ad);
+  const spec = requirePlacementSpec(input.placementKey);
+  const card = content.media[input.index];
+  if (!card) throw new AdSetError(422, `No card at ${input.index}`);
+
+  let variant: AdPlacementVariant;
+  if ("mediaAssetId" in input.source) {
+    const picked = await cardFromAsset(ad.brand.id, input.source.mediaAssetId);
+    variant = { ...picked.item, via: "upload" };
+  } else {
+    if (!input.userId) {
+      throw new AdSetError(422, "Deriving a placement file needs a user");
+    }
+    // Story is the only derived shape today; the wider crop set arrives with
+    // the platforms that need it.
+    if (spec.crop !== "story") {
+      throw new AdSetError(
+        422,
+        `Nothing to derive for a ${spec.crop} placement; upload or leave the base`,
+      );
+    }
+    variant = await deriveStory({
+      brand: ad.brand,
+      userId: input.userId,
+      card,
+      how: input.source.derive,
+      home: content.propertyName ?? null,
+    });
+  }
+
+  const next = withCard(
+    asPlacements(ad.placements),
+    input.placementKey,
+    input.index,
+    variant,
+    content.media.length,
+    { via: input.via ?? "manual" },
+  );
+  await savePlacements(ad.id, next);
+  return { adId: ad.id, placementKey: input.placementKey, via: variant.via };
+}
+
+/** Drop a cell, back to a live render of the base. */
+export async function clearPlacement(input: {
+  adId: string;
+  orgId: string;
+  placementKey: string;
+}) {
+  const ad = await requireOwnedAd(input);
+  const next = withoutKey(asPlacements(ad.placements), input.placementKey);
+  await savePlacements(ad.id, next);
+  return { adId: ad.id, placementKey: input.placementKey };
+}
+
+/**
+ * Freeze a cell: pin the copy and the files the push will take. Anything the
+ * cell still shows from the base is materialized now, so a later global edit
+ * cannot move it. A story cell derives its 9:16 where a card lacks one; the
+ * feed shapes pin the base asset, which the platform crops on push.
+ */
+export async function freezePlacement(input: {
+  adId: string;
+  orgId: string;
+  userId: string;
+  placementKey: string;
+}) {
+  const ad = await requireOwnedAd(input);
+  const content = creativeContent(ad);
+  const spec = requirePlacementSpec(input.placementKey);
+  const placements = asPlacements(ad.placements);
+  const resolved = resolveCell({ content, placements }, spec);
+
+  const cards: AdPlacementVariant[] = [];
+  for (let i = 0; i < content.media.length; i += 1) {
+    const own = placements[input.placementKey]?.cards?.[i] ?? null;
+    if (own) {
+      cards.push(own);
+      continue;
+    }
+    const base = content.media[i]!;
+    if (spec.crop === "story" && base.type !== "video") {
+      cards.push(
+        await deriveStory({
+          brand: ad.brand,
+          userId: input.userId,
+          card: base,
+          how: "auto",
+          home: content.propertyName ?? null,
+        }),
+      );
+    } else {
+      const shown = resolved.cards[i]!;
+      cards.push({
+        url: shown.url,
+        type: shown.type,
+        thumbnail: shown.thumbnail ?? undefined,
+        assetId: shown.assetId ?? undefined,
+        via: "crop",
+      });
+    }
+  }
+
+  const next = withFrozen(placements, input.placementKey, {
+    at: new Date().toISOString(),
+    by: input.userId,
+    cards,
+    copy: {
+      headline: resolved.copy.headline,
+      body: resolved.copy.body,
+      ...(resolved.copy.callToAction
+        ? { callToAction: resolved.copy.callToAction }
+        : {}),
+      ...(resolved.copy.linkUrl ? { linkUrl: resolved.copy.linkUrl } : {}),
+    },
+  });
+  await savePlacements(ad.id, next);
+  return {
+    adId: ad.id,
+    placementKey: input.placementKey,
+    fit: resolved.fit,
+  };
+}
+
+/** Unfreeze a cell, keeping its pinned copy and files as an override. */
+export async function unfreezePlacement(input: {
+  adId: string;
+  orgId: string;
+  placementKey: string;
+}) {
+  const ad = await requireOwnedAd(input);
+  const next = withUnfrozen(asPlacements(ad.placements), input.placementKey);
+  await savePlacements(ad.id, next);
+  return { adId: ad.id, placementKey: input.placementKey };
 }

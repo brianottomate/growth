@@ -127,6 +127,46 @@ export type AdPlacementVariant = MediaItem & {
 };
 
 /**
+ * What one cell of the placement matrix keeps that differs from the base
+ * `content`. The map is keyed "<platform>:<placement>", e.g.
+ * "meta_ads:facebook_feed"; the placements a platform offers, and each one's
+ * crop and copy rules, live in `lib/ad-placements.ts`.
+ *
+ * Sparse on purpose. A cell with no entry is a live render of the base into
+ * the placement's spec and stores nothing, so the library never fills with
+ * renders nobody chose. An entry exists only once someone overrides a cell
+ * or freezes it. Freezing is per cell: `frozenAt` marks the copy and files
+ * the push takes for that placement.
+ */
+export type AdPlacementCell = {
+  /** Copy that differs from the base here. A missing field inherits the base. */
+  copy?: {
+    headline?: string;
+    body?: string;
+    callToAction?: string;
+    linkUrl?: string;
+  };
+  /**
+   * This placement's own file per card, in card order. `null`, or an array
+   * shorter than the cards, means "show the base card in this crop". This
+   * generalizes the older `AdCard.story` slot, which was this map with one
+   * key; `lib/ad-placements.ts` reads that slot as the story cell until the
+   * ad is migrated.
+   */
+  cards?: (AdPlacementVariant | null)[];
+  /** Set when the cell is frozen: these are the files and copy the push takes. */
+  frozenAt?: string;
+  frozenBy?: string;
+  /** Last touch and by what, for the cell's chip. Absent on legacy cells. */
+  updatedAt?: string;
+  via?: "manual" | "ai" | "director";
+  note?: string;
+};
+
+/** The sparse per-cell map on an ad. An absent key renders the base. */
+export type AdPlacements = Record<string, AdPlacementCell>;
+
+/**
  * One card of an ad: the baseline file every placement falls back to, and
  * the 9:16 that stories and reels show instead when there is one. The push
  * sends both as one ad through Meta's placement asset customization.
@@ -436,6 +476,17 @@ export const adTable = pgTable(
     type: adTypeEnum().default("creative").notNull(),
     status: adStatusEnum().default("drawn").notNull(),
     content: t.jsonb().$type<AdContent>().notNull(),
+    /**
+     * Per platform × placement cells that differ from `content`: copy
+     * overrides, a placement's own files, and whether the cell is frozen.
+     * Sparse; an absent key renders the base and stores nothing. Kept apart
+     * from `content` so a global copy edit writes one column and a selective
+     * one writes the other. See `AdPlacements`.
+     *
+     * Nullable: this column lands in production through the release build's
+     * schema push, so code that reads it must tolerate its absence until then.
+     */
+    placements: t.jsonb().$type<AdPlacements>(),
 
     /**
      * Deterministic key carried to the provider as the idempotency key, and
