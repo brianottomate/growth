@@ -7,10 +7,11 @@ import { z } from "zod";
 // The words an ad set runs on, written from what the client's own site says.
 //
 // Two surfaces, two rules. The PRIMARY TEXT is the caption above the image:
-// it is where a property manager's own copy lives, it is read as prose, and
-// emoji feature bullets are the house style of the briefs this replaces. The
-// CARD is drawn into the image by the renderer, which cannot draw most emoji
-// and has no room for a paragraph, so it gets a short line and nothing else.
+// the feed cuts it off after about 125 characters, behind a "more", so it is
+// one or two short sentences that hook and name the place, not a feature dump.
+// The CARD is drawn into the image by the renderer, which cannot draw most
+// emoji and has no room for a paragraph, so it gets a short line and nothing
+// else. The features live in the composition, not the caption.
 //
 // Everything is grounded in the listing: its amenity labels and its own
 // description. The model is told to use nothing else, because an invented
@@ -18,9 +19,12 @@ import { z } from "zod";
 
 const MODEL = "claude-sonnet-5";
 
+/** The feed truncates primary text past this, so the caption is written to it. */
+const BODY_MAX = 125;
+
 const HomeCopySchema = z.object({
-  /** The caption, in the house shape: a promise, feature bullets, a close. */
-  primaryText: z.string().min(40).max(1200),
+  /** The caption: one or two short sentences, under what the feed truncates. */
+  primaryText: z.string().min(20).max(BODY_MAX),
   /** Meta's headline, under the image. */
   headline: z.string().max(60),
   /** The words drawn onto the card. No emoji: the renderer cannot draw them. */
@@ -31,10 +35,10 @@ const SetCopySchema = z.object({
   /** One per home, in the order given. */
   homes: z.array(HomeCopySchema),
   /** The caption for the carousel of every home in the set. */
-  portfolioPrimaryText: z.string().min(40).max(1200),
+  portfolioPrimaryText: z.string().min(20).max(BODY_MAX),
   portfolioHeadline: z.string().max(60),
   /** The caption for the catalog ad, where Meta ranks the same homes. */
-  catalogPrimaryText: z.string().min(40).max(1200),
+  catalogPrimaryText: z.string().min(20).max(BODY_MAX),
   catalogHeadline: z.string().max(60),
 });
 
@@ -119,12 +123,7 @@ export async function writeAdSetCopy(input: {
         "You write paid-social ad copy for a vacation-rental manager.",
         "Use ONLY the facts given for each home. Never invent an amenity, a rating, a distance, a price or availability. If a home has no hot tub listed, it has no hot tub.",
         "",
-        "primaryText is the caption above the image. Write it in this shape:",
-        "  a one-line promise naming the place,",
-        "  then 4 to 6 feature lines, each starting with one relevant emoji, drawn from that home's amenities and its bed/bath/sleeps count,",
-        "  then one or two sentences on who the home suits,",
-        "  then a short closing line.",
-        "Emoji are welcome in primaryText and must match the feature (pool, hot tub, kitchen, golf, beach, games).",
+        `primaryText is the caption above the image, and the feed cuts it off after about ${BODY_MAX} characters. Write ONE or TWO short sentences, at most about 110 characters in total, that name the place and give the single best reason to stay. No bullet lists, no line breaks, no feature dumps: the image already carries the facts. At most one emoji, and only if it earns its place.`,
         "",
         "headline is the short line under the image. No emoji.",
         "cardTitle is drawn INTO the image by a renderer that cannot draw emoji and has little room: at most six words, no emoji, no punctuation at the end.",
