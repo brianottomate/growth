@@ -9,6 +9,7 @@ import { listBrandHomes } from "@/server/services/homes.service";
 import { panel, SectionLabel } from "../../../_components";
 import { HomesStrip } from "../HomesStrip";
 import { AddHomesByHand } from "../AddHomesByHand";
+import { HomesHero } from "../HomesHero";
 import { brandTabHref, loadPerformanceBrand } from "../_data";
 
 export const metadata: Metadata = { title: "Homes · Wander Performance" };
@@ -45,6 +46,16 @@ export default async function PerformanceBrandHomesPage({
 
   return (
     <div className="space-y-4">
+      {withPhoto.length > 0 ? (
+        <HomesHero
+          brandName={brand.name}
+          count={withPhoto.length}
+          images={withPhoto.map((home) => ({
+            imageUrl: home.imageUrl!,
+            thumbUrl: home.thumbUrl ?? null,
+          }))}
+        />
+      ) : null}
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <SectionLabel>
           Homes{homes.length ? ` · ${homes.length}` : ""}
