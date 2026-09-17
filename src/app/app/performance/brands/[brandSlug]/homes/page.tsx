@@ -49,14 +49,20 @@ export default async function PerformanceBrandHomesPage({
   const byId = new Map(homes.map((listing) => [listing.id, listing]));
   const pickedHomes: PickedHome[] = committed.map((home) => {
     const listing = byId.get(home.externalId) ?? null;
-    const gallery = listing?.gallery ?? [];
-    const images = (
-      gallery.length > 0
-        ? gallery.map((photo) => photo.thumbUrl || photo.url)
-        : [listing?.imageUrl ?? home.heroSourceUrl].filter(
-            (url): url is string => Boolean(url),
-          )
-    ).slice(0, 5);
+    // The full gallery is cached on the row at pick time; the live feed only
+    // carries a ~5-photo preview. Prefer the cache, fall back to the feed.
+    const cached = home.galleryCache ?? [];
+    const feed = listing?.gallery ?? [];
+    const galleryUrls =
+      cached.length > 0
+        ? cached.map((photo) => photo.thumbUrl || photo.url)
+        : feed.length > 0
+          ? feed.map((photo) => photo.thumbUrl || photo.url)
+          : [listing?.imageUrl ?? home.heroSourceUrl].filter(
+              (url): url is string => Boolean(url),
+            );
+    const photoCount = galleryUrls.length;
+    const images = galleryUrls.slice(0, 12);
     return {
       id: home.id,
       externalId: home.externalId,
@@ -64,6 +70,7 @@ export default async function PerformanceBrandHomesPage({
       name: listing?.name ?? home.name,
       hero: listing?.imageUrl ?? home.heroSourceUrl ?? images[0] ?? null,
       images,
+      photoCount,
       bedrooms: listing?.bedrooms ?? home.bedrooms,
       bathrooms: listing?.bathrooms ?? home.bathrooms,
       guests: listing?.guests ?? home.guests,

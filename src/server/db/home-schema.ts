@@ -89,6 +89,17 @@ export const homeTable = pgTable(
      */
     heroSourceUrl: t.text(),
 
+    /**
+     * The listing's full photo set, cached from the detail endpoint the search
+     * feed does not carry. The feed's per-listing preview is around five
+     * photos; a large home's gallery is forty-odd. Filled when a home is
+     * picked, so the setup cards can show the real photo count and more than
+     * five thumbnails without a per-render detail fetch. A cache of the feed's
+     * facts, like the name/geo above, not a decision — decisions live on
+     * `home_media`. The detail page still reads the gallery live.
+     */
+    galleryCache: t.jsonb().$type<{ url: string; thumbUrl: string }[]>(),
+
     sortOrder: t.integer(),
     /** Last time the feed's facts above were refreshed. */
     syncedAt: t.timestamp({ withTimezone: true }),

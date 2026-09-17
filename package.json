@@ -20,6 +20,7 @@
     "db:apply:cycle-paid-columns": "bun --conditions=react-server scripts/apply-cycle-paid-columns.ts",
     "db:apply:lifecycle-split": "bun --conditions=react-server scripts/apply-lifecycle-split.ts",
     "db:apply:pregen-verdict": "bun --conditions=react-server scripts/apply-pregen-verdict-schema.ts",
+    "db:apply:home-gallery-cache": "bun --conditions=react-server scripts/apply-home-gallery-cache.ts",
     "hubspot:import:companies": "bun --conditions=react-server scripts/import-hubspot-company-export.ts",
     "hubspot:process:webhooks": "bun --conditions=react-server scripts/process-hubspot-webhook-backlog.ts",
     "hubspot:build:sales-email-corpus": "bun --conditions=react-server scripts/build-hubspot-sales-email-corpus.ts",

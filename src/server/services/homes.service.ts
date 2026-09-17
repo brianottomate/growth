@@ -444,6 +444,8 @@ export type BrandHome = {
   rating: number | null;
   nightlyFrom: number | null;
   heroSourceUrl: string | null;
+  /** The full photo set, cached at pick time; null until a home is (re)picked. */
+  galleryCache: { url: string; thumbUrl: string }[] | null;
 };
 
 /** Every committed home for a brand, newest picks last, for the setup grid. */
@@ -466,6 +468,7 @@ export async function listBrandHomes(brandId: string): Promise<BrandHome[]> {
       rating: true,
       nightlyFrom: true,
       heroSourceUrl: true,
+      galleryCache: true,
     },
   });
   return rows;
@@ -491,7 +494,44 @@ export async function addWanderOsHome(input: {
   });
   const listing = listings.find((row) => row.id === input.externalId);
   if (!listing) throw new HomeError(404, "That home is not on their feed");
-  return ensureHome({ brandId: input.brandId, listing });
+  const row = await ensureHome({ brandId: input.brandId, listing });
+  // Picking a home is a deliberate, one-at-a-time act, so the extra detail
+  // fetch here is off the render path. It caches the full gallery the search
+  // feed does not carry, so the setup cards show the real photo count.
+  await refreshHomeGalleryCache({
+    brandId: input.brandId,
+    homeId: row.id,
+    externalId: listing.id,
+  });
+  return row;
+}
+
+/**
+ * Fill a home's `galleryCache` from the listing detail endpoint. The search
+ * feed carries a five-photo preview; the detail endpoint carries the full
+ * gallery. Best-effort: a home whose detail cannot be read keeps what it has.
+ */
+export async function refreshHomeGalleryCache(input: {
+  brandId: string;
+  homeId: string;
+  externalId: string;
+}) {
+  const websiteId = await brandWebsiteId(input.brandId);
+  if (!websiteId) return;
+  const photos = await listWanderOsListingPhotos({
+    websiteId,
+    propertyId: input.externalId,
+  });
+  if (photos.length === 0) return;
+  await db
+    .update(homeTable)
+    .set({
+      galleryCache: photos.map((photo) => ({
+        url: photo.url,
+        thumbUrl: photo.thumbUrl,
+      })),
+    })
+    .where(eq(homeTable.id, input.homeId));
 }
 
 /** One typed-in home, before it is a row. Only the name is required. */

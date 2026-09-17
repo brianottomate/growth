@@ -21,6 +21,8 @@ export type PickedHome = {
   name: string;
   hero: string | null;
   images: string[];
+  /** Total photos on the listing, from the cached gallery (not just `images`). */
+  photoCount: number;
   bedrooms: number | null;
   bathrooms: number | null;
   guests: number | null;
@@ -135,9 +137,11 @@ export function PickedHomes({
       ) : (
         <div className="grid gap-2.5 sm:grid-cols-2">
           {picked.map((home) => {
-            const thumbs = home.images
-              .filter((url) => url !== home.hero)
-              .slice(0, 4);
+            const rest = home.images.filter((url) => url !== home.hero);
+            const thumbs = rest.slice(0, 5);
+            // Photos beyond the hero and the thumbnails shown, so the tile can
+            // say how many more the gallery holds.
+            const overflow = Math.max(0, home.photoCount - 1 - thumbs.length);
             const busy = busyId === home.id;
             return (
               <div
@@ -194,7 +198,7 @@ export function PickedHomes({
                     </div>
                   </div>
                   {thumbs.length > 0 ? (
-                    <div className="mt-1.5 flex gap-1">
+                    <div className="mt-1.5 flex items-center gap-1">
                       {thumbs.map((url) => (
                         <div
                           key={url}
@@ -210,6 +214,16 @@ export function PickedHomes({
                           />
                         </div>
                       ))}
+                      {overflow > 0 ? (
+                        <div className="flex size-9 shrink-0 items-center justify-center rounded bg-muted text-[10.5px] font-medium text-muted-foreground">
+                          +{overflow}
+                        </div>
+                      ) : null}
+                      {home.photoCount > 1 ? (
+                        <span className="ml-0.5 text-[10.5px] text-muted-foreground">
+                          {home.photoCount} photos
+                        </span>
+                      ) : null}
                     </div>
                   ) : home.offFeed ? (
                     <div className="mt-1.5 text-[10.5px] text-muted-foreground">
