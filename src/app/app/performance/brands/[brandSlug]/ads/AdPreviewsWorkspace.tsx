@@ -13,8 +13,11 @@ import type { HotelFeedHome } from "@/lib/meta-hotel-feed";
 import { MAX_SET_HOMES } from "@/lib/performance-ads";
 import { useTRPC } from "@/trpc/react";
 
+import type { BrandIdentity } from "@/server/db/brand-schema";
+
 import { HomePicker } from "../HomePicker";
 import { AddAdDialog } from "./AddAdDialog";
+import { BrandProfile } from "./BrandProfile";
 import { CreativeDrop } from "./CreativeDrop";
 import { PlacementMatrix, type MatrixHome } from "./matrix/PlacementMatrix";
 
@@ -45,6 +48,8 @@ export function AdPreviewsWorkspace({
   brandSlug,
   brandName,
   brandLogo,
+  brandRawLogo,
+  brandIdentity,
   homes,
   withoutPhoto,
   initialPicked,
@@ -57,7 +62,11 @@ export function AdPreviewsWorkspace({
   brandId: string;
   brandSlug: string;
   brandName: string;
+  /** The resolved brand mark (vector/PNG), used on the feed mocks. */
   brandLogo: string | null;
+  /** The raw scraped logo, for the branding panel's fallback. */
+  brandRawLogo: string | null;
+  brandIdentity: BrandIdentity | null;
   homes: WorkspaceHome[];
   withoutPhoto: number;
   initialPicked: string[];
@@ -152,6 +161,15 @@ export function AdPreviewsWorkspace({
 
   return (
     <div className="space-y-7">
+      {/* The brand's identity, folded away: the mark the creatives draw from. */}
+      <BrandProfile
+        brandSlug={brandSlug}
+        logo={brandRawLogo}
+        markUrl={brandLogo}
+        identity={brandIdentity}
+        website={website}
+      />
+
       {/* 1 · The homes the set runs on, as chips, and the build. */}
       <section className="space-y-2.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
