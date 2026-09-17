@@ -6,6 +6,7 @@ import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import type { db } from "@/server/db";
 import { brandTable, memberTable, personaTable } from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
+import { demandGeographySchema } from "@/lib/persona-geography";
 
 // ---- PERSONAS ----------------------------------------------------------
 //
@@ -46,6 +47,7 @@ const geographies = z
   .array(z.string().trim().min(1).max(100))
   .max(20)
   .nullish();
+const demandGeography = demandGeographySchema.nullish();
 const notes = z.string().trim().max(4000).nullish();
 
 async function requirePersona(ctx: Ctx, personaId: string) {
@@ -82,6 +84,7 @@ export const personaRouter = createTRPCRouter({
         description,
         ageRanges,
         geographies,
+        demandGeography,
         notes,
       }),
     )
@@ -96,6 +99,7 @@ export const personaRouter = createTRPCRouter({
           description: input.description ?? null,
           ageRanges: input.ageRanges ?? null,
           geographies: input.geographies ?? null,
+          demandGeography: input.demandGeography ?? null,
           notes: input.notes ?? null,
         })
         .returning();
@@ -110,6 +114,7 @@ export const personaRouter = createTRPCRouter({
         description,
         ageRanges,
         geographies,
+        demandGeography,
         notes,
       }),
     )

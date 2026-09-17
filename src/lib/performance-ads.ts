@@ -331,6 +331,7 @@ export type PerformanceAdPlanItem = {
     | "static"
     | "carousel"
     | "catalog_home"
+    | "hero_carousel"
     | "all_properties_carousel"
     | "catalog";
   propertyIndex: number | null;
@@ -378,6 +379,19 @@ export function buildPerformanceAdPlan(input: {
   ]);
   return [
     ...perProperty,
+    {
+      name: performanceAdName({
+        customer: input.customer,
+        format: "Carousel",
+        propertyName: "Featured heroes",
+      }),
+      // One carousel whose cards are the hero of each featured home, drawn with
+      // the bold hero composition rather than the catalog listing card: the
+      // portfolio read as feature shots instead of catalog tiles.
+      kind: "hero_carousel",
+      propertyIndex: null,
+      linkUrl: null,
+    },
     {
       name: performanceAdName({
         customer: input.customer,

@@ -11,6 +11,10 @@ import { NewClientDialog } from "./NewClientDialog";
  */
 export function HeaderNewClient() {
   const pathname = usePathname();
-  if (pathname.startsWith("/app/performance/brands/")) return null;
+  if (
+    pathname.startsWith("/app/performance/brands/") ||
+    pathname.startsWith("/app/performance/prototype")
+  )
+    return null;
   return <NewClientDialog />;
 }

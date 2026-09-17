@@ -534,6 +534,29 @@ export type AccessInsert = typeof accessTable.$inferInsert;
  * compilable narrowing ("CA homebuyers 30-50, $5/day") is a campaign-scoped
  * `audience` row that may point back here via personaId.
  */
+/**
+ * Structured demand geography for a persona: where the guests we want come
+ * FROM. This is the interesting side. Supply geography — where a brand's homes
+ * are — is housekeeping that lives on the listings; this is the demand signal
+ * that shapes who the ads chase. Mirrors a campaign audience's geography on
+ * purpose: the persona is the reusable brand-level source, the audience the
+ * per-campaign buy derived from it. Filled today by an operator or an agent's
+ * reasoning (often a blob looked up in another system and pasted in), not yet
+ * a live data source; `source` records where it came from.
+ */
+export type PersonaDemandGeography = {
+  /** ISO country codes, e.g. ["US"]. */
+  countries?: string[];
+  /** Two-letter state codes, e.g. ["CA", "TX"]. */
+  states?: string[];
+  /** Region/state names a platform geo search resolves, e.g. ["California"]. */
+  regions?: string[];
+  /** City names, e.g. ["Los Angeles", "Dallas"]. */
+  cities?: string[];
+  /** Provenance: an operator note, the system a blob was pasted from, a date. */
+  source?: string | null;
+};
+
 export const personaTable = pgTable(
   "persona",
   (t) => ({
@@ -554,6 +577,11 @@ export const personaTable = pgTable(
     ageRanges: t.jsonb().$type<string[]>(),
     /** Loose prose, e.g. ["California", "big US cities"]. Not targeting. */
     geographies: t.jsonb().$type<string[]>(),
+    /**
+     * The demand side, structured: where the guests we want come from. Filled
+     * by an operator or agent; a campaign audience can be derived from it.
+     */
+    demandGeography: t.jsonb().$type<PersonaDemandGeography>(),
     notes: t.text(),
 
     createdAt: t

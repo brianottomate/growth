@@ -26,6 +26,11 @@ type PersonaForm = {
   description: string;
   ageRanges: string;
   geographies: string;
+  demandStates: string;
+  demandCities: string;
+  demandCountries: string;
+  demandRegions: string;
+  demandSource: string;
   notes: string;
 };
 
@@ -34,6 +39,11 @@ const EMPTY: PersonaForm = {
   description: "",
   ageRanges: "",
   geographies: "",
+  demandStates: "",
+  demandCities: "",
+  demandCountries: "",
+  demandRegions: "",
+  demandSource: "",
   notes: "",
 };
 
@@ -92,11 +102,25 @@ export function PersonasClient({
 
   const save = () => {
     if (!form) return;
+    const demand = {
+      countries: list(form.demandCountries).map((c) => c.toUpperCase()),
+      states: list(form.demandStates).map((s) => s.toUpperCase()),
+      regions: list(form.demandRegions),
+      cities: list(form.demandCities),
+      source: form.demandSource.trim() || null,
+    };
+    const hasDemand =
+      demand.countries.length ||
+      demand.states.length ||
+      demand.regions.length ||
+      demand.cities.length ||
+      demand.source;
     const payload = {
       name: form.name.trim(),
       description: form.description.trim() || null,
       ageRanges: list(form.ageRanges),
       geographies: list(form.geographies),
+      demandGeography: hasDemand ? demand : null,
       notes: form.notes.trim() || null,
     };
     if (form.personaId) {
@@ -183,6 +207,19 @@ export function PersonasClient({
                         description: persona.description ?? "",
                         ageRanges: (persona.ageRanges ?? []).join(", "),
                         geographies: (persona.geographies ?? []).join(", "),
+                        demandStates: (
+                          persona.demandGeography?.states ?? []
+                        ).join(", "),
+                        demandCities: (
+                          persona.demandGeography?.cities ?? []
+                        ).join(", "),
+                        demandCountries: (
+                          persona.demandGeography?.countries ?? []
+                        ).join(", "),
+                        demandRegions: (
+                          persona.demandGeography?.regions ?? []
+                        ).join(", "),
+                        demandSource: persona.demandGeography?.source ?? "",
                         notes: persona.notes ?? "",
                       })
                     }
@@ -272,7 +309,7 @@ export function PersonasClient({
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="pers-geos">Geographies</Label>
+                  <Label htmlFor="pers-geos">Geographies (prose)</Label>
                   <Input
                     id="pers-geos"
                     value={form.geographies}
@@ -280,6 +317,75 @@ export function PersonasClient({
                       setForm({ ...form, geographies: event.target.value })
                     }
                     placeholder="California, big US cities"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
+                <div>
+                  <p className="text-xs font-semibold">Demand geography</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Where the guests we want come from. The structured source a
+                    campaign audience derives from. Comma-separated.
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="pers-dstates">States (2-letter)</Label>
+                    <Input
+                      id="pers-dstates"
+                      value={form.demandStates}
+                      onChange={(event) =>
+                        setForm({ ...form, demandStates: event.target.value })
+                      }
+                      placeholder="CA, TX, AZ"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="pers-dcities">Cities</Label>
+                    <Input
+                      id="pers-dcities"
+                      value={form.demandCities}
+                      onChange={(event) =>
+                        setForm({ ...form, demandCities: event.target.value })
+                      }
+                      placeholder="Los Angeles, Dallas"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="pers-dcountries">Countries</Label>
+                    <Input
+                      id="pers-dcountries"
+                      value={form.demandCountries}
+                      onChange={(event) =>
+                        setForm({
+                          ...form,
+                          demandCountries: event.target.value,
+                        })
+                      }
+                      placeholder="US"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="pers-dregions">Region names</Label>
+                    <Input
+                      id="pers-dregions"
+                      value={form.demandRegions}
+                      onChange={(event) =>
+                        setForm({ ...form, demandRegions: event.target.value })
+                      }
+                      placeholder="California"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="pers-dsource">Source</Label>
+                  <Input
+                    id="pers-dsource"
+                    value={form.demandSource}
+                    onChange={(event) =>
+                      setForm({ ...form, demandSource: event.target.value })
+                    }
+                    placeholder="Pasted from bookings export, 2026-09"
                   />
                 </div>
               </div>

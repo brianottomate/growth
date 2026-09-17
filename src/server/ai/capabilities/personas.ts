@@ -7,6 +7,7 @@ import { and, asc, eq, isNull } from "drizzle-orm";
 import { db } from "@/server/db";
 import { brandTable, personaTable } from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
+import { demandGeographySchema } from "@/lib/persona-geography";
 import { growthAction } from "./types";
 
 // ---- PERSONAS ----------------------------------------------------------
@@ -51,6 +52,11 @@ const personaFields = {
     .max(20)
     .optional()
     .describe('Loose prose, e.g. ["California", "big US cities"].'),
+  demandGeography: demandGeographySchema
+    .nullish()
+    .describe(
+      "The demand side, structured: where the guests we want come FROM. This is the reusable source a campaign audience derives from; supply geography (where the homes are) is not this. Fill it from your own reasoning or a blob looked up elsewhere and note the `source`.",
+    ),
   notes: z.string().trim().max(4000).optional(),
 };
 
@@ -88,6 +94,7 @@ export const createPersona = growthAction({
         description: input.description ?? null,
         ageRanges: input.ageRanges ?? null,
         geographies: input.geographies ?? null,
+        demandGeography: input.demandGeography ?? null,
         notes: input.notes ?? null,
       })
       .returning();
@@ -103,6 +110,7 @@ export const updatePersona = growthAction({
     description: personaFields.description,
     ageRanges: personaFields.ageRanges,
     geographies: personaFields.geographies,
+    demandGeography: personaFields.demandGeography,
     notes: personaFields.notes,
   }),
   execute: async (input, ctx) => {

@@ -78,8 +78,7 @@ async function worker() {
         error: e instanceof Error ? e.message : String(e),
       });
     }
-    if ((i + 1) % 25 === 0)
-      console.log(`  …processed ${i + 1}/${rows.length}`);
+    if ((i + 1) % 25 === 0) console.log(`  …processed ${i + 1}/${rows.length}`);
   }
 }
 

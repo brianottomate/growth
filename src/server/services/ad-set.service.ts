@@ -111,6 +111,7 @@ export type BuiltAd = {
     | "static"
     | "carousel"
     | "catalog_home"
+    | "hero_carousel"
     | "all_properties_carousel"
     | "catalog";
   homeName: string | null;
@@ -123,6 +124,9 @@ const KIND_FORMAT: Record<BuiltAd["kind"], AdFormat> = {
   // A per-home catalog card is one image drawn with the listing composition;
   // it reads as a catalog on the wall but pushes as the single static it is.
   catalog_home: "catalog",
+  // A carousel of the homes' heroes, the same portfolio shape as the catalog
+  // one but drawn as feature shots.
+  hero_carousel: "portfolio",
   all_properties_carousel: "portfolio",
   catalog: "catalog",
 };
@@ -783,6 +787,19 @@ export async function buildAdSet(input: {
         callToAction: PERFORMANCE_AD_DEFAULTS.callToAction,
         propertyName: home.listing.name,
         media: [withStory(listingCard(home.hero!, home.listing))],
+      };
+    } else if (item.kind === "hero_carousel") {
+      // The portfolio as feature shots: each featured home's hero drawn with
+      // the bold hero composition, one card per home, in the set's order. The
+      // catalog carousel below draws the same homes as branded listing cards.
+      content = {
+        format,
+        headline: copy.portfolioHeadline,
+        body: copy.portfolioPrimaryText,
+        callToAction: PERFORMANCE_AD_DEFAULTS.callToAction,
+        media: usable.map(({ hero }, i) =>
+          heroCard(hero!, copy.homes[i]!.cardTitle),
+        ),
       };
     } else if (item.kind === "all_properties_carousel") {
       content = {
