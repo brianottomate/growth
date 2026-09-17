@@ -67,6 +67,18 @@ describe("who works a demand lead (both CRMs written)", () => {
     });
   });
 
+  test("an off-roster picker is preserved even when demand_bdr_email is a stale roster address", () => {
+    // The picker points at an off-roster owner (999); the sibling email field
+    // still names a roster rep (Stacy). The picker wins — the lead must not be
+    // silently reassigned to Stacy off the stale email.
+    const result = findExistingDemandBdr({
+      outreachActive: false,
+      hubspotDemandBdr: { ownerId: "999", email: "stacy@wander.com" },
+    });
+    expect(result.source).toBe("hubspot_demand__bdr");
+    expect(result.bdr?.hubspotOwnerId).toBe("999");
+  });
+
   test("CIO's attributes are honoured before rotation when neither CRM has an owner", () => {
     const result = findExistingDemandBdr({
       outreachActive: true,

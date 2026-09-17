@@ -122,10 +122,13 @@ going, in order of effort:
    should grow through business hours; `DEMAND - BDR` should never be empty
    on a contact that has `DEMAND - Stage`.
 
-What "rock solid" looks like before retiring Outreach: a week where
-`failedInWindow` stays at zero apart from transient 429s, `syncedInWindow`
-matches Outreach volume, and spot-checked contacts show the same BDR in
-both CRMs.
+What "rock solid" looks like before retiring Outreach: a week where the
+per-run `[FunnelSweep]`/`funnel_abandonment_sweep] Done` log counters show
+`hubspot=written` tracking `synced` and `hubspot=failed` at zero apart from
+transient 429s (there is no `demand_crm_link` table, so per-lead success is
+log-derived, not an endpoint metric); `parity.pending` on
+`?status=1` stays at 0 or draining; and spot-checked contacts show the same
+BDR in both CRMs.
 
 ## Property naming quirks
 

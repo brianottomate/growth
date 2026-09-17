@@ -239,8 +239,14 @@ export function findExistingDemandBdr(inputs: DemandAssignmentInputs): {
 
   if (inputs.hubspotDemandBdr) {
     const { ownerId, email } = inputs.hubspotDemandBdr;
-    const roster =
-      findDemandBdrByOwnerId(ownerId) ?? findDemandBdrByEmail(email);
+    // The picker is authoritative. `demand_bdr_email` is a sibling text field
+    // that can drift (a rep changes the picker to an off-roster owner without
+    // touching it), so it is consulted only when the picker itself is empty —
+    // never as a fallback that could reassign an off-roster pick to whoever
+    // the stale email happens to name.
+    const roster = ownerId
+      ? findDemandBdrByOwnerId(ownerId)
+      : findDemandBdrByEmail(email);
     if (roster && (!inputs.outreachActive || roster.outreachUserId)) {
       return { bdr: toResolved(roster), source: "hubspot_demand__bdr" };
     }
