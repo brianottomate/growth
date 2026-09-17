@@ -17,20 +17,14 @@ export type MatrixAdRow = {
 
 /**
  * The drafted set as home groups the matrix draws: every home a group, every
- * ad three or more rows, every placement a live-resolved cell. Shared by the
- * Ads tab and the full-width matrix route so the two never drift. `wanted`
- * filters to a picked set of homes by their feed id; empty means all.
+ * ad three or more rows, every placement a live-resolved cell.
  */
-export function toMatrixHomes(
-  ads: MatrixAdRow[],
-  wanted?: Set<string>,
-): MatrixHome[] {
+export function toMatrixHomes(ads: MatrixAdRow[]): MatrixHome[] {
   const groups = new Map<string, MatrixHome>();
   for (const ad of ads) {
     const content = ad.content as AdCreativeContent;
     if (!Array.isArray(content.media) || content.media.length === 0) continue;
     const homeKey = ad.home?.externalId ?? ad.homeId ?? "unbound";
-    if (wanted && wanted.size > 0 && !wanted.has(homeKey)) continue;
 
     const resolved = resolveMatrix({ content, placements: ad.placements });
     const matrixAd: MatrixAd = {

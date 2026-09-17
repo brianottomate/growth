@@ -26,7 +26,7 @@ export default async function PerformanceBrandAdsPage({
   searchParams,
 }: {
   params: Promise<{ brandSlug: string }>;
-  searchParams: Promise<{ homes?: string }>;
+  searchParams: Promise<{ homes?: string; focus?: string }>;
 }) {
   const [{ brandSlug }, query] = await Promise.all([params, searchParams]);
   const { session, org, brand, deskBrand } =
@@ -80,10 +80,19 @@ export default async function PerformanceBrandAdsPage({
       ),
     ),
   ];
-  const initialPicked = (fromUrl.length > 0 ? fromUrl : fromSet).slice(
-    0,
-    MAX_SET_HOMES,
-  );
+  // A per-home link (`?focus=`) opens on one home: scroll to it if it is drawn,
+  // and pre-tick it *on top of* the set already drawn so a rebuild draws it
+  // without dropping the rest. `buildAdSet` replaces the whole set, so pre-
+  // ticking only the focused home would silently wipe the others.
+  const focusHomeId = (query.focus ?? "").trim();
+  const focused = focusHomeId && ids.has(focusHomeId) ? focusHomeId : null;
+  const initialPicked = (
+    focused
+      ? [...new Set([...fromSet, focused])]
+      : fromUrl.length > 0
+        ? fromUrl
+        : fromSet
+  ).slice(0, MAX_SET_HOMES);
 
   // Where approved ads can go. Only a campaign nothing has been pushed for
   // can still take ads; a live one is Meta's to edit.
@@ -109,6 +118,7 @@ export default async function PerformanceBrandAdsPage({
         campaigns={campaigns}
         hasSite={listings.length > 0}
         website={brand.website}
+        focusHomeId={focused}
       />
       <CatalogCards
         brandId={brand.id}

@@ -52,6 +52,7 @@ export function AdPreviewsWorkspace({
   campaigns,
   hasSite,
   website,
+  focusHomeId,
 }: {
   brandId: string;
   brandSlug: string;
@@ -65,6 +66,8 @@ export function AdPreviewsWorkspace({
   campaigns: { id: string; name: string }[];
   hasSite: boolean;
   website: string | null;
+  /** A single home a per-home link opened on: open and scroll to it. */
+  focusHomeId?: string | null;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -333,6 +336,7 @@ export function AdPreviewsWorkspace({
             brandId={brandId}
             brandName={brandName}
             brandLogo={brandLogo}
+            focusKey={focusHomeId}
           />
         </div>
       ) : (

@@ -175,9 +175,9 @@ export function PickedHomes({
                     </div>
                     <div className="flex shrink-0 items-center gap-0.5">
                       <Link
-                        href={`/app/performance/brands/${brandSlug}/ads/matrix?homes=${encodeURIComponent(home.externalId)}`}
-                        aria-label={`Open ${home.name}'s ad matrix`}
-                        title="Its ad matrix"
+                        href={`/app/performance/brands/${brandSlug}/ads?focus=${encodeURIComponent(home.externalId)}#home-${encodeURIComponent(home.externalId)}`}
+                        aria-label={`Open ${home.name}'s ads`}
+                        title="Its ads"
                         className="flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
                       >
                         <Megaphone className="size-3.5" />

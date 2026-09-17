@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
@@ -89,15 +89,32 @@ export function PlacementMatrix({
   brandId,
   brandName,
   brandLogo,
+  focusKey,
 }: {
   homes: MatrixHome[];
   brandId: string;
   brandName: string;
   brandLogo: string | null;
+  /** A home to open and scroll to on arrival, from a per-home link. */
+  focusKey?: string | null;
 }) {
   const [open, setOpen] = useState<Set<string>>(
-    () => new Set(homes.slice(0, 1).map((home) => home.key)),
+    () =>
+      new Set(
+        [focusKey, ...homes.slice(0, 1).map((home) => home.key)].filter(
+          (key): key is string => Boolean(key),
+        ),
+      ),
   );
+
+  // A per-home link lands here focused on one home; open it and bring it into
+  // view. Only fires when that home is actually in the drafted set.
+  useEffect(() => {
+    if (!focusKey) return;
+    document
+      .getElementById(`home-${focusKey}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [focusKey]);
   const toggle = (key: string) =>
     setOpen((prev) => {
       const next = new Set(prev);
@@ -117,7 +134,11 @@ export function PlacementMatrix({
         const total = home.ads.reduce((sum, ad) => sum + ad.coverage.total, 0);
         const unfit = home.ads.reduce((sum, ad) => sum + ad.coverage.unfit, 0);
         return (
-          <div key={home.key} className="overflow-hidden rounded-2xl border">
+          <div
+            key={home.key}
+            id={`home-${home.key}`}
+            className="scroll-mt-24 overflow-hidden rounded-2xl border"
+          >
             <button
               type="button"
               onClick={() => toggle(home.key)}
