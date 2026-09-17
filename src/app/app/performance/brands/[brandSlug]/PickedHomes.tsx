@@ -219,11 +219,6 @@ export function PickedHomes({
                           +{overflow}
                         </div>
                       ) : null}
-                      {home.photoCount > 1 ? (
-                        <span className="ml-0.5 text-[10.5px] text-muted-foreground">
-                          {home.photoCount} photos
-                        </span>
-                      ) : null}
                     </div>
                   ) : home.offFeed ? (
                     <div className="mt-1.5 text-[10.5px] text-muted-foreground">
