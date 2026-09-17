@@ -478,6 +478,10 @@ export type ContactProperties = {
   growth_pregen_touch_3_subject?: string;
   // Read-only context (used by the inbound router)
   notes_last_contacted?: string;
+  // Demand-sales namespace (src/server/services/demand/field-mapping.ts).
+  // Every guest/BDR field lives under this prefix so the sink can never
+  // reach a supply-side property; the manifest there is the source of truth.
+  [key: `demand_${string}`]: string | undefined;
 };
 
 export type DealProperties = {
@@ -613,11 +617,7 @@ export async function getCompanyById(
     }
     return { id: found.id, values };
   } catch (error) {
-    const status =
-      typeof error === "object" && error !== null && "statusCode" in error
-        ? Number((error as { statusCode?: unknown }).statusCode)
-        : null;
-    if (status === 404) return null;
+    if (httpStatusOf(error) === 404) return null;
     console.error(`❌ [HUBSPOT] getCompanyById(${companyId})`, error);
     throw error;
   }
@@ -1092,11 +1092,7 @@ export async function getContactById(
     ]);
     return contactFrom(found);
   } catch (error) {
-    const status =
-      typeof error === "object" && error !== null && "statusCode" in error
-        ? Number((error as { statusCode?: unknown }).statusCode)
-        : null;
-    if (status === 404) return null;
+    if (httpStatusOf(error) === 404) return null;
     console.error(`❌ [HUBSPOT] getContactById(${contactId})`, error);
     throw error;
   }
@@ -1319,7 +1315,9 @@ export async function createContact(
 ): Promise<{ id: string }> {
   try {
     const created = await client().crm.contacts.basicApi.create({
-      properties: props,
+      // The `demand_*` slot admits undefined (optional keys); the SDK type
+      // does not, and JSON serialisation drops undefined either way.
+      properties: props as Record<string, string>,
       associations: [],
     });
     console.log(
@@ -1338,7 +1336,7 @@ export async function updateContact(
 ): Promise<void> {
   try {
     await client().crm.contacts.basicApi.update(id, {
-      properties: props,
+      properties: props as Record<string, string>,
     });
   } catch (err) {
     console.error(`❌ [HUBSPOT] updateContact(${id})`, err);
@@ -1803,4 +1801,128 @@ export async function nextRepInRR(
   }
 
   return nextRep ?? null;
+}
+
+// =====================================================
+// ERROR SHAPE
+// =====================================================
+
+/**
+ * HTTP status of a thrown SDK error. `@hubspot/api-client` raises
+ * `ApiException` with the status on `code`; older call sites in this file
+ * check `statusCode`, so accept both.
+ */
+function httpStatusOf(error: unknown): number | null {
+  if (typeof error !== "object" || error === null) return null;
+  const candidate =
+    (error as { code?: unknown }).code ??
+    (error as { statusCode?: unknown }).statusCode;
+  const status = Number(candidate);
+  return Number.isFinite(status) ? status : null;
+}
+
+// =====================================================
+// OWNERS
+// =====================================================
+
+export type HubspotOwner = {
+  id: string;
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  userId: number | null;
+  archived: boolean;
+};
+
+function ownerFrom(owner: {
+  id: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  userId?: number;
+  archived?: boolean;
+}): HubspotOwner {
+  return {
+    id: owner.id,
+    email: owner.email ?? null,
+    firstName: owner.firstName ?? null,
+    lastName: owner.lastName ?? null,
+    userId: owner.userId ?? null,
+    archived: owner.archived ?? false,
+  };
+}
+
+/** Every owner in the portal, active by default; `archived` for the rest. */
+export async function listOwners(
+  options: { archived?: boolean } = {},
+): Promise<HubspotOwner[]> {
+  const owners: HubspotOwner[] = [];
+  let after: string | undefined;
+  do {
+    const page = await client().crm.owners.ownersApi.getPage(
+      undefined,
+      after,
+      100,
+      options.archived ?? false,
+    );
+    owners.push(...(page.results ?? []).map(ownerFrom));
+    after = page.paging?.next?.after;
+  } while (after);
+  return owners;
+}
+
+/**
+ * One owner by id, checking the active list first and the archived one
+ * second so a deactivated rep still resolves to a name. `null` when unknown.
+ */
+export async function getOwnerById(
+  ownerId: string,
+): Promise<HubspotOwner | null> {
+  for (const archived of [false, true]) {
+    try {
+      const owner = await client().crm.owners.ownersApi.getById(
+        Number(ownerId),
+        "id",
+        archived,
+      );
+      return ownerFrom(owner);
+    } catch (error) {
+      if (httpStatusOf(error) !== 404) {
+        console.error(`❌ [HUBSPOT] getOwnerById(${ownerId})`, error);
+        throw error;
+      }
+    }
+  }
+  return null;
+}
+
+// =====================================================
+// ARBITRARY PROPERTY READS
+// =====================================================
+
+/**
+ * Read a chosen set of properties off one contact by id. `null` when the
+ * contact no longer exists (deleted or merged away). Used by writers that
+ * remember the record id and must not spend the search budget to find it
+ * again.
+ */
+export async function getContactProperties<K extends keyof ContactProperties>(
+  contactId: string,
+  properties: K[],
+): Promise<{ id: string; values: Record<K, string | null> } | null> {
+  try {
+    const found = await client().crm.contacts.basicApi.getById(contactId, [
+      ...(properties as string[]),
+    ]);
+    const values = {} as Record<K, string | null>;
+    for (const prop of properties) {
+      values[prop] =
+        (found.properties?.[prop as string] as string | undefined) ?? null;
+    }
+    return { id: found.id, values };
+  } catch (error) {
+    if (httpStatusOf(error) === 404) return null;
+    console.error(`❌ [HUBSPOT] getContactProperties(${contactId})`, error);
+    throw error;
+  }
 }

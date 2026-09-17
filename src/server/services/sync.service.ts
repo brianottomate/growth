@@ -3,6 +3,7 @@ import {
   getCustomerByEmail,
   updateBdrAssignment,
 } from "@/server/clients/customerio.client";
+import { isHubspotConfigured } from "@/server/clients/hubspot.client";
 import {
   searchProspectByEmail,
   createProspect,
@@ -20,8 +21,21 @@ import {
 import {
   getNextBdr,
   getNextBdrFromOutreachLoad,
-  type BdrConfig,
 } from "@/server/services/outreach/bdr-assignment.service";
+import {
+  findExistingDemandBdr,
+  getNextDemandBdr,
+  toResolved,
+  withRosterIds,
+  type DemandAssignmentSource,
+  type ResolvedBdr,
+} from "@/server/services/demand/bdr-assignment.service";
+import {
+  lookupDemandContact,
+  writeDemandContact,
+  type DemandContactState,
+} from "@/server/services/demand/hubspot-sink.service";
+import { resolveHubspotOwnerIdByEmail } from "@/server/services/demand/owners";
 import {
   enrichByEmail as enrichFromMinerva,
   isMinervaConfigured,
@@ -37,10 +51,38 @@ export interface SyncResult {
   eventType: string;
   outreachAction?: "created" | "updated";
   outreachProspectId?: string;
+  hubspotAction?: "created" | "updated";
+  hubspotContactId?: string;
+  /** HubSpot failure that did not fail the lead (shadow mode only). */
+  hubspotError?: string;
   assignedBdr?: { name: string; email: string };
+  assignmentSource?: DemandAssignmentSource;
   dataSource?: string;
   processingTimeMs?: number;
   error?: string;
+}
+
+// =====================================================
+// DEMAND CRMS
+// =====================================================
+
+/**
+ * Both CRMs are written on every sync — there is no switch. Outreach is the
+ * system BDRs work in today, so its owner is authoritative and a HubSpot
+ * failure never fails a lead while Outreach is configured; it is logged on the
+ * `[DemandSync]` line instead (docs/demand-sales-hubspot.md).
+ */
+export function resolveDemandCrms(): {
+  useOutreach: boolean;
+  useHubspot: boolean;
+  /** HubSpot errors fail the lead only when HubSpot is the only sink. */
+  hubspotFatal: boolean;
+} {
+  return {
+    useOutreach: isOutreachConfigured,
+    useHubspot: isHubspotConfigured,
+    hubspotFatal: isHubspotConfigured && !isOutreachConfigured,
+  };
 }
 
 // =====================================================
@@ -81,19 +123,235 @@ function stageName(stageId: number | undefined): string {
   return entry ? `${entry[0]}(${stageId})` : String(stageId);
 }
 
+function ownerSummary(
+  bdr: ResolvedBdr | null,
+  source: DemandAssignmentSource,
+): string {
+  if (!bdr) return "owner: none";
+  const ids = [
+    bdr.outreachUserId ? `outreach:${bdr.outreachUserId}` : null,
+    bdr.hubspotOwnerId ? `hubspot:${bdr.hubspotOwnerId}` : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return `owner: ${bdr.name}(${ids || "-"}, src: ${source})`;
+}
+
+// =====================================================
+// LEAD DATA
+// =====================================================
+
+export interface BuiltLeadData {
+  leadData: LeadData;
+  dataSource: string;
+  bqData: LeadData | null;
+  cioCustomer: Awaited<ReturnType<typeof getCustomerByEmail>>;
+  minervaData: Awaited<ReturnType<typeof enrichFromMinerva>> | null;
+  minervaBackfilled: string[];
+}
+
+/**
+ * Steps 1–2 of the pipeline: fetch BigQuery + Customer.io + Minerva in
+ * parallel, merge, apply webhook context, enrich phone. Shared by
+ * `processLead` and the lab dry-run harnesses so a diagnostic sees exactly
+ * what production would write.
+ */
+export async function buildLeadData(params: {
+  email: string;
+  eventType: string;
+  eventData?: Record<string, unknown>;
+}): Promise<BuiltLeadData> {
+  const { email, eventType, eventData } = params;
+  let leadData: LeadData | null = null;
+  let dataSource = "none";
+
+  const [bqResult, cioResult, minervaResult] = await Promise.allSettled([
+    fetchLeadForRealtimeSync({
+      email,
+      eventType,
+      propertyName: eventData?.property_name as string | undefined,
+    }),
+    getCustomerByEmail(email),
+    isMinervaConfigured ? enrichFromMinerva(email) : Promise.resolve(null),
+  ]);
+
+  const bqData = bqResult.status === "fulfilled" ? bqResult.value : null;
+  if (bqResult.status === "rejected") {
+    console.warn("⚠️ [Sync] BigQuery fetch failed", bqResult.reason);
+  }
+
+  const cioCustomer = cioResult.status === "fulfilled" ? cioResult.value : null;
+  if (cioResult.status === "rejected") {
+    console.warn("⚠️ [Sync] Customer.io fetch failed", cioResult.reason);
+  }
+
+  const minervaData =
+    minervaResult.status === "fulfilled" ? minervaResult.value : null;
+  if (minervaResult.status === "rejected") {
+    console.warn("⚠️ [Sync] Minerva fetch failed", minervaResult.reason);
+  }
+
+  if (bqData && cioCustomer) {
+    const cioLead = transformCioToLeadFormat(cioCustomer, eventType, eventData);
+    leadData = mergeLeadData(bqData, cioLead);
+    dataSource = "bigquery+customerio";
+  } else if (bqData) {
+    leadData = bqData;
+    dataSource = "bigquery";
+  } else if (cioCustomer) {
+    leadData = transformCioToLeadFormat(cioCustomer, eventType, eventData);
+    dataSource = "customerio";
+  }
+
+  // If no data from either source, build minimal lead from webhook
+  if (!leadData) {
+    console.log("⚠️ [Sync] No data from BQ or CIO, using webhook data only");
+    leadData = {
+      email,
+      webhook_event_type: eventType,
+      webhook_property_name: eventData?.property_name as string | undefined,
+      first_name: eventData?.first_name as string | undefined,
+      last_name: eventData?.last_name as string | undefined,
+      phone: eventData?.phone as string | undefined,
+    };
+    dataSource = "webhook";
+  }
+
+  // Set webhook context on all paths
+  leadData.webhook_event_type = eventType;
+  if (eventData?.property_name) {
+    leadData.webhook_property_name = eventData.property_name as string;
+  }
+  leadData.last_activity_type = eventType;
+
+  // Keep last-event filters fresh even when CIO templates omit/format timestamp inconsistently.
+  const rawTimestamp = eventData?.timestamp;
+  const nowIso = new Date().toISOString();
+  if (
+    rawTimestamp != null &&
+    rawTimestamp !== "" &&
+    (typeof rawTimestamp === "string" || typeof rawTimestamp === "number")
+  ) {
+    const parsed = new Date(rawTimestamp);
+    if (!isNaN(parsed.getTime())) {
+      const ageMs = Date.now() - parsed.getTime();
+      const maxAgeMs = 1000 * 60 * 60 * 24 * 7; // 7 days
+      leadData.last_activity_ts =
+        ageMs >= 0 && ageMs <= maxAgeMs ? parsed.toISOString() : nowIso;
+    } else {
+      leadData.last_activity_ts = nowIso;
+    }
+  } else {
+    leadData.last_activity_ts = nowIso;
+  }
+
+  // Carry forward checkout-specific context (checkin/checkout dates, amount)
+  // CIO renders missing dates as the string "false" — filter those out
+  const rawDestination = eventData?.search_destination;
+  if (typeof rawDestination === "string" && rawDestination) {
+    leadData.webhook_search_destination = rawDestination;
+  }
+  const rawSearchCount = eventData?.search_count;
+  if (rawSearchCount != null && !isNaN(Number(rawSearchCount))) {
+    leadData.webhook_search_count = Number(rawSearchCount);
+  }
+  const rawLastSearch = eventData?.last_search_date;
+  if (typeof rawLastSearch === "string" && rawLastSearch) {
+    leadData.webhook_last_search_date = rawLastSearch;
+  }
+  const rawCheckin = eventData?.checkin;
+  if (
+    rawCheckin != null &&
+    rawCheckin !== false &&
+    rawCheckin !== "false" &&
+    rawCheckin !== "" &&
+    (typeof rawCheckin === "string" || typeof rawCheckin === "number")
+  ) {
+    leadData.webhook_checkin_date = String(rawCheckin);
+  }
+  const rawCheckout = eventData?.checkout;
+  if (
+    rawCheckout != null &&
+    rawCheckout !== false &&
+    rawCheckout !== "false" &&
+    rawCheckout !== "" &&
+    (typeof rawCheckout === "string" || typeof rawCheckout === "number")
+  ) {
+    leadData.webhook_checkout_date = String(rawCheckout);
+  }
+  const rawAmount = eventData?.checkout_amount;
+  if (rawAmount != null && rawAmount !== "") {
+    const amount = Number(rawAmount);
+    if (!isNaN(amount) && amount > 0) leadData.webhook_checkout_amount = amount;
+  }
+
+  // Minerva enrichment + phone fallback
+  const minervaBackfilled: string[] = [];
+  if (minervaData) {
+    if (!leadData.phone && minervaData.phone) {
+      leadData.phone = minervaData.phone;
+      minervaBackfilled.push("phone");
+    }
+    if (!leadData.city && minervaData.city) {
+      leadData.city = minervaData.city;
+      minervaBackfilled.push("city");
+    }
+    if (!leadData.state && minervaData.state) {
+      leadData.state = minervaData.state;
+      minervaBackfilled.push("state");
+    }
+    if (!leadData.country && minervaData.country) {
+      leadData.country = minervaData.country;
+      minervaBackfilled.push("country");
+    }
+    if (
+      !leadData.minerva_household_income &&
+      minervaData.estimatedIncomeRange
+    ) {
+      leadData.minerva_household_income = minervaData.estimatedIncomeRange;
+      minervaBackfilled.push("minerva_household_income");
+    }
+  }
+
+  leadData.phone = await enrichPhone(leadData, eventData);
+
+  return {
+    leadData,
+    dataSource,
+    bqData,
+    cioCustomer,
+    minervaData,
+    minervaBackfilled,
+  };
+}
+
+/** Customer.io's current BDR attributes, as carried on the merged lead. */
+export function cioAssignmentOf(leadData: LeadData): {
+  email: string | null;
+  outreachId: string | null;
+} {
+  const record = leadData as Record<string, unknown>;
+  return {
+    email:
+      ((record.assignedBdrEmail as string | null) ?? null)?.toLowerCase() ??
+      null,
+    outreachId: (record.assignedBdrOutreachId as string | null) ?? null,
+  };
+}
+
 // =====================================================
 // MAIN SYNC FUNCTION
 // =====================================================
 
 /**
- * Process a single lead through the CIO → Outreach sync pipeline.
+ * Process a single lead through the CIO → CRM sync pipeline.
  *
  * Flow:
  * 1. Fetch lead data from BigQuery and Customer.io
  * 2. Enrich phone number from available sources
- * 3. Determine BDR assignment (existing → validate → round-robin)
- * 4. Search Outreach for existing prospect
- * 5. Create or update prospect with mapped fields
+ * 3. Look up the existing prospect (Outreach) and contact (HubSpot)
+ * 4. Determine BDR assignment (existing owner → CIO attrs → rotation)
+ * 5. Create or update the prospect / contact with mapped fields
  * 6. Update CIO with BDR assignment if newly assigned
  */
 export async function processLead(params: {
@@ -117,319 +375,242 @@ export async function processLead(params: {
 
   try {
     // -----------------------------------------------
-    // Step 1: Fetch lead data
+    // Steps 1–2: Fetch + enrich lead data
     // -----------------------------------------------
-    let leadData: LeadData | null = null;
-    let dataSource = "none";
+    const {
+      leadData,
+      dataSource,
+      bqData,
+      cioCustomer,
+      minervaData,
+      minervaBackfilled,
+    } = await buildLeadData({ email, eventType, eventData });
+    const sources = dataSourcesSummary(
+      bqData,
+      cioCustomer,
+      minervaData,
+      minervaBackfilled,
+    );
 
-    const [bqResult, cioResult, minervaResult] = await Promise.allSettled([
-      fetchLeadForRealtimeSync({
-        email,
-        eventType,
-        propertyName: eventData?.property_name as string | undefined,
-      }),
-      getCustomerByEmail(email),
-      isMinervaConfigured ? enrichFromMinerva(email) : Promise.resolve(null),
-    ]);
-
-    const bqData = bqResult.status === "fulfilled" ? bqResult.value : null;
-    if (bqResult.status === "rejected") {
-      console.warn("⚠️ [Sync] BigQuery fetch failed", bqResult.reason);
-    }
-
-    const cioCustomer =
-      cioResult.status === "fulfilled" ? cioResult.value : null;
-    if (cioResult.status === "rejected") {
-      console.warn("⚠️ [Sync] Customer.io fetch failed", cioResult.reason);
-    }
-
-    const minervaData =
-      minervaResult.status === "fulfilled" ? minervaResult.value : null;
-    if (minervaResult.status === "rejected") {
-      console.warn("⚠️ [Sync] Minerva fetch failed", minervaResult.reason);
-    }
-
-    if (bqData && cioCustomer) {
-      const cioLead = transformCioToLeadFormat(
-        cioCustomer,
-        eventType,
-        eventData,
+    // -----------------------------------------------
+    // Step 3: Look up the existing record in each active CRM
+    // -----------------------------------------------
+    const { useOutreach, useHubspot, hubspotFatal } = resolveDemandCrms();
+    if (!useOutreach && !useHubspot) {
+      console.log(
+        "⚠️ [Sync] Neither Outreach nor HubSpot configured — skipping",
       );
-      leadData = mergeLeadData(bqData, cioLead);
-      dataSource = "bigquery+customerio";
-    } else if (bqData) {
-      leadData = bqData;
-      dataSource = "bigquery";
-    } else if (cioCustomer) {
-      leadData = transformCioToLeadFormat(cioCustomer, eventType, eventData);
-      dataSource = "customerio";
-    }
-
-    // If no data from either source, build minimal lead from webhook
-    if (!leadData) {
-      console.log("⚠️ [Sync] No data from BQ or CIO, using webhook data only");
-      leadData = {
-        email,
-        webhook_event_type: eventType,
-        webhook_property_name: eventData?.property_name as string | undefined,
-        first_name: eventData?.first_name as string | undefined,
-        last_name: eventData?.last_name as string | undefined,
-        phone: eventData?.phone as string | undefined,
-      };
-      dataSource = "webhook";
-    }
-
-    // Set webhook context on all paths
-    leadData.webhook_event_type = eventType;
-    if (eventData?.property_name) {
-      leadData.webhook_property_name = eventData.property_name as string;
-    }
-    leadData.last_activity_type = eventType;
-
-    // Keep last-event filters fresh even when CIO templates omit/format timestamp inconsistently.
-    const rawTimestamp = eventData?.timestamp;
-    const nowIso = new Date().toISOString();
-    if (
-      rawTimestamp != null &&
-      rawTimestamp !== "" &&
-      (typeof rawTimestamp === "string" || typeof rawTimestamp === "number")
-    ) {
-      const parsed = new Date(rawTimestamp);
-      if (!isNaN(parsed.getTime())) {
-        const ageMs = Date.now() - parsed.getTime();
-        const maxAgeMs = 1000 * 60 * 60 * 24 * 7; // 7 days
-        leadData.last_activity_ts =
-          ageMs >= 0 && ageMs <= maxAgeMs ? parsed.toISOString() : nowIso;
-      } else {
-        leadData.last_activity_ts = nowIso;
-      }
-    } else {
-      leadData.last_activity_ts = nowIso;
-    }
-
-    // Carry forward checkout-specific context (checkin/checkout dates, amount)
-    // CIO renders missing dates as the string "false" — filter those out
-    const rawDestination = eventData?.search_destination;
-    if (typeof rawDestination === "string" && rawDestination) {
-      leadData.webhook_search_destination = rawDestination;
-    }
-    const rawSearchCount = eventData?.search_count;
-    if (rawSearchCount != null && !isNaN(Number(rawSearchCount))) {
-      leadData.webhook_search_count = Number(rawSearchCount);
-    }
-    const rawLastSearch = eventData?.last_search_date;
-    if (typeof rawLastSearch === "string" && rawLastSearch) {
-      leadData.webhook_last_search_date = rawLastSearch;
-    }
-    const rawCheckin = eventData?.checkin;
-    if (
-      rawCheckin != null &&
-      rawCheckin !== false &&
-      rawCheckin !== "false" &&
-      rawCheckin !== "" &&
-      (typeof rawCheckin === "string" || typeof rawCheckin === "number")
-    ) {
-      leadData.webhook_checkin_date = String(rawCheckin);
-    }
-    const rawCheckout = eventData?.checkout;
-    if (
-      rawCheckout != null &&
-      rawCheckout !== false &&
-      rawCheckout !== "false" &&
-      rawCheckout !== "" &&
-      (typeof rawCheckout === "string" || typeof rawCheckout === "number")
-    ) {
-      leadData.webhook_checkout_date = String(rawCheckout);
-    }
-    const rawAmount = eventData?.checkout_amount;
-    if (rawAmount != null && rawAmount !== "") {
-      const amount = Number(rawAmount);
-      if (!isNaN(amount) && amount > 0)
-        leadData.webhook_checkout_amount = amount;
-    }
-
-    // -----------------------------------------------
-    // Step 2: Apply Minerva enrichment + phone fallback
-    // -----------------------------------------------
-    const minervaBackfilled: string[] = [];
-    if (minervaData) {
-      if (!leadData.phone && minervaData.phone) {
-        leadData.phone = minervaData.phone;
-        minervaBackfilled.push("phone");
-      }
-      if (!leadData.city && minervaData.city) {
-        leadData.city = minervaData.city;
-        minervaBackfilled.push("city");
-      }
-      if (!leadData.state && minervaData.state) {
-        leadData.state = minervaData.state;
-        minervaBackfilled.push("state");
-      }
-      if (!leadData.country && minervaData.country) {
-        leadData.country = minervaData.country;
-        minervaBackfilled.push("country");
-      }
-      if (
-        !leadData.minerva_household_income &&
-        minervaData.estimatedIncomeRange
-      ) {
-        leadData.minerva_household_income = minervaData.estimatedIncomeRange;
-        minervaBackfilled.push("minerva_household_income");
-      }
-    }
-
-    leadData.phone = await enrichPhone(leadData, eventData);
-
-    // -----------------------------------------------
-    // Step 3: Check Outreach for existing prospect
-    // -----------------------------------------------
-    if (!isOutreachConfigured) {
-      console.log("⚠️ [Sync] Outreach not configured — skipping");
       return {
         status: "skipped",
         email,
         eventType,
         dataSource,
-        error: "Outreach not configured",
+        error: "No demand CRM configured",
         processingTimeMs: Date.now() - startMs,
       };
     }
 
-    const existingProspect = await searchProspectByEmail(email);
+    const existingProspect = useOutreach
+      ? await searchProspectByEmail(email)
+      : null;
 
-    // -----------------------------------------------
-    // Step 4: Determine BDR assignment (Outreach owner is source of truth)
-    // -----------------------------------------------
-    let assignedBdr: BdrConfig | null = null;
-    let assignmentSource:
-      | "outreach_owner"
-      | "outreach_load"
-      | "static_round_robin"
-      | "cio_existing"
-      | "none" = "none";
-
-    if (existingProspect) {
-      const existingOwnerId = getProspectOwnerId(existingProspect);
-      if (existingOwnerId) {
-        const ownerUser = await getOutreachUserById(existingOwnerId);
-        assignedBdr = {
-          name: ownerUser?.name ?? `Outreach User ${existingOwnerId}`,
-          email: ownerUser?.email?.toLowerCase() ?? "",
-          outreachUserId: existingOwnerId,
-          active: true,
-          assignNewLeads: true,
-        };
-        assignmentSource = "outreach_owner";
+    // In shadow mode a HubSpot lookup failure must not cost the Outreach
+    // write; in hubspot mode it is the write, so let it fail the lead. Either
+    // way the reason is logged on the `[DemandSync]` line below.
+    let existingContact: DemandContactState | null = null;
+    let hubspotError: string | undefined;
+    if (useHubspot) {
+      try {
+        existingContact = await lookupDemandContact(email);
+      } catch (error) {
+        if (hubspotFatal) throw error;
+        hubspotError = `lookup: ${error instanceof Error ? error.message : String(error)}`;
+        console.error(`⚠️ [Sync] HubSpot lookup failed for ${email}:`, error);
       }
     }
+    const hubspotWritable = useHubspot && hubspotError === undefined;
 
-    if (!assignedBdr) {
-      const existingBdrOutreachId =
-        ((leadData as Record<string, unknown>).assignedBdrOutreachId as
-          | string
-          | null) ?? null;
-      const existingBdrEmail =
-        ((leadData as Record<string, unknown>).assignedBdrEmail as
-          | string
-          | null) ?? null;
-      const cioAssignee = await resolveCioAssignedOutreachUser(
-        existingBdrOutreachId,
-        existingBdrEmail,
-      );
+    // -----------------------------------------------
+    // Step 4: Determine BDR assignment (existing owner is source of truth)
+    // -----------------------------------------------
+    const outreachOwner = existingProspect
+      ? await resolveOutreachOwner(existingProspect)
+      : null;
 
-      if (cioAssignee) {
-        assignedBdr = {
-          name: cioAssignee.name,
-          email: cioAssignee.email?.toLowerCase() ?? "",
-          outreachUserId: cioAssignee.id,
-          active: true,
-          assignNewLeads: true,
-        };
-        assignmentSource = "cio_existing";
-      }
-    }
+    const cioAssignment = cioAssignmentOf(leadData);
+    // Outreach knows people the static roster does not; resolve CIO's
+    // attributes against its live user list while Outreach is still written.
+    const cioResolved =
+      useOutreach && !outreachOwner
+        ? await resolveCioAssignedOutreachUser(
+            cioAssignment.outreachId,
+            cioAssignment.email,
+          )
+        : null;
+
+    const existing = findExistingDemandBdr({
+      outreachActive: useOutreach,
+      outreachOwner,
+      hubspotDemandBdr: existingContact
+        ? {
+            ownerId: existingContact.bdrOwnerId,
+            email: existingContact.bdrEmail,
+          }
+        : null,
+      cioAssignment: {
+        ...cioAssignment,
+        resolved: cioResolved
+          ? {
+              name: cioResolved.name,
+              email: cioResolved.email?.toLowerCase() ?? "",
+              outreachUserId: cioResolved.id,
+              hubspotOwnerId: null,
+            }
+          : null,
+      },
+    });
+    let assignedBdr = existing.bdr;
+    let assignmentSource = existing.source;
 
     if (!assignedBdr) {
       const hasPhone = !!leadData.phone;
-      assignedBdr = await getNextBdrFromOutreachLoad(hasPhone);
-      if (assignedBdr) {
-        assignmentSource = "outreach_load";
+      if (useOutreach) {
+        const fromLoad = await getNextBdrFromOutreachLoad(hasPhone);
+        const picked = fromLoad ?? getNextBdr(hasPhone);
+        if (picked) {
+          assignedBdr = withRosterIds({
+            name: picked.name,
+            email: picked.email.toLowerCase(),
+            outreachUserId: picked.outreachUserId,
+            hubspotOwnerId: null,
+          });
+          assignmentSource = fromLoad ? "outreach_load" : "static_round_robin";
+        }
       } else {
-        assignedBdr = getNextBdr(hasPhone);
-        if (assignedBdr) assignmentSource = "static_round_robin";
+        const picked = getNextDemandBdr(hasPhone);
+        if (picked) {
+          assignedBdr = toResolved(picked);
+          assignmentSource = "rotation";
+        }
+      }
+    }
+
+    // A rep outside the static roster (manual reassignment, live-load pick)
+    // still gets a real picker value when HubSpot knows their email.
+    if (hubspotWritable && assignedBdr && !assignedBdr.hubspotOwnerId) {
+      try {
+        const ownerId = await resolveHubspotOwnerIdByEmail(assignedBdr.email);
+        if (ownerId) assignedBdr = { ...assignedBdr, hubspotOwnerId: ownerId };
+      } catch (error) {
+        console.warn(
+          `⚠️ [Sync] Could not resolve HubSpot owner for ${assignedBdr.email}:`,
+          error,
+        );
       }
     }
 
     // -----------------------------------------------
-    // Step 5: Create or update prospect
+    // Step 5a: Outreach — create or update prospect
     // -----------------------------------------------
-    let outreachAction: "created" | "updated";
-    let prospectId: string;
+    let outreachAction: SyncResult["outreachAction"];
+    let prospectId: string | undefined;
 
-    if (existingProspect) {
-      // Carry forward existing sync count
-      leadData.existing_sync_count =
-        parseInt(existingProspect.attributes.custom51! ?? "0", 10) || 0;
+    if (useOutreach) {
+      const ownerId = assignedBdr?.outreachUserId
+        ? parseInt(assignedBdr.outreachUserId, 10)
+        : undefined;
 
-      const { attributes, stageId } = buildUpdatePayload(
-        leadData,
-        existingProspect.attributes.tags,
-      );
+      if (existingProspect) {
+        // Carry forward existing sync count
+        leadData.existing_sync_count =
+          parseInt(existingProspect.attributes.custom51! ?? "0", 10) || 0;
 
-      const updated = await updateProspect(existingProspect.id, {
-        attributes,
-        stageId,
-        ownerId: assignedBdr
-          ? parseInt(assignedBdr.outreachUserId, 10)
-          : undefined,
-      });
+        const { attributes, stageId } = buildUpdatePayload(
+          leadData,
+          existingProspect.attributes.tags,
+        );
 
-      outreachAction = "updated";
-      prospectId = String(updated.id);
+        const updated = await updateProspect(existingProspect.id, {
+          attributes,
+          stageId,
+          ownerId,
+        });
 
-      console.log(
-        `✅ [Sync] updated #${prospectId} | ${dataSourcesSummary(bqData, cioCustomer, minervaData, minervaBackfilled)} | owner: ${assignedBdr?.name ?? "none"}(${assignedBdr?.outreachUserId ?? "-"}, src: ${assignmentSource}) | stage: ${stageName(stageId)} | fields: ${describeFields(attributes)}`,
-      );
-    } else {
-      const { attributes, stageId, personaId } = buildCreatePayload(leadData);
+        outreachAction = "updated";
+        prospectId = String(updated.id);
 
-      const created = await createProspect({
-        attributes,
-        stageId,
-        personaId,
-        ownerId: assignedBdr
-          ? parseInt(assignedBdr.outreachUserId, 10)
-          : undefined,
-      });
+        console.log(
+          `✅ [Sync] updated #${prospectId} | ${sources} | ${ownerSummary(assignedBdr, assignmentSource)} | stage: ${stageName(stageId)} | fields: ${describeFields(attributes)}`,
+        );
+      } else {
+        const { attributes, stageId, personaId } = buildCreatePayload(leadData);
 
-      outreachAction = "created";
-      prospectId = String(created.id);
+        const created = await createProspect({
+          attributes,
+          stageId,
+          personaId,
+          ownerId,
+        });
 
-      console.log(
-        `✅ [Sync] created #${prospectId} | ${dataSourcesSummary(bqData, cioCustomer, minervaData, minervaBackfilled)} | owner: ${assignedBdr?.name ?? "none"}(${assignedBdr?.outreachUserId ?? "-"}, src: ${assignmentSource}) | stage: ${stageName(stageId)} | fields: ${describeFields(attributes)}`,
-      );
+        outreachAction = "created";
+        prospectId = String(created.id);
+
+        console.log(
+          `✅ [Sync] created #${prospectId} | ${sources} | ${ownerSummary(assignedBdr, assignmentSource)} | stage: ${stageName(stageId)} | fields: ${describeFields(attributes)}`,
+        );
+      }
     }
 
     // -----------------------------------------------
-    // Step 6: Update CIO with BDR assignment (parity with Outreach owner)
+    // Step 5b: HubSpot — create or force-update the contact's demand_* props
     // -----------------------------------------------
-    const cioAssignedEmail =
-      (
-        (leadData as Record<string, unknown>).assignedBdrEmail as string | null
-      )?.toLowerCase() ?? null;
-    const cioAssignedOutreachId =
-      ((leadData as Record<string, unknown>).assignedBdrOutreachId as
-        | string
-        | null) ?? null;
+    let hubspotAction: SyncResult["hubspotAction"];
+    let hubspotContactId: string | undefined;
+
+    if (hubspotWritable) {
+      // Stamp demand_assigned_at when the rep changes, not only the first time.
+      const newlyAssigned =
+        !!assignedBdr && !contactHasBdr(existingContact, assignedBdr);
+      try {
+        const written = await writeDemandContact({
+          email,
+          lead: leadData,
+          existing: existingContact,
+          bdr: assignedBdr,
+          newlyAssigned,
+        });
+        if (written.action !== "dry_run") {
+          hubspotAction = written.action;
+          hubspotContactId = written.contactId ?? undefined;
+        }
+        console.log(
+          `✅ [Sync] hubspot ${written.action} #${written.contactId} | ${ownerSummary(assignedBdr, assignmentSource)} | fields: ${Object.keys(written.props).join(", ") || "none"}`,
+        );
+      } catch (error) {
+        if (hubspotFatal) throw error;
+        hubspotError = `write: ${error instanceof Error ? error.message : String(error)}`;
+        console.error(`⚠️ [Sync] HubSpot write failed for ${email}:`, error);
+      }
+    }
+
+    // -----------------------------------------------
+    // Step 6: Update CIO with BDR assignment (parity with the CRM owner)
+    // -----------------------------------------------
+    // CIO's attribute is still named `assigned_bdr_outreach_id`; once Outreach
+    // is gone it carries the HubSpot owner id (docs/demand-sales-hubspot.md).
+    const cioBdrId = assignedBdr
+      ? (assignedBdr.outreachUserId ?? assignedBdr.hubspotOwnerId)
+      : null;
     const shouldWriteCioAssignment =
       !!assignedBdr &&
-      (cioAssignedOutreachId !== assignedBdr.outreachUserId ||
-        cioAssignedEmail !== assignedBdr.email.toLowerCase());
+      !!cioBdrId &&
+      (cioAssignment.outreachId !== cioBdrId ||
+        cioAssignment.email !== assignedBdr.email.toLowerCase());
 
-    if (shouldWriteCioAssignment && assignedBdr) {
+    if (shouldWriteCioAssignment && assignedBdr && cioBdrId) {
       if (!assignedBdr.email) {
         console.warn(
-          `⚠️ [Sync] Skipping CIO parity write-back for ${assignedBdr.outreachUserId}: owner email not available`,
+          `⚠️ [Sync] Skipping CIO parity write-back for ${cioBdrId}: owner email not available`,
         );
       } else {
         try {
@@ -437,7 +618,7 @@ export async function processLead(params: {
             customerEmail: email,
             bdrEmail: assignedBdr.email,
             bdrName: assignedBdr.name,
-            bdrOutreachId: assignedBdr.outreachUserId,
+            bdrOutreachId: cioBdrId,
           });
         } catch (error) {
           // Non-fatal — log and continue
@@ -454,15 +635,25 @@ export async function processLead(params: {
     // -----------------------------------------------
     const processingTimeMs = Date.now() - startMs;
 
+    // One grep-able line per lead: `grep "\[DemandSync\]"` tells the whole
+    // story of the rollout — which CRMs were written, by whom, how long.
+    console.log(
+      `📦 [DemandSync] ${email} | ${eventType} | outreach=${outreachAction ? `${outreachAction}#${prospectId}` : "-"} | hubspot=${hubspotAction ? `${hubspotAction}#${hubspotContactId}` : hubspotError ? "FAILED" : "-"} | ${ownerSummary(assignedBdr, assignmentSource)} | ${processingTimeMs}ms${hubspotError ? ` | hubspotError=${hubspotError}` : ""}`,
+    );
+
     return {
       status: "success",
       email,
       eventType,
       outreachAction,
       outreachProspectId: prospectId,
+      hubspotAction,
+      hubspotContactId,
+      hubspotError,
       assignedBdr: assignedBdr
         ? { name: assignedBdr.name, email: assignedBdr.email }
         : undefined,
+      assignmentSource,
       dataSource,
       processingTimeMs,
     };
@@ -534,6 +725,7 @@ function transformCioToLeadFormat(
     ...({
       assignedBdrEmail: cioCustomer.assignedBdrEmail,
       assignedBdrName: cioCustomer.assignedBdrName,
+      assignedBdrOutreachId: cioCustomer.assignedBdrOutreachId,
     } as Record<string, unknown>),
   };
 }
@@ -570,13 +762,47 @@ function mergeLeadData(primary: LeadData, secondary: LeadData): LeadData {
     }
   }
 
-  for (const extraKey of ["assignedBdrEmail", "assignedBdrName"]) {
+  for (const extraKey of [
+    "assignedBdrEmail",
+    "assignedBdrName",
+    "assignedBdrOutreachId",
+  ]) {
     if (secondaryRecord[extraKey] != null) {
       mergedRecord[extraKey] = secondaryRecord[extraKey];
     }
   }
 
   return mergedRecord;
+}
+
+/** True when the contact already names this rep (by HubSpot id or email). */
+function contactHasBdr(
+  contact: DemandContactState | null,
+  bdr: ResolvedBdr,
+): boolean {
+  if (!contact) return false;
+  if (bdr.hubspotOwnerId && contact.bdrOwnerId === bdr.hubspotOwnerId) {
+    return true;
+  }
+  return (
+    !!contact.bdrEmail &&
+    contact.bdrEmail.toLowerCase() === bdr.email.toLowerCase()
+  );
+}
+
+/** The Outreach prospect's owner as a BDR, or null when it has none. */
+export async function resolveOutreachOwner(prospect: {
+  relationships?: Record<string, unknown>;
+}): Promise<ResolvedBdr | null> {
+  const ownerId = getProspectOwnerId(prospect);
+  if (!ownerId) return null;
+  const ownerUser = await getOutreachUserById(ownerId);
+  return {
+    name: ownerUser?.name ?? `Outreach User ${ownerId}`,
+    email: ownerUser?.email?.toLowerCase() ?? "",
+    outreachUserId: ownerId,
+    hubspotOwnerId: null,
+  };
 }
 
 function getProspectOwnerId(prospect: {
@@ -627,7 +853,13 @@ async function getOutreachUserByEmail(email: string): Promise<{
   };
 }
 
-async function resolveCioAssignedOutreachUser(
+/**
+ * CIO's `assigned_bdr_*` attributes resolved against Outreach's live user
+ * list. Email first: it is the attribute humans and `cio:repair` edit, and
+ * the id is only ever a copy of it — so a hand-corrected email wins over a
+ * stale id rather than being reverted.
+ */
+export async function resolveCioAssignedOutreachUser(
   outreachUserId: string | null,
   email: string | null,
 ): Promise<{
@@ -635,12 +867,12 @@ async function resolveCioAssignedOutreachUser(
   name: string;
   email: string | null;
 } | null> {
-  if (outreachUserId) {
-    const byId = await getOutreachUserById(outreachUserId);
-    if (byId) return byId;
-  }
   if (email) {
-    return await getOutreachUserByEmail(email);
+    const byEmail = await getOutreachUserByEmail(email);
+    if (byEmail) return byEmail;
+  }
+  if (outreachUserId) {
+    return await getOutreachUserById(outreachUserId);
   }
   return null;
 }

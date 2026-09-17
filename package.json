@@ -46,6 +46,7 @@
     "update:design-system": "pnpm up '@wandercom/design-system-*'",
     "cio:diagnose": "bun run src/scripts/diagnose-cio-assignment.ts",
     "cio:repair": "bun run src/scripts/repair-cio-assignment.ts",
+    "hubspot:setup-demand-properties": "bun --conditions=react-server scripts/setup-demand-hubspot-properties.ts",
     "product-update:preview": "bun run src/scripts/render-product-update-preview.ts",
     "ai:contracts": "bun --conditions=react-server src/scripts/ai-kernel-gauntlet.ts --contracts-only",
     "ai:gauntlet": "bun --conditions=react-server src/scripts/ai-kernel-gauntlet.ts",

@@ -127,7 +127,7 @@ export async function handleCioToOutreachWebhook(
       try {
         const result = await processLead({ email, eventType, eventData });
         console.log(
-          `📋 [${options.serviceLabel}] Sync result: ${result.status} — ${result.outreachAction ?? "no action"} (${result.processingTimeMs}ms)`,
+          `📋 [${options.serviceLabel}] Sync result: ${result.status} — outreach ${result.outreachAction ?? "no action"} | hubspot ${result.hubspotAction ?? (result.hubspotError ? "FAILED" : "no action")} (${result.processingTimeMs}ms)`,
         );
       } catch (err) {
         console.error(

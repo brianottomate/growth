@@ -65,6 +65,7 @@ const DIAGNOSTICS: { name: string; href: string; note?: string }[] = [
   { name: "Instantly", href: "/api/lab/instantly" },
   { name: "Instantly write-test", href: "/api/lab/instantly-write" },
   { name: "CIO→Outreach dry-run", href: "/api/lab/cio-to-outreach" },
+  { name: "CIO→HubSpot dry-run", href: "/api/lab/cio-to-hubspot" },
 ];
 
 export default function LabIndexPage() {

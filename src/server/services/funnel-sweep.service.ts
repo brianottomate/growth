@@ -152,6 +152,13 @@ export interface StageSweepResult {
   newEpisodes: number;
   synced: number;
   failed: number;
+  /**
+   * HubSpot half of the sync. A HubSpot failure does not fail the episode
+   * while Outreach is configured, so `synced` alone cannot show a dark
+   * HubSpot — these can.
+   */
+  hubspotWritten: number;
+  hubspotFailed: number;
 }
 
 export interface FunnelSweepResult {
@@ -255,6 +262,8 @@ export async function runFunnelAbandonmentSweep(options: {
 
     let synced = 0;
     let failed = 0;
+    let hubspotWritten = 0;
+    let hubspotFailed = 0;
 
     if (!dryRun && toProcess.length > 0) {
       const byUserId = new Map(emailable.map((c) => [c.userId, c]));
@@ -279,6 +288,8 @@ export async function runFunnelAbandonmentSweep(options: {
             } else {
               failed++;
             }
+            if (result.hubspotAction) hubspotWritten++;
+            if (result.hubspotError) hubspotFailed++;
             await db
               .update(funnelSendLogTable)
               .set({
@@ -302,7 +313,7 @@ export async function runFunnelAbandonmentSweep(options: {
     }
 
     console.log(
-      `🔎 [FunnelSweep] ${def.stage}: eligible=${candidates.length} missingEmail=${missingEmail} newEpisodes=${newEpisodes.length}${dryRun ? " (dry run)" : ` synced=${synced} failed=${failed}`}`,
+      `🔎 [FunnelSweep] ${def.stage}: eligible=${candidates.length} missingEmail=${missingEmail} newEpisodes=${newEpisodes.length}${dryRun ? " (dry run)" : ` synced=${synced} failed=${failed} hubspot=${hubspotWritten}/${hubspotFailed} (written/failed)`}`,
     );
 
     results.push({
@@ -312,6 +323,8 @@ export async function runFunnelAbandonmentSweep(options: {
       newEpisodes: newEpisodes.length,
       synced,
       failed,
+      hubspotWritten,
+      hubspotFailed,
     });
   }
 

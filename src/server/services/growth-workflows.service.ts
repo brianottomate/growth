@@ -34,6 +34,8 @@ interface RunCandidateResult {
   eventType: string;
   status: SyncResult["status"];
   outreachAction?: SyncResult["outreachAction"];
+  hubspotAction?: SyncResult["hubspotAction"];
+  hubspotError?: string;
   processingTimeMs?: number;
   error?: string;
 }
@@ -48,6 +50,10 @@ export interface WorkflowRunResult {
   successCount: number;
   failedCount: number;
   skippedCount: number;
+  /** Leads whose HubSpot contact was created/updated. */
+  hubspotWrittenCount: number;
+  /** Leads whose HubSpot half failed — non-fatal in `both`, so not in failedCount. */
+  hubspotFailedCount: number;
   dryRun: boolean;
   sampleFailures: Array<{ email: string; error: string }>;
   /** Job-specific breakdown (e.g. per-stage sweep counts). */
@@ -131,6 +137,8 @@ async function runCandidates(params: {
         eventType: candidate.eventType,
         status: syncResult.status,
         outreachAction: syncResult.outreachAction,
+        hubspotAction: syncResult.hubspotAction,
+        hubspotError: syncResult.hubspotError,
         processingTimeMs: syncResult.processingTimeMs,
         error: syncResult.error,
       });
@@ -155,10 +163,12 @@ async function runCandidates(params: {
   const successCount = results.filter((r) => r.status === "success").length;
   const failedCount = results.filter((r) => r.status === "failed").length;
   const skippedCount = results.filter((r) => r.status === "skipped").length;
+  const hubspotWrittenCount = results.filter((r) => r.hubspotAction).length;
+  const hubspotFailedCount = results.filter((r) => r.hubspotError).length;
 
   const totalMs = Date.now() - startedMs;
   console.log(
-    `✅ [${params.workflow}] Done | ${successCount} success | ${failedCount} failed | ${skippedCount} skipped | ${(totalMs / 1000).toFixed(1)}s`,
+    `✅ [${params.workflow}] Done | ${successCount} success | ${failedCount} failed | ${skippedCount} skipped | hubspot ${hubspotWrittenCount} written / ${hubspotFailedCount} failed | ${(totalMs / 1000).toFixed(1)}s`,
   );
 
   return {
@@ -171,6 +181,8 @@ async function runCandidates(params: {
     successCount,
     failedCount,
     skippedCount,
+    hubspotWrittenCount,
+    hubspotFailedCount,
     dryRun: params.dryRun,
     sampleFailures: results
       .filter((result) => result.status === "failed" && !!result.error)
@@ -285,6 +297,14 @@ async function runFunnelSweepWorkflow(
   const newEpisodes = sweep.stages.reduce((sum, s) => sum + s.newEpisodes, 0);
   const synced = sweep.stages.reduce((sum, s) => sum + s.synced, 0);
   const failed = sweep.stages.reduce((sum, s) => sum + s.failed, 0);
+  const hubspotWritten = sweep.stages.reduce(
+    (sum, s) => sum + s.hubspotWritten,
+    0,
+  );
+  const hubspotFailed = sweep.stages.reduce(
+    (sum, s) => sum + s.hubspotFailed,
+    0,
+  );
 
   return {
     workflow: "funnel_abandonment_sweep",
@@ -296,6 +316,8 @@ async function runFunnelSweepWorkflow(
     successCount: synced,
     failedCount: failed,
     skippedCount: newEpisodes - synced - failed,
+    hubspotWrittenCount: hubspotWritten,
+    hubspotFailedCount: hubspotFailed,
     dryRun: sweep.dryRun,
     sampleFailures: [],
     details: sweep,
@@ -316,6 +338,8 @@ async function runFunnelEmailBackfillWorkflow(
     processedCount: heal.lookedUp,
     successCount: heal.healed,
     failedCount: 0,
+    hubspotWrittenCount: 0,
+    hubspotFailedCount: 0,
     skippedCount: heal.missingEmail - heal.healed,
     dryRun: false,
     sampleFailures: [],
