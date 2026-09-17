@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   Check,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   ImageOff,
   Loader2,
@@ -397,6 +398,41 @@ function AdRow({
                 className="absolute -top-1.5 -right-1.5 hidden size-4 items-center justify-center rounded-full bg-background text-muted-foreground shadow group-hover:flex hover:text-destructive"
               >
                 <Trash2 className="size-2.5" />
+              </button>
+            ) : null}
+            {/* Reorder within the carousel; a static holds one card. */}
+            {multi && index > 0 ? (
+              <button
+                type="button"
+                onClick={() =>
+                  editCards.mutate({
+                    adId: ad.id,
+                    edit: { op: "move", index, to: index - 1 },
+                  })
+                }
+                disabled={editCards.isPending}
+                aria-label={`Move card ${index + 1} earlier`}
+                title="Move earlier"
+                className="absolute top-1/2 -left-1.5 hidden size-4 -translate-y-1/2 items-center justify-center rounded-full bg-background text-muted-foreground shadow group-hover:flex hover:text-sky-400"
+              >
+                <ChevronLeft className="size-2.5" />
+              </button>
+            ) : null}
+            {multi && index < ad.sourceCards.length - 1 ? (
+              <button
+                type="button"
+                onClick={() =>
+                  editCards.mutate({
+                    adId: ad.id,
+                    edit: { op: "move", index, to: index + 1 },
+                  })
+                }
+                disabled={editCards.isPending}
+                aria-label={`Move card ${index + 1} later`}
+                title="Move later"
+                className="absolute top-1/2 -right-1.5 hidden size-4 -translate-y-1/2 items-center justify-center rounded-full bg-background text-muted-foreground shadow group-hover:flex hover:text-sky-400"
+              >
+                <ChevronRight className="size-2.5" />
               </button>
             ) : null}
           </div>
