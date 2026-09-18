@@ -26,6 +26,7 @@ import { DraftFromHomesButton } from "./DraftFromHomesButton";
 import { money } from "./format";
 import { PlanPlatformButton } from "./PlanPlatformButton";
 import { PlatformSection } from "./PlatformSection";
+import { Projected } from "./Projected";
 import { WorkInChatButton } from "./WorkInChatButton";
 
 /**
@@ -42,9 +43,11 @@ import { WorkInChatButton } from "./WorkInChatButton";
 export async function CampaignView({
   brandSlug,
   campaignId,
+  group = "home",
 }: {
   brandSlug: string;
   campaignId: string;
+  group?: "home" | "format";
 }) {
   const session = await getSession();
   if (!session?.user) redirect("/signin");
@@ -281,12 +284,30 @@ export async function CampaignView({
                 campaignId={campaign.id}
               />
               {ads.length > 0 ? (
-                <Link
-                  href={`/app/brands/${brandSlug}/ads/${campaign.id}/by-home`}
-                  className="px-2 text-xs text-muted-foreground hover:text-foreground"
-                >
-                  By home
-                </Link>
+                <span className="flex items-center gap-0.5 text-xs">
+                  <Link
+                    href="?group=home"
+                    className={cn(
+                      "rounded-full px-2 py-0.5",
+                      group !== "format"
+                        ? "bg-accent text-foreground"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    By home
+                  </Link>
+                  <Link
+                    href="?group=format"
+                    className={cn(
+                      "rounded-full px-2 py-0.5",
+                      group === "format"
+                        ? "bg-accent text-foreground"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    By format
+                  </Link>
+                </span>
               ) : null}
               {ads.length > 0
                 ? ask("ads", `Review the ads for “${campaign.name}”`)
@@ -324,6 +345,7 @@ export async function CampaignView({
                 ads={wall}
                 states={states}
                 title="Ads"
+                groupBy={group}
               />
             )}
             {anyPushed ? null : (
@@ -334,6 +356,39 @@ export async function CampaignView({
               />
             )}
           </div>
+        </Step>
+
+        <Step
+          title="Projected"
+          meta={
+            planned.length > 0
+              ? planned.map((row) => platformLabel(row.platform)).join(", ")
+              : undefined
+          }
+        >
+          {planned.length === 0 ? (
+            <EmptyState
+              compact
+              icon={Radio}
+              title="No projection yet"
+              description="Plan a platform below to preview how these ideas render on it — a feed card on Meta, a search result on Google."
+            />
+          ) : wall.length === 0 ? (
+            <EmptyState
+              compact
+              icon={Radio}
+              title="Nothing to project"
+              description="Add an idea above to see it rendered per platform."
+            />
+          ) : (
+            <Projected
+              brandName={brandName}
+              brandLogo={brand.logo}
+              landingUrl={campaign.landingUrl}
+              planned={planned}
+              ads={wall}
+            />
+          )}
         </Step>
 
         <Step

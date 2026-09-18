@@ -18,10 +18,13 @@ export const dynamic = "force-dynamic";
  */
 export default async function CampaignPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ brandSlug: string; campaignId: string }>;
+  searchParams: Promise<{ group?: string }>;
 }) {
   const { brandSlug, campaignId } = await params;
+  const { group } = await searchParams;
 
   if (!campaignId.startsWith("camp_")) {
     const platformCampaign = await db.query.platformCampaignTable.findFirst({
@@ -32,5 +35,11 @@ export default async function CampaignPage({
     redirect(`/app/brands/${brandSlug}/ads/platform/${campaignId}`);
   }
 
-  return <CampaignView brandSlug={brandSlug} campaignId={campaignId} />;
+  return (
+    <CampaignView
+      brandSlug={brandSlug}
+      campaignId={campaignId}
+      group={group === "format" ? "format" : "home"}
+    />
+  );
 }

@@ -18,6 +18,7 @@ import {
   editAdCards,
   setAdCopy,
   setAdPhotoOnly,
+  setAdTextOnly,
   setCardCopy,
   setAdHome,
   setAdStatus,
@@ -378,6 +379,16 @@ export const adsRouter = {
         adId: input.adId,
         orgId: await organizationIdFor(ctx),
         photoOnly: input.photoOnly,
+      }),
+    ),
+
+  setAdTextOnly: protectedProcedure
+    .input(z.object({ adId: z.string().min(1), textOnly: z.boolean() }))
+    .mutation(async ({ ctx, input }) =>
+      setAdTextOnly({
+        adId: input.adId,
+        orgId: await organizationIdFor(ctx),
+        textOnly: input.textOnly,
       }),
     ),
 

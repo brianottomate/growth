@@ -17,6 +17,7 @@ import type {
   AdCreativeContent,
   AdPlacements,
   AdPlacementVariant,
+  AdTextContent,
 } from "@/server/db/ads-schema";
 import type { MediaItem } from "@/server/db/content-schema";
 import { placementSpec, resolveCell, withTitle } from "@/lib/ad-placements";
@@ -1394,6 +1395,48 @@ export async function setAdCopy(input: {
     })
     .where(eq(adTable.id, ad.id));
   return { adId: ad.id };
+}
+
+/**
+ * Flip an idea between creative and text-only. Text-only is copy alone: it
+ * pushes to Google Search / OpenAI and never to a feed placement. The switch
+ * is the `type` column (which the compile already keys off), so the copy is
+ * preserved across the flip and the creative is dropped, reversibly.
+ */
+export async function setAdTextOnly(input: {
+  adId: string;
+  orgId: string;
+  textOnly: boolean;
+}) {
+  const ad = await requireOwnedAd(input);
+  if (input.textOnly) {
+    if (ad.type === "text") return { adId: ad.id, textOnly: true };
+    const c = ad.content as AdCreativeContent;
+    const next: AdTextContent = {
+      headlines: c.headline ? [c.headline] : [],
+      descriptions: c.body ? [c.body] : [],
+      linkUrl: c.linkUrl,
+    };
+    await db
+      .update(adTable)
+      .set({ type: "text", content: next })
+      .where(eq(adTable.id, ad.id));
+  } else {
+    if (ad.type === "creative") return { adId: ad.id, textOnly: false };
+    const t = ad.content as AdTextContent;
+    const next: AdCreativeContent = {
+      format: "static",
+      headline: t.headlines?.[0] ?? "",
+      body: t.descriptions?.[0] ?? "",
+      linkUrl: t.linkUrl,
+      media: [],
+    };
+    await db
+      .update(adTable)
+      .set({ type: "creative", content: next })
+      .where(eq(adTable.id, ad.id));
+  }
+  return { adId: ad.id, textOnly: input.textOnly };
 }
 
 // ---- PLACEMENT CELLS -------------------------------------------------------

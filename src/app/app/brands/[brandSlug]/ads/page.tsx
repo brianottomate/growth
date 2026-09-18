@@ -232,10 +232,13 @@ function CampaignRow({
 
 export default async function BrandAdsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ brandSlug: string }>;
+  searchParams: Promise<{ status?: string }>;
 }) {
   const { brandSlug } = await params;
+  const sp = await searchParams;
   const session = await getSession();
   if (!session?.user) redirect("/signin");
 
@@ -397,6 +400,24 @@ export default async function BrandAdsPage({
     .filter(Boolean)
     .join("\n");
 
+  // New campaigns first, with a live/draft filter. Draft = a campaign still
+  // being planned (status "planned"); live = anything that has gone real
+  // (active/paused/…), matching the status badge on each card.
+  const isDraft = (status: string) => status === "planned";
+  const statusFilter =
+    sp.status === "live" || sp.status === "draft" ? sp.status : "all";
+  const sortedCampaigns = [...campaigns].sort(
+    (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+  );
+  const draftCount = sortedCampaigns.filter((c) => isDraft(c.status)).length;
+  const liveCount = sortedCampaigns.length - draftCount;
+  const visibleCampaigns =
+    statusFilter === "all"
+      ? sortedCampaigns
+      : sortedCampaigns.filter((c) =>
+          statusFilter === "live" ? !isDraft(c.status) : isDraft(c.status),
+        );
+
   return (
     <div>
       {/* header */}
@@ -437,11 +458,40 @@ export default async function BrandAdsPage({
       </div>
 
       {/* campaigns → per-channel campaigns */}
-      <h2 className="mt-10 mb-3 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-        Campaigns · {campaigns.length} · one push, verified across its channels
-      </h2>
+      <div className="mt-10 mb-3 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+          Campaigns · {campaigns.length} · one push, verified across its
+          channels
+        </h2>
+        <div className="flex items-center gap-1 text-xs">
+          {(
+            [
+              ["all", "All", sortedCampaigns.length],
+              ["live", "Live", liveCount],
+              ["draft", "Draft", draftCount],
+            ] as const
+          ).map(([key, label, n]) => (
+            <Link
+              key={key}
+              href={`?status=${key}`}
+              className={`rounded-full border px-2.5 py-1 font-medium ${
+                statusFilter === key
+                  ? "border-foreground/30 bg-accent text-foreground"
+                  : "border-border text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {label} · {n}
+            </Link>
+          ))}
+        </div>
+      </div>
       <div className="flex flex-col gap-4">
-        {campaigns.map((init) => {
+        {visibleCampaigns.length === 0 && (
+          <p className="rounded-xl border bg-card p-6 text-center text-sm text-muted-foreground">
+            No {statusFilter === "all" ? "" : statusFilter} campaigns.
+          </p>
+        )}
+        {visibleCampaigns.map((init) => {
           const initCampaigns = platformByCampaign.get(init.id) ?? [];
           const spend = campaignSpend(init.id);
           const pct = init.budget ? Math.min(1, spend / init.budget) : 0;

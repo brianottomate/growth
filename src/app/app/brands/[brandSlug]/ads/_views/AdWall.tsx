@@ -34,11 +34,16 @@ import { useMediaUpload } from "@/app/app/media/use-media-upload";
 import {
   cardsForSurface,
   groupWall,
+  groupWallByFormat,
   type AdState,
   type WallAd,
   type WallCard,
 } from "@/lib/ad-wall";
-import { AD_FORMAT_LABEL, cardCapacity } from "@/lib/performance-ads";
+import {
+  AD_FORMAT_LABEL,
+  type AdFormat,
+  cardCapacity,
+} from "@/lib/performance-ads";
 import type { MediaItem } from "@/server/db/schema";
 import { useTRPC } from "@/trpc/react";
 
@@ -70,6 +75,7 @@ export function AdWall({
   ads,
   states = {},
   title = "The wall",
+  groupBy = "home",
 }: {
   brandId: string;
   brandSlug: string;
@@ -83,9 +89,14 @@ export function AdWall({
   /** Where each ad stands on a platform; an ad on one is read-only here. */
   states?: Record<string, AdState>;
   title?: string;
+  /** How the wall is sectioned: by the home an ad is about, or by format. */
+  groupBy?: "home" | "format";
 }) {
   const [surface, setSurface] = useState<AdMockSurface>("instagram");
   const grouped = groupWall(ads);
+  const formatGroups = groupBy === "format" ? groupWallByFormat(ads) : null;
+  const formatLabel = (key: string) =>
+    key === "text" ? "Text ads" : (AD_FORMAT_LABEL[key as AdFormat] ?? key);
   const approved = ads.filter((ad) => ad.status === "approved").length;
   const shells = ads.filter((ad) => ad.cards.length === 0).length;
   const tile = {
@@ -123,45 +134,66 @@ export function AdWall({
         </Tabs>
       </div>
 
-      {grouped.homes.map((group) => (
-        <div key={group.homeId ?? group.homeName} className="space-y-2">
-          <div className="flex items-baseline justify-between gap-2">
-            <p className="text-[13px] font-semibold">
-              {group.homeId ? (
-                <Link
-                  href={`/app/performance/brands/${brandSlug}/homes/${group.homeId}`}
-                  className="hover:underline"
-                >
-                  {group.homeName}
-                </Link>
-              ) : (
-                group.homeName
-              )}
-            </p>
-            {group.homeUrl ? (
-              <a
-                href={group.homeUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="truncate text-[11px] text-muted-foreground hover:underline"
-              >
-                {group.homeUrl.replace(/^https?:\/\//, "")}
-              </a>
-            ) : null}
-          </div>
-          <ul className="grid gap-3 @3xl:grid-cols-2">
-            {group.ads.map((ad) => (
-              <AdTile key={ad.id} ad={ad} {...tile} />
-            ))}
-          </ul>
-        </div>
-      ))}
+      {formatGroups
+        ? formatGroups.map((group) => (
+            <div key={group.key} className="space-y-2">
+              <p className="text-[13px] font-semibold">
+                {formatLabel(group.key)} · {group.ads.length}
+              </p>
+              <ul className="grid gap-3 @3xl:grid-cols-2">
+                {group.ads.map((ad) => (
+                  <AdTile key={ad.id} ad={ad} {...tile} />
+                ))}
+              </ul>
+            </div>
+          ))
+        : null}
 
-      {grouped.other.length > 0 ? (
+      {!formatGroups &&
+        grouped.homes.map((group) => (
+          <div key={group.homeId ?? group.homeName} className="space-y-2">
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="text-[13px] font-semibold">
+                {group.homeId ? (
+                  <Link
+                    href={`/app/performance/brands/${brandSlug}/homes/${group.homeId}`}
+                    className="hover:underline"
+                  >
+                    {group.homeName}
+                  </Link>
+                ) : (
+                  group.homeName
+                )}
+              </p>
+              {group.homeUrl ? (
+                <a
+                  href={group.homeUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="truncate text-[11px] text-muted-foreground hover:underline"
+                >
+                  {group.homeUrl.replace(/^https?:\/\//, "")}
+                </a>
+              ) : null}
+            </div>
+            <ul className="grid gap-3 @3xl:grid-cols-2">
+              {group.ads.map((ad) => (
+                <AdTile key={ad.id} ad={ad} {...tile} />
+              ))}
+            </ul>
+          </div>
+        ))}
+
+      {!formatGroups && grouped.other.length > 0 ? (
         <div className="space-y-2">
-          <p className="text-[13px] font-semibold">
-            About no home in particular
-          </p>
+          {/* Only frame these as "no home" when there ARE home ads to
+              contrast against. A campaign with zero home ads is just ads;
+              a home ad is one opt-in flavor, not the default. */}
+          {grouped.homes.length > 0 ? (
+            <p className="text-[13px] font-semibold">
+              About no home in particular
+            </p>
+          ) : null}
           <ul className="grid gap-3 @3xl:grid-cols-2">
             {grouped.other.map((ad) => (
               <AdTile key={ad.id} ad={ad} {...tile} />
@@ -170,7 +202,7 @@ export function AdWall({
         </div>
       ) : null}
 
-      {grouped.slices.length > 0 ? (
+      {!formatGroups && grouped.slices.length > 0 ? (
         <div className="space-y-2">
           <p className="text-[13px] font-semibold">The whole set</p>
           <ul className="space-y-3">
@@ -232,6 +264,9 @@ function AdTile({
   const refresh = () => router.refresh();
   const setStatus = useMutation(
     trpc.ads.setAdStatus.mutationOptions({ onSuccess: refresh, onError }),
+  );
+  const setTextOnly = useMutation(
+    trpc.ads.setAdTextOnly.mutationOptions({ onSuccess: refresh, onError }),
   );
   const setCopy = useMutation(
     trpc.ads.setAdCopy.mutationOptions({
@@ -314,7 +349,24 @@ function AdTile({
   };
 
   const shell = ad.cards.length === 0;
-  const mock = shell ? (
+  const mock = ad.textOnly ? (
+    // A text-only idea is copy alone: render it as a search result, not a
+    // feed card, and never nag for a creative.
+    <div className="w-full max-w-80 rounded-xl border bg-card p-4 text-left">
+      <p className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
+        Ad · Text
+      </p>
+      <p className="mt-1 line-clamp-2 text-[13px] leading-snug font-medium text-sky-300">
+        {ad.headline || "Headline"}
+      </p>
+      <p className="mt-0.5 text-[11px] text-emerald-300/80">
+        {(ad.linkUrl ?? landingUrl ?? "wander.com").replace(/^https?:\/\//, "")}
+      </p>
+      <p className="mt-1 line-clamp-3 text-[11px] leading-snug text-muted-foreground">
+        {ad.body || "Description"}
+      </p>
+    </div>
+  ) : shell ? (
     <Dropzone
       compact
       accept={MEDIA_ACCEPT}
@@ -495,10 +547,16 @@ function AdTile({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-[11px] text-muted-foreground">
-            {AD_FORMAT_LABEL[ad.format]}
-            {ad.format === "video"
-              ? ""
-              : ` · ${ad.cards.length}/${capacity} ${capacity === 1 ? "card" : "cards"}`}
+            {ad.textOnly ? (
+              "Text ad"
+            ) : (
+              <>
+                {AD_FORMAT_LABEL[ad.format]}
+                {ad.format === "video"
+                  ? ""
+                  : ` · ${ad.cards.length}/${capacity} ${capacity === 1 ? "card" : "cards"}`}
+              </>
+            )}
             {" · "}
             {ad.name}
           </p>
@@ -543,6 +601,23 @@ function AdTile({
               {ad.status === "approved" ? "Approved" : "Approve"}
             </button>
           )}
+          {!locked ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() =>
+                setTextOnly.mutate({ adId: ad.id, textOnly: !ad.textOnly })
+              }
+              title={
+                ad.textOnly
+                  ? "Add a creative — make it a visual ad (Meta, LinkedIn…)"
+                  : "Make text-only — copy alone (Google Search, OpenAI)"
+              }
+              className="rounded-full border px-2 py-0.5 text-[10px] font-medium text-muted-foreground transition hover:border-white/30 hover:text-foreground disabled:opacity-40"
+            >
+              {ad.textOnly ? "Add creative" : "Text only"}
+            </button>
+          ) : null}
           {!locked && bindable ? (
             homes.length > 0 ? (
               <HomePicker
@@ -563,12 +638,12 @@ function AdTile({
             ) : (
               <Button
                 size="sm"
-                variant="outline"
+                variant="ghost"
                 shape="round"
                 density="editorial"
                 onClick={() => setNaming(true)}
               >
-                {ad.homeName ? "Rename home" : "Name the home"}
+                {ad.homeName ? "Rename home" : "+ Home"}
               </Button>
             )
           ) : null}
@@ -604,7 +679,7 @@ function AdTile({
       >
         <div className="flex justify-center @2xl:justify-start">{mock}</div>
         <div className="min-w-0 space-y-2">
-          {strip}
+          {ad.textOnly ? null : strip}
           {!editing ? (
             <div className="space-y-1">
               <p className="truncate text-[12px] font-medium">{ad.headline}</p>
@@ -671,10 +746,12 @@ function AdTile({
           ) : null}
           {!ad.homeId && bindable ? (
             <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
-              <Home className="size-3" />
-              {ad.homeName
-                ? `${ad.homeName}, by name; no listing on their site yet.`
-                : "About no home yet."}{" "}
+              {ad.homeName ? (
+                <>
+                  <Home className="size-3" />
+                  {`${ad.homeName}, by name; no listing on their site yet. `}
+                </>
+              ) : null}
               Links to {ad.linkUrl ?? landingUrl ?? "the brand's site"}.
             </p>
           ) : null}
