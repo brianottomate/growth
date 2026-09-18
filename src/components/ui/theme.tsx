@@ -28,12 +28,14 @@ export type ThemeMode = z.output<typeof ThemeModeSchema>;
 export type ResolvedTheme = Exclude<ThemeMode, "auto">;
 
 const getStoredThemeMode = (): ThemeMode => {
-  if (typeof window === "undefined") return "dark";
+  // No stored preference → follow the browser (prefers-color-scheme) via "auto",
+  // rather than forcing dark. Only an explicit Light/Dark/System choice persists.
+  if (typeof window === "undefined") return "auto";
   try {
     const storedTheme = localStorage.getItem(themeKey);
     return ThemeModeSchema.parse(storedTheme);
   } catch {
-    return "dark";
+    return "auto";
   }
 };
 

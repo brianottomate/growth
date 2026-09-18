@@ -12,10 +12,10 @@ const validThemeModes = ["light", "dark", "auto"] as const;
 type ThemeMode = (typeof validThemeModes)[number];
 
 try {
-  const savedMode = window.localStorage.getItem("theme-mode") ?? "dark";
+  const savedMode = window.localStorage.getItem("theme-mode") ?? "auto";
   const mode: ThemeMode = validThemeModes.includes(savedMode as ThemeMode)
     ? (savedMode as ThemeMode)
-    : "dark";
+    : "auto";
 
   document.documentElement.dataset.theme =
     mode === "auto"
