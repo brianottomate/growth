@@ -22,6 +22,7 @@ import {
   memberTable,
 } from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
+import { CHECKLIST_FIELD_KIND } from "@/lib/performance-checklist";
 import { type db } from "@/server/db";
 import {
   addWanderOsHome,
@@ -477,6 +478,53 @@ export const brandRouter = createTRPCRouter({
         .where(eq(brandTable.id, input.id))
         .returning();
       return updated;
+    }),
+
+  /**
+   * Set fields on the hand-kept performance checklist. Each changed field is
+   * stamped with who set it and when (server-side, from the session), like a
+   * comment. A null or empty value clears the field and its stamp.
+   */
+  setPerformanceChecklist: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        patch: z.record(
+          z.string(),
+          z.union([z.string(), z.number(), z.null()]),
+        ),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandManageable(ctx, input.id);
+      const brand = await ctx.db.query.brandTable.findFirst({
+        where: eq(brandTable.id, input.id),
+        columns: { performanceChecklist: true },
+      });
+      const current = brand?.performanceChecklist ?? {};
+      const values = { ...(current.values ?? {}) };
+      const meta = { ...(current.meta ?? {}) };
+      const now = new Date().toISOString();
+      const by = ctx.session.user.id;
+      const byName = ctx.session.user.name ?? null;
+      for (const [key, value] of Object.entries(input.patch)) {
+        if (!CHECKLIST_FIELD_KIND[key]) continue; // ignore unknown keys
+        if (value === null || value === "") {
+          delete values[key];
+          delete meta[key];
+        } else {
+          values[key] = value;
+          meta[key] = { by, byName, at: now };
+        }
+      }
+      const [updated] = await ctx.db
+        .update(brandTable)
+        .set({ performanceChecklist: { values, meta } })
+        .where(eq(brandTable.id, input.id))
+        .returning({
+          performanceChecklist: brandTable.performanceChecklist,
+        });
+      return updated?.performanceChecklist ?? { values, meta };
     }),
 
   /**

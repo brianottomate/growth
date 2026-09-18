@@ -1,4 +1,5 @@
 import type { BrandingProfile } from "@mendable/firecrawl-js";
+import type { PerformanceChecklist } from "@/lib/performance-checklist";
 import { relations, sql } from "drizzle-orm";
 import {
   check,
@@ -384,6 +385,8 @@ export const brandTable = pgTable(
     adPreviews: t.jsonb().$type<BrandAdPreview[]>(),
     /** Live client settings; see PerformanceSettings. */
     performanceSettings: t.jsonb().$type<PerformanceSettings>(),
+    /** Hand-kept performance checklist; see PerformanceChecklist. Each field carries who last set it. */
+    performanceChecklist: t.jsonb().$type<PerformanceChecklist>(),
     brandFingerprint: t.jsonb().$type<BrandFingerprint>(),
     // Shared listening judgment + reply guidance (voice still from brandFingerprint).
     brandListeningStory: t.jsonb().$type<BrandListeningStory>(),
