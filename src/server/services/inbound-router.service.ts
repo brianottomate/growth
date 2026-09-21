@@ -169,6 +169,25 @@ function formatHSDate(dateStr: string | null): string {
  * tagAsInbound controls whether inbound-specific fields (owner, inbound_date,
  * lead_type) are written; false for leads that are already actively worked.
  */
+/**
+ * Wander's qualification bar for a WanderOS inbound is a portfolio of 10+
+ * units; anything smaller parks in the portal's "< 10 Homes" hold status and a
+ * missing count needs research before an AE touches it. Listed inbounds keep
+ * their own status. Same rule for the contact and the company, in each
+ * object's own status vocabulary.
+ */
+export function inboundLeadStatus(
+  object: "contact" | "company",
+  input: { isListedSource: boolean; numberOfProperties: string },
+): string {
+  if (input.isListedSource) return "Listed Inbound";
+  const units = Number(input.numberOfProperties);
+  if (!Number.isFinite(units) || units <= 0)
+    return "New Lead - Research Needed";
+  if (units < 10) return "On Hold - Sites - Less than 6 Homes";
+  return object === "contact" ? "MARKETING QUALIFIED LEAD" : "MQL";
+}
+
 async function upsertOsInboundLead(data: {
   existing: {
     contact: Awaited<ReturnType<typeof findContactByEmail>>;
@@ -255,9 +274,10 @@ async function upsertOsInboundLead(data: {
       const created = await createContact({
         email,
         ...contactProps,
-        hs_lead_status: isListedSource
-          ? "Listed Inbound"
-          : "MARKETING QUALIFIED LEAD",
+        hs_lead_status: inboundLeadStatus("contact", {
+          isListedSource,
+          numberOfProperties,
+        }),
       });
       contactId = created.id;
     }
@@ -295,7 +315,10 @@ async function upsertOsInboundLead(data: {
           domain,
           ...companyProps,
           name: domain,
-          hs_lead_status: isListedSource ? "Listed Inbound" : "MQL",
+          hs_lead_status: inboundLeadStatus("company", {
+            isListedSource,
+            numberOfProperties,
+          }),
           type: "Wander Sites",
         });
         companyId = created.id;
