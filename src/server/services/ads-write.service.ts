@@ -2,6 +2,8 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 
+import { META_AD_UTM, withAdUtms } from "@/lib/ad-utm";
+
 import { and, desc, eq, isNotNull, isNull } from "drizzle-orm";
 
 import {
@@ -569,6 +571,38 @@ export function assertMetaAdPayload(
   }
 }
 
+/**
+ * Tag every Meta destination link with campaign utm before it ships. Applied to
+ * the resolved ad-level link, each carousel card, and each multi-creative link,
+ * so a click carries campaign identity into Amplitude and the Meta pixel/custom
+ * conversion regardless of which shape the ad uses. Per-item content keys off
+ * the item (creative/card) so a carousel is attributable card by card; falls
+ * back to the ad name. Preserves any utm an operator already set. A card/creative
+ * with no own link keeps `undefined` and inherits the tagged ad-level link.
+ */
+export function tagMetaAdUtms(
+  payload: CreateZernioStandaloneAdInput,
+): CreateZernioStandaloneAdInput {
+  const campaign = payload.campaignName ?? payload.name;
+  const content = payload.adName ?? payload.name;
+  const base = { ...META_AD_UTM, campaign };
+  return {
+    ...payload,
+    linkUrl: withAdUtms(payload.linkUrl, { ...base, content }),
+    carouselCards: payload.carouselCards?.map((card) => ({
+      ...card,
+      linkUrl: withAdUtms(card.linkUrl, {
+        ...base,
+        content: card.headline ?? content,
+      }),
+    })),
+    creatives: payload.creatives?.map((cr) => ({
+      ...cr,
+      linkUrl: withAdUtms(cr.linkUrl, { ...base, content: cr.name ?? content }),
+    })),
+  };
+}
+
 /** The only way this service creates a Meta ad. Validates, then sends. */
 async function createMetaAd(
   payload: CreateZernioStandaloneAdInput,
@@ -577,8 +611,9 @@ async function createMetaAd(
     adAccount: { currency?: string; minimumDailyBudget?: number };
   },
 ) {
-  assertMetaAdPayload(payload, options.adAccount);
-  return createZernioStandaloneAd(payload, {
+  const tagged = tagMetaAdUtms(payload);
+  assertMetaAdPayload(tagged, options.adAccount);
+  return createZernioStandaloneAd(tagged, {
     idempotencyKey: options.idempotencyKey,
   });
 }
