@@ -10,71 +10,19 @@
  * rotation on `bdr_for_rr`) is a later step once `demand__bdr` has volume.
  */
 
+import { BDR_ROSTER, type BdrRosterEntry } from "@/server/services/bdr-roster";
+
 // =====================================================
 // ROSTER
 // =====================================================
 
-export interface DemandBdr {
-  name: string;
-  email: string;
-  /**
-   * HubSpot owner id written to `demand__bdr`. Null when the person has no
-   * HubSpot owner record yet — they can still be named on
-   * `demand_bdr_email`, but cannot be picked by rotation.
-   */
-  hubspotOwnerId: string | null;
-  /** Outreach user id, kept while both CRMs run side by side. */
-  outreachUserId: string | null;
-  active: boolean;
-  assignNewLeads: boolean;
-}
-
 /**
- * Snapshot of the Outreach BDR pool (`outreach/bdr-assignment.service.ts`,
- * 2026-08-05) joined to HubSpot owners. All four were (re)invited to HubSpot
- * on 2026-09-14 and read active in the `demand__bdr` picker that day.
- *
- * Keep in sync when someone joins or leaves the pool —
- * `GET /api/lab/cio-to-hubspot?roster=1` reports each entry's live owner
- * status. Everyone needs a HubSpot owner id to be assignable by rotation.
+ * The roster lives in one place (`bdr-roster.ts`) so a join or departure is a
+ * single edit shared with the Outreach sink. `DemandBdr` / `DEMAND_BDR_ROSTER`
+ * are the names this sink and the lab routes read it under.
  */
-export const DEMAND_BDR_ROSTER: DemandBdr[] = [
-  {
-    name: "Serrelle Baker",
-    email: "serrelle.baker@wander.com",
-    hubspotOwnerId: "612529696",
-    outreachUserId: "3",
-    active: true,
-    assignNewLeads: true,
-  },
-  {
-    // Offboarded 2026-09-21 — kept in the roster so leads she still owns resolve
-    // by id/email while they're reassigned; assignNewLeads:false drops her from
-    // rotation. Remove once reassignment is done and her Outreach user is locked.
-    name: "Stacy Darko",
-    email: "stacy@wander.com",
-    hubspotOwnerId: "81150805",
-    outreachUserId: "32",
-    active: true,
-    assignNewLeads: false,
-  },
-  {
-    name: "Cate Hutcherson",
-    email: "catherine@wander.com",
-    hubspotOwnerId: "82516258",
-    outreachUserId: "33",
-    active: true,
-    assignNewLeads: true,
-  },
-  {
-    name: "James Crawford",
-    email: "james.crawford@wander.com",
-    hubspotOwnerId: "82516259",
-    outreachUserId: "37",
-    active: true,
-    assignNewLeads: true,
-  },
-];
+export type DemandBdr = BdrRosterEntry;
+export const DEMAND_BDR_ROSTER = BDR_ROSTER;
 
 export function findDemandBdrByOwnerId(
   hubspotOwnerId: string | null | undefined,

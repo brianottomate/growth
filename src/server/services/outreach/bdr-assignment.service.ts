@@ -10,22 +10,29 @@
  * Ported from wander-growth-api/app/services/bdr/
  */
 import { formatDistanceStrict } from "date-fns";
+import { BDR_ROSTER } from "@/server/services/bdr-roster";
 import {
   getOwnerProspectLoad,
   getUsers,
 } from "@/server/clients/outreach.client";
 
+export { BDR_ROSTER };
+
 // =====================================================
 // BDR CONFIGURATION
 // =====================================================
 
+/**
+ * The Outreach sink's view of a roster entry. The shared roster
+ * (`bdr-roster.ts`) is the source of truth and carries a superset of these
+ * fields; this narrower shape is also what the live-load path builds per lead.
+ */
 export interface BdrConfig {
   name: string;
   email: string;
   outreachUserId: string;
   active: boolean;
   assignNewLeads: boolean;
-  slackChannelId?: string;
 }
 
 interface DynamicBdrCandidate {
@@ -74,53 +81,11 @@ const DEFAULT_DYNAMIC_BDR_OPTIONS: Required<DynamicBdrSelectionOptions> = {
   pageSize: 100,
 };
 
-/**
- * BDR Roster — the unlocked Outreach users whose title matches the demand BDR
- * pool, snapshotted from the Outreach users API on 2026-08-05.
- *
- * This is the same set `getNextBdrFromOutreachLoad` derives at runtime
- * (unlocked, title contains "bdr", title does not contain "manager"), so the
- * static and dynamic paths agree. Everyone else with a BDR title in Outreach is
- * locked, i.e. offboarded.
- *
- * Keep in sync when someone joins or leaves the pool — `GET /api/outreach/users`
- * dumps the live list. Each BDR needs a valid Outreach user ID for ownership.
- *
- * TODO: Fetch from Sanity CMS or DB in the future.
- */
-export const BDR_ROSTER: BdrConfig[] = [
-  {
-    name: "Serrelle Baker",
-    email: "serrelle.baker@wander.com",
-    outreachUserId: "3",
-    active: true,
-    assignNewLeads: true,
-  },
-  {
-    // Offboarded 2026-09-21 — assignNewLeads:false removes her from static
-    // rotation. The live-load path (getNextBdrFromOutreachLoad) reads Outreach
-    // directly, so it only stops picking her once her Outreach user is locked.
-    name: "Stacy Darko",
-    email: "stacy@wander.com",
-    outreachUserId: "32",
-    active: true,
-    assignNewLeads: false,
-  },
-  {
-    name: "Cate Hutcherson",
-    email: "catherine@wander.com",
-    outreachUserId: "33",
-    active: true,
-    assignNewLeads: true,
-  },
-  {
-    name: "James Crawford",
-    email: "james.crawford@wander.com",
-    outreachUserId: "37",
-    active: true,
-    assignNewLeads: true,
-  },
-];
+// The static roster is the shared source of truth (`bdr-roster.ts`) and is the
+// same set `getNextBdrFromOutreachLoad` derives at runtime (unlocked Outreach
+// users whose title contains "bdr" and not "manager"), so the static and
+// dynamic paths agree. Everyone else with a BDR title in Outreach is locked,
+// i.e. offboarded; `GET /api/outreach/users` dumps the live list.
 
 // =====================================================
 // ROUND-ROBIN STATE
@@ -448,40 +413,6 @@ export async function getNextBdrFromOutreachLoadDetailed(
     selectedLoad,
     topCandidates,
   };
-}
-
-/**
- * Validate that an existing BDR assignment is still active.
- *
- * @returns The BDR config if valid, null if not found or inactive.
- */
-export function validateExistingAssignment(
-  assignedBdrEmail: string,
-): BdrConfig | null {
-  const bdr = BDR_ROSTER.find(
-    (b) => b.email.toLowerCase() === assignedBdrEmail.toLowerCase(),
-  );
-
-  if (!bdr) {
-    console.log(
-      `⚠️ [BDR] Assignment to ${assignedBdrEmail} not found in roster`,
-    );
-    return null;
-  }
-
-  if (!bdr.active) {
-    console.log(`⚠️ [BDR] Assignment to ${bdr.name} invalid — BDR is inactive`);
-    return null;
-  }
-
-  return bdr;
-}
-
-/**
- * Look up a BDR by their Outreach user ID.
- */
-export function getBdrByOutreachId(outreachUserId: string): BdrConfig | null {
-  return BDR_ROSTER.find((b) => b.outreachUserId === outreachUserId) ?? null;
 }
 
 /**
