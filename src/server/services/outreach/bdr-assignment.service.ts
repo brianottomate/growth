@@ -97,11 +97,14 @@ export const BDR_ROSTER: BdrConfig[] = [
     assignNewLeads: true,
   },
   {
+    // Offboarded 2026-09-21 — assignNewLeads:false removes her from static
+    // rotation. The live-load path (getNextBdrFromOutreachLoad) reads Outreach
+    // directly, so it only stops picking her once her Outreach user is locked.
     name: "Stacy Darko",
     email: "stacy@wander.com",
     outreachUserId: "32",
     active: true,
-    assignNewLeads: true,
+    assignNewLeads: false,
   },
   {
     name: "Cate Hutcherson",

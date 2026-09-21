@@ -48,12 +48,15 @@ export const DEMAND_BDR_ROSTER: DemandBdr[] = [
     assignNewLeads: true,
   },
   {
+    // Offboarded 2026-09-21 — kept in the roster so leads she still owns resolve
+    // by id/email while they're reassigned; assignNewLeads:false drops her from
+    // rotation. Remove once reassignment is done and her Outreach user is locked.
     name: "Stacy Darko",
     email: "stacy@wander.com",
     hubspotOwnerId: "81150805",
     outreachUserId: "32",
     active: true,
-    assignNewLeads: true,
+    assignNewLeads: false,
   },
   {
     name: "Cate Hutcherson",
