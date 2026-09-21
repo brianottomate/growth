@@ -1,3 +1,10 @@
+import { after } from "next/server";
+import { starterGenerationSchema } from "@/lib/starter-ad-generation";
+import {
+  startStarterGeneration,
+  runStarterGeneration,
+  starterGenerationStatus,
+} from "@/server/services/starter-ad-generation.service";
 import {
   importMetaCampaign,
   importMetaCampaignSchema,
@@ -254,6 +261,22 @@ export const adsRouter = {
     .input(z.object({ campaignId: z.string().min(1) }))
     .query(async ({ ctx, input }) =>
       starterIdeaHomes({
+        ...input,
+        organizationId: await organizationIdFor(ctx),
+      }),
+    ),
+  generateStarterIdeas: protectedProcedure
+    .input(starterGenerationSchema)
+    .mutation(async ({ ctx, input }) => {
+      const args = { ...input, organizationId: await organizationIdFor(ctx) };
+      const run = await startStarterGeneration(args);
+      after(() => runStarterGeneration(run.runId, args));
+      return run;
+    }),
+  starterGenerationStatus: protectedProcedure
+    .input(z.object({ campaignId: z.string().min(1) }))
+    .query(async ({ ctx, input }) =>
+      starterGenerationStatus({
         ...input,
         organizationId: await organizationIdFor(ctx),
       }),

@@ -327,19 +327,90 @@ export function AdIdeaCard({
       aria-label={ad.name}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <h3 className="font-medium">{savedState.name}</h3>
-          <span className="text-xs text-muted-foreground">
-            {isStatic ? "Static" : "Carousel"} ·{" "}
-            {savedState.document.cards.length} {isStatic ? "image" : "slides"}
-          </span>
-          {save.isPending && (
-            <span className="text-xs text-muted-foreground">Saving…</span>
-          )}
-          <span className="text-xs text-muted-foreground">
-            {approved ? "Approved · frozen creative" : "Draft idea"}
-            {deliveryState ? ` · ${deliveryState}` : ""}
-          </span>
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <h3 className="font-medium break-words">{savedState.name}</h3>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+            <span>
+              {isStatic ? "Static" : "Carousel"} ·{" "}
+              {savedState.document.cards.length} {isStatic ? "image" : "slides"}
+            </span>
+            <span aria-hidden="true">·</span>
+            <span>
+              {approved
+                ? "Approved · frozen creative"
+                : ad.content.metaImport
+                  ? "Needs local review"
+                  : "Draft idea"}
+              {deliveryState ? ` · ${deliveryState}` : ""}
+            </span>
+            {save.isPending && <span>· Saving…</span>}
+            {ad.content.metaImport && <span aria-hidden="true">·</span>}
+            {ad.content.metaImport && (
+              <Dialog>
+                <span className="inline-flex items-center gap-2">
+                  <span>Imported from Meta</span>
+                  <DialogTrigger asChild>
+                    <button
+                      type="button"
+                      className="underline underline-offset-4 hover:text-foreground focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-ring"
+                    >
+                      {ad.content.metaImport.issues.length
+                        ? "Review import"
+                        : "Source details"}
+                    </button>
+                  </DialogTrigger>
+                </span>
+                <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Imported creative</DialogTitle>
+                    <DialogDescription>
+                      Review the recovered artwork and copy before reusing this
+                      ad. Source data is kept for reference.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-2 pt-3">
+                    <p>
+                      Meta ad {ad.content.metaImport.adId}. Original composition
+                      layers are not available.
+                    </p>
+                    <details>
+                      <summary className="cursor-pointer">
+                        Original Meta creative data
+                      </summary>
+                      <pre className="mt-2 max-h-72 overflow-auto text-xs break-all whitespace-pre-wrap">
+                        {JSON.stringify(
+                          ad.content.metaImport.rawCreative,
+                          null,
+                          2,
+                        )}
+                      </pre>
+                    </details>
+                    {ad.content.metaImport.issues.map((issue) => (
+                      <p key={issue}>{issue}</p>
+                    ))}
+                    {ad.content.metaImport.issues.length > 0 && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy || approved}
+                        onClick={() =>
+                          save.mutate({
+                            adId: ad.id,
+                            expectedUpdatedAt: savedState.version,
+                            name: savedState.name,
+                            document: savedState.document,
+                            reviewImportedCreative: true,
+                          })
+                        }
+                      >
+                        Mark artwork and copy reviewed
+                      </Button>
+                    )}
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
         </div>
         <div className="ml-auto flex items-center gap-2">
           <Button
@@ -376,64 +447,6 @@ export function AdIdeaCard({
           </Button>
         </div>
       </div>
-      {ad.content.metaImport && (
-        <Dialog>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <span>Imported from Meta</span>
-            <DialogTrigger asChild>
-              <Button size="sm" variant="ghost">
-                {ad.content.metaImport.issues.length
-                  ? "Review import"
-                  : "Source details"}
-              </Button>
-            </DialogTrigger>
-          </div>
-          <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Imported creative</DialogTitle>
-              <DialogDescription>
-                Review the recovered artwork and copy before reusing this ad.
-                Source data is kept for reference.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-2 pt-3">
-              <p>
-                Meta ad {ad.content.metaImport.adId}. Original composition
-                layers are not available.
-              </p>
-              <details>
-                <summary className="cursor-pointer">
-                  Original Meta creative data
-                </summary>
-                <pre className="mt-2 max-h-72 overflow-auto text-xs break-all whitespace-pre-wrap">
-                  {JSON.stringify(ad.content.metaImport.rawCreative, null, 2)}
-                </pre>
-              </details>
-              {ad.content.metaImport.issues.map((issue) => (
-                <p key={issue}>{issue}</p>
-              ))}
-              {ad.content.metaImport.issues.length > 0 && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={busy || approved}
-                  onClick={() =>
-                    save.mutate({
-                      adId: ad.id,
-                      expectedUpdatedAt: savedState.version,
-                      name: savedState.name,
-                      document: savedState.document,
-                      reviewImportedCreative: true,
-                    })
-                  }
-                >
-                  Mark artwork and copy reviewed
-                </Button>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
       <Dialog
         open={approvalOpen}
         onOpenChange={(open) => {

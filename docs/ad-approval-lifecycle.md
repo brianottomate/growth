@@ -101,3 +101,18 @@ the existing working copy. Imported assets are supplied artwork, not reconstruct
 composition layers. Dynamic copy, catalog/video sources, unresolved originals and
 unsupported delivery settings remain explicit review gaps. Import does not push,
 launch, or modify the source campaign.
+
+### Generative starter ideas
+
+The featured-home starter dialog defaults to AI copy, photo selection and editable
+compositions. Each generation creates a fresh set: a static and carousel per home,
+plus one shared hero carousel. A home's two formats share copy. Feed layouts are
+always included; Stories layouts can be included with their own composition recipes.
+These are intended creative placements, not a change to Meta delivery settings.
+
+The server builds numbered photo contact sheets from the homes' galleries and uses
+listing facts and brand voice in structured generation. It does not cache photo
+analysis. Drafts are saved as each home finishes and remain unapproved. Next `after()`
+runs the job after the start response; a `creative_run` record stores progress and
+errors, and the campaign polls every two seconds while it is active. Completed drafts
+remain available if generation fails. There is no automatic retry or reconciliation.

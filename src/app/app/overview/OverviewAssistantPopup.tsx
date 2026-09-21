@@ -66,6 +66,11 @@ export function OverviewAssistantPopup({
   );
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const creatingInitialThread = useRef(false);
+  const creatingCampaignThread = useRef(false);
+  const [threadIntent, setThreadIntent] = useState<{
+    threadId: string;
+    intent: AssistantIntent;
+  } | null>(null);
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const desktop = useMediaQuery("(min-width: 1280px)");
@@ -140,6 +145,26 @@ export function OverviewAssistantPopup({
       // global (its own Postgres schema, no organizationId), so a prospect
       // handed to the assistant carries no brand to select.
       setIntentBrandId("brandId" in intent ? (intent.brandId ?? null) : null);
+      if (intent.type === "work_ad_campaign" && intent.newThread) {
+        if (creatingCampaignThread.current) return;
+        creatingCampaignThread.current = true;
+        createThread.mutate(
+          { brandId: intent.brandId },
+          {
+            onSuccess: (thread) => {
+              setThreadIntent({ threadId: thread.id, intent });
+              setWorkContext(null);
+            },
+            onError: () =>
+              toast.error(
+                "Could not start a new campaign chat. Please try again.",
+              ),
+            onSettled: () => {
+              creatingCampaignThread.current = false;
+            },
+          },
+        );
+      }
       if (intent.type === "work_ad_campaign") {
         setCampaignContext({
           type: intent.type,
@@ -167,7 +192,7 @@ export function OverviewAssistantPopup({
     window.addEventListener(ASSISTANT_INTENT_EVENT, receiveIntent);
     return () =>
       window.removeEventListener(ASSISTANT_INTENT_EVENT, receiveIntent);
-  }, []);
+  }, [createThread.mutate]);
 
   const setVisible = (next: boolean) => {
     setOpen(next);
@@ -314,6 +339,12 @@ export function OverviewAssistantPopup({
               key={activeThreadId}
               threadId={activeThreadId}
               initialMessages={threadQuery.data.messages}
+              initialAssistantIntent={
+                threadIntent?.threadId === activeThreadId
+                  ? threadIntent.intent
+                  : undefined
+              }
+              onInitialIntentConsumed={() => setThreadIntent(null)}
               onThreadFinish={() => {
                 void queryClient.invalidateQueries(
                   trpc.creativeWork.getThread.queryFilter({

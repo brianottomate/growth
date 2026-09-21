@@ -2,6 +2,10 @@
 
 import { useCallback, useDeferredValue, useRef, useState } from "react";
 import Image from "next/image";
+import {
+  groupMediaExports,
+  mediaExportProvenance,
+} from "@/lib/media-export-bundles";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Accept } from "react-dropzone";
 import {
@@ -32,6 +36,7 @@ import {
   DialogContent,
   DialogFooter,
   DialogHeader,
+  DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Dropzone } from "@/components/ui/dropzone";
@@ -412,6 +417,27 @@ export function MediaLibrary({
     [uploadFile],
   );
 
+  const renderAsset = (asset: LibraryAsset) => (
+    <MediaCard
+      key={asset.id}
+      asset={asset}
+      onDelete={() => deleteMedia.mutate({ id: asset.id })}
+      onEdit={
+        asset.provider === "external" ? () => setEditingAsset(asset) : undefined
+      }
+      onOrganize={() => setOrganizingAsset(asset)}
+      onPreview={() => setPreviewAsset(asset)}
+      onAnalyze={
+        asset.kind === "image" || asset.kind === "video"
+          ? () => analyzeMedia.mutate({ id: asset.id })
+          : undefined
+      }
+      analyzing={
+        analyzeMedia.isPending && analyzeMedia.variables?.id === asset.id
+      }
+      launchHref={assetLaunchHref(asset, brandId)}
+    />
+  );
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -612,30 +638,18 @@ export function MediaLibrary({
         </p>
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-          {(assets ?? []).map((asset) => (
-            <MediaCard
-              key={asset.id}
-              asset={asset}
-              onDelete={() => deleteMedia.mutate({ id: asset.id })}
-              onEdit={
-                asset.provider === "external"
-                  ? () => setEditingAsset(asset)
-                  : undefined
-              }
-              onOrganize={() => setOrganizingAsset(asset)}
-              onPreview={() => setPreviewAsset(asset)}
-              onAnalyze={
-                asset.kind === "image" || asset.kind === "video"
-                  ? () => analyzeMedia.mutate({ id: asset.id })
-                  : undefined
-              }
-              analyzing={
-                analyzeMedia.isPending &&
-                analyzeMedia.variables?.id === asset.id
-              }
-              launchHref={assetLaunchHref(asset, brandId)}
-            />
-          ))}
+          {groupMediaExports(assets ?? []).map((entry) =>
+            entry.approval ? (
+              <ExportBundle
+                key={entry.key}
+                assets={entry.assets}
+                approval={entry.approval}
+                renderAsset={renderAsset}
+              />
+            ) : (
+              renderAsset(entry.assets[0]!)
+            ),
+          )}
         </div>
       )}
 
@@ -918,5 +932,90 @@ function MediaCard({
         )}
       </div>
     </div>
+  );
+}
+
+function ExportBundle({
+  assets,
+  approval,
+  renderAsset,
+}: {
+  assets: LibraryAsset[];
+  approval: NonNullable<ReturnType<typeof mediaExportProvenance>>;
+  renderAsset: (asset: LibraryAsset) => React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const shapes = [
+    ...new Set(
+      assets.map((asset) => mediaExportProvenance(asset.metadata)!.shape),
+    ),
+  ];
+  const cover =
+    assets.find(
+      (asset) => mediaExportProvenance(asset.metadata)?.shape === "portrait",
+    ) ?? assets[0]!;
+  const title = approval.adName ?? cover.title?.split(" · ")[0] ?? "Ad exports";
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="overflow-hidden rounded-lg border bg-muted/30 text-left"
+      >
+        <div className="relative aspect-square bg-muted">
+          {cover.url && (
+            <Image
+              src={cover.url}
+              alt={title}
+              fill
+              sizes="240px"
+              className="object-cover"
+            />
+          )}
+          <span className="absolute bottom-2 left-2 rounded bg-background px-2 py-1 text-xs">
+            {assets.length} exports · {shapes.length}{" "}
+            {shapes.length === 1 ? "size" : "sizes"}
+          </span>
+        </div>
+        <div className="space-y-1 p-3">
+          <p className="truncate text-sm font-medium">{title}</p>
+          <p className="truncate text-xs text-muted-foreground">
+            {approval.campaignName ?? "Ad approval"}
+          </p>
+          <p className="text-xs text-muted-foreground">Open slides & sizes</p>
+        </div>
+      </button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>{title} · exports</DialogTitle>
+            <DialogDescription>
+              {approval.campaignName ?? "Ad approval"} · {assets.length}{" "}
+              matching images
+            </DialogDescription>
+          </DialogHeader>
+          {shapes.map((shape) => (
+            <section key={shape} className="space-y-3">
+              <h3 className="text-sm font-medium capitalize">{shape}</h3>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                {assets
+                  .filter(
+                    (asset) =>
+                      mediaExportProvenance(asset.metadata)?.shape === shape,
+                  )
+                  .sort((a, b) =>
+                    (a.title ?? a.filename ?? a.id).localeCompare(
+                      b.title ?? b.filename ?? b.id,
+                      undefined,
+                      { numeric: true },
+                    ),
+                  )
+                  .map(renderAsset)}
+              </div>
+            </section>
+          ))}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

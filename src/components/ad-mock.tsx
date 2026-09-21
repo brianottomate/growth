@@ -303,6 +303,24 @@ function VerticalAdPreview({
             </div>
           </div>
         )}
+        {!isReel && media.length > 1 && (
+          <div className="absolute inset-x-0 top-[14%] bottom-[20%] z-20 flex">
+            <button
+              type="button"
+              aria-label="Previous story frame"
+              disabled={index === 0}
+              onClick={() => go(index - 1)}
+              className="w-1/3 cursor-pointer focus-visible:bg-white/10 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-white disabled:cursor-default"
+            />
+            <button
+              type="button"
+              aria-label="Next story frame"
+              disabled={index === media.length - 1}
+              onClick={() => go(index + 1)}
+              className="flex-1 cursor-pointer focus-visible:bg-white/10 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-white disabled:cursor-default"
+            />
+          </div>
+        )}
         {diagnostics && (
           <div className="pointer-events-none absolute inset-x-[6%] top-[14%] bottom-[25%] border border-dashed border-white">
             <span className="bg-black/80 p-1 text-[10px]">

@@ -64,7 +64,14 @@ export const getPerformanceAccountAction = growthAction({
 export const clientCampaignContextAction = growthAction({
   description:
     "What a Performance client agreed to and what we would advertise for them: the monthly media budget, whether they asked for every home, the property URLs on the record, and where those homes are (countries, state codes, resolvable region names, cities). Read this before proposing campaigns or audiences for a client brand — the geography is a fact about their portfolio, not a recommendation about who to target.",
-  inputSchema: z.object({ brandId: z.string().min(1) }),
+  inputSchema: z.object({
+    brandId: z
+      .string()
+      .startsWith("brand_")
+      .describe(
+        "The brand_ ID returned by openCampaign or a brand lookup, not a URL slug or domain.",
+      ),
+  }),
   outputSchema: z.object({
     accountId: z.string().nullable(),
     mediaBudgetDollars: z.number().nullable(),

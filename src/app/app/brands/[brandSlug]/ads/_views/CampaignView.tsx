@@ -265,7 +265,6 @@ export async function CampaignView({
             homes={homes}
             campaignId={campaign.id}
           />
-          {ask("ads", `Review the ads for “${campaign.name}”`)}
         </div>
         <AdIdeasList
           ads={ads}

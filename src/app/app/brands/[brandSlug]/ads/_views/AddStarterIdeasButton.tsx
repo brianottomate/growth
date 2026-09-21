@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
@@ -21,6 +21,8 @@ export function AddStarterIdeasButton({ campaignId }: { campaignId: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [source, setSource] = useState<"blank" | "featured">("featured");
+  const [generate, setGenerate] = useState(true);
+  const [stories, setStories] = useState(true);
   const [refreshing, startTransition] = useTransition();
   const homes = useQuery({
     ...trpc.ads.starterIdeaHomes.queryOptions({ campaignId }),
@@ -41,6 +43,34 @@ export function AddStarterIdeasButton({ campaignId }: { campaignId: string }) {
       onError: (error) => toast.error(error.message),
     }),
   );
+  const progress = useQuery({
+    ...trpc.ads.starterGenerationStatus.queryOptions({ campaignId }),
+    refetchInterval: (query) =>
+      ["queued", "processing"].includes(query.state.data?.status ?? "")
+        ? 2000
+        : false,
+  });
+  const lastProgress = useRef("");
+  useEffect(() => {
+    if (!progress.data) return;
+    const key = `${progress.data.id}:${progress.data.created}:${progress.data.status}`;
+    if (key === lastProgress.current) return;
+    lastProgress.current = key;
+    startTransition(() => router.refresh());
+  }, [progress.data, router]);
+  const generating = ["queued", "processing"].includes(
+    progress.data?.status ?? "",
+  );
+  const generation = useMutation(
+    trpc.ads.generateStarterIdeas.mutationOptions({
+      onSuccess: () => {
+        setOpen(false);
+        void progress.refetch();
+      },
+      onError: (error) => toast.error(error.message),
+    }),
+  );
+  const pending = add.isPending || generation.isPending;
   const unavailable =
     source === "featured" &&
     (homes.isPending ||
@@ -53,16 +83,38 @@ export function AddStarterIdeasButton({ campaignId }: { campaignId: string }) {
       <Button
         size="sm"
         variant="outline"
-        disabled={add.isPending || refreshing}
+        disabled={pending || refreshing || generating}
         onClick={() => setOpen(true)}
       >
         <Plus className="size-3" />
         Add starter ad ideas
       </Button>
+      {progress.data && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="basis-full rounded-lg border p-3 text-sm"
+        >
+          <p>
+            {progress.data.message} · {progress.data.created}/
+            {progress.data.total} ideas
+          </p>
+          {generating && (
+            <progress
+              className="mt-2 h-1 w-full"
+              value={progress.data.created}
+              max={progress.data.total}
+            />
+          )}
+          {progress.data.status === "error" && (
+            <p className="mt-1 text-muted-foreground">{progress.data.error}</p>
+          )}
+        </div>
+      )}
       <Dialog
         open={open}
         onOpenChange={(value) => {
-          if (!add.isPending) setOpen(value);
+          if (!pending) setOpen(value);
         }}
       >
         <DialogContent>
@@ -76,14 +128,14 @@ export function AddStarterIdeasButton({ campaignId }: { campaignId: string }) {
           <div className="flex gap-2">
             <Button
               variant={source === "featured" ? "secondary" : "outline"}
-              disabled={add.isPending}
+              disabled={pending}
               onClick={() => setSource("featured")}
             >
               From featured homes
             </Button>
             <Button
               variant={source === "blank" ? "secondary" : "outline"}
-              disabled={add.isPending}
+              disabled={pending}
               onClick={() => setSource("blank")}
             >
               Start blank
@@ -98,10 +150,34 @@ export function AddStarterIdeasButton({ campaignId }: { campaignId: string }) {
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground">
                 Uses the featured WanderOS homes selected on the Homes page.
-                Each static starts with its hero image; each home carousel
-                starts with up to six photos. Browse the full home gallery later
-                to add more.
+                Generate copy and layouts from real photos and listing details,
+                ready to refine in the ad studio.
               </p>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={generate}
+                  onChange={(e) => setGenerate(e.target.checked)}
+                />
+                Write copy, choose photos and compose with AI
+              </label>
+              {generate && (
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={stories}
+                    onChange={(e) => setStories(e.target.checked)}
+                  />
+                  Include Stories layouts alongside Facebook and Instagram Feed
+                </label>
+              )}
+              {generate && (
+                <p className="text-xs text-muted-foreground">
+                  Runs in the background and creates a fresh set of unapproved
+                  drafts. Copy is shared within each home’s ads; layouts stay
+                  editable.
+                </p>
+              )}
               {homes.isPending ? (
                 <p className="text-sm">Loading featured homes…</p>
               ) : homes.isError ? (
@@ -142,25 +218,41 @@ export function AddStarterIdeasButton({ campaignId }: { campaignId: string }) {
           <DialogFooter>
             <Button
               variant="outline"
-              disabled={add.isPending}
+              disabled={pending}
               onClick={() => setOpen(false)}
             >
               Cancel
             </Button>
             <Button
-              disabled={add.isPending || unavailable}
-              loading={add.isPending}
-              onClick={() =>
+              disabled={pending || unavailable}
+              loading={pending}
+              onClick={() => {
+                if (source === "featured" && generate) {
+                  generation.mutate({
+                    campaignId,
+                    homeIds: available.map((h) => h.id),
+                    intendedPlacements: [
+                      "facebook-feed",
+                      "instagram-feed",
+                      ...(stories
+                        ? (["facebook-story", "instagram-story"] as const)
+                        : []),
+                    ],
+                  });
+                  return;
+                }
                 add.mutate({
                   campaignId,
                   source,
                   ...(source === "featured"
                     ? { homeIds: available.map((h) => h.id) }
                     : {}),
-                })
-              }
+                });
+              }}
             >
-              Create ideas
+              {source === "featured" && generate
+                ? "Generate ideas"
+                : "Create ideas"}
             </Button>
           </DialogFooter>
         </DialogContent>

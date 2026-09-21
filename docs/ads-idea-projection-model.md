@@ -1,3 +1,5 @@
+> Historical design note. The campaign page now uses the consolidated workspace and approval lifecycle described in [ad-approval-lifecycle.md](ad-approval-lifecycle.md). The standalone Projected step has been removed.
+
 # Ads: idea → projection → mirror
 
 The model the ads builder is moving toward, and what has landed so far.

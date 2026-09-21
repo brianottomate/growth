@@ -193,6 +193,8 @@ type PendingAttachment = {
 export function OverviewChat({
   threadId,
   initialMessages,
+  initialAssistantIntent,
+  onInitialIntentConsumed,
   onThreadFinish,
   userName,
   active = true,
@@ -206,6 +208,8 @@ export function OverviewChat({
 }: {
   threadId: string;
   initialMessages: UIMessage[];
+  initialAssistantIntent?: AssistantIntent;
+  onInitialIntentConsumed?: () => void;
   onThreadFinish?: () => void;
   userName: string;
   /** Lets the popup focus its composer only when it is actually opened. */
@@ -343,12 +347,23 @@ export function OverviewChat({
 
   useEffect(() => {
     const receiveIntent = (event: Event) => {
-      submitAssistantIntent((event as CustomEvent<AssistantIntent>).detail);
+      const incoming = (event as CustomEvent<AssistantIntent>).detail;
+      // The dock creates and mounts the new session before delivering this intent.
+      if (incoming.type === "work_ad_campaign" && incoming.newThread) return;
+      submitAssistantIntent(incoming);
     };
     window.addEventListener(ASSISTANT_INTENT_EVENT, receiveIntent);
     return () =>
       window.removeEventListener(ASSISTANT_INTENT_EVENT, receiveIntent);
   }, [submitAssistantIntent]);
+
+  const initialIntentSent = useRef(false);
+  useEffect(() => {
+    if (!initialAssistantIntent || initialIntentSent.current) return;
+    initialIntentSent.current = true;
+    onInitialIntentConsumed?.();
+    submitAssistantIntent(initialAssistantIntent);
+  }, [initialAssistantIntent, onInitialIntentConsumed, submitAssistantIntent]);
 
   // Portable capability results can either navigate or report a durable save.
   // After a save, reconcile both server components and active React Query

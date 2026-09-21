@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { isImportedMetaCatalog } from "@/lib/meta-import";
 import { useLocalStorage } from "@/components/ui/hooks/use-local-storage";
 import { ChevronDown, ChevronRight } from "lucide-react";
@@ -413,8 +414,14 @@ export function MetaPlatformCard({
               </Dialog>
             )}
             <p className="text-xs text-muted-foreground">
-              Each creative is shown once, shared across {sets.length} ad{" "}
-              {sets.length === 1 ? "set" : "sets"}.
+              {meta?.importSource
+                ? "Recovered from Meta · local working copy. "
+                : ""}
+              {meta?.importSource && !placementPlan.length
+                ? "Artwork below is recovered; select delivery placements in setup before shipping. "
+                : ""}
+              Each creative is shared across {sets.length} ad{" "}
+              {sets.length === 1 ? "set" : "sets"}. Expand to inspect delivery.
             </p>
             {creativeAds.map((ad, index) => {
               const open = projectionOpen?.[ad.id] ?? index === 0;
@@ -438,16 +445,17 @@ export function MetaPlatformCard({
                     ) : (
                       <ChevronRight className="size-4 shrink-0" />
                     )}
-                    <span className="min-w-0 flex-1 text-sm font-medium">
-                      {ad.name}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {ad.status === "approved" ? "Approved" : "Draft"} ·{" "}
-                      {"media" in ad.content
-                        ? metaPreviewPlacements(ad.content, placementPlan)
-                            .length
-                        : 0}{" "}
-                      placements
+                    <span className="min-w-0 flex-1 space-y-2">
+                      <span className="block text-sm font-medium">
+                        {ad.name
+                          .replace(/^[^_]+_(?:Carousel|Static)_/, "")
+                          .replaceAll("_", " ")}
+                      </span>
+                      <ProjectionSummary
+                        ad={ad}
+                        placements={placementPlan}
+                        expanded={open}
+                      />
                     </span>
                   </button>
                   <div id={panelId} hidden={!open} className="px-4 pb-4">
@@ -457,6 +465,7 @@ export function MetaPlatformCard({
                         brandName={brandName}
                         brandLogo={brandLogo}
                         placements={placementPlan}
+                        configuration={configuration}
                       />
                     )}
                   </div>
@@ -765,16 +774,201 @@ function MetaSettings({
   );
 }
 
+function ProjectionSummary({
+  ad,
+  placements,
+  expanded,
+}: {
+  ad: Ad;
+  placements: MetaPlacement[];
+  expanded: boolean;
+}) {
+  if (!("media" in ad.content)) return null;
+  const content = ad.content;
+  const visible = metaPreviewPlacements(content, placements);
+  const views = META_PLACEMENTS.filter((view) => visible.includes(view.id));
+  const groups = new Map<
+    string,
+    {
+      media: ReturnType<typeof metaPreviewMedia>["media"];
+      labels: Set<string>;
+      vertical: boolean;
+    }
+  >();
+  const issues = new Set<string>();
+  for (const view of views) {
+    const resolved = metaPreviewMedia(content, view.id);
+    const vertical = view.kind !== "feed";
+    const label = vertical ? "Vertical" : "Feed";
+    if (resolved.issue) {
+      issues.add(`${label} artwork missing`);
+      continue;
+    }
+    if (vertical && resolved.media.length > 1)
+      issues.add("Vertical carousel · preview only");
+    const key = JSON.stringify(resolved.media.map((item) => item.url));
+    const existing = groups.get(key);
+    if (existing) existing.labels.add(label);
+    else
+      groups.set(key, {
+        media: resolved.media,
+        labels: new Set([label]),
+        vertical,
+      });
+  }
+  return (
+    <span className="block space-y-3">
+      <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <span>
+          {content.media.length > 1
+            ? `Carousel · ${content.media.length} slides`
+            : "Single image"}
+        </span>
+        {[...new Set(views.map((view) => view.publisher))].map((publisher) => (
+          <ChannelLogo
+            key={publisher}
+            platform={publisher}
+            className="size-3.5"
+          />
+        ))}
+        {issues.size > 0 && <span>· {[...issues].join(" · ")}</span>}
+      </span>
+      {!expanded && (
+        <span className="flex flex-wrap gap-x-5 gap-y-3">
+          {[...groups.entries()].map(([key, group]) => (
+            <span key={key} className="block max-w-full min-w-0 space-y-1.5">
+              {groups.size > 1 && (
+                <span className="block text-xs text-muted-foreground">
+                  {[...group.labels].join(" / ")}
+                </span>
+              )}
+              <span className="flex flex-wrap gap-2">
+                {group.media.map((item, index) => (
+                  <span
+                    key={`${index}:${item.url}`}
+                    className={`relative block h-[144px] shrink-0 overflow-hidden rounded-md bg-muted ${group.vertical ? "w-[81px]" : "w-[115px]"}`}
+                  >
+                    {item.type === "video" ? (
+                      <span className="flex size-full items-center justify-center text-xs">
+                        Video
+                      </span>
+                    ) : (
+                      <Image
+                        src={item.url}
+                        alt={`${[...group.labels].join(" / ")} · slide ${index + 1}`}
+                        fill
+                        unoptimized
+                        className="object-contain"
+                      />
+                    )}
+                  </span>
+                ))}
+              </span>
+            </span>
+          ))}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function MetaNativePreview({
+  adId,
+  configuration,
+}: {
+  adId: string;
+  configuration?: { connectionAccountId: string; adAccountId: string };
+}) {
+  const trpc = useTRPC();
+  const preview = useMutation(trpc.ads.previewAd.mutationOptions());
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={!configuration}
+          onClick={() => {
+            if (configuration && !preview.data && !preview.isPending)
+              preview.mutate({
+                adId,
+                connectionAccountId: configuration.connectionAccountId,
+                adAccountId: configuration.adAccountId,
+              });
+          }}
+        >
+          Meta preview
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Meta-rendered feed preview</DialogTitle>
+          <DialogDescription>
+            Meta renders this local copy using the selected account and Page.
+            This is not a snapshot of the live ad. Stories and Reels use the
+            local previews.
+          </DialogDescription>
+        </DialogHeader>
+        {preview.isPending && (
+          <p role="status" className="text-sm text-muted-foreground">
+            Loading Meta previews…
+          </p>
+        )}
+        {preview.error && (
+          <p role="alert" className="text-sm">
+            {preview.error.message}
+          </p>
+        )}
+        {preview.data && !preview.data.previewUrls.length && (
+          <p className="text-sm">Meta did not return an embeddable preview.</p>
+        )}
+        {preview.data?.previewUrls.map((src, index) => {
+          let safe = false;
+          try {
+            const url = new URL(src);
+            safe =
+              url.protocol === "https:" &&
+              (url.hostname === "facebook.com" ||
+                url.hostname.endsWith(".facebook.com"));
+          } catch {}
+          return safe ? (
+            <iframe
+              key={src}
+              src={src}
+              title={`Meta feed preview ${index + 1}`}
+              className="h-[640px] w-full rounded border bg-white"
+              sandbox="allow-scripts allow-same-origin allow-popups"
+              referrerPolicy="strict-origin-when-cross-origin"
+            />
+          ) : null;
+        })}
+        {preview.error && (
+          <Button
+            variant="outline"
+            onClick={() => {
+              if (configuration) preview.mutate({ adId, ...configuration });
+            }}
+          >
+            Try again
+          </Button>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function ProjectedAd({
   ad,
   brandName,
   brandLogo,
   placements,
+  configuration,
 }: {
   ad: Ad;
   brandName: string;
   brandLogo: string | null;
   placements: MetaPlacement[];
+  configuration?: { connectionAccountId: string; adAccountId: string };
 }) {
   const [selected, setSelected] = useState<MetaPlacement | "">("");
   const [compare, setCompare] = useState(true);
@@ -792,7 +986,17 @@ function ProjectedAd({
           review the imported ad.
         </p>
       )}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <MetaNativePreview
+          key={`${String(ad.updatedAt)}:${configuration?.connectionAccountId}:${configuration?.adAccountId}`}
+          adId={ad.id}
+          configuration={configuration}
+        />
+        {!configuration && (
+          <span className="text-xs text-muted-foreground">
+            Select an account in setup for Meta previews.
+          </span>
+        )}
         <label className="text-sm">
           Placements{" "}
           <select

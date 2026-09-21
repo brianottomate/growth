@@ -186,13 +186,14 @@ describe("ad plan", () => {
     },
   ];
 
-  it("draws a static, a carousel and a catalog card per home, plus the two set slices", () => {
+  it("draws a static, a carousel and a catalog card per home, plus the three set slices", () => {
     const plan = buildPerformanceAdPlan({
       customer: "Away & Stay",
       properties,
     });
-    // 4 homes × 3 per-home ads + the portfolio carousel + the catalog ad.
-    expect(plan).toHaveLength(14);
+    // 4 homes × 3 per-home ads + hero carousel, portfolio carousel and catalog ad.
+    expect(plan).toHaveLength(15);
+    expect(plan.filter((ad) => ad.kind === "hero_carousel")).toHaveLength(1);
     expect(plan.filter((ad) => ad.kind === "static")).toHaveLength(4);
     expect(plan.filter((ad) => ad.kind === "carousel")).toHaveLength(4);
     expect(plan.filter((ad) => ad.kind === "catalog_home")).toHaveLength(4);
@@ -214,7 +215,7 @@ describe("ad plan", () => {
     }));
     expect(
       buildPerformanceAdPlan({ customer: "X", properties: many }),
-    ).toHaveLength(62);
+    ).toHaveLength(63);
   });
 
   it("refuses an empty portfolio", () => {

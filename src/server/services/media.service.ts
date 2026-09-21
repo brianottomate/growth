@@ -138,7 +138,7 @@ const IMPORTABLE_IMAGE_TYPES: readonly string[] = [
   ...MEDIA_MIME.gif,
 ];
 
-async function fetchPublicImage(rawUrl: string): Promise<{
+export async function fetchPublicImage(rawUrl: string): Promise<{
   body: Buffer;
   contentType: string;
   finalUrl: string;

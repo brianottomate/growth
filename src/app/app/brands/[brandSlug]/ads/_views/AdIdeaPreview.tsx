@@ -1,5 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { ExternalLink } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
 import { CompactAdMock } from "@/components/ad-mock";
 import { META_PLACEMENTS, type MetaPlacement } from "@/lib/meta-placement-plan";
@@ -42,6 +44,32 @@ export function AdIdeaPreview({
     });
   const media = mediaFor(shape);
   const copy = studio.document.copyOverrides[shape] ?? studio.document.copy;
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  const [descriptionOverflows, setDescriptionOverflows] = useState(false);
+  const descriptionRef = useRef<HTMLParagraphElement>(null);
+  const descriptionId = useId();
+  useEffect(() => {
+    const element = descriptionRef.current;
+    if (!element || descriptionExpanded) return;
+    const measure = () =>
+      setDescriptionOverflows(element.scrollHeight > element.clientHeight + 1);
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    measure();
+    return () => observer.disconnect();
+  }, [copy.body, descriptionExpanded, platform]);
+  const destination = (() => {
+    try {
+      const url = new URL(copy.linkUrl);
+      return ["https:", "http:"].includes(url.protocol) ? url : null;
+    } catch {
+      return null;
+    }
+  })();
+  const ctaLabel = copy.callToAction
+    ?.toLowerCase()
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
   return (
     <div className="space-y-4">
       {platform ? (
@@ -140,12 +168,52 @@ export function AdIdeaPreview({
           </div>
           <div className="max-w-2xl space-y-2 text-sm">
             <p className="font-medium">{copy.headline || "Headline not set"}</p>
-            <p className="whitespace-pre-wrap text-muted-foreground">
-              {copy.body || "Primary text not set"}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {copy.callToAction} · {copy.linkUrl || "Destination not set"}
-            </p>
+            <div className="space-y-1">
+              <p
+                ref={descriptionRef}
+                id={descriptionId}
+                className={`whitespace-pre-wrap text-muted-foreground ${descriptionExpanded ? "" : "line-clamp-3"}`}
+              >
+                {copy.body || "Primary text not set"}
+              </p>
+              {(descriptionOverflows || descriptionExpanded) && (
+                <button
+                  type="button"
+                  aria-expanded={descriptionExpanded}
+                  aria-controls={descriptionId}
+                  className="text-xs underline underline-offset-4 hover:text-muted-foreground focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-ring"
+                  onClick={() => setDescriptionExpanded((current) => !current)}
+                >
+                  {descriptionExpanded ? "Show less" : "Show more"}
+                </button>
+              )}
+            </div>
+            <div className="flex min-w-0 items-center gap-3 border-t pt-3 text-xs">
+              {ctaLabel && <Badge variant="secondary">{ctaLabel}</Badge>}
+              {destination ? (
+                <a
+                  href={destination.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={destination.href}
+                  className="inline-flex min-w-0 items-center gap-1.5 text-muted-foreground hover:text-foreground"
+                >
+                  <span className="truncate">
+                    {destination.hostname.replace(/^www\./, "")}
+                    {destination.pathname === "/" ? "" : destination.pathname}
+                  </span>
+                  <ExternalLink
+                    aria-hidden="true"
+                    className="size-3 shrink-0"
+                  />
+                  <span className="sr-only">(opens in a new tab)</span>
+                </a>
+              ) : (
+                <span className="text-muted-foreground">
+                  Destination not set
+                </span>
+              )}
+            </div>
           </div>
         </>
       )}

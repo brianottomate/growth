@@ -1,16 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { cn } from "@/components/ui/lib/utils";
 
-import {
-  brandAdsHref,
-  CampaignRow,
-  panel,
-  SectionLabel,
-} from "../../../_components";
-import { StartCampaignInChat } from "../../../StartCampaignInChat";
+import { CampaignRow, panel, SectionLabel } from "../../../_components";
+import { NewCampaignButton } from "../../../NewCampaignButton";
 import { loadPerformanceBrand } from "../_data";
 
 export const metadata: Metadata = { title: "Campaigns · Wander Performance" };
@@ -37,16 +31,7 @@ export default async function PerformanceBrandCampaignsPage({
         <SectionLabel>
           Campaigns{campaigns.length ? ` · ${campaigns.length}` : ""}
         </SectionLabel>
-        {campaigns.length === 0 ? (
-          <StartCampaignInChat brandId={brand.id} brandName={brand.name} />
-        ) : (
-          <Link
-            href={brandAdsHref(brand)}
-            className="text-[11.5px] text-sky-300 hover:underline"
-          >
-            New campaign
-          </Link>
-        )}
+        <NewCampaignButton brandId={brand.id} />
       </div>
       {deskBrand && campaigns.length > 0 ? (
         <ul className={cn(panel, "divide-y")}>

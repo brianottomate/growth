@@ -128,6 +128,7 @@ export type CampaignFocus =
 
 export type WorkAdCampaignIntent = {
   type: "work_ad_campaign";
+  newThread?: boolean;
   brandId: string;
   brandName: string;
   campaignId: string;

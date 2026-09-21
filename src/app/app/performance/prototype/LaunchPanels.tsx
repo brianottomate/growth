@@ -1,3 +1,4 @@
+import { GeographyChips as Chips } from "@/components/geography-chips";
 import { Layers3, MapPinned } from "lucide-react";
 
 import type {
@@ -87,23 +88,6 @@ function HomeThumb({ home }: { home: WorkspaceHome }) {
           .filter(Boolean)
           .join(" · ")}
       </p>
-    </div>
-  );
-}
-
-function Chips({ label, values }: { label: string; values?: string[] }) {
-  if (!values || values.length === 0) return null;
-  return (
-    <div className="flex flex-wrap items-baseline gap-1.5">
-      <span className="text-[10.5px] text-muted-foreground">{label}</span>
-      {values.map((value) => (
-        <span
-          key={value}
-          className="rounded-full bg-sky-500/10 px-2 py-0.5 text-[11px] text-sky-600"
-        >
-          {value}
-        </span>
-      ))}
     </div>
   );
 }

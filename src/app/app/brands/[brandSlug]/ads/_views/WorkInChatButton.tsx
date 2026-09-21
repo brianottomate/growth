@@ -31,12 +31,13 @@ export function WorkInChatButton({
       onClick={() =>
         sendAssistantIntent({
           type: "work_ad_campaign",
+          newThread: true,
           brandId,
           brandName,
           campaignId,
           campaignName,
           visibleText: hasAds
-            ? `Work the copy on “${campaignName}”`
+            ? `Help me work on “${campaignName}”`
             : `Draft the ads for “${campaignName}”`,
         })
       }
