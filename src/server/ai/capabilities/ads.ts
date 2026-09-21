@@ -1,4 +1,11 @@
+import {
+  importMetaCampaign,
+  importMetaCampaignSchema,
+} from "@/server/services/meta-campaign-import.service";
+import { metaPlacementPlanSchema } from "@/lib/meta-placement-plan";
 import "server-only";
+import { ideaSaveSchema, ideaExportShapesSchema } from "@/lib/ad-idea-studio";
+import { saveAdIdea } from "@/server/services/ad-idea-studio.service";
 
 import { z } from "zod";
 
@@ -33,6 +40,7 @@ import {
   syncBrandPlatformAudiences,
 } from "@/server/services/ads-write.service";
 import {
+  adIdeaHomePhotos,
   addAudience,
   addDraftAd,
   attachPlatformCampaign,
@@ -55,7 +63,6 @@ import { MediaService } from "@/server/services/media.service";
 import { mediaTypeForUrl } from "@/lib/media-url";
 import { and, eq, isNull } from "drizzle-orm";
 
-import { campaignDraftName } from "@/lib/performance-ads";
 import { db } from "@/server/db";
 import { brandTable, type MediaItem } from "@/server/db/schema";
 import {
@@ -205,11 +212,10 @@ export const draftCampaignAction = growthAction({
       ),
     platforms: z
       .array(z.enum(PLANNABLE_AD_PLATFORMS))
-      .min(1)
       .max(PLANNABLE_AD_PLATFORMS.length)
       .optional()
       .describe(
-        "Platforms to plan: each gets a local draft platform campaign holding its budget and settings. Default meta_ads.",
+        "Platforms to plan: each gets a local draft platform campaign holding its budget and settings. Omit for a thin campaign with no platform planned yet.",
       ),
     landingUrl: z.string().url().optional(),
     goal: z.string().trim().max(200).optional(),
@@ -221,34 +227,12 @@ export const draftCampaignAction = growthAction({
       .describe("Total intended budget in whole dollars."),
     campaignId: z.string().trim().min(1).optional(),
   }),
-  execute: async (input, ctx) => {
-    // The convention lives in code so the model never has to spell it.
-    const name =
-      input.name ??
-      (await conventionalCampaignName(input.brandSlug, ctx.orgId));
-    return createDraftCampaign({
+  execute: async (input, ctx) =>
+    createDraftCampaign({
       ...input,
-      name,
       organizationId: ctx.orgId,
-    });
-  },
+    }),
 });
-
-async function conventionalCampaignName(brandSlug: string, orgId: string) {
-  const brand = await db.query.brandTable.findFirst({
-    where: and(
-      eq(brandTable.slug, brandSlug),
-      eq(brandTable.organizationId, orgId),
-      isNull(brandTable.deletedAt),
-    ),
-    columns: { name: true, relationship: true },
-  });
-  if (!brand) throw new Error("No access to this brand");
-  return campaignDraftName({
-    brandName: brand.name,
-    isClient: brand.relationship === "client",
-  });
-}
 
 export const createMetaAdDraftAction = growthAction({
   description:
@@ -866,7 +850,7 @@ export const addAudienceAction = growthAction({
       .describe('ISO country codes, e.g. ["US"].'),
     regions: z
       .array(z.string().trim().min(1).max(100))
-      .max(20)
+      .max(60)
       .optional()
       .describe(
         'Region/state names, e.g. ["California"] — resolved to platform geo keys at push.',
@@ -879,6 +863,13 @@ export const addAudienceAction = growthAction({
         "Loose suggestions. The Google compile derives keywords from these; Meta ignores them.",
       ),
   }),
+  examples: [
+    {
+      campaignId: "camp_contract",
+      name: "US multi-state",
+      regions: Array.from({ length: 28 }, (_, index) => `Region ${index + 1}`),
+    },
+  ],
   execute: async (input, ctx) =>
     addAudience({
       campaignId: input.campaignId,
@@ -904,9 +895,15 @@ export const updateAudienceAction = growthAction({
     ageMin: z.number().int().min(13).max(100).nullish(),
     ageMax: z.number().int().min(13).max(100).nullish(),
     countries: z.array(z.string().length(2)).max(20).optional(),
-    regions: z.array(z.string().trim().min(1).max(100)).max(20).optional(),
+    regions: z.array(z.string().trim().min(1).max(100)).max(60).optional(),
     keywords: z.array(z.string().trim().min(1).max(80)).max(50).optional(),
   }),
+  examples: [
+    {
+      audienceId: "aud_contract",
+      regions: Array.from({ length: 28 }, (_, index) => `Region ${index + 1}`),
+    },
+  ],
   execute: async (input, ctx) =>
     updateAudience({
       audienceId: input.audienceId,
@@ -1040,6 +1037,8 @@ export const setPlatformDraftAction = growthAction({
         customEventType: z.string().trim().min(1).optional(),
         customConversionId: z.string().trim().min(1).optional(),
         budgetMode: z.enum(["cbo", "abo"]).optional(),
+        placements: metaPlacementPlanSchema.optional(),
+        importReviewed: z.boolean().optional(),
       })
       .optional(),
     linkedin: z
@@ -1371,13 +1370,22 @@ export const attachAdSetAction = growthAction({
 
 export const setAdStatusAction = growthAction({
   description:
-    "Approve one drafted ad, or put it back to drawn. Approved means someone wants it: it is safe from the next rebuild of the set. This is production state on our side and touches no platform.",
+    "Approve an ad, freezing image compositions into media assets, or reopen it as an editable draft. Supply expectedUpdatedAt from the latest read. This never publishes to a platform.",
   inputSchema: z.object({
     adId: z.string().min(1),
     status: z.enum(["drawn", "approved"]),
+    expectedUpdatedAt: z.string().datetime().optional(),
+    exportShapes: ideaExportShapesSchema.optional(),
   }),
   execute: (input, ctx) =>
-    setAdStatus({ adId: input.adId, orgId: ctx.orgId, status: input.status }),
+    setAdStatus({
+      adId: input.adId,
+      orgId: ctx.orgId,
+      status: input.status,
+      expectedUpdatedAt: input.expectedUpdatedAt,
+      exportShapes: input.exportShapes,
+      userId: ctx.userId,
+    }),
 });
 
 export const setAdCopyAction = growthAction({
@@ -1475,4 +1483,28 @@ export const unfreezePlacementAction = growthAction({
       orgId: ctx.orgId,
       placementKey: input.placementKey,
     }),
+});
+
+export const saveIdeaAction = growthAction({
+  description:
+    "Save an editable image ad idea: shared ad copy, ordered source images, per-image composition recipes and shape overrides. Read the campaign first for the current updatedAt and ideaStudio document. Preserves recipes and returns the ad to draft; does not publish or materialize renders.",
+  inputSchema: ideaSaveSchema,
+  execute: (input, ctx) =>
+    saveAdIdea(input, { orgId: ctx.orgId, userId: ctx.userId }),
+});
+
+export const ideaHomePhotosAction = growthAction({
+  description:
+    "Read the full home gallery for a campaign ad idea. To shortlist candidates, add source references to the ideaStudio document pool using saveIdea; selected slides live separately in cards.",
+  inputSchema: z.object({ adId: z.string().min(1) }),
+  execute: (input, ctx) =>
+    adIdeaHomePhotos({ ...input, organizationId: ctx.orgId }),
+});
+
+export const importMetaCampaignAction = growthAction({
+  description:
+    "Read a live Meta campaign from this brand’s allowlisted account and copy its ads, original artwork and audiences into a NEW local draft. Preserve raw creative and delivery settings, explicitly mark unsupported mappings, and leave the live campaign unchanged. Repeated imports return the existing copy.",
+  inputSchema: importMetaCampaignSchema,
+  execute: (input, ctx) =>
+    importMetaCampaign(input, { orgId: ctx.orgId, userId: ctx.userId }),
 });

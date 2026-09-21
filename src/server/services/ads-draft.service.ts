@@ -31,6 +31,12 @@ import {
   requireAdPlatformSpec,
   type PlannableAdPlatform,
 } from "@/lib/ad-platforms";
+import { starterAdIdeas, featuredStarterAdIdeas } from "@/lib/starter-ad-ideas";
+import { listBrandHomes } from "./homes.service";
+import { listWanderOsListingPhotos } from "@/server/clients/wanderos-site.client";
+import { brandListings, brandWebsiteId } from "./wanderos-listings.service";
+import { ideaDocumentFromAd, projectIdea } from "@/lib/ad-idea-studio";
+import { campaignDraftName } from "@/lib/performance-ads";
 import { importRemoteImage } from "@/server/services/media.service";
 
 // ---- THE PLAN'S CRUD ---------------------------------------------------
@@ -61,7 +67,13 @@ async function requireOwnedBrand(input: {
           ),
       isNull(brandTable.deletedAt),
     ),
-    columns: { id: true, name: true, slug: true, organizationId: true },
+    columns: {
+      id: true,
+      name: true,
+      slug: true,
+      organizationId: true,
+      relationship: true,
+    },
   });
   if (brand?.organizationId !== input.organizationId) {
     throw new Error("No access to this brand");
@@ -127,15 +139,15 @@ async function ensureAdsChannel(brandId: string, platform: DraftAdPlatform) {
 }
 
 /**
- * Create the plan: a campaign, plus one draft platform_campaign row per
- * platform the operator picked. The drafts are where budget and platform
+ * Create a thin internal campaign. Only explicitly selected platforms get
+ * a draft platform_campaign row. The drafts are where budget and platform
  * settings live; they are not on any provider yet.
  */
 export async function createDraftCampaign(input: {
   organizationId: string;
   brandId?: string;
   brandSlug?: string;
-  name: string;
+  name?: string;
   goal?: string | null;
   landingUrl?: string | null;
   description?: string | null;
@@ -152,7 +164,12 @@ export async function createDraftCampaign(input: {
     .values({
       id: createId("camp"),
       brandId: brand.id,
-      name: input.name,
+      name:
+        input.name ??
+        campaignDraftName({
+          brandName: brand.name,
+          isClient: brand.relationship === "client",
+        }),
       status: "planned",
       goal: input.goal ?? null,
       landingUrl: input.landingUrl ?? null,
@@ -163,7 +180,7 @@ export async function createDraftCampaign(input: {
     })
     .returning();
 
-  for (const platform of input.platforms ?? ["meta_ads" as const]) {
+  for (const platform of input.platforms ?? []) {
     await planPlatformInternal({
       campaign: campaign!,
       brandId: brand.id,
@@ -444,6 +461,162 @@ export async function updateAudience(input: {
   return updated!;
 }
 
+/** Read the same committed set shown on the brand's Homes page. */
+export async function starterIdeaHomes(input: {
+  organizationId: string;
+  campaignId: string;
+}) {
+  const { brand } = await requireOwnedCampaign(
+    input.campaignId,
+    input.organizationId,
+  );
+  const [homes, listings] = await Promise.all([
+    listBrandHomes(brand.id),
+    brandListings(brand),
+  ]);
+  const featured = homes.filter((home) => home.source === "wanderos");
+  const websiteId = featured.some((home) => !home.galleryCache?.length)
+    ? await brandWebsiteId(brand.id)
+    : null;
+  const selected = await Promise.all(
+    featured.map(async (home) => {
+      const listing = listings.find((l) => l.id === home.externalId);
+      const gallery = home.galleryCache?.length
+        ? home.galleryCache
+        : websiteId
+          ? await listWanderOsListingPhotos({
+              websiteId,
+              propertyId: home.externalId,
+            })
+          : (listing?.gallery ?? []);
+      const urls = [
+        home.heroSourceUrl ?? listing?.imageUrl,
+        ...gallery.map((p) => p.url),
+      ].filter((url): url is string => Boolean(url));
+      return {
+        id: home.id,
+        name: listing?.name ?? home.name,
+        url: listing?.url ?? home.url,
+        photos: [...new Set(urls)].map((url) => ({ url })),
+      };
+    }),
+  );
+  const urls = selected.flatMap((home) =>
+    home.photos.map((photo) => photo.url),
+  );
+  const assets = urls.length
+    ? await db.query.mediaAssetTable.findMany({
+        where: and(
+          eq(mediaAssetTable.brandId, brand.id),
+          eq(mediaAssetTable.status, "ready"),
+          isNull(mediaAssetTable.deletedAt),
+          inArray(mediaAssetTable.url, urls),
+        ),
+        columns: { id: true, url: true },
+      })
+    : [];
+  const assetIds = new Map(assets.map((asset) => [asset.url, asset.id]));
+  return selected.map((home) => ({
+    ...home,
+    photos: home.photos.map((photo) => ({
+      ...photo,
+      ...(assetIds.has(photo.url) ? { assetId: assetIds.get(photo.url)! } : {}),
+    })),
+  }));
+}
+
+/** The full gallery is browsed on demand, independently of an idea's shortlist. */
+export async function adIdeaHomePhotos(input: {
+  organizationId: string;
+  adId: string;
+}) {
+  const ad = await db.query.adTable.findFirst({
+    where: eq(adTable.id, input.adId),
+  });
+  if (!ad?.campaignId) throw new Error("Campaign ad not found");
+  const homes = await starterIdeaHomes({
+    organizationId: input.organizationId,
+    campaignId: ad.campaignId,
+  });
+  return homes.find((home) => home.id === ad.homeId) ?? null;
+}
+
+/** Add starter ideas in creation order; retries preserve existing ideas and edits. */
+export async function addStarterAdIdeas(input: {
+  organizationId: string;
+  campaignId: string;
+  source?: "blank" | "featured";
+  homeIds?: string[];
+}) {
+  const { campaign, brand } = await requireOwnedCampaign(
+    input.campaignId,
+    input.organizationId,
+  );
+  if (campaign.deletedAt) throw new Error("Campaign not found");
+  const source = input.source ?? "blank";
+  const existing = await db.query.adTable.findMany({
+    where: eq(adTable.campaignId, campaign.id),
+    columns: { businessKey: true },
+  });
+  const prefix = `${campaign.id}:${source === "blank" ? "starter-v1" : "featured-starter-v1"}:`;
+  const otherPrefix = `${campaign.id}:${source === "blank" ? "featured-starter-v1" : "starter-v1"}:`;
+  if (existing.some((ad) => ad.businessKey?.startsWith(otherPrefix)))
+    throw new Error(
+      "This campaign already has a different starter set. Use a new campaign or delete the existing starter ideas first.",
+    );
+  const available = source === "featured" ? await starterIdeaHomes(input) : [];
+  const homes = input.homeIds
+    ? available.filter((h) => input.homeIds!.includes(h.id))
+    : available;
+  if (
+    source === "featured" &&
+    (!homes.length ||
+      homes.length > 10 ||
+      (input.homeIds && homes.length !== new Set(input.homeIds).size))
+  )
+    throw new Error("Choose between 1 and 10 of this brand's featured homes.");
+  if (homes.some((h) => !h.photos.length))
+    throw new Error(
+      "A selected home has no source photo. Add a photo in Homes or start blank.",
+    );
+  const ideas =
+    source === "featured" ? featuredStarterAdIdeas(homes) : starterAdIdeas();
+  if (source === "featured" && brand.website) {
+    ideas[0]!.content.linkUrl = brand.website;
+    if (ideas[0]!.content.ideaStudio)
+      ideas[0]!.content.ideaStudio.document.copy.linkUrl = brand.website;
+  }
+  let created = 0;
+  for (const idea of ideas) {
+    const projected =
+      source === "featured"
+        ? projectIdea(
+            brand.id,
+            idea.content,
+            { document: ideaDocumentFromAd(idea) },
+            null,
+          )
+        : { content: idea.content };
+
+    const rows = await db
+      .insert(adTable)
+      .values({
+        brandId: brand.id,
+        campaignId: campaign.id,
+        name: idea.name,
+        type: "creative",
+        status: "drawn",
+        ...projected,
+        homeId: "homeId" in idea ? (idea.homeId as string) : null,
+        businessKey: `${prefix}${idea.key}`,
+      })
+      .onConflictDoNothing()
+      .returning({ id: adTable.id });
+    created += rows.length;
+  }
+  return { created };
+}
+
 /** Add a drafted ad: a suggestion the push transforms per platform. */
 export async function addDraftAd(input: {
   organizationId: string;
@@ -469,7 +642,7 @@ export async function addDraftAd(input: {
   // refresh it, not fail.
   const existing = await db.query.adTable.findFirst({
     where: eq(adTable.businessKey, businessKey),
-    columns: { id: true, campaignId: true },
+    columns: { id: true, campaignId: true, content: true, status: true },
   });
 
   if (existing && existing.campaignId !== campaign.id) {
@@ -489,6 +662,13 @@ export async function addDraftAd(input: {
     businessKey,
   };
 
+  if (existing?.status === "approved")
+    throw new Error("Reopen this approved ad before editing it.");
+  if (existing && "media" in existing.content && existing.content.ideaStudio) {
+    throw new Error(
+      "This ad uses the mini studio. Edit it in Ad ideas or use saveIdea.",
+    );
+  }
   if (existing) {
     const [updated] = await db
       .update(adTable)
@@ -960,6 +1140,10 @@ export async function replaceDraftAdMedia(input: {
   if (!("media" in content) || !Array.isArray(content.media)) {
     throw new Error("This ad has no cards to replace");
   }
+  if (content.ideaStudio)
+    throw new Error(
+      "This ad uses the mini studio. Replace its image in Ad ideas or use saveIdea.",
+    );
   if (input.index < 0 || input.index >= content.media.length) {
     throw new Error(
       `This ad has ${content.media.length} card(s); there is no card ${input.index + 1}`,

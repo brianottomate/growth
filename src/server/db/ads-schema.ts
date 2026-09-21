@@ -1,3 +1,5 @@
+import type { MetaPlacement } from "@/lib/meta-placement-plan";
+import type { IdeaStudio } from "@/lib/ad-idea-studio";
 import { relations, sql } from "drizzle-orm";
 import { index, pgEnum, pgTable, uniqueIndex } from "drizzle-orm/pg-core";
 
@@ -177,6 +179,16 @@ export type AdCard = MediaItem & {
 
 /** Content of a `creative` ad: one image/carousel plus its copy. */
 export type AdCreativeContent = {
+  /** Editable source recipes and shape variants; no schema migration. */
+  ideaStudio?: IdeaStudio;
+  metaImport?: {
+    campaignId: string;
+    adId: string;
+    creativeId: string;
+    importedAt: string;
+    issues: string[];
+    rawCreative: Record<string, unknown>;
+  };
   /**
    * What the ad is, declared. Absent on ads drawn before the field existed,
    * which read their shape off `media` (see `adFormatOf`). Declared so a
@@ -261,6 +273,14 @@ export type PlatformCampaignSettings = {
     businessName?: string;
   };
   meta?: {
+    placements?: MetaPlacement[];
+    importReviewed?: boolean;
+    importSource?: {
+      campaignId: string;
+      importedAt: string;
+      issues: string[];
+      adSets: Record<string, unknown>[];
+    };
     pixelId?: string;
     customEventType?: string;
     /**

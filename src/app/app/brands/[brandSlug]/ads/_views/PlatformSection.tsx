@@ -1,3 +1,5 @@
+import { MetaPlatformCard } from "./MetaPlatformCard";
+import type { Ad, AudienceGeographyPlan } from "@/server/db/ads-schema";
 import Link from "next/link";
 
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
@@ -23,18 +25,36 @@ import { PushToPlatform } from "./PushToPlatform";
  */
 export async function PlatformSection({
   brandSlug,
+  brandName = brandSlug,
+  brandLogo = null,
   campaignId,
   platformCampaign,
   draftAdCount,
+  unapprovedCount = 0,
   audienceCount,
   brandUrl,
+  campaignName,
+  draftAds,
+  audiences,
 }: {
   brandSlug: string;
+  brandName?: string;
+  brandLogo?: string | null;
   campaignId: string;
   platformCampaign: PlatformCampaign;
   draftAdCount: number;
+  unapprovedCount?: number;
   audienceCount: number;
   brandUrl: string | null;
+  campaignName?: string;
+  draftAds?: Ad[];
+  audiences?: {
+    id: string;
+    name: string;
+    geography: AudienceGeographyPlan | null;
+    ageMin: number | null;
+    ageMax: number | null;
+  }[];
 }) {
   const platform = platformCampaign.platform;
   const label = platformLabel(platform);
@@ -43,6 +63,21 @@ export async function PlatformSection({
   const linkedin = platformCampaign.settings?.linkedin;
 
   // ---- draft: the pre-push contract ------------------------------------
+  if (isDraft && platform === "meta_ads" && draftAds && audiences) {
+    return (
+      <MetaPlatformCard
+        campaignId={campaignId}
+        campaignName={campaignName ?? platformCampaign.name}
+        brandSlug={brandSlug}
+        brandName={brandName}
+        brandLogo={brandLogo}
+        platformCampaign={platformCampaign}
+        ads={draftAds}
+        audiences={audiences}
+        unapprovedCount={unapprovedCount}
+      />
+    );
+  }
   if (isDraft) {
     const googleBlocked = platform === "google_ads" && !google?.campaignType;
     const pushable = isPushableAdPlatform(platform);
@@ -81,16 +116,25 @@ export async function PlatformSection({
               config={linkedin}
             />
           )}
-          {pushable && draftAdCount > 0 && !googleBlocked && (
-            <PushToPlatform
-              campaignId={campaignId}
-              brandSlug={brandSlug}
-              platform={platform}
-              draftAdCount={draftAdCount}
-              audienceCount={audienceCount}
-              budget={platformCampaign.budget}
-              budgetType={platformCampaign.budgetType}
-            />
+          {pushable &&
+            draftAdCount > 0 &&
+            !googleBlocked &&
+            unapprovedCount === 0 && (
+              <PushToPlatform
+                campaignId={campaignId}
+                brandSlug={brandSlug}
+                platform={platform}
+                draftAdCount={draftAdCount}
+                audienceCount={audienceCount}
+                budget={platformCampaign.budget}
+                budgetType={platformCampaign.budgetType}
+              />
+            )}
+          {unapprovedCount > 0 && (
+            <span className="text-xs text-muted-foreground">
+              Approve {unapprovedCount} ad{unapprovedCount === 1 ? "" : "s"} to
+              enable push
+            </span>
           )}
           {!pushable && (
             <span className="text-xs text-muted-foreground">

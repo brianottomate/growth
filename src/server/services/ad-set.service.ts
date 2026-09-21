@@ -1,3 +1,5 @@
+import { projectIdea, type IdeaShape } from "@/lib/ad-idea-studio";
+import { transitionAdApproval } from "./ad-approval.service";
 import "server-only";
 
 import { and, eq, inArray, isNull } from "drizzle-orm";
@@ -156,7 +158,10 @@ async function requireOwnedBrand(input: {
 }
 
 /** An ad with its brand, or 404 when it is not this organization's. */
-async function requireOwnedAd(input: { adId: string; orgId: string }) {
+async function requireOwnedAd(
+  input: { adId: string; orgId: string },
+  allowStudio = false,
+) {
   const ad = await db.query.adTable.findFirst({
     where: eq(adTable.id, input.adId),
     with: {
@@ -173,6 +178,14 @@ async function requireOwnedAd(input: { adId: string; orgId: string }) {
   });
   if (!ad || ad.brand?.organizationId !== input.orgId) {
     throw new AdSetError(404, "Ad not found");
+  }
+  if (!allowStudio && ad.status === "approved")
+    throw new AdSetError(422, "Reopen this approved ad before editing it.");
+  if (!allowStudio && "media" in ad.content && ad.content.ideaStudio) {
+    throw new AdSetError(
+      422,
+      "This ad uses the mini studio. Edit it in the ad Details view or use saveIdea to preserve its editable composition.",
+    );
   }
   return ad;
 }
@@ -1085,8 +1098,10 @@ export async function setAdHome(input: {
   /** A home by name alone, for a brand whose site is not connected. */
   homeName?: string | null;
 }) {
-  const ad = await requireOwnedAd(input);
+  const ad = await requireOwnedAd(input, true);
   const content = creativeContent(ad);
+  if (ad.status === "approved" || content.ideaStudio?.approval)
+    throw new Error("Reopen this approved ad before changing its home.");
   const brand = ad.brand;
   const bound = await homeBinding(brand, input);
   const { home } = bound;
@@ -1111,10 +1126,34 @@ export async function setAdHome(input: {
     ? adName(brand, format, bound.name)
     : ad.name;
 
-  await db
+  const studio = next.ideaStudio;
+  const projected = studio
+    ? projectIdea(
+        ad.brandId,
+        next,
+        {
+          document: {
+            ...studio.document,
+            copy: { ...studio.document.copy, linkUrl: next.linkUrl ?? "" },
+          },
+        },
+        ad.placements,
+      )
+    : { content: next };
+  const [saved] = await db
     .update(adTable)
-    .set({ homeId: home?.id ?? null, name, content: next })
-    .where(eq(adTable.id, ad.id));
+    .set({
+      homeId: home?.id ?? null,
+      name,
+      ...projected,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(adTable.id, ad.id), eq(adTable.updatedAt, ad.updatedAt)))
+    .returning({ id: adTable.id });
+  if (!saved)
+    throw new Error(
+      "This ad changed elsewhere. Reload before changing its home.",
+    );
   return { adId: ad.id, name, homeName: bound.name };
 }
 
@@ -1297,7 +1336,7 @@ export async function attachAdSet(input: {
 
 /** Remove one ad: a draft outright, a campaign ad through its own guard. */
 export async function deleteAd(input: { adId: string; orgId: string }) {
-  const ad = await requireOwnedAd(input);
+  const ad = await requireOwnedAd(input, true);
   if (ad.campaignId) {
     return deleteDraftAd({ adId: ad.id, organizationId: input.orgId });
   }
@@ -1310,8 +1349,26 @@ export async function setAdStatus(input: {
   adId: string;
   orgId: string;
   status: "drawn" | "approved";
+  userId?: string;
+  expectedUpdatedAt?: string;
+  exportShapes?: IdeaShape[];
 }) {
-  const ad = await requireOwnedAd(input);
+  const ad = await requireOwnedAd(input, true);
+  if (
+    "media" in ad.content &&
+    ad.content.media.every((card) => card.type === "image") &&
+    (!ad.content.format || ["static", "carousel"].includes(ad.content.format))
+  ) {
+    if (!input.userId || !input.expectedUpdatedAt)
+      throw new Error(
+        "Review the ad and supply expectedUpdatedAt before changing approval.",
+      );
+    return transitionAdApproval({
+      ...input,
+      userId: input.userId,
+      expectedUpdatedAt: input.expectedUpdatedAt,
+    });
+  }
   await db
     .update(adTable)
     .set({ status: input.status })

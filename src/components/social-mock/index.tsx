@@ -480,12 +480,14 @@ function FacebookMock({
         <MoreHorizontal className="size-5 text-[#65676b]" />
       </header>
       {(post.text || !post.ad) && (
-        <Copy
-          text={post.text}
-          clamp={clampText}
-          muted="text-[#65676b]"
-          className="px-3 pb-3 text-[15px] leading-snug"
-        />
+        <div className="px-3 pb-3">
+          <Copy
+            text={post.text}
+            clamp={clampText}
+            muted="text-[#65676b]"
+            className="text-[15px] leading-snug"
+          />
+        </div>
       )}
       {post.ad ? (
         <>

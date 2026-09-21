@@ -1,0 +1,894 @@
+"use client";
+
+import { isImportedMetaCatalog } from "@/lib/meta-import";
+import { useLocalStorage } from "@/components/ui/hooks/use-local-storage";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { useId, useState } from "react";
+import {
+  metaPreviewPlacements,
+  metaPreviewMedia,
+  importedPlacementLabel,
+} from "@/lib/meta-preview";
+import {
+  META_PLACEMENTS,
+  metaPlacementMedia,
+  type MetaPlacement,
+} from "@/lib/meta-placement-plan";
+import { useRouter } from "next/navigation";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { ChannelLogo } from "@/components/channel-logos";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogTrigger,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { useTRPC } from "@/trpc/react";
+import { AD_PUSH_GOALS, type AdPushGoal } from "@/lib/ad-platforms";
+import type {
+  Ad,
+  PlatformCampaign,
+  AudienceGeographyPlan,
+} from "@/server/db/ads-schema";
+import { CompactAdMock } from "@/components/ad-mock";
+import { PushToPlatform } from "./PushToPlatform";
+import { META_DEFAULT_CALL_TO_ACTION } from "@/lib/zernio-ads";
+import { money } from "./format";
+
+type Audience = {
+  id: string;
+  name: string;
+  geography: AudienceGeographyPlan | null;
+  ageMin: number | null;
+  ageMax: number | null;
+};
+const DEFAULT_PROJECTION_EXPANSION: Record<string, boolean> = {};
+
+export function MetaPlatformCard({
+  campaignId,
+  campaignName,
+  brandSlug,
+  brandName,
+  brandLogo,
+  platformCampaign: pc,
+  ads,
+  audiences,
+  unapprovedCount,
+}: {
+  campaignId: string;
+  campaignName: string;
+  brandSlug: string;
+  brandName: string;
+  brandLogo: string | null;
+  platformCampaign: PlatformCampaign;
+  ads: Ad[];
+  audiences: Audience[];
+  unapprovedCount: number;
+}) {
+  const [expanded, setExpanded] = useState(true);
+  const [projectionOpen, setProjectionOpen] = useLocalStorage<
+    Record<string, boolean>
+  >({
+    key: `meta-projections:${campaignId}:${pc.id}:expanded`,
+    defaultValue: DEFAULT_PROJECTION_EXPANSION,
+  });
+
+  const [destinationKey, setDestinationKey] = useState("");
+  const [goal, setGoal] = useState<AdPushGoal>("conversions");
+  const sectionId = useId();
+  const trpc = useTRPC();
+  const destinations = useQuery(
+    trpc.ads.destinations.queryOptions(
+      { brandSlug, platform: "meta" },
+      { enabled: expanded },
+    ),
+  );
+  const choices = destinations.data?.destinations ?? [];
+  const chosen =
+    choices.find(
+      (d) => `${d.connectionAccountId}:${d.adAccountId}` === destinationKey,
+    ) ?? (choices.length === 1 ? choices[0] : undefined);
+  const configuration = chosen
+    ? {
+        connectionAccountId: chosen.connectionAccountId,
+        adAccountId: chosen.adAccountId,
+        goal,
+        label: `${chosen.adAccountName ?? chosen.adAccountId} · Page ${chosen.pageId ?? "not resolved"}`,
+      }
+    : undefined;
+  const catalogCount = ads.filter(
+    (ad) => "media" in ad.content && isImportedMetaCatalog(ad.content),
+  ).length;
+  const creativeAds = ads.filter(
+    (ad) =>
+      ad.type === "creative" &&
+      "media" in ad.content &&
+      !isImportedMetaCatalog(ad.content) &&
+      Boolean(ad.content.media[0]?.url),
+  );
+  const sets = audiences.length
+    ? audiences
+    : [
+        {
+          id: "broad",
+          name: "Broad",
+          geography: null,
+          ageMin: null,
+          ageMax: null,
+        },
+      ];
+  const meta = pc.settings?.meta;
+  const placementPlan = meta?.placements ?? [];
+  const missingCreative = creativeAds.some(
+    (ad) =>
+      "media" in ad.content &&
+      placementPlan.some(
+        (p) =>
+          metaPlacementMedia(
+            ad.content as import("@/server/db/ads-schema").AdCreativeContent,
+            p,
+          ).issue,
+      ),
+  );
+  const ready = Boolean(
+    placementPlan.length &&
+    !missingCreative &&
+    !catalogCount &&
+    (!meta?.importSource?.issues.length || meta.importReviewed) &&
+    configuration &&
+    chosen?.runsAsBrandPage &&
+    pc.budget &&
+    creativeAds.length &&
+    !unapprovedCount,
+  );
+  return (
+    <section className="space-y-5 rounded-xl border bg-card p-5">
+      <div className="flex flex-wrap items-center gap-3">
+        <ChannelLogo platform="meta_ads" className="size-5" />
+        <h3 className="font-semibold">On Meta Ads</h3>
+        <span className="rounded-full bg-muted px-2 py-1 text-xs text-muted-foreground">
+          Planned
+        </span>
+        <span className="text-sm text-muted-foreground">
+          {sets.length} ad {sets.length === 1 ? "set" : "sets"} ×{" "}
+          {creativeAds.length} {creativeAds.length === 1 ? "ad" : "ads"} ·{" "}
+          {pc.budget ? money(pc.budget) : "Budget not set"}
+        </span>
+        <div className="ml-auto flex flex-wrap gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-expanded={expanded}
+            aria-controls={sectionId}
+            onClick={() => setExpanded(!expanded)}
+          >
+            {expanded ? "Collapse" : "Expand"}
+          </Button>
+          {!ready && (
+            <>
+              <Button size="sm" variant="outline" disabled>
+                Validate
+              </Button>
+              <Button size="sm" disabled>
+                Push to Meta
+              </Button>
+            </>
+          )}
+          {ready &&
+            (["validate", "push"] as const).map((intent) => (
+              <PushToPlatform
+                key={intent}
+                intent={intent}
+                configuration={configuration}
+                campaignId={campaignId}
+                brandSlug={brandSlug}
+                platform="meta_ads"
+                draftAdCount={creativeAds.length}
+                audienceCount={audiences.length}
+                budget={pc.budget}
+                budgetType={pc.budgetType}
+              />
+            ))}
+        </div>
+      </div>
+      {expanded && (
+        <div id={sectionId} className="space-y-5">
+          <section className="space-y-4" aria-label="Setup">
+            <div className="flex items-center justify-between gap-3">
+              <h4 className="font-semibold">Setup</h4>
+              <MetaSettings
+                pc={pc}
+                choices={choices}
+                destinationKey={
+                  chosen
+                    ? `${chosen.connectionAccountId}:${chosen.adAccountId}`
+                    : ""
+                }
+                goal={goal}
+                onApply={(key, nextGoal) => {
+                  setDestinationKey(key);
+                  setGoal(nextGoal);
+                }}
+              />
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-4 rounded-lg border p-4">
+                <h5 className="text-sm font-semibold">Identity & objective</h5>
+                <dl className="grid grid-cols-2 gap-3 text-sm">
+                  <dt className="text-muted-foreground">Ad account</dt>
+                  <dd>
+                    {chosen?.adAccountName ??
+                      chosen?.adAccountId ??
+                      (destinations.isPending ? "Loading…" : "Not selected")}
+                  </dd>
+                  <dt className="text-muted-foreground">Facebook Page</dt>
+                  <dd>{chosen?.pageId ?? "Not selected"}</dd>
+                  <dt className="text-muted-foreground">Placements</dt>
+                  <dd>
+                    {META_PLACEMENTS.filter((p) => placementPlan.includes(p.id))
+                      .map((p) => p.label)
+                      .join(", ") ||
+                      (meta?.importSource
+                        ? importedPlacementLabel(meta.importSource.adSets)
+                        : "Not selected")}
+                  </dd>
+                  <dt className="text-muted-foreground">Goal</dt>
+                  <dd>{goal}</dd>
+                </dl>
+                {destinations.error && (
+                  <p role="alert" className="text-sm">
+                    {destinations.error.message}
+                  </p>
+                )}
+                {chosen && !chosen.runsAsBrandPage && (
+                  <p role="alert" className="text-sm">
+                    This destination does not match the brand’s Facebook Page.
+                    Choose a matching connection before pushing.
+                  </p>
+                )}
+                {!destinations.isPending &&
+                  !destinations.error &&
+                  !choices.length && (
+                    <p className="text-sm text-muted-foreground">
+                      No allowlisted Meta destination is connected to this
+                      brand.
+                    </p>
+                  )}
+                <p className="text-xs text-muted-foreground">
+                  Account and goal are selected for this push. The connected
+                  Page supplies the advertising identity; Instagram identity is
+                  not separately configurable here.
+                </p>
+              </div>
+              <div className="space-y-4 rounded-lg border p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h4 className="text-sm font-semibold">
+                    Budget, schedule & tracking
+                  </h4>
+                </div>
+                <dl className="grid grid-cols-2 gap-3 text-sm">
+                  <dt className="text-muted-foreground">Budget</dt>
+                  <dd>
+                    {pc.budget
+                      ? `${money(pc.budget)} ${pc.budgetType === "lifetime" ? "lifetime" : "/ day"}`
+                      : "Not set"}
+                  </dd>
+                  <dt className="text-muted-foreground">Budget allocation</dt>
+                  <dd>
+                    {meta?.budgetMode === "abo"
+                      ? "Per ad set (ABO)"
+                      : "Campaign (CBO)"}
+                  </dd>
+                  <dt className="text-muted-foreground">Start</dt>
+                  <dd>
+                    {pc.startAt
+                      ? new Date(pc.startAt).toLocaleString()
+                      : "Campaign default"}
+                  </dd>
+                  <dt className="text-muted-foreground">End</dt>
+                  <dd>
+                    {pc.endAt
+                      ? new Date(pc.endAt).toLocaleString()
+                      : "Campaign default"}
+                  </dd>
+                  <dt className="text-muted-foreground">Pixel / dataset</dt>
+                  <dd className="break-all">
+                    {meta?.pixelId || "Not configured"}
+                  </dd>
+                  <dt className="text-muted-foreground">Conversion</dt>
+                  <dd>
+                    {meta?.customConversionId ||
+                      meta?.customEventType ||
+                      "Not configured"}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </section>
+          <section className="space-y-4 border-t pt-5" aria-label="Projection">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h4 className="font-semibold">Placement review</h4>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() =>
+                    setProjectionOpen(
+                      Object.fromEntries(
+                        creativeAds.map((ad) => [ad.id, true]),
+                      ),
+                    )
+                  }
+                >
+                  Expand all
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() =>
+                    setProjectionOpen(
+                      Object.fromEntries(
+                        creativeAds.map((ad) => [ad.id, false]),
+                      ),
+                    )
+                  }
+                >
+                  Collapse all
+                </Button>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Compare placements for each ad. These previews share the creative
+              above; editing happens in the ad idea. Previewing does not approve
+              delivery.
+            </p>
+            <div>
+              <h4 className="font-semibold">{campaignName}</h4>
+              <p className="text-sm text-muted-foreground">
+                {goal} · {sets.length} ad sets ·{" "}
+                {sets.length * creativeAds.length} ads · Will create paused
+              </p>
+            </div>
+            {sets.map((audience) => (
+              <div
+                key={audience.id}
+                className="space-y-1 rounded-lg border px-4 py-3"
+              >
+                <h5 className="text-sm font-semibold">
+                  Ad set · {audience.name}
+                </h5>
+                <p className="text-xs text-muted-foreground">
+                  {[
+                    ...(audience.geography?.countries ?? []),
+                    ...(audience.geography?.states ?? []),
+                    ...(audience.geography?.regions ?? []),
+                    ...(audience.geography?.cities ?? []),
+                  ].join(" · ") || "Broad · provider defaults"}
+                  {audience.ageMin != null || audience.ageMax != null
+                    ? ` · Ages ${audience.ageMin ?? 13}–${audience.ageMax ?? "65+"}`
+                    : " · No age narrowing"}
+                </p>
+              </div>
+            ))}
+            {!placementPlan.length && !meta?.importSource && (
+              <p className="text-sm text-muted-foreground">
+                Choose placements in Edit setup to review delivery.
+              </p>
+            )}
+            {meta?.importSource && (
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button size="sm" variant="ghost">
+                    Imported from Meta · Source details
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Meta campaign source</DialogTitle>
+                    <DialogDescription>
+                      Local working copy of campaign{" "}
+                      {meta.importSource.campaignId}. Reconstructed previews are
+                      not a report of actual delivery.
+                    </DialogDescription>
+                  </DialogHeader>
+                  {meta.importSource.issues.map((issue) => (
+                    <p key={issue} className="text-sm">
+                      {issue}
+                    </p>
+                  ))}
+                  <details>
+                    <summary className="cursor-pointer text-sm">
+                      Original ad set settings
+                    </summary>
+                    <pre className="mt-3 max-h-80 overflow-auto text-xs whitespace-pre-wrap">
+                      {JSON.stringify(meta.importSource.adSets, null, 2)}
+                    </pre>
+                  </details>
+                </DialogContent>
+              </Dialog>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Each creative is shown once, shared across {sets.length} ad{" "}
+              {sets.length === 1 ? "set" : "sets"}.
+            </p>
+            {creativeAds.map((ad, index) => {
+              const open = projectionOpen?.[ad.id] ?? index === 0;
+              const panelId = `${sectionId}-projection-${ad.id}`;
+              return (
+                <div key={ad.id} className="rounded-lg border">
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-3 p-4 text-left"
+                    aria-expanded={open}
+                    aria-controls={panelId}
+                    onClick={() =>
+                      setProjectionOpen((current) => ({
+                        ...current,
+                        [ad.id]: !open,
+                      }))
+                    }
+                  >
+                    {open ? (
+                      <ChevronDown className="size-4 shrink-0" />
+                    ) : (
+                      <ChevronRight className="size-4 shrink-0" />
+                    )}
+                    <span className="min-w-0 flex-1 text-sm font-medium">
+                      {ad.name}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {ad.status === "approved" ? "Approved" : "Draft"} ·{" "}
+                      {"media" in ad.content
+                        ? metaPreviewPlacements(ad.content, placementPlan)
+                            .length
+                        : 0}{" "}
+                      placements
+                    </span>
+                  </button>
+                  <div id={panelId} hidden={!open} className="px-4 pb-4">
+                    {open && (
+                      <ProjectedAd
+                        ad={ad}
+                        brandName={brandName}
+                        brandLogo={brandLogo}
+                        placements={placementPlan}
+                      />
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            {ads.length - catalogCount !== creativeAds.length && (
+              <p className="text-sm text-muted-foreground">
+                {ads.length - catalogCount - creativeAds.length} ads without
+                media are excluded from this Meta projection.
+              </p>
+            )}
+          </section>
+          {catalogCount > 0 && (
+            <p className="text-sm text-muted-foreground">
+              {catalogCount} imported catalog ad(s) are reference only and
+              cannot be rebuilt by this publisher. This campaign cannot be
+              pushed with catalog ads included.
+            </p>
+          )}
+          {unapprovedCount > 0 && (
+            <p className="text-sm">
+              Approve {unapprovedCount} remaining ads before pushing.
+            </p>
+          )}
+          {!pc.budget && (
+            <p className="text-sm text-muted-foreground">
+              Set a budget to enable validation and push.
+            </p>
+          )}
+          <p className="text-xs text-muted-foreground">
+            Push creates the campaign paused. Launch is a separate action after
+            reviewing the result in Meta.
+          </p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function MetaSettings({
+  pc,
+  choices,
+  destinationKey,
+  goal,
+  onApply,
+}: {
+  pc: PlatformCampaign;
+  choices: {
+    connectionAccountId: string;
+    adAccountId: string;
+    adAccountName?: string | null;
+    pageId?: string | null;
+  }[];
+  destinationKey: string;
+  goal: AdPushGoal;
+  onApply: (key: string, goal: AdPushGoal) => void;
+}) {
+  const [draftDestination, setDraftDestination] = useState(destinationKey);
+  const [draftGoal, setDraftGoal] = useState(goal);
+  const [amount, setAmount] = useState(pc.budget?.toString() ?? "");
+  const [budgetType, setBudgetType] = useState<"daily" | "lifetime">(
+    pc.budgetType === "lifetime" ? "lifetime" : "daily",
+  );
+  const [open, setOpen] = useState(false);
+  const meta = pc.settings?.meta;
+  const [importReviewed, setImportReviewed] = useState(
+    meta?.importReviewed ?? false,
+  );
+  const [placements, setPlacements] = useState<MetaPlacement[]>(
+    meta?.placements ?? [],
+  );
+  const [pixel, setPixel] = useState(meta?.pixelId ?? "");
+  const [event, setEvent] = useState(meta?.customEventType ?? "");
+  const [conversion, setConversion] = useState(meta?.customConversionId ?? "");
+  const [mode, setMode] = useState<"cbo" | "abo">(meta?.budgetMode ?? "cbo");
+  const dateValue = (d: Date | null) =>
+    d
+      ? new Date(
+          new Date(d).getTime() - new Date(d).getTimezoneOffset() * 60000,
+        )
+          .toISOString()
+          .slice(0, 16)
+      : "";
+  const [start, setStart] = useState(dateValue(pc.startAt));
+  const [end, setEnd] = useState(dateValue(pc.endAt));
+  const trpc = useTRPC();
+  const router = useRouter();
+  const save = useMutation(
+    trpc.ads.setPlatformDraft.mutationOptions({
+      onSuccess: () => {
+        onApply(draftDestination, draftGoal);
+        setOpen(false);
+        router.refresh();
+      },
+    }),
+  );
+  const invalidDates = Boolean(
+    start && end && new Date(end) <= new Date(start),
+  );
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => {
+          setDraftDestination(destinationKey);
+          setDraftGoal(goal);
+          setAmount(pc.budget?.toString() ?? "");
+          setBudgetType(pc.budgetType === "lifetime" ? "lifetime" : "daily");
+          setImportReviewed(meta?.importReviewed ?? false);
+          setPlacements(meta?.placements ?? []);
+          setPixel(meta?.pixelId ?? "");
+          setEvent(meta?.customEventType ?? "");
+          setConversion(meta?.customConversionId ?? "");
+          setMode(meta?.budgetMode ?? "cbo");
+          setStart(dateValue(pc.startAt));
+          setEnd(dateValue(pc.endAt));
+          save.reset();
+          setOpen(true);
+        }}
+      >
+        Edit setup
+      </Button>
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Meta delivery settings</DialogTitle>
+        </DialogHeader>
+        <label className="space-y-1 text-sm">
+          Ad account · Facebook Page
+          <select
+            className="w-full rounded border bg-background p-2"
+            value={draftDestination}
+            onChange={(e) => setDraftDestination(e.target.value)}
+          >
+            <option value="" disabled>
+              Choose an allowlisted account
+            </option>
+            {choices.map((d) => (
+              <option
+                key={`${d.connectionAccountId}:${d.adAccountId}`}
+                value={`${d.connectionAccountId}:${d.adAccountId}`}
+              >
+                {d.adAccountName ?? d.adAccountId} · Page{" "}
+                {d.pageId ?? "not resolved"}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="space-y-1 text-sm">
+          Goal
+          <select
+            className="w-full rounded border bg-background p-2"
+            value={draftGoal}
+            onChange={(e) => setDraftGoal(e.target.value as AdPushGoal)}
+          >
+            {AD_PUSH_GOALS.map((g) => (
+              <option key={g} value={g}>
+                {g}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="text-xs text-muted-foreground">
+          Account and goal apply to this push session. Budget, schedule and
+          tracking are saved to the platform draft.
+        </p>
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium">Placements</legend>
+          {META_PLACEMENTS.map((p) => (
+            <label key={p.id} className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={placements.includes(p.id)}
+                onChange={(e) =>
+                  setPlacements((current) =>
+                    e.target.checked
+                      ? [...current, p.id]
+                      : current.filter((id) => id !== p.id),
+                  )
+                }
+              />
+              {p.label}
+            </label>
+          ))}
+          <p className="text-xs text-muted-foreground">
+            These are the placements sent to Meta. Missing creative is shown in
+            review.
+          </p>
+        </fieldset>
+        <label className="space-y-1 text-sm">
+          Budget (account currency)
+          <Input
+            inputMode="numeric"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+          />
+        </label>
+        <label className="space-y-1 text-sm">
+          Budget period
+          <select
+            className="w-full rounded border bg-background p-2"
+            value={budgetType}
+            onChange={(e) =>
+              setBudgetType(e.target.value as "daily" | "lifetime")
+            }
+          >
+            <option value="daily">Daily</option>
+            <option value="lifetime">Lifetime</option>
+          </select>
+        </label>
+        <label className="space-y-1 text-sm">
+          Budget allocation
+          <select
+            className="w-full rounded border bg-background p-2"
+            value={mode}
+            onChange={(e) => setMode(e.target.value as "cbo" | "abo")}
+          >
+            <option value="cbo">Campaign budget (CBO)</option>
+            <option value="abo">Ad set budgets (ABO)</option>
+          </select>
+        </label>
+        <label className="space-y-1 text-sm">
+          Pixel / dataset ID
+          <Input value={pixel} onChange={(e) => setPixel(e.target.value)} />
+        </label>
+        <label className="space-y-1 text-sm">
+          Conversion event
+          <Input
+            placeholder="PURCHASE"
+            value={event}
+            onChange={(e) => setEvent(e.target.value)}
+          />
+        </label>
+        <label className="space-y-1 text-sm">
+          Custom conversion ID (optional)
+          <Input
+            value={conversion}
+            onChange={(e) => setConversion(e.target.value)}
+          />
+        </label>
+        <label className="space-y-1 text-sm">
+          Start (local time)
+          <Input
+            type="datetime-local"
+            value={start}
+            onChange={(e) => setStart(e.target.value)}
+          />
+        </label>
+        <label className="space-y-1 text-sm">
+          End (local time)
+          <Input
+            type="datetime-local"
+            value={end}
+            onChange={(e) => setEnd(e.target.value)}
+          />
+        </label>
+        {meta?.importSource && (
+          <label className="flex gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={importReviewed}
+              onChange={(e) => setImportReviewed(e.target.checked)}
+            />
+            I reviewed the imported audience and delivery settings. Use this
+            setup for the new campaign; source-only settings will not be copied.
+          </label>
+        )}
+        {invalidDates && <p role="alert">End must be after start.</p>}
+        {save.error && <p role="alert">{save.error.message}</p>}
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            loading={save.isPending}
+            disabled={
+              !placements.length ||
+              invalidDates ||
+              (amount !== "" &&
+                (!Number.isInteger(Number(amount)) || Number(amount) <= 0))
+            }
+            onClick={() =>
+              save.mutate({
+                platformCampaignId: pc.id,
+                budget: amount ? Number(amount) : null,
+                budgetType,
+                meta: {
+                  placements,
+                  importReviewed,
+                  pixelId: pixel.trim(),
+                  customEventType: event.trim(),
+                  customConversionId: conversion.trim(),
+                  budgetMode: mode,
+                },
+                startAt: start ? new Date(start) : null,
+                endAt: end ? new Date(end) : null,
+              })
+            }
+          >
+            Save settings
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ProjectedAd({
+  ad,
+  brandName,
+  brandLogo,
+  placements,
+}: {
+  ad: Ad;
+  brandName: string;
+  brandLogo: string | null;
+  placements: MetaPlacement[];
+}) {
+  const [selected, setSelected] = useState<MetaPlacement | "">("");
+  const [compare, setCompare] = useState(true);
+  const [card, setCard] = useState(0);
+  if (!("media" in ad.content)) return null;
+  const content = ad.content;
+  const previewPlacements = metaPreviewPlacements(content, placements);
+  const views = META_PLACEMENTS.filter((p) => previewPlacements.includes(p.id));
+  const active = views.find((p) => p.id === selected) ?? views[0];
+  return (
+    <div className="space-y-4">
+      {!views.length && (
+        <p className="text-sm text-muted-foreground">
+          No placement mapping is available. Choose placements in setup or
+          review the imported ad.
+        </p>
+      )}
+      <div className="flex items-center gap-3">
+        <label className="text-sm">
+          Placements{" "}
+          <select
+            className="ml-2 rounded border bg-background p-2"
+            value={compare ? "all" : active?.id}
+            onChange={(e) => {
+              setCompare(e.target.value === "all");
+              if (e.target.value !== "all")
+                setSelected(e.target.value as MetaPlacement);
+              setCard(0);
+            }}
+          >
+            <option value="all">Compare all placements</option>
+            {views.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div
+        className={
+          compare
+            ? "grid grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] items-start gap-5"
+            : "max-w-72"
+        }
+      >
+        {(compare ? views : active ? [active] : []).map((view) => {
+          const resolved = metaPreviewMedia(content, view.id);
+          const { media } = resolved;
+          const issue = resolved.issue;
+          return (
+            <section
+              key={view.id}
+              className="space-y-3"
+              aria-label={view.label}
+            >
+              {compare && <h6 className="text-sm font-medium">{view.label}</h6>}
+              {view.kind !== "feed" && media.length > 1 && (
+                <p className="text-xs text-muted-foreground">
+                  Recovered carousel preview. Publishing vertical carousel
+                  variants is not supported yet.
+                </p>
+              )}
+              {issue ? (
+                <div className="space-y-3 rounded-lg border border-dashed p-5 text-sm">
+                  <p>{issue}</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      document.getElementById(`ad-${ad.id}`)?.scrollIntoView({
+                        behavior: "smooth",
+                        block: "start",
+                      });
+                      window.dispatchEvent(
+                        new CustomEvent("prepare-ad-creative", {
+                          detail: {
+                            adId: ad.id,
+                            shape: view.kind === "feed" ? "portrait" : "story",
+                          },
+                        }),
+                      );
+                    }}
+                  >
+                    Review ad creative
+                  </Button>
+                </div>
+              ) : (
+                <CompactAdMock
+                  publisher={view.publisher}
+                  verticalKind={view.kind === "reel" ? "reel" : "story"}
+                  surface={view.surface}
+                  crop={
+                    content.ideaStudio?.document.shapes.includes("portrait")
+                      ? "portrait"
+                      : (content.ideaStudio?.document.shapes[0] ?? "portrait")
+                  }
+                  brandName={brandName}
+                  brandLogo={brandLogo}
+                  body={content.body}
+                  headline={content.headline}
+                  link={content.linkUrl ?? null}
+                  callToAction={
+                    content.callToAction ?? META_DEFAULT_CALL_TO_ACTION
+                  }
+                  media={media}
+                  card={Math.min(card, Math.max(0, media.length - 1))}
+                  onCard={setCard}
+                />
+              )}
+            </section>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

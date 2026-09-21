@@ -24,12 +24,15 @@ const SPEND_CAPABLE = [
 
 /** Local rows only: safe to expose everywhere, including MCP. */
 const LOCAL_ONLY = [
+  "setAdStatus",
+  "planPlatform",
   "draftCampaign",
   "draftAd",
   "addAudience",
   "setCreativePool",
   "setPlatformDraft",
   "attachCampaign",
+  "importMetaCampaign",
   "deleteCampaignDraft",
   "deleteAudience",
   "deleteAdDraft",
@@ -47,6 +50,7 @@ describe("ads action policy", () => {
     it(`${action} stays a local write needing no approval`, () => {
       expect(adsWrite[action].consequence).toBe("local-write");
       expect(adsWrite[action].approval).toBe("none");
+      expect(adsWrite[action].surfaces).toContain("mcp");
     });
   }
 

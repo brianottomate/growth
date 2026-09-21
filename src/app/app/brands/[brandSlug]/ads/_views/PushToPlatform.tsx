@@ -40,6 +40,8 @@ export function PushToPlatform({
   audienceCount,
   budget,
   budgetType,
+  configuration,
+  intent = "push",
 }: {
   campaignId: string;
   brandSlug: string;
@@ -48,6 +50,13 @@ export function PushToPlatform({
   audienceCount: number;
   budget: number | null;
   budgetType: string | null;
+  configuration?: {
+    connectionAccountId: string;
+    adAccountId: string;
+    goal: AdPushGoal;
+    label: string;
+  };
+  intent?: "push" | "validate";
 }) {
   const spec = requireAdPlatformSpec(platform);
   const platformName = spec.shortLabel;
@@ -60,7 +69,8 @@ export function PushToPlatform({
   const trpc = useTRPC();
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [goal, setGoal] = useState<AdPushGoal>(goals[0] ?? "traffic");
+  const [selectedGoal, setGoal] = useState<AdPushGoal>(goals[0] ?? "traffic");
+  const goal = configuration?.goal ?? selectedGoal;
   const [destinationKey, setDestinationKey] = useState("");
 
   const destinations = useQuery(
@@ -82,9 +92,13 @@ export function PushToPlatform({
     connectionAccountId: row.connectionAccountId,
     adAccountId: row.adAccountId,
   }));
-  const chosen =
-    options.find((option) => option.key === destinationKey) ??
-    (options.length === 1 ? options[0] : undefined);
+  const chosen = configuration
+    ? {
+        ...configuration,
+        key: `${configuration.connectionAccountId}:${configuration.adAccountId}`,
+      }
+    : (options.find((option) => option.key === destinationKey) ??
+      (options.length === 1 ? options[0] : undefined));
 
   const push = useMutation(
     trpc.ads.pushDraftToPlatform.mutationOptions({
@@ -93,7 +107,8 @@ export function PushToPlatform({
         // platform campaign it just made real.
         if (!result.validateOnly) {
           setOpen(false);
-          if ("path" in result && result.path) router.push(result.path);
+          if (configuration) router.refresh();
+          else if ("path" in result && result.path) router.push(result.path);
           else router.refresh();
         }
       },
@@ -109,14 +124,21 @@ export function PushToPlatform({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm">
+        <Button
+          size="sm"
+          variant={intent === "validate" ? "outline" : "default"}
+        >
           <UploadCloud className="size-3.5" />
-          Push to {platformName}
+          {intent === "validate" ? "Validate" : `Push to ${platformName}`}
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Push this plan to {platformName}?</DialogTitle>
+          <DialogTitle>
+            {intent === "validate"
+              ? `Validate ${platformName} delivery`
+              : `Push this plan to ${platformName}?`}
+          </DialogTitle>
           <DialogDescription>
             Compiles {setSummary} × {draftAdCount} ad
             {draftAdCount === 1 ? "" : "s"} at{" "}
@@ -126,44 +148,63 @@ export function PushToPlatform({
             — all PAUSED. Nothing spends until you hit Launch afterwards.
           </DialogDescription>
         </DialogHeader>
+        {configuration && (
+          <p className="text-sm">
+            {configuration.label} · {goal}
+          </p>
+        )}
         <div className="space-y-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="push-destination">Ad account</Label>
-            <select
-              id="push-destination"
-              value={chosen?.key ?? ""}
-              onChange={(event) => setDestinationKey(event.target.value)}
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-            >
-              <option value="" disabled>
-                {destinations.isPending
-                  ? "Loading destinations…"
-                  : options.length === 0
-                    ? "No allowlisted destination"
-                    : "Pick the ad account"}
-              </option>
-              {options.map((option) => (
-                <option key={option.key} value={option.key}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="push-goal">Goal</Label>
-            <select
-              id="push-goal"
-              value={goal}
-              onChange={(event) => setGoal(event.target.value as typeof goal)}
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-            >
-              {goals.map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
-          </div>
+          {!configuration && (
+            <>
+              <div className="space-y-1.5">
+                <Label htmlFor="push-destination">Ad account</Label>
+                <select
+                  id="push-destination"
+                  value={chosen?.key ?? ""}
+                  onChange={(event) => setDestinationKey(event.target.value)}
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  <option value="" disabled>
+                    {destinations.isPending
+                      ? "Loading destinations…"
+                      : options.length === 0
+                        ? "No allowlisted destination"
+                        : "Pick the ad account"}
+                  </option>
+                  {options.map((option) => (
+                    <option key={option.key} value={option.key}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="push-goal">Goal</Label>
+                <select
+                  id="push-goal"
+                  value={goal}
+                  onChange={(event) =>
+                    setGoal(event.target.value as typeof goal)
+                  }
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  {goals.map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
+          {dryRunReason && (
+            <p className="text-sm text-muted-foreground">
+              {dryRunReason}. Review Setup and Projection before pushing paused.
+            </p>
+          )}
+          {destinations.error && (
+            <p role="alert">{destinations.error.message}</p>
+          )}
           {budget == null && (
             <p className="text-xs text-amber-400">
               Set the budget on the {platformName} draft first — the push sends
@@ -195,23 +236,25 @@ export function PushToPlatform({
           >
             Dry run
           </Button>
-          <Button
-            size="sm"
-            disabled={!canPush}
-            loading={push.isPending}
-            onClick={() =>
-              chosen &&
-              push.mutate({
-                campaignId,
-                platform,
-                connectionAccountId: chosen.connectionAccountId,
-                adAccountId: chosen.adAccountId,
-                goal,
-              })
-            }
-          >
-            Push paused
-          </Button>
+          {intent === "push" && (
+            <Button
+              size="sm"
+              disabled={!canPush}
+              loading={push.isPending}
+              onClick={() =>
+                chosen &&
+                push.mutate({
+                  campaignId,
+                  platform,
+                  connectionAccountId: chosen.connectionAccountId,
+                  adAccountId: chosen.adAccountId,
+                  goal,
+                })
+              }
+            >
+              Push paused
+            </Button>
+          )}
         </DialogFooter>
         {push.isSuccess && push.data.validateOnly && (
           <p className="text-xs text-emerald-400">

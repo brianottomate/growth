@@ -271,7 +271,23 @@ export function OverviewChat({
       body: () => requestBodyRef.current,
     }),
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
-    onFinish: onThreadFinish,
+    onFinish: ({ message }) => {
+      // Reconcile once more after the whole turn: concurrent writes can finish
+      // while an earlier server-component refresh is still in flight.
+      const saved = message.parts.some((part) => {
+        if (!isToolUIPart(part)) return false;
+        const completed = completedCapability(part);
+        return (
+          completed &&
+          capabilityWritesWorkspace(getToolName(part), completed.data)
+        );
+      });
+      if (saved) {
+        void queryClient.invalidateQueries();
+        router.refresh();
+      }
+      onThreadFinish?.();
+    },
   });
 
   const busy = status === "submitted" || status === "streaming";

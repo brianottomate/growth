@@ -33,6 +33,7 @@ export function cardsForSurface(
 }
 
 export type WallAd = {
+  updatedAt?: string;
   id: string;
   name: string;
   status: "drawn" | "approved";
@@ -62,6 +63,7 @@ export type AdState = "draft" | "pushed" | "live";
  * anything not approved is a draft.
  */
 export function toWallAd(ad: {
+  updatedAt?: Date;
   id: string;
   name: string;
   status: string;
@@ -76,6 +78,7 @@ export function toWallAd(ad: {
     const text = content;
     return {
       id: ad.id,
+      updatedAt: ad.updatedAt?.toISOString(),
       name: ad.name,
       status,
       format: "static",
@@ -99,6 +102,7 @@ export function toWallAd(ad: {
   const cardUrl = (url: string) => (bare ? withPhotoOnly(url) : url);
   return {
     id: ad.id,
+    updatedAt: ad.updatedAt?.toISOString(),
     name: ad.name,
     status,
     format: adFormatOf(creative),

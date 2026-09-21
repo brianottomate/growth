@@ -1,0 +1,94 @@
+import { expect, it } from "bun:test";
+import { importedIdea, inspectMetaCreative } from "./meta-import";
+import {
+  metaPreviewMedia,
+  metaPreviewPlacements,
+  importedPlacementLabel,
+} from "./meta-preview";
+import { metaPlacementMedia } from "./meta-placement-plan";
+import type { AdCreativeContent } from "@/server/db/ads-schema";
+const copy = {
+  headline: "Stay",
+  body: "In the mountains",
+  linkUrl: "https://example.com",
+  callToAction: "BOOK_NOW",
+};
+const document = importedIdea(
+  copy,
+  [
+    {
+      hash: "a",
+      assetId: "a",
+      url: "https://example.com/feed.jpg",
+      width: 1080,
+      height: 1350,
+    },
+    {
+      hash: "b",
+      assetId: "b",
+      url: "https://example.com/story.jpg",
+      width: 1080,
+      height: 1920,
+    },
+  ],
+  inspectMetaCreative({
+    asset_feed_spec: {
+      optimization_type: "PLACEMENT",
+      images: [{ hash: "a" }, { hash: "b" }],
+    },
+  }),
+);
+const imported: AdCreativeContent = {
+  ...copy,
+  media: [],
+  ideaStudio: { document },
+  metaImport: {
+    campaignId: "c",
+    adId: "a",
+    creativeId: "cr",
+    importedAt: "now",
+    issues: ["Review copy"],
+    rawCreative: {},
+  },
+};
+it("previews recovered artwork without local approval, while delivery stays blocked", () => {
+  expect(metaPreviewPlacements(imported, [])).toContain("facebook-feed");
+  expect(metaPreviewMedia(imported, "facebook-feed").media[0]?.url).toBe(
+    "https://example.com/feed.jpg",
+  );
+  expect(metaPreviewMedia(imported, "instagram-story").media[0]?.url).toBe(
+    "https://example.com/story.jpg",
+  );
+  expect(metaPlacementMedia(imported, "facebook-feed").issue).toContain(
+    "review",
+  );
+});
+it("uses the explicit delivery plan when set and never fills missing vertical artwork with a crop", () => {
+  expect(metaPreviewPlacements(imported, ["instagram-feed"])).toEqual([
+    "instagram-feed",
+  ]);
+  const missing = {
+    ...imported,
+    ideaStudio: {
+      document: {
+        ...document,
+        cards: document.cards.map((c) => ({ ...c, sourceOverrides: {} })),
+      },
+    },
+  };
+  expect(metaPreviewMedia(missing, "instagram-story").media).toEqual([]);
+  expect(metaPreviewMedia(missing, "instagram-story").issue).toContain(
+    "Missing",
+  );
+});
+it("labels automatic source settings without pretending manual selection or observed delivery", () => {
+  expect(importedPlacementLabel([{ targeting: { age_min: 18 } }])).toContain(
+    "Automatic",
+  );
+  expect(
+    importedPlacementLabel([
+      { targeting: { publisher_platforms: ["facebook"] } },
+    ]),
+  ).not.toContain("Automatic");
+  expect(importedPlacementLabel([])).not.toContain("Automatic");
+});

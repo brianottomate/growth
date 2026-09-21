@@ -1238,6 +1238,7 @@ export type CreateZernioStandaloneAdInput = {
   validateOnly?: boolean;
   /** Meta only: one asset per placement on a single-image ad. */
   placementAssets?: ZernioPlacementAssets;
+  placements?: ZernioPlacementAssets["rules"][number]["placements"];
   promotedObject?: {
     pixelId?: string;
     customEventType?: string;
@@ -2096,4 +2097,31 @@ export function mapZernioPostToPlatformPosts(
       },
     };
   });
+}
+
+/** Read-only Meta inspection for importing a local working copy. */
+export async function getZernioMetaCreative(
+  creativeId: string,
+  accountId: string,
+) {
+  return zernioFetch<{ creative: Record<string, unknown> }>(
+    `/ads/creatives/${encodeURIComponent(creativeId)}?${new URLSearchParams({ accountId })}`,
+  );
+}
+export async function getZernioMetaAdSet(adSetId: string, accountId: string) {
+  return zernioFetch<{ adSet: Record<string, unknown> }>(
+    `/ads/ad-sets/${encodeURIComponent(adSetId)}?${new URLSearchParams({ accountId })}`,
+  );
+}
+export async function listZernioMetaImages(
+  accountId: string,
+  adAccountId: string,
+  after?: string,
+) {
+  return zernioFetch<{
+    data: { hash: string; url: string; width?: number; height?: number }[];
+    paging?: { after?: string | null };
+  }>(
+    `/ads/images?${new URLSearchParams({ accountId, adAccountId, limit: "100", ...(after ? { after } : {}) })}`,
+  );
 }

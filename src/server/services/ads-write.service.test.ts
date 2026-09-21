@@ -115,11 +115,11 @@ describe("tagMetaAdUtms", () => {
         { imageUrl: "https://cdn/y.jpg", headline: "No Link" },
       ],
     });
-    const card0 = new URL(out.carouselCards?.[0]?.linkUrl ?? "");
+    const card0 = new URL(out.carouselCards![0]!.linkUrl!);
     expect(card0.searchParams.get("utm_content")).toBe("Roam River");
     expect(card0.searchParams.get("utm_campaign")).toBe("camp");
     // No own link → stays undefined so it inherits the tagged ad-level link.
-    expect(out.carouselCards?.[1]?.linkUrl).toBeUndefined();
+    expect(out.carouselCards![1]!.linkUrl).toBeUndefined();
   });
 
   it("tags each multi-creative link by creative name", () => {
@@ -135,7 +135,7 @@ describe("tagMetaAdUtms", () => {
         },
       ],
     });
-    const u = new URL(out.creatives?.[0]?.linkUrl ?? "");
+    const u = new URL(out.creatives![0]!.linkUrl!);
     expect(u.searchParams.get("utm_content")).toBe("cr_a");
   });
 });

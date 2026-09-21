@@ -1,3 +1,10 @@
+import {
+  importMetaCampaign,
+  importMetaCampaignSchema,
+} from "@/server/services/meta-campaign-import.service";
+import { metaPlacementPlanSchema } from "@/lib/meta-placement-plan";
+import { ideaSaveSchema, ideaExportShapesSchema } from "@/lib/ad-idea-studio";
+import { saveAdIdea } from "@/server/services/ad-idea-studio.service";
 import type { TRPCRouterRecord } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
 import { and, eq } from "drizzle-orm";
@@ -53,6 +60,9 @@ import {
 } from "@/server/services/ads-write.service";
 import {
   addDraftAd,
+  addStarterAdIdeas,
+  starterIdeaHomes,
+  adIdeaHomePhotos,
   addAudience,
   deleteDraftAd,
   deleteAudience,
@@ -168,12 +178,11 @@ export const adsRouter = {
     .input(
       z.object({
         brandId: z.string().min(1),
-        name: z.string().trim().min(1).max(300),
+        name: z.string().trim().min(1).max(300).optional(),
         platforms: z
           .array(z.enum(PLANNABLE_AD_PLATFORMS))
-          .min(1)
           .max(PLANNABLE_AD_PLATFORMS.length)
-          .default(["meta_ads"]),
+          .default([]),
         goal: z.string().trim().max(200).nullish(),
         landingUrl: z.string().url().nullish(),
         description: z.string().trim().max(2000).nullish(),
@@ -221,6 +230,47 @@ export const adsRouter = {
       writeSetCopy({
         brandId: input.brandId,
         orgId: await organizationIdFor(ctx),
+      }),
+    ),
+
+  saveIdea: protectedProcedure
+    .input(ideaSaveSchema)
+    .mutation(async ({ ctx, input }) =>
+      saveAdIdea(input, {
+        orgId: await organizationIdFor(ctx),
+        userId: ctx.session.user.id,
+      }),
+    ),
+
+  adIdeaHomePhotos: protectedProcedure
+    .input(z.object({ adId: z.string().min(1) }))
+    .query(async ({ ctx, input }) =>
+      adIdeaHomePhotos({
+        ...input,
+        organizationId: await organizationIdFor(ctx),
+      }),
+    ),
+  starterIdeaHomes: protectedProcedure
+    .input(z.object({ campaignId: z.string().min(1) }))
+    .query(async ({ ctx, input }) =>
+      starterIdeaHomes({
+        ...input,
+        organizationId: await organizationIdFor(ctx),
+      }),
+    ),
+  /** Editable starter ideas, blank or prefilled from selected homes. */
+  addStarterIdeas: protectedProcedure
+    .input(
+      z.object({
+        campaignId: z.string().min(1),
+        source: z.enum(["blank", "featured"]).default("blank"),
+        homeIds: z.array(z.string().min(1)).min(1).max(10).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      addStarterAdIdeas({
+        ...input,
+        organizationId: await organizationIdFor(ctx),
       }),
     ),
 
@@ -344,6 +394,8 @@ export const adsRouter = {
       z.object({
         adId: z.string().min(1),
         status: z.enum(["drawn", "approved"]),
+        expectedUpdatedAt: z.string().datetime().optional(),
+        exportShapes: ideaExportShapesSchema.optional(),
       }),
     )
     .mutation(async ({ ctx, input }) =>
@@ -351,6 +403,9 @@ export const adsRouter = {
         adId: input.adId,
         orgId: await organizationIdFor(ctx),
         status: input.status,
+        expectedUpdatedAt: input.expectedUpdatedAt,
+        exportShapes: input.exportShapes,
+        userId: ctx.session.user.id,
       }),
     ),
 
@@ -588,12 +643,23 @@ export const adsRouter = {
       }),
     ),
 
+  importMetaCampaign: protectedProcedure
+    .input(importMetaCampaignSchema)
+    .mutation(async ({ ctx, input }) =>
+      importMetaCampaign(input, {
+        orgId: await organizationIdFor(ctx),
+        userId: ctx.session.user.id,
+      }),
+    ),
+
   setPlatformDraft: protectedProcedure
     .input(
       z.object({
         platformCampaignId: z.string().min(1),
         budget: z.number().int().positive().nullish(),
         budgetType: z.enum(["daily", "lifetime"]).nullish(),
+        startAt: z.coerce.date().nullish(),
+        endAt: z.coerce.date().nullish(),
         google: z
           .object({
             campaignType: z.enum(["search", "display"]).optional(),
@@ -619,6 +685,8 @@ export const adsRouter = {
             customEventType: z.string().trim().max(64).optional(),
             customConversionId: z.string().trim().max(64).optional(),
             budgetMode: z.enum(["cbo", "abo"]).optional(),
+            placements: metaPlacementPlanSchema.optional(),
+            importReviewed: z.boolean().optional(),
           })
           .nullish(),
         linkedin: z

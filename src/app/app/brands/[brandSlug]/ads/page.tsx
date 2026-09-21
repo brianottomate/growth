@@ -24,6 +24,7 @@ import { CopyButton } from "@/components/copy-button";
 
 import { AttachCampaign } from "./AttachCampaign";
 import { ImportCreativeButton } from "./_views/ImportCreativeButton";
+import { ImportMetaCampaignButton } from "./ImportMetaCampaignButton";
 import { NewCampaignButton } from "./NewCampaignButton";
 import { DeleteCampaignButton } from "./_views/DeleteCampaignButton";
 import { DefinePersonasButton } from "./DefinePersonasButton";
@@ -448,6 +449,7 @@ export default async function BrandAdsPage({
         </div>
         <div className="flex items-center gap-2">
           <CopyButton text={md} label="Copy for ChatGPT / Claude" />
+          {brand.slug && <ImportMetaCampaignButton brandSlug={brand.slug} />}
           <NewCampaignButton
             brandId={brand.id}
             brandName={brand.name}

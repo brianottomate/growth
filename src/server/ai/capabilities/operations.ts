@@ -1042,23 +1042,34 @@ const listingPhotoShape = z.object({
  */
 export const listListingPhotos = growthAction({
   description:
-    "The homes on an owned brand's WanderOS site with each one's hero photo URL, straight from the site's feed. Nothing is imported. Use it to see what there is to work with, then mediaLibraryWrite.importListingPhotos for the ones worth keeping, or adsWrite.draftAdsFromHomes to turn them into cards in one step. Empty for a brand whose website is not a WanderOS site.",
+    "The homes on an owned brand's WanderOS site with each one's hero photo URL, straight from the site's feed. Search by home name, listing ID or URL with query; paginate with offset/nextOffset to reach the whole portfolio. Nothing is imported. Use it to see what there is to work with, then mediaLibraryWrite.importListingPhotos for the ones worth keeping, or adsWrite.draftAdsFromHomes to turn them into cards in one step. Empty for a brand whose website is not a WanderOS site.",
   inputSchema: z.object({
     brandId: z.string(),
+    query: z.string().trim().max(200).optional(),
+    offset: z.number().int().min(0).default(0),
     limit: z.number().int().min(1).max(48).default(24),
   }),
   outputSchema: z.object({
     brandId: z.string(),
     hasSite: z.boolean(),
     homes: z.array(listingPhotoShape),
+    total: z.number(),
+    nextOffset: z.number().nullable(),
   }),
-  execute: async ({ brandId, limit }, ctx) => {
+  execute: async ({ brandId, limit, query, offset }, ctx) => {
     const brand = await requireOwnedBrand(brandId, ctx);
-    const listings = (
+    const matching = (
       await brandListings({ id: brand.id, website: brand.website })
     )
       .filter((row) => row.imageUrl)
-      .slice(0, limit);
+      .filter(
+        (row) =>
+          !query ||
+          `${row.name} ${row.id} ${row.url}`
+            .toLowerCase()
+            .includes(query.toLowerCase()),
+      );
+    const listings = matching.slice(offset, offset + limit);
     const imported = await Promise.all(
       listings.map((row) =>
         findImportedImage({ brandId: brand.id, url: row.imageUrl! }),
@@ -1067,6 +1078,11 @@ export const listListingPhotos = growthAction({
     return {
       brandId: brand.id,
       hasSite: Boolean(brand.website),
+      total: matching.length,
+      nextOffset:
+        offset + listings.length < matching.length
+          ? offset + listings.length
+          : null,
       homes: listings.map((row, index) => ({
         name: row.name,
         url: row.url,

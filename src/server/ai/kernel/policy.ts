@@ -252,6 +252,7 @@ export const growthActionPolicies = {
     listDestinations: read("provider-read"),
     openCampaign: read(),
     listCampaigns: read(),
+    ideaHomePhotos: read(),
     // Renders via Meta's preview API; creates nothing.
     previewAd: read("provider-read"),
     diagnoseAlignment: read("model-read"),
@@ -271,6 +272,7 @@ export const growthActionPolicies = {
     buildAdSet: write({ idempotent: true, consequence: "model-write" }),
     setAdStatus: write({ idempotent: true }),
     setAdCopy: write({ idempotent: true }),
+    saveIdea: write(),
     // Shells, bindings and cards: local ad rows, no provider call.
     addAdShell: write(),
     createAdsFromAssets: write(),
@@ -292,6 +294,7 @@ export const growthActionPolicies = {
     setCreativePool: write({ idempotent: true }),
     setPlatformDraft: write({ idempotent: true }),
     attachCampaign: write({ idempotent: true }),
+    importMetaCampaign: write({ idempotent: true }),
     // Reads the provider's audiences; writes only Growth's mirror rows and
     // changes nothing on the ad account.
     pullPlatformAudiences: write({

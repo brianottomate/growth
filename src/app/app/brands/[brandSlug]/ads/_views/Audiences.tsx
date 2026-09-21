@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { Plus, Trash2, Users } from "lucide-react";
+import { Pencil, Plus, Trash2, Users } from "lucide-react";
 
+import { AudienceMap } from "@/components/audience-map";
+import { GeographyChips } from "@/components/geography-chips";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,6 +20,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Label } from "@/components/ui/label";
+import { sendAssistantIntent } from "@/lib/assistant-events";
 import { useTRPC } from "@/trpc/react";
 
 type AudienceRow = {
@@ -50,12 +53,18 @@ type PersonaOption = {
  */
 export function Audiences({
   campaignId,
+  campaignName,
+  brandId,
+  brandName,
   audiences,
   personas,
   geoPrefill,
   emptyActions,
 }: {
   campaignId: string;
+  campaignName: string;
+  brandId: string;
+  brandName: string;
   audiences: AudienceRow[];
   personas: PersonaOption[];
   /** Where this client's homes are, rolled up from their property rows. */
@@ -137,25 +146,6 @@ export function Audiences({
       .split(",")
       .map((part) => part.trim())
       .filter(Boolean);
-
-  const describe = (row: AudienceRow) =>
-    [
-      row.ageMin != null || row.ageMax != null
-        ? `${row.ageMin ?? "13"}–${row.ageMax ?? "65+"}`
-        : null,
-      [
-        ...(row.geography?.cities ?? []),
-        ...(row.geography?.regions ?? row.geography?.states ?? []),
-        ...(row.geography?.countries ?? []),
-      ]
-        .slice(0, 3)
-        .join(", ") || null,
-      row.keywords?.length
-        ? `${row.keywords.length} keyword suggestion${row.keywords.length === 1 ? "" : "s"}`
-        : null,
-    ]
-      .filter(Boolean)
-      .join(" · ");
 
   return (
     <div className="space-y-2">
@@ -343,6 +333,7 @@ export function Audiences({
             </DialogContent>
           </Dialog>
         </div>
+        {emptyActions}
       </div>
 
       {audiences.length === 0 ? (
@@ -362,39 +353,94 @@ export function Audiences({
           }
         />
       ) : (
-        <div className="divide-y divide-white/5 rounded-xl border bg-card px-3.5 py-1">
-          {audiences.map((row) => (
-            <div
-              key={row.id}
-              className="flex items-center justify-between gap-3 py-2"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">
-                  {row.name}
-                  {row.persona && (
-                    <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                      · {row.persona.name}
-                    </span>
-                  )}
-                </p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {describe(row) || "Broad"}
-                </p>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  tone="muted"
-                  className="h-7"
-                  disabled={remove.isPending}
-                  onClick={() => remove.mutate({ audienceId: row.id })}
-                >
-                  <Trash2 className="size-3.5" />
-                </Button>
-              </div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <section className="space-y-4 rounded-xl border bg-card p-5">
+            <div>
+              <h3 className="font-semibold">Guest-origin coverage</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Where this campaign will look for guests. Each audience becomes
+                a separate ad set.
+              </p>
             </div>
-          ))}
+            {audiences.map((row) => (
+              <div key={row.id} className="space-y-3 rounded-xl border p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold">{row.name}</p>
+                    {row.persona && (
+                      <p className="text-xs text-muted-foreground">
+                        {row.persona.name}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      tone="muted"
+                      className="h-7"
+                      aria-label={`Edit ${row.name} in chat`}
+                      title="Edit audience in chat"
+                      onClick={() =>
+                        sendAssistantIntent({
+                          type: "work_ad_campaign",
+                          brandId,
+                          brandName,
+                          campaignId,
+                          campaignName,
+                          focus: "audiences",
+                          visibleText: `Help me edit the audience “${row.name}” (${row.id}) in “${campaignName}”. Read its current settings and ask what I would like to change.`,
+                        })
+                      }
+                    >
+                      <Pencil className="size-3.5" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      tone="muted"
+                      className="h-7"
+                      aria-label={`Remove ${row.name}`}
+                      disabled={remove.isPending}
+                      onClick={() => remove.mutate({ audienceId: row.id })}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <GeographyChips
+                    label="Countries"
+                    values={row.geography?.countries}
+                  />
+                  <GeographyChips
+                    label="States"
+                    values={row.geography?.states}
+                  />
+                  <GeographyChips
+                    label="Regions"
+                    values={row.geography?.regions}
+                  />
+                  <GeographyChips
+                    label="Cities"
+                    values={row.geography?.cities}
+                  />
+                  <GeographyChips
+                    label="Keyword suggestions"
+                    values={row.keywords ?? undefined}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {row.ageMin != null || row.ageMax != null
+                      ? `Ages ${row.ageMin ?? 13}–${row.ageMax ?? "65+"}`
+                      : "No age narrowing"}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </section>
+          <aside className="space-y-4 rounded-xl border bg-card p-5">
+            <AudienceMap audiences={audiences} />
+          </aside>
         </div>
       )}
       {remove.error && (

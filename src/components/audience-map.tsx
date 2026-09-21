@@ -1,0 +1,178 @@
+"use client";
+
+import { useId, useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  audienceMapTarget,
+  audienceMapCoverage,
+  type AudienceGeography,
+} from "@/lib/audience-map";
+import { usStateCode } from "@/lib/us-states";
+import maps from "@/lib/maps/audience-maps.json";
+
+type MapAudience = {
+  id: string;
+  name: string;
+  geography: AudienceGeography | null;
+};
+export function AudienceMap({ audiences }: { audiences: MapAudience[] }) {
+  const [selection, setSelection] = useState("all");
+  const [view, setView] = useState<"us" | "world">(() =>
+    audiences.some((a) => audienceMapTarget(a.geography).countries.has("US"))
+      ? "us"
+      : "world",
+  );
+  const [hover, setHover] = useState<string | null>(null);
+  const labelId = useId();
+  const current = audiences.some((a) => a.id === selection) ? selection : "all";
+  const selected =
+    current === "all" ? audiences : audiences.filter((a) => a.id === current);
+  const targets = selected.map((a) => audienceMapTarget(a.geography));
+  const map = maps[view];
+  const missingCountries =
+    view === "world"
+      ? [...new Set(targets.flatMap((t) => [...t.countries]))].filter(
+          (code) => !maps.world.paths.some((p) => p.id === code),
+        )
+      : [];
+  const partialCountries = maps.world.paths
+    .filter((p) => audienceMapCoverage(targets, "world", p.id) === "partial")
+    .map((p) => p.name);
+
+  const fullUS = targets.some((t) => t.countries.has("US") && !t.narrowed);
+  const unmapped = [...new Set(targets.flatMap((t) => t.unlocated))];
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="font-semibold">Audience coverage</h3>
+        <div className="flex gap-1" aria-label="Map view">
+          {(["us", "world"] as const).map((value) => (
+            <Button
+              key={value}
+              size="sm"
+              variant={view === value ? "secondary" : "ghost"}
+              aria-pressed={view === value}
+              onClick={() => {
+                setView(value);
+                setHover(null);
+              }}
+            >
+              {value === "us" ? "US" : "World"}
+            </Button>
+          ))}
+        </div>
+      </div>
+      <label htmlFor={labelId} className="sr-only">
+        Audience shown on map
+      </label>
+      <select
+        id={labelId}
+        value={current}
+        onChange={(event) => {
+          setSelection(event.target.value);
+          setHover(null);
+        }}
+        className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+      >
+        <option value="all">All audiences</option>
+        {audiences.map((a) => (
+          <option key={a.id} value={a.id}>
+            {a.name}
+          </option>
+        ))}
+      </select>
+      <svg
+        viewBox={map.viewBox}
+        role="img"
+        aria-label={`${view === "us" ? "United States" : "World"} targeting coverage for ${current === "all" ? "all audiences" : selected[0]?.name}`}
+        className="w-full"
+        onMouseLeave={() => setHover(null)}
+      >
+        {map.paths.map((place) => {
+          const id =
+            view === "us" ? (usStateCode(place.name) ?? place.id) : place.id;
+          const coverage = audienceMapCoverage(targets, view, id);
+          const description = `${place.name}: ${coverage === "full" ? "targeted" : coverage === "partial" ? "selected locations only" : "not highlighted"}`;
+          return (
+            <path
+              key={place.id}
+              d={place.d ?? undefined}
+              fill={
+                coverage === "none"
+                  ? "var(--color-muted)"
+                  : "var(--color-foreground)"
+              }
+              fillOpacity={
+                coverage === "partial" ? 0.55 : coverage === "full" ? 0.8 : 1
+              }
+              stroke="var(--color-background)"
+              strokeWidth={0.8}
+              vectorEffect="non-scaling-stroke"
+              onMouseEnter={() => setHover(description)}
+            >
+              <title>{description}</title>
+            </path>
+          );
+        })}
+      </svg>
+      <p className="min-h-8 text-xs text-muted-foreground" aria-live="polite">
+        {hover ?? "Hover over a state or country to see coverage."}
+      </p>
+      <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+        <span className="flex items-center gap-1.5">
+          <span className="size-2.5 rounded-sm bg-foreground opacity-80" />
+          Targeted
+        </span>
+        {view === "world" && (
+          <span className="flex items-center gap-1.5">
+            <span className="size-2.5 rounded-sm bg-foreground opacity-55" />
+            Selected locations
+          </span>
+        )}
+        <span className="flex items-center gap-1.5">
+          <span className="size-2.5 rounded-sm border bg-muted" />
+          Not highlighted
+        </span>
+      </div>
+      {view === "us" && fullUS && (
+        <p className="text-xs text-muted-foreground">
+          Nationwide US targeting. Select an individual audience to inspect
+          narrower coverage.
+        </p>
+      )}
+      {view === "world" && partialCountries.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          Selected locations within {partialCountries.join(", ")}; not the
+          entire country.
+        </p>
+      )}
+      {missingCountries.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          Country outlines unavailable at this scale:{" "}
+          {missingCountries.join(", ")}.
+        </p>
+      )}
+      {unmapped.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          Not plotted at this scale: {unmapped.join(", ")}. See the audience’s
+          location details.
+        </p>
+      )}
+      {view === "us" &&
+        targets.some((t) => [...t.countries].some((c) => c !== "US")) && (
+          <p className="text-xs text-muted-foreground">
+            Other countries are selected. Switch to World to see them.
+          </p>
+        )}
+      {targets.every((t) => !t.countries.size && !t.states.size) && (
+        <p className="text-xs text-muted-foreground">
+          No country or state coverage to display.
+        </p>
+      )}
+      <p className="text-xs text-muted-foreground">
+        Planned targeting · audiences may overlap. This map does not show
+        bookings or estimated reach.
+      </p>
+    </div>
+  );
+}

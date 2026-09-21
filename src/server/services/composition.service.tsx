@@ -773,7 +773,13 @@ export function renderComposition(
             tone={spec.mark}
             inverse
           />
-          <div style={{ display: "flex", maxWidth: portrait ? "92%" : "64%" }}>
+          <div
+            style={{
+              display: "flex",
+              marginTop: "auto",
+              maxWidth: portrait ? "92%" : "64%",
+            }}
+          >
             <Message spec={spec} color="#ffffff" titleSize={titleSize} />
           </div>
         </div>

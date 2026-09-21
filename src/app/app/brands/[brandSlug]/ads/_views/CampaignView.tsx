@@ -1,3 +1,4 @@
+import { isImportedMetaCatalog } from "@/lib/meta-import";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
@@ -14,7 +15,8 @@ import { getDraftCampaign } from "@/server/services/ads-draft.service";
 import { brandListings } from "@/server/services/wanderos-listings.service";
 import { toWallAd, type AdState, type WallAd } from "@/lib/ad-wall";
 import { AddAdDialog } from "@/app/app/performance/brands/[brandSlug]/ads/AddAdDialog";
-import { AdWall } from "./AdWall";
+import { AdIdeasList } from "./AdIdeasList";
+import { AdTile } from "./AdWall";
 import { CreativeDrop } from "@/app/app/performance/brands/[brandSlug]/ads/CreativeDrop";
 import type { PickableHome } from "@/app/app/performance/brands/[brandSlug]/HomePicker";
 
@@ -22,11 +24,10 @@ import { AskAssistantButton } from "./AskAssistantButton";
 import { Audiences } from "./Audiences";
 import { CreativePool } from "./CreativePool";
 import { DeleteCampaignButton } from "./DeleteCampaignButton";
-import { DraftFromHomesButton } from "./DraftFromHomesButton";
+import { AddStarterIdeasButton } from "./AddStarterIdeasButton";
 import { money } from "./format";
 import { PlanPlatformButton } from "./PlanPlatformButton";
 import { PlatformSection } from "./PlatformSection";
-import { Projected } from "./Projected";
 import { WorkInChatButton } from "./WorkInChatButton";
 
 /**
@@ -43,7 +44,6 @@ import { WorkInChatButton } from "./WorkInChatButton";
 export async function CampaignView({
   brandSlug,
   campaignId,
-  group = "home",
 }: {
   brandSlug: string;
   campaignId: string;
@@ -159,7 +159,6 @@ export async function CampaignView({
       : "—";
 
   const pool = campaign.creativePool ?? [];
-  const homesRun = campaign.homesRun ?? null;
   const ask = (
     focus: "photos" | "ads" | "audiences" | "platforms" | "live",
     text: string,
@@ -175,6 +174,9 @@ export async function CampaignView({
     />
   );
 
+  const editableAds = ads.filter(
+    (ad) => !("media" in ad.content) || !isImportedMetaCatalog(ad.content),
+  );
   return (
     <div className="space-y-8">
       <header className="space-y-3">
@@ -255,261 +257,204 @@ export async function CampaignView({
         </div>
       </header>
 
-      <ol className="space-y-8">
-        <Step
-          title="Ads"
-          meta={
-            ads.length > 0
-              ? [
-                  `${ads.length} ad${ads.length === 1 ? "" : "s"}`,
-                  Object.values(states).length > 0
-                    ? `${Object.values(states).length} on a platform`
-                    : null,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")
-              : undefined
-          }
-          actions={
-            <>
-              <DraftFromHomesButton
-                campaignId={campaign.id}
-                brandId={brand.id}
-                lastRun={homesRun}
-                label={homesRun ? "Homes run" : "From their homes"}
-              />
-              <AddAdDialog
-                brandId={brand.id}
-                homes={homes}
-                campaignId={campaign.id}
-              />
-              {ads.length > 0 ? (
-                <span className="flex items-center gap-0.5 text-xs">
-                  <Link
-                    href="?group=home"
-                    className={cn(
-                      "rounded-full px-2 py-0.5",
-                      group !== "format"
-                        ? "bg-accent text-foreground"
-                        : "text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    By home
-                  </Link>
-                  <Link
-                    href="?group=format"
-                    className={cn(
-                      "rounded-full px-2 py-0.5",
-                      group === "format"
-                        ? "bg-accent text-foreground"
-                        : "text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    By format
-                  </Link>
-                </span>
-              ) : null}
-              {ads.length > 0
-                ? ask("ads", `Review the ads for “${campaign.name}”`)
-                : null}
-            </>
-          }
-        >
-          <div className="space-y-4">
-            {wall.length === 0 ? (
-              <EmptyState
-                compact
-                icon={Radio}
-                title="No ads yet"
-                description="Draft them from their homes, add shells to fill, or drop finished creatives."
-                actions={
-                  <>
-                    <DraftFromHomesButton
-                      campaignId={campaign.id}
-                      brandId={brand.id}
-                      lastRun={homesRun}
-                      variant="default"
-                    />
-                    {ask("ads", `Draft the ads for “${campaign.name}”`)}
-                  </>
-                }
-              />
-            ) : (
-              <AdWall
+      <section className="space-y-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <AddStarterIdeasButton campaignId={campaign.id} />
+          <AddAdDialog
+            brandId={brand.id}
+            homes={homes}
+            campaignId={campaign.id}
+          />
+          {ask("ads", `Review the ads for “${campaign.name}”`)}
+        </div>
+        <AdIdeasList
+          ads={ads}
+          brandId={brand.id}
+          brandName={brandName}
+          brandLogo={brand.logo}
+          states={states}
+          fallback={(id) => (
+            <ul>
+              <AdTile
                 brandId={brand.id}
                 brandSlug={brandSlug}
                 brandName={brandName}
                 brandLogo={brand.logo}
                 landingUrl={campaign.landingUrl}
                 homes={homes}
-                ads={wall}
+                ad={wall.find((ad) => ad.id === id)!}
                 states={states}
-                title="Ads"
-                groupBy={group}
+                surface="instagram"
+                allowHomeBinding={false}
               />
-            )}
-            {anyPushed ? null : (
-              <CreativeDrop
-                brandId={brand.id}
-                homes={homes}
-                campaignId={campaign.id}
-              />
-            )}
+            </ul>
+          )}
+        />
+        <details className="rounded-xl border p-4">
+          <summary className="cursor-pointer text-sm font-medium">
+            Import finished creative
+          </summary>
+          <div className="mt-4">
+            <CreativeDrop
+              brandId={brand.id}
+              homes={homes}
+              campaignId={campaign.id}
+            />
           </div>
-        </Step>
-
-        <Step
-          title="Projected"
-          meta={
-            planned.length > 0
-              ? planned.map((row) => platformLabel(row.platform)).join(", ")
-              : undefined
-          }
-        >
-          {planned.length === 0 ? (
-            <EmptyState
-              compact
-              icon={Radio}
-              title="No projection yet"
-              description="Plan a platform below to preview how these ideas render on it — a feed card on Meta, a search result on Google."
+        </details>
+        <details className="rounded-xl border p-4">
+          <summary className="cursor-pointer text-sm font-medium">
+            Campaign assets · {pool.length} photos
+          </summary>
+          <div className="mt-4">
+            <CreativePool
+              campaignId={campaign.id}
+              brandId={brand.id}
+              pool={pool}
+              askAssistant={ask("photos", `Find photos for “${campaign.name}”`)}
             />
-          ) : wall.length === 0 ? (
-            <EmptyState
-              compact
-              icon={Radio}
-              title="Nothing to project"
-              description="Add an idea above to see it rendered per platform."
-            />
-          ) : (
-            <Projected
-              brandName={brandName}
-              brandLogo={brand.logo}
-              landingUrl={campaign.landingUrl}
-              planned={planned}
-              ads={wall}
-            />
-          )}
-        </Step>
-
-        <Step
-          title="Sources"
-          meta={
-            pool.length > 0
-              ? `${pool.length} photos the ads can draw from`
-              : "optional"
-          }
-        >
-          <CreativePool
-            campaignId={campaign.id}
-            brandId={brand.id}
-            pool={pool}
-            askAssistant={ask("photos", `Find photos for “${campaign.name}”`)}
-          />
-        </Step>
-
-        <Step
-          title="Audiences"
-          meta={
-            audiences.length > 0
-              ? `${audiences.length} ad set${audiences.length === 1 ? "" : "s"}`
-              : "broad"
-          }
-        >
-          <Audiences
-            campaignId={campaign.id}
-            audiences={audiences}
-            personas={personas}
-            geoPrefill={prefill?.geography ?? null}
-            emptyActions={ask(
-              "audiences",
-              `Suggest audiences for “${campaign.name}”`,
-            )}
-          />
-        </Step>
-
-        <Step
-          title="Platforms"
-          meta={
-            planned.length > 0
-              ? planned.map((row) => platformLabel(row.platform)).join(", ")
-              : undefined
-          }
-          actions={
-            planned.length > 0 ? (
-              <PlanPlatformButton
-                campaignId={campaign.id}
-                planned={plannedPlatforms}
-              />
-            ) : null
-          }
-        >
-          {planned.length === 0 ? (
-            <EmptyState
-              compact
-              icon={Radio}
-              title="No platform yet"
-              description="Plan one to set its budget. Nothing reaches the platform until you push."
-              actions={
-                <>
-                  <PlanPlatformButton
-                    campaignId={campaign.id}
-                    planned={plannedPlatforms}
-                  />
-                  {ask(
-                    "platforms",
-                    `Plan the platforms for “${campaign.name}”`,
-                  )}
-                </>
-              }
-            />
-          ) : (
-            <div className="space-y-2">
-              {planned.map((platformCampaign) => (
-                <PlatformSection
-                  key={platformCampaign.id}
-                  brandSlug={brandSlug}
-                  campaignId={campaign.id}
-                  platformCampaign={platformCampaign}
-                  draftAdCount={ads.length}
-                  audienceCount={audiences.length}
-                  brandUrl={campaign.landingUrl ?? brand.website ?? null}
-                />
-              ))}
-            </div>
-          )}
-        </Step>
-
-        {anyPushed ? (
+          </div>
+        </details>
+      </section>
+      <section className="space-y-4 border-t pt-6">
+        <h2 className="font-semibold">Delivery</h2>
+        <p className="text-sm text-muted-foreground">
+          {
+            editableAds.filter(
+              (ad) =>
+                ad.status === "approved" &&
+                (!("media" in ad.content) ||
+                  !ad.content.ideaStudio ||
+                  ad.content.ideaStudio.approval),
+            ).length
+          }{" "}
+          of {editableAds.length} creative ads approved. Approve every creative
+          before pushing. Approval does not publish or start spending.
+        </p>
+        <ol className="space-y-8">
           <Step
-            title="Live"
-            meta={anyLive ? "spending" : "paused"}
-            actions={ask("live", `How is “${campaign.name}” doing?`)}
+            title="Audiences"
+            meta={
+              audiences.length > 0
+                ? `${audiences.length} ad set${audiences.length === 1 ? "" : "s"}`
+                : "broad"
+            }
           >
-            <div className="grid grid-cols-2 gap-3 @2xl:grid-cols-4">
-              <Stat
-                label="Spend"
-                value={money(totals.spend)}
-                sub={
-                  campaign.budget != null
-                    ? `of ${money(campaign.budget)} planned`
-                    : undefined
-                }
-              />
-              <Stat
-                label="Impressions"
-                value={
-                  totals.impressions ? totals.impressions.toLocaleString() : "—"
-                }
-              />
-              <Stat
-                label="Clicks"
-                value={totals.clicks ? totals.clicks.toLocaleString() : "—"}
-              />
-              <Stat label="CTR" value={ctr} />
-            </div>
+            <Audiences
+              campaignId={campaign.id}
+              campaignName={campaign.name}
+              brandId={brand.id}
+              brandName={brandName}
+              audiences={audiences}
+              personas={personas}
+              geoPrefill={prefill?.geography ?? null}
+              emptyActions={ask(
+                "audiences",
+                `Suggest audiences for “${campaign.name}”`,
+              )}
+            />
           </Step>
-        ) : null}
-      </ol>
+
+          <Step
+            title="Platforms"
+            meta={
+              planned.length > 0
+                ? planned.map((row) => platformLabel(row.platform)).join(", ")
+                : undefined
+            }
+            actions={
+              planned.length > 0 ? (
+                <PlanPlatformButton
+                  campaignId={campaign.id}
+                  planned={plannedPlatforms}
+                />
+              ) : null
+            }
+          >
+            {planned.length === 0 ? (
+              <EmptyState
+                compact
+                icon={Radio}
+                title="No platform yet"
+                description="Plan one to set its budget. Nothing reaches the platform until you push."
+                actions={
+                  <>
+                    <PlanPlatformButton
+                      campaignId={campaign.id}
+                      planned={plannedPlatforms}
+                    />
+                    {ask(
+                      "platforms",
+                      `Plan the platforms for “${campaign.name}”`,
+                    )}
+                  </>
+                }
+              />
+            ) : (
+              <div className="space-y-2">
+                {planned.map((platformCampaign) => (
+                  <PlatformSection
+                    brandName={brandName}
+                    brandLogo={brand.logo}
+                    key={platformCampaign.id}
+                    brandSlug={brandSlug}
+                    campaignId={campaign.id}
+                    platformCampaign={platformCampaign}
+                    campaignName={campaign.name}
+                    draftAds={ads}
+                    audiences={audiences}
+                    draftAdCount={ads.length}
+                    unapprovedCount={
+                      editableAds.filter(
+                        (ad) =>
+                          ad.status !== "approved" ||
+                          ("media" in ad.content &&
+                            ad.content.ideaStudio &&
+                            !ad.content.ideaStudio.approval),
+                      ).length
+                    }
+                    audienceCount={audiences.length}
+                    brandUrl={campaign.landingUrl ?? brand.website ?? null}
+                  />
+                ))}
+              </div>
+            )}
+          </Step>
+
+          {anyPushed ? (
+            <Step
+              title="Live"
+              meta={anyLive ? "spending" : "paused"}
+              actions={ask("live", `How is “${campaign.name}” doing?`)}
+            >
+              <div className="grid grid-cols-2 gap-3 @2xl:grid-cols-4">
+                <Stat
+                  label="Spend"
+                  value={money(totals.spend)}
+                  sub={
+                    campaign.budget != null
+                      ? `of ${money(campaign.budget)} planned`
+                      : undefined
+                  }
+                />
+                <Stat
+                  label="Impressions"
+                  value={
+                    totals.impressions
+                      ? totals.impressions.toLocaleString()
+                      : "—"
+                  }
+                />
+                <Stat
+                  label="Clicks"
+                  value={totals.clicks ? totals.clicks.toLocaleString() : "—"}
+                />
+                <Stat label="CTR" value={ctr} />
+              </div>
+            </Step>
+          ) : null}
+        </ol>
+      </section>
     </div>
   );
 }

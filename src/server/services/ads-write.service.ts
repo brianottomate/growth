@@ -1,8 +1,13 @@
+import {
+  metaPlacementPlanSchema,
+  metaPlacementMedia,
+  metaProviderPlacements,
+} from "@/lib/meta-placement-plan";
+import { ideaAwaitingArtwork } from "@/lib/ad-idea-studio";
+import { META_AD_UTM, withAdUtms } from "@/lib/ad-utm";
 import "server-only";
 
 import { createHash } from "node:crypto";
-
-import { META_AD_UTM, withAdUtms } from "@/lib/ad-utm";
 
 import { and, desc, eq, isNotNull, isNull } from "drizzle-orm";
 
@@ -2007,6 +2012,27 @@ export async function pushDraftToPlatform(
   if (ads.length === 0) {
     throw new Error("This campaign has no drafted ads — add ads first");
   }
+  const unapproved = ads.filter(
+    (ad) =>
+      ad.status !== "approved" ||
+      ("media" in ad.content &&
+        ad.content.ideaStudio &&
+        !ad.content.ideaStudio.approval),
+  );
+  if (unapproved.length)
+    throw new Error(
+      `Approve all ads before pushing: ${unapproved.map((ad) => ad.name).join(", ")}`,
+    );
+  const awaitingArtwork = ads.filter(
+    (ad) =>
+      "media" in ad.content &&
+      ad.content.ideaStudio &&
+      ideaAwaitingArtwork(ad.content.ideaStudio.document),
+  );
+  if (awaitingArtwork.length)
+    throw new Error(
+      `Artwork is still missing for an included size: ${awaitingArtwork.map((ad) => ad.name).join(", ")}. Add artwork, use the base image, or exclude that size before pushing.`,
+    );
   // A shell is an ad someone meant to fill and did not. Sending the rest
   // around it would ship a set with a hole nobody chose.
   const shells = ads.filter(
@@ -2393,6 +2419,21 @@ async function pushToMeta(args: PushArgs) {
   }
 
   const meta = settings.meta ?? {};
+  const planned = metaPlacementPlanSchema.safeParse(meta.placements);
+  if (!planned.success)
+    throw new Error("Choose delivery placements in Meta setup before pushing.");
+  const placementPlan = planned.data;
+  if (meta.importSource?.issues.length && !meta.importReviewed)
+    throw new Error(
+      "Resolve imported delivery settings before pushing: " +
+        meta.importSource.issues.join(" "),
+    );
+  for (const { ad, content } of usable) {
+    for (const placement of placementPlan) {
+      const issue = metaPlacementMedia(content, placement).issue;
+      if (issue) throw new Error(`${ad.name}: ${issue}`);
+    }
+  }
   const useCbo = (meta.budgetMode ?? "cbo") === "cbo";
   const promotedObject = await metaPromotedObjectFor({
     brand,
@@ -2469,16 +2510,17 @@ async function pushToMeta(args: PushArgs) {
     if (!card || content.media.length !== 1 || card.type === "video") {
       return undefined;
     }
-    if (!card.story) return undefined;
+    if (!card.story || !placementPlan.some((p) => !p.endsWith("-feed")))
+      return undefined;
     return {
       defaultImageUrl: card.url,
       rules: [
         {
           imageUrl: card.story.url,
           placements: {
-            publisherPlatforms: ["facebook", "instagram"],
-            facebookPositions: ["story", "facebook_reels"],
-            instagramPositions: ["story", "reels"],
+            ...metaProviderPlacements(
+              placementPlan.filter((p) => !p.endsWith("-feed")),
+            ),
           },
         },
       ],
@@ -2549,6 +2591,7 @@ async function pushToMeta(args: PushArgs) {
     callToAction: metaCallToAction(usable[0]!.content),
     creatives: creativesFor(usable),
     targeting: setArgs.spec,
+    placements: metaProviderPlacements(placementPlan),
     startDate,
     endDate,
     promotedObject,

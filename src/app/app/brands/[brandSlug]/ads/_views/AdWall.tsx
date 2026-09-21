@@ -219,7 +219,7 @@ export function AdWall({
 /** A picked library asset or upload as the wall hands it to the server. */
 const assetIdOf = (item: MediaItem) => item.assetId ?? null;
 
-function AdTile({
+export function AdTile({
   ad,
   brandId,
   brandSlug,
@@ -230,6 +230,7 @@ function AdTile({
   surface,
   states,
   slice = false,
+  allowHomeBinding = true,
 }: {
   ad: WallAd;
   brandId: string;
@@ -242,6 +243,7 @@ function AdTile({
   states: Record<string, AdState>;
   /** The portfolio and catalog rows: the cards laid out beside the mock. */
   slice?: boolean;
+  allowHomeBinding?: boolean;
 }) {
   const router = useRouter();
   const trpc = useTRPC();
@@ -583,6 +585,7 @@ function AdTile({
                 setStatus.mutate({
                   adId: ad.id,
                   status: ad.status === "approved" ? "drawn" : "approved",
+                  expectedUpdatedAt: ad.updatedAt,
                 })
               }
               title={
@@ -618,7 +621,7 @@ function AdTile({
               {ad.textOnly ? "Add creative" : "Text only"}
             </button>
           ) : null}
-          {!locked && bindable ? (
+          {allowHomeBinding && !locked && bindable ? (
             homes.length > 0 ? (
               <HomePicker
                 homes={homes}
