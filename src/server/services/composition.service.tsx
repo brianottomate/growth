@@ -40,6 +40,14 @@ export type CompositionContext = {
   };
   /** Where the source lives. A lookup needs only this; a render loads it. */
   sourceUrl: string | null;
+  /** Ready, brand-owned R2 source, resolved after access checks. */
+  sourceAsset?: {
+    id: string;
+    url: string;
+    width: number | null;
+    height: number | null;
+    mimeType: string | null;
+  };
 };
 
 /** A context with everything satori draws loaded: source, logo, brand font. */
@@ -158,6 +166,7 @@ export async function resolveCompositionContext(
   }
 
   let sourceUrl: string | null = null;
+  let sourceAsset: CompositionContext["sourceAsset"];
   if (spec.sourceMediaAssetId) {
     const source = await db.query.mediaAssetTable.findFirst({
       where: and(
@@ -168,7 +177,13 @@ export async function resolveCompositionContext(
         eq(mediaAssetTable.status, "ready"),
         isNull(mediaAssetTable.deletedAt),
       ),
-      columns: { url: true },
+      columns: {
+        id: true,
+        url: true,
+        width: true,
+        height: true,
+        mimeType: true,
+      },
     });
     if (!source?.url || !R2.isPublicUrl(source.url)) {
       throw new CompositionAccessError(
@@ -177,6 +192,7 @@ export async function resolveCompositionContext(
       );
     }
     sourceUrl = source.url;
+    sourceAsset = { ...source, url: source.url };
   } else if (options.sourceUrl) {
     if (!isAllowedPreviewSource(options.sourceUrl)) {
       throw new CompositionAccessError(
@@ -202,6 +218,7 @@ export async function resolveCompositionContext(
       brandMark: brand.brandMark ?? null,
     },
     sourceUrl,
+    sourceAsset,
   };
 }
 

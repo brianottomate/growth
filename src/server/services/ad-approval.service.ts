@@ -1,4 +1,5 @@
 import "server-only";
+import { reusableApprovalAsset } from "@/lib/ad-approval-assets";
 import { isImportedMetaCatalog } from "@/lib/meta-import";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/server/db";
@@ -102,7 +103,7 @@ export async function transitionAdApproval(input: {
         renders: {},
       };
       for (const shape of document.shapes) {
-        const renders: { assetId: string; url: string }[] = [];
+        const renders: { assetId: string; url: string; reused?: true }[] = [];
         for (const [index, card] of document.cards.entries()) {
           const url = new URL(
             ideaPreviewUrl(brand.id, card, shape)!,
@@ -111,11 +112,19 @@ export async function transitionAdApproval(input: {
           const spec = compositionPreviewSchema.parse(
             Object.fromEntries(url.searchParams),
           );
-          const context = await loadCompositionSource(
-            await resolveCompositionContext(input.userId, spec, {
-              sourceUrl: url.searchParams.get("sourceUrl"),
-            }),
+          const resolved = await resolveCompositionContext(input.userId, spec, {
+            sourceUrl: url.searchParams.get("sourceUrl"),
+          });
+          const reusable = reusableApprovalAsset(
+            card,
+            shape,
+            resolved.sourceAsset,
           );
+          if (reusable) {
+            renders.push(reusable);
+            continue;
+          }
+          const context = await loadCompositionSource(resolved);
           const bytes = Buffer.from(
             await renderComposition(spec, context).arrayBuffer(),
           );
@@ -155,7 +164,7 @@ export async function transitionAdApproval(input: {
       .returning({ id: adTable.id });
     if (!saved)
       throw new Error(
-        "This ad changed during rendering. Review it and approve again.",
+        "This ad changed during approval. Review it and approve again.",
       );
   } catch (error) {
     // Uncommitted exports cannot be referenced by this ad. Hide them from the library;
@@ -178,6 +187,8 @@ export async function transitionAdApproval(input: {
         columns: { id: true, content: true, placements: true },
       });
       for (const asset of Object.values(previous.renders).flat()) {
+        // Reused originals belong to the library, not this approval.
+        if (asset.reused) continue;
         const shared = others.some(
           (row) =>
             row.id !== ad.id &&

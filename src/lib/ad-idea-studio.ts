@@ -89,7 +89,9 @@ export type IdeaStudio = {
     approvedAt: string;
     approvedBy: string;
     sourceVersion: string;
-    renders: Partial<Record<IdeaShape, { assetId: string; url: string }[]>>;
+    renders: Partial<
+      Record<IdeaShape, { assetId: string; url: string; reused?: true }[]>
+    >;
   };
 };
 export const ideaSaveSchema = z.object({

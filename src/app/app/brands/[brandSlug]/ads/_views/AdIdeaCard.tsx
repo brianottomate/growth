@@ -508,7 +508,7 @@ export function AdIdeaCard({
           <DialogHeader>
             <DialogTitle>Approve ad</DialogTitle>
             <DialogDescription>
-              Choose the sizes to save as finished images. Approval freezes the
+              Choose the finished image sizes to include. Approval freezes the
               creative and copy; it does not publish the ad.
             </DialogDescription>
           </DialogHeader>
@@ -553,7 +553,7 @@ export function AdIdeaCard({
               />
               <div className="space-y-1">
                 <p className="text-sm font-medium">
-                  Rendering and saving{" "}
+                  Approving{" "}
                   {savedState.document.cards.length * exportShapes.length}{" "}
                   {savedState.document.cards.length * exportShapes.length === 1
                     ? "image"
@@ -603,9 +603,7 @@ export function AdIdeaCard({
                 })
               }
             >
-              {approval.isPending
-                ? "Saving creative…"
-                : "Approve & save creative"}
+              {approval.isPending ? "Approving…" : "Approve & save creative"}
             </Button>
           </DialogFooter>
         </DialogContent>
