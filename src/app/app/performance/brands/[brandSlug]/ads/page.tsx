@@ -111,8 +111,6 @@ export default async function PerformanceBrandAdsPage({
         brandSlug={slug}
         brandName={brand.name}
         brandLogo={avatarUrl}
-        brandRawLogo={brand.logo}
-        brandIdentity={brand.brandIdentity}
         homes={homes}
         withoutPhoto={withoutPhoto}
         initialPicked={initialPicked}

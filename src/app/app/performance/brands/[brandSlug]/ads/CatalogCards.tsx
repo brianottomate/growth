@@ -18,6 +18,7 @@ import {
   type CompositionFormatId,
 } from "@/lib/compositions";
 import {
+  catalogArtworkIssues,
   type CatalogCard,
   type CatalogDraft,
   type CatalogHome,
@@ -39,6 +40,7 @@ function preview(
   card: CatalogCard,
   format: CompositionFormatId,
 ) {
+  if (card.mode === "finished") return card.finishedArtwork?.url;
   const params = new URLSearchParams({
     brandId,
     templateId: card.templateId,
@@ -177,7 +179,10 @@ export function CatalogCards({ brandId }: { brandId: string }) {
               </Button>
               <Button
                 disabled={
-                  busy || activeExport || !draft.cards.some((c) => c.included)
+                  busy ||
+                  activeExport ||
+                  !draft.cards.some((c) => c.included) ||
+                  catalogArtworkIssues(draft).length > 0
                 }
                 onClick={() => void save("export")}
               >
@@ -278,6 +283,11 @@ export function CatalogCards({ brandId }: { brandId: string }) {
               Exclude all
             </Button>
           </div>
+          {catalogArtworkIssues(draft).length > 0 && (
+            <p role="alert" className="text-sm text-destructive">
+              {catalogArtworkIssues(draft).join(" · ")}
+            </p>
+          )}
           {!draft.cards.length && (
             <p className="text-muted-foreground">
               No homes with photos found on this brand’s WanderOS site.
@@ -304,6 +314,12 @@ export function CatalogCards({ brandId }: { brandId: string }) {
                     }}
                   />
                 </button>
+                {card.mode === "finished" && (
+                  <p className="px-3 pt-2 text-xs text-muted-foreground">
+                    Finished artwork ·{" "}
+                    {card.finishedArtwork?.format ?? "Choose image"}
+                  </p>
+                )}
                 <div className="flex items-start gap-2 p-3">
                   <input
                     type="checkbox"
@@ -441,101 +457,159 @@ export function CatalogCards({ brandId }: { brandId: string }) {
               />
               <div className="space-y-4">
                 <label className="block space-y-1 text-sm">
-                  Headline
-                  <Input
-                    value={details.title}
-                    maxLength={120}
-                    onChange={(e) =>
-                      setDetails({ ...details, title: e.target.value })
-                    }
-                  />
-                </label>
-                <label className="block space-y-1 text-sm">
-                  Facts
-                  <Input
-                    value={details.subtitle}
-                    maxLength={220}
-                    onChange={(e) =>
-                      setDetails({ ...details, subtitle: e.target.value })
-                    }
-                  />
-                </label>
-                <label className="block space-y-1 text-sm">
-                  Composition
+                  Artwork
                   <select
                     className="block w-full rounded border bg-background p-2"
-                    value={details.templateId}
+                    value={details.mode ?? "compose"}
                     onChange={(e) =>
                       setDetails({
                         ...details,
-                        templateId: e.target.value as CatalogCard["templateId"],
+                        mode: e.target.value as "compose" | "finished",
                       })
                     }
                   >
-                    {COMPOSITION_TEMPLATES.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.label}
-                      </option>
-                    ))}
+                    <option value="compose">Compose</option>
+                    <option value="finished">Finished artwork</option>
                   </select>
                 </label>
-                <label className="block text-sm">
-                  Crop focus
-                  <select
-                    className="ml-2 rounded border bg-background p-2"
-                    value={details.imagePosition}
-                    onChange={(e) =>
-                      setDetails({
-                        ...details,
-                        imagePosition: e.target
-                          .value as CatalogCard["imagePosition"],
-                      })
-                    }
-                  >
-                    {["top", "center", "bottom"].map((p) => (
-                      <option key={p}>{p}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={details.showLogo}
-                    onChange={(e) =>
-                      setDetails({ ...details, showLogo: e.target.checked })
-                    }
-                  />
-                  Include brand logo
-                </label>
-                <Button variant="outline" onClick={() => setLibrary(true)}>
-                  Choose from library or upload
-                </Button>
-                <div>
-                  <p className="mb-2 text-sm">Choose from this home</p>
-                  <div className="grid max-h-56 grid-cols-3 gap-2 overflow-y-auto">
-                    {selectedHome?.gallery?.map((photo) => (
-                      <button
-                        key={photo.url}
-                        aria-label="Use home photo"
-                        onClick={() =>
+                {details.mode === "finished" ? (
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      Use the original image as-is. Text and branding are
+                      already part of the image. Your composition is kept if you
+                      switch back.
+                    </p>
+                    <label className="block text-sm">
+                      Artwork size
+                      <select
+                        className="ml-2 rounded border bg-background p-2"
+                        value={details.finishedArtwork?.format ?? format}
+                        onChange={(e) => {
+                          if (details.finishedArtwork)
+                            setDetails({
+                              ...details,
+                              finishedArtwork: {
+                                ...details.finishedArtwork,
+                                format: e.target.value as CompositionFormatId,
+                              },
+                            });
+                        }}
+                      >
+                        {COMPOSITION_FORMATS.map((f) => (
+                          <option key={f.id} value={f.id}>
+                            {f.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <Button variant="outline" onClick={() => setLibrary(true)}>
+                      Choose finished artwork
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <label className="block space-y-1 text-sm">
+                      Headline
+                      <Input
+                        value={details.title}
+                        maxLength={120}
+                        onChange={(e) =>
+                          setDetails({ ...details, title: e.target.value })
+                        }
+                      />
+                    </label>
+                    <label className="block space-y-1 text-sm">
+                      Facts
+                      <Input
+                        value={details.subtitle}
+                        maxLength={220}
+                        onChange={(e) =>
+                          setDetails({ ...details, subtitle: e.target.value })
+                        }
+                      />
+                    </label>
+                    <label className="block space-y-1 text-sm">
+                      Composition
+                      <select
+                        className="block w-full rounded border bg-background p-2"
+                        value={details.templateId}
+                        onChange={(e) =>
                           setDetails({
                             ...details,
-                            imageUrl: photo.url,
-                            assetId: undefined,
+                            templateId: e.target
+                              .value as CatalogCard["templateId"],
                           })
                         }
                       >
-                        <img
-                          src={photo.thumbUrl}
-                          alt="Home photo"
-                          className="aspect-square w-full rounded object-cover"
-                        />
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                        {COMPOSITION_TEMPLATES.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="block text-sm">
+                      Crop focus
+                      <select
+                        className="ml-2 rounded border bg-background p-2"
+                        value={details.imagePosition}
+                        onChange={(e) =>
+                          setDetails({
+                            ...details,
+                            imagePosition: e.target
+                              .value as CatalogCard["imagePosition"],
+                          })
+                        }
+                      >
+                        {["top", "center", "bottom"].map((p) => (
+                          <option key={p}>{p}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={details.showLogo}
+                        onChange={(e) =>
+                          setDetails({ ...details, showLogo: e.target.checked })
+                        }
+                      />
+                      Include brand logo
+                    </label>
+                    <Button variant="outline" onClick={() => setLibrary(true)}>
+                      Choose from library or upload
+                    </Button>
+                    <div>
+                      <p className="mb-2 text-sm">Choose from this home</p>
+                      <div className="grid max-h-56 grid-cols-3 gap-2 overflow-y-auto">
+                        {selectedHome?.gallery?.map((photo) => (
+                          <button
+                            key={photo.url}
+                            aria-label="Use home photo"
+                            onClick={() =>
+                              setDetails({
+                                ...details,
+                                imageUrl: photo.url,
+                                assetId: undefined,
+                              })
+                            }
+                          >
+                            <img
+                              src={photo.thumbUrl}
+                              alt="Home photo"
+                              className="aspect-square w-full rounded object-cover"
+                            />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
                 <Button
-                  disabled={!details.title.trim()}
+                  disabled={
+                    !details.title.trim() ||
+                    (details.mode === "finished" && !details.finishedArtwork)
+                  }
                   onClick={() => {
                     update(details);
                     setDetails(null);
@@ -554,12 +628,19 @@ export function CatalogCards({ brandId }: { brandId: string }) {
         onOpenChange={setLibrary}
         existingAssetIds={[]}
         onPick={(item) => {
-          if (details && item.type === "image") {
-            setDetails({
-              ...details,
-              imageUrl: item.url,
-              assetId: item.assetId,
-            });
+          if (details && item.type === "image" && item.assetId) {
+            setDetails(
+              details.mode === "finished"
+                ? {
+                    ...details,
+                    finishedArtwork: {
+                      assetId: item.assetId,
+                      url: item.url,
+                      format: details.finishedArtwork?.format ?? format,
+                    },
+                  }
+                : { ...details, imageUrl: item.url, assetId: item.assetId },
+            );
             setLibrary(false);
           }
         }}

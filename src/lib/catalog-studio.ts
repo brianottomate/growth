@@ -12,6 +12,14 @@ import {
 
 export const catalogCardSchema = z.object({
   homeId: z.string().min(1),
+  mode: z.enum(["compose", "finished"]).optional(),
+  finishedArtwork: z
+    .object({
+      assetId: z.string().min(1),
+      url: z.string().url(),
+      format: compositionFormatIdSchema,
+    })
+    .optional(),
   included: z.boolean(),
   imageUrl: z.string().url(),
   assetId: z.string().optional(),
@@ -149,4 +157,18 @@ export function catalogFeedCsv(rows: HotelFeedRow[]) {
       ...rows.map((row) => catalogFeedCells(row).map(cell).join(",")),
     ].join("\r\n") + "\r\n"
   );
+}
+
+/** Never synthesize another size or apply a composition to supplied artwork. */
+export function catalogArtworkIssues(draft: CatalogDraft): string[] {
+  return draft.cards
+    .filter((c) => c.included && c.mode === "finished")
+    .flatMap((c) => {
+      if (!c.finishedArtwork) return [`${c.title}: choose finished artwork`];
+      return draft.formats.some((f) => f !== c.finishedArtwork!.format)
+        ? [
+            `${c.title}: finished artwork is available only in ${c.finishedArtwork.format}; export that size or switch to Compose`,
+          ]
+        : [];
+    });
 }

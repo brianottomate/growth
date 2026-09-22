@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import {
+  catalogArtworkIssues,
   catalogDraft,
   catalogDraftSchema,
   catalogExportRows,
@@ -70,4 +71,39 @@ test("primary feed format must be included", () => {
   const draft = catalogDraft(homes);
   draft.primaryFormat = "story";
   expect(catalogDraftSchema.safeParse(draft).success).toBe(false);
+});
+
+test("finished artwork survives refresh without replacing the saved composition", () => {
+  const draft = catalogDraft(homes);
+  const card = draft.cards[0]!;
+  card.mode = "finished";
+  card.finishedArtwork = {
+    assetId: "original",
+    url: "https://example.com/finished.png",
+    format: "portrait",
+  };
+  const saved = catalogDraftSchema.parse(draft);
+  const refreshed = catalogDraft(homes, saved);
+  expect(refreshed.cards[0]?.finishedArtwork).toEqual(card.finishedArtwork);
+  expect(refreshed.cards[0]?.imageUrl).toBe(homes[0]!.imageUrl);
+  expect(refreshed.cards[0]?.templateId).toBe("catalog-copy");
+  expect(catalogArtworkIssues(refreshed)).toEqual([]);
+});
+test("finished artwork requires an original and cannot silently generate other export sizes", () => {
+  const draft = catalogDraft(homes);
+  const card = draft.cards[0]!;
+  card.mode = "finished";
+  expect(catalogArtworkIssues(draft)).toHaveLength(1);
+  card.finishedArtwork = {
+    assetId: "original",
+    url: "https://example.com/finished.png",
+    format: "portrait",
+  };
+  draft.formats = ["portrait", "story"];
+  expect(catalogArtworkIssues(draft)).toHaveLength(1);
+  card.included = false;
+  expect(catalogArtworkIssues(draft)).toEqual([]);
+  card.included = true;
+  card.mode = "compose";
+  expect(catalogArtworkIssues(draft)).toEqual([]);
 });

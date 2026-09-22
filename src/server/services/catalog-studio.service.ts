@@ -9,6 +9,7 @@ import {
   mediaAssetTable,
 } from "@/server/db/schema";
 import {
+  catalogArtworkIssues,
   catalogDraft,
   catalogDraftSchema,
   catalogExportRows,
@@ -99,6 +100,12 @@ export async function startCatalogExport(
     included.some((c) => !homes.some((h) => h.id === c.homeId))
   )
     throw new Error("Choose homes from this brand");
+  const artworkIssues = catalogArtworkIssues(draft);
+  if (artworkIssues.length) throw new Error(artworkIssues.join(" · "));
+  // Resolve library identity server-side; never trust an override URL from the client.
+  for (const card of included.filter((c) => c.mode === "finished")) {
+    await finishedCatalogAsset(brandId, card.finishedArtwork!.assetId);
+  }
   await saveCatalog(userId, brandId, draft);
   const [run] = await db
     .insert(creativeRunTable)
@@ -152,7 +159,12 @@ export async function renderCatalogExport(
       .where(eq(creativeRunTable.id, run.id));
     for (const card of draft.cards.filter((c) => c.included)) {
       const home = homes.find((h) => h.id === card.homeId)!;
+      const finished =
+        card.mode === "finished"
+          ? await finishedCatalogAsset(brand.id, card.finishedArtwork!.assetId)
+          : null;
       const sourceId =
+        finished?.id ??
         card.assetId ??
         (
           await importRemoteImage({
@@ -163,20 +175,30 @@ export async function renderCatalogExport(
           })
         ).id;
       for (const format of draft.formats) {
-        const asset = await freezeComposition({
-          userId,
-          spec: {
-            brandId: brand.id,
-            sourceMediaAssetId: sourceId,
-            templateId: card.templateId,
-            formatId: format,
-            title: card.title,
-            subtitle: card.subtitle,
-            imagePosition: card.imagePosition,
-            mark: card.showLogo ? "auto" : "none",
-            assetTitle: `${home.name} · ${format}`,
-          },
-        });
+        const asset = finished
+          ? await importRemoteImage({
+              brandId: brand.id,
+              uploadedBy: userId,
+              url: finished.url!,
+              filename: finished.filename ?? undefined,
+              width: finished.width ?? undefined,
+              height: finished.height ?? undefined,
+              title: `${home.name} · ${format} · Finished artwork`,
+            })
+          : await freezeComposition({
+              userId,
+              spec: {
+                brandId: brand.id,
+                sourceMediaAssetId: sourceId,
+                templateId: card.templateId,
+                formatId: format,
+                title: card.title,
+                subtitle: card.subtitle,
+                imagePosition: card.imagePosition,
+                mark: card.showLogo ? "auto" : "none",
+                assetTitle: `${home.name} · ${format}`,
+              },
+            });
         if (!asset.url) throw new Error(`No image URL for ${home.name}`);
         await db
           .update(mediaAssetTable)
@@ -247,4 +269,22 @@ export async function catalogExport(
   return run.providerOutput as unknown as Required<
     Pick<CatalogExport, "rows" | "assets" | "folderId">
   >;
+}
+
+async function finishedCatalogAsset(brandId: string, assetId: string) {
+  const asset = await db.query.mediaAssetTable.findFirst({
+    where: and(
+      eq(mediaAssetTable.id, assetId),
+      eq(mediaAssetTable.brandId, brandId),
+      eq(mediaAssetTable.kind, "image"),
+      eq(mediaAssetTable.status, "ready"),
+      eq(mediaAssetTable.provider, "r2"),
+      isNull(mediaAssetTable.deletedAt),
+    ),
+  });
+  if (!asset?.url)
+    throw new Error(
+      "Choose ready finished artwork from this brand’s media library",
+    );
+  return asset;
 }
