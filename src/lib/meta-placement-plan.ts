@@ -97,9 +97,43 @@ export function metaPlacementMedia(
         "Imported creative needs review: " +
         content.metaImport.issues.join(" "),
     };
+  const studio = content.ideaStudio;
+  if (studio && !studio.approval)
+    return {
+      media: [],
+      issue: "Approve and save this idea before previewing or publishing.",
+    };
+  if (studio?.approval) {
+    const shape = studio.document.shapes.includes("portrait")
+      ? "portrait"
+      : studio.document.shapes[0]!;
+    const frozen = studio.approval.renders[shape];
+    if (
+      !frozen?.length ||
+      frozen.length !== studio.document.cards.length ||
+      frozen.length !== content.media.length ||
+      frozen.some((item, index) => item.url !== content.media[index]?.url)
+    )
+      return {
+        media: [],
+        issue:
+          "Published artwork does not match the approved exports. Reopen and approve the idea again.",
+      };
+    if (
+      !id.endsWith("-feed") &&
+      content.media.length === 1 &&
+      studio.approval.renders.story?.[0]?.url !== content.media[0]?.story?.url
+    )
+      return {
+        media: [],
+        issue:
+          "Approve a vertical (9:16) export before previewing or publishing this placement.",
+      };
+  }
   if (!content.media.length) return { media: [], issue: "Add creative." };
   if (id.endsWith("-feed")) return { media: content.media, issue: null };
-  // Zernio shares the ordered carousel across the ad set’s placements.
+  // A carousel delivers its canonical cards across placements. The preview
+  // preserves those exact assets; it must not substitute alternate Story files.
   if (content.media.length > 1) return { media: content.media, issue: null };
   const first = content.media[0]!;
   if (first.type === "video")

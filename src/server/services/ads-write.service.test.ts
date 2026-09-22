@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import {
   assertMetaAdPayload,
-  assertSharedPageCarouselPush,
+  metaRequiresCampaignShell,
   estimateMonthlyKeywordCost,
   extractPreviewFrames,
   metaPageIdFromConnection,
@@ -740,34 +740,9 @@ it("attaches a carousel to a conversion ad set without resending its pixel and b
   ).not.toThrow();
 });
 
-describe("shared Page carousel identity", () => {
-  it("blocks a multi-carousel shared-Page push before inheriting the managing Page", () => {
-    expect(() =>
-      assertSharedPageCarouselPush({
-        pageId: "client",
-        connectionPageId: "manager",
-        carouselCount: 2,
-      }),
-    ).toThrow("wrong identity");
-  });
-  it("allows own-Page carousels and shapes supporting explicit Page overrides", () => {
-    for (const input of [
-      {
-        pageId: "client",
-        connectionPageId: "client",
-        carouselCount: 3,
-      },
-      {
-        pageId: "client",
-        connectionPageId: "manager",
-        carouselCount: 1,
-      },
-      {
-        pageId: "client",
-        connectionPageId: "manager",
-        carouselCount: 0,
-      },
-    ])
-      expect(() => assertSharedPageCarouselPush(input)).not.toThrow();
-  });
+it("keeps campaign budgets on the campaign with any audience count", () => {
+  for (const count of [0, 1, 2])
+    expect(metaRequiresCampaignShell(count, true)).toBe(true);
+  expect(metaRequiresCampaignShell(1, false)).toBe(false);
+  expect(metaRequiresCampaignShell(2, false)).toBe(true);
 });

@@ -3,6 +3,8 @@ import { useEffect, useId, useRef, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
+import type { AdCreativeContent } from "@/server/db/ads-schema";
+import { metaPreviewMedia } from "@/lib/meta-preview";
 import { CompactAdMock } from "@/components/ad-mock";
 import { META_PLACEMENTS, type MetaPlacement } from "@/lib/meta-placement-plan";
 import {
@@ -18,12 +20,14 @@ export function AdIdeaPreview({
   brandName,
   brandLogo,
   platform = false,
+  content,
 }: {
   studio: IdeaStudio;
   brandId: string;
   brandName: string;
   brandLogo: string | null;
   platform?: boolean;
+  content?: AdCreativeContent;
 }) {
   const [cards, setCards] = useState<Partial<Record<MetaPlacement, number>>>(
     {},
@@ -75,7 +79,7 @@ export function AdIdeaPreview({
       {platform ? (
         <>
           <p className="text-xs text-muted-foreground">
-            Composition previews · platform appearance is approximate.
+            Approved delivery assets · platform controls are illustrative.
           </p>
           <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] items-start gap-5">
             {META_PLACEMENTS.filter(
@@ -85,14 +89,14 @@ export function AdIdeaPreview({
               const label =
                 surface.kind === "feed" ? surface.label : "Stories / Reels";
               const size = surface.kind !== "feed" ? "story" : shape;
-              const included = studio.approval
-                ? Boolean(studio.approval.renders[size]?.length)
-                : (
-                    studio.document.exportShapes ?? studio.document.shapes
-                  ).includes(size);
-              const surfaceMedia = mediaFor(size);
-              const surfaceCopy =
-                studio.document.copyOverrides[size] ?? studio.document.copy;
+              const resolved = content
+                ? metaPreviewMedia(content, surface.id)
+                : {
+                    media: [],
+                    issue: "Approve and save this idea before previewing.",
+                  };
+              const surfaceMedia = resolved.media;
+              const surfaceCopy = content ?? studio.document.copy;
               return (
                 <section
                   key={surface.id}
@@ -100,13 +104,9 @@ export function AdIdeaPreview({
                   className="min-w-0 space-y-3"
                 >
                   <h4 className="text-sm font-medium">{label}</h4>
-                  {!included && (
-                    <p className="text-xs text-muted-foreground">
-                      Not included in export
-                    </p>
-                  )}
                   {surfaceMedia.length ? (
                     <CompactAdMock
+                      preserveArtwork
                       surface={surface.surface}
                       publisher={surface.publisher}
                       verticalKind="story"
@@ -115,8 +115,8 @@ export function AdIdeaPreview({
                       brandLogo={brandLogo}
                       body={surfaceCopy.body}
                       headline={surfaceCopy.headline}
-                      link={surfaceCopy.linkUrl}
-                      callToAction={surfaceCopy.callToAction}
+                      link={surfaceCopy.linkUrl ?? null}
+                      callToAction={surfaceCopy.callToAction ?? null}
                       media={surfaceMedia}
                       card={Math.min(
                         cards[surface.id] ?? 0,
@@ -131,8 +131,7 @@ export function AdIdeaPreview({
                     />
                   ) : (
                     <p className="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">
-                      Add artwork for this size in Details to preview the
-                      composition.
+                      {resolved.issue}
                     </p>
                   )}
                 </section>

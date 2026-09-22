@@ -51,50 +51,40 @@ const imported: AdCreativeContent = {
     rawCreative: {},
   },
 };
-it("shows local approved creative before delivery placements are configured", () => {
-  const content: AdCreativeContent = {
-    ...copy,
-    media: [
-      { type: "image", url: "https://example.com/first.jpg" },
-      { type: "image", url: "https://example.com/second.jpg" },
-    ],
-  };
-  expect(metaPreviewPlacements(content, [])).toContain("facebook-feed");
-  expect(metaPreviewPlacements(content, [])).toContain("instagram-story");
-  expect(metaPreviewPlacements(content, ["instagram-feed"])).toEqual([
-    "instagram-feed",
-  ]);
-  expect(metaPreviewPlacements({ ...copy, media: [] }, [])).toEqual([]);
-});
-it("previews recovered artwork without local approval, while delivery stays blocked", () => {
-  expect(metaPreviewPlacements(imported, [])).toContain("facebook-feed");
-  expect(metaPreviewMedia(imported, "facebook-feed").media[0]?.url).toBe(
-    "https://example.com/feed.jpg",
-  );
-  expect(metaPreviewMedia(imported, "instagram-story").media[0]?.url).toBe(
-    "https://example.com/story.jpg",
-  );
-  expect(metaPlacementMedia(imported, "facebook-feed").issue).toContain(
-    "review",
-  );
-});
-it("uses the explicit delivery plan when set and never fills missing vertical artwork with a crop", () => {
+it("does not invent placements before delivery is configured", () => {
+  expect(metaPreviewPlacements(imported, [])).toEqual([]);
   expect(metaPreviewPlacements(imported, ["instagram-feed"])).toEqual([
     "instagram-feed",
   ]);
-  const missing = {
-    ...imported,
-    ideaStudio: {
-      document: {
-        ...document,
-        cards: document.cards.map((c) => ({ ...c, sourceOverrides: {} })),
-      },
+});
+it("never previews recovered but unapproved artwork", () => {
+  for (const placement of ["facebook-feed", "instagram-story"] as const) {
+    expect(metaPreviewMedia(imported, placement).media).toEqual([]);
+    expect(metaPreviewMedia(imported, placement)).toEqual(
+      metaPlacementMedia(imported, placement),
+    );
+  }
+});
+it("rejects unapproved and stale frozen assets in previews and publishing", () => {
+  const content: AdCreativeContent = {
+    ...copy,
+    media: [{ type: "image", url: "https://example.com/feed.jpg" }],
+    ideaStudio: { document },
+  };
+  expect(metaPreviewMedia(content, "facebook-feed").issue).toContain("Approve");
+  content.ideaStudio!.approval = {
+    approvedAt: "now",
+    approvedBy: "u",
+    sourceVersion: "v",
+    renders: {
+      portrait: [{ assetId: "a", url: "https://example.com/feed.jpg" }],
     },
   };
-  expect(metaPreviewMedia(missing, "instagram-story").media).toEqual([]);
-  expect(metaPreviewMedia(missing, "instagram-story").issue).toContain(
-    "Missing",
+  expect(metaPreviewMedia(content, "facebook-feed").media).toEqual(
+    content.media,
   );
+  content.media[0]!.url = "https://example.com/unapproved.jpg";
+  expect(metaPreviewMedia(content, "facebook-feed").media).toEqual([]);
 });
 it("labels automatic source settings without pretending manual selection or observed delivery", () => {
   expect(importedPlacementLabel([{ targeting: { age_min: 18 } }])).toContain(
@@ -129,8 +119,6 @@ it("previews the same ordered carousel cards that ship, not alternate Story expo
     expect(metaPreviewMedia(content, placement).media).toEqual(
       metaPlacementMedia(content, placement).media,
     );
-    expect(
-      metaPreviewMedia(content, placement).media.map((card) => card.url),
-    ).toEqual(content.media.map((card) => card.url));
+    expect(metaPreviewMedia(content, placement).media).toEqual(content.media);
   }
 });

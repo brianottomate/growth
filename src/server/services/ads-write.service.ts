@@ -184,23 +184,6 @@ export function connectionRunsAsBrandPage(
   );
 }
 
-/** Standalone carousel creatives currently inherit the connection's Page. */
-export function assertSharedPageCarouselPush(input: {
-  pageId: string | null;
-  connectionPageId: string | null;
-  carouselCount: number;
-}) {
-  if (
-    input.pageId &&
-    input.pageId !== input.connectionPageId &&
-    input.carouselCount > 1
-  ) {
-    throw new Error(
-      "This multi-carousel push needs a connection selected as the client's Page. Zernio's standalone carousel-creative endpoint does not document a Page override; pushing through the managing Page could use the wrong identity. Drafts and previews remain available.",
-    );
-  }
-}
-
 async function allowedAccountsForBrand(
   brandId: string,
   platform: ZernioAdPlatform,
@@ -690,6 +673,7 @@ async function createMetaAd(
     pageId: string | null;
     idempotencyKey: string;
     adAccount: { currency?: string; minimumDailyBudget?: number };
+    carouselSeedBudget?: number;
   },
 ) {
   const tagged = tagMetaAdUtms({
@@ -699,6 +683,7 @@ async function createMetaAd(
   assertMetaAdPayload(tagged, options.adAccount);
   return createZernioStandaloneAd(tagged, {
     idempotencyKey: options.idempotencyKey,
+    carouselSeedBudget: options.carouselSeedBudget,
   });
 }
 
@@ -1616,6 +1601,9 @@ export async function previewDraftAd(
     );
   }
   const content = ad.content as AdCreativeContent;
+  const previewIssue = metaPlacementMedia(content, "facebook-feed").issue;
+  if (previewIssue) throw new Error(previewIssue);
+
   if (content.media[0]?.type === "video") {
     throw new Error(
       "Video preview needs an uploaded video id, which a pre-push draft does not have — push paused and preview from Ads Manager",
@@ -1897,7 +1885,11 @@ async function compileAudienceTargeting(input: {
         );
       }
     }
-    if (resolved.length > 0) spec.regions = resolved;
+    if (resolved.length > 0) {
+      spec.regions = resolved;
+      // Countries scope lookup; including them in delivery conflicts with their states.
+      if (input.platform === "meta_ads") delete spec.countries;
+    }
     if (resolved.length === 0 && !spec.countries?.length) {
       warnings.push(
         `${audience.name}: no location resolved and no countries set — this targets WORLDWIDE`,
@@ -2478,6 +2470,14 @@ export async function metaPromotedObjectFor(args: {
 // Each plan audience becomes an ad set; every creative ad runs under every
 // ad set. One audience (or none) is a single create; several use the
 // shell-then-attach shape with rollback so nothing is left half-built.
+/** A campaign budget must belong to an explicit shell, even for one audience. */
+export function metaRequiresCampaignShell(
+  audienceCount: number,
+  useCbo: boolean,
+) {
+  return useCbo || audienceCount > 1;
+}
+
 async function pushToMeta(args: PushArgs) {
   const {
     input,
@@ -2536,17 +2536,6 @@ async function pushToMeta(args: PushArgs) {
       if (issue) throw new Error(`${ad.name}: ${issue}`);
     }
   }
-  // Before custom-conversion provisioning or any other provider mutation.
-  assertSharedPageCarouselPush({
-    pageId: brand.metaPageId,
-    connectionPageId: metaPageIdFromConnection(
-      destination.connection.platformUserId,
-    ),
-    carouselCount: usable.filter(
-      ({ content }) =>
-        !isVideoContent(content) && (content.media?.length ?? 0) >= 2,
-    ).length,
-  });
   const useCbo = (meta.budgetMode ?? "cbo") === "cbo";
   const promotedObject = await metaPromotedObjectFor({
     brand,
@@ -2815,6 +2804,11 @@ async function pushToMeta(args: PushArgs) {
               attachPayload,
             ),
             adAccount: destination.adAccount,
+            carouselSeedBudget:
+              brand.metaPageId &&
+              !connectionRunsAsBrandPage(brand, destination.connection)
+                ? budgetAmount
+                : undefined,
           }),
         });
       }
@@ -2889,7 +2883,10 @@ async function pushToMeta(args: PushArgs) {
   };
 
   // ---- one (or no) audience: a single create --------------------------
-  if (compiled.length <= 1) {
+  if (
+    compiled.length <= 1 &&
+    (!metaRequiresCampaignShell(compiled.length, useCbo) || input.validateOnly)
+  ) {
     const only = compiled[0] ?? null;
     const set = await createAdSetWithAds({
       audience: only?.audience ?? null,
@@ -2940,7 +2937,7 @@ async function pushToMeta(args: PushArgs) {
     };
   }
 
-  // ---- several audiences: shell, then one create per audience ---------
+  // CBO needs an explicit budget-owning shell, even with one audience.
   if (input.validateOnly) {
     throw new Error(
       "Dry run covers single-audience pushes only; Meta has no dry run for the two-step shape",
@@ -2973,13 +2970,15 @@ async function pushToMeta(args: PushArgs) {
   // the tree and impossible to clean up by hand. Delete it rather than
   // stranding it, and surface which audience failed.
   try {
-    for (const { audience, spec } of compiled) {
+    for (const { audience, spec } of compiled.length
+      ? compiled
+      : [{ audience: null, spec: undefined }]) {
       const set = await createAdSetWithAds({
         audience,
         spec,
         existingCampaignId: shellId,
         validateOnly: false,
-        keyScope: `push:${campaign.id}:${audience.id}`,
+        keyScope: `push:${campaign.id}:${audience?.id ?? "broad"}`,
       });
       perSet.push({ audience, spec, set });
     }
@@ -3008,8 +3007,8 @@ async function pushToMeta(args: PushArgs) {
     heroThumbnailUrl: usable[0]!.content.media[0]?.url ?? null,
     sets: perSet.map(({ audience, spec, set }) => ({
       audience,
-      name: audience.name,
-      externalId: set.result.platformAdSetId ?? null,
+      name: audience?.name ?? campaign.name,
+      externalId: writtenAdSetId(set.result),
       targetingSpec: spec ?? null,
       budget: useCbo ? null : budgetAmount,
       budgetType,

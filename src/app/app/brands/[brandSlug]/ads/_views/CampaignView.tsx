@@ -19,7 +19,7 @@ import { toWallAd, type AdState, type WallAd } from "@/lib/ad-wall";
 import { AddAdDialog } from "@/app/app/performance/brands/[brandSlug]/ads/AddAdDialog";
 import { AdIdeasList } from "./AdIdeasList";
 import { AdTile } from "./AdWall";
-import { CreativeDrop } from "@/app/app/performance/brands/[brandSlug]/ads/CreativeDrop";
+import { CampaignAssetsDrawer } from "./CampaignAssetsDrawer";
 import type { PickableHome } from "@/app/app/performance/brands/[brandSlug]/HomePicker";
 
 import { AskAssistantButton } from "./AskAssistantButton";
@@ -272,6 +272,14 @@ export async function CampaignView({
             homes={homes}
             campaignId={campaign.id}
           />
+          <CampaignAssetsDrawer count={pool.length} brandId={brand.id}>
+            <CreativePool
+              campaignId={campaign.id}
+              brandId={brand.id}
+              pool={pool}
+              askAssistant={ask("photos", `Find photos for “${campaign.name}”`)}
+            />
+          </CampaignAssetsDrawer>
         </div>
         <AdIdeasList
           preparingHero={
@@ -302,31 +310,6 @@ export async function CampaignView({
             </ul>
           )}
         />
-        <details className="rounded-xl border p-4">
-          <summary className="cursor-pointer text-sm font-medium">
-            Import finished creative
-          </summary>
-          <div className="mt-4">
-            <CreativeDrop
-              brandId={brand.id}
-              homes={homes}
-              campaignId={campaign.id}
-            />
-          </div>
-        </details>
-        <details className="rounded-xl border p-4">
-          <summary className="cursor-pointer text-sm font-medium">
-            Campaign assets · {pool.length} photos
-          </summary>
-          <div className="mt-4">
-            <CreativePool
-              campaignId={campaign.id}
-              brandId={brand.id}
-              pool={pool}
-              askAssistant={ask("photos", `Find photos for “${campaign.name}”`)}
-            />
-          </div>
-        </details>
       </section>
       <section className="space-y-4 border-t pt-6">
         <h2 className="font-semibold">Delivery</h2>

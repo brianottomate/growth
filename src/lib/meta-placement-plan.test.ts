@@ -50,13 +50,13 @@ describe("Meta placement delivery", () => {
       ).media[0]?.url,
     ).toBe("https://cdn.example/story.jpg");
   });
-  it("shares the ordered carousel across Story placements", () => {
+  it("uses canonical carousel cards for vertical delivery", () => {
     expect(
       metaPlacementMedia(
         { ...content, media: [...content.media, ...content.media] },
         "facebook-story",
-      ).media,
-    ).toEqual([...content.media, ...content.media]);
+      ).issue,
+    ).toBeNull();
   });
 });
 describe("Meta source reconstruction", () => {

@@ -3,7 +3,6 @@
 import { resolveMetaSchedule, metaScheduleIssue } from "@/lib/meta-schedule";
 import { applyMetaTrackingDefaults } from "@/lib/meta-tracking";
 import Image from "next/image";
-import { IDEA_SHAPES, IDEA_SHAPE_LABELS } from "@/lib/ad-idea-studio";
 import { isImportedMetaCatalog } from "@/lib/meta-import";
 import { useLocalStorage } from "@/components/ui/hooks/use-local-storage";
 import { ChevronDown, ChevronRight } from "lucide-react";
@@ -439,7 +438,7 @@ export function MetaPlatformCard({
             ))}
             {!placementPlan.length && !meta?.importSource && (
               <p className="text-sm text-muted-foreground">
-                Local previews below show available creative.{" "}
+                Choose delivery placements to preview approved artwork.{" "}
                 <a className="underline" href={`#${sectionId}-setup`}>
                   Edit setup above
                 </a>{" "}
@@ -932,7 +931,7 @@ function ProjectionSummary({
     const vertical = view.kind !== "feed";
     const label = vertical ? "Vertical" : "Feed";
     if (resolved.issue) {
-      issues.add(`${label} artwork missing`);
+      issues.add(`${label}: ${resolved.issue}`);
       continue;
     }
     const key = JSON.stringify(resolved.media.map((item) => item.url));
@@ -1107,13 +1106,6 @@ function ProjectedAd({
   const previewPlacements = metaPreviewPlacements(content, placements);
   const views = META_PLACEMENTS.filter((p) => previewPlacements.includes(p.id));
   const active = views.find((p) => p.id === selected) ?? views[0];
-  const baseShape = content.ideaStudio?.document.shapes.includes("portrait")
-    ? "portrait"
-    : content.ideaStudio?.document.shapes[0];
-  const unusedExports = IDEA_SHAPES.filter(
-    (size) =>
-      size !== baseShape && content.ideaStudio?.approval?.renders[size]?.length,
-  );
   return (
     <div className="space-y-4">
       {!views.length && (
@@ -1154,34 +1146,6 @@ function ProjectedAd({
           </select>
         </label>
       </div>
-      {content.media.length > 1 && views.length > 0 && (
-        <div className="space-y-1 rounded-lg border p-3 text-xs text-muted-foreground">
-          <p className="font-medium text-foreground">
-            Carousel delivery artwork
-          </p>
-          {views.some((view) => view.kind === "feed") && (
-            <p>
-              Feed →{" "}
-              {baseShape
-                ? IDEA_SHAPE_LABELS[baseShape]
-                : "shared carousel cards"}
-            </p>
-          )}
-          {views.some((view) => view.kind !== "feed") && (
-            <p>
-              Stories / Reels → the same carousel cards; Meta adapts their
-              presentation.
-            </p>
-          )}
-          {unusedExports.length > 0 && (
-            <p>
-              Saved exports not used in this publish:{" "}
-              {unusedExports.map((size) => IDEA_SHAPE_LABELS[size]).join(" · ")}
-              .
-            </p>
-          )}
-        </div>
-      )}
       <div
         className={
           compare
@@ -1226,6 +1190,7 @@ function ProjectedAd({
                 </div>
               ) : (
                 <CompactAdMock
+                  preserveArtwork
                   publisher={view.publisher}
                   verticalKind={view.kind === "reel" ? "reel" : "story"}
                   surface={view.surface}

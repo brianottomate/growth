@@ -1359,8 +1359,58 @@ export function writtenAdSetId(result: ZernioAdWriteResponse): string | null {
  */
 export async function createZernioStandaloneAd(
   input: CreateZernioStandaloneAdInput,
-  options: { idempotencyKey: string },
+  options: { idempotencyKey: string; carouselSeedBudget?: number },
 ): Promise<ZernioAdWriteResponse> {
+  if (input.adSetId && input.carouselCards && input.validateOnly)
+    throw new Error("Validate the carousel before attaching it to an ad set.");
+  // The campaign-creation route honors pageId; the standalone creative route
+  // currently ignores it. Seed a paused carousel, reuse its creative in the
+  // intended ad set, then remove only the temporary campaign we just created.
+  if (input.adSetId && input.carouselCards && options.carouselSeedBudget) {
+    const seed = await zernioFetch<ZernioAdWriteResponse>("/ads/create", {
+      method: "POST",
+      headers: { "Idempotency-Key": `${options.idempotencyKey}:page-seed` },
+      body: JSON.stringify({
+        ...input,
+        adSetId: undefined,
+        existingCampaignId: undefined,
+        name: `${input.name} · creative preparation`,
+        campaignName: `${input.name} · creative preparation`,
+        goal: "traffic",
+        budgetAmount: options.carouselSeedBudget,
+        budgetType: "daily",
+        status: "PAUSED",
+        targeting: { countries: ["US"] },
+      }),
+    });
+    const seedCampaignId = writtenCampaignId(seed);
+    if (!seedCampaignId)
+      throw new Error(
+        "Carousel preparation returned no campaign ID; inspect Zernio before retrying.",
+      );
+    try {
+      const creativeId = seed.ad?.creative?.creativeId;
+      if (typeof creativeId !== "string")
+        throw new Error("Carousel preparation returned no creative ID.");
+      const verified = await getZernioMetaCreative(creativeId, input.accountId);
+      const spec = verified.creative.object_story_spec as
+        | { page_id?: string }
+        | undefined;
+      if (spec?.page_id !== input.pageId)
+        throw new Error("Prepared carousel does not use the requested Page.");
+      const { carouselCards: _cards, ...attached } = input;
+      return await zernioFetch<ZernioAdWriteResponse>("/ads/create", {
+        method: "POST",
+        headers: { "Idempotency-Key": options.idempotencyKey },
+        body: JSON.stringify({ ...attached, existingCreativeId: creativeId }),
+      });
+    } finally {
+      await deleteZernioCampaign({
+        campaignId: seedCampaignId,
+        accountId: input.accountId,
+      });
+    }
+  }
   // /ads/create rejects carouselCards + adSetId. Reuse a standalone
   // carousel creative when adding another ad to an existing ad set.
   if (input.adSetId && input.carouselCards) {
@@ -1377,6 +1427,7 @@ export async function createZernioStandaloneAd(
         headers: { "Idempotency-Key": `${options.idempotencyKey}:creative` },
         body: JSON.stringify({
           accountId: input.accountId,
+          pageId: input.pageId,
           adAccountId: input.adAccountId,
           headline: input.headline,
           body: input.body,
@@ -1389,6 +1440,19 @@ export async function createZernioStandaloneAd(
         }),
       },
     );
+    if (input.pageId) {
+      const verified = await getZernioMetaCreative(
+        creative.creativeId,
+        input.accountId,
+      );
+      const spec = verified.creative.object_story_spec as
+        | { page_id?: string }
+        | undefined;
+      if (spec?.page_id !== input.pageId)
+        throw new Error(
+          `Carousel creative ${creative.creativeId} has Page ${spec?.page_id ?? "unknown"}; expected ${input.pageId}. No ad was attached.`,
+        );
+    }
     input = { ...attached, existingCreativeId: creative.creativeId };
   }
   return zernioFetch<ZernioAdWriteResponse>("/ads/create", {

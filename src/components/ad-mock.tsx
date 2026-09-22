@@ -65,11 +65,13 @@ export function AdMock({
   verticalKind = "story",
   previewState = "normal",
   diagnostics = false,
+  preserveArtwork = false,
 }: {
   publisher?: "facebook" | "instagram";
   verticalKind?: "story" | "reel";
   previewState?: "normal" | "caption" | "end-card";
   diagnostics?: boolean;
+  preserveArtwork?: boolean;
   surface: AdMockSurface;
   /**
    * The crop to draw, when it is not the surface's own — a placement whose
@@ -99,6 +101,7 @@ export function AdMock({
           verticalKind,
           previewState,
           diagnostics,
+          preserveArtwork,
           brandName,
           brandLogo,
           body,
@@ -126,7 +129,10 @@ export function AdMock({
         // middle of the brand's name, so the logo is contained.
         avatars: [{ url: brandLogo, fit: "contain" }],
         text: body,
-        media: onCard ? media : media.slice(0, 1),
+        media: (onCard ? media : media.slice(0, 1)).map((item) => ({
+          ...item,
+          ...(preserveArtwork ? { fit: "contain" as const } : {}),
+        })),
         sponsored: true,
         ad: { headline, link, callToAction },
       }}
@@ -150,6 +156,7 @@ function VerticalAdPreview({
   verticalKind,
   previewState,
   diagnostics,
+  preserveArtwork,
   brandName,
   brandLogo,
   body,
@@ -163,6 +170,7 @@ function VerticalAdPreview({
   verticalKind: "story" | "reel";
   previewState: "normal" | "caption" | "end-card";
   diagnostics: boolean;
+  preserveArtwork: boolean;
   brandName: string;
   brandLogo: string | null;
   body: string | null;
@@ -198,7 +206,9 @@ function VerticalAdPreview({
             preload="metadata"
             className={cn(
               "absolute inset-0 size-full",
-              diagnostics ? "object-contain" : "object-cover",
+              diagnostics || preserveArtwork
+                ? "object-contain"
+                : "object-cover",
             )}
           />
         ) : (
@@ -208,7 +218,9 @@ function VerticalAdPreview({
               alt="Ad creative"
               className={cn(
                 "absolute inset-0 size-full",
-                diagnostics ? "object-contain" : "object-cover",
+                diagnostics || preserveArtwork
+                  ? "object-contain"
+                  : "object-cover",
               )}
             />
           )

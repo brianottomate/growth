@@ -494,7 +494,7 @@ export function AdIdeaCard({
               ? "Working…"
               : approved
                 ? "Reopen idea"
-                : "Approve & save creative"}
+                : "Approve"}
           </Button>
         </div>
       </div>
@@ -603,7 +603,7 @@ export function AdIdeaCard({
                 })
               }
             >
-              {approval.isPending ? "Approving…" : "Approve & save creative"}
+              {approval.isPending ? "Approving…" : "Approve"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -680,6 +680,7 @@ export function AdIdeaCard({
                 document: savedState.document,
                 approval: ad.content.ideaStudio?.approval,
               }}
+              content={ad.content}
               platform={view === "platform"}
             />
           )}
