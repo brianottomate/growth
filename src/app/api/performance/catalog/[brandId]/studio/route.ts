@@ -40,8 +40,15 @@ export async function POST(
   try {
     const { brandId } = await params;
     const body = z
-      .object({ action: z.enum(["save", "export"]), draft: catalogDraftSchema })
+      .object({
+        action: z.enum(["save", "export", "refresh"]),
+        draft: catalogDraftSchema.optional(),
+      })
       .parse(await request.json());
+    if (body.action === "refresh")
+      return NextResponse.json(
+        await catalogState(session.user.id, brandId, true),
+      );
     const draft = catalogDraftSchema.parse(body.draft);
     if (body.action === "export") {
       const input = await startCatalogExport(session.user.id, brandId, draft);

@@ -78,7 +78,12 @@ export function AdIdeaPreview({
             Composition previews · platform appearance is approximate.
           </p>
           <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] items-start gap-5">
-            {META_PLACEMENTS.map((surface) => {
+            {META_PLACEMENTS.filter(
+              (surface) =>
+                surface.kind === "feed" || surface.id === "facebook-story",
+            ).map((surface) => {
+              const label =
+                surface.kind === "feed" ? surface.label : "Stories / Reels";
               const size = surface.kind !== "feed" ? "story" : shape;
               const included = studio.approval
                 ? Boolean(studio.approval.renders[size]?.length)
@@ -91,10 +96,10 @@ export function AdIdeaPreview({
               return (
                 <section
                   key={surface.id}
-                  aria-label={surface.label}
+                  aria-label={label}
                   className="min-w-0 space-y-3"
                 >
-                  <h4 className="text-sm font-medium">{surface.label}</h4>
+                  <h4 className="text-sm font-medium">{label}</h4>
                   {!included && (
                     <p className="text-xs text-muted-foreground">
                       Not included in export
@@ -104,7 +109,7 @@ export function AdIdeaPreview({
                     <CompactAdMock
                       surface={surface.surface}
                       publisher={surface.publisher}
-                      verticalKind={surface.kind === "reel" ? "reel" : "story"}
+                      verticalKind="story"
                       crop={size}
                       brandName={brandName}
                       brandLogo={brandLogo}

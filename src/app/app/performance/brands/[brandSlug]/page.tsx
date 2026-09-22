@@ -9,7 +9,6 @@ import {
   performanceAccountTable,
   performanceIntakeTable,
 } from "@/server/db/schema";
-import { BrandBrandingCard } from "@/app/app/brands/[brandSlug]/BrandBrandingCard";
 import { cn } from "@/components/ui/lib/utils";
 import { loadBrandContacts } from "@/server/services/brand-contacts.service";
 import { listMedia } from "@/server/services/media.service";
@@ -192,13 +191,6 @@ export default async function PerformanceBrandPage({
           />
         )}
       </section>
-
-      <BrandBrandingCard
-        brandId={brand.id}
-        logo={brand.logo}
-        identity={brand.brandIdentity ?? null}
-        website={brand.website}
-      />
 
       <section className="space-y-2.5">
         <SectionLabel>Contacts</SectionLabel>

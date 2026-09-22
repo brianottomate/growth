@@ -223,7 +223,7 @@ export function readinessLinks(
   return {
     intake: brand.intakeUrl,
     connect: `/app/brands/${slug}`,
-    homes: `/app/performance/brands/${slug}/homes`,
+    homes: `/app/performance/brands/${slug}/setup`,
     draw: `/app/performance/brands/${slug}/ads`,
     mark: `/app/brands/${slug}#brand-mark`,
     ads: `/app/brands/${slug}/ads`,

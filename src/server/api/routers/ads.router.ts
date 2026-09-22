@@ -704,6 +704,18 @@ export const adsRouter = {
           .nullish(),
         meta: z
           .object({
+            startWhenLaunched: z
+              .boolean()
+              .optional()
+              .describe(
+                "Start when launched; do not inherit or invent a start date.",
+              ),
+            runUntilPaused: z
+              .boolean()
+              .optional()
+              .describe(
+                "No end date; daily budgets only. False allows a scheduled or inherited end.",
+              ),
             pixelId: z.string().trim().max(64).optional(),
             customEventType: z.string().trim().max(64).optional(),
             customConversionId: z.string().trim().max(64).optional(),

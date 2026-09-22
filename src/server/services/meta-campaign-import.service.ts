@@ -62,7 +62,7 @@ export async function importMetaCampaign(
       reused: true,
     };
   const [tree, scope] = await Promise.all([
-    getZernioAdsTree(),
+    getZernioAdsTree({ pageId: brand.metaPageId ?? undefined }),
     listAdsWriteDestinations({
       organizationId: ctx.orgId,
       brandSlug: args.brandSlug,

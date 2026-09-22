@@ -101,7 +101,9 @@ export function AdIdeaCard({
     trpc.ads.setAdStatus.mutationOptions({
       onSuccess: () => {
         toast.success(
-          approved ? "Ad reopened" : "Ad approved and creative saved",
+          approved
+            ? "Draft reopened. Previously pushed ads are unchanged."
+            : "Ad approved and creative saved",
         );
         setApprovalOpen(false);
         setView("overview");
@@ -686,6 +688,62 @@ export function AdIdeaCard({
           {view === "details" && (
             <div className="space-y-5">
               <div className="space-y-3 border-t pt-4">
+                <div className="space-y-2">
+                  <h5 className="text-xs font-medium">Creative sizes</h5>
+                  <div
+                    className="flex flex-wrap gap-2"
+                    aria-label="Creative sizes"
+                  >
+                    {IDEA_SHAPES.map((size) => (
+                      <div
+                        key={size}
+                        className={`flex items-center rounded-lg border transition-colors ${shape === size ? "border-ring bg-accent text-accent-foreground" : "bg-background text-muted-foreground"}`}
+                      >
+                        <label className="flex cursor-pointer items-center py-3 pr-1 pl-3">
+                          <input
+                            type="checkbox"
+                            className="size-4 accent-current"
+                            aria-label={`Export ${IDEA_SHAPE_LABELS[size]}`}
+                            disabled={
+                              approved ||
+                              approval.isPending ||
+                              busy ||
+                              editor !== null
+                            }
+                            checked={(
+                              savedState.document.exportShapes ??
+                              savedState.document.shapes
+                            ).includes(size)}
+                            onChange={(event) => {
+                              const selected =
+                                savedState.document.exportShapes ??
+                                savedState.document.shapes;
+                              persist({
+                                ...savedState.document,
+                                exportShapes: IDEA_SHAPES.filter((item) =>
+                                  item === size
+                                    ? event.target.checked
+                                    : selected.includes(item),
+                                ),
+                              });
+                            }}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          className="rounded-md px-3 py-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-ring"
+                          aria-pressed={shape === size}
+                          onClick={() => setShape(size)}
+                        >
+                          {IDEA_SHAPE_LABELS[size]}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Select a size to edit. Check sizes to export.
+                  </p>
+                </div>
                 {savedState.document.cards.length === 0 ? (
                   <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed px-6 py-8 text-center">
                     <h4 className="text-sm font-medium">
@@ -718,62 +776,6 @@ export function AdIdeaCard({
                         ? "Creative"
                         : `Slides · ${savedState.document.cards.length}`}
                     </h4>
-                    <div className="space-y-2">
-                      <h5 className="text-xs font-medium">Creative sizes</h5>
-                      <div
-                        className="flex flex-wrap gap-2"
-                        aria-label="Creative sizes"
-                      >
-                        {IDEA_SHAPES.map((size) => (
-                          <div
-                            key={size}
-                            className={`flex items-center rounded-lg border transition-colors ${shape === size ? "border-ring bg-accent text-accent-foreground" : "bg-background text-muted-foreground"}`}
-                          >
-                            <label className="flex cursor-pointer items-center py-3 pr-1 pl-3">
-                              <input
-                                type="checkbox"
-                                className="size-4 accent-current"
-                                aria-label={`Export ${IDEA_SHAPE_LABELS[size]}`}
-                                disabled={
-                                  approved ||
-                                  approval.isPending ||
-                                  busy ||
-                                  editor !== null
-                                }
-                                checked={(
-                                  savedState.document.exportShapes ??
-                                  savedState.document.shapes
-                                ).includes(size)}
-                                onChange={(event) => {
-                                  const selected =
-                                    savedState.document.exportShapes ??
-                                    savedState.document.shapes;
-                                  persist({
-                                    ...savedState.document,
-                                    exportShapes: IDEA_SHAPES.filter((item) =>
-                                      item === size
-                                        ? event.target.checked
-                                        : selected.includes(item),
-                                    ),
-                                  });
-                                }}
-                              />
-                            </label>
-                            <button
-                              type="button"
-                              className="rounded-md px-3 py-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-ring"
-                              aria-pressed={shape === size}
-                              onClick={() => setShape(size)}
-                            >
-                              {IDEA_SHAPE_LABELS[size]}
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Select a size to edit. Check sizes to export.
-                      </p>
-                    </div>
                     <fieldset
                       disabled={
                         approved ||

@@ -34,6 +34,8 @@ export async function PlatformSection({
   audienceCount,
   brandUrl,
   campaignName,
+  campaignStartAt,
+  campaignEndAt,
   draftAds,
   audiences,
 }: {
@@ -47,6 +49,8 @@ export async function PlatformSection({
   audienceCount: number;
   brandUrl: string | null;
   campaignName?: string;
+  campaignStartAt?: Date | null;
+  campaignEndAt?: Date | null;
   draftAds?: Ad[];
   audiences?: {
     id: string;
@@ -67,6 +71,8 @@ export async function PlatformSection({
     return (
       <MetaPlatformCard
         campaignId={campaignId}
+        campaignStartAt={campaignStartAt}
+        campaignEndAt={campaignEndAt}
         campaignName={campaignName ?? platformCampaign.name}
         brandSlug={brandSlug}
         brandName={brandName}

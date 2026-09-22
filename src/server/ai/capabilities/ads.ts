@@ -185,7 +185,7 @@ const schedulingSchema = {
 
 export const listAdsDestinations = growthAction({
   description:
-    "List the active Zernio Meta, Google or LinkedIn connection and the live provider ad accounts that are explicitly allowlisted for one owned brand. Use this before any adsWrite action; never guess either account id. Each Meta destination carries the Facebook Page it runs as (pageId) and runsAsBrandPage; a false value means the push will refuse it because the brand is bound to a different Page.",
+    "List the active Zernio Meta, Google or LinkedIn connection and the live provider ad accounts that are explicitly allowlisted for one owned brand. Use this before any adsWrite action; never guess either account id. Each Meta destination carries the Facebook Page it runs as (pageId) and runsAsBrandPage; a false value means the connection cannot access the brand Page. Performance clients may use an explicitly shared managing-brand connection with their own Page identity. trackingDefaults contains the verified pixelId and customEventType inherited for this paying account; use these for campaign setup unless the operator requests an override.",
   inputSchema: z.object({
     brandSlug: destinationSchema.brandSlug,
     platform: platformSchema,
@@ -832,7 +832,7 @@ export const replaceAdCardAction = growthAction({
 
 export const addAudienceAction = growthAction({
   description:
-    "Add an audience to a LOCAL campaign: one buyable narrowing (one age window, one geography, optional keyword suggestions) that the push compiles to a Meta ad set / Google ad group. Wanting two age ranges means two audiences. Local only, and an audience carries NO money — budgets live on the platform draft. Omit everything but the name for broad targeting, which is a legitimate and often correct choice.",
+    "Add an audience to a LOCAL campaign: one buyable narrowing (one age window, one geography, optional keyword suggestions) that the push compiles to a Meta ad set / Google ad group. Default to ONE audience and ONE ad set per campaign. Reuse or update the existing audience. Only propose or create multiple audiences when the operator explicitly requests a split or experiment. Local only, and an audience carries NO money — budgets live on the platform draft. Omit everything but the name for broad targeting, which is a legitimate and often correct choice.",
   inputSchema: z.object({
     campaignId: z.string().trim().min(1),
     name: z.string().trim().min(1).max(300),
@@ -988,7 +988,7 @@ export const setCreativePoolAction = growthAction({
 
 export const setPlatformDraftAction = growthAction({
   description:
-    "Set a platform draft's AUTHORITATIVE budget and its platform-specific settings before pushing: Google needs a campaign type (a search campaign without keywords is rejected at push — its keywords derive from the audiences' suggestions unless overridden here); Meta takes pixel and budget mode; LinkedIn takes the authoring Company Page id, a manual bid and the CTA, all optional. Also the only place to set flight dates, which a lifetime budget requires. Local only.",
+    "Set a platform draft's AUTHORITATIVE budget and its platform-specific settings before pushing: Google needs a campaign type (a search campaign without keywords is rejected at push — its keywords derive from the audiences' suggestions unless overridden here); Meta takes pixel, conversion event, placements, budget mode, and optional schedule controls (startWhenLaunched/runUntilPaused). Daily budgets need no dates; lifetime budgets need an end. Read listDestinations for verified trackingDefaults instead of guessing a pixel; LinkedIn takes the authoring Company Page id, a manual bid and the CTA, all optional. Also the only place to set flight dates, which a lifetime budget requires. Local only.",
   inputSchema: z.object({
     platformCampaignId: z
       .string()
@@ -1007,7 +1007,7 @@ export const setPlatformDraftAction = growthAction({
       .datetime()
       .optional()
       .describe(
-        "ISO start for this platform's flight; overrides the campaign.",
+        "Optional ISO start; overrides the campaign. For Meta, set startWhenLaunched false when scheduling, true to start on launch.",
       ),
     endAt: z
       .string()
@@ -1034,6 +1034,18 @@ export const setPlatformDraftAction = growthAction({
       .optional(),
     meta: z
       .object({
+        startWhenLaunched: z
+          .boolean()
+          .optional()
+          .describe(
+            "Start when launched; do not inherit or invent a start date.",
+          ),
+        runUntilPaused: z
+          .boolean()
+          .optional()
+          .describe(
+            "No end date; daily budgets only. False allows a scheduled or inherited end.",
+          ),
         pixelId: z.string().trim().min(1).optional(),
         customEventType: z.string().trim().min(1).optional(),
         customConversionId: z.string().trim().min(1).optional(),

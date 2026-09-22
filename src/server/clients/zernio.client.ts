@@ -878,6 +878,18 @@ export type ZernioAdAccount = {
   [key: string]: unknown;
 };
 
+/** Granted Pages for a Meta ads connection; does not change its selected Page. */
+export async function listZernioAdPages(
+  accountId: string,
+  adAccountId: string,
+) {
+  const params = new URLSearchParams({ accountId, adAccountId });
+  const result = await zernioFetch<{
+    pages?: { pageId: string; name: string }[];
+  }>(`/ads/instagram-accounts?${params.toString()}`);
+  return result.pages ?? [];
+}
+
 export type ZernioFacebookPage = {
   id: string;
   name?: string;
@@ -1145,6 +1157,8 @@ export type ZernioPlacementAssets = {
 };
 
 export type CreateZernioStandaloneAdInput = {
+  /** Meta Page override, verified against the connection grants. */
+  pageId?: string;
   accountId: string;
   adAccountId: string;
   name: string;
@@ -1707,7 +1721,12 @@ export async function getZernioAdAudience(
 // fetch) omit the window and keep the 90d default; the analytics layer passes a
 // real window to rank "previous campaigns".
 export async function getZernioAdsTree(
-  options: { fromDate?: string; toDate?: string; status?: string } = {},
+  options: {
+    fromDate?: string;
+    toDate?: string;
+    status?: string;
+    pageId?: string;
+  } = {},
 ): Promise<ZernioAdsTreeCampaign[]> {
   const all: ZernioAdsTreeCampaign[] = [];
   const limit = 100;
@@ -1722,6 +1741,7 @@ export async function getZernioAdsTree(
     if (options.fromDate) params.set("fromDate", options.fromDate);
     if (options.toDate) params.set("toDate", options.toDate);
     if (options.status) params.set("status", options.status);
+    if (options.pageId) params.set("pageId", options.pageId);
 
     const data = await zernioFetch<unknown>(`/ads/tree?${params.toString()}`);
 
@@ -2155,4 +2175,13 @@ export async function listZernioMetaImages(
   }>(
     `/ads/images?${new URLSearchParams({ accountId, adAccountId, limit: "100", ...(after ? { after } : {}) })}`,
   );
+}
+
+export async function listZernioPixels(accountId: string, adAccountId: string) {
+  const result = await zernioFetch<{
+    tags: Array<{ id: string; name: string; kind?: string }>;
+  }>(
+    `/accounts/${encodeURIComponent(accountId)}/tracking-tags?adAccountId=${encodeURIComponent(adAccountId)}`,
+  );
+  return (result.tags ?? []).map(({ id, name }) => ({ id, name }));
 }

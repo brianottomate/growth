@@ -15,7 +15,7 @@ import {
   type CatalogDraft,
   type CatalogExport,
 } from "@/lib/catalog-studio";
-import { brandListings } from "./wanderos-listings.service";
+import { brandHomeInventory } from "./home-inventory.service";
 import { freezeComposition } from "./composition.service";
 import { importRemoteImage } from "./media.service";
 
@@ -42,9 +42,14 @@ export async function catalogBrand(userId: string, brandId: string) {
   if (!brand) throw new Error("Brand not found");
   return brand;
 }
-export async function catalogState(userId: string, brandId: string) {
+export async function catalogState(
+  userId: string,
+  brandId: string,
+  refresh = false,
+) {
   const brand = await catalogBrand(userId, brandId);
-  const homes = await brandListings(brand);
+  const inventory = await brandHomeInventory(brand, refresh);
+  const homes = inventory.homes;
   const saved = catalogDraftSchema.safeParse(brand.settings?.catalogStudio);
   const runs = await db.query.creativeRunTable.findMany({
     where: and(
@@ -55,6 +60,8 @@ export async function catalogState(userId: string, brandId: string) {
   });
   return {
     homes,
+    enrichmentError: inventory.enrichmentError,
+    syncedAt: inventory.syncedAt,
     draft: catalogDraft(homes, saved.success ? saved.data : null),
     exports: runs.map((run): CatalogExport => ({
       ...run.providerOutput,
@@ -84,7 +91,7 @@ export async function startCatalogExport(
   draft: CatalogDraft,
 ) {
   const brand = await catalogBrand(userId, brandId);
-  const homes = await brandListings(brand);
+  const { homes } = await brandHomeInventory(brand);
   const included = draft.cards.filter((c) => c.included);
   if (!included.length) throw new Error("Include at least one home");
   if (
@@ -123,6 +130,10 @@ export async function renderCatalogExport(
   const total =
     draft.cards.filter((c) => c.included).length * draft.formats.length;
   try {
+    await db
+      .update(creativeRunTable)
+      .set({ status: "processing" })
+      .where(eq(creativeRunTable.id, run.id));
     const [folder] = await db
       .insert(mediaFolderTable)
       .values({

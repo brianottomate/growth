@@ -1,3 +1,4 @@
+import { SharedAdsConnections } from "../SharedAdsConnections";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { and, eq, isNull } from "drizzle-orm";
@@ -83,6 +84,7 @@ export default async function BrandSetupPage({
       <WanderOsSiteCard brandId={brand.id} />
 
       <AdAccountsCard brandId={brand.id} brandSlug={brand.slug ?? brandSlug} />
+      <SharedAdsConnections brandId={brand.id} />
 
       <PurgeBrandCard brandId={brand.id} brandName={brand.name} />
     </div>

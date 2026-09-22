@@ -34,6 +34,8 @@ export const catalogDraftSchema = z
 export type CatalogCard = z.infer<typeof catalogCardSchema>;
 export type CatalogDraft = z.infer<typeof catalogDraftSchema>;
 export type CatalogHome = HotelFeedHome & {
+  rating?: number;
+  thumbUrl?: string;
   gallery?: { url: string; thumbUrl: string }[];
 };
 export type CatalogExport = {
@@ -111,6 +113,7 @@ export const CATALOG_FEED_COLUMNS = [
   "url",
   "image[0].url",
   "address.addr1",
+  "address.postal_code",
   "address.city",
   "address.region",
   "address.country",
@@ -126,12 +129,15 @@ export function catalogFeedCells(row: HotelFeedRow) {
     row.brand,
     row.link,
     row.imageUrl,
-    "",
+    [row.streetAddress, row.streetAddress2, row.streetAddress3]
+      .filter(Boolean)
+      .join(", "),
+    row.postalCode ?? "",
     row.city,
     row.region,
     row.country,
-    "",
-    "",
+    row.latitude == null ? "" : String(row.latitude),
+    row.longitude == null ? "" : String(row.longitude),
     row.price,
   ];
 }

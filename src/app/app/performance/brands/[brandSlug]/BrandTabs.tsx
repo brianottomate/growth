@@ -7,7 +7,7 @@ import { cn } from "@/components/ui/lib/utils";
 
 const TABS = [
   { label: "Overview", tab: "", exact: true },
-  { label: "Homes", tab: "homes" },
+  { label: "Setup", tab: "setup" },
   { label: "Ads", tab: "ads" },
   { label: "Campaigns", tab: "campaigns" },
   { label: "Settings", tab: "settings" },
@@ -30,7 +30,8 @@ export function BrandTabs({ slug }: { slug: string }) {
         const active =
           "exact" in item && item.exact
             ? pathname === href
-            : pathname.startsWith(href);
+            : pathname.startsWith(href) ||
+              (item.tab === "setup" && pathname.startsWith(`${base}/homes/`));
         return (
           <Link
             key={item.label}

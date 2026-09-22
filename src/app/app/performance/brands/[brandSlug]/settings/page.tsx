@@ -1,3 +1,4 @@
+import { SharedAdsConnections } from "@/app/app/brands/[brandSlug]/SharedAdsConnections";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { inArray } from "drizzle-orm";
@@ -94,6 +95,7 @@ export default async function PerformanceBrandSettingsPage({
   return (
     <div className="space-y-3">
       <SectionLabel>Settings</SectionLabel>
+      <SharedAdsConnections brandId={brand.id} />
       <SettingsCard
         derived={derived}
         settings={brand.performanceSettings ?? null}

@@ -413,6 +413,8 @@ export async function CampaignView({
                     campaignId={campaign.id}
                     platformCampaign={platformCampaign}
                     campaignName={campaign.name}
+                    campaignStartAt={campaign.startAt}
+                    campaignEndAt={campaign.endAt}
                     draftAds={ads}
                     audiences={audiences}
                     draftAdCount={ads.length}

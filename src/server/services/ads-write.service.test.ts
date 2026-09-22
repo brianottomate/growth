@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import {
   assertMetaAdPayload,
+  assertSharedPageCarouselPush,
   estimateMonthlyKeywordCost,
   extractPreviewFrames,
   metaPageIdFromConnection,
@@ -556,9 +557,7 @@ describe("metaPageIdFromConnection", () => {
 });
 
 /**
- * Zernio creates every ad as the Page its connection is bound to, with no
- * per-ad override, so this guard is the only thing between a client's
- * campaign and someone else's identity.
+ * Per-ad Page overrides must remain limited to verified connection grants.
  */
 describe("connectionRunsAsBrandPage", () => {
   const winterPark = { metaPageId: "410431762630458" };
@@ -576,6 +575,18 @@ describe("connectionRunsAsBrandPage", () => {
       connectionRunsAsBrandPage(winterPark, {
         platformUserId: "27501783656071882:page:101399685529192",
       }),
+    ).toBe(false);
+  });
+
+  it("allows a shared connection only for an explicitly granted brand Page", () => {
+    const connection = {
+      platformUserId: "27501783656071882:page:101399685529192",
+    };
+    expect(
+      connectionRunsAsBrandPage(winterPark, connection, ["410431762630458"]),
+    ).toBe(true);
+    expect(
+      connectionRunsAsBrandPage(winterPark, connection, ["1247371591803872"]),
     ).toBe(false);
   });
 
@@ -727,4 +738,36 @@ it("attaches a carousel to a conversion ad set without resending its pixel and b
       account,
     ),
   ).not.toThrow();
+});
+
+describe("shared Page carousel identity", () => {
+  it("blocks a multi-carousel shared-Page push before inheriting the managing Page", () => {
+    expect(() =>
+      assertSharedPageCarouselPush({
+        pageId: "client",
+        connectionPageId: "manager",
+        carouselCount: 2,
+      }),
+    ).toThrow("wrong identity");
+  });
+  it("allows own-Page carousels and shapes supporting explicit Page overrides", () => {
+    for (const input of [
+      {
+        pageId: "client",
+        connectionPageId: "client",
+        carouselCount: 3,
+      },
+      {
+        pageId: "client",
+        connectionPageId: "manager",
+        carouselCount: 1,
+      },
+      {
+        pageId: "client",
+        connectionPageId: "manager",
+        carouselCount: 0,
+      },
+    ])
+      expect(() => assertSharedPageCarouselPush(input)).not.toThrow();
+  });
 });

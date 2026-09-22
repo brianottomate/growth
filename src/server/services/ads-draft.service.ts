@@ -1,3 +1,4 @@
+import { resolveMetaSchedule, metaScheduleIssue } from "@/lib/meta-schedule";
 import "server-only";
 
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
@@ -350,7 +351,19 @@ export async function setPlatformDraft(input: {
   // `assertLinkedInAdPayload` enforces; the difference is that here the
   // operator is still setting the number, rather than watching a push fail.
   const warnings: string[] = [];
-  if (saved.budgetType === "lifetime" && !(saved.endAt ?? parentEndAt)) {
+  if (saved.platform === "meta_ads") {
+    const issue = metaScheduleIssue(
+      resolveMetaSchedule({
+        startAt: saved.startAt,
+        endAt: saved.endAt,
+        campaignStartAt: parent.startAt,
+        campaignEndAt: parent.endAt,
+        ...saved.settings?.meta,
+      }),
+      saved.budgetType,
+    );
+    if (issue) warnings.push(issue);
+  } else if (saved.budgetType === "lifetime" && !(saved.endAt ?? parentEndAt)) {
     warnings.push(
       "This is a lifetime budget and the campaign has no end date, so the push will refuse it. Set an end date on the campaign, or switch to a daily budget.",
     );

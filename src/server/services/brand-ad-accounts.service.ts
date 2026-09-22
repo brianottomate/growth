@@ -1,3 +1,4 @@
+import { adsConnectionProfile } from "./ads-connection-profile";
 import "server-only";
 
 import { and, eq, inArray, or } from "drizzle-orm";
@@ -74,9 +75,15 @@ export async function listBrandAdAccounts(
   const discover = options.discover ?? true;
   const brand = await db.query.brandTable.findFirst({
     where: eq(brandTable.id, brandId),
-    columns: { id: true, zernioProfileId: true },
+    columns: {
+      id: true,
+      zernioProfileId: true,
+      organizationId: true,
+      performanceSettings: true,
+    },
   });
   if (!brand) throw new Error("Brand not found");
+  const profileId = await adsConnectionProfile(brand);
 
   type Discovered = {
     platform: AdAccountPlatform;
@@ -90,8 +97,7 @@ export async function listBrandAdAccounts(
   if (discover && isZernioConfigured) {
     const connections = (await listZernioAccounts()).filter(
       (account) =>
-        (!brand.zernioProfileId ||
-          zernioAccountProfileId(account) === brand.zernioProfileId) &&
+        (!profileId || zernioAccountProfileId(account) === profileId) &&
         CONNECTION_PLATFORMS[account.platform?.toLowerCase() ?? ""],
     );
     const results = await Promise.allSettled(

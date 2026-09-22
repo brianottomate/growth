@@ -51,6 +51,21 @@ const imported: AdCreativeContent = {
     rawCreative: {},
   },
 };
+it("shows local approved creative before delivery placements are configured", () => {
+  const content: AdCreativeContent = {
+    ...copy,
+    media: [
+      { type: "image", url: "https://example.com/first.jpg" },
+      { type: "image", url: "https://example.com/second.jpg" },
+    ],
+  };
+  expect(metaPreviewPlacements(content, [])).toContain("facebook-feed");
+  expect(metaPreviewPlacements(content, [])).toContain("instagram-story");
+  expect(metaPreviewPlacements(content, ["instagram-feed"])).toEqual([
+    "instagram-feed",
+  ]);
+  expect(metaPreviewPlacements({ ...copy, media: [] }, [])).toEqual([]);
+});
 it("previews recovered artwork without local approval, while delivery stays blocked", () => {
   expect(metaPreviewPlacements(imported, [])).toContain("facebook-feed");
   expect(metaPreviewMedia(imported, "facebook-feed").media[0]?.url).toBe(

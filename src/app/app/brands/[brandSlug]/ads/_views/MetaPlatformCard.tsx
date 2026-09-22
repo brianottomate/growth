@@ -1,5 +1,7 @@
 "use client";
 
+import { resolveMetaSchedule, metaScheduleIssue } from "@/lib/meta-schedule";
+import { applyMetaTrackingDefaults } from "@/lib/meta-tracking";
 import Image from "next/image";
 import { IDEA_SHAPES, IDEA_SHAPE_LABELS } from "@/lib/ad-idea-studio";
 import { isImportedMetaCatalog } from "@/lib/meta-import";
@@ -57,6 +59,8 @@ export function MetaPlatformCard({
   brandSlug,
   brandName,
   brandLogo,
+  campaignStartAt,
+  campaignEndAt,
   platformCampaign: pc,
   ads,
   audiences,
@@ -64,6 +68,8 @@ export function MetaPlatformCard({
 }: {
   campaignId: string;
   campaignName: string;
+  campaignStartAt?: Date | null;
+  campaignEndAt?: Date | null;
   brandSlug: string;
   brandName: string;
   brandLogo: string | null;
@@ -90,7 +96,17 @@ export function MetaPlatformCard({
       { enabled: expanded },
     ),
   );
-  const choices = destinations.data?.destinations ?? [];
+  // Facebook and Meta Ads connections can expose the same paying account/Page.
+  const choices = (destinations.data?.destinations ?? []).filter(
+    (choice, index, all) =>
+      index ===
+      all.findIndex(
+        (other) =>
+          other.adAccountId === choice.adAccountId &&
+          other.pageId === choice.pageId &&
+          other.runsAsBrandPage === choice.runsAsBrandPage,
+      ),
+  );
   const chosen =
     choices.find(
       (d) => `${d.connectionAccountId}:${d.adAccountId}` === destinationKey,
@@ -124,7 +140,18 @@ export function MetaPlatformCard({
           ageMax: null,
         },
       ];
-  const meta = pc.settings?.meta;
+  const meta = applyMetaTrackingDefaults(
+    pc.settings?.meta ?? {},
+    chosen?.trackingDefaults,
+  );
+  const schedule = resolveMetaSchedule({
+    startAt: pc.startAt,
+    endAt: pc.endAt,
+    campaignStartAt,
+    campaignEndAt,
+    ...meta,
+  });
+  const scheduleError = metaScheduleIssue(schedule, pc.budgetType);
   const placementPlan = meta?.placements ?? [];
   const missingCreative = creativeAds.some(
     (ad) =>
@@ -137,17 +164,31 @@ export function MetaPlatformCard({
           ).issue,
       ),
   );
-  const ready = Boolean(
-    placementPlan.length &&
-    !missingCreative &&
-    !catalogCount &&
-    (!meta?.importSource?.issues.length || meta.importReviewed) &&
+  const missingTracking =
+    goal === "conversions" &&
+    !meta?.customConversionId &&
+    !(meta?.pixelId && meta?.customEventType);
+  const blockers = [
+    scheduleError,
+    !configuration && "Choose an ad account in Edit setup.",
     configuration &&
-    chosen?.runsAsBrandPage &&
-    pc.budget &&
-    creativeAds.length &&
-    !unapprovedCount,
-  );
+      !chosen?.runsAsBrandPage &&
+      "The connection does not have access to this brand’s Facebook Page.",
+    !placementPlan.length && "Choose delivery placements in Edit setup.",
+    missingTracking &&
+      "Set a pixel and conversion event, or a custom conversion, in Edit setup.",
+    !pc.budget && "Set a budget in Edit setup.",
+    !creativeAds.length && "Add at least one creative ad.",
+    Boolean(unapprovedCount) &&
+      "Approve or delete all remaining ad ideas before validating or pushing.",
+    missingCreative && "Add the missing artwork for the selected placements.",
+    Boolean(catalogCount) &&
+      "Catalog ads cannot be included in this creative push.",
+    Boolean(meta?.importSource?.issues.length && !meta.importReviewed) &&
+      "Review imported delivery settings in Edit setup.",
+  ].filter((message): message is string => typeof message === "string");
+  const ready = blockers.length === 0;
+
   return (
     <section className="space-y-5 rounded-xl border bg-card p-5">
       <div className="flex flex-wrap items-center gap-3">
@@ -198,13 +239,32 @@ export function MetaPlatformCard({
             ))}
         </div>
       </div>
+      {!ready && !destinations.isPending && (
+        <div
+          className="space-y-1 text-sm text-muted-foreground"
+          aria-label="Required before validation"
+        >
+          <p className="font-medium">Before validating</p>
+          <ul className="list-disc pl-5">
+            {blockers.map((message) => (
+              <li key={message}>{message}</li>
+            ))}
+          </ul>
+        </div>
+      )}
       {expanded && (
         <div id={sectionId} className="space-y-5">
-          <section className="space-y-4" aria-label="Setup">
+          <section
+            id={`${sectionId}-setup`}
+            className="space-y-4"
+            aria-label="Setup"
+          >
             <div className="flex items-center justify-between gap-3">
               <h4 className="font-semibold">Setup</h4>
               <MetaSettings
-                pc={pc}
+                pc={{ ...pc, settings: { ...pc.settings, meta } }}
+                campaignStartAt={campaignStartAt}
+                campaignEndAt={campaignEndAt}
                 choices={choices}
                 destinationKey={
                   chosen
@@ -262,9 +322,9 @@ export function MetaPlatformCard({
                     </p>
                   )}
                 <p className="text-xs text-muted-foreground">
-                  Account and goal are selected for this push. The connected
-                  Page supplies the advertising identity; Instagram identity is
-                  not separately configurable here.
+                  Account and goal are selected for this push. The brand’s Page
+                  supplies the advertising identity; Instagram identity is not
+                  separately configurable here.
                 </p>
               </div>
               <div className="space-y-4 rounded-lg border p-4">
@@ -288,15 +348,15 @@ export function MetaPlatformCard({
                   </dd>
                   <dt className="text-muted-foreground">Start</dt>
                   <dd>
-                    {pc.startAt
-                      ? new Date(pc.startAt).toLocaleString()
-                      : "Campaign default"}
+                    {schedule.startAt
+                      ? new Date(schedule.startAt).toLocaleString()
+                      : "When launched"}
                   </dd>
                   <dt className="text-muted-foreground">End</dt>
                   <dd>
-                    {pc.endAt
-                      ? new Date(pc.endAt).toLocaleString()
-                      : "Campaign default"}
+                    {schedule.endAt
+                      ? new Date(schedule.endAt).toLocaleString()
+                      : "Run until paused"}
                   </dd>
                   <dt className="text-muted-foreground">Pixel / dataset</dt>
                   <dd className="break-all">
@@ -379,7 +439,11 @@ export function MetaPlatformCard({
             ))}
             {!placementPlan.length && !meta?.importSource && (
               <p className="text-sm text-muted-foreground">
-                Choose placements in Edit setup to review delivery.
+                Local previews below show available creative.{" "}
+                <a className="underline" href={`#${sectionId}-setup`}>
+                  Edit setup above
+                </a>{" "}
+                to choose delivery placements.
               </p>
             )}
             {meta?.importSource && (
@@ -489,7 +553,7 @@ export function MetaPlatformCard({
           )}
           {unapprovedCount > 0 && (
             <p className="text-sm">
-              Approve {unapprovedCount} remaining ads before pushing.
+              Approve or delete {unapprovedCount} remaining ads before pushing.
             </p>
           )}
           {!pc.budget && (
@@ -509,12 +573,16 @@ export function MetaPlatformCard({
 
 function MetaSettings({
   pc,
+  campaignStartAt,
+  campaignEndAt,
   choices,
   destinationKey,
   goal,
   onApply,
 }: {
   pc: PlatformCampaign;
+  campaignStartAt?: Date | null;
+  campaignEndAt?: Date | null;
   choices: {
     connectionAccountId: string;
     adAccountId: string;
@@ -551,8 +619,21 @@ function MetaSettings({
           .toISOString()
           .slice(0, 16)
       : "";
-  const [start, setStart] = useState(dateValue(pc.startAt));
-  const [end, setEnd] = useState(dateValue(pc.endAt));
+  const effective = resolveMetaSchedule({
+    startAt: pc.startAt,
+    endAt: pc.endAt,
+    campaignStartAt,
+    campaignEndAt,
+    ...meta,
+  });
+  const [start, setStart] = useState(dateValue(effective.startAt));
+  const [end, setEnd] = useState(dateValue(effective.endAt));
+  const [scheduledStart, setScheduledStart] = useState(
+    Boolean(effective.startAt),
+  );
+  const [scheduledEnd, setScheduledEnd] = useState(
+    Boolean(effective.endAt) || pc.budgetType === "lifetime",
+  );
   const trpc = useTRPC();
   const router = useRouter();
   const save = useMutation(
@@ -564,9 +645,19 @@ function MetaSettings({
       },
     }),
   );
-  const invalidDates = Boolean(
-    start && end && new Date(end) <= new Date(start),
-  );
+  const dateIssue =
+    scheduledStart && !start
+      ? "Choose a start date."
+      : scheduledEnd && !end
+        ? "Choose an end date."
+        : metaScheduleIssue(
+            {
+              startAt: scheduledStart && start ? new Date(start) : null,
+              endAt: scheduledEnd && end ? new Date(end) : null,
+            },
+            budgetType,
+          );
+  const invalidDates = Boolean(dateIssue);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <Button
@@ -583,8 +674,12 @@ function MetaSettings({
           setEvent(meta?.customEventType ?? "");
           setConversion(meta?.customConversionId ?? "");
           setMode(meta?.budgetMode ?? "cbo");
-          setStart(dateValue(pc.startAt));
-          setEnd(dateValue(pc.endAt));
+          setStart(dateValue(effective.startAt));
+          setEnd(dateValue(effective.endAt));
+          setScheduledStart(Boolean(effective.startAt));
+          setScheduledEnd(
+            Boolean(effective.endAt) || pc.budgetType === "lifetime",
+          );
           save.reset();
           setOpen(true);
         }}
@@ -670,9 +765,10 @@ function MetaSettings({
           <select
             className="w-full rounded border bg-background p-2"
             value={budgetType}
-            onChange={(e) =>
-              setBudgetType(e.target.value as "daily" | "lifetime")
-            }
+            onChange={(e) => {
+              setBudgetType(e.target.value as "daily" | "lifetime");
+              if (e.target.value === "lifetime") setScheduledEnd(true);
+            }}
           >
             <option value="daily">Daily</option>
             <option value="lifetime">Lifetime</option>
@@ -709,21 +805,53 @@ function MetaSettings({
           />
         </label>
         <label className="space-y-1 text-sm">
-          Start (local time)
-          <Input
-            type="datetime-local"
-            value={start}
-            onChange={(e) => setStart(e.target.value)}
-          />
+          Start
+          <select
+            className="w-full rounded border bg-background p-2"
+            value={scheduledStart ? "scheduled" : "launch"}
+            onChange={(e) => setScheduledStart(e.target.value === "scheduled")}
+          >
+            <option value="launch">When launched</option>
+            <option value="scheduled">Schedule a date</option>
+          </select>
         </label>
+        {scheduledStart && (
+          <label className="space-y-1 text-sm">
+            Start date (local time)
+            <Input
+              type="datetime-local"
+              value={start}
+              onChange={(e) => setStart(e.target.value)}
+            />
+          </label>
+        )}
         <label className="space-y-1 text-sm">
-          End (local time)
-          <Input
-            type="datetime-local"
-            value={end}
-            onChange={(e) => setEnd(e.target.value)}
-          />
+          End
+          <select
+            className="w-full rounded border bg-background p-2"
+            value={scheduledEnd ? "scheduled" : "none"}
+            onChange={(e) => setScheduledEnd(e.target.value === "scheduled")}
+          >
+            <option value="none" disabled={budgetType === "lifetime"}>
+              Run until paused
+            </option>
+            <option value="scheduled">Schedule an end date</option>
+          </select>
         </label>
+        {scheduledEnd && (
+          <label className="space-y-1 text-sm">
+            End date (local time)
+            <Input
+              type="datetime-local"
+              value={end}
+              onChange={(e) => setEnd(e.target.value)}
+            />
+          </label>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Push creates ads paused. When launched, they become eligible to
+          deliver after Meta review. Lifetime budgets require an end date.
+        </p>
         {meta?.importSource && (
           <label className="flex gap-2 text-sm">
             <input
@@ -735,7 +863,7 @@ function MetaSettings({
             setup for the new campaign; source-only settings will not be copied.
           </label>
         )}
-        {invalidDates && <p role="alert">End must be after start.</p>}
+        {dateIssue && <p role="alert">{dateIssue}</p>}
         {save.error && <p role="alert">{save.error.message}</p>}
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
@@ -755,6 +883,8 @@ function MetaSettings({
                 budget: amount ? Number(amount) : null,
                 budgetType,
                 meta: {
+                  startWhenLaunched: !scheduledStart,
+                  runUntilPaused: !scheduledEnd,
                   placements,
                   importReviewed,
                   pixelId: pixel.trim(),
@@ -762,8 +892,8 @@ function MetaSettings({
                   customConversionId: conversion.trim(),
                   budgetMode: mode,
                 },
-                startAt: start ? new Date(start) : null,
-                endAt: end ? new Date(end) : null,
+                startAt: scheduledStart && start ? new Date(start) : null,
+                endAt: scheduledEnd && end ? new Date(end) : null,
               })
             }
           >

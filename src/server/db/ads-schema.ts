@@ -273,6 +273,9 @@ export type PlatformCampaignSettings = {
     businessName?: string;
   };
   meta?: {
+    /** Explicitly bypass inherited dates; omitted preserves legacy inheritance. */
+    startWhenLaunched?: boolean;
+    runUntilPaused?: boolean;
     placements?: MetaPlacement[];
     importReviewed?: boolean;
     importSource?: {

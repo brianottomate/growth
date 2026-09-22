@@ -1,3 +1,7 @@
+import { applyMetaTrackingDefaults } from "@/lib/meta-tracking";
+import { metaTrackingDefaults } from "./meta-tracking-defaults";
+import { resolveMetaSchedule, metaScheduleIssue } from "@/lib/meta-schedule";
+import { adsConnectionProfile } from "./ads-connection-profile";
 import {
   metaPlacementPlanSchema,
   metaPlacementMedia,
@@ -49,6 +53,7 @@ import {
   duplicateZernioMetaCampaign,
   getZernioAdsTree,
   listZernioAccounts,
+  listZernioAdPages,
   listZernioAdAccounts,
   listZernioAdAudiences,
   generateZernioAdPreviews,
@@ -148,35 +153,52 @@ async function resolveOwnedBrand(organizationId: string, brandSlug: string) {
       name: true,
       zernioProfileId: true,
       metaPageId: true,
+      performanceSettings: true,
+      organizationId: true,
     },
   });
   if (!brand) throw new Error(`Owned brand not found: ${brandSlug}`);
+  brand.zernioProfileId = await adsConnectionProfile(brand);
   if (!brand.zernioProfileId) {
-    // Zernio creates every ad as the Page its connection is bound to and
-    // offers no per-ad override, so a Leadsie grant alone (their Page visible
-    // through Wander's connection) cannot run ads as the client. The brand
-    // needs a connection of its own, which the connect link makes in two
-    // clicks for anyone whose Meta login can manage the client's Page.
     throw new Error(
-      `${brand.name} has no Zernio connection of its own. Open its connect link from the brand page and connect Facebook and Meta Ads with a Wander login that can manage the ${brand.name} Page; the connection then runs as that Page.`,
+      `${brand.name} needs its own Zernio connection or an explicitly shared ads connection.`,
     );
   }
   return brand;
 }
 
 /**
- * Whether a Meta connection runs as the Page a brand is bound to. A brand
+ * Whether a Meta connection can run as the Page a brand is bound to. A brand
  * with no Page recorded yet passes; an unreadable connection identity fails,
  * because "unknown" is not "theirs". Pure, so the guard is testable.
  */
 export function connectionRunsAsBrandPage(
   brand: { metaPageId: string | null },
   connection: { platformUserId?: string | null },
+  grantedPageIds: string[] = [],
 ): boolean {
   if (!brand.metaPageId) return true;
   return (
-    metaPageIdFromConnection(connection.platformUserId) === brand.metaPageId
+    metaPageIdFromConnection(connection.platformUserId) === brand.metaPageId ||
+    grantedPageIds.includes(brand.metaPageId)
   );
+}
+
+/** Standalone carousel creatives currently inherit the connection's Page. */
+export function assertSharedPageCarouselPush(input: {
+  pageId: string | null;
+  connectionPageId: string | null;
+  carouselCount: number;
+}) {
+  if (
+    input.pageId &&
+    input.pageId !== input.connectionPageId &&
+    input.carouselCount > 1
+  ) {
+    throw new Error(
+      "This multi-carousel push needs a connection selected as the client's Page. Zernio's standalone carousel-creative endpoint does not document a Page override; pushing through the managing Page could use the wrong identity. Drafts and previews remain available.",
+    );
+  }
 }
 
 async function allowedAccountsForBrand(
@@ -235,6 +257,36 @@ export async function listAdsWriteDestinations(input: {
         accountId: connectionId,
         limit: 1000,
       });
+      const tracking = new Map(
+        await Promise.all(
+          allowed.map(
+            async (row) =>
+              [
+                row.externalId,
+                await metaTrackingDefaults(brand.id, row.externalId),
+              ] as const,
+          ),
+        ),
+      );
+      const grants = new Map<string, string[]>();
+      if (
+        input.platform === "meta" &&
+        brand.metaPageId &&
+        !connectionRunsAsBrandPage(brand, connection)
+      ) {
+        for (const account of providerAccounts.filter((account) =>
+          allowed.some((row) =>
+            sameAdAccountId(input.platform, row.externalId, account.id),
+          ),
+        )) {
+          grants.set(
+            account.id,
+            (await listZernioAdPages(connectionId, account.id)).map(
+              (page) => page.pageId,
+            ),
+          );
+        }
+      }
       return providerAccounts.flatMap((adAccount) => {
         const allowedRow = allowed.find((row) =>
           sameAdAccountId(input.platform, row.externalId, adAccount.id),
@@ -242,7 +294,8 @@ export async function listAdsWriteDestinations(input: {
         if (!allowedRow || adAccount.selectable === false) return [];
         const pageId =
           input.platform === "meta"
-            ? metaPageIdFromConnection(connection.platformUserId)
+            ? (brand.metaPageId ??
+              metaPageIdFromConnection(connection.platformUserId))
             : null;
         return [
           {
@@ -251,6 +304,7 @@ export async function listAdsWriteDestinations(input: {
               connection.displayName ?? connection.name ?? connection.username,
             adAccountId: adAccount.id,
             adAccountName: adAccount.name ?? allowedRow.name ?? undefined,
+            trackingDefaults: tracking.get(allowedRow.externalId),
             currency: adAccount.currency,
             minimumDailyBudget: adAccount.minimumDailyBudget,
             /** Meta: the Page the ads would run as, read off the connection. */
@@ -258,7 +312,11 @@ export async function listAdsWriteDestinations(input: {
             /** False when the brand is bound to a different Page; the push refuses it. */
             runsAsBrandPage:
               input.platform === "meta"
-                ? connectionRunsAsBrandPage(brand, connection)
+                ? connectionRunsAsBrandPage(
+                    brand,
+                    connection,
+                    grants.get(adAccount.id),
+                  )
                 : true,
           },
         ];
@@ -344,17 +402,26 @@ async function requireAdDestination(input: {
       `Ad account ${input.adAccountId} is outside ${brand.name}'s allowlist`,
     );
   }
-  // A client's ads must never run as someone else's Page. The connection
-  // decides the Page and nothing on the push can change it, so the only
-  // safe answer to a mismatch is to refuse and say which Page to select.
+  // A shared connection may serve a granted brand Page via per-ad pageId.
   if (
     input.platform === "meta" &&
     !connectionRunsAsBrandPage(brand, connection)
   ) {
-    const bound = metaPageIdFromConnection(connection.platformUserId);
-    throw new Error(
-      `Connection ${input.connectionAccountId} runs as Facebook Page ${bound ?? "(unknown)"}, but ${brand.name} is bound to Page ${brand.metaPageId}. Re-select ${brand.name}'s Page on that connection in Zernio, or reconnect it from the brand's connect link.`,
+    const pages = await listZernioAdPages(
+      input.connectionAccountId,
+      input.adAccountId,
     );
+    if (
+      !connectionRunsAsBrandPage(
+        brand,
+        connection,
+        pages.map((page) => page.pageId),
+      )
+    ) {
+      throw new Error(
+        `Connection cannot advertise as ${brand.name}'s Facebook Page ${brand.metaPageId}.`,
+      );
+    }
   }
 
   const providerAccounts = await listZernioAdAccounts({
@@ -620,11 +687,15 @@ export function tagMetaAdUtms(
 async function createMetaAd(
   payload: CreateZernioStandaloneAdInput,
   options: {
+    pageId: string | null;
     idempotencyKey: string;
     adAccount: { currency?: string; minimumDailyBudget?: number };
   },
 ) {
-  const tagged = tagMetaAdUtms(payload);
+  const tagged = tagMetaAdUtms({
+    ...payload,
+    pageId: options.pageId ?? undefined,
+  });
   assertMetaAdPayload(tagged, options.adAccount);
   return createZernioStandaloneAd(tagged, {
     idempotencyKey: options.idempotencyKey,
@@ -667,6 +738,9 @@ export async function createMetaAdDraft(
     ...metaDraftProviderControls(input.validateOnly),
   };
   const result = await createMetaAd(payload, {
+    pageId:
+      destination.brand.metaPageId ??
+      metaPageIdFromConnection(destination.connection.platformUserId),
     idempotencyKey: idempotencyKey(
       context,
       "create-meta",
@@ -2056,8 +2130,25 @@ export async function pushDraftToPlatform(
     );
   }
 
-  const startDate = (draft.startAt ?? campaign.startAt)?.toISOString();
-  const endDate = (draft.endAt ?? campaign.endAt)?.toISOString();
+  const schedule =
+    platform === "meta_ads"
+      ? resolveMetaSchedule({
+          startAt: draft.startAt,
+          endAt: draft.endAt,
+          campaignStartAt: campaign.startAt,
+          campaignEndAt: campaign.endAt,
+          ...draft.settings?.meta,
+        })
+      : {
+          startAt: draft.startAt ?? campaign.startAt,
+          endAt: draft.endAt ?? campaign.endAt,
+        };
+  if (platform === "meta_ads") {
+    const issue = metaScheduleIssue(schedule, budgetType);
+    if (issue) throw new Error(issue);
+  }
+  const startDate = schedule.startAt?.toISOString();
+  const endDate = schedule.endAt?.toISOString();
   if (budgetType === "lifetime" && !endDate) {
     throw new Error(
       "A lifetime budget needs an end date — set one on the campaign, or switch the draft to a daily budget",
@@ -2426,7 +2517,10 @@ async function pushToMeta(args: PushArgs) {
     );
   }
 
-  const meta = settings.meta ?? {};
+  const meta = applyMetaTrackingDefaults(
+    settings.meta ?? {},
+    await metaTrackingDefaults(brand.id, destination.adAccount.id),
+  );
   const planned = metaPlacementPlanSchema.safeParse(meta.placements);
   if (!planned.success)
     throw new Error("Choose delivery placements in Meta setup before pushing.");
@@ -2442,6 +2536,17 @@ async function pushToMeta(args: PushArgs) {
       if (issue) throw new Error(`${ad.name}: ${issue}`);
     }
   }
+  // Before custom-conversion provisioning or any other provider mutation.
+  assertSharedPageCarouselPush({
+    pageId: brand.metaPageId,
+    connectionPageId: metaPageIdFromConnection(
+      destination.connection.platformUserId,
+    ),
+    carouselCount: usable.filter(
+      ({ content }) =>
+        !isVideoContent(content) && (content.media?.length ?? 0) >= 2,
+    ).length,
+  });
   const useCbo = (meta.budgetMode ?? "cbo") === "cbo";
   const promotedObject = await metaPromotedObjectFor({
     brand,
@@ -2546,6 +2651,20 @@ async function pushToMeta(args: PushArgs) {
   const splitForPush = (subset: typeof usable) => {
     const carousels = subset.filter(({ content }) => isCarousel(content));
     const statics = subset.filter(({ content }) => !isCarousel(content));
+    // The opening create supports pageId; attaching a standalone carousel does not.
+    // Start with the lone carousel so all trailing statics stay in this same ad set.
+    if (
+      brand.metaPageId &&
+      !connectionRunsAsBrandPage(brand, destination.connection) &&
+      carousels.length === 1
+    ) {
+      return {
+        shape: "carousel" as const,
+        opening: carousels,
+        trailing: statics,
+      };
+    }
+
     const placed = statics.filter(({ content }) =>
       Boolean(placementAssetsFor(content)),
     );
@@ -2642,6 +2761,9 @@ async function pushToMeta(args: PushArgs) {
           }),
     };
     const result = await createMetaAd(payload, {
+      pageId:
+        destination.brand.metaPageId ??
+        metaPageIdFromConnection(destination.connection.platformUserId),
       idempotencyKey: idempotencyKey(
         context,
         `push-adset:${setArgs.keyScope}`,
@@ -2684,6 +2806,9 @@ async function pushToMeta(args: PushArgs) {
         attached.push({
           planAd: ad,
           result: await createMetaAd(attachPayload, {
+            pageId:
+              destination.brand.metaPageId ??
+              metaPageIdFromConnection(destination.connection.platformUserId),
             idempotencyKey: idempotencyKey(
               context,
               `push-attach:${setArgs.keyScope}:${ad.id}`,

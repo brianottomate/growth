@@ -1,16 +1,17 @@
 import type { AdCreativeContent } from "@/server/db/ads-schema";
-import type { MetaPlacement } from "./meta-placement-plan";
+import { META_PLACEMENTS, type MetaPlacement } from "./meta-placement-plan";
 
 /** Viewing recovered artwork never grants approval or changes the delivery plan. */
 export function metaPreviewPlacements(
   content: AdCreativeContent,
   planned: MetaPlacement[],
 ) {
-  return planned.length
-    ? planned
-    : content.metaImport
-      ? (content.ideaStudio?.document.intendedPlacements ?? [])
-      : [];
+  if (planned.length) return planned;
+  const intended = content.ideaStudio?.document.intendedPlacements ?? [];
+  if (intended.length) return intended;
+  return META_PLACEMENTS.filter(
+    (placement) => metaPreviewMedia(content, placement.id).media.length > 0,
+  ).map((placement) => placement.id);
 }
 export function metaPreviewMedia(
   content: AdCreativeContent,

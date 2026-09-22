@@ -2,13 +2,16 @@
 // the ad-previews page counts and describes rows in the browser, and the
 // export route writes the same rows to a file.
 //
-// The shape follows Meta's hotel CSV template column for column, so a file
-// uploads without remapping. Two facts the WanderOS listing feed does not
-// carry, the street address and the coordinates, are exported as empty
-// columns rather than invented; Meta flags them on upload and they are
-// filled in Commerce Manager or when the feed learns them.
+// Catalog exports enrich address fields from the warehouse before freezing.
 
 export type HotelFeedHome = {
+  streetAddress?: string | null;
+  streetAddress2?: string | null;
+  streetAddress3?: string | null;
+  postalCode?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+
   id: string;
   name: string;
   url: string;
@@ -26,6 +29,13 @@ export type HotelFeedHome = {
 };
 
 export type HotelFeedRow = {
+  streetAddress?: string | null;
+  streetAddress2?: string | null;
+  streetAddress3?: string | null;
+  postalCode?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+
   id: string;
   brand: string;
   description: string;
@@ -112,6 +122,12 @@ export function hotelFeedRows(
         title: home.name,
         link: home.url,
         imageUrl: home.imageUrl,
+        streetAddress: home.streetAddress,
+        streetAddress2: home.streetAddress2,
+        streetAddress3: home.streetAddress3,
+        postalCode: home.postalCode,
+        latitude: home.latitude,
+        longitude: home.longitude,
         city: home.city ?? "",
         region: home.state ?? "",
         country: home.country
@@ -146,12 +162,12 @@ export function hotelFeedCsv(rows: HotelFeedRow[]): string {
       link: row.link,
       "image[0].url": row.imageUrl,
       "image[0].tag[0]": "Exterior",
-      "address.addr1": "",
+      "address.addr1": row.streetAddress ?? "",
       "address.city": row.city,
       "address.region": row.region,
       "address.country": row.country,
-      latitude: "",
-      longitude: "",
+      latitude: row.latitude ?? "",
+      longitude: row.longitude ?? "",
       "neighborhood[0]": row.city,
       custom_label_0: row.region,
       custom_label_1: row.bedrooms ? `${row.bedrooms} bedrooms` : "",
@@ -196,11 +212,18 @@ export function hotelFeedXml(rows: HotelFeedRow[], feedTitle: string): string {
         "      <tag>Exterior</tag>",
         "    </image>",
         '    <address format="simple">',
-        '      <component name="addr1"></component>',
+        `      <component name="addr1">${xml(row.streetAddress)}</component>`,
+        `      <component name="postal_code">${xml(row.postalCode)}</component>`,
         `      <component name="city">${xml(row.city)}</component>`,
         `      <component name="region">${xml(row.region)}</component>`,
         `      <component name="country">${xml(row.country)}</component>`,
         "    </address>",
+        row.latitude != null
+          ? `    <latitude>${xml(row.latitude)}</latitude>`
+          : null,
+        row.longitude != null
+          ? `    <longitude>${xml(row.longitude)}</longitude>`
+          : null,
         row.city ? `    <neighborhood>${xml(row.city)}</neighborhood>` : null,
         row.price ? `    <base_price>${xml(row.price)}</base_price>` : null,
         row.guests != null

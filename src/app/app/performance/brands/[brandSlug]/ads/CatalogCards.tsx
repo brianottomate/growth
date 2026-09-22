@@ -1,4 +1,5 @@
 "use client";
+import { catalogAddressIssues } from "@/lib/catalog-addresses";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -57,6 +58,7 @@ export function CatalogCards({ brandId }: { brandId: string }) {
   const client = useQueryClient();
   const url = `/api/performance/catalog/${brandId}/studio`;
   const query = useQuery<{
+    enrichmentError?: string;
     homes: CatalogHome[];
     draft: CatalogDraft;
     exports: CatalogExport[];
@@ -91,7 +93,7 @@ export function CatalogCards({ brandId }: { brandId: string }) {
       ...draft!,
       cards: draft!.cards.map((c) => (c.homeId === card.homeId ? card : c)),
     });
-  async function save(action: "save" | "export") {
+  async function save(action: "save" | "export" | "refresh") {
     setBusy(true);
     setError("");
     try {
@@ -103,7 +105,7 @@ export function CatalogCards({ brandId }: { brandId: string }) {
         }),
       );
       await client.invalidateQueries({ queryKey: ["catalog-studio", brandId] });
-      setEdited(null);
+      if (action !== "refresh") setEdited(null);
       if (action === "export") setView("exports");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to save");
@@ -144,6 +146,11 @@ export function CatalogCards({ brandId }: { brandId: string }) {
           {error || query.error?.message}
         </p>
       )}
+      {query.data?.enrichmentError && (
+        <p className="text-sm text-muted-foreground">
+          {query.data.enrichmentError}
+        </p>
+      )}
       {query.isLoading && <p>Loading homes…</p>}
       {view === "studio" && draft && (
         <>
@@ -160,6 +167,13 @@ export function CatalogCards({ brandId }: { brandId: string }) {
                 onClick={() => void save("save")}
               >
                 Save draft
+              </Button>
+              <Button
+                variant="outline"
+                disabled={busy}
+                onClick={() => void save("refresh")}
+              >
+                Refresh homes
               </Button>
               <Button
                 disabled={
@@ -310,9 +324,17 @@ export function CatalogCards({ brandId }: { brandId: string }) {
             ))}
           </div>
           {limit < draft.cards.length && (
-            <Button variant="outline" onClick={() => setLimit(limit + 10)}>
-              Load more homes
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={() => setLimit(limit + 10)}>
+                Load more homes
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setLimit(draft.cards.length)}
+              >
+                Load all homes
+              </Button>
+            </div>
           )}
         </>
       )}
@@ -367,9 +389,9 @@ export function CatalogCards({ brandId }: { brandId: string }) {
               )}
               {item.status === "ready" && (
                 <p className="text-xs text-muted-foreground">
-                  Street address and coordinates are not supplied by the current
-                  listing feed. Complete those columns before importing into a
-                  hotel catalog.
+                  {catalogAddressIssues(item.rows ?? []).length
+                    ? catalogAddressIssues(item.rows ?? []).join(" · ")
+                    : "Addresses and coordinates saved with this export."}
                 </p>
               )}
               <div className="flex gap-3 overflow-x-auto">
