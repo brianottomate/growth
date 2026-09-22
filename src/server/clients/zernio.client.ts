@@ -1175,6 +1175,7 @@ export type CreateZernioStandaloneAdInput = {
   images?: { landscape: string; square: string };
   /** Meta only: 2–10 cards; mutually exclusive with imageUrl/images. */
   carouselCards?: ZernioCarouselCard[];
+  existingCreativeId?: string;
   /**
    * Meta only: multi-creative shape — ONE ad set with N ads sharing budget and
    * targeting. Mutually exclusive with imageUrl/images/carouselCards. The 201
@@ -1346,6 +1347,36 @@ export async function createZernioStandaloneAd(
   input: CreateZernioStandaloneAdInput,
   options: { idempotencyKey: string },
 ): Promise<ZernioAdWriteResponse> {
+  // /ads/create rejects carouselCards + adSetId. Reuse a standalone
+  // carousel creative when adding another ad to an existing ad set.
+  if (input.adSetId && input.carouselCards) {
+    if (input.validateOnly) {
+      throw new Error(
+        "Validate the carousel before attaching it to an ad set.",
+      );
+    }
+    const { carouselCards, ...attached } = input;
+    const creative = await zernioFetch<{ creativeId: string }>(
+      "/ads/creatives",
+      {
+        method: "POST",
+        headers: { "Idempotency-Key": `${options.idempotencyKey}:creative` },
+        body: JSON.stringify({
+          accountId: input.accountId,
+          adAccountId: input.adAccountId,
+          headline: input.headline,
+          body: input.body,
+          linkUrl: input.linkUrl,
+          callToAction: input.callToAction,
+          carouselCards: carouselCards.map((card) => ({
+            ...card,
+            linkUrl: card.linkUrl ?? input.linkUrl,
+          })),
+        }),
+      },
+    );
+    input = { ...attached, existingCreativeId: creative.creativeId };
+  }
   return zernioFetch<ZernioAdWriteResponse>("/ads/create", {
     method: "POST",
     headers: { "Idempotency-Key": options.idempotencyKey },

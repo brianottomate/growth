@@ -8,7 +8,7 @@ import type {
 
 /** The house blueprint a preview starts from when nobody picked one. */
 export const AD_PREVIEW_DEFAULTS = {
-  templateId: "catalog-place" satisfies CompositionTemplateId,
+  templateId: "catalog-copy" satisfies CompositionTemplateId,
   formatId: "portrait" satisfies CompositionFormatId,
 } as const;
 

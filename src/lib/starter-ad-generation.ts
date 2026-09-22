@@ -1,11 +1,16 @@
 import { z } from "zod";
-import { ideaDocumentSchema, type IdeaDocument } from "./ad-idea-studio";
+import {
+  IDEA_SHAPES,
+  ideaDocumentSchema,
+  type IdeaDocument,
+} from "./ad-idea-studio";
 import { metaPlacementSchema } from "./meta-placement-plan";
 import type { StarterHome } from "./starter-ad-ideas";
 
 export const starterGenerationSchema = z.object({
   campaignId: z.string().min(1),
-  homeIds: z.array(z.string().min(1)).min(1).max(10),
+  source: z.enum(["featured", "brand"]).default("featured"),
+  homeIds: z.array(z.string().min(1)).max(10),
   intendedPlacements: z.array(metaPlacementSchema).min(1).max(6),
 });
 export const generatedCopySchema = z.object({
@@ -13,7 +18,6 @@ export const generatedCopySchema = z.object({
   body: z.string().min(1).max(1200),
 });
 const layoutSchema = z.object({
-  templateId: z.enum(["image-hero", "hero-overlay", "editorial-overlay"]),
   title: z.string().min(1).max(65),
   subtitle: z.string().max(100),
   imagePosition: z.enum(["top", "center", "bottom"]),
@@ -29,7 +33,7 @@ export const generatedHomeSchema = z.object({
       }),
     )
     .min(1)
-    .max(5),
+    .max(10),
 });
 export type GeneratedHome = z.infer<typeof generatedHomeSchema>;
 
@@ -44,10 +48,19 @@ export function generatedDocument(
     format === "static" ? generated.cards.slice(0, 1) : generated.cards;
   const hasVertical = placements.some((p) => !p.endsWith("feed"));
   const hasFeed = placements.some((p) => p.endsWith("feed"));
-  const recipe = (layout: GeneratedHome["cards"][number]["layout"]) => ({
+  const recipe = (
+    layout: GeneratedHome["cards"][number]["layout"],
+    hero: boolean,
+    story = false,
+  ) => ({
     ...layout,
+    templateId: hero
+      ? story
+        ? ("tall-statement" as const)
+        : ("hero-overlay" as const)
+      : ("image-hero" as const),
     eyebrow: "",
-    cta: "",
+    cta: hero ? "Explore your next escape" : "",
     showLogo: true,
   });
   const cards = selected.map((card, i) => {
@@ -60,12 +73,21 @@ export function generatedDocument(
       id: `card-${i + 1}`,
       source,
       mode: "compose" as const,
-      recipe: recipe(card.layout),
-      overrides: hasVertical ? { story: recipe(card.storyLayout) } : {},
+      recipe: recipe(card.layout, i === 0 || i === selected.length - 1),
+      overrides: hasVertical
+        ? {
+            story: recipe(
+              card.storyLayout,
+              i === 0 || i === selected.length - 1,
+              true,
+            ),
+          }
+        : {},
     };
   });
   return ideaDocumentSchema.parse({
     role: format === "static" ? "hero_static" : "home_carousel",
+    exportShapes: [...IDEA_SHAPES],
     shapes: [
       ...(hasFeed ? ["portrait"] : []),
       ...(hasVertical ? ["story"] : []),
@@ -77,3 +99,16 @@ export function generatedDocument(
     cards,
   });
 }
+
+export const brandStarterCopySchema = z.object({
+  ideas: z
+    .array(
+      z.object({
+        name: z.string().min(1).max(100),
+        format: z.enum(["static", "carousel"]),
+        headline: z.string().min(1).max(70),
+        body: z.string().min(1).max(1200),
+      }),
+    )
+    .length(3),
+});

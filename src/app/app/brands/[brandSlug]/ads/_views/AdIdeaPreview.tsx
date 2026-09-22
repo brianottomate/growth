@@ -35,7 +35,7 @@ export function AdIdeaPreview({
     studio.document.cards.flatMap((slide, index) => {
       const url =
         studio.approval?.renders[size]?.[index]?.url ??
-        (studio.approval
+        (studio.approval && !platform
           ? null
           : slide.mode === "supplied"
             ? ideaSource(slide, size)?.url
@@ -75,22 +75,16 @@ export function AdIdeaPreview({
       {platform ? (
         <>
           <p className="text-xs text-muted-foreground">
-            Placement approximation ·{" "}
-            {studio.approval ? "Approved creative" : "Draft creative"}.{" "}
+            Composition previews · platform appearance is approximate.
           </p>
           <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] items-start gap-5">
-            {!studio.document.intendedPlacements?.length && (
-              <p className="text-sm text-muted-foreground">
-                Choose intended placements in Details to preview them here.
-              </p>
-            )}
-            {META_PLACEMENTS.filter((p) =>
-              studio.document.intendedPlacements?.includes(p.id),
-            ).map((surface) => {
+            {META_PLACEMENTS.map((surface) => {
               const size = surface.kind !== "feed" ? "story" : shape;
-              const included =
-                !studio.approval ||
-                Boolean(studio.approval.renders[size]?.length);
+              const included = studio.approval
+                ? Boolean(studio.approval.renders[size]?.length)
+                : (
+                    studio.document.exportShapes ?? studio.document.shapes
+                  ).includes(size);
               const surfaceMedia = mediaFor(size);
               const surfaceCopy =
                 studio.document.copyOverrides[size] ?? studio.document.copy;
@@ -101,14 +95,12 @@ export function AdIdeaPreview({
                   className="min-w-0 space-y-3"
                 >
                   <h4 className="text-sm font-medium">{surface.label}</h4>
-                  {surface.kind !== "feed" &&
-                    studio.document.cards.length > 1 && (
-                      <p className="text-xs text-muted-foreground">
-                        Creative preview only. Vertical carousel delivery is not
-                        supported by our current publisher.
-                      </p>
-                    )}
-                  {included && surfaceMedia.length ? (
+                  {!included && (
+                    <p className="text-xs text-muted-foreground">
+                      Not included in export
+                    </p>
+                  )}
+                  {surfaceMedia.length ? (
                     <CompactAdMock
                       surface={surface.surface}
                       publisher={surface.publisher}
@@ -134,8 +126,8 @@ export function AdIdeaPreview({
                     />
                   ) : (
                     <p className="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">
-                      No approved export for this placement. Reopen the idea and
-                      include this size when approving.
+                      Add artwork for this size in Details to preview the
+                      composition.
                     </p>
                   )}
                 </section>

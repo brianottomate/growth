@@ -142,10 +142,21 @@ export function AddStarterIdeasButton({ campaignId }: { campaignId: string }) {
             </Button>
           </div>
           {source === "blank" ? (
-            <p className="text-sm text-muted-foreground">
-              Nine empty ideas: one hero carousel, four statics, and four home
-              carousels.
-            </p>
+            <div className="space-y-3">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={generate}
+                  onChange={(e) => setGenerate(e.target.checked)}
+                />
+                Write initial concepts and copy from the brand with AI
+              </label>
+              <p className="text-sm text-muted-foreground">
+                {generate
+                  ? "Three brand-based ad ideas with headlines and copy. Add photos and compose them in the ad studio when you’re ready."
+                  : "Nine empty ideas: one hero carousel, four statics, and four home carousels."}
+              </p>
+            </div>
           ) : (
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground">
@@ -227,14 +238,16 @@ export function AddStarterIdeasButton({ campaignId }: { campaignId: string }) {
               disabled={pending || unavailable}
               loading={pending}
               onClick={() => {
-                if (source === "featured" && generate) {
+                if (generate) {
                   generation.mutate({
                     campaignId,
-                    homeIds: available.map((h) => h.id),
+                    source: source === "blank" ? "brand" : "featured",
+                    homeIds:
+                      source === "featured" ? available.map((h) => h.id) : [],
                     intendedPlacements: [
                       "facebook-feed",
                       "instagram-feed",
-                      ...(stories
+                      ...(source === "featured" && stories
                         ? (["facebook-story", "instagram-story"] as const)
                         : []),
                     ],
@@ -250,9 +263,7 @@ export function AddStarterIdeasButton({ campaignId }: { campaignId: string }) {
                 });
               }}
             >
-              {source === "featured" && generate
-                ? "Generate ideas"
-                : "Create ideas"}
+              {generate ? "Generate ideas" : "Create ideas"}
             </Button>
           </DialogFooter>
         </DialogContent>

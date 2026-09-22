@@ -191,7 +191,7 @@ export function AdIdeaSlideRow({
         <div className="min-w-0 space-y-3">
           {!editing ? (
             <>
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <h5 className="text-sm font-medium">
                   {card.mode === "supplied"
                     ? "Supplied artwork"
@@ -199,9 +199,14 @@ export function AdIdeaSlideRow({
                         (t) => t.id === recipe.templateId,
                       )?.label ?? "Composition")}
                 </h5>
-                <Button size="sm" variant="outline" onClick={onEdit}>
-                  {isStatic ? "Edit image" : "Edit slide"}
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" onClick={onReplace}>
+                    {awaitingArtwork ? "Choose image" : "Change image"}
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={onEdit}>
+                    {isStatic ? "Edit image" : "Edit slide"}
+                  </Button>
+                </div>
               </div>
               {card.mode === "compose" ? (
                 <dl className="space-y-3 text-sm">

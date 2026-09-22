@@ -108,3 +108,49 @@ test("WanderOS fills static pools with heroes and home carousel pools with the f
   expect(ideas[3]!.content.ideaStudio!.document.pool).toHaveLength(6);
   expect(ideas[3]!.content.ideaStudio!.document.cards).toHaveLength(6);
 });
+
+test("curated home photos keep their order beyond the default six-card starter", () => {
+  const photos = Array.from({ length: 8 }, (_, index) => ({
+    url: `https://example.com/selected-${index}.jpg`,
+  }));
+  const ideas = featuredStarterAdIdeas([
+    {
+      id: "curated-home",
+      name: "Curated cabin",
+      url: "https://example.com/cabin",
+      curated: true,
+      photos,
+    },
+  ]);
+  expect(
+    ideas
+      .find((idea) => idea.key === "curated-home-carousel")!
+      .content.media.map((photo) => photo.url),
+  ).toEqual(photos.map((photo) => photo.url));
+  expect(
+    ideas
+      .find((idea) => idea.key === "curated-home-static")!
+      .content.media.map((photo) => photo.url),
+  ).toEqual([photos[0]!.url]);
+});
+
+test("blank and featured starters include every creative size for export", () => {
+  for (const idea of [
+    ...starterAdIdeas(),
+    ...featuredStarterAdIdeas([
+      {
+        id: "home",
+        name: "Home",
+        url: "https://example.com",
+        photos: [{ url: "https://example.com/photo.jpg" }],
+      },
+    ]),
+  ]) {
+    expect(idea.content.ideaStudio?.document.exportShapes).toEqual([
+      "portrait",
+      "square",
+      "story",
+      "wide",
+    ]);
+  }
+});

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import {
   LINKEDIN_MIN_DAILY_BUDGET,
@@ -12,6 +12,7 @@ import {
   adTable,
   audienceTable,
   mediaAssetTable,
+  homeMediaTable,
   brandTable,
   channelTable,
   personaTable,
@@ -489,15 +490,44 @@ export async function starterIdeaHomes(input: {
               propertyId: home.externalId,
             })
           : (listing?.gallery ?? []);
+      const media = await db
+        .select({
+          sourceUrl: homeMediaTable.sourceUrl,
+          assetUrl: mediaAssetTable.url,
+          role: homeMediaTable.role,
+        })
+        .from(homeMediaTable)
+        .leftJoin(
+          mediaAssetTable,
+          eq(homeMediaTable.assetId, mediaAssetTable.id),
+        )
+        .where(eq(homeMediaTable.homeId, home.id))
+        .orderBy(asc(homeMediaTable.sortOrder));
+      const excluded = new Set(
+        media
+          .filter((p) => p.role === "excluded")
+          .map((p) => p.assetUrl ?? p.sourceUrl),
+      );
+      const shortlist = media
+        .filter((p) => p.role === "carousel")
+        .map((p) => p.assetUrl ?? p.sourceUrl)
+        .filter((url): url is string => Boolean(url));
       const urls = [
         home.heroSourceUrl ?? listing?.imageUrl,
-        ...gallery.map((p) => p.url),
-      ].filter((url): url is string => Boolean(url));
+        ...(shortlist.length ? shortlist : gallery.map((p) => p.url)),
+      ].filter(
+        (url): url is string => Boolean(url) && !excluded.has(url ?? null),
+      );
       return {
         id: home.id,
+        curated: shortlist.length > 0,
         name: listing?.name ?? home.name,
         url: listing?.url ?? home.url,
-        photos: [...new Set(urls)].map((url) => ({ url })),
+        photos: [...new Set(urls)].map((url, index) => ({
+          url,
+          homeId: home.id,
+          label: `${listing?.name ?? home.name} · Photo ${index + 1}`,
+        })),
       };
     }),
   );

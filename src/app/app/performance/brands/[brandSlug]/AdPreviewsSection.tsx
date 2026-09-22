@@ -126,9 +126,11 @@ export function AdPreviewsSection({
         }
       : {
           ...base,
-          templateId: "catalog-place",
+          templateId: "catalog-copy",
           eyebrow: drawn.catalog.eyebrow,
-          title: drawn.catalog.title,
+          title: [drawn.catalog.eyebrow, drawn.catalog.title]
+            .filter(Boolean)
+            .join(" "),
           subtitle: drawn.catalog.subtitle,
           rating: drawn.catalog.rating,
         };

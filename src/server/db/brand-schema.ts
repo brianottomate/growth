@@ -159,6 +159,7 @@ export type BrandMark = {
  * Applied with scripts/apply-performance-settings-schema.ts.
  */
 export type PerformanceSettings = {
+  catalogStudio?: import("@/lib/catalog-studio").CatalogDraft;
   /** Who receives the monthly report; free text, commas between addresses. */
   reportEmails?: string | null;
   invoiceEmail?: string | null;

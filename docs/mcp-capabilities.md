@@ -120,3 +120,14 @@ After deployment, use an OAuth access token without printing it:
 ```sh
 GROWTH_MCP_TOKEN=... bun run smoke:mcp:modern
 ```
+
+### Individual ad studio work
+
+`adsRead.ideaContext` accepts `campaignId` and `adId` and returns the current
+editable document/version, ordered image references, brand voice, and listing
+facts for represented houses. Use `adsWrite.saveIdea` to save copy and composition
+recipes as a draft. External MCP clients must visually inspect the returned image
+references; JSON URLs alone are not image input. The in-app ad card's Work in chat
+action starts a fresh thread and supplies numbered contact sheets as model image
+inputs, including size-specific source variants. It preserves ad focus in the
+thread and leaves approval and publishing to the existing workflow.

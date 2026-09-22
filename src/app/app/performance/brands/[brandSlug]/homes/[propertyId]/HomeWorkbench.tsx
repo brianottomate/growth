@@ -5,25 +5,11 @@ import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, EyeOff, X } from "lucide-react";
 
-import { AdMock } from "@/components/ad-mock";
 import { cn } from "@/components/ui/lib/utils";
 import { toast } from "@/components/ui/toast";
-import type { CompositionFormatId } from "@/lib/compositions";
-import {
-  homeCatalogCopy,
-  homeCatalogPreviewUrl,
-  homePreviewRecipes,
-  type HomeForPreview,
-  type PreviewSpec,
-} from "@/lib/home-ad-previews";
 import type { HomeDetail, HomePhoto } from "@/server/services/homes.service";
 import { useTRPC } from "@/trpc/react";
 
-import { OnDemandTile } from "../../OnDemandTile";
-
-// The sizes Brooke's own exports use: one file per creative per size.
-const FORMATS: CompositionFormatId[] = ["square", "portrait", "story", "wide"];
-/** Meta's carousel holds ten cards. */
 const MAX_CAROUSEL = 10;
 
 const panel = "bg-card overflow-hidden rounded-2xl border";
@@ -37,34 +23,13 @@ const photoRef = (photo: HomePhoto) =>
     ? { assetId: photo.assetId, thumbUrl: photo.thumbUrl }
     : { sourceUrl: photo.url, thumbUrl: photo.thumbUrl };
 
-/**
- * One home's workbench, in the three parts a photo can belong to: all of
- * them, the one the creatives draw on, and the ones the carousel runs.
- *
- * Each photo carries its own labelled controls rather than a badge, because
- * "hero" and "in the carousel" are separate choices and a photo can be both.
- * An earlier pass marked them with a star and a tick, which could never
- * disagree and so said nothing.
- */
-export function HomeWorkbench({
-  home,
-  brandId,
-  brandSlug,
-  brandName,
-  brandLogo,
-}: {
-  home: HomeDetail;
-  brandId: string;
-  brandSlug: string;
-  brandName: string;
-  brandLogo: string | null;
-}) {
+/** Choose the hero and ordered source photos for new campaign ads. */
+export function HomeWorkbench({ home }: { home: HomeDetail }) {
   const router = useRouter();
   const trpc = useTRPC();
   const [order, setOrder] = useState<string[]>(
     home.carousel.map((photo) => photo.key),
   );
-  const [card, setCard] = useState(0);
 
   const byKey = useMemo(
     () => new Map(home.photos.map((photo) => [photo.key, photo])),
@@ -99,7 +64,6 @@ export function HomeWorkbench({
 
   const commit = (keys: string[]) => {
     setOrder(keys);
-    setCard(0);
     saveCarousel.mutate({
       homeId: home.id,
       photos: keys.flatMap((key) => {
@@ -113,7 +77,7 @@ export function HomeWorkbench({
       return commit(order.filter((key) => key !== photo.key));
     }
     if (order.length >= MAX_CAROUSEL) {
-      toast.info(`A carousel holds ${MAX_CAROUSEL} cards.`);
+      toast.info(`Choose up to ${MAX_CAROUSEL} ad photos.`);
       return;
     }
     commit([...order, photo.key]);
@@ -126,188 +90,36 @@ export function HomeWorkbench({
     commit(next);
   };
 
-  const facts: HomeForPreview = {
-    name: home.name,
-    city: home.city,
-    state: home.state,
-    bedrooms: home.bedrooms,
-    bathrooms: home.bathrooms,
-    guests: home.guests,
-    rating: home.rating,
-  };
-  const recipes = homePreviewRecipes(facts);
-  const catalog = homeCatalogCopy(facts);
-  // With no hero picked the creatives still have to draw on something, and
-  // the first photo is what the rest of the desk falls back to.
   const heroUrl = home.hero?.url ?? home.photos[0]?.url ?? null;
   const busy =
     setHero.isPending || setMedia.isPending || saveCarousel.isPending;
 
   return (
     <div className="space-y-8">
-      {/* 1 · Every photo, and what each one is for */}
-      <section className="space-y-2.5">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <p className={sectionLabel}>All photos · {home.photos.length}</p>
-          <span className="text-[11px] text-muted-foreground/70">
-            {home.photos.some((photo) => photo.from === "library")
-              ? "their site and uploads"
-              : "from their site"}
-          </span>
-        </div>
-        {home.photos.length === 0 ? (
-          <p className={empty}>No photos on their feed for this home.</p>
-        ) : (
-          <ul className="grid grid-cols-2 gap-2.5 @xl:grid-cols-3 @3xl:grid-cols-4 @5xl:grid-cols-6">
-            {home.photos.map((photo) => {
-              const inCarousel = order.includes(photo.key);
-              const position = order.indexOf(photo.key) + 1;
-              return (
-                <li key={photo.key} className={cn(panel, "group")}>
-                  <div className="relative">
-                    {/* oxlint-disable-next-line nextjs/no-img-element */}
-                    <img
-                      src={photo.thumbUrl}
-                      alt=""
-                      loading="lazy"
-                      className="aspect-[4/3] w-full object-cover"
-                    />
-                    {inCarousel ? (
-                      <span
-                        className="absolute top-1.5 left-1.5 grid size-5 place-items-center rounded-full bg-sky-500 text-[10px] font-semibold text-white tabular-nums"
-                        title={`Card ${position} of the carousel`}
-                      >
-                        {position}
-                      </span>
-                    ) : null}
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() =>
-                        setMedia.mutate({
-                          homeId: home.id,
-                          ...photoRef(photo),
-                          role: "excluded",
-                        })
-                      }
-                      title="Hide this photo"
-                      className="absolute top-1.5 right-1.5 grid size-6 place-items-center rounded-full border border-white/50 bg-black/50 text-white opacity-0 transition group-hover:opacity-100 focus:opacity-100 disabled:opacity-30"
-                    >
-                      <EyeOff className="size-3" />
-                    </button>
-                  </div>
-                  {photo.room ? (
-                    <p className="truncate px-2 pt-1.5 text-[10px] text-muted-foreground">
-                      {photo.room}
-                    </p>
-                  ) : null}
-                  <div className="flex items-center gap-1 px-1.5 py-1.5">
-                    <Chip
-                      on={photo.isHero}
-                      disabled={busy}
-                      onClick={() =>
-                        setHero.mutate({
-                          homeId: home.id,
-                          sourceUrl: photo.isHero ? null : photo.url,
-                        })
-                      }
-                      title={
-                        photo.isHero
-                          ? "Stop drawing the creatives on this"
-                          : "Draw the creatives on this"
-                      }
-                    >
-                      Hero
-                    </Chip>
-                    <Chip
-                      on={inCarousel}
-                      disabled={busy}
-                      onClick={() => toggleCarousel(photo)}
-                      title={
-                        inCarousel
-                          ? "Take out of the carousel"
-                          : "Add to the carousel"
-                      }
-                    >
-                      Carousel
-                    </Chip>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
-
-      {/* 2 · The hero, and what it draws */}
       <section className="space-y-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <p className={sectionLabel}>Hero</p>
-          {!home.hero && heroUrl ? (
-            <span className="text-[11px] text-muted-foreground/80">
-              None picked, so the creatives use the first photo
-            </span>
-          ) : null}
-        </div>
-        {!heroUrl ? (
-          <p className={empty}>Pick a hero above to draw the creatives.</p>
+        <p className={sectionLabel}>Hero preview</p>
+        {heroUrl ? (
+          <div className={cn(panel, "w-full max-w-sm")}>
+            {/* oxlint-disable-next-line nextjs/no-img-element */}
+            <img
+              src={heroUrl}
+              alt={home.name}
+              className="aspect-[4/3] w-full object-cover"
+            />
+          </div>
         ) : (
-          <>
-            <div className={cn(panel, "w-full max-w-56")}>
-              {/* oxlint-disable-next-line nextjs/no-img-element */}
-              <img
-                src={heroUrl}
-                alt=""
-                className="aspect-[4/3] w-full object-cover"
-              />
-            </div>
-            {recipes.map((recipe) => (
-              <div key={recipe.id} className="space-y-2">
-                <div className="flex flex-wrap items-baseline gap-2">
-                  <span className={sectionLabel}>{recipe.label}</span>
-                  <span className="truncate text-[11px] text-muted-foreground/80">
-                    {recipe.title}
-                  </span>
-                </div>
-                <ul className="flex scrollbar-thin gap-4 overflow-x-auto pb-1">
-                  {FORMATS.map((formatId) => {
-                    const spec: PreviewSpec = {
-                      brandId,
-                      templateId: "hero-overlay",
-                      formatId,
-                      source: { url: heroUrl },
-                      title: recipe.title,
-                      cta: recipe.cta,
-                    };
-                    return (
-                      <OnDemandTile
-                        key={`${recipe.id}-${formatId}`}
-                        variant="canvas"
-                        brandId={brandId}
-                        brandSlug={brandSlug}
-                        brandName={brandName}
-                        brandLogo={brandLogo}
-                        spec={spec}
-                        home={{
-                          name: home.name,
-                          url: home.url,
-                          imageUrl: heroUrl,
-                        }}
-                      />
-                    );
-                  })}
-                </ul>
-              </div>
-            ))}
-          </>
+          <p className={empty}>Choose a hero from the gallery below.</p>
         )}
+        <p className="text-xs text-muted-foreground">
+          The lead photo for new ads. Choose Hero on any photo below to change
+          it.
+        </p>
       </section>
-
-      {/* 3 · The carousel, in the order it runs */}
+      {/* Saved shortlist; existing campaign ads are unchanged. */}
       <section className="space-y-2.5">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <p className={sectionLabel}>
-            Carousel · {carousel.length}/{MAX_CAROUSEL}
+            Ad photos · {carousel.length}/{MAX_CAROUSEL}
           </p>
           {carousel.length > 0 ? (
             <button
@@ -320,9 +132,14 @@ export function HomeWorkbench({
             </button>
           ) : null}
         </div>
+        <p className="text-xs text-muted-foreground">
+          The hero leads new ads, followed by these photos in order (up to 10
+          total). Existing ads stay unchanged.
+        </p>
         {carousel.length === 0 ? (
           <p className={empty}>
-            Nothing in the carousel. Add photos from All photos above.
+            No shortlist yet. New ads will use the hero and gallery. Choose Ad
+            photo below to curate the selection.
           </p>
         ) : (
           <>
@@ -369,39 +186,98 @@ export function HomeWorkbench({
                 </li>
               ))}
             </ul>
-            {carousel.length >= 2 ? (
-              <div className="flex justify-center pt-1 @2xl:justify-start">
-                <AdMock
-                  surface="instagram"
-                  brandName={brandName}
-                  brandLogo={brandLogo}
-                  body={[catalog.title, catalog.subtitle]
-                    .filter(Boolean)
-                    .join(". ")}
-                  headline={home.name}
-                  link={home.url}
-                  callToAction="See details"
-                  media={carousel.map((photo) => ({
-                    url: homeCatalogPreviewUrl({
-                      brandId,
-                      source: { url: photo.url },
-                      formatId: "square",
-                      copy: catalog,
-                    }),
-                    thumbnail: null,
-                    type: "image",
-                  }))}
-                  card={card}
-                  onCard={setCard}
-                  className="w-full max-w-96"
-                />
-              </div>
-            ) : (
-              <p className="text-[11px] text-muted-foreground">
-                Two cards is the minimum Meta will run.
-              </p>
-            )}
           </>
+        )}
+      </section>
+      {/* 1 · Every photo, and what each one is for */}
+      <section className="space-y-2.5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <p className={sectionLabel}>All photos · {home.photos.length}</p>
+          <span className="text-[11px] text-muted-foreground/70">
+            {home.photos.some((photo) => photo.from === "library")
+              ? "their site and uploads"
+              : "from their site"}
+          </span>
+        </div>
+        {home.photos.length === 0 ? (
+          <p className={empty}>No photos on their feed for this home.</p>
+        ) : (
+          <ul className="grid grid-cols-2 gap-2.5 @xl:grid-cols-3 @3xl:grid-cols-4 @5xl:grid-cols-6">
+            {home.photos.map((photo) => {
+              const inCarousel = order.includes(photo.key);
+              const position = order.indexOf(photo.key) + 1;
+              return (
+                <li key={photo.key} className={cn(panel, "group")}>
+                  <div className="relative">
+                    {/* oxlint-disable-next-line nextjs/no-img-element */}
+                    <img
+                      src={photo.thumbUrl}
+                      alt=""
+                      loading="lazy"
+                      className="aspect-[4/3] w-full object-cover"
+                    />
+                    {inCarousel ? (
+                      <span
+                        className="absolute top-1.5 left-1.5 grid size-5 place-items-center rounded-full bg-sky-500 text-[10px] font-semibold text-white tabular-nums"
+                        title={`Ad photo ${position}`}
+                      >
+                        {position}
+                      </span>
+                    ) : null}
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        setMedia.mutate({
+                          homeId: home.id,
+                          ...photoRef(photo),
+                          role: "excluded",
+                        })
+                      }
+                      title="Hide this photo"
+                      className="absolute top-1.5 right-1.5 grid size-6 place-items-center rounded-full border border-white/50 bg-black/50 text-white opacity-0 transition group-hover:opacity-100 focus:opacity-100 disabled:opacity-30"
+                    >
+                      <EyeOff className="size-3" />
+                    </button>
+                  </div>
+                  {photo.room ? (
+                    <p className="truncate px-2 pt-1.5 text-[10px] text-muted-foreground">
+                      {photo.room}
+                    </p>
+                  ) : null}
+                  <div className="flex items-center gap-1 px-1.5 py-1.5">
+                    <Chip
+                      on={photo.isHero}
+                      disabled={busy}
+                      onClick={() =>
+                        setHero.mutate({
+                          homeId: home.id,
+                          sourceUrl: photo.isHero ? null : photo.url,
+                        })
+                      }
+                      title={
+                        photo.isHero ? "Clear hero selection" : "Use as hero"
+                      }
+                    >
+                      Hero
+                    </Chip>
+                    <Chip
+                      on={inCarousel}
+                      disabled={busy}
+                      onClick={() => toggleCarousel(photo)}
+                      title={
+                        inCarousel
+                          ? "Remove from ad photos"
+                          : "Add to ad photos"
+                      }
+                    >
+                      Ad photo
+                    </Chip>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         )}
       </section>
     </div>

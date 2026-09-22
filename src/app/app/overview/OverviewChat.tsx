@@ -937,6 +937,7 @@ export function OverviewChat({
                             },
                             send,
                             submitAssistantIntent,
+                            busy && messageIdx === messages.length - 1,
                           );
                         }
                         return null;
@@ -1170,7 +1171,7 @@ function UserMessage({ message }: { message: UIMessage }) {
   );
   const longText = text.length >= LONG_TEXT_ATTACHMENT_THRESHOLD;
   return (
-    <div className="flex max-w-[85%] flex-col items-end gap-1.5">
+    <div className="flex max-w-[85%] min-w-0 flex-col items-end gap-1.5">
       {images.length > 0 && (
         <div
           className={cn(
@@ -1229,7 +1230,7 @@ function UserMessage({ message }: { message: UIMessage }) {
         </details>
       )}
       {text && !longText && (
-        <div className="rounded-2xl rounded-br-sm bg-primary px-4 py-2 text-sm break-words whitespace-pre-wrap text-primary-foreground">
+        <div className="max-w-full rounded-2xl rounded-br-sm bg-primary px-4 py-2 text-sm [overflow-wrap:anywhere] whitespace-pre-wrap text-primary-foreground">
           {text}
         </div>
       )}
@@ -1245,6 +1246,7 @@ function renderToolPart(
   onApprove: (approved: boolean) => void,
   onPrompt: (prompt: string) => void,
   onIntent: (intent: AssistantIntent) => void,
+  isRunning: boolean,
 ) {
   const toolName = getToolName(part);
   const action = toolAction(part);
@@ -1273,6 +1275,14 @@ function renderToolPart(
   }
 
   if (part.state === "input-streaming" || part.state === "input-available") {
+    if (!isRunning) {
+      return (
+        <p key={key} className="text-xs text-destructive" role="alert">
+          {toolLabel(toolName, action)} did not finish. Generation ended before
+          a result was received. Try again.
+        </p>
+      );
+    }
     return (
       <ToolCallPending
         key={key}

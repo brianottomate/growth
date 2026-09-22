@@ -92,3 +92,30 @@ it("labels automatic source settings without pretending manual selection or obse
   ).not.toContain("Automatic");
   expect(importedPlacementLabel([])).not.toContain("Automatic");
 });
+
+it("previews the same ordered carousel cards that ship, not alternate Story exports", () => {
+  const content: AdCreativeContent = {
+    ...copy,
+    media: ["first", "second"].map((name) => ({
+      type: "image" as const,
+      url: `https://example.com/${name}.jpg`,
+      story: {
+        url: `https://example.com/${name}-story.jpg`,
+        type: "image" as const,
+        via: "upload" as const,
+      },
+    })),
+  };
+  for (const placement of [
+    "facebook-feed",
+    "instagram-story",
+    "facebook-story",
+  ] as const) {
+    expect(metaPreviewMedia(content, placement).media).toEqual(
+      metaPlacementMedia(content, placement).media,
+    );
+    expect(
+      metaPreviewMedia(content, placement).media.map((card) => card.url),
+    ).toEqual(content.media.map((card) => card.url));
+  }
+});

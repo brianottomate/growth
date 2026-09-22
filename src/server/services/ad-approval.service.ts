@@ -64,8 +64,12 @@ export async function transitionAdApproval(input: {
   if (input.status === "approved" && ad.content.metaImport?.issues.length)
     throw new Error("Review the imported artwork and copy before approving.");
   const document = ideaDocumentFromAd({ name: ad.name, content: ad.content });
-  if (input.status === "approved" && input.exportShapes)
-    document.shapes = ideaExportShapesSchema.parse(input.exportShapes);
+  if (input.status === "approved") {
+    document.shapes = ideaExportShapesSchema.parse(
+      input.exportShapes ?? document.exportShapes ?? document.shapes,
+    );
+    document.exportShapes = [...document.shapes];
+  }
   const previous = ad.content.ideaStudio?.approval;
   if (input.status === "approved" && previous)
     return { adId: ad.id, status: "approved" as const };

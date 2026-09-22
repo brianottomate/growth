@@ -127,6 +127,7 @@ export type CampaignFocus =
   | "live";
 
 export type WorkAdCampaignIntent = {
+  adId?: string;
   type: "work_ad_campaign";
   newThread?: boolean;
   brandId: string;

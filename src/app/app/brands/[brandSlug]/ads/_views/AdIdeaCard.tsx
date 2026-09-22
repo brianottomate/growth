@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { META_PLACEMENTS } from "@/lib/meta-placement-plan";
 import { ideaSource } from "@/lib/ad-idea-studio";
-import { Loader2 } from "lucide-react";
+import { sendAssistantIntent } from "@/lib/assistant-events";
+import { Loader2, MessageSquare } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
@@ -21,6 +21,13 @@ import { AdIdeaPreview } from "./AdIdeaPreview";
 import { AdIdeaSlideRow } from "./AdIdeaSlideRow";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Dropzone } from "@/components/ui/dropzone";
 import { toast } from "@/components/ui/toast";
@@ -53,12 +60,14 @@ export type StudioAd = {
 
 export function AdIdeaCard({
   ad,
+  campaignId,
   brandId,
   brandName,
   brandLogo,
   deliveryState,
 }: {
   ad: StudioAd;
+  campaignId: string;
   brandId: string;
   brandName: string;
   brandLogo: string | null;
@@ -110,7 +119,7 @@ export function AdIdeaCard({
   const [dirty, setDirty] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editor, setEditor] = useState<
-    "copy" | "slide" | "pool" | "placements" | null
+    "copy" | "slide" | "image" | "pool" | null
   >(null);
   const [showPool, setShowPool] = useState(false);
   const [savedState, setSavedState] = useState(() => ({
@@ -120,10 +129,25 @@ export function AdIdeaCard({
   }));
   const [shape, setShape] = useState<IdeaShape>("portrait");
   const [homePickerOpen, setHomePickerOpen] = useState(false);
-  const homeGallery = useQuery({
-    ...trpc.ads.adIdeaHomePhotos.queryOptions({ adId: ad.id }),
-    enabled: homePickerOpen && Boolean(ad.homeId),
+  const [selectedHomeId, setSelectedHomeId] = useState(ad.homeId ?? "");
+  const [photoSearch, setPhotoSearch] = useState("");
+  const homeGalleries = useQuery({
+    ...trpc.ads.starterIdeaHomes.queryOptions({ campaignId }),
+    enabled: editor === "image" || editor === "pool" || homePickerOpen,
   });
+  const homes = homeGalleries.data ?? [];
+  const galleryHome = homes.find((home) => home.id === selectedHomeId);
+  const galleryPhotos = (galleryHome ? [galleryHome] : homes)
+    .flatMap((home) => home.photos)
+    .filter((source) =>
+      source.label.toLowerCase().includes(photoSearch.toLowerCase()),
+    );
+  const photoLabel = (source: IdeaSource, index: number) =>
+    source.label ??
+    homes
+      .flatMap((home) => home.photos)
+      .find((photo) => sameIdeaSource(photo, source))?.label ??
+    `Image ${index + 1}`;
   const [poolTarget, setPoolTarget] = useState<"slide" | "size">("slide");
   const [picker, setPicker] = useState<"add" | "replace" | null>(null);
   const { uploadFiles, uploading, progress } = useMediaUpload(brandId);
@@ -175,7 +199,7 @@ export function AdIdeaCard({
     });
   }, [ad]);
   const openEditor = (
-    kind: "copy" | "slide" | "pool" | "placements",
+    kind: "copy" | "slide" | "image" | "pool",
     id: string | null = null,
   ) => {
     setDocument(savedState.document);
@@ -183,7 +207,7 @@ export function AdIdeaCard({
     setVersion(savedState.version);
     setDirty(false);
     setSelectedId(id);
-    setPoolTarget("slide");
+    setPoolTarget(kind === "image" ? "size" : "slide");
     setShowPool(kind === "pool");
     setEditor(kind);
   };
@@ -302,7 +326,9 @@ export function AdIdeaCard({
       }
       onEdit={() => openEditor("slide", slide.id)}
       onChange={(fn) => updateCardById(slide.id, fn)}
-      onReplace={() => setPicker("replace")}
+      onReplace={() =>
+        editing ? setPicker("replace") : openEditor("image", slide.id)
+      }
       onUpload={async (files) =>
         attach(await uploadFiles(files), "replace", slide.id, shape)
       }
@@ -412,7 +438,27 @@ export function AdIdeaCard({
             )}
           </div>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={busy || editor !== null}
+            onClick={() =>
+              sendAssistantIntent({
+                type: "work_ad_campaign",
+                newThread: true,
+                brandId,
+                brandName,
+                campaignId,
+                campaignName: "this ad's campaign",
+                adId: ad.id,
+                focus: "ads",
+                visibleText: `Work on “${savedState.name}”. Inspect its existing carousel photos, use the brand and house facts, write shared ad copy, and compose each slide for its intended sizes. Keep the selected images and slide order, and save the result for review.`,
+              })
+            }
+          >
+            <MessageSquare className="size-3.5" /> Work in chat
+          </Button>
           <Button
             size="sm"
             variant="ghost"
@@ -433,7 +479,10 @@ export function AdIdeaCard({
                     expectedUpdatedAt: savedState.version,
                   })
                 : (() => {
-                    setExportShapes([...savedState.document.shapes]);
+                    setExportShapes([
+                      ...(savedState.document.exportShapes ??
+                        savedState.document.shapes),
+                    ]);
                     setApprovalVersion(savedState.version);
                     setApprovalOpen(true);
                   })()
@@ -480,9 +529,10 @@ export function AdIdeaCard({
               </label>
             ))}
           </fieldset>
-          {savedState.document.intendedPlacements?.some(
-            (p) => !p.endsWith("-feed"),
-          ) &&
+          {isStatic &&
+            savedState.document.intendedPlacements?.some(
+              (p) => !p.endsWith("-feed"),
+            ) &&
             !exportShapes.includes("story") && (
               <p className="text-sm text-muted-foreground">
                 Stories or Reels are intended, but no vertical export is
@@ -571,6 +621,38 @@ export function AdIdeaCard({
       )}
       {!collapsed && (
         <>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-medium">Ad copy</h4>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={approved || busy || editor !== null}
+                onClick={() => openEditor("copy")}
+              >
+                Edit copy
+              </Button>
+            </div>
+            <dl className="grid gap-4 text-sm sm:grid-cols-2">
+              {(
+                [
+                  ["Headline", savedState.document.copy.headline],
+                  ["Primary text", savedState.document.copy.body],
+                  ["Destination URL", savedState.document.copy.linkUrl],
+                  ["Call to action", savedState.document.copy.callToAction],
+                ] as const
+              ).map(([label, value]) => (
+                <div key={label} className="min-w-0">
+                  <dt className="mb-1 text-xs text-muted-foreground">
+                    {label}
+                  </dt>
+                  <dd className="break-words whitespace-pre-wrap">
+                    {value || "Not set"}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
           <div className="flex gap-1" aria-label="Ad view">
             {(["details", "platform"] as const).map((item) => (
               <Button
@@ -602,98 +684,7 @@ export function AdIdeaCard({
             />
           )}
           {view === "details" && (
-            <div className="space-y-3 rounded-lg border p-4">
-              <div className="flex items-center justify-between">
-                <h4 className="text-sm font-medium">Intended placements</h4>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={approved || busy}
-                  onClick={() => openEditor("placements")}
-                >
-                  Choose placements
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Creative goals for this ad. Delivery placements are chosen in
-                Meta setup.
-              </p>
-              {!savedState.document.intendedPlacements?.length && (
-                <p className="text-sm text-muted-foreground">
-                  No placements designated yet.
-                </p>
-              )}
-              {META_PLACEMENTS.filter((p) =>
-                savedState.document.intendedPlacements?.includes(p.id),
-              ).map((p) => {
-                const size =
-                  p.kind === "feed"
-                    ? savedState.document.shapes.includes("portrait")
-                      ? "portrait"
-                      : savedState.document.shapes[0]!
-                    : "story";
-                const missing =
-                  !savedState.document.cards.length ||
-                  savedState.document.cards.some((c) => !ideaSource(c, size));
-                const exported =
-                  ad.content.ideaStudio?.approval?.renders[size]?.length ===
-                    savedState.document.cards.length && !missing;
-                return (
-                  <p key={p.id} className="text-sm">
-                    {p.label} ·{" "}
-                    {missing
-                      ? "Needs images"
-                      : exported
-                        ? "Saved creative available"
-                        : approved
-                          ? "Needs approved export"
-                          : "Preview and approve creative"}
-                    {!isStatic && p.kind !== "feed"
-                      ? " · Vertical carousel delivery not supported yet"
-                      : ""}
-                  </p>
-                );
-              })}
-            </div>
-          )}
-          {view === "details" && (
-            <fieldset
-              disabled={
-                approved || approval.isPending || busy || editor !== null
-              }
-              className="space-y-5"
-            >
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-medium">Ad copy</h4>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => openEditor("copy")}
-                  >
-                    Edit copy
-                  </Button>
-                </div>
-                <dl className="grid gap-4 text-sm sm:grid-cols-2">
-                  {(
-                    [
-                      ["Headline", savedState.document.copy.headline],
-                      ["Primary text", savedState.document.copy.body],
-                      ["Destination URL", savedState.document.copy.linkUrl],
-                      ["Call to action", savedState.document.copy.callToAction],
-                    ] as const
-                  ).map(([label, value]) => (
-                    <div key={label} className="min-w-0">
-                      <dt className="mb-1 text-xs text-muted-foreground">
-                        {label}
-                      </dt>
-                      <dd className="break-words whitespace-pre-wrap">
-                        {value || "Not set"}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-              </div>
+            <div className="space-y-5">
               <div className="space-y-3 border-t pt-4">
                 {savedState.document.cards.length === 0 ? (
                   <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed px-6 py-8 text-center">
@@ -708,6 +699,7 @@ export function AdIdeaCard({
                     <Button
                       size="sm"
                       variant="outline"
+                      disabled={approved || busy || editor !== null}
                       onClick={() => openEditor("pool")}
                     >
                       {isStatic ? "Add image" : "Add images"}
@@ -726,29 +718,75 @@ export function AdIdeaCard({
                         ? "Creative"
                         : `Slides · ${savedState.document.cards.length}`}
                     </h4>
-                    <div
-                      className="flex flex-wrap items-center gap-1"
-                      aria-label="Creative shape"
-                    >
-                      {IDEA_SHAPES.map((s) => (
-                        <Button
-                          key={s}
-                          size="sm"
-                          variant={shape === s ? "secondary" : "ghost"}
-                          aria-pressed={shape === s}
-                          onClick={() => setShape(s)}
-                        >
-                          {IDEA_SHAPE_LABELS[s]}
-                        </Button>
-                      ))}
+                    <div className="space-y-2">
+                      <h5 className="text-xs font-medium">Creative sizes</h5>
+                      <div
+                        className="flex flex-wrap gap-2"
+                        aria-label="Creative sizes"
+                      >
+                        {IDEA_SHAPES.map((size) => (
+                          <div
+                            key={size}
+                            className={`flex items-center rounded-lg border transition-colors ${shape === size ? "border-ring bg-accent text-accent-foreground" : "bg-background text-muted-foreground"}`}
+                          >
+                            <label className="flex cursor-pointer items-center py-3 pr-1 pl-3">
+                              <input
+                                type="checkbox"
+                                className="size-4 accent-current"
+                                aria-label={`Export ${IDEA_SHAPE_LABELS[size]}`}
+                                disabled={
+                                  approved ||
+                                  approval.isPending ||
+                                  busy ||
+                                  editor !== null
+                                }
+                                checked={(
+                                  savedState.document.exportShapes ??
+                                  savedState.document.shapes
+                                ).includes(size)}
+                                onChange={(event) => {
+                                  const selected =
+                                    savedState.document.exportShapes ??
+                                    savedState.document.shapes;
+                                  persist({
+                                    ...savedState.document,
+                                    exportShapes: IDEA_SHAPES.filter((item) =>
+                                      item === size
+                                        ? event.target.checked
+                                        : selected.includes(item),
+                                    ),
+                                  });
+                                }}
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              className="rounded-md px-3 py-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-ring"
+                              aria-pressed={shape === size}
+                              onClick={() => setShape(size)}
+                            >
+                              {IDEA_SHAPE_LABELS[size]}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Select a size to edit. Check sizes to export.
+                      </p>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Preview the layout in each shape. Choose which sizes to
-                      save when approving.
-                    </p>
-                    {savedState.document.cards.map((slide, index) =>
-                      renderSlide(slide, index, false),
-                    )}
+                    <fieldset
+                      disabled={
+                        approved ||
+                        approval.isPending ||
+                        busy ||
+                        editor !== null
+                      }
+                      className="space-y-3"
+                    >
+                      {savedState.document.cards.map((slide, index) =>
+                        renderSlide(slide, index, false),
+                      )}
+                    </fieldset>
                     <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3">
                       <p className="text-sm text-muted-foreground">
                         Image pool · {savedState.document.pool?.length ?? 0}{" "}
@@ -757,6 +795,7 @@ export function AdIdeaCard({
                       <Button
                         size="sm"
                         variant="outline"
+                        disabled={approved || busy || editor !== null}
                         onClick={() => openEditor("pool")}
                       >
                         {isStatic
@@ -767,7 +806,7 @@ export function AdIdeaCard({
                   </>
                 )}
               </div>
-            </fieldset>
+            </div>
           )}
         </>
       )}
@@ -784,12 +823,12 @@ export function AdIdeaCard({
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>
-              {editor === "placements"
-                ? "Intended placements"
-                : editor === "copy"
-                  ? "Edit ad copy"
-                  : editor === "slide"
-                    ? `Edit ${isStatic ? "image" : `slide ${document.cards.findIndex((c) => c.id === selectedId) + 1}`}`
+              {editor === "copy"
+                ? "Edit ad copy"
+                : editor === "slide"
+                  ? `Edit ${isStatic ? "image" : `slide ${document.cards.findIndex((c) => c.id === selectedId) + 1}`}`
+                  : editor === "image"
+                    ? `Choose image · ${isStatic ? "Image" : `Slide ${document.cards.findIndex((c) => c.id === selectedId) + 1}`} · ${IDEA_SHAPE_LABELS[shape]}`
                     : "Manage images"}
             </DialogTitle>
             <DialogDescription>
@@ -803,26 +842,6 @@ export function AdIdeaCard({
             </p>
           )}
           <fieldset disabled={busy || stale} className="space-y-4">
-            {editor === "placements" &&
-              META_PLACEMENTS.map((p) => (
-                <label key={p.id} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={
-                      document.intendedPlacements?.includes(p.id) ?? false
-                    }
-                    onChange={(e) =>
-                      edit((d) => ({
-                        ...d,
-                        intendedPlacements: e.target.checked
-                          ? [...(d.intendedPlacements ?? []), p.id]
-                          : d.intendedPlacements?.filter((id) => id !== p.id),
-                      }))
-                    }
-                  />
-                  {p.label}
-                </label>
-              ))}
             {editor === "copy" && (
               <>
                 <label className="block space-y-1 text-xs">
@@ -904,20 +923,32 @@ export function AdIdeaCard({
                 document.cards.findIndex((c) => c.id === card.id),
                 true,
               )}
-            {(editor === "pool" || (editor === "slide" && showPool)) && (
+            {(editor === "image" ||
+              editor === "pool" ||
+              (editor === "slide" && showPool)) && (
               <>
                 <div className="space-y-3">
-                  <h3 className="text-sm font-medium">
-                    Image pool · {document.pool?.length ?? 0} available ·{" "}
-                    {document.cards.length} selected
-                  </h3>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-sm font-medium">
+                      Image pool · {document.pool?.length ?? 0} available
+                    </h3>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setHomePickerOpen(true)}
+                    >
+                      Choose from house
+                    </Button>
+                  </div>
                   <div className="mt-3 space-y-3">
                     <p className="text-xs text-muted-foreground">
-                      {isStatic
-                        ? "Choose one base image. Other candidates stay here."
-                        : "Choose up to ten slides. Removing a slide keeps its image here."}
+                      {editor === "image"
+                        ? `Choose an image for ${IDEA_SHAPE_LABELS[shape]}. Your composition stays in place.`
+                        : isStatic
+                          ? "Choose one base image. Other candidates stay here."
+                          : "Choose up to ten slides. Removing a slide keeps its image here."}
                     </p>
-                    {card && (
+                    {card && editor !== "image" && (
                       <div className="flex flex-wrap gap-2">
                         <Button
                           size="sm"
@@ -943,11 +974,18 @@ export function AdIdeaCard({
                         </Button>
                       </div>
                     )}
-                    <div className="grid max-h-64 grid-cols-3 gap-2 overflow-y-auto sm:grid-cols-4">
+                    <div className="grid max-h-64 auto-rows-max grid-cols-3 content-start items-start gap-2 overflow-y-auto sm:grid-cols-4">
                       {(document.pool ?? []).map((source, index) => {
                         const selectedIndex = document.cards.findIndex((c) =>
                           sameIdeaSource(c.source, source),
                         );
+                        const currentSource = card
+                          ? ideaSource(card, shape)
+                          : null;
+                        const selectedForSize =
+                          editor === "image" &&
+                          currentSource !== null &&
+                          sameIdeaSource(currentSource, source);
                         const disabled =
                           busy ||
                           (poolTarget === "slide" &&
@@ -960,21 +998,34 @@ export function AdIdeaCard({
                             type="button"
                             disabled={disabled}
                             onClick={() => choosePoolImage(source)}
+                            aria-pressed={
+                              editor === "image" ? selectedForSize : undefined
+                            }
                             aria-label={`Use pool image ${index + 1}${selectedIndex >= 0 ? `, selected as slide ${selectedIndex + 1}` : ""}`}
-                            className="overflow-hidden rounded-md border bg-muted text-xs disabled:opacity-50"
+                            className="overflow-hidden rounded-md border bg-muted text-xs disabled:opacity-50 aria-pressed:ring-2 aria-pressed:ring-primary"
                           >
                             <Image
                               unoptimized
                               src={source.url}
-                              alt={`Candidate ${index + 1}`}
+                              alt={photoLabel(source, index)}
                               width={120}
                               height={90}
                               className="aspect-[4/3] w-full object-cover"
                             />
                             <span className="block p-1">
-                              {selectedIndex >= 0
-                                ? `Selected · ${selectedIndex + 1}`
-                                : `Image ${index + 1}`}
+                              <span
+                                className="block truncate"
+                                title={photoLabel(source, index)}
+                              >
+                                {photoLabel(source, index)}
+                              </span>
+                              {editor === "image"
+                                ? selectedForSize
+                                  ? "Selected image"
+                                  : ""
+                                : selectedIndex >= 0
+                                  ? `Selected · ${selectedIndex + 1}`
+                                  : ""}
                             </span>
                           </button>
                         );
@@ -982,29 +1033,35 @@ export function AdIdeaCard({
                     </div>
                     <Dropzone
                       compact
-                      title="Add photos to the pool"
-                      hint="Uploads stay available; open slide slots are filled first"
+                      title={
+                        editor === "image"
+                          ? "Upload a replacement image"
+                          : "Add photos to the pool"
+                      }
+                      hint={
+                        editor === "image"
+                          ? "The first image replaces this size; others stay in the pool"
+                          : "Uploads stay available; open slide slots are filled first"
+                      }
                       uploading={uploading}
                       progress={progress}
                       onFiles={async (files) =>
-                        attach(await uploadFiles(files), "add")
+                        attach(
+                          await uploadFiles(files),
+                          editor === "image" ? "replace" : "add",
+                        )
                       }
                     />
-                    {ad.homeId && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setHomePickerOpen(true)}
-                      >
-                        Add from this home
-                      </Button>
-                    )}
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => setPicker("add")}
+                      onClick={() =>
+                        setPicker(editor === "image" ? "replace" : "add")
+                      }
                     >
-                      Add from library
+                      {editor === "image"
+                        ? "Choose from library"
+                        : "Add from library"}
                     </Button>
                   </div>
                 </div>
@@ -1047,31 +1104,125 @@ export function AdIdeaCard({
         isLoading={remove.isPending}
       />
       <Dialog open={homePickerOpen} onOpenChange={setHomePickerOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
           <DialogHeader>
-            <DialogTitle>{homeGallery.data?.name ?? "Home images"}</DialogTitle>
+            <DialogTitle>Choose from house</DialogTitle>
             <DialogDescription>
-              Add candidates to this idea’s pool, then choose and arrange slides
-              in the editor.
+              {poolTarget === "size"
+                ? "Choose a photo for the current slide and size."
+                : "Add photos to your image pool."}
             </DialogDescription>
           </DialogHeader>
-          {homeGallery.isPending ? (
+          <div className="flex flex-wrap gap-2">
+            <Select
+              value={selectedHomeId || "all"}
+              onValueChange={(value) =>
+                setSelectedHomeId(value === "all" ? "" : value)
+              }
+            >
+              <SelectTrigger
+                aria-label="House"
+                className="h-auto! min-h-16 w-full max-w-full sm:w-96"
+              >
+                <SelectValue>
+                  <span className="flex min-w-0 items-center gap-3 text-left">
+                    {galleryHome?.photos[0] && (
+                      <Image
+                        unoptimized
+                        src={galleryHome.photos[0].url}
+                        alt=""
+                        width={48}
+                        height={48}
+                        className="size-12 shrink-0 rounded-md object-cover"
+                      />
+                    )}
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium">
+                        {galleryHome?.name ?? "All houses"}
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        {galleryHome
+                          ? `${galleryHome.photos.length} photos`
+                          : `${homes.length} houses`}
+                      </span>
+                    </span>
+                  </span>
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent position="popper" className="max-h-96">
+                <SelectItem value="all">
+                  All houses · {homes.length} homes
+                </SelectItem>
+                {homes.map((home) => (
+                  <SelectItem
+                    key={home.id}
+                    value={home.id}
+                    textValue={home.name}
+                  >
+                    <span className="flex items-center gap-3">
+                      {home.photos[0] && (
+                        <Image
+                          unoptimized
+                          src={home.photos[0].url}
+                          alt=""
+                          width={64}
+                          height={64}
+                          className="size-16 shrink-0 rounded-md object-cover"
+                        />
+                      )}
+                      <span className="min-w-0">
+                        <span className="block text-sm font-medium">
+                          {home.name}
+                        </span>
+                        <span className="mt-1 flex items-center gap-1">
+                          {home.photos.slice(1, 4).map((photo) => (
+                            <Image
+                              key={photo.url}
+                              unoptimized
+                              src={photo.url}
+                              alt=""
+                              width={32}
+                              height={24}
+                              className="h-6 w-8 rounded object-cover"
+                            />
+                          ))}
+                          <span className="ml-1 text-xs text-muted-foreground">
+                            {home.photos.length} photos
+                          </span>
+                        </span>
+                      </span>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input
+              aria-label="Search house photos"
+              placeholder="Search house photos…"
+              value={photoSearch}
+              onChange={(event) => setPhotoSearch(event.target.value)}
+            />
+          </div>
+          {homeGalleries.isPending ? (
             <p className="text-sm">Loading home images…</p>
-          ) : homeGallery.isError ? (
+          ) : homeGalleries.isError ? (
             <p className="text-sm">
               Could not load images.{" "}
-              <Button variant="link" onClick={() => void homeGallery.refetch()}>
+              <Button
+                variant="link"
+                onClick={() => void homeGalleries.refetch()}
+              >
                 Try again
               </Button>
             </p>
-          ) : !homeGallery.data?.photos.length ? (
+          ) : !galleryPhotos.length ? (
             <p className="text-sm text-muted-foreground">
               No gallery available for this home. You can still upload or choose
               from the library.
             </p>
           ) : (
-            <div className="grid max-h-96 grid-cols-3 gap-2 overflow-y-auto">
-              {homeGallery.data.photos.map((source, index) => {
+            <div className="grid max-h-[50vh] auto-rows-max grid-cols-2 content-start items-start gap-3 overflow-y-auto sm:grid-cols-3">
+              {galleryPhotos.map((source) => {
                 const added = document.pool?.some((item) =>
                   sameIdeaSource(item, source),
                 );
@@ -1079,25 +1230,28 @@ export function AdIdeaCard({
                   <button
                     key={source.assetId ?? source.url}
                     type="button"
-                    disabled={added || busy}
-                    aria-label={
-                      added
-                        ? `Home image ${index + 1}, already in pool`
-                        : `Add home image ${index + 1} to pool`
-                    }
-                    className="overflow-hidden rounded-md border bg-muted text-xs disabled:opacity-50"
-                    onClick={() => edit((d) => withIdeaPool(d, [source]))}
+                    disabled={(poolTarget !== "size" && added) || busy}
+                    aria-label={`${poolTarget === "size" ? "Use" : "Add"} ${source.label}`}
+                    className="overflow-hidden rounded-md border bg-muted text-xs disabled:opacity-50 aria-pressed:ring-2 aria-pressed:ring-primary"
+                    onClick={() => {
+                      edit((d) => withIdeaPool(d, [source]));
+                      if (poolTarget === "size") {
+                        choosePoolImage(source);
+                        setHomePickerOpen(false);
+                      }
+                    }}
                   >
                     <Image
                       unoptimized
                       src={source.url}
-                      alt={`Home image ${index + 1}`}
+                      alt={source.label}
                       width={160}
                       height={120}
                       className="aspect-[4/3] w-full object-cover"
                     />
                     <span className="block p-1">
-                      {added ? "In pool" : "Add to pool"}
+                      {source.label}
+                      {poolTarget !== "size" && added ? " · In pool" : ""}
                     </span>
                   </button>
                 );

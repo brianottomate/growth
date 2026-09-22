@@ -5,11 +5,7 @@ import { ChevronLeft, ExternalLink } from "lucide-react";
 
 import { HomeError, loadBrandHome } from "@/server/services/homes.service";
 
-import {
-  brandAvatarUrl,
-  brandTabHref,
-  loadPerformanceBrand,
-} from "../../_data";
+import { brandTabHref, loadPerformanceBrand } from "../../_data";
 
 import { HomeWorkbench } from "./HomeWorkbench";
 
@@ -43,7 +39,6 @@ export default async function PerformanceHomePage({
   });
   if (!loaded) notFound();
 
-  const avatarUrl = await brandAvatarUrl(brand);
   const slug = brand.slug ?? brand.id;
   const { home } = loaded;
   const place = [home.city, home.state].filter(Boolean).join(", ");
@@ -93,13 +88,7 @@ export default async function PerformanceHomePage({
         </div>
       </div>
 
-      <HomeWorkbench
-        home={home}
-        brandId={brand.id}
-        brandSlug={slug}
-        brandName={brand.name}
-        brandLogo={avatarUrl}
-      />
+      <HomeWorkbench home={home} />
     </div>
   );
 }

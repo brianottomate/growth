@@ -41,6 +41,8 @@ export const ideaCopySchema = z.object({
   callToAction: z.string().max(60),
 });
 export const ideaSourceSchema = z.object({
+  label: z.string().optional(),
+  homeId: z.string().optional(),
   assetId: z.string().optional(),
   url: z.string().min(1),
 });
@@ -53,6 +55,7 @@ export const ideaDocumentSchema = z
   .object({
     role: z.enum(["hero_carousel", "hero_static", "home_carousel"]),
     shapes: z.array(ideaShapeSchema).min(1).max(4),
+    exportShapes: z.array(ideaShapeSchema).max(4).optional(),
     intendedPlacements: z.array(metaPlacementSchema).max(6).optional(),
     copy: ideaCopySchema,
     copyOverrides: z.partialRecord(ideaShapeSchema, ideaCopySchema),
@@ -96,10 +99,10 @@ export const ideaSaveSchema = z.object({
   reviewImportedCreative: z.boolean().optional(),
   document: ideaDocumentSchema,
 });
-// Three independent starting recipes; defaults do not constrain later card edits.
+// Starting recipes remain editable per slide.
 export const IDEA_DEFAULT_TEMPLATES = {
-  hero_carousel: "image-hero",
-  hero_static: "image-hero",
+  hero_carousel: "hero-overlay",
+  hero_static: "hero-overlay",
   home_carousel: "image-hero",
 } as const;
 export function defaultIdeaRecipe(role: IdeaDocument["role"]): IdeaRecipe {
@@ -186,7 +189,7 @@ export function withIdeaPool(
   for (const source of sources) {
     const existing = pool.findIndex((item) => sameIdeaSource(item, source));
     if (existing < 0) pool.push(source);
-    else if (source.assetId) pool[existing] = source;
+    else pool[existing] = { ...pool[existing], ...source };
   }
   return { ...document, pool };
 }

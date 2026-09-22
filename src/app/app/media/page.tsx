@@ -9,9 +9,9 @@ import { MediaLibrary } from "./MediaLibrary";
 export default async function MediaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ brand?: string }>;
+  searchParams: Promise<{ brand?: string; folder?: string }>;
 }) {
-  const { brand: requestedBrand } = await searchParams;
+  const { brand: requestedBrand, folder } = await searchParams;
   const session = await getSession();
   if (!session?.user) redirect("/signin");
 
@@ -57,9 +57,10 @@ export default async function MediaPage({
     // Keyed so client-side navigation to a different ?brand= remounts with
     // the right library instead of keeping the mounted state.
     <MediaLibrary
-      key={initialBrandId ?? "default"}
+      key={`${initialBrandId ?? "default"}:${folder ?? "all"}`}
       brands={brands}
       initialBrandId={initialBrandId}
+      initialFolderId={folder}
     />
   );
 }

@@ -696,3 +696,35 @@ describe("what a Meta ad set optimises toward", () => {
     expect(result).toBeUndefined();
   });
 });
+
+it("attaches a carousel to a conversion ad set without resending its pixel and budget", () => {
+  const payload: CreateZernioStandaloneAdInput = {
+    ...base,
+    adSetId: "existing_set",
+    goal: "conversions",
+    budgetAmount: undefined,
+    budgetType: undefined,
+    imageUrl: undefined,
+    carouselCards: [
+      { imageUrl: "https://example.com/1.jpg" },
+      { imageUrl: "https://example.com/2.jpg" },
+    ],
+  };
+  expect(() => assertMetaAdPayload(payload, account)).not.toThrow();
+  expect(() =>
+    assertMetaAdPayload(
+      { ...payload, adSetId: undefined, budgetAmount: 50 },
+      account,
+    ),
+  ).toThrow(/pixelId/);
+  expect(() =>
+    assertMetaAdPayload(
+      {
+        ...payload,
+        carouselCards: undefined,
+        existingCreativeId: "creative_1",
+      },
+      account,
+    ),
+  ).not.toThrow();
+});

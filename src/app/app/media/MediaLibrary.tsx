@@ -146,9 +146,11 @@ function formatBytes(bytes: number | null): string {
 export function MediaLibrary({
   brands,
   initialBrandId,
+  initialFolderId,
 }: {
   brands: Brand[];
   initialBrandId?: string | null;
+  initialFolderId?: string;
 }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -157,13 +159,15 @@ export function MediaLibrary({
   // Keep ?brand= in the URL so the current library is always linkable.
   const setBrandId = (id: string) => {
     setBrandIdState(id);
+    setFolderFilter("all");
     const brand = brands.find((row) => row.id === id);
     const url = new URL(window.location.href);
     url.searchParams.set("brand", brand?.slug ?? id);
+    url.searchParams.delete("folder");
     window.history.replaceState(null, "", url);
   };
   const [filter, setFilter] = useState<string>("all");
-  const [folderFilter, setFolderFilter] = useState("all");
+  const [folderFilter, setFolderFilter] = useState(initialFolderId ?? "all");
   const [tagFilter, setTagFilter] = useState("all");
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search);

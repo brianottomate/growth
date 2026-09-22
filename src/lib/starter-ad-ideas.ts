@@ -1,4 +1,8 @@
-import { ideaDocumentFromAd, withIdeaPool } from "./ad-idea-studio";
+import {
+  IDEA_SHAPES,
+  ideaDocumentFromAd,
+  withIdeaPool,
+} from "./ad-idea-studio";
 import type { AdCreativeContent } from "@/server/db/ads-schema";
 
 /** Editable placeholders only; the home labels do not claim real inventory. */
@@ -25,14 +29,20 @@ export function starterAdIdeas() {
       });
     }
   }
+  for (const idea of ideas) {
+    const document = ideaDocumentFromAd(idea);
+    document.exportShapes = [...IDEA_SHAPES];
+    idea.content.ideaStudio = { document };
+  }
   return ideas;
 }
 
 export type StarterHome = {
   id: string;
+  curated?: boolean;
   name: string;
   url: string;
-  photos: { url: string; assetId?: string }[];
+  photos: { url: string; assetId?: string; label?: string; homeId?: string }[];
 };
 /** Known inventory fills the same draft model, without rendering files or inventing copy. */
 export function featuredStarterAdIdeas(homes: StarterHome[]) {
@@ -69,7 +79,7 @@ export function featuredStarterAdIdeas(homes: StarterHome[]) {
           linkUrl: home.url,
           callToAction: "BOOK_NOW",
           media: home.photos
-            .slice(0, format === "static" ? 1 : 6)
+            .slice(0, format === "static" ? 1 : home.curated ? 10 : 6)
             .map((p) => ({ ...p, type: "image" as const })),
         },
       });
@@ -78,11 +88,16 @@ export function featuredStarterAdIdeas(homes: StarterHome[]) {
     const sources = idea.homeId
       ? homes
           .find((home) => home.id === idea.homeId)!
-          .photos.slice(0, idea.content.format === "static" ? 1 : 6)
+          .photos.slice(0, idea.content.media.length)
       : homes.flatMap((home) => home.photos.slice(0, 1));
     idea.content.ideaStudio = {
       document: withIdeaPool(ideaDocumentFromAd(idea), sources),
     };
+  }
+  for (const idea of ideas) {
+    const document = ideaDocumentFromAd(idea);
+    document.exportShapes = [...IDEA_SHAPES];
+    idea.content.ideaStudio = { document };
   }
   return ideas;
 }

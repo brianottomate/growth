@@ -1,3 +1,4 @@
+import { adChatContext } from "@/server/services/ad-chat-context.service";
 import {
   importMetaCampaign,
   importMetaCampaignSchema,
@@ -921,7 +922,7 @@ export const updateAudienceAction = growthAction({
 
 export const planPlatformAction = growthAction({
   description:
-    "Plan a platform for a LOCAL campaign: creates the draft platform campaign row that holds that platform's authoritative budget and settings. Local only; idempotent per platform.",
+    "Plan a platform for a LOCAL campaign: creates the draft platform campaign row that holds that platform's authoritative budget and settings. Local only; idempotent per platform. Does not require Zernio, a connected ad account, or listDestinations. Account connection is needed later for pushing, not planning.",
   inputSchema: z.object({
     campaignId: z.string().trim().min(1),
     platform: z.enum(PLANNABLE_AD_PLATFORMS),
@@ -1507,4 +1508,15 @@ export const importMetaCampaignAction = growthAction({
   inputSchema: importMetaCampaignSchema,
   execute: (input, ctx) =>
     importMetaCampaign(input, { orgId: ctx.orgId, userId: ctx.userId }),
+});
+
+export const ideaContextAction = growthAction({
+  description:
+    "Read one ad's current editable document, version, ordered source-image URLs (including size variants), brand voice and facts for every represented home. Use before saveIdea. Image URLs are references; inspect them visually before making composition decisions.",
+  inputSchema: z.object({
+    campaignId: z.string().min(1),
+    adId: z.string().min(1),
+  }),
+  execute: (input, ctx) =>
+    adChatContext({ ...input, organizationId: ctx.orgId }),
 });

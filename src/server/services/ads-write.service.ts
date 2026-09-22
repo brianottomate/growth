@@ -476,6 +476,7 @@ export function assertMetaAdPayload(
     throw new Error("Meta lifetime budgets require endDate");
   }
   if (
+    !payload.adSetId &&
     goal === "catalog_sales" &&
     (!promotedObject?.productSetId ||
       !promotedObject.pixelId ||
@@ -488,6 +489,7 @@ export function assertMetaAdPayload(
   // Meta takes EITHER a pixel + event OR a custom conversion on its own;
   // sending the pixel alongside the conversion is rejected (subcode 1885014).
   if (
+    !payload.adSetId &&
     (goal === "conversions" || goal === "lead_conversion") &&
     !promotedObject?.customConversionId &&
     (!promotedObject?.pixelId || !promotedObject.customEventType)
@@ -501,10 +503,15 @@ export function assertMetaAdPayload(
       "promotedObject.customConversionId must be sent without pixelId — Meta rejects the pair",
     );
   }
-  if (goal === "lead_generation" && !payload.leadGenFormId) {
+  if (
+    !payload.adSetId &&
+    goal === "lead_generation" &&
+    !payload.leadGenFormId
+  ) {
     throw new Error("Meta lead generation requires leadGenFormId");
   }
   if (
+    !payload.adSetId &&
     goal === "app_promotion" &&
     (!promotedObject?.applicationId || !promotedObject.objectStoreUrl)
   ) {
@@ -516,6 +523,7 @@ export function assertMetaAdPayload(
   // The three creative shapes are mutually exclusive, and one of them has to
   // be there — except for catalog sales, where the product set is the creative.
   const shapes = [
+    payload.existingCreativeId ? "existingCreativeId" : null,
     payload.imageUrl ? "imageUrl" : null,
     payload.video ? "video" : null,
     payload.carouselCards ? "carouselCards" : null,

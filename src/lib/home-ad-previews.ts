@@ -128,7 +128,7 @@ export function carouselSlideTitles(
 /** Everything a preview tile needs to draw itself, and to be frozen as is. */
 export type PreviewSpec = {
   brandId: string;
-  templateId: "hero-overlay" | "catalog-place" | "photo-only";
+  templateId: "hero-overlay" | "catalog-copy" | "catalog-place" | "photo-only";
   formatId: CompositionFormatId;
   source: { assetId: string } | { url: string };
   title: string;
@@ -147,7 +147,7 @@ export function compositionPreviewUrl(spec: PreviewSpec) {
     templateId: spec.templateId,
     formatId: spec.formatId,
     title: spec.title,
-    mark: "none",
+    mark: "auto",
   });
   if (spec.subtitle) params.set("subtitle", spec.subtitle);
   if (spec.eyebrow) params.set("eyebrow", spec.eyebrow);
@@ -201,11 +201,11 @@ export function homeCatalogPreviewUrl(input: {
 }) {
   return compositionPreviewUrl({
     brandId: input.brandId,
-    templateId: "catalog-place",
+    templateId: "catalog-copy",
     formatId: input.formatId,
     source: input.source,
     eyebrow: input.copy.eyebrow,
-    title: input.copy.title,
+    title: [input.copy.eyebrow, input.copy.title].filter(Boolean).join(" "),
     subtitle: input.copy.subtitle,
     rating: input.copy.rating,
   });

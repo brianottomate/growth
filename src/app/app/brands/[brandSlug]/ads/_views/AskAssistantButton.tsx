@@ -46,7 +46,7 @@ export function AskAssistantButton({
           campaignId,
           campaignName,
           focus,
-          visibleText: ask,
+          visibleText: `${ask}\n\nBrand ID: ${brandId}\nCampaign ID: ${campaignId}`,
         })
       }
     >

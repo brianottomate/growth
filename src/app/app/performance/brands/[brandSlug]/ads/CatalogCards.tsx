@@ -1,111 +1,547 @@
 "use client";
-
 import { useState } from "react";
-import { Download } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { MediaPickerDialog } from "@/app/app/content/[contentId]/MediaPickerDialog";
+import {
+  COMPOSITION_FORMATS,
+  COMPOSITION_TEMPLATES,
+  type CompositionFormatId,
+} from "@/lib/compositions";
+import {
+  type CatalogCard,
+  type CatalogDraft,
+  type CatalogHome,
+  type CatalogExport,
+} from "@/lib/catalog-studio";
 
-import { cn } from "@/components/ui/lib/utils";
-import { homeCatalogCopy, homeCatalogPreviewUrl } from "@/lib/home-ad-previews";
-
-/** A home as the catalog card draws it; only what the render needs. */
-export type CatalogHome = {
-  id: string;
-  name: string;
-  imageUrl: string;
-  city: string | null;
-  state: string | null;
-  bedrooms: number | null;
-  bathrooms: number | null;
-  guests: number | null;
-  rating: number | null;
-};
-
-/** Each card is a server render, so they arrive in tens. */
-const PAGE = 10;
-
-/** What the download is, on hover; the section itself stays heading and data. */
-const FEED_TITLE =
-  "Meta Hotels and rentals feed, one row per home with a photo. Street address and coordinates are not on the WanderOS feed and export empty.";
-
-/**
- * The listing card an Advantage+ catalog ad would draw for each home, and the
- * Meta feed the catalog reads from. The photo roster lives on the Homes tab;
- * this is the same homes as the ad a catalog builds, at the foot of the wall.
- */
-export function CatalogCards({
-  brandId,
-  homes,
-}: {
-  brandId: string;
-  homes: CatalogHome[];
-}) {
-  const [page, setPage] = useState(PAGE);
-  const visible = homes.slice(0, page);
-  const left = homes.length - visible.length;
-
-  if (homes.length === 0) return null;
-
+async function readResponse<T = unknown>(response: Response): Promise<T> {
+  const body: unknown = await response.json();
+  if (!response.ok)
+    throw new Error(
+      typeof body === "object" && body && "error" in body
+        ? String(body.error)
+        : "Catalog request failed",
+    );
+  return body as T;
+}
+function preview(
+  brandId: string,
+  card: CatalogCard,
+  format: CompositionFormatId,
+) {
+  const params = new URLSearchParams({
+    brandId,
+    templateId: card.templateId,
+    formatId: format,
+    title: card.title,
+    subtitle: card.subtitle,
+    imagePosition: card.imagePosition,
+    mark: card.showLogo ? "auto" : "none",
+  });
+  params.set(
+    card.assetId ? "sourceMediaAssetId" : "sourceUrl",
+    card.assetId ?? card.imageUrl,
+  );
+  return `/api/compositions/preview?${params}`;
+}
+export function CatalogCards({ brandId }: { brandId: string }) {
+  const client = useQueryClient();
+  const url = `/api/performance/catalog/${brandId}/studio`;
+  const query = useQuery<{
+    homes: CatalogHome[];
+    draft: CatalogDraft;
+    exports: CatalogExport[];
+  }>({
+    queryKey: ["catalog-studio", brandId],
+    queryFn: async () =>
+      readResponse<{
+        homes: CatalogHome[];
+        draft: CatalogDraft;
+        exports: CatalogExport[];
+      }>(await fetch(url)),
+    refetchInterval: (q) =>
+      q.state.data?.exports.some((e) =>
+        ["queued", "processing"].includes(e.status),
+      )
+        ? 2500
+        : false,
+  });
+  const [edited, setEdited] = useState<CatalogDraft | null>(null);
+  const [view, setView] = useState<"studio" | "exports">("studio");
+  const [format, setFormat] = useState<CompositionFormatId>("portrait");
+  const [details, setDetails] = useState<CatalogCard | null>(null);
+  const [library, setLibrary] = useState(false);
+  const [limit, setLimit] = useState(10);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const draft = edited ?? query.data?.draft;
+  const homes = query.data?.homes ?? [];
+  const selectedHome = homes.find((h) => h.id === details?.homeId);
+  const update = (card: CatalogCard) =>
+    setEdited({
+      ...draft!,
+      cards: draft!.cards.map((c) => (c.homeId === card.homeId ? card : c)),
+    });
+  async function save(action: "save" | "export") {
+    setBusy(true);
+    setError("");
+    try {
+      await readResponse(
+        await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action, draft }),
+        }),
+      );
+      await client.invalidateQueries({ queryKey: ["catalog-studio", brandId] });
+      setEdited(null);
+      if (action === "export") setView("exports");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unable to save");
+    } finally {
+      setBusy(false);
+    }
+  }
+  const activeExport = query.data?.exports.some((e) =>
+    ["queued", "processing"].includes(e.status),
+  );
   return (
-    <section className="space-y-2.5 border-t pt-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
-          Catalog cards{homes.length ? ` · ${homes.length}` : ""}
-        </span>
-        <div className="flex items-center gap-3 text-[11.5px]">
-          {(["csv", "xml"] as const).map((format) => (
-            <a
-              key={format}
-              href={`/api/performance/catalog/${encodeURIComponent(brandId)}?format=${format}`}
-              download
-              title={FEED_TITLE}
-              className="inline-flex items-center gap-1 text-sky-300 hover:underline"
-            >
-              <Download className="size-3" />
-              Meta {format.toUpperCase()}
-            </a>
-          ))}
+    <section className="space-y-5 border-t pt-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">Catalog</h2>
+          <p className="text-sm text-muted-foreground">
+            One card per home. Review, then save a frozen export to your media
+            library.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant={view === "studio" ? "secondary" : "ghost"}
+            onClick={() => setView("studio")}
+          >
+            Studio
+          </Button>
+          <Button
+            variant={view === "exports" ? "secondary" : "ghost"}
+            onClick={() => setView("exports")}
+          >
+            Exports {query.data?.exports.length || ""}
+          </Button>
         </div>
       </div>
-      <ul className="grid grid-cols-2 gap-2.5 @xl:grid-cols-3 @4xl:grid-cols-5">
-        {visible.map((home) => (
-          <li
-            key={home.id}
-            className="overflow-hidden rounded-2xl border bg-card"
-          >
-            {/* oxlint-disable-next-line nextjs/no-img-element */}
-            <img
-              src={homeCatalogPreviewUrl({
-                brandId,
-                source: { url: home.imageUrl },
-                formatId: "square",
-                copy: homeCatalogCopy(home),
-              })}
-              alt={home.name}
-              loading="lazy"
-              className="aspect-square w-full bg-black/20 object-cover"
-            />
-          </li>
-        ))}
-      </ul>
-      {left > 0 ? (
-        <div className="flex items-center gap-3 text-[11.5px]">
-          <button
-            type="button"
-            onClick={() => setPage(page + PAGE)}
-            className="text-sky-300 hover:underline"
-          >
-            Load {Math.min(PAGE, left)} more
-          </button>
-          {left > PAGE ? (
-            <button
-              type="button"
-              onClick={() => setPage(homes.length)}
-              className={cn("text-muted-foreground hover:text-foreground")}
+      {(error || query.error) && (
+        <p role="alert" className="text-destructive">
+          {error || query.error?.message}
+        </p>
+      )}
+      {query.isLoading && <p>Loading homes…</p>}
+      {view === "studio" && draft && (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span>
+              {draft.cards.filter((c) => c.included).length} of{" "}
+              {draft.cards.length} homes included{" "}
+              {edited && "· Unsaved changes"}
+            </span>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                disabled={busy || !edited}
+                onClick={() => void save("save")}
+              >
+                Save draft
+              </Button>
+              <Button
+                disabled={
+                  busy || activeExport || !draft.cards.some((c) => c.included)
+                }
+                onClick={() => void save("export")}
+              >
+                {busy ? "Saving…" : "Create export"}
+              </Button>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {COMPOSITION_FORMATS.filter((f) =>
+              ["portrait", "square", "story", "wide"].includes(f.id),
+            ).map((f) => (
+              <div
+                key={f.id}
+                className={`flex items-center rounded-lg border ${format === f.id ? "border-primary bg-accent" : ""}`}
+              >
+                <button
+                  type="button"
+                  className="px-3 py-2 text-sm"
+                  onClick={() => setFormat(f.id)}
+                  aria-pressed={format === f.id}
+                >
+                  {f.label} ·{" "}
+                  {f.id === "portrait"
+                    ? "4:5"
+                    : f.id === "square"
+                      ? "1:1"
+                      : f.id === "story"
+                        ? "9:16"
+                        : "16:9"}
+                </button>
+                <input
+                  type="checkbox"
+                  className="mr-3"
+                  aria-label={`Include ${f.label} in export`}
+                  checked={draft.formats.includes(f.id)}
+                  onChange={(e) => {
+                    const formats = e.target.checked
+                      ? [...draft.formats, f.id]
+                      : draft.formats.filter((x) => x !== f.id);
+                    if (formats.length)
+                      setEdited({
+                        ...draft,
+                        formats,
+                        primaryFormat: formats.includes(draft.primaryFormat)
+                          ? draft.primaryFormat
+                          : formats[0]!,
+                      });
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <span className="text-muted-foreground">
+              Click a size to preview; check it to export.
+            </span>
+            <label>
+              Feed image{" "}
+              <select
+                className="rounded border bg-background p-1"
+                value={draft.primaryFormat}
+                onChange={(e) =>
+                  setEdited({
+                    ...draft,
+                    primaryFormat: e.target.value as CompositionFormatId,
+                  })
+                }
+              >
+                {draft.formats.map((f) => (
+                  <option key={f} value={f}>
+                    {COMPOSITION_FORMATS.find((x) => x.id === f)?.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                setEdited({
+                  ...draft,
+                  cards: draft.cards.map((c) => ({ ...c, included: true })),
+                })
+              }
             >
-              Show all {homes.length}
-            </button>
-          ) : null}
+              Include all
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                setEdited({
+                  ...draft,
+                  cards: draft.cards.map((c) => ({ ...c, included: false })),
+                })
+              }
+            >
+              Exclude all
+            </Button>
+          </div>
+          {!draft.cards.length && (
+            <p className="text-muted-foreground">
+              No homes with photos found on this brand’s WanderOS site.
+            </p>
+          )}
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 xl:grid-cols-5">
+            {draft.cards.slice(0, limit).map((card) => (
+              <div
+                key={card.homeId}
+                className={`overflow-hidden rounded-xl border bg-card ${card.included ? "" : "opacity-50"}`}
+              >
+                <button
+                  className="block w-full"
+                  onClick={() => setDetails({ ...card })}
+                  aria-label={`Edit ${homes.find((h) => h.id === card.homeId)?.name}`}
+                >
+                  <img
+                    src={preview(brandId, card, format)}
+                    alt={card.title}
+                    loading="lazy"
+                    className="w-full object-contain"
+                    style={{
+                      aspectRatio: `${COMPOSITION_FORMATS.find((f) => f.id === format)!.width}/${COMPOSITION_FORMATS.find((f) => f.id === format)!.height}`,
+                    }}
+                  />
+                </button>
+                <div className="flex items-start gap-2 p-3">
+                  <input
+                    type="checkbox"
+                    aria-label={`Include ${homes.find((h) => h.id === card.homeId)?.name}`}
+                    checked={card.included}
+                    onChange={(e) =>
+                      update({ ...card, included: e.target.checked })
+                    }
+                  />
+                  <button
+                    className="text-left text-sm"
+                    onClick={() => setDetails({ ...card })}
+                  >
+                    {homes.find((h) => h.id === card.homeId)?.name}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+          {limit < draft.cards.length && (
+            <Button variant="outline" onClick={() => setLimit(limit + 10)}>
+              Load more homes
+            </Button>
+          )}
+        </>
+      )}
+      {view === "exports" && (
+        <div className="space-y-5">
+          {!query.data?.exports.length && (
+            <p className="text-muted-foreground">
+              No exports yet. Review the Studio cards and create your first
+              export.
+            </p>
+          )}
+          {query.data?.exports.map((item) => (
+            <article key={item.id} className="space-y-3 rounded-xl border p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-medium">
+                    {new Date(item.createdAt).toLocaleString()}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {item.status === "ready"
+                      ? `${item.rows?.length} homes · ${item.assets?.length} images`
+                      : item.status === "error"
+                        ? "Export failed"
+                        : `Rendering ${item.completed ?? 0} of ${item.total ?? 0} images…`}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-3 text-sm">
+                  {item.status === "ready" &&
+                    ["csv", "xlsx"].map((type) => (
+                      <a
+                        className="underline"
+                        key={type}
+                        href={`/api/performance/catalog/${brandId}/exports/${item.id}?format=${type}`}
+                      >
+                        Download {type.toUpperCase()}
+                      </a>
+                    ))}
+                  {item.folderId && (
+                    <a
+                      className="underline"
+                      href={`/app/media?brand=${brandId}&folder=${item.folderId}`}
+                    >
+                      Open in media library
+                    </a>
+                  )}
+                </div>
+              </div>
+              {item.error && (
+                <p role="alert" className="text-destructive">
+                  {item.error}
+                </p>
+              )}
+              {item.status === "ready" && (
+                <p className="text-xs text-muted-foreground">
+                  Street address and coordinates are not supplied by the current
+                  listing feed. Complete those columns before importing into a
+                  hotel catalog.
+                </p>
+              )}
+              <div className="flex gap-3 overflow-x-auto">
+                {item.assets?.map((a) => (
+                  <a
+                    key={a.assetId}
+                    href={a.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-32 shrink-0"
+                  >
+                    <img
+                      src={a.url}
+                      alt={`${a.name} · ${a.format}`}
+                      loading="lazy"
+                      className="h-40 w-32 rounded bg-muted object-contain"
+                    />
+                    <p className="mt-1 text-xs">
+                      {a.name} · {a.format}
+                    </p>
+                  </a>
+                ))}
+              </div>
+            </article>
+          ))}
         </div>
-      ) : null}
+      )}
+      <Dialog
+        open={!!details}
+        onOpenChange={(open) => {
+          if (!open) setDetails(null);
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>{selectedHome?.name}</DialogTitle>
+            <DialogDescription>
+              Edit the catalog artwork. Listing facts stay unchanged.
+            </DialogDescription>
+          </DialogHeader>
+          {details && (
+            <div className="grid gap-6 md:grid-cols-2">
+              <img
+                src={preview(brandId, details, format)}
+                alt={details.title}
+                className="w-full rounded-lg"
+              />
+              <div className="space-y-4">
+                <label className="block space-y-1 text-sm">
+                  Headline
+                  <Input
+                    value={details.title}
+                    maxLength={120}
+                    onChange={(e) =>
+                      setDetails({ ...details, title: e.target.value })
+                    }
+                  />
+                </label>
+                <label className="block space-y-1 text-sm">
+                  Facts
+                  <Input
+                    value={details.subtitle}
+                    maxLength={220}
+                    onChange={(e) =>
+                      setDetails({ ...details, subtitle: e.target.value })
+                    }
+                  />
+                </label>
+                <label className="block space-y-1 text-sm">
+                  Composition
+                  <select
+                    className="block w-full rounded border bg-background p-2"
+                    value={details.templateId}
+                    onChange={(e) =>
+                      setDetails({
+                        ...details,
+                        templateId: e.target.value as CatalogCard["templateId"],
+                      })
+                    }
+                  >
+                    {COMPOSITION_TEMPLATES.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block text-sm">
+                  Crop focus
+                  <select
+                    className="ml-2 rounded border bg-background p-2"
+                    value={details.imagePosition}
+                    onChange={(e) =>
+                      setDetails({
+                        ...details,
+                        imagePosition: e.target
+                          .value as CatalogCard["imagePosition"],
+                      })
+                    }
+                  >
+                    {["top", "center", "bottom"].map((p) => (
+                      <option key={p}>{p}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={details.showLogo}
+                    onChange={(e) =>
+                      setDetails({ ...details, showLogo: e.target.checked })
+                    }
+                  />
+                  Include brand logo
+                </label>
+                <Button variant="outline" onClick={() => setLibrary(true)}>
+                  Choose from library or upload
+                </Button>
+                <div>
+                  <p className="mb-2 text-sm">Choose from this home</p>
+                  <div className="grid max-h-56 grid-cols-3 gap-2 overflow-y-auto">
+                    {selectedHome?.gallery?.map((photo) => (
+                      <button
+                        key={photo.url}
+                        aria-label="Use home photo"
+                        onClick={() =>
+                          setDetails({
+                            ...details,
+                            imageUrl: photo.url,
+                            assetId: undefined,
+                          })
+                        }
+                      >
+                        <img
+                          src={photo.thumbUrl}
+                          alt="Home photo"
+                          className="aspect-square w-full rounded object-cover"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <Button
+                  disabled={!details.title.trim()}
+                  onClick={() => {
+                    update(details);
+                    setDetails(null);
+                  }}
+                >
+                  Apply changes
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+      <MediaPickerDialog
+        brandId={brandId}
+        open={library}
+        onOpenChange={setLibrary}
+        existingAssetIds={[]}
+        onPick={(item) => {
+          if (details && item.type === "image") {
+            setDetails({
+              ...details,
+              imageUrl: item.url,
+              assetId: item.assetId,
+            });
+            setLibrary(false);
+          }
+        }}
+      />
     </section>
   );
 }

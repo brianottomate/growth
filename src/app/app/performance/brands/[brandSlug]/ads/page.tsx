@@ -122,20 +122,7 @@ export default async function PerformanceBrandAdsPage({
         website={brand.website}
         focusHomeId={focused}
       />
-      <CatalogCards
-        brandId={brand.id}
-        homes={homes.map((home) => ({
-          id: home.id,
-          name: home.name,
-          imageUrl: home.imageUrl,
-          city: home.city ?? null,
-          state: home.state ?? null,
-          bedrooms: home.bedrooms ?? null,
-          bathrooms: home.bathrooms ?? null,
-          guests: home.guests ?? null,
-          rating: home.rating ?? null,
-        }))}
-      />
+      <CatalogCards brandId={brand.id} />
     </div>
   );
 }

@@ -68,6 +68,8 @@ describe("ads action policy", () => {
   });
 
   it("reading a campaign needs no approval and reaches every surface", () => {
+    expect(growthActionPolicies.adsRead.ideaContext.approval).toBe("none");
+    expect(growthActionPolicies.adsRead.ideaContext.surfaces).toContain("mcp");
     expect(growthActionPolicies.adsRead.openCampaign.approval).toBe("none");
     expect(growthActionPolicies.adsRead.openCampaign.surfaces).toContain("mcp");
   });

@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { IDEA_SHAPES, IDEA_SHAPE_LABELS } from "@/lib/ad-idea-studio";
 import { isImportedMetaCatalog } from "@/lib/meta-import";
 import { useLocalStorage } from "@/components/ui/hooks/use-local-storage";
 import { ChevronDown, ChevronRight } from "lucide-react";
@@ -804,8 +805,6 @@ function ProjectionSummary({
       issues.add(`${label} artwork missing`);
       continue;
     }
-    if (vertical && resolved.media.length > 1)
-      issues.add("Vertical carousel · preview only");
     const key = JSON.stringify(resolved.media.map((item) => item.url));
     const existing = groups.get(key);
     if (existing) existing.labels.add(label);
@@ -978,6 +977,13 @@ function ProjectedAd({
   const previewPlacements = metaPreviewPlacements(content, placements);
   const views = META_PLACEMENTS.filter((p) => previewPlacements.includes(p.id));
   const active = views.find((p) => p.id === selected) ?? views[0];
+  const baseShape = content.ideaStudio?.document.shapes.includes("portrait")
+    ? "portrait"
+    : content.ideaStudio?.document.shapes[0];
+  const unusedExports = IDEA_SHAPES.filter(
+    (size) =>
+      size !== baseShape && content.ideaStudio?.approval?.renders[size]?.length,
+  );
   return (
     <div className="space-y-4">
       {!views.length && (
@@ -1018,6 +1024,34 @@ function ProjectedAd({
           </select>
         </label>
       </div>
+      {content.media.length > 1 && views.length > 0 && (
+        <div className="space-y-1 rounded-lg border p-3 text-xs text-muted-foreground">
+          <p className="font-medium text-foreground">
+            Carousel delivery artwork
+          </p>
+          {views.some((view) => view.kind === "feed") && (
+            <p>
+              Feed →{" "}
+              {baseShape
+                ? IDEA_SHAPE_LABELS[baseShape]
+                : "shared carousel cards"}
+            </p>
+          )}
+          {views.some((view) => view.kind !== "feed") && (
+            <p>
+              Stories / Reels → the same carousel cards; Meta adapts their
+              presentation.
+            </p>
+          )}
+          {unusedExports.length > 0 && (
+            <p>
+              Saved exports not used in this publish:{" "}
+              {unusedExports.map((size) => IDEA_SHAPE_LABELS[size]).join(" · ")}
+              .
+            </p>
+          )}
+        </div>
+      )}
       <div
         className={
           compare
@@ -1036,12 +1070,6 @@ function ProjectedAd({
               aria-label={view.label}
             >
               {compare && <h6 className="text-sm font-medium">{view.label}</h6>}
-              {view.kind !== "feed" && media.length > 1 && (
-                <p className="text-xs text-muted-foreground">
-                  Recovered carousel preview. Publishing vertical carousel
-                  variants is not supported yet.
-                </p>
-              )}
               {issue ? (
                 <div className="space-y-3 rounded-lg border border-dashed p-5 text-sm">
                   <p>{issue}</p>

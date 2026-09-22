@@ -65,7 +65,7 @@ describe("editable ad ideas", () => {
       ideaPreviewUrl("brand-one", card, "story")!,
       "http://local",
     );
-    expect(portrait.searchParams.get("templateId")).toBe("image-hero");
+    expect(portrait.searchParams.get("templateId")).toBe("hero-overlay");
     expect(story.searchParams.get("templateId")).toBe("tall-welcome");
     expect(story.searchParams.get("mark")).toBe("none");
     expect(
@@ -209,4 +209,19 @@ test("a damaged approval never falls back to mutable preview URLs", () => {
   );
   expect(result.content.media).toEqual([]);
   expect(result.placements["meta_ads:story"]!.cards).toEqual([null]);
+});
+
+test("retains export selection independently of editable sizes and compositions", () => {
+  const document = { ...draft(), exportShapes: ["square" as const] };
+  const result = projectIdea("brand-one", content, { document }, null);
+  const restored = ideaDocumentFromAd({
+    name: "Hero",
+    content: result.content,
+  });
+  expect(restored.exportShapes).toEqual(["square"]);
+  expect(restored.shapes).toEqual(["portrait", "story"]);
+  expect(restored.cards[0]?.overrides.story?.title).toBe("Story words");
+  expect(
+    ideaDocumentSchema.parse({ ...document, exportShapes: [] }).exportShapes,
+  ).toEqual([]);
 });

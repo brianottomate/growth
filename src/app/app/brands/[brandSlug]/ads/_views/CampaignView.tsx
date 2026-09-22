@@ -1,3 +1,5 @@
+import { starterGenerationStatus } from "@/server/services/starter-ad-generation.service";
+import { listBrandHomes } from "@/server/services/homes.service";
 import { isImportedMetaCatalog } from "@/lib/meta-import";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -86,6 +88,11 @@ export async function CampaignView({
 
   // Their homes, for binding an ad to one. Empty for a brand whose WanderOS
   // site is not connected, in which case a home is a name typed on the tile.
+  const generation = await starterGenerationStatus({
+    organizationId: org.id,
+    campaignId,
+  });
+  const orderedHomes = await listBrandHomes(brand.id);
   const listings = await brandListings({
     id: brand.id,
     website: brand.website,
@@ -267,6 +274,12 @@ export async function CampaignView({
           />
         </div>
         <AdIdeasList
+          preparingHero={
+            generation?.source === "featured" &&
+            ["queued", "processing"].includes(generation.status)
+          }
+          homeOrder={orderedHomes.map((home) => home.id)}
+          campaignId={campaign.id}
           ads={ads}
           brandId={brand.id}
           brandName={brandName}

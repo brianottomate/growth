@@ -92,13 +92,16 @@ export function DeleteCampaignButton({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete “{campaignName}”?</DialogTitle>
+            <DialogTitle>Delete campaign?</DialogTitle>
             <DialogDescription>
               {livePlatformCampaigns > 0
                 ? `This campaign has ${livePlatformCampaigns} campaign(s) on a platform. Delete those first — removing this would only stop growth describing them, not stop them running.`
                 : "Removes the draft and its ad sets and ads. Nothing exists on a platform yet, so nothing else is affected."}
             </DialogDescription>
           </DialogHeader>
+          <p className="min-w-0 text-sm font-medium [overflow-wrap:anywhere]">
+            {campaignName}
+          </p>
           {remove.error && (
             <p className="text-xs text-red-300">{remove.error.message}</p>
           )}

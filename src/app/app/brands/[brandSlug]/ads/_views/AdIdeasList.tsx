@@ -1,15 +1,22 @@
 import type { AdContent } from "@/server/db/schema";
+import { ideaDocumentFromAd } from "@/lib/ad-idea-studio";
 import { isImportedMetaCatalog } from "@/lib/meta-import";
 import { AdIdeaCard } from "./AdIdeaCard";
 
 export function AdIdeasList({
   ads,
+  homeOrder,
+  preparingHero,
+  campaignId,
   brandId,
   brandName,
   brandLogo,
   states,
   fallback,
 }: {
+  homeOrder: string[];
+  preparingHero: boolean;
+  campaignId: string;
   brandId: string;
   brandName: string;
   brandLogo: string | null;
@@ -28,6 +35,32 @@ export function AdIdeasList({
     (ad) => "media" in ad.content && isImportedMetaCatalog(ad.content),
   );
   const ideas = ads.filter((ad) => !catalogs.includes(ad));
+  const chronological = [...ideas].sort(
+    (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
+  );
+  const homes = [
+    ...new Set([
+      ...homeOrder,
+      ...chronological.flatMap((ad) => (ad.homeId ? [ad.homeId] : [])),
+    ]),
+  ];
+  const rank = (ad: (typeof ideas)[number]) => {
+    if (
+      "media" in ad.content &&
+      ideaDocumentFromAd({ name: ad.name, content: ad.content }).role ===
+        "hero_carousel"
+    )
+      return -1;
+    return ad.homeId ? homes.indexOf(ad.homeId) : homes.length;
+  };
+  const ordered = chronological.sort(
+    (a, b) =>
+      rank(a) - rank(b) ||
+      (a.homeId && a.homeId === b.homeId
+        ? Number("format" in a.content && a.content.format === "carousel") -
+          Number("format" in b.content && b.content.format === "carousel")
+        : 0),
+  );
   return (
     <section aria-labelledby="ad-ideas-heading" className="space-y-4">
       <div>
@@ -39,37 +72,45 @@ export function AdIdeasList({
           finished creative.
         </p>
       </div>
+      {preparingHero && (
+        <div
+          className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground"
+          role="status"
+        >
+          <span className="font-medium text-foreground">Hero carousel</span> ·
+          Preparing from the selected homes
+        </div>
+      )}
       {ideas.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           No ads yet. Add an ad or a starter set to begin.
         </p>
       ) : (
-        [...ideas]
-          .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
-          .map((ad) =>
-            "media" in ad.content &&
-            ad.content.media.every((m) => m.type === "image") &&
-            (!ad.content.format ||
-              ad.content.format === "static" ||
-              ad.content.format === "carousel") ? (
-              <AdIdeaCard
-                key={ad.id}
-                brandId={brandId}
-                brandName={brandName}
-                brandLogo={brandLogo}
-                deliveryState={states[ad.id]}
-                ad={{
-                  id: ad.id,
-                  name: ad.name,
-                  content: ad.content,
-                  updatedAt: ad.updatedAt.toISOString(),
-                  homeId: ad.homeId,
-                }}
-              />
-            ) : (
-              <div key={ad.id}>{fallback(ad.id)}</div>
-            ),
-          )
+        ordered.map((ad) =>
+          "media" in ad.content &&
+          ad.content.media.every((m) => m.type === "image") &&
+          (!ad.content.format ||
+            ad.content.format === "static" ||
+            ad.content.format === "carousel") ? (
+            <AdIdeaCard
+              key={ad.id}
+              campaignId={campaignId}
+              brandId={brandId}
+              brandName={brandName}
+              brandLogo={brandLogo}
+              deliveryState={states[ad.id]}
+              ad={{
+                id: ad.id,
+                name: ad.name,
+                content: ad.content,
+                updatedAt: ad.updatedAt.toISOString(),
+                homeId: ad.homeId,
+              }}
+            />
+          ) : (
+            <div key={ad.id}>{fallback(ad.id)}</div>
+          ),
+        )
       )}
       {catalogs.length > 0 && (
         <section

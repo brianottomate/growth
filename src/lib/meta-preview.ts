@@ -16,6 +16,9 @@ export function metaPreviewMedia(
   content: AdCreativeContent,
   placement: MetaPlacement,
 ) {
+  // Delivery uses the canonical cards, including on Stories; alternate Story
+  // exports cannot be combined with carouselCards in Zernio.
+  if (content.media.length > 1) return { media: content.media, issue: null };
   const studio = content.ideaStudio;
   const vertical = !placement.endsWith("-feed");
   const shape = vertical

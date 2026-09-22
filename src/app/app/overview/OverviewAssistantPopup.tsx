@@ -170,6 +170,7 @@ export function OverviewAssistantPopup({
           type: intent.type,
           brandId: intent.brandId,
           brandName: intent.brandName,
+          adId: intent.adId,
           campaignId: intent.campaignId,
           campaignName: intent.campaignName,
           focus: intent.focus,

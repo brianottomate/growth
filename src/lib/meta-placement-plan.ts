@@ -99,12 +99,8 @@ export function metaPlacementMedia(
     };
   if (!content.media.length) return { media: [], issue: "Add creative." };
   if (id.endsWith("-feed")) return { media: content.media, issue: null };
-  if (content.media.length > 1)
-    return {
-      media: [],
-      issue:
-        "Vertical carousel delivery is not supported by our current publisher. Use a separate vertical ad or choose Feed.",
-    };
+  // Zernio shares the ordered carousel across the ad set’s placements.
+  if (content.media.length > 1) return { media: content.media, issue: null };
   const first = content.media[0]!;
   if (first.type === "video")
     return {

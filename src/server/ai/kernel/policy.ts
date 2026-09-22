@@ -253,6 +253,7 @@ export const growthActionPolicies = {
     openCampaign: read(),
     listCampaigns: read(),
     ideaHomePhotos: read(),
+    ideaContext: read(),
     // Renders via Meta's preview API; creates nothing.
     previewAd: read("provider-read"),
     diagnoseAlignment: read("model-read"),

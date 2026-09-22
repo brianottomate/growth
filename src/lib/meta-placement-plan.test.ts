@@ -50,13 +50,13 @@ describe("Meta placement delivery", () => {
       ).media[0]?.url,
     ).toBe("https://cdn.example/story.jpg");
   });
-  it("rejects unsupported vertical carousel delivery even when alternate exports exist", () => {
+  it("shares the ordered carousel across Story placements", () => {
     expect(
       metaPlacementMedia(
         { ...content, media: [...content.media, ...content.media] },
         "facebook-story",
-      ).issue,
-    ).toContain("carousel");
+      ).media,
+    ).toEqual([...content.media, ...content.media]);
   });
 });
 describe("Meta source reconstruction", () => {

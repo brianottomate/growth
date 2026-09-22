@@ -574,6 +574,16 @@ export function renderComposition(
   const portrait = format.height > format.width;
   const square = format.height === format.width;
   const padding = portrait ? 68 : 58;
+  // Keep Story artwork clear of the account header and native booking controls.
+  const overlayInsets =
+    spec.formatId === "story"
+      ? {
+          paddingTop: 270,
+          paddingBottom: 420,
+          paddingLeft: 96,
+          paddingRight: 96,
+        }
+      : { padding };
   const titleSize = portrait ? 78 : 68;
   // A focal point pans the cover crop so that point of the photo lands at the
   // same fraction of the canvas, which keeps it in frame whatever the ratio.
@@ -630,15 +640,13 @@ export function renderComposition(
             position: "absolute",
             // Satori does not honour the `inset` shorthand, so an absolute box
             // with only `inset: 0` collapses to nothing and paints no scrim.
-            // The other cards size their gradients with explicit edges; so must
-            // this one. A strong top band keeps white type legible even where
-            // the headline sits over a bright sky, fading by the middle and
-            // returning under the foot pill.
+            // Keep contrast around the headline, leaving the property's
+            // middle clear and only a light fade beneath the CTA.
             top: 0,
             left: 0,
             width: "100%",
             height: "100%",
-            background: `linear-gradient(180deg, ${scrim(0.82)} 0%, ${scrim(0.62)} 24%, ${scrim(0.24)} 46%, ${scrim(0)} 60%, ${scrim(0)} 72%, ${scrim(0.46)} 100%)`,
+            background: `linear-gradient(180deg, ${scrim(0.42)} 0%, ${scrim(0.3)} 20%, ${scrim(0)} 44%, ${scrim(0)} 82%, ${scrim(0.16)} 100%)`,
           }}
         />
         <div
@@ -653,6 +661,7 @@ export function renderComposition(
             width: format.width,
             height: format.height,
             padding: overlayPadding,
+            ...(story ? { paddingTop: 270, paddingBottom: 420 } : {}),
           }}
         >
           <div
@@ -660,7 +669,7 @@ export function renderComposition(
               display: "flex",
               flexDirection: "column",
               maxWidth: story ? "88%" : link ? "72%" : wide ? "60%" : "90%",
-              marginTop: story ? 60 : 0,
+              marginTop: 0,
               color: "#ffffff",
               fontSize: headlineSize,
               fontWeight: 700,
@@ -669,6 +678,20 @@ export function renderComposition(
               textAlign: story ? "center" : "left",
             }}
           >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: story ? "center" : "flex-start",
+                marginBottom: 32,
+              }}
+            >
+              <BrandMark
+                brandName={context.brand.name}
+                logo={context.logo}
+                tone={spec.mark}
+                inverse
+              />
+            </div>
             {headlineLines.map((line, index) => (
               <div
                 key={index}
@@ -750,8 +773,7 @@ export function renderComposition(
             left: 0,
             width: "100%",
             height: "100%",
-            background:
-              "linear-gradient(90deg, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.54) 48%, rgba(0,0,0,0.08) 100%)",
+            background: `linear-gradient(180deg, ${scrim(0.2)} 0%, ${scrim(0)} 18%, ${scrim(0)} 52%, ${scrim(0.38)} 78%, ${scrim(0.64)} 100%)`,
           }}
         />
         <div
@@ -764,7 +786,7 @@ export function renderComposition(
             left: 0,
             width: "100%",
             height: "100%",
-            padding,
+            ...overlayInsets,
           }}
         >
           <BrandMark
@@ -888,7 +910,7 @@ export function renderComposition(
             left: 0,
             width: "100%",
             height: "100%",
-            padding,
+            ...overlayInsets,
           }}
         >
           <BrandMark
@@ -1343,8 +1365,9 @@ export function renderComposition(
             right: 0,
             top: 0,
             height: "58%",
-            background:
-              "linear-gradient(180deg, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.35) 55%, rgba(0,0,0,0) 100%)",
+            background: centred
+              ? `linear-gradient(180deg, ${scrim(0.34)} 0%, ${scrim(0.24)} 55%, ${scrim(0)} 100%)`
+              : "linear-gradient(180deg, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.35) 55%, rgba(0,0,0,0) 100%)",
           }}
         />
         <div
@@ -1355,8 +1378,9 @@ export function renderComposition(
             right: 0,
             bottom: 0,
             height: "28%",
-            background:
-              "linear-gradient(0deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 100%)",
+            background: centred
+              ? `linear-gradient(0deg, ${scrim(0.24)} 0%, ${scrim(0)} 100%)`
+              : "linear-gradient(0deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 100%)",
           }}
         />
         <div
@@ -1364,7 +1388,7 @@ export function renderComposition(
             display: "flex",
             flexDirection: "column",
             position: "absolute",
-            top: pad,
+            top: story ? 270 : pad,
             left: pad,
             right: pad,
             alignItems: centred ? "center" : "flex-start",
@@ -1424,7 +1448,7 @@ export function renderComposition(
               position: "absolute",
               left: pad,
               right: pad,
-              bottom: pad,
+              bottom: story ? 420 : pad,
               justifyContent: centred ? "center" : "flex-start",
             }}
           >
