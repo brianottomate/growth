@@ -2547,18 +2547,6 @@ export function metaRequiresCampaignShell(
   return useCbo || audienceCount > 1;
 }
 
-/** Meta shows headline and primary text together, so the same line twice reads as a bug. */
-export function headlineRepeatsBody(
-  content: Pick<AdCreativeContent, "headline" | "body">,
-) {
-  const headline = content.headline?.trim();
-  const firstLine = content.body
-    ?.split("\n")
-    .find((line) => line.trim())
-    ?.trim();
-  return Boolean(headline && firstLine && headline === firstLine);
-}
-
 async function pushToMeta(args: PushArgs) {
   const {
     input,
@@ -2617,11 +2605,6 @@ async function pushToMeta(args: PushArgs) {
     for (const placement of placementPlan) {
       const issue = metaPlacementMedia(content, placement).issue;
       if (issue) throw new Error(`${ad.name}: ${issue}`);
-    }
-    if (headlineRepeatsBody(content)) {
-      throw new Error(
-        `${ad.name}: the headline repeats the first line of the primary text. Give it its own headline.`,
-      );
     }
   }
   const useCbo = (meta.budgetMode ?? "cbo") === "cbo";

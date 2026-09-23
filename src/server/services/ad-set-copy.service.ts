@@ -215,7 +215,7 @@ export async function writeAdSetCopy(input: {
         "",
         "The examples show the shape and tone only; their amenities are not facts about these homes. A portfolio or catalog bullet may only claim what most of the homes have.",
         "",
-        "headline is the short line under the image. No emoji. For the catalog and portfolio, never write “Homes in <place>”: lead on what the homes offer.",
+        "headline is the short line under the image. No emoji. Meta shows it with the primary text, so it never repeats the hook line: it adds something the primaryText does not open with. For the catalog and portfolio, never write “Homes in <place>”: lead on what the homes offer.",
         "cardTitle is drawn INTO the image by a renderer that cannot draw emoji and has little room: at most six words, no emoji, no punctuation at the end. Lead on the home's best amenity, not its name.",
         "",
         "Vary the hooks across homes. Do not start every home the same way.",

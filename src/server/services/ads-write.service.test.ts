@@ -10,7 +10,6 @@ import {
   googlePauseOutcome,
   googleDisplayImages,
   matchResponseAdsToPlan,
-  headlineRepeatsBody,
   metaPromotedObjectFor,
   tagMetaAdUtms,
   videoPayloadFor,
@@ -788,22 +787,5 @@ describe("Google draft display crops", () => {
     expect(() => googleDisplayImages(undefined, undefined)).toThrow(
       "needs landscape and square",
     );
-  });
-});
-
-describe("Meta headline and primary text", () => {
-  it("flags a headline that is the primary text's first line", () => {
-    expect(
-      headlineRepeatsBody({
-        headline: "Wake up in Sonoma 🍷",
-        body: "\nWake up in Sonoma 🍷\n\n🏡 Ten private acres",
-      }),
-    ).toBe(true);
-    expect(
-      headlineRepeatsBody({
-        headline: "Ten private acres in the Sonoma hills",
-        body: "Wake up in Sonoma 🍷\n\n🏡 Ten private acres",
-      }),
-    ).toBe(false);
   });
 });

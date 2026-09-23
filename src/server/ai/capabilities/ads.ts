@@ -535,7 +535,9 @@ export const draftAdAction = growthAction({
         .trim()
         .max(255)
         .optional()
-        .describe("creative only; required for it."),
+        .describe(
+          "creative only; required for it. Meta shows it beside the primary text, so never repeat the body's first line.",
+        ),
       body: z
         .string()
         .trim()
@@ -1545,7 +1547,11 @@ export const setAdCopyAction = growthAction({
     "Rewrite the words on one drafted ad: its headline, its primary text, or both. The cards are left alone. Emoji belong in primary text and never in the words drawn onto a card.",
   inputSchema: z.object({
     adId: z.string().min(1),
-    headline: z.string().max(60).optional(),
+    headline: z
+      .string()
+      .max(60)
+      .optional()
+      .describe("Never the primary text's first line; Meta shows both."),
     body: z.string().max(1200).optional(),
   }),
   execute: (input, ctx) =>
