@@ -42,6 +42,11 @@ import {
   setBrandPreviewSource,
 } from "@/server/services/brand-ad-previews.service";
 import {
+  BrandFontError,
+  googleFontCatalog,
+  setBrandFonts,
+} from "@/server/services/brand-fonts.service";
+import {
   clearBrandMark,
   critiqueBrandMark,
   setBrandMark,
@@ -584,6 +589,38 @@ export const brandRouter = createTRPCRouter({
           fontFamily: input.fontFamily,
         },
       });
+    }),
+
+  /** Every Google Fonts family, most popular first, for the font picker. */
+  fontCatalog: protectedProcedure.query(() => googleFontCatalog()),
+
+  /**
+   * Pick the heading and body fonts the brand's cards are set in. Both null
+   * goes back to the fonts read off the site.
+   */
+  setFonts: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        heading: z.string().trim().min(1).max(80).nullable(),
+        body: z.string().trim().min(1).max(80).nullable(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandManageable(ctx, input.id);
+      try {
+        return await setBrandFonts({
+          brandId: input.id,
+          userId: ctx.session.user.id,
+          heading: input.heading,
+          body: input.body,
+        });
+      } catch (error) {
+        if (error instanceof BrandFontError) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+        }
+        throw error;
+      }
     }),
 
   clearMark: protectedProcedure

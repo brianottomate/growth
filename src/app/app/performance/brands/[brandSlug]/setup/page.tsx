@@ -1,4 +1,5 @@
 import { BrandBrandingCard } from "@/app/app/brands/[brandSlug]/BrandBrandingCard";
+import { BrandPreviewCard } from "../BrandPreviewCard";
 import { BrandMarkCard } from "@/app/app/brands/[brandSlug]/BrandMarkCard";
 import { db } from "@/server/db";
 import { mediaAssetTable } from "@/server/db/schema";
@@ -16,7 +17,8 @@ import { panel, SectionLabel } from "../../../_components";
 import { HomesStrip } from "../HomesStrip";
 import { AddHomesByHand } from "../AddHomesByHand";
 import { PickedHomes, type PickedHome } from "../PickedHomes";
-import { brandTabHref, loadPerformanceBrand } from "../_data";
+import { loadPerformanceBrand } from "../_data";
+import { resolvePreviewHome } from "../_preview-home";
 
 export const metadata: Metadata = { title: "Setup · Wander Performance" };
 export const dynamic = "force-dynamic";
@@ -25,7 +27,7 @@ export const dynamic = "force-dynamic";
  * Every home on the client's WanderOS site: browse them, pick the set the ads
  * run on, and feature the one that stands for the brand. A brand with no feed
  * pastes its homes in by hand instead. This is where a signed client's homes
- * are set up; the catalog cards live at the foot of Ads.
+ * are set up; the catalog cards have their own tab.
  */
 export default async function PerformanceBrandHomesPage({
   params,
@@ -62,6 +64,26 @@ export default async function PerformanceBrandHomesPage({
       }
     : null;
   const withPhoto = homes.filter((home) => home.imageUrl);
+  // The hero picker offers the picked homes; before any are picked, the feed.
+  const feedWithPhoto = homes.filter((home) => home.imageUrl);
+  const pickedIds = new Set(committed.map((home) => home.externalId));
+  const pickedListings = feedWithPhoto.filter((home) => pickedIds.has(home.id));
+  const heroOptions = (
+    pickedListings.length > 0 ? pickedListings : feedWithPhoto
+  ).map((home) => ({
+    name: home.name,
+    url: home.url,
+    imageUrl: home.imageUrl!,
+    thumbUrl: home.thumbUrl ?? null,
+  }));
+  const previewHome = await resolvePreviewHome({
+    brandId: brand.id,
+    brandName: brand.name,
+    featuredListingUrl: brand.featuredListingUrl,
+    previewSourceUrl: brand.previewSourceUrl,
+    feed: homes,
+    committed,
+  });
   const slug = brand.slug ?? brand.id;
   // The grid's tick toggle keys the set by feed id → home row id.
   const picked = committed.map((home) => ({
@@ -132,6 +154,14 @@ export default async function PerformanceBrandHomesPage({
         variants={markVariants}
         photo={homes[0]?.imageUrl ?? null}
       />
+      <BrandPreviewCard
+        brandId={brand.id}
+        brandName={brand.name}
+        identity={brand.brandIdentity ?? null}
+        previewHome={previewHome}
+        heroOptions={heroOptions}
+        featuredUrl={brand.featuredListingUrl}
+      />
       {committed.length > 0 ? (
         <PickedHomes brandId={brand.id} brandSlug={slug} picked={pickedHomes} />
       ) : null}
@@ -140,12 +170,6 @@ export default async function PerformanceBrandHomesPage({
           Homes{homes.length ? ` · ${homes.length}` : ""}
         </SectionLabel>
         <div className="flex items-center gap-3 text-[11.5px]">
-          <Link
-            href={brandTabHref(slug, "ads")}
-            className="text-sky-300 hover:underline"
-          >
-            Draw ads from a set
-          </Link>
           {brand.website ? (
             <a
               href={brand.website}

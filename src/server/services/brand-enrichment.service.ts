@@ -38,6 +38,24 @@ const HEX = /^#[0-9a-fA-F]{6}$/;
 const hex = (value: string | undefined) =>
   value && HEX.test(value.trim()) ? value.trim().toLowerCase() : undefined;
 
+/** The site's fonts: the typography roles when present, else the flat list. */
+export function fontsFromBranding(
+  branding: BrandingProfile | undefined,
+): NonNullable<BrandIdentity["fonts"]> {
+  const families = branding?.typography?.fontFamilies;
+  const fonts: NonNullable<BrandIdentity["fonts"]> = [];
+  if (families?.primary) fonts.push({ family: families.primary, role: "body" });
+  if (families?.heading && families.heading !== families.primary) {
+    fonts.push({ family: families.heading, role: "heading" });
+  }
+  if (fonts.length === 0) {
+    for (const font of branding?.fonts ?? []) {
+      if (font.family) fonts.push({ family: font.family });
+    }
+  }
+  return fonts;
+}
+
 /**
  * Firecrawl's branding profile, reduced to what the brand row stores and the
  * renderer reads. Only six-digit hex colours survive: the renderer feeds them
@@ -49,17 +67,7 @@ export function identityFromBranding(
   fallback: { favicon?: string; ogImage?: string },
 ): BrandIdentity | undefined {
   if (!branding) return undefined;
-  const families = branding.typography?.fontFamilies;
-  const fonts: NonNullable<BrandIdentity["fonts"]> = [];
-  if (families?.primary) fonts.push({ family: families.primary, role: "body" });
-  if (families?.heading && families.heading !== families.primary) {
-    fonts.push({ family: families.heading, role: "heading" });
-  }
-  if (fonts.length === 0) {
-    for (const font of branding.fonts ?? []) {
-      if (font.family) fonts.push({ family: font.family });
-    }
-  }
+  const fonts = fontsFromBranding(branding);
   const colors = {
     primary: hex(branding.colors?.primary),
     secondary: hex(branding.colors?.secondary),

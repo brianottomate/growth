@@ -8,6 +8,7 @@ import {
   renderComposition,
   resolveCompositionContext,
 } from "@/server/services/composition.service";
+import { googleFontCatalog } from "@/server/services/brand-fonts.service";
 
 export const dynamic = "force-dynamic";
 
@@ -64,7 +65,18 @@ export async function GET(request: NextRequest) {
       parsed.data,
       { sourceUrl },
     );
-    return renderComposition(parsed.data, await loadCompositionSource(context));
+    // A draft font from the setup page's preview strip. Only Google families
+    // reach the font loader; anything else renders in the brand's own font.
+    const fontParam = params.get("fontFamily")?.trim().slice(0, 80) || null;
+    const fontFamily =
+      fontParam &&
+      (await googleFontCatalog()).some((font) => font.family === fontParam)
+        ? fontParam
+        : null;
+    return renderComposition(
+      parsed.data,
+      await loadCompositionSource(context, { fontFamily }),
+    );
   } catch (error) {
     if (error instanceof CompositionAccessError) {
       return NextResponse.json(

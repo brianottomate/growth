@@ -134,7 +134,7 @@ export async function enrichBrandById(
 ) {
   const existing = await db.query.brandTable.findFirst({
     where: eq(brandTable.id, brandId),
-    columns: { id: true, website: true },
+    columns: { id: true, website: true, brandIdentity: true },
   });
   if (!existing) throw new Error("Brand not found");
   const website = normalizeWebsiteUrl(websiteOverride) ?? existing.website;
@@ -142,6 +142,15 @@ export async function enrichBrandById(
 
   const enrichment = await enrichBrandFromWebsite(website);
   if (!enrichment) return null;
+  // Fonts an operator picked outlive a re-read of the site.
+  const chosen = existing.brandIdentity?.fontsChosen;
+  if (chosen && enrichment.brandIdentity) {
+    enrichment.brandIdentity = {
+      ...enrichment.brandIdentity,
+      fonts: existing.brandIdentity?.fonts ?? [],
+      fontsChosen: chosen,
+    };
+  }
 
   const patch = {
     website,

@@ -79,7 +79,11 @@ import {
  */
 // Blog-agent edits can include a Dato upload job and a verify pass. Keep the
 // durable chat drain alive long enough to complete that bounded inner loop.
-export const maxDuration = 300;
+// Fluid compute's ceiling on Pro. The model loop stops TURN_DEADLINE_MS in,
+// leaving time to persist the reply and close the run before the platform
+// kills the function; a killed function saves nothing.
+export const maxDuration = 800;
+const TURN_DEADLINE_MS = (maxDuration - 45) * 1000;
 
 const MODEL = "claude-sonnet-5";
 function sanitizeForModel(history: UIMessage[]) {
@@ -115,17 +119,24 @@ function sanitizeForModel(history: UIMessage[]) {
     );
 }
 
-/** Which step of the campaign page the operator asked from, as a first move. */
+/**
+ * Which step of the campaign page the operator asked from. Local steps are
+ * built, not proposed: the chat makes the piece, reports it in a line, and
+ * the operator iterates on it. Nothing here pushes or spends.
+ */
+const BUILD_FIRST =
+  " Build it now instead of asking whether to: make the call, then say in one line what you made and offer the one change most worth trying. The operator iterates from there.";
+
 function campaignFocusPrompt(focus: AdCampaignWorkContext["focus"]) {
   switch (focus) {
     case "photos":
-      return "\n\nThe operator asked from the Photos step: they want images in this campaign's pool. Check mediaLibraryRead.list for the brand first; adsWrite.draftAdsFromHomes both imports their listing photos and renders cards from them, and adsWrite.setCreativePool sets the pool from library assets.";
+      return `\n\nThe operator asked from the Photos step: fill this campaign's pool. Check mediaLibraryRead.list for the brand first; adsWrite.draftAdsFromHomes both imports their listing photos and renders cards from them, and adsWrite.setCreativePool sets the pool from library assets.${BUILD_FIRST}`;
     case "ads":
-      return "\n\nThe operator asked from the Ads step: they want ads drafted or improved. For a brand with a WanderOS site, adsWrite.draftAdsFromHomes is the fast path (cards per home, one static, one carousel); otherwise adsWrite.draftAd with pool media. Write the copy yourself, do not ask them for it.";
+      return `\n\nThe operator asked from the Ads step: they want ads drafted or improved. For a brand with a WanderOS site, adsWrite.draftAdsFromHomes is the fast path (cards per home, one static, one carousel); otherwise adsWrite.draftAd with pool media. Write the copy yourself, do not ask them for it.${BUILD_FIRST}`;
     case "audiences":
-      return "\n\nThe operator asked from the Audiences step. Broad with a geography is the default that leaves the learning phase at these budgets; propose one or two audiences with a reason each, then adsWrite.addAudience once they agree.";
+      return `\n\nThe operator asked from the Audiences step: create the audience. Broad with a geography is the default that leaves the learning phase at these budgets; derive the geography from where the brand's guests come from or, failing that, its homes' region and the brand's personas. Create it with adsWrite.addAudience.${BUILD_FIRST}`;
     case "platforms":
-      return "\n\nThe operator asked from the Platforms step. Use adsWrite.planPlatform to create the local platform draft when asked to plan. This requires no Zernio connection or ad account. Budget and creative planning can proceed before connecting. Only look up destinations when selecting a connected account or preparing an explicitly requested push; an absent connection must not block local planning.";
+      return `\n\nThe operator asked from the Platforms step: plan the platform. Create the local draft with adsWrite.planPlatform, Meta unless the campaign says otherwise, with a daily budget from the client's monthly media budget. This requires no Zernio connection or ad account, so an absent connection must not block it. Only look up destinations when selecting a connected account or preparing an explicitly requested push.${BUILD_FIRST}`;
     case "live":
       return "\n\nThe operator asked from the Live step: what the pushed campaign is doing. Read adsRead.openCampaign and adsRead.top, report spend against budget, and suggest at most one change.";
     default:
@@ -642,6 +653,7 @@ export async function POST(req: Request): Promise<Response> {
     });
 
     let streamFailure: string | undefined;
+    const deadline = AbortSignal.timeout(TURN_DEADLINE_MS);
     const result = await (async () => {
       try {
         return streamText({
@@ -651,6 +663,7 @@ export async function POST(req: Request): Promise<Response> {
           tools: anthropicTools(runtime.tools),
           toolsContext: runtime.toolsContext,
           toolApproval: runtime.toolApproval,
+          abortSignal: deadline,
           stopWhen: stepCountIs(20),
           maxOutputTokens: GROWTH_MAX_OUTPUT_TOKENS,
           prepareStep: async ({ messages, stepNumber }) => {
@@ -694,12 +707,16 @@ export async function POST(req: Request): Promise<Response> {
       originalMessages: history,
       generateMessageId: () => createId("amsg_ui"),
       onFinish: async ({ messages: updatedMessages, isAborted }) => {
-        const finishReason = await result.finishReason;
-        const turnError =
-          streamFailure ??
-          (isAborted || finishReason === "length" || finishReason === "error"
-            ? "The response ended before completion. Review completed actions before retrying."
-            : undefined);
+        // An aborted stream can reject its result promises; read them softly.
+        const finishReason = await Promise.resolve(result.finishReason).catch(
+          () => "error" as const,
+        );
+        const turnError = deadline.aborted
+          ? "This turn hit the time limit. Completed actions are saved; say continue to pick up where it stopped."
+          : (streamFailure ??
+            (isAborted || finishReason === "length" || finishReason === "error"
+              ? "The response ended before completion. Review completed actions before retrying."
+              : undefined));
         await finishChatTurn(
           claimedThreadId,
           turnId,
@@ -763,7 +780,6 @@ export async function POST(req: Request): Promise<Response> {
               .where(eq(assistantThreadTable.id, thread.id));
           },
         );
-        const steps = await result.steps;
         if (turnError) {
           await failAssistantRun(
             runId,
@@ -771,6 +787,7 @@ export async function POST(req: Request): Promise<Response> {
           );
           return;
         }
+        const steps = await result.steps;
         await completeAssistantRun(runId, {
           persistedMessages: updatedMessages.length,
           steps: steps.length,

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { Loader2, Megaphone, Trash2 } from "lucide-react";
+import { Loader2, Trash2 } from "lucide-react";
 
 import { Button, ButtonLink } from "@/components/ui/button";
 import { DeleteAlert } from "@/components/ui/alert-dialog";
@@ -92,14 +92,8 @@ export function PickedHomes({
     setConfirming(null);
   }
 
-  // The ads wall keys homes by their feed id (a home's externalId); a manual
-  // shell has no listing to draw from, so it is not carried.
-  const setIds = picked
-    .filter((home) => home.source === "wanderos")
-    .map((home) => home.externalId);
-  const adsHref =
-    `/app/performance/brands/${brandSlug}/ads` +
-    (setIds.length > 0 ? `?homes=${encodeURIComponent(setIds.join(","))}` : "");
+  // New ads start in a campaign; the per-home ad wall is Ads (old).
+  const campaignsHref = `/app/performance/brands/${brandSlug}/campaigns`;
 
   return (
     <div className="space-y-3">
@@ -119,12 +113,12 @@ export function PickedHomes({
           </span>
         </div>
         {ready ? (
-          <ButtonLink href={adsHref} size="sm">
-            Continue to Ads
+          <ButtonLink href={campaignsHref} size="sm">
+            Continue to Campaigns
           </ButtonLink>
         ) : (
           <Button size="sm" disabled title="Pick at least three homes">
-            Continue to Ads
+            Continue to Campaigns
           </Button>
         )}
       </div>
@@ -180,14 +174,6 @@ export function PickedHomes({
                         className="mr-1 text-xs text-muted-foreground hover:text-foreground hover:underline"
                       >
                         Edit home
-                      </Link>
-                      <Link
-                        href={`/app/performance/brands/${brandSlug}/ads?focus=${encodeURIComponent(home.externalId)}#home-${encodeURIComponent(home.externalId)}`}
-                        aria-label={`Open ${home.name}'s ads`}
-                        title="Its ads"
-                        className="flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
-                      >
-                        <Megaphone className="size-3.5" />
                       </Link>
                       <button
                         type="button"

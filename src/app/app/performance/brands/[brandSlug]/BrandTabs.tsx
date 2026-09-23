@@ -8,9 +8,10 @@ import { cn } from "@/components/ui/lib/utils";
 const TABS = [
   { label: "Overview", tab: "", exact: true },
   { label: "Setup", tab: "setup" },
-  { label: "Ads", tab: "ads" },
+  { label: "Catalog", tab: "catalog" },
   { label: "Campaigns", tab: "campaigns" },
   { label: "Settings", tab: "settings" },
+  { label: "Ads (old)", tab: "ads" },
 ] as const;
 
 /**

@@ -119,7 +119,7 @@ export function CatalogCards({ brandId }: { brandId: string }) {
     ["queued", "processing"].includes(e.status),
   );
   return (
-    <section className="space-y-5 border-t pt-6">
+    <section className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Catalog</h2>

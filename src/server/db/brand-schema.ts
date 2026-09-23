@@ -210,6 +210,11 @@ export type BrandIdentity = {
   colorScheme?: "light" | "dark";
   colors?: { primary?: string; secondary?: string; accent?: string };
   fonts?: Array<{ family: string; weight?: number; role?: "body" | "heading" }>;
+  /**
+   * Set when an operator picked the fonts instead of taking the scrape.
+   * Re-enrich keeps `fonts` while this is set; the scrape stays in `raw`.
+   */
+  fontsChosen?: { by: string; at: string } | null;
   logo?: string | null;
   favicon?: string | null;
   personality?: { tone: string; energy: string; targetAudience: string };

@@ -1,11 +1,12 @@
 import { isDeepStrictEqual } from "node:util";
 import "server-only";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, gt, inArray } from "drizzle-orm";
 import type { UIMessage } from "ai";
 import { db, withTransaction } from "@/server/db";
 import {
   assistantInputTable as inputs,
   assistantMessageTable as messages,
+  assistantRunTable as runs,
   assistantThreadTable as threads,
   memberTable,
 } from "@/server/db/schema";
@@ -70,6 +71,18 @@ async function recover(tx: Tx, thread: typeof threads.$inferSelect) {
     .update(inputs)
     .set({ status: "queued", targetTurnId: null })
     .where(and(eq(inputs.threadId, thread.id), eq(inputs.status, "steering")));
+  // A turn killed by the platform never reaches its own finish; close its run.
+  await tx
+    .update(runs)
+    .set({
+      status: "failed",
+      error: {
+        code: "turn_expired",
+        message: "The turn expired before finishing",
+      },
+      finishedAt: new Date(),
+    })
+    .where(and(eq(runs.threadId, thread.id), eq(runs.status, "running")));
   const [updated] = await tx
     .update(threads)
     .set({
@@ -282,16 +295,25 @@ export async function claimChatTurn(
     return { turnId, payload };
   });
 }
+/**
+ * Check the turn is still ours and extend its lease. Called before every model
+ * step and tool call, so a working turn never expires mid-run while a crashed
+ * one frees the thread within one lease.
+ */
 export async function assertChatTurn(threadId: string, turnId: string) {
-  const thread = await db.query.assistantThreadTable.findFirst({
-    where: eq(threads.id, threadId),
-  });
-  if (
-    thread?.activeTurnId !== turnId ||
-    thread.stopRequested ||
-    !thread.activeTurnExpiresAt ||
-    thread.activeTurnExpiresAt.getTime() <= Date.now()
-  )
+  const [renewed] = await db
+    .update(threads)
+    .set({ activeTurnExpiresAt: new Date(Date.now() + LEASE_MS) })
+    .where(
+      and(
+        eq(threads.id, threadId),
+        eq(threads.activeTurnId, turnId),
+        eq(threads.stopRequested, false),
+        gt(threads.activeTurnExpiresAt, new Date()),
+      ),
+    )
+    .returning({ id: threads.id });
+  if (!renewed)
     throw new ChatTurnError("The response was stopped or its turn expired");
 }
 export async function readChatSteering(

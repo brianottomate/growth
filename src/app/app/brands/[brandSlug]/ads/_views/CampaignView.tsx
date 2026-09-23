@@ -277,7 +277,10 @@ export async function CampaignView({
               campaignId={campaign.id}
               brandId={brand.id}
               pool={pool}
-              askAssistant={ask("photos", `Find photos for “${campaign.name}”`)}
+              askAssistant={ask(
+                "photos",
+                `Fill the photo pool for “${campaign.name}”`,
+              )}
             />
           </CampaignAssetsDrawer>
         </div>
@@ -345,7 +348,7 @@ export async function CampaignView({
               geoPrefill={prefill?.geography ?? null}
               emptyActions={ask(
                 "audiences",
-                `Suggest audiences for “${campaign.name}”`,
+                `Create the audience for “${campaign.name}”`,
               )}
             />
           </Step>
@@ -380,7 +383,7 @@ export async function CampaignView({
                     />
                     {ask(
                       "platforms",
-                      `Plan the platforms for “${campaign.name}”`,
+                      `Plan the platform and budget for “${campaign.name}”`,
                     )}
                   </>
                 }

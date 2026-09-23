@@ -9,15 +9,14 @@ import { brandAvatarUrl, loadPerformanceBrand } from "../_data";
 import { MAX_SET_HOMES } from "@/lib/performance-ads";
 
 import { AdPreviewsWorkspace, type WorkspaceHome } from "./AdPreviewsWorkspace";
-import { CatalogCards } from "./CatalogCards";
 import { toMatrixHomes } from "./matrix/build";
 
 export const metadata: Metadata = { title: "Ads · Wander Performance" };
 export const dynamic = "force-dynamic";
 
 /**
- * The client's ad wall: every drafted ad, filed under the home it is about,
- * with the portfolio and catalog ads as a slice at the foot. A set can be
+ * The client's ad wall: every drafted ad, filed under the home it is about.
+ * Catalog ads have their own tab. A set can be
  * drawn from a pick of homes (carried in `?homes=` so a link opens on it) or
  * from a count, and any ad can be made by hand and filled by upload.
  */
@@ -105,22 +104,19 @@ export default async function PerformanceBrandAdsPage({
   const slug = brand.slug ?? brand.id;
 
   return (
-    <div className="space-y-3">
-      <AdPreviewsWorkspace
-        brandId={brand.id}
-        brandSlug={slug}
-        brandName={brand.name}
-        brandLogo={avatarUrl}
-        homes={homes}
-        withoutPhoto={withoutPhoto}
-        initialPicked={initialPicked}
-        matrixHomes={matrixHomes}
-        campaigns={campaigns}
-        hasSite={listings.length > 0}
-        website={brand.website}
-        focusHomeId={focused}
-      />
-      <CatalogCards brandId={brand.id} />
-    </div>
+    <AdPreviewsWorkspace
+      brandId={brand.id}
+      brandSlug={slug}
+      brandName={brand.name}
+      brandLogo={avatarUrl}
+      homes={homes}
+      withoutPhoto={withoutPhoto}
+      initialPicked={initialPicked}
+      matrixHomes={matrixHomes}
+      campaigns={campaigns}
+      hasSite={listings.length > 0}
+      website={brand.website}
+      focusHomeId={focused}
+    />
   );
 }

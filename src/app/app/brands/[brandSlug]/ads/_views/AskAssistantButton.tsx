@@ -9,9 +9,9 @@ import {
 } from "@/lib/assistant-events";
 
 /**
- * Hand one step of the campaign to the assistant. The same intent as "Work in
- * chat", with the step attached so the chat opens on that job rather than
- * reading the whole campaign back first.
+ * Hand one step of the campaign to the assistant. The same intent as the
+ * campaign's "Work in chat", with the step attached so the chat builds that
+ * piece first and the operator iterates on what it made.
  */
 export function AskAssistantButton({
   brandId,
@@ -20,7 +20,7 @@ export function AskAssistantButton({
   campaignName,
   focus,
   ask,
-  label = "Ask the assistant",
+  label = "Work in chat",
   variant = "outline",
 }: {
   brandId: string;

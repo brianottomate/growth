@@ -187,7 +187,9 @@ export async function resolveCompositionContext(
     });
     if (!source?.url || !R2.isPublicUrl(source.url)) {
       throw new CompositionAccessError(
-        "Choose a ready image from this brand's library",
+        /^https?:\/\//.test(spec.sourceMediaAssetId)
+          ? "sourceMediaAssetId takes a library asset id (media_…), not a URL. Import the photo into the brand's library first and pass its id."
+          : "Choose a ready image from this brand's library",
         422,
       );
     }
@@ -268,8 +270,13 @@ async function loadChosenMark(mark: BrandMark): Promise<LogoImage | null> {
  */
 export async function loadCompositionSource(
   context: CompositionContext,
+  options: {
+    /** Preview only: a family to try in place of the brand's own. */
+    fontFamily?: string | null;
+  } = {},
 ): Promise<RenderContext> {
-  const family = brandFontFamily(context.brand.brandIdentity);
+  const family =
+    options.fontFamily ?? brandFontFamily(context.brand.brandIdentity);
   // The logo and the font are best effort: a card without them is still the
   // card. The source is not; its failure is the render's failure.
   const [sourceImage, logo, fonts] = await Promise.all([

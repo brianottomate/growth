@@ -22,7 +22,10 @@ export function BrandingPanel({
     (entry): entry is [string, string] =>
       typeof entry[1] === "string" && entry[1].length > 0,
   );
-  const fonts = identity?.fonts ?? [];
+  // Heading first, matching the Studio pickers.
+  const fonts = [...(identity?.fonts ?? [])].sort(
+    (a, b) => Number(b.role === "heading") - Number(a.role === "heading"),
+  );
   const sizes = Object.entries(raw?.typography?.fontSizes ?? {}).filter(
     (entry): entry is [string, string] => typeof entry[1] === "string",
   );
