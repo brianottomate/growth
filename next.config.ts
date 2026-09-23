@@ -6,6 +6,9 @@ import "./src/env";
 import type { NextConfig } from "next";
 
 const config: NextConfig = {
+  // `bun run build` runs the native type checker before compilation. Keeping
+  // Next's duplicate checker alive alongside the build exhausts Vercel memory.
+  typescript: { ignoreBuildErrors: true },
   // The published email registry is ESM-only. Keep it external so the Node
   // runtime loads its named exports natively instead of passing it through
   // webpack's CommonJS bridge.
@@ -13,10 +16,6 @@ const config: NextConfig = {
   turbopack: {
     root: process.cwd(),
   },
-  // `bun run build` type-checks with `tsc --noEmit` before `next build`. Next's
-  // own check ran out of memory on Vercel's build container once the oRPC
-  // router landed; run apart, each step fits.
-  typescript: { ignoreBuildErrors: true },
   /** Enable MDX pages */
   pageExtensions: ["ts", "tsx", "md", "mdx"],
 

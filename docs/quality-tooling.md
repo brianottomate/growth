@@ -10,6 +10,12 @@ The initial 580 restyling findings are resolved through call-site migration and 
 
 The official `eslint-plugin-drizzle` checks unscoped updates and deletes. Its undeclared runtime dependency, `@typescript-eslint/utils`, is installed explicitly. There is no local rule fork.
 
+## Deployment type checking
+
+`bun run build` runs `bun run typecheck` before the production schema push and Next compilation. That command generates Velite content and Next route types, then checks the application and generated route validator with native Oxlint TypeScript diagnostics. A type error stops the build before either later step.
+
+Next's embedded TypeScript check is disabled because it exhausted the 8 GB Vercel build container after compilation on the oRPC branch. Running the existing native checker first keeps the type gate while letting its process exit before compilation starts. Use `bun run build` for deployment; invoking `next build` directly skips this gate.
+
 ## Editing loop
 
 Install dependencies with `bun install` to enable Husky. Pre-commit runs Oxfmt on staged files through lint-staged, which preserves unstaged edits. Pre-push runs the full check without modifying source files.

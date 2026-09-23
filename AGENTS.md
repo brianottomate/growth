@@ -72,7 +72,7 @@ Since 2026-08-28 this repo follows the org-wide release-drafter flow
   ruleset requires a PR but, since 2026-09-11, no approving review, so authors
   can merge their own. Nothing else gates the merge: there are no required
   status checks, so read the Vercel preview build yourself before merging (it
-  runs `next build`, which type-checks and lints).
+  runs `bun run build`, which type-checks before compiling).
 - Every merge to `dev` deploys a preview build. Production only moves when a
   GitHub Release is published.
 - Merges to `dev` accumulate in a draft release. To deploy production, publish

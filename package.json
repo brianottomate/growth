@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "velite build && tsc --noEmit && bun run db:push:vercel-prod && next build",
+    "build": "bun run typecheck && bun run db:push:vercel-prod && next build",
     "db:push:vercel-prod": "if [ \"$VERCEL_ENV\" = production ]; then drizzle-kit push --force; else echo \"Skipping schema push (VERCEL_ENV=$VERCEL_ENV, not production)\"; fi",
     "check": "velite build && next typegen && oxlint --type-aware --type-check . .next/types/validator.ts && oxfmt --check && bun run test:quality-toolchain",
     "clean": "rm -rf node_modules .next .turbo .cache .velite bun.lock",
@@ -39,7 +39,7 @@
     "format:write": "oxfmt",
     "lint": "velite build && oxlint --type-aware",
     "lint:fix": "velite build && oxlint --type-aware --fix",
-    "preview": "next build && next start",
+    "preview": "bun run typecheck && next build && next start",
     "start": "next start",
     "typecheck": "velite build && next typegen && oxlint --type-aware --type-check . .next/types/validator.ts",
     "test": "bun test",
