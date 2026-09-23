@@ -67,19 +67,26 @@ maps the Conditional form's buckets.
   Brooke Hughes. CAPI to pixel 340 verified with a `test_event_code`.
 - Doppler `wander-growth` prd/stg/dev: `META_LEADS_ACCESS_TOKEN`,
   `META_LEADS_APP_SECRET`, `META_LEADGEN_VERIFY_TOKEN`.
+- Page **Leads Access → CRMs** lists Wander Growth Leads (assigned
+  2026-09-23). Without it Meta verifies the callback but never POSTs a lead;
+  Graph reads still work through the system user, so only the cron delivers.
+- The Page carries 68 active forms, 62 of them marketplace guest waitlists.
+  Only forms that ask the unit question are routed to HubSpot
+  (`isOperatorLead`). The separate "WanderOS" Page `1035111979680271` has OS
+  Handle forms with no leads and is not watched.
+- The system user can't read the pixel's `/stats`; check MQL arrival in the
+  Events Manager UI.
 - The older `FB_SYSUSER_TOKEN` (app "Wander Data Lake Transfer"
   `245420291973931`) also reads leads but lacks `pages_manage_metadata`, and
   that app's Page webhook callback may belong to the data lake, so leave it.
 
 ## Cutover checklist
 
-1. Merge, ship a release (the table is already applied to the shared Neon DB).
-2. Subscribe the Wander Page to the app for `leadgen`:
-   - App dashboard → Webhooks → Page → callback
-     `https://growth-red.vercel.app/api/webhooks/meta-leadgen`, verify token =
-     Doppler `META_LEADGEN_VERIFY_TOKEN`, subscribe field `leadgen`.
-   - `POST /101399685529192/subscribed_apps?subscribed_fields=leadgen` with the
-     Page token (mint it from `META_LEADS_ACCESS_TOKEN`).
+1. ~~Merge, ship a release.~~ v1.0.130, 2026-09-23. 7-day backfill sent 47
+   MQLs.
+2. ~~Subscribe the Wander Page to the app for `leadgen` and assign the app in
+   Leads Access.~~ Done 2026-09-23; a test lead reached the webhook in 4 s.
+   HubSpot workflow `1887873568` disabled the same day.
 3. Run one day alongside Make with `META_LEADGEN_ROUTE_FROM` unset: CAPI
    events flow, HubSpot writes stay with Make. Compare `leads.meta_leadgen_lead`
    to Make's run history by leadgen id.
