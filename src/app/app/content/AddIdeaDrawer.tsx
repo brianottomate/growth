@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { ChannelLogo } from "@/components/channel-logos";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -93,7 +93,6 @@ export function AddIdeaDrawer({
   onOpenChange: (open: boolean) => void;
   onCreated: (id?: string) => void;
 }) {
-  const trpc = useTRPC();
   const hookRef = useRef<HTMLInputElement>(null);
 
   const [seed, setSeed] = useState<Seed>("blank");
@@ -140,7 +139,7 @@ export function AddIdeaDrawer({
   );
 
   const create = useMutation(
-    trpc.content.create.mutationOptions({
+    orpc.content.create.mutationOptions({
       onSuccess: ({ id }) => {
         onCreated(id);
         onOpenChange(false);

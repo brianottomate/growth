@@ -2,7 +2,7 @@ import { after } from "next/server";
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { protectedProcedure } from "@/server/api/orpc";
 import {
   pregenNativeBuildTable,
   pregenNativeProspectTable,
@@ -16,10 +16,10 @@ import { pregenPreviewUrl } from "@/server/services/pregen/preview-url";
  * on the leads router. One mutation starts a build; the build row's stepLog
  * is the progress feed.
  */
-export const pregenNativeRouter = createTRPCRouter({
+export const pregenNativeRouter = {
   startBuild: protectedProcedure
     .input(z.object({ url: z.string().min(4) }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const origin = normalizeToOrigin(input.url);
       const domain = new URL(origin).hostname.replace(/^www\./, "");
 
@@ -60,14 +60,14 @@ export const pregenNativeRouter = createTRPCRouter({
 
   getBuild: protectedProcedure
     .input(z.object({ buildId: z.string() }))
-    .query(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       return ctx.db.query.pregenNativeBuildTable.findFirst({
         where: eq(pregenNativeBuildTable.id, input.buildId),
         with: { prospect: true },
       });
     }),
 
-  listProspects: protectedProcedure.query(async ({ ctx }) => {
+  listProspects: protectedProcedure.handler(async ({ context: ctx }) => {
     return ctx.db.query.pregenNativeProspectTable.findMany({
       orderBy: [desc(pregenNativeProspectTable.createdAt)],
       limit: 50,
@@ -76,7 +76,7 @@ export const pregenNativeRouter = createTRPCRouter({
       },
     });
   }),
-});
+};
 
 function normalizeToOrigin(input: string): string {
   const withScheme = /^https?:\/\//i.test(input) ? input : `https://${input}`;

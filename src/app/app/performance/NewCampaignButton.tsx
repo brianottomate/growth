@@ -7,18 +7,21 @@ import { Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 /** Start with an empty campaign; its brief and delivery can be decided later. */
-export function NewCampaignButton({ brandId }: { brandId: string }) {
-  const trpc = useTRPC();
+export function NewCampaignButton({ brandSlug }: { brandSlug: string }) {
   const router = useRouter();
   const [refreshing, startTransition] = useTransition();
   const create = useMutation(
-    trpc.ads.createDraft.mutationOptions({
+    orpc.ads.createDraft.mutationOptions({
       onSuccess: (result) => {
         toast.success("Campaign created");
-        startTransition(() => router.push(result.path));
+        startTransition(() =>
+          router.push(
+            `/app/performance/brands/${brandSlug}/campaigns/${result.campaign.id}`,
+          ),
+        );
       },
       onError: (error) => toast.error(error.message),
     }),
@@ -31,7 +34,7 @@ export function NewCampaignButton({ brandId }: { brandId: string }) {
       density="editorial"
       disabled={create.isPending || refreshing}
       loading={create.isPending || refreshing}
-      onClick={() => create.mutate({ brandId })}
+      onClick={() => create.mutate({ brandSlug })}
     >
       <Plus className="size-3" />
       New campaign

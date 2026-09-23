@@ -19,13 +19,12 @@ import {
   CommandShortcut,
 } from "@/components/ui/command";
 import { BUSINESS_LABEL, DELIVERY_LABEL } from "@/lib/performance-stage";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 export const OPEN_COMMAND_MENU_EVENT = "growth-command-menu:open";
 
 export function CommandMenu() {
   const router = useRouter();
-  const trpc = useTRPC();
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -45,7 +44,7 @@ export function CommandMenu() {
   }, []);
 
   const { data, isLoading } = useQuery({
-    ...trpc.content.searchIndex.queryOptions(),
+    ...orpc.content.searchIndex.queryOptions(),
     enabled: open,
   });
 

@@ -14,10 +14,9 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/toast";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 export function AddStarterIdeasButton({ campaignId }: { campaignId: string }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [source, setSource] = useState<"blank" | "featured">("featured");
@@ -25,12 +24,12 @@ export function AddStarterIdeasButton({ campaignId }: { campaignId: string }) {
   const [stories, setStories] = useState(true);
   const [refreshing, startTransition] = useTransition();
   const homes = useQuery({
-    ...trpc.ads.starterIdeaHomes.queryOptions({ campaignId }),
+    ...orpc.ads.starterIdeaHomes.queryOptions({ input: { campaignId } }),
     enabled: open,
   });
   const available = homes.data ?? [];
   const add = useMutation(
-    trpc.ads.addStarterIdeas.mutationOptions({
+    orpc.ads.addStarterIdeas.mutationOptions({
       onSuccess: ({ created }) => {
         toast.success(
           created
@@ -44,7 +43,7 @@ export function AddStarterIdeasButton({ campaignId }: { campaignId: string }) {
     }),
   );
   const progress = useQuery({
-    ...trpc.ads.starterGenerationStatus.queryOptions({ campaignId }),
+    ...orpc.ads.starterGenerationStatus.queryOptions({ input: { campaignId } }),
     refetchInterval: (query) =>
       ["queued", "processing"].includes(query.state.data?.status ?? "")
         ? 2000
@@ -62,7 +61,7 @@ export function AddStarterIdeasButton({ campaignId }: { campaignId: string }) {
     progress.data?.status ?? "",
   );
   const generation = useMutation(
-    trpc.ads.generateStarterIdeas.mutationOptions({
+    orpc.ads.generateStarterIdeas.mutationOptions({
       onSuccess: () => {
         setOpen(false);
         void progress.refetch();

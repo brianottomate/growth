@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 
-import { useTRPC, type RouterOutputs } from "@/trpc/react";
+import { orpc, type RouterOutputs } from "@/orpc/client";
 
 import { ListenItemActions } from "@/components/listening/ListenItemActions";
 
@@ -39,8 +39,7 @@ function ageLabel(createdUtc: number): string {
 }
 
 export function RedditScanWidget() {
-  const trpc = useTRPC();
-  const scan = useMutation(trpc.reddit.scanNow.mutationOptions());
+  const scan = useMutation(orpc.reddit.scanNow.mutationOptions());
 
   const all = scan.data?.scored ?? [];
   const engage = all.filter((s) => s.suggestedAction === "engage");
@@ -126,8 +125,7 @@ function ScoredGroup({
 }
 
 function ScoredPostCard({ scored }: { scored: ScannedPost }) {
-  const trpc = useTRPC();
-  const draft = useMutation(trpc.reddit.draftReply.mutationOptions());
+  const draft = useMutation(orpc.reddit.draftReply.mutationOptions());
   const [pills, setPills] = useState<Set<Pill>>(new Set());
   const [customInstructions, setCustomInstructions] = useState("");
 

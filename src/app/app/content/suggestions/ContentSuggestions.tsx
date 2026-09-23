@@ -5,15 +5,14 @@ import { Check, Loader2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 export function ContentSuggestions() {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const query = trpc.contentSuggestion.pending.queryOptions();
+  const query = orpc.contentSuggestion.pending.queryOptions();
   const { data, isLoading } = useQuery(query);
   const resolve = useMutation(
-    trpc.contentSuggestion.resolve.mutationOptions({
+    orpc.contentSuggestion.resolve.mutationOptions({
       onSuccess: () => void queryClient.invalidateQueries(query),
       onError: (error) => toast.error(error.message),
     }),

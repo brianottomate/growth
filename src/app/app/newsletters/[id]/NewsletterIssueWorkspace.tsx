@@ -21,7 +21,7 @@ import {
 
 import { SimpleDialog } from "@/components/ui/dialog";
 import { sendAssistantIntent } from "@/lib/assistant-events";
-import { useTRPC, type RouterOutputs } from "@/trpc/react";
+import { orpc, type RouterOutputs } from "@/orpc/client";
 import { DigestImageBoard } from "./DigestImageBoard";
 
 type Workspace = RouterOutputs["newsletter"]["workspace"];
@@ -44,10 +44,11 @@ const controlClass =
   "bg-background border-input focus:ring-ring/30 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2";
 
 function Editor({ workspace }: { workspace: Workspace }) {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const queryKey = trpc.newsletter.workspace.queryKey({
-    platformPostId: workspace.spot.id,
+  const queryKey = orpc.newsletter.workspace.queryKey({
+    input: {
+      platformPostId: workspace.spot.id,
+    },
   });
   const [draft, setDraft] = useState<Draft>({
     subject: workspace.document.subject,
@@ -82,22 +83,22 @@ function Editor({ workspace }: { workspace: Workspace }) {
     await queryClient.invalidateQueries({ queryKey });
   };
   const save = useMutation(
-    trpc.newsletter.saveDocument.mutationOptions({
+    orpc.newsletter.saveDocument.mutationOptions({
       onSuccess: refreshWorkspace,
     }),
   );
   const generate = useMutation(
-    trpc.newsletter.generateDraft.mutationOptions({
+    orpc.newsletter.generateDraft.mutationOptions({
       onSuccess: refreshWorkspace,
     }),
   );
   const restore = useMutation(
-    trpc.newsletter.restoreVersion.mutationOptions({
+    orpc.newsletter.restoreVersion.mutationOptions({
       onSuccess: refreshWorkspace,
     }),
   );
   const preview = useMutation(
-    trpc.newsletter.renderPreview.mutationOptions({
+    orpc.newsletter.renderPreview.mutationOptions({
       onSuccess: ({ html, warnings }) => {
         setPreviewHtml(html);
         setPreviewWarnings(warnings ?? []);
@@ -105,17 +106,17 @@ function Editor({ workspace }: { workspace: Workspace }) {
     }),
   );
   const prepareSend = useMutation(
-    trpc.newsletter.prepareSend.mutationOptions({
+    orpc.newsletter.prepareSend.mutationOptions({
       onSuccess: refreshWorkspace,
     }),
   );
   const approveSend = useMutation(
-    trpc.newsletter.approveSend.mutationOptions({
+    orpc.newsletter.approveSend.mutationOptions({
       onSuccess: refreshWorkspace,
     }),
   );
   const sendApproved = useMutation(
-    trpc.newsletter.sendApproved.mutationOptions({
+    orpc.newsletter.sendApproved.mutationOptions({
       onSuccess: async () => {
         setSendConfirmation("");
         await refreshWorkspace();
@@ -135,8 +136,10 @@ function Editor({ workspace }: { workspace: Workspace }) {
 
   const copyHandoff = async () => {
     const result = await queryClient.fetchQuery(
-      trpc.newsletter.exportHandoff.queryOptions({
-        platformPostId: workspace.spot.id,
+      orpc.newsletter.exportHandoff.queryOptions({
+        input: {
+          platformPostId: workspace.spot.id,
+        },
       }),
     );
     await navigator.clipboard.writeText(result.markdown);
@@ -252,7 +255,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
                 onClick={() =>
                   save.mutate({
                     platformPostId: workspace.spot.id,
-                    draft,
+                    changes: draft,
                     note: "Saved from the newsletter workspace",
                   })
                 }
@@ -312,7 +315,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
                 save.mutate(
                   {
                     platformPostId: workspace.spot.id,
-                    draft: next,
+                    changes: next,
                     note: "Edited fields manually",
                   },
                   { onSuccess: () => setFieldsOpen(false) },
@@ -923,9 +926,8 @@ export function NewsletterIssueWorkspace({
 }: {
   platformPostId: string;
 }) {
-  const trpc = useTRPC();
   const query = useQuery({
-    ...trpc.newsletter.workspace.queryOptions({ platformPostId }),
+    ...orpc.newsletter.workspace.queryOptions({ input: { platformPostId } }),
     refetchInterval: (result) => {
       const status = result.state.data?.latestJob?.status;
       return status === "queued" || status === "running" ? 2_000 : false;

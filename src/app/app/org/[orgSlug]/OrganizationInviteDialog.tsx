@@ -35,7 +35,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
 
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 const inviteSchema = z.object({
   email: z.string().email("Please enter a valid email"),
@@ -54,7 +54,6 @@ export function OrganizationInviteDialog({
   children,
 }: OrganizationInviteDialogProps) {
   const [open, setOpen] = useState(false);
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
 
   const form = useForm<InviteInput>({
@@ -66,7 +65,7 @@ export function OrganizationInviteDialog({
   });
 
   const inviteMutation = useMutation(
-    trpc.org.inviteMember.mutationOptions({
+    orpc.org.inviteMember.mutationOptions({
       onSuccess: (_, variables) => {
         toast.success(`Invitation sent to ${variables.email}`);
         void queryClient.invalidateQueries();

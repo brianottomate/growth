@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createContext, useContext, useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { SimpleDialog } from "@/components/ui/dialog";
 import {
@@ -550,7 +550,6 @@ export function FeedClient({
 }) {
   const now = new Date(nowISO).getTime();
   const todayKey = dayKey(new Date(nowISO));
-  const trpc = useTRPC();
   const router = useRouter();
 
   const [brandFilter, setBrandFilter] = useState("all");
@@ -567,7 +566,7 @@ export function FeedClient({
   // of truth; router.refresh() reconciles after the mutation settles).
   const [overrides, setOverrides] = useState<Record<string, Member | null>>({});
   const setSpotOwner = useMutation(
-    trpc.content.setSpotOwner.mutationOptions({
+    orpc.content.setSpotOwner.mutationOptions({
       onSettled: () => router.refresh(),
     }),
   );
@@ -785,10 +784,9 @@ function SpotlightDialog({
   entry: FeedEntry | null;
   onClose: () => void;
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const promote = useMutation(
-    trpc.content.promotePlatformPost.mutationOptions({
+    orpc.content.promotePlatformPost.mutationOptions({
       onSuccess: (result) => router.push(`/app/content/${result.id}`),
     }),
   );

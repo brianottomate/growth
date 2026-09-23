@@ -14,7 +14,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 import { IntakePanel } from "./IntakePanel";
 import {
@@ -32,20 +32,19 @@ const usd = (value: number | null | undefined) =>
 const DAYS_IN_MONTH = 30;
 
 export function AccountDetail({ accountId }: { accountId: string }) {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [pickerFor, setPickerFor] = useState<string | null>(null);
   const { data, isLoading } = useQuery(
-    trpc.performance.get.queryOptions({ accountId }),
+    orpc.performance.get.queryOptions({ input: { accountId } }),
   );
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: [["performance"]] });
   const attach = useMutation(
-    trpc.performance.attach.mutationOptions({ onSuccess: invalidate }),
+    orpc.performance.attach.mutationOptions({ onSuccess: invalidate }),
   );
   const refreshSpend = useMutation(
-    trpc.performance.refreshSpend.mutationOptions({ onSuccess: invalidate }),
+    orpc.performance.refreshSpend.mutationOptions({ onSuccess: invalidate }),
   );
 
   if (isLoading) {
@@ -448,12 +447,13 @@ function CampaignPicker({
   onAttach: (platformCampaignId: string) => void;
   attaching: boolean;
 }) {
-  const trpc = useTRPC();
   const [query, setQuery] = useState("");
   const { data, isLoading } = useQuery(
-    trpc.performance.attachableCampaigns.queryOptions({
-      query: query.trim() || undefined,
-      limit: 12,
+    orpc.performance.attachableCampaigns.queryOptions({
+      input: {
+        query: query.trim() || undefined,
+        limit: 12,
+      },
     }),
   );
 
@@ -599,14 +599,15 @@ const HEAT_META: Record<string, { label: string; cls: string }> = {
  * rather than reported as zero.
  */
 function SponsoredAbandonment({ accountId }: { accountId: string }) {
-  const trpc = useTRPC();
   const { data, isLoading } = useQuery(
-    trpc.performance.sponsoredAbandonment.queryOptions({
-      accountId,
-      sinceHours: 168,
-      stage: "checkout",
-      includeConverted: false,
-      limit: 25,
+    orpc.performance.sponsoredAbandonment.queryOptions({
+      input: {
+        accountId,
+        sinceHours: 168,
+        stage: "checkout",
+        includeConverted: false,
+        limit: 25,
+      },
     }),
   );
 

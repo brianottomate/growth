@@ -37,7 +37,7 @@ import { Button } from "@/components/ui/button";
 import { SimpleSelect } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
 import type { WorkContentIntent } from "@/lib/assistant-events";
-import { type RouterInputs, type RouterOutputs, useTRPC } from "@/trpc/react";
+import { type RouterInputs, type RouterOutputs, orpc } from "@/orpc/client";
 
 /**
  * Typed result cards for the /overview assistant's read-only tools.
@@ -255,13 +255,14 @@ export function ProductionPacketCard({
 }: {
   output: ProductionPacketOutput;
 }) {
-  const trpc = useTRPC();
   const configuration = useQuery(
-    trpc.creativeWork.configuration.queryOptions(),
+    orpc.creativeWork.configuration.queryOptions(),
   );
   const latestRun = useQuery(
-    trpc.creativeWork.latestRunForPacket.queryOptions({
-      packetId: output.packetId,
+    orpc.creativeWork.latestRunForPacket.queryOptions({
+      input: {
+        packetId: output.packetId,
+      },
     }),
   );
   const [modelProfile, setModelProfile] = useState<CreativeImageModelId>(
@@ -271,7 +272,7 @@ export function ProductionPacketCard({
     RouterOutputs["creativeWork"]["submitImage"] | null
   >(null);
   const submitImage = useMutation(
-    trpc.creativeWork.submitImage.mutationOptions({
+    orpc.creativeWork.submitImage.mutationOptions({
       onSuccess: setRun,
       onError: (error) =>
         toast.error("Image generation could not start", {
@@ -280,7 +281,7 @@ export function ProductionPacketCard({
     }),
   );
   const refreshRun = useMutation(
-    trpc.creativeWork.refreshRun.mutationOptions({
+    orpc.creativeWork.refreshRun.mutationOptions({
       onSuccess: setRun,
       onError: (error) =>
         toast.error("Could not refresh generation", {
@@ -289,7 +290,7 @@ export function ProductionPacketCard({
     }),
   );
   const acceptCandidate = useMutation(
-    trpc.creativeWork.acceptCandidate.mutationOptions({
+    orpc.creativeWork.acceptCandidate.mutationOptions({
       onSuccess: ({ run: accepted }) => {
         setRun(accepted);
         toast.success("Saved to the brand library");
@@ -2018,11 +2019,10 @@ function MiniSelect({
 /**
  * `topAds` — ranked creative rows with INTERACTIVE controls (Tier 2). First
  * paint is the chat tool's output (seeded as `initialData`); changing a control
- * refetches in place through the `ads` tRPC router — same compute, no LLM
+ * refetches in place through the `ads` oRPC router — same compute, no LLM
  * round-trip, no new chat messages.
  */
 export function AdsRankedCard({ output }: { output: AdsRankedOutput }) {
-  const trpc = useTRPC();
   const [metric, setMetric] = useState<Metric>(output.filters.metric as Metric);
   const [status, setStatus] = useState<StatusFilter>(
     output.filters.status as StatusFilter,
@@ -2044,7 +2044,7 @@ export function AdsRankedCard({ output }: { output: AdsRankedOutput }) {
   };
 
   const { data, isFetching } = useQuery({
-    ...trpc.ads.topAds.queryOptions(input),
+    ...orpc.ads.topAds.queryOptions({ input: input }),
     initialData: output as RouterOutputs["ads"]["topAds"],
   });
 

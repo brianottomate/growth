@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { useTRPC, type RouterOutputs } from "@/trpc/react";
+import { orpc, type RouterOutputs } from "@/orpc/client";
 
 type Reference = RouterOutputs["productStorefront"]["listReferences"][number];
 
@@ -21,14 +21,17 @@ export function StorefrontReferences({
 }: {
   storefrontId: string;
 }) {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
   const referenceBrandsOptions =
-    trpc.productStorefront.listReferenceBrands.queryOptions({
-      storefrontId,
+    orpc.productStorefront.listReferenceBrands.queryOptions({
+      input: {
+        storefrontId,
+      },
     });
-  const referencesOptions = trpc.productStorefront.listReferences.queryOptions({
-    storefrontId,
+  const referencesOptions = orpc.productStorefront.listReferences.queryOptions({
+    input: {
+      storefrontId,
+    },
   });
   const referenceBrandsQuery = useQuery(referenceBrandsOptions);
   const referencesQuery = useQuery(referencesOptions);
@@ -61,7 +64,7 @@ export function StorefrontReferences({
     queryClient.invalidateQueries({ queryKey: referencesOptions.queryKey });
 
   const captureMutation = useMutation(
-    trpc.productStorefront.captureReference.mutationOptions({
+    orpc.productStorefront.captureReference.mutationOptions({
       onSuccess: async () => {
         await invalidateReferences();
         setSourceUrl("");
@@ -73,7 +76,7 @@ export function StorefrontReferences({
     }),
   );
   const removeMutation = useMutation(
-    trpc.productStorefront.removeReference.mutationOptions({
+    orpc.productStorefront.removeReference.mutationOptions({
       onSuccess: async () => {
         await invalidateReferences();
         toast.success("Reference snapshot removed");

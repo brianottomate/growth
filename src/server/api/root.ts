@@ -39,14 +39,13 @@ import { studioRouter } from "@/server/api/routers/studio.router";
 import { twitterRouter } from "@/server/api/routers/twitter.router";
 import { websiteRouter } from "@/server/api/routers/website.router";
 import { zernioRouter } from "@/server/api/routers/zernio.router";
-import { createCallerFactory, createTRPCRouter } from "@/server/api/trpc";
 
 /**
  * This is the primary router for your server.
  *
  * All routers added in /api/routers should be manually added here.
  */
-export const appRouter = createTRPCRouter({
+export const appRouter = {
   launch: launchRouter,
   user: userRouter,
   ads: adsRouter,
@@ -88,15 +87,7 @@ export const appRouter = createTRPCRouter({
   twitter: twitterRouter,
   website: websiteRouter,
   zernio: zernioRouter,
-});
+};
 
 // export type definition of API
 export type AppRouter = typeof appRouter;
-
-/**
- * Create a server-side caller for the tRPC API.
- * @example
- * const trpc = createCaller(createContext);
- * const res = await trpc.user.me();
- */
-export const createCaller = createCallerFactory(appRouter);

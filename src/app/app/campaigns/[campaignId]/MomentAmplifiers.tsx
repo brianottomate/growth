@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { SimpleSelect } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
 import { ChannelLogo } from "@/components/channel-logos";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 // planned → asked → confirmed → fulfilled (matches amplification_target.ask)
 const ASKS = ["planned", "asked", "confirmed", "fulfilled"] as const;
@@ -56,13 +56,14 @@ const TYPE_OPTIONS = [
 ];
 
 export function MomentAmplifiers({ momentId }: { momentId: string }) {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
 
   const { data, isLoading } = useQuery(
-    trpc.amplifier.targetsForCampaign.queryOptions({
-      campaignId: momentId,
+    orpc.amplifier.targetsForCampaign.queryOptions({
+      input: {
+        campaignId: momentId,
+      },
     }),
   );
   const targets = data?.targets;
@@ -70,25 +71,27 @@ export function MomentAmplifiers({ momentId }: { momentId: string }) {
 
   const invalidate = () =>
     queryClient.invalidateQueries(
-      trpc.amplifier.targetsForCampaign.queryOptions({
-        campaignId: momentId,
+      orpc.amplifier.targetsForCampaign.queryOptions({
+        input: {
+          campaignId: momentId,
+        },
       }),
     );
 
   const setAsk = useMutation(
-    trpc.amplifier.setTargetAsk.mutationOptions({
+    orpc.amplifier.setTargetAsk.mutationOptions({
       onSuccess: invalidate,
       onError: (e) => toast.error(e.message || "Failed to update status"),
     }),
   );
   const removeTarget = useMutation(
-    trpc.amplifier.removeTarget.mutationOptions({
+    orpc.amplifier.removeTarget.mutationOptions({
       onSuccess: invalidate,
       onError: (e) => toast.error(e.message || "Failed to remove"),
     }),
   );
   const notifyTarget = useMutation(
-    trpc.amplifier.notifyTarget.mutationOptions({
+    orpc.amplifier.notifyTarget.mutationOptions({
       onSuccess: async (result) => {
         await invalidate();
         toast.success(
@@ -252,7 +255,6 @@ function AddAmplifierDialog({
   existingAmplifierIds: Set<string>;
   onAdded: () => Promise<void> | void;
 }) {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<"pick" | "new">("pick");
   // Asks anchor to one platform post; default to the first of the launch.
@@ -261,10 +263,11 @@ function AddAmplifierDialog({
 
   // ---- pick from the org rolodex ----
   const [q, setQ] = useState("");
-  const { data: rolodex, isLoading } = useQuery({
-    ...trpc.amplifier.list.queryOptions(),
+  const { data, isLoading } = useQuery({
+    ...orpc.amplifier.list.queryOptions({ input: {} }),
     enabled: open,
   });
+  const rolodex = data?.amplifiers;
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     const list = (rolodex ?? []).filter((a) => !existingAmplifierIds.has(a.id));
@@ -273,7 +276,7 @@ function AddAmplifierDialog({
   }, [rolodex, q, existingAmplifierIds]);
 
   const addTarget = useMutation(
-    trpc.amplifier.addTarget.mutationOptions({
+    orpc.amplifier.addTarget.mutationOptions({
       onSuccess: async () => {
         await onAdded();
         onOpenChange(false);
@@ -289,13 +292,15 @@ function AddAmplifierDialog({
   const [handle, setHandle] = useState("");
 
   const createAndAdd = useMutation(
-    trpc.amplifier.create.mutationOptions({
+    orpc.amplifier.create.mutationOptions({
       onSuccess: async (amp) => {
         if (!amp || !selectedPostId) return;
-        await queryClient.invalidateQueries(trpc.amplifier.list.queryOptions());
+        await queryClient.invalidateQueries(
+          orpc.amplifier.list.queryOptions({ input: {} }),
+        );
         addTarget.mutate({
           platformPostId: selectedPostId,
-          amplifierId: amp.id,
+          amplifierIds: [amp.id],
         });
         setName("");
         setHandle("");
@@ -386,7 +391,7 @@ function AddAmplifierDialog({
                       onClick={() =>
                         addTarget.mutate({
                           platformPostId: selectedPostId,
-                          amplifierId: a.id,
+                          amplifierIds: [a.id],
                         })
                       }
                       className="flex items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/40 disabled:opacity-50"

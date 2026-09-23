@@ -80,7 +80,7 @@ The human UI and OAuth MCP share one organization-scoped service:
   `storefrontRead` / `storefrontWrite` capabilities
 
 Strict TypeScript types describe stored documents. Zod validates raw JSON,
-tRPC, and MCP input at the service boundary. MCP actions cannot rewrite
+oRPC, and MCP input at the service boundary. MCP actions cannot rewrite
 changelog entries or bypass brand, media, Website, membership, or concurrency
 checks.
 

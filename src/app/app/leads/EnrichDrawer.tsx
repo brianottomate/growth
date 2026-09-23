@@ -25,7 +25,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useTRPC, type RouterOutputs } from "@/trpc/react";
+import { orpc, type RouterOutputs } from "@/orpc/client";
 
 /** A row from the leads list — what the table passes into the drawer. */
 export type LeadRow = RouterOutputs["leads"]["listDomains"]["items"][number];
@@ -112,29 +112,28 @@ export function EnrichDrawer({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const trpc = useTRPC();
   const domain = lead?.domain ?? null;
-  const enrich = useMutation(trpc.leads.enrich.mutationOptions());
-  const hubspot = useMutation(trpc.leads.pullFromHubspot.mutationOptions());
-  const merge = useMutation(trpc.leads.proposeMerge.mutationOptions());
-  const apply = useMutation(trpc.leads.applyMerge.mutationOptions());
+  const enrich = useMutation(orpc.leads.enrich.mutationOptions());
+  const hubspot = useMutation(orpc.leads.pullFromHubspot.mutationOptions());
+  const merge = useMutation(orpc.leads.proposeMerge.mutationOptions());
+  const apply = useMutation(orpc.leads.applyMerge.mutationOptions());
   const pregenOutreach = useMutation(
-    trpc.leads.generatePregenOutreach.mutationOptions(),
+    orpc.leads.generatePregenOutreach.mutationOptions(),
   );
   const publishPregen = useMutation(
-    trpc.leads.publishPregenOutreach.mutationOptions(),
+    orpc.leads.publishPregenOutreach.mutationOptions(),
   );
-  const queue = useMutation(trpc.leads.queueInstantlyLead.mutationOptions());
+  const queue = useMutation(orpc.leads.queueInstantlyLead.mutationOptions());
   const launch = useMutation(
-    trpc.leads.launchInstantlyCampaign.mutationOptions(),
+    orpc.leads.launchInstantlyCampaign.mutationOptions(),
   );
 
   // Our own contacts for this domain (the people we'd actually email), ranked.
   const detail = useQuery(
-    trpc.leads.getDomain.queryOptions(
-      { id: lead?.id ?? "" },
-      { enabled: open && !!lead?.id },
-    ),
+    orpc.leads.getDomain.queryOptions({
+      input: { id: lead?.id ?? "" },
+      enabled: open && !!lead?.id,
+    }),
   );
   const rankedContacts = [...(detail.data?.contacts ?? [])].sort(
     (a, b) => contactScore(b) - contactScore(a),

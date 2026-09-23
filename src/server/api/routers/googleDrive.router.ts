@@ -1,13 +1,16 @@
 import { z } from "zod";
 import { and, eq } from "drizzle-orm";
-import { TRPCError } from "@trpc/server";
+import { ORPCError } from "@orpc/server";
 
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { protectedProcedure, actionProcedure } from "@/server/api/orpc";
 import type { Database } from "@/server/db";
 import { brandTable, memberTable } from "@/server/db/schema";
 import { GoogleDriveService } from "@/server/services/google-drive.service";
 import { GoogleDriveError } from "@/server/clients/google-drive.client";
-import { DRIVE_READONLY_SCOPE } from "@/lib/google-drive";
+import {
+  browseDrive,
+  driveConnectionStatus,
+} from "@/server/ai/capabilities/drive";
 
 type Ctx = {
   db: Database;
@@ -20,7 +23,7 @@ async function assertBrandAccess(ctx: Ctx, brandId: string) {
     where: eq(brandTable.id, brandId),
   });
   if (!brand?.organizationId) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Brand not found" });
+    throw new ORPCError("NOT_FOUND", { message: "Brand not found" });
   }
   const membership = await ctx.db.query.memberTable.findFirst({
     where: and(
@@ -29,57 +32,34 @@ async function assertBrandAccess(ctx: Ctx, brandId: string) {
     ),
   });
   if (!membership) {
-    throw new TRPCError({ code: "FORBIDDEN", message: "No access to brand" });
+    throw new ORPCError("FORBIDDEN", { message: "No access to brand" });
   }
   return brand;
 }
 
 /** Drive failures are expected (revoked consent, deleted file) — not 500s. */
-function asTRPCError(error: unknown): TRPCError {
+function asORPCError(error: unknown) {
   if (error instanceof GoogleDriveError) {
-    return new TRPCError({
-      code:
-        error.status === 401 || error.status === 403
-          ? "FORBIDDEN"
-          : "BAD_REQUEST",
-      message: error.message,
-    });
+    return new ORPCError(
+      error.status === 401 || error.status === 403
+        ? "FORBIDDEN"
+        : "BAD_REQUEST",
+      { message: error.message },
+    );
   }
-  return new TRPCError({
-    code: "INTERNAL_SERVER_ERROR",
+  return new ORPCError("INTERNAL_SERVER_ERROR", {
     message: error instanceof Error ? error.message : "Google Drive failed.",
   });
 }
 
-export const googleDriveRouter = createTRPCRouter({
+export const googleDriveRouter = {
   /**
    * Whether this user can browse Drive, and the scope the UI must request if
    * not. Cheap enough to call on every render of the media page.
    */
-  status: protectedProcedure.query(async ({ ctx }) => {
-    const connection = await GoogleDriveService.connection(ctx.session.user.id);
-    return { ...connection, scope: DRIVE_READONLY_SCOPE };
-  }),
+  status: actionProcedure(driveConnectionStatus),
 
-  browse: protectedProcedure
-    .input(
-      z.object({
-        folderId: z.string().min(1).max(200).optional(),
-        search: z.string().trim().max(200).optional(),
-        includeFolders: z.boolean().default(true),
-        limit: z.number().int().min(1).max(200).default(100),
-      }),
-    )
-    .query(async ({ ctx, input }) => {
-      try {
-        return await GoogleDriveService.browse({
-          userId: ctx.session.user.id,
-          ...input,
-        });
-      } catch (error) {
-        throw asTRPCError(error);
-      }
-    }),
+  browse: actionProcedure(browseDrive),
 
   importFiles: protectedProcedure
     .input(
@@ -89,7 +69,7 @@ export const googleDriveRouter = createTRPCRouter({
         fileIds: z.array(z.string().min(1).max(200)).min(1).max(50),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandAccess(ctx, input.brandId);
       try {
         const result = await GoogleDriveService.importFiles({
@@ -103,34 +83,7 @@ export const googleDriveRouter = createTRPCRouter({
           assets: result.imported,
         };
       } catch (error) {
-        throw asTRPCError(error);
+        throw asORPCError(error);
       }
     }),
-
-  importFolder: protectedProcedure
-    .input(
-      z.object({
-        brandId: z.string(),
-        folderId: z.string().min(1).max(200),
-        limit: z.number().int().min(1).max(50).default(50),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      await assertBrandAccess(ctx, input.brandId);
-      try {
-        const result = await GoogleDriveService.importFolder({
-          userId: ctx.session.user.id,
-          brandId: input.brandId,
-          folderId: input.folderId,
-          limit: input.limit,
-        });
-        return {
-          imported: result.imported.length,
-          failures: result.failures,
-          assets: result.imported,
-        };
-      } catch (error) {
-        throw asTRPCError(error);
-      }
-    }),
-});
+};

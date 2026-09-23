@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { CalendarIcon, ChevronDown } from "lucide-react";
 
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
@@ -18,35 +18,41 @@ import { cn } from "@/components/ui/lib/utils";
  *  for its planned ship day; the chevron opens a date picker (defaulted to that
  *  day) for when the platform queue date differs. */
 export function MarkScheduledButton({
+  contentPostId,
   spotId,
   at,
   scheduled,
   onChanged,
 }: {
+  contentPostId: string;
   spotId: string;
   /** The spot's effective ship date (ISO), used as the one-click default. */
   at: string | null;
   scheduled: boolean;
   onChanged: () => void;
 }) {
-  const trpc = useTRPC();
   const [pickOpen, setPickOpen] = useState(false);
   const setSchedule = useMutation(
-    trpc.content.setSpotSchedule.mutationOptions({ onSettled: onChanged }),
+    orpc.content.updateWorkItem.mutationOptions({ onSettled: onChanged }),
   );
   const atDate = at ? new Date(at) : undefined;
 
   const mark = (d: Date) =>
     setSchedule.mutate({
-      platformPostId: spotId,
-      // Local noon, same convention as the calendar drag-drop.
-      scheduledAt: new Date(
-        d.getFullYear(),
-        d.getMonth(),
-        d.getDate(),
-        12,
-      ).toISOString(),
-      markScheduled: true,
+      contentPostId,
+      platformDrafts: [
+        {
+          platformPostId: spotId,
+          status: "scheduled",
+          // Local noon, same convention as the calendar drag-drop.
+          scheduledAt: new Date(
+            d.getFullYear(),
+            d.getMonth(),
+            d.getDate(),
+            12,
+          ).toISOString(),
+        },
+      ],
     });
 
   const chip = cn(

@@ -30,7 +30,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/components/ui/lib/utils";
 import { toast } from "@/components/ui/toast";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 type CellState = "rendered" | "overridden" | "frozen";
 
@@ -205,7 +205,6 @@ function AdRow({
   brandLogo: string | null;
 }) {
   const router = useRouter();
-  const trpc = useTRPC();
   const [editingBase, setEditingBase] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   // Which card the library picker fills: an index to swap, or "append".
@@ -217,13 +216,13 @@ function AdRow({
   const onError = (error: { message: string }) => toast.error(error.message);
 
   const photoOnly = useMutation(
-    trpc.ads.setAdPhotoOnly.mutationOptions({ onSuccess: refresh, onError }),
+    orpc.ads.setAdPhotoOnly.mutationOptions({ onSuccess: refresh, onError }),
   );
   const approve = useMutation(
-    trpc.ads.setAdStatus.mutationOptions({ onSuccess: refresh, onError }),
+    orpc.ads.setAdStatus.mutationOptions({ onSuccess: refresh, onError }),
   );
   const remove = useMutation(
-    trpc.ads.deleteAd.mutationOptions({
+    orpc.ads.deleteAd.mutationOptions({
       onSuccess: () => {
         toast.success("Ad deleted.");
         refresh();
@@ -232,10 +231,10 @@ function AdRow({
     }),
   );
   const editCards = useMutation(
-    trpc.ads.editAdCards.mutationOptions({ onSuccess: refresh, onError }),
+    orpc.ads.editAdCards.mutationOptions({ onSuccess: refresh, onError }),
   );
   const cardCopy = useMutation(
-    trpc.ads.setCardCopy.mutationOptions({
+    orpc.ads.setCardCopy.mutationOptions({
       onSuccess: () => {
         setEditingText(null);
         refresh();
@@ -551,11 +550,10 @@ function BaseCopyEditor({
   onClose: () => void;
 }) {
   const router = useRouter();
-  const trpc = useTRPC();
   const [headline, setHeadline] = useState(ad.base.headline);
   const [body, setBody] = useState(ad.base.body);
   const save = useMutation(
-    trpc.ads.setAdCopy.mutationOptions({
+    orpc.ads.setAdCopy.mutationOptions({
       onSuccess: () => {
         toast.success("Base copy updated. Rendered cells follow it.");
         onClose();
@@ -609,7 +607,6 @@ function CellCard({
   brandLogo: string | null;
 }) {
   const router = useRouter();
-  const trpc = useTRPC();
   const [editing, setEditing] = useState(false);
   const [card, setCard] = useState(0);
   const [headline, setHeadline] = useState(cell.copy.headline);
@@ -619,7 +616,7 @@ function CellCard({
   const onError = (error: { message: string }) => toast.error(error.message);
 
   const overrideCopy = useMutation(
-    trpc.ads.setPlacementCopy.mutationOptions({
+    orpc.ads.setPlacementCopy.mutationOptions({
       onSuccess: () => {
         toast.success(`${cell.shortLabel} copy overridden.`);
         setEditing(false);
@@ -629,10 +626,10 @@ function CellCard({
     }),
   );
   const reset = useMutation(
-    trpc.ads.clearPlacement.mutationOptions({ onSuccess: refresh, onError }),
+    orpc.ads.clearPlacement.mutationOptions({ onSuccess: refresh, onError }),
   );
   const freeze = useMutation(
-    trpc.ads.freezePlacement.mutationOptions({
+    orpc.ads.freezePlacement.mutationOptions({
       onSuccess: () => {
         toast.success(`${cell.shortLabel} frozen.`);
         refresh();
@@ -641,7 +638,7 @@ function CellCard({
     }),
   );
   const unfreeze = useMutation(
-    trpc.ads.unfreezePlacement.mutationOptions({ onSuccess: refresh, onError }),
+    orpc.ads.unfreezePlacement.mutationOptions({ onSuccess: refresh, onError }),
   );
 
   const busy =
@@ -707,8 +704,8 @@ function CellCard({
                 overrideCopy.mutate({
                   adId,
                   placementKey: cell.key,
-                  patch: { headline, body },
-                  via: "manual",
+                  headline,
+                  body,
                 })
               }
             >

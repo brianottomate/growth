@@ -1,7 +1,6 @@
-import { TRPCError } from "@trpc/server";
+import { ORPCError } from "@orpc/server";
 import { z } from "zod";
-import type { TRPCRouterRecord } from "@trpc/server";
-import { protectedProcedure } from "../trpc";
+import { protectedProcedure } from "@/server/api/orpc";
 import {
   isOutreachConfigured,
   testConnection,
@@ -10,7 +9,7 @@ import {
 } from "@/server/clients/outreach.client";
 
 /**
- * Outreach tRPC Router
+ * Outreach oRPC Router
  *
  * Provides type-safe access to Outreach API endpoints.
  * All endpoints require authentication (protectedProcedure).
@@ -21,10 +20,9 @@ export const outreachRouter = {
    *
    * Verifies that S2S credentials are configured and working.
    */
-  testAuth: protectedProcedure.query(async () => {
+  testAuth: protectedProcedure.handler(async () => {
     if (!isOutreachConfigured) {
-      throw new TRPCError({
-        code: "PRECONDITION_FAILED",
+      throw new ORPCError("PRECONDITION_FAILED", {
         message:
           "Outreach is not configured. Set OUTREACH_S2S_GUID, OUTREACH_PRIVATE_KEY, and OUTREACH_INSTALL_ID.",
       });
@@ -33,8 +31,7 @@ export const outreachRouter = {
     const result = await testConnection();
 
     if (!result.success) {
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
+      throw new ORPCError("INTERNAL_SERVER_ERROR", {
         message: `Outreach connection failed: ${result.message}`,
       });
     }
@@ -57,10 +54,9 @@ export const outreachRouter = {
         pageNumber: z.number().min(1).optional(),
       }),
     )
-    .query(async ({ input }) => {
+    .handler(async ({ input }) => {
       if (!isOutreachConfigured) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
+        throw new ORPCError("PRECONDITION_FAILED", {
           message:
             "Outreach is not configured. Set OUTREACH_S2S_GUID, OUTREACH_PRIVATE_KEY, and OUTREACH_INSTALL_ID.",
         });
@@ -78,22 +74,19 @@ export const outreachRouter = {
 
         if (isOutreachError(error)) {
           if (error.isRateLimited) {
-            throw new TRPCError({
-              code: "TOO_MANY_REQUESTS",
+            throw new ORPCError("TOO_MANY_REQUESTS", {
               message: `Rate limited. ${error.retryAfter ? `Retry after ${error.retryAfter}s` : ""}`,
             });
           }
 
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
+          throw new ORPCError("INTERNAL_SERVER_ERROR", {
             message: error.message,
           });
         }
 
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
+        throw new ORPCError("INTERNAL_SERVER_ERROR", {
           message: "Failed to fetch prospects from Outreach",
         });
       }
     }),
-} satisfies TRPCRouterRecord;
+};

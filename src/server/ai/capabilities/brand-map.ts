@@ -7,7 +7,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/server/db";
 import { brandTable } from "@/server/db/schema";
 import { getBrandSurfaceSummary } from "@/server/services/brand-map.service";
-import { growthAction } from "./types";
+import { growthAction, GrowthActionError } from "./types";
 
 export const getBrandMap = growthAction({
   outputSchema: getBrandMapOutputSchema,
@@ -33,11 +33,10 @@ export const getBrandMap = growthAction({
     });
 
     if (input.brandId && brands.length === 0) {
-      return {
-        error:
-          "That brand is not in this organization. Call listBrands to get a valid brandId.",
-        brands: [],
-      };
+      throw new GrowthActionError(
+        "not_found",
+        "That brand is not in this organization. Call listBrands to get a valid brandId.",
+      );
     }
 
     const mapped = await Promise.all(

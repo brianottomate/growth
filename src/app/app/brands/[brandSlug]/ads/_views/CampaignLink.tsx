@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  campaignPath,
+  type CampaignWorkspace,
+} from "@/lib/campaign-navigation";
+
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -8,7 +13,7 @@ import { Link2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 /**
  * The unlinked→first-party mapping: attach this platform campaign to a
@@ -19,24 +24,25 @@ import { useTRPC } from "@/trpc/react";
 export function CampaignLink({
   brandId,
   brandSlug,
+  workspace = "brand",
   platformCampaignId,
   campaign,
 }: {
   brandId: string;
   brandSlug: string;
+  workspace?: CampaignWorkspace;
   platformCampaignId: string;
   campaign: { id: string; name: string } | null;
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [newName, setNewName] = useState("");
 
   const options = useQuery(
-    trpc.ads.campaigns.queryOptions({ brandId }, { enabled: open }),
+    orpc.ads.campaigns.queryOptions({ input: { brandId }, enabled: open }),
   );
   const link = useMutation(
-    trpc.ads.attachPlatformCampaign.mutationOptions({
+    orpc.ads.attachPlatformCampaign.mutationOptions({
       onSuccess: () => {
         setOpen(false);
         setNewName("");
@@ -50,7 +56,7 @@ export function CampaignLink({
       <span className="text-sm text-muted-foreground">
         Campaign:{" "}
         <Link
-          href={`/app/brands/${brandSlug}/ads/${campaign.id}`}
+          href={campaignPath(brandSlug, campaign.id, workspace)}
           className="text-foreground hover:underline"
         >
           {campaign.name}

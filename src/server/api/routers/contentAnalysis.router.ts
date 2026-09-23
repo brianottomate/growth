@@ -1,4 +1,4 @@
-import { TRPCError } from "@trpc/server";
+import { ORPCError } from "@orpc/server";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 
@@ -23,12 +23,12 @@ import {
   normalizeContentSource,
 } from "@/server/services/content-analysis.service";
 
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { protectedProcedure } from "@/server/api/orpc";
 
 const metadataText = (value: unknown, fallback: string) =>
   typeof value === "string" && value.trim() ? value : fallback;
 
-export const contentAnalysisRouter = createTRPCRouter({
+export const contentAnalysisRouter = {
   analyzeWebsitePortfolio: protectedProcedure
     .input(
       z.object({
@@ -36,11 +36,11 @@ export const contentAnalysisRouter = createTRPCRouter({
         includeSavedPageAnalyses: z.boolean().default(false),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const membership = await ctx.db.query.memberTable.findFirst({
         where: eq(memberTable.userId, ctx.session.user.id),
       });
-      if (!membership) throw new TRPCError({ code: "FORBIDDEN" });
+      if (!membership) throw new ORPCError("FORBIDDEN");
 
       const brands = await ctx.db.query.brandTable.findMany({
         where: and(
@@ -51,8 +51,7 @@ export const contentAnalysisRouter = createTRPCRouter({
         columns: { id: true, name: true },
       });
       if (!brands.length) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
+        throw new ORPCError("NOT_FOUND", {
           message: input.brandId ? "Owned brand not found" : "No brands found",
         });
       }
@@ -69,8 +68,7 @@ export const contentAnalysisRouter = createTRPCRouter({
         limit: 80,
       });
       if (!pages.length) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
+        throw new ORPCError("BAD_REQUEST", {
           message: "Sync a website before analyzing its page system",
         });
       }
@@ -133,14 +131,14 @@ export const contentAnalysisRouter = createTRPCRouter({
         steer: z.string().trim().max(1_000).optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       if (input.kind === "website") {
         const page = await ctx.db.query.webPageTable.findFirst({
           where: eq(webPageTable.id, input.id),
           with: { brand: true },
         });
         if (!page?.brand?.organizationId) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "Page not found" });
+          throw new ORPCError("NOT_FOUND", { message: "Page not found" });
         }
         const membership = await ctx.db.query.memberTable.findFirst({
           where: and(
@@ -148,11 +146,10 @@ export const contentAnalysisRouter = createTRPCRouter({
             eq(memberTable.organizationId, page.brand.organizationId),
           ),
         });
-        if (!membership) throw new TRPCError({ code: "FORBIDDEN" });
+        if (!membership) throw new ORPCError("FORBIDDEN");
         const source = await loadReadableSource(page.url);
         if (!source) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
+          throw new ORPCError("BAD_REQUEST", {
             message: "The live page could not be read",
           });
         }
@@ -197,10 +194,7 @@ ${source}`;
         with: { brand: true },
       });
       if (!post?.brand) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Artifact not found",
-        });
+        throw new ORPCError("NOT_FOUND", { message: "Artifact not found" });
       }
       const memberships = await ctx.db.query.memberTable.findMany({
         where: eq(memberTable.userId, ctx.session.user.id),
@@ -228,7 +222,7 @@ ${source}`;
           hasAccess = Boolean(inspiration);
         }
       }
-      if (!hasAccess) throw new TRPCError({ code: "FORBIDDEN" });
+      if (!hasAccess) throw new ORPCError("FORBIDDEN");
 
       let source: string | null = null;
       let title = post.text ?? "Untitled";
@@ -263,8 +257,7 @@ ${source}`;
         );
       }
       if (!source) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
+        throw new ORPCError("BAD_REQUEST", {
           message: "The artifact has no readable content",
         });
       }
@@ -302,4 +295,4 @@ ${source}`;
         .where(eq(platformPostTable.id, post.id));
       return analysis;
     }),
-});
+};

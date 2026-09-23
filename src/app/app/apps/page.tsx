@@ -8,7 +8,12 @@ import {
 
 import { StorefrontOperations } from "./StorefrontOperations";
 
-export default async function AppsPage() {
+export default async function AppsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ brand?: string }>;
+}) {
+  const { brand } = await searchParams;
   const session = await getSession();
   if (!session?.user) redirect("/signin");
   const orgId = await resolveProductOrganizationId({
@@ -20,5 +25,14 @@ export default async function AppsPage() {
     userId: session.user.id,
     kind: "human",
   });
-  return <StorefrontOperations storefronts={storefronts} />;
+  return (
+    <StorefrontOperations
+      key={brand ?? "all"}
+      storefronts={
+        brand
+          ? storefronts.filter((row) => row.product.brandId === brand)
+          : storefronts
+      }
+    />
+  );
 }

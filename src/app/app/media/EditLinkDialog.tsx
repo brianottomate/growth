@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SimpleSelect } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { PhotoPickerField, usePhotoPicker } from "../people/PhotoPicker";
 
 const KIND_OPTIONS = [
@@ -45,7 +45,6 @@ export function EditLinkDialog({
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }) {
-  const trpc = useTRPC();
   const thumb = usePhotoPicker(asset?.thumbnailUrl ?? null);
   const [title, setTitle] = useState(asset?.title ?? "");
   const [url, setUrl] = useState(asset?.externalUrl ?? "");
@@ -64,7 +63,7 @@ export function EditLinkDialog({
   }, [asset?.id, open]);
 
   const updateExternal = useMutation(
-    trpc.media.updateExternal.mutationOptions({
+    orpc.media.updateExternal.mutationOptions({
       onSuccess: () => {
         toast.success("Saved");
         onOpenChange(false);

@@ -1,13 +1,14 @@
 import { z } from "zod";
-import { TRPCError } from "@trpc/server";
+import { ORPCError } from "@orpc/server";
 import { and, eq, gt, isNull, or } from "drizzle-orm";
 
 import {
-  createTRPCRouter,
   organizationProcedure,
   protectedProcedure,
   publicProcedure,
-} from "../trpc";
+  organizationAccess,
+  organizationInput,
+} from "@/server/api/orpc";
 import * as schema from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
 import { R2 } from "@/server/clients/r2.client";
@@ -36,10 +37,7 @@ async function uploadUserPhoto(
   if (src.photo) {
     const buffer = Buffer.from(src.photo.base64Data, "base64");
     if (buffer.length > MAX_PHOTO_BYTES) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "Photo exceeds 4.5MB",
-      });
+      throw new ORPCError("BAD_REQUEST", { message: "Photo exceeds 4.5MB" });
     }
     const key = R2.buildUserPhotoKey(userId, src.photo.filename);
     return R2.putBuffer(key, buffer, src.photo.mimeType);
@@ -52,11 +50,11 @@ async function uploadUserPhoto(
   return null;
 }
 
-export const orgRouter = createTRPCRouter({
+export const orgRouter = {
   // Get invitation details (public - used by invite page)
   getOrgInvite: publicProcedure
     .input(z.object({ invitationId: z.string() }))
-    .query(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const invitation = await ctx.db.query.invitationTable.findFirst({
         where: eq(schema.invitationTable.id, input.invitationId),
         with: {
@@ -73,24 +71,17 @@ export const orgRouter = createTRPCRouter({
       });
 
       if (!invitation) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Invitation not found",
-        });
+        throw new ORPCError("NOT_FOUND", { message: "Invitation not found" });
       }
 
       // Check if expired
       if (invitation.expiresAt && invitation.expiresAt < new Date()) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Invitation expired",
-        });
+        throw new ORPCError("BAD_REQUEST", { message: "Invitation expired" });
       }
 
       // Check if already accepted
       if (invitation.status !== "pending") {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
+        throw new ORPCError("BAD_REQUEST", {
           message: "Invitation no longer valid",
         });
       }
@@ -101,7 +92,7 @@ export const orgRouter = createTRPCRouter({
   // Accept invitation (protected)
   acceptInvitation: protectedProcedure
     .input(z.object({ invitationId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       // Delegate to Better Auth
       const result = await ctx.authApi.acceptInvitation({
         body: { invitationId: input.invitationId },
@@ -112,7 +103,7 @@ export const orgRouter = createTRPCRouter({
     }),
 
   // List user's organizations
-  list: protectedProcedure.query(async ({ ctx }) => {
+  list: protectedProcedure.handler(async ({ context: ctx }) => {
     const orgs = await ctx.authApi.listOrganizations({
       headers: ctx.headers,
     });
@@ -127,7 +118,7 @@ export const orgRouter = createTRPCRouter({
         slug: z.string().min(1).max(100),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const org = await ctx.authApi.createOrganization({
         body: {
           name: input.name,
@@ -141,7 +132,7 @@ export const orgRouter = createTRPCRouter({
   // Get organization by slug
   getBySlug: protectedProcedure
     .input(z.object({ slug: z.string() }))
-    .query(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const org = await ctx.db.query.organizationTable.findFirst({
         where: eq(schema.organizationTable.slug, input.slug),
         with: {
@@ -161,10 +152,7 @@ export const orgRouter = createTRPCRouter({
       });
 
       if (!org) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Organization not found",
-        });
+        throw new ORPCError("NOT_FOUND", { message: "Organization not found" });
       }
 
       // Check if user is a member
@@ -173,8 +161,7 @@ export const orgRouter = createTRPCRouter({
       );
 
       if (!isMember) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
+        throw new ORPCError("FORBIDDEN", {
           message: "You are not a member of this organization",
         });
       }
@@ -192,18 +179,18 @@ export const orgRouter = createTRPCRouter({
     }),
 
   // Update organization (admins+)
-  update: organizationProcedure
+  update: protectedProcedure
     .input(
-      z.object({
+      organizationInput.extend({
         name: z.string().min(1).max(100).optional(),
         slug: z.string().min(1).max(100).optional(),
         logo: z.string().nullable().optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .use(organizationAccess)
+    .handler(async ({ context: ctx, input }) => {
       if (!ctx.orgPermissions.canUpdateOrg) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
+        throw new ORPCError("FORBIDDEN", {
           message: "Only admins can update organization settings",
         });
       }
@@ -213,8 +200,7 @@ export const orgRouter = createTRPCRouter({
           where: eq(schema.organizationTable.slug, input.slug),
         });
         if (existing && existing.id !== ctx.organization.id) {
-          throw new TRPCError({
-            code: "CONFLICT",
+          throw new ORPCError("CONFLICT", {
             message: "This slug is already taken",
           });
         }
@@ -234,10 +220,9 @@ export const orgRouter = createTRPCRouter({
     }),
 
   // Delete organization (owner only)
-  delete: organizationProcedure.mutation(async ({ ctx }) => {
+  delete: organizationProcedure.handler(async ({ context: ctx }) => {
     if (!ctx.orgPermissions.canDeleteOrg) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
+      throw new ORPCError("FORBIDDEN", {
         message: "Only the owner can delete the organization",
       });
     }
@@ -250,17 +235,17 @@ export const orgRouter = createTRPCRouter({
   }),
 
   // Invite member (admins+)
-  inviteMember: organizationProcedure
+  inviteMember: protectedProcedure
     .input(
-      z.object({
+      organizationInput.extend({
         email: z.string().email(),
         role: z.enum(["admin", "member"]),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .use(organizationAccess)
+    .handler(async ({ context: ctx, input }) => {
       if (!ctx.orgPermissions.canInvite) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
+        throw new ORPCError("FORBIDDEN", {
           message: "Only admins can invite members",
         });
       }
@@ -276,9 +261,9 @@ export const orgRouter = createTRPCRouter({
     }),
 
   // Pre-create a teammate's account (admins+, no email sent).
-  createPerson: organizationProcedure
+  createPerson: protectedProcedure
     .input(
-      z.object({
+      organizationInput.extend({
         name: z.string().min(1).max(120),
         email: z.string().email(),
         role: z.enum(["admin", "member"]).default("member"),
@@ -292,10 +277,10 @@ export const orgRouter = createTRPCRouter({
         photoUrl: z.string().url().optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .use(organizationAccess)
+    .handler(async ({ context: ctx, input }) => {
       if (!ctx.orgPermissions.canManageMembers) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
+        throw new ORPCError("FORBIDDEN", {
           message: "Only admins can create members",
         });
       }
@@ -317,12 +302,12 @@ export const orgRouter = createTRPCRouter({
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Failed to create user";
-        throw new TRPCError({
-          code: message.toLowerCase().includes("already")
+        throw new ORPCError(
+          message.toLowerCase().includes("already")
             ? "CONFLICT"
             : "BAD_REQUEST",
-          message,
-        });
+          { message },
+        );
       }
 
       const existing = await ctx.db.query.memberTable.findFirst({
@@ -366,10 +351,9 @@ export const orgRouter = createTRPCRouter({
     }),
 
   // Only genuinely pending, unexpired invitations (admins+).
-  listInvitations: organizationProcedure.query(async ({ ctx }) => {
+  listInvitations: organizationProcedure.handler(async ({ context: ctx }) => {
     if (!ctx.orgPermissions.canInvite) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
+      throw new ORPCError("FORBIDDEN", {
         message: "Only admins can view invitations",
       });
     }
@@ -391,12 +375,12 @@ export const orgRouter = createTRPCRouter({
     });
   }),
 
-  cancelInvitation: organizationProcedure
-    .input(z.object({ invitationId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+  cancelInvitation: protectedProcedure
+    .input(organizationInput.extend({ invitationId: z.string() }))
+    .use(organizationAccess)
+    .handler(async ({ context: ctx, input }) => {
       if (!ctx.orgPermissions.canInvite) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
+        throw new ORPCError("FORBIDDEN", {
           message: "Only admins can cancel invitations",
         });
       }
@@ -409,8 +393,7 @@ export const orgRouter = createTRPCRouter({
         columns: { id: true },
       });
       if (!invitation) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
+        throw new ORPCError("NOT_FOUND", {
           message: "Invitation not found in this organization",
         });
       }
@@ -423,12 +406,12 @@ export const orgRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  removeMember: organizationProcedure
-    .input(z.object({ memberId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+  removeMember: protectedProcedure
+    .input(organizationInput.extend({ memberId: z.string() }))
+    .use(organizationAccess)
+    .handler(async ({ context: ctx, input }) => {
       if (!ctx.orgPermissions.canManageMembers) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
+        throw new ORPCError("FORBIDDEN", {
           message: "Only admins can remove members",
         });
       }
@@ -440,21 +423,18 @@ export const orgRouter = createTRPCRouter({
         ),
       });
       if (!member) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
+        throw new ORPCError("NOT_FOUND", {
           message: "Member not found in this organization",
         });
       }
       if (member.userId === ctx.session.user.id) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
+        throw new ORPCError("BAD_REQUEST", {
           message: "You can't remove yourself",
         });
       }
       if (member.role === "owner") {
         if (ctx.membership.role !== "owner") {
-          throw new TRPCError({
-            code: "FORBIDDEN",
+          throw new ORPCError("FORBIDDEN", {
             message: "Only an owner can remove another owner",
           });
         }
@@ -466,8 +446,7 @@ export const orgRouter = createTRPCRouter({
           columns: { id: true },
         });
         if (owners.length <= 1) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
+          throw new ORPCError("BAD_REQUEST", {
             message: "An organization must keep at least one owner",
           });
         }
@@ -480,12 +459,12 @@ export const orgRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  resetPassword: organizationProcedure
-    .input(z.object({ memberId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+  resetPassword: protectedProcedure
+    .input(organizationInput.extend({ memberId: z.string() }))
+    .use(organizationAccess)
+    .handler(async ({ context: ctx, input }) => {
       if (!ctx.orgPermissions.canManageMembers) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
+        throw new ORPCError("FORBIDDEN", {
           message: "Only admins can reset member passwords",
         });
       }
@@ -498,8 +477,7 @@ export const orgRouter = createTRPCRouter({
         columns: { userId: true },
       });
       if (!member) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
+        throw new ORPCError("NOT_FOUND", {
           message: "Member not found in this organization",
         });
       }
@@ -509,9 +487,9 @@ export const orgRouter = createTRPCRouter({
     }),
 
   // Members may edit themselves; admins may edit other members.
-  updatePerson: organizationProcedure
+  updatePerson: protectedProcedure
     .input(
-      z.object({
+      organizationInput.extend({
         memberId: z.string(),
         name: z.string().min(1).max(120).optional(),
         role: z.enum(["owner", "admin", "member"]).optional(),
@@ -525,7 +503,8 @@ export const orgRouter = createTRPCRouter({
         photoUrl: z.string().url().optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .use(organizationAccess)
+    .handler(async ({ context: ctx, input }) => {
       const member = await ctx.db.query.memberTable.findFirst({
         where: and(
           eq(schema.memberTable.id, input.memberId),
@@ -533,37 +512,32 @@ export const orgRouter = createTRPCRouter({
         ),
       });
       if (!member) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
+        throw new ORPCError("NOT_FOUND", {
           message: "Member not found in this organization",
         });
       }
 
       const isSelf = member.userId === ctx.session.user.id;
       if (!isSelf && !ctx.orgPermissions.canManageMembers) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
+        throw new ORPCError("FORBIDDEN", {
           message: "Only admins can edit another member",
         });
       }
 
       if (input.role && input.role !== member.role) {
         if (isSelf) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
+          throw new ORPCError("BAD_REQUEST", {
             message: "You can't change your own role",
           });
         }
         if (!ctx.orgPermissions.canManageMembers) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
+          throw new ORPCError("FORBIDDEN", {
             message: "Only admins can change member roles",
           });
         }
         const ownerInvolved = input.role === "owner" || member.role === "owner";
         if (ownerInvolved && ctx.membership.role !== "owner") {
-          throw new TRPCError({
-            code: "FORBIDDEN",
+          throw new ORPCError("FORBIDDEN", {
             message: "Only an owner can assign or change the owner role",
           });
         }
@@ -576,8 +550,7 @@ export const orgRouter = createTRPCRouter({
             columns: { id: true },
           });
           if (owners.length <= 1) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
+            throw new ORPCError("BAD_REQUEST", {
               message: "An organization must keep at least one owner",
             });
           }
@@ -608,4 +581,4 @@ export const orgRouter = createTRPCRouter({
 
       return { success: true };
     }),
-});
+};

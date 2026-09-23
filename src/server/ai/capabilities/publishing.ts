@@ -84,7 +84,7 @@ export const publishSocialPostNow = growthAction({
   inputSchema: z.object({ platformPostId: z.string() }),
   execute: async (input, ctx) => {
     const post = await requireOwnedSocialPost(input.platformPostId, ctx.orgId);
-    await ContentService.setPublishingUnitStatus({
+    await ContentService.setPublishingUnit({
       rootPlatformPostId: post.id,
       status: "approved",
     });

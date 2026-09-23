@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Building2, Clock } from "lucide-react";
 import { useQueryState } from "nuqs";
 
-import { useTRPC, type RouterOutputs } from "@/trpc/react";
+import { orpc, type RouterOutputs } from "@/orpc/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -40,9 +40,6 @@ export function OrganizationInviteClient({
 
   // Query param to trigger auto-accept after auth redirect
   const [autoAccept, setAutoAccept] = useQueryState("autoAccept");
-
-  const trpc = useTRPC();
-
   const redirectToOrg = () => {
     const destination = initialInvitation.organization.slug
       ? `/app/org/${initialInvitation.organization.slug}`
@@ -51,7 +48,7 @@ export function OrganizationInviteClient({
   };
 
   const acceptMutation = useMutation(
-    trpc.org.acceptInvitation.mutationOptions({
+    orpc.org.acceptInvitation.mutationOptions({
       onSuccess: redirectToOrg,
       onError: (err) => {
         const message = err.message || "Failed to accept invitation";

@@ -6,7 +6,7 @@ import { Check, Copy, ExternalLink, Send } from "lucide-react";
 
 import { toast } from "@/components/ui/toast";
 import type { TrackedLinkInput } from "@/lib/tracked-link";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 import { CopyTrackedLink } from "./CopyTrackedLink";
 
@@ -33,9 +33,8 @@ export function ListenItemActions({
   trackedLink?: TrackedLinkInput;
 }) {
   const [copied, setCopied] = useState(false);
-  const trpc = useTRPC();
   const testSlack = useMutation(
-    trpc.mention.testSlack.mutationOptions({
+    orpc.mention.testSlack.mutationOptions({
       onSuccess: (res) => {
         if (res.success) toast.success(`Sent test mention to ${res.channel}`);
         else toast.error(`Slack: ${res.error}`);

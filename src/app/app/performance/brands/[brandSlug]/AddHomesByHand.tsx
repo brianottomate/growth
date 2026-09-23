@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/components/ui/lib/utils";
 import { toast } from "@/components/ui/toast";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 export type HandHome = {
   id: string;
@@ -36,12 +36,11 @@ export function AddHomesByHand({
   homes: HandHome[];
 }) {
   const router = useRouter();
-  const trpc = useTRPC();
   const [paste, setPaste] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const shells = useMutation(
-    trpc.brand.homesShellsFromText.mutationOptions({
+    orpc.brand.homesShellsFromText.mutationOptions({
       onSuccess: (result) => {
         toast.success(
           `Added ${result.added} home${result.added === 1 ? "" : "s"}.`,
@@ -53,7 +52,7 @@ export function AddHomesByHand({
     }),
   );
   const drop = useMutation(
-    trpc.brand.homesRemove.mutationOptions({
+    orpc.brand.homesRemove.mutationOptions({
       onSuccess: () => router.refresh(),
       onError: (error) => toast.error(error.message),
       onSettled: () => setBusyId(null),

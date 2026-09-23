@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useMutation } from "@tanstack/react-query";
 import { MessageSquare, X } from "lucide-react";
 
-import { useTRPC } from "@/trpc/react";
+import { orpc, type RouterInputs } from "@/orpc/client";
 import { SimpleSelect } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
@@ -29,6 +29,10 @@ import {
   PlatformPostEditDialog,
   type PlatformThreadItemData,
 } from "./PlatformPostEditDialog";
+
+type SpotDraft = NonNullable<
+  RouterInputs["content"]["updateWorkItem"]["platformDrafts"]
+>[number];
 
 const STATUS_PILL: Record<string, string> = {
   published: "bg-emerald-500/15 text-emerald-300",
@@ -141,7 +145,6 @@ export function SpotCard({
   contentTitle: string;
   brandName: string;
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const owned = spot.source === "owned";
   const story = isStoryFormat(spot.format);
@@ -158,14 +161,16 @@ export function SpotCard({
     (spot.format === "newsletter.broadcast" ||
       spot.format === "newsletter.blast");
   const refresh = { onSettled: () => router.refresh() };
-  const setStatus = useMutation(
-    trpc.content.setSpotStatus.mutationOptions(refresh),
+  const update = useMutation(
+    orpc.content.updateWorkItem.mutationOptions(refresh),
   );
-  const setSchedule = useMutation(
-    trpc.content.setSpotSchedule.mutationOptions(refresh),
-  );
+  const updateSpot = (draft: Omit<SpotDraft, "platformPostId">) =>
+    update.mutate({
+      contentPostId,
+      platformDrafts: [{ platformPostId: spot.id, ...draft }],
+    });
   const removeSpot = useMutation(
-    trpc.content.removeSpot.mutationOptions(refresh),
+    orpc.content.removeSpot.mutationOptions(refresh),
   );
 
   const label = formatLabel(spot.format, spot.archetype, spot.template);
@@ -259,10 +264,7 @@ export function SpotCard({
                     : "draft"
                 }
                 onValueChange={(status) =>
-                  setStatus.mutate({
-                    platformPostId: spot.id,
-                    status: status as never,
-                  })
+                  updateSpot({ status: status as SpotDraft["status"] })
                 }
                 options={STATUS_OPTIONS}
                 size="sm"
@@ -289,8 +291,7 @@ export function SpotCard({
                     value={toLocalDateTimeInput(spot.scheduledAtISO)}
                     min={toLocalDateTimeInput(new Date().toISOString())}
                     onChange={(event) =>
-                      setSchedule.mutate({
-                        platformPostId: spot.id,
+                      updateSpot({
                         scheduledAt: event.target.value
                           ? new Date(event.target.value).toISOString()
                           : null,
@@ -308,8 +309,7 @@ export function SpotCard({
                         : undefined
                     }
                     onChange={(date) =>
-                      setSchedule.mutate({
-                        platformPostId: spot.id,
+                      updateSpot({
                         scheduledAt: date ? date.toISOString() : null,
                       })
                     }
@@ -320,6 +320,7 @@ export function SpotCard({
                 )}
                 {spot.status !== "published" && !providerPublishing && (
                   <MarkScheduledButton
+                    contentPostId={contentPostId}
                     spotId={spot.id}
                     at={spot.scheduledAtISO}
                     scheduled={spot.status === "scheduled"}

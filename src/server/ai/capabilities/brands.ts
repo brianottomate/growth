@@ -49,7 +49,7 @@ export async function orgBrandIds(orgId: string): Promise<string[]> {
 export const listBrands = growthAction({
   outputSchema: listBrandsOutputSchema,
   description:
-    "List the brands in the current organization (id, name, tagline). Use when the operator asks about brands or you need a brand's name/id.",
+    "List the brands in the current organization (id, name, tagline, and Wander's relationship to each: internal, client, prospect or reference). Use when the operator asks about brands or you need a brand's name/id.",
   inputSchema: z.object({}),
   execute: async (_input, ctx) => {
     const brands = await db.query.brandTable.findMany({
@@ -57,7 +57,8 @@ export const listBrands = growthAction({
         eq(brandTable.organizationId, ctx.orgId),
         isNull(brandTable.deletedAt),
       ),
-      columns: { id: true, name: true, tagline: true },
+      columns: { id: true, name: true, tagline: true, relationship: true },
+      orderBy: (t, { asc }) => asc(t.name),
     });
     return { brands };
   },
@@ -251,12 +252,39 @@ export const setBrandMarkAction = growthAction({
       .string()
       .trim()
       .max(60)
-      .optional()
+      .nullish()
       .describe("Lockup only: the wordmark text. Defaults to the brand name."),
     iconFrom: z
       .enum(["logo", "favicon"])
-      .optional()
-      .describe("Lockup only: which scraped image is the icon. Default logo."),
+      .nullish()
+      .describe(
+        "Lockup only: which scraped image is the icon. Default logo; null for a wordmark with no icon.",
+      ),
+    iconAssetId: z
+      .string()
+      .nullish()
+      .describe(
+        "Lockup only: a library image to use as the icon instead of iconFrom.",
+      ),
+    fontFamily: z
+      .string()
+      .trim()
+      .max(80)
+      .nullish()
+      .describe(
+        "Lockup only: the wordmark font. Omit for the brand's heading font; null for the house font.",
+      ),
+    tuning: z
+      .object({
+        iconScale: z.number().min(0.7).max(1.4),
+        iconShift: z.number().min(-0.3).max(0.3),
+        gapScale: z.number().min(0.6).max(1.6),
+        note: z.string().max(600),
+      })
+      .nullish()
+      .describe(
+        "Lockup only: art director corrections to keep as given; null saves the lockup as measured. Omit to have it judged before saving.",
+      ),
   }),
   outputSchema: z.object({
     brandId: z.string(),
@@ -275,26 +303,37 @@ export const setBrandMarkAction = growthAction({
   ],
   execute: async (input, ctx) => {
     const brand = await assertOwnedBrand(input.brandId, ctx.orgId);
+    const lockup = input.source === "lockup";
+    const iconAssetId = lockup ? (input.iconAssetId ?? null) : null;
     const recipe = {
       source: input.source,
-      iconAssetId: null,
-      iconFrom: input.source === "lockup" ? (input.iconFrom ?? "logo") : null,
+      iconAssetId,
+      iconFrom:
+        !lockup || iconAssetId
+          ? null
+          : input.iconFrom === undefined
+            ? ("logo" as const)
+            : input.iconFrom,
       text: input.text ?? null,
+      fontFamily: lockup ? input.fontFamily : undefined,
     };
     // A lockup is measured, then looked at: the same vision pass the editor's
-    // Fix with AI runs, applied before the tones are rendered.
+    // Fix with AI runs, applied before the tones are rendered. Corrections the
+    // caller already accepted are kept as given.
     const tuning =
-      input.source === "lockup"
-        ? await critiqueBrandMark({ brandId: brand.id, recipe }).catch(
-            (error: unknown) => {
-              console.error(
-                "lockup critique failed, saving as measured",
-                error,
-              );
-              return null;
-            },
-          )
-        : null;
+      input.tuning !== undefined
+        ? input.tuning
+        : lockup
+          ? await critiqueBrandMark({ brandId: brand.id, recipe }).catch(
+              (error: unknown) => {
+                console.error(
+                  "lockup critique failed, saving as measured",
+                  error,
+                );
+                return null;
+              },
+            )
+          : null;
     const mark = await setBrandMark({
       brandId: brand.id,
       userId: ctx.userId,

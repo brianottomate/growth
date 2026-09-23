@@ -29,6 +29,11 @@ export const navigateWorkspaceOutputSchema = z.union([
     action: z.literal("navigate"),
     data: z.strictObject({
       href: z.enum([
+        "/app/performance",
+        "/app/performance/clients",
+        "/app/performance/campaigns",
+        "/app/performance/prospects",
+        "/app/performance/accounts",
         "/app/brands",
         "/app/review",
         "/app/pillars",
@@ -63,6 +68,11 @@ export const navigateWorkspaceOutputSchema = z.union([
       note: z.string(),
       opened: z.literal("index"),
       surface: z.enum([
+        "performance",
+        "performance_clients",
+        "performance_campaigns",
+        "performance_prospects",
+        "performance_accounts",
         "spend",
         "plan",
         "website",

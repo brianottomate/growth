@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 export type TrackedLite = {
   inspirationId: string;
@@ -57,7 +57,6 @@ export function TrackedBrands({
   tracked: TrackedLite[];
 }) {
   const router = useRouter();
-  const trpc = useTRPC();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [website, setWebsite] = useState("");
@@ -68,7 +67,7 @@ export function TrackedBrands({
 
   const refresh = () => router.refresh();
   const createM = useMutation(
-    trpc.brand.create.mutationOptions({
+    orpc.brand.create.mutationOptions({
       onSuccess: () => {
         setOpen(false);
         setName("");
@@ -82,7 +81,7 @@ export function TrackedBrands({
     }),
   );
   const untrackM = useMutation(
-    trpc.brand.untrack.mutationOptions({ onSuccess: refresh }),
+    orpc.brand.untrack.mutationOptions({ onSuccess: refresh }),
   );
 
   const save = () =>

@@ -22,7 +22,7 @@ import {
   type AdPushGoal,
   type PushableAdPlatform,
 } from "@/lib/ad-platforms";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 import { money } from "./format";
 
@@ -66,7 +66,6 @@ export function PushToPlatform({
     : audienceCount > 1
       ? `${platformName} has no dry run for the multi-audience shape`
       : undefined;
-  const trpc = useTRPC();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [selectedGoal, setGoal] = useState<AdPushGoal>(goals[0] ?? "traffic");
@@ -74,10 +73,10 @@ export function PushToPlatform({
   const [destinationKey, setDestinationKey] = useState("");
 
   const destinations = useQuery(
-    trpc.ads.destinations.queryOptions(
-      { brandSlug, platform: zernioAdPlatformKey(platform) },
-      { enabled: open },
-    ),
+    orpc.ads.destinations.queryOptions({
+      input: { brandSlug, platform: zernioAdPlatformKey(platform) },
+      enabled: open,
+    }),
   );
   // A Meta destination names the Page it runs as, because that is the
   // identity the client's ads will carry; one bound to the wrong Page is
@@ -101,7 +100,7 @@ export function PushToPlatform({
       (options.length === 1 ? options[0] : undefined));
 
   const push = useMutation(
-    trpc.ads.pushDraftToPlatform.mutationOptions({
+    orpc.ads.pushDraftToPlatform.mutationOptions({
       onSuccess: (result) => {
         // A dry run stays open to show its result; a real push lands on the
         // platform campaign it just made real.

@@ -30,8 +30,16 @@ import { z } from "zod";
 import { growthAction, GrowthActionError } from "./types";
 import { requireOwnedBrand, requireVisibleBrand } from "./brand-access";
 import { discoverAndSaveSuggestions } from "@/server/services/social-discovery.service";
-import { scrapeBrandChannel } from "@/server/services/peer-scrape.service";
+import {
+  ScrapeSetupError,
+  scrapeBrandChannel,
+} from "@/server/services/peer-scrape.service";
 import { syncBrandContent } from "@/server/services/content-sync.service";
+import {
+  failContentIngestRun,
+  finishContentIngestRun,
+  startContentIngestRun,
+} from "@/server/services/platform-post-ingest.service";
 import { syncBrandWebsite as syncWebsite } from "@/server/services/website-sync.service";
 import { syncBrandBlog as syncBlog } from "@/server/services/blog-sync.service";
 import { suggestGroupingsForBrand } from "@/server/services/content-grouping.service";
@@ -171,14 +179,25 @@ export const scrapeBrandPosts = growthAction({
   }),
   execute: async ({ brandId, platform, sinceDays, limit }, ctx) => {
     await requireVisibleBrand(brandId, ctx);
-    const result = await scrapeBrandChannel({
-      brandId,
-      platform,
-      sinceDays,
-      limit,
-      requestedById: ctx.userId,
-    });
-    return { ...result, reviewUrl: "/app/review" };
+    try {
+      const result = await scrapeBrandChannel({
+        brandId,
+        platform,
+        sinceDays,
+        limit,
+        requestedById: ctx.userId,
+      });
+      return { ...result, reviewUrl: "/app/review" };
+    } catch (error) {
+      if (error instanceof ScrapeSetupError)
+        throw new GrowthActionError(
+          error.code === "missing_profile_url"
+            ? "invalid_input"
+            : "provider_unavailable",
+          error.message,
+        );
+      throw error;
+    }
   },
 });
 
@@ -192,7 +211,25 @@ export const syncOwnedBrandContent = growthAction({
   }),
   execute: async ({ brandId, daysBack }, ctx) => {
     await requireOwnedBrand(brandId, ctx);
-    return syncBrandContent({ brandId, daysBack });
+    const to = new Date();
+    const from = new Date(to);
+    from.setUTCDate(from.getUTCDate() - daysBack);
+    const runId = await startContentIngestRun({
+      brandId,
+      requestedById: ctx.userId,
+      mode: "owned_backfill",
+      provider: "zernio+x_api",
+      requestedFrom: from,
+      requestedTo: to,
+    });
+    try {
+      const result = await syncBrandContent({ brandId, daysBack });
+      await finishContentIngestRun(runId, result);
+      return { runId, ...result };
+    } catch (error) {
+      await failContentIngestRun(runId, error);
+      throw error;
+    }
   },
 });
 
@@ -1005,7 +1042,14 @@ const registerChannelInput = z.object({
   displayName: z.string().trim().max(200).optional(),
   profileUrl: z.string().trim().url().max(2000).optional(),
   manageUrl: z.string().trim().url().max(2000).optional(),
+  profileImageUrl: z.string().trim().url().max(2000).optional(),
   connectionStatus: z.enum(connectionStatusEnum.enumValues).optional(),
+  followerCount: z
+    .number()
+    .int()
+    .min(0)
+    .optional()
+    .describe("Followers as seen now; starts the channel's follower history."),
 });
 
 export const registerBrandChannel = growthAction({
@@ -1042,8 +1086,18 @@ export const registerBrandChannel = growthAction({
         displayName: input.displayName ?? null,
         profileUrl: input.profileUrl ?? null,
         manageUrl: input.manageUrl ?? null,
+        profileImageUrl: input.profileImageUrl ?? null,
         connectionStatus: input.connectionStatus ?? "connected",
-        followerHistory: [],
+        followerHistory:
+          input.followerCount === undefined
+            ? []
+            : [
+                {
+                  count: input.followerCount,
+                  capturedAt: new Date().toISOString(),
+                },
+              ],
+        followerCount: input.followerCount ?? null,
       })
       .returning({
         id: channelTable.id,
@@ -1079,6 +1133,7 @@ const listingPhotoShape = z.object({
   name: z.string(),
   url: z.string(),
   imageUrl: z.string(),
+  thumbUrl: z.string(),
   place: z.string(),
   /** Set when this hero is already in the library; use it instead of importing. */
   mediaAssetId: z.string().nullable(),
@@ -1135,6 +1190,7 @@ export const listListingPhotos = growthAction({
         name: row.name,
         url: row.url,
         imageUrl: row.imageUrl!,
+        thumbUrl: row.thumbUrl ?? row.imageUrl!,
         place: [row.city, row.state].filter(Boolean).join(", "),
         mediaAssetId: imported[index]?.id ?? null,
       })),

@@ -16,7 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 type Brand = { id: string; name: string };
 
@@ -61,21 +61,23 @@ export function PersonasClient({
    * shell and the big header so it aligns with the surrounding sections. */
   embedded?: boolean;
 }) {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [brandId, setBrandId] = useState(brands[0]?.id ?? "");
   const [form, setForm] = useState<PersonaForm | null>(null);
 
   const personas = useQuery(
-    trpc.persona.list.queryOptions({ brandId }, { enabled: Boolean(brandId) }),
+    orpc.persona.list.queryOptions({
+      input: { brandId },
+      enabled: Boolean(brandId),
+    }),
   );
   const invalidate = () =>
     void queryClient.invalidateQueries({
-      queryKey: trpc.persona.list.queryKey({ brandId }),
+      queryKey: orpc.persona.list.queryKey({ input: { brandId } }),
     });
 
   const create = useMutation(
-    trpc.persona.create.mutationOptions({
+    orpc.persona.create.mutationOptions({
       onSuccess: () => {
         setForm(null);
         invalidate();
@@ -83,7 +85,7 @@ export function PersonasClient({
     }),
   );
   const update = useMutation(
-    trpc.persona.update.mutationOptions({
+    orpc.persona.update.mutationOptions({
       onSuccess: () => {
         setForm(null);
         invalidate();
@@ -91,7 +93,7 @@ export function PersonasClient({
     }),
   );
   const remove = useMutation(
-    trpc.persona.delete.mutationOptions({ onSuccess: invalidate }),
+    orpc.persona.delete.mutationOptions({ onSuccess: invalidate }),
   );
 
   const list = (value: string) =>

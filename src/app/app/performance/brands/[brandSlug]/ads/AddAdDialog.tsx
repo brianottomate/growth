@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/components/ui/lib/utils";
 import { toast } from "@/components/ui/toast";
 import { AD_FORMAT_LABEL, HAND_MADE_AD_FORMATS } from "@/lib/performance-ads";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 import { HomePicker, type PickableHome } from "../HomePicker";
 
@@ -37,7 +37,6 @@ export function AddAdDialog({
   campaignId?: string | null;
 }) {
   const router = useRouter();
-  const trpc = useTRPC();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"create" | "import">("create");
   const [format, setFormat] = useState<Format>("static");
@@ -48,7 +47,7 @@ export function AddAdDialog({
   const byName = homes.length === 0;
 
   const add = useMutation(
-    trpc.ads.addAdShell.mutationOptions({
+    orpc.ads.addAdShell.mutationOptions({
       onSuccess: (result) => {
         toast.success(
           `${result.name} is on the wall, waiting for its creative.`,
@@ -84,13 +83,14 @@ export function AddAdDialog({
               add.mutate({
                 brandId,
                 format,
-                propertyId: format === "catalog" ? null : homeId,
+                propertyId:
+                  format === "catalog" ? undefined : (homeId ?? undefined),
                 homeName:
                   format === "catalog" || !byName
-                    ? null
-                    : homeName.trim() || null,
-                campaignId,
-                name: name.trim() || null,
+                    ? undefined
+                    : homeName.trim() || undefined,
+                campaignId: campaignId ?? undefined,
+                name: name.trim() || undefined,
               })
             }
           >

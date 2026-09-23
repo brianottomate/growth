@@ -14,7 +14,7 @@ import {
   X,
 } from "lucide-react";
 
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { useMediaUpload } from "@/app/app/media/use-media-upload";
 import { Button } from "@/components/ui/button";
 import { Dropzone } from "@/components/ui/dropzone";
@@ -107,7 +107,6 @@ export function PlatformPostEditDialog({
   linkCard?: CompactPreviewLinkCard | null;
   scheduled: boolean;
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const { uploadFiles, uploading, progress } = useMediaUpload(brandId);
   const [open, setOpen] = useState(false);
@@ -118,7 +117,7 @@ export function PlatformPostEditDialog({
   const [items, setItems] = useState<EditorItem[]>([]);
 
   const save = useMutation(
-    trpc.content.saveSpotThread.mutationOptions({
+    orpc.content.saveSpotThread.mutationOptions({
       onSuccess: (result) => {
         const label = isStoryFormat(format)
           ? `${platformLabel(platform)} Story`

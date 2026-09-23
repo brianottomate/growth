@@ -214,6 +214,15 @@ export const readLaunchActionOutputSchema = z.strictObject({
       status: z.enum(seriesStatusEnum.enumValues),
     }),
   ),
+  features: z.array(
+    z.strictObject({
+      id: z.string(),
+      job: z.string().nullable(),
+      name: z.string(),
+      shipping: z.boolean(),
+    }),
+  ),
+  unknownStoryIds: z.array(z.string()),
 });
 
 export const createLaunchActionOutputSchema = z.strictObject({

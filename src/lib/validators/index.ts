@@ -36,17 +36,17 @@
  *
  * ## USAGE
  *
- * ### In tRPC routers:
+ * ### In oRPC routers:
  * ```typescript
  * import { topicKeySchema, emailSchema } from "@/lib/validators";
  *
- * export const myRouter = createTRPCRouter({
+ * export const myRouter = {
  *   myProcedure: publicProcedure
  *     .input(z.object({
  *       email: emailSchema,
  *       topic: topicKeySchema,
  *     }))
- *     .mutation(async ({ input }) => {
+ *     .handler(async ({ input }) => {
  *       // input is fully typed
  *     }),
  * });

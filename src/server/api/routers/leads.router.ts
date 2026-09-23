@@ -15,15 +15,15 @@ import {
   sql,
 } from "drizzle-orm";
 
-import { CURRENT_PREGEN_BATCH } from "@/lib/pregen-batch";
 import { generateAndStoreSequence } from "@/server/services/pregen/generate-sequence";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { actionProcedure, protectedProcedure } from "@/server/api/orpc";
+import { createProspectAction } from "@/server/ai/capabilities/brands";
+import { leadsSummary } from "@/server/ai/capabilities/leads";
 import {
   leadChannelTable,
   leadContactTable,
   leadDomainTable,
   hubspotListMembershipTable,
-  leadImportTable,
   leadSequenceTable,
   pregenBuildTable,
 } from "@/server/db/leads-schema";
@@ -33,9 +33,7 @@ import {
   listWebsiteProspects,
   SETTLED_PROSPECT_STATUSES,
 } from "@/server/clients/wander.client";
-import { memberTable } from "@/server/db/auth-schema";
 import { brandTable } from "@/server/db/brand-schema";
-import { createProspectFromLead } from "@/server/services/brand-relationship.service";
 import { captureAndPersistChannels } from "@/server/services/channel-discovery.service";
 import { capturePreviewVisual } from "@/server/services/pregen/preview-visual";
 import { discoverDomain } from "@/server/services/lead-discovery.service";
@@ -87,11 +85,10 @@ import {
   getCompanyContacts,
   HUBSPOT_ACCOUNT_ID,
   isHubspotConfigured,
-  updateContact,
   updateCompany,
   type CompanyProperties,
 } from "@/server/clients/hubspot.client";
-import { TRPCError } from "@trpc/server";
+import { ORPCError } from "@orpc/server";
 
 /**
  * Leads router — read surface over the leads.* prospecting tables.
@@ -168,140 +165,8 @@ async function probePreview(url: string | null): Promise<PreviewProbe> {
   }
 }
 
-export const leadsRouter = createTRPCRouter({
-  // High-level dashboard numbers.
-  stats: protectedProcedure.query(async ({ ctx }) => {
-    const [totals] = await ctx.db
-      .select({
-        domains: sql<number>`count(*)::int`,
-        builtwith: sql<number>`count(*) filter (where ${leadDomainTable.inBuiltwith})::int`,
-        hubspot: sql<number>`count(*) filter (where ${leadDomainTable.inHubspot})::int`,
-        instantly: sql<number>`count(*) filter (where ${leadDomainTable.inInstantly})::int`,
-        integratedPms: sql<number>`count(*) filter (where ${leadDomainTable.isIntegratedPms})::int`,
-        withPregenSite: sql<number>`count(*) filter (where ${leadDomainTable.pregenSiteUrl} is not null)::int`,
-        // Expansion pool: known through BuiltWith, never in the CRM.
-        untouched: sql<number>`count(*) filter (where ${leadDomainTable.inBuiltwith} and not ${leadDomainTable.inHubspot})::int`,
-        ranked: sql<number>`count(*) filter (where ${leadDomainTable.scorePregenPotential} is not null)::int`,
-        sendBatch: sql<number>`count(*) filter (where ${leadDomainTable.pregenBatch} is not null)::int`,
-        // The batch being worked right now, counted on its own. Send-20 is
-        // "any batch ever stamped", so it only grows; this is the one that
-        // answers "what am I looking at today".
-        currentBatch: sql<number>`count(*) filter (where ${leadDomainTable.pregenBatch} = ${CURRENT_PREGEN_BATCH})::int`,
-      })
-      .from(leadDomainTable);
-
-    // Net-new sendable target — counted with the SAME exists() the list filter
-    // uses. A correlated EXISTS folded into a multi-aggregate count(*) FILTER
-    // renders unreliably under Drizzle (came back 0), so the pill badge and the
-    // filtered list must share this exact predicate to stay in agreement.
-    const [netNewRow] = await ctx.db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(leadDomainTable)
-      .where(
-        and(
-          eq(leadDomainTable.inHubspot, false),
-          eq(leadDomainTable.hasHubspotDeal, false),
-          eq(leadDomainTable.isExistingCustomer, false),
-          eq(leadDomainTable.excludeFromOutreach, false),
-          sql`${leadDomainTable.scorePregenPotential} is not null`,
-          exists(
-            ctx.db
-              .select({ one: sql`1` })
-              .from(leadContactTable)
-              .where(
-                and(
-                  eq(leadContactTable.domainId, leadDomainTable.id),
-                  isNull(leadContactTable.deletedAt),
-                  // Same credible-contact rule as leadsSummary — a placeholder
-                  // mailbox is not a contact. Three definitions of one number
-                  // should not differ, even while they happen to agree at 19.
-                  sql`lower(split_part(${leadContactTable.email}, '@', 2)) <> all(${PLACEHOLDER_EMAIL_DOMAINS_SQL})`,
-                  sql`(${leadContactTable.firstName} is not null or ${leadContactTable.lastName} is not null or ${leadContactTable.email} !~* '@(gmail|yahoo|hotmail|aol|outlook|msn|icloud)\\.')`,
-                ),
-              ),
-          ),
-        ),
-      );
-
-    const [contacts] = await ctx.db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(leadContactTable);
-
-    const targetMemberships = await ctx.db
-      .select({
-        cohort: hubspotListMembershipTable.cohort,
-        objectType: hubspotListMembershipTable.objectType,
-        count: sql<number>`count(*)::int`,
-        linked: sql<number>`count(*) filter (where ${hubspotListMembershipTable.domainId} is not null)::int`,
-      })
-      .from(hubspotListMembershipTable)
-      .groupBy(
-        hubspotListMembershipTable.cohort,
-        hubspotListMembershipTable.objectType,
-      );
-
-    // The number that actually gates the pregen send motion: cohort companies
-    // we could enroll today. A company counts only if it has a live contact
-    // with an email, a HubSpot contact id to enroll against, and no mirrored
-    // opt-out. Reviewing or building a site for anything else burns operator
-    // attention and a paid site build on someone we cannot email.
-    const targetEnrollableRows = await ctx.db.execute<{
-      cohort: string;
-      linked: number;
-      enrollable: number;
-    }>(sql`
-      select
-        membership.cohort as cohort,
-        count(distinct membership.domain_id)::int as linked,
-        count(distinct membership.domain_id) filter (
-          where exists (
-            select 1
-            from leads.contact as contact
-            where contact.domain_id = membership.domain_id
-              and contact.deleted_at is null
-              and nullif(btrim(contact.email), '') is not null
-              and contact.hubspot_contact_id is not null
-              and coalesce(contact.email_opt_out, false) = false
-              and lower(split_part(contact.email, '@', 2)) <> all(${PLACEHOLDER_EMAIL_DOMAINS_SQL})
-          )
-        )::int as enrollable
-      from leads.hubspot_list_membership as membership
-      where membership.object_type = 'company'
-        and membership.domain_id is not null
-      group by membership.cohort
-    `);
-
-    const topPms = await ctx.db
-      .select({
-        pms: leadDomainTable.pms,
-        count: sql<number>`count(*)::int`,
-      })
-      .from(leadDomainTable)
-      .where(sql`${leadDomainTable.pms} is not null`)
-      .groupBy(leadDomainTable.pms)
-      .orderBy(desc(sql`count(*)`))
-      .limit(12);
-
-    const imports = await ctx.db
-      .select()
-      .from(leadImportTable)
-      .orderBy(desc(leadImportTable.createdAt))
-      .limit(10);
-
-    return {
-      ...totals,
-      netNew: netNewRow?.count ?? 0,
-      contacts: contacts?.count ?? 0,
-      targetMemberships,
-      targetEnrollable: targetEnrollableRows.rows.map((row) => ({
-        cohort: row.cohort,
-        linked: Number(row.linked),
-        enrollable: Number(row.enrollable),
-      })),
-      topPms,
-      imports,
-    };
-  }),
+export const leadsRouter = {
+  stats: actionProcedure(leadsSummary),
 
   // Paginated / filtered / sorted domain list.
   listDomains: protectedProcedure
@@ -364,7 +229,7 @@ export const leadsRouter = createTRPCRouter({
         offset: z.number().int().nonnegative().default(0),
       }),
     )
-    .query(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       // Everything except the exclusion rule, so the same predicate can answer
       // both "what can I work" and "how many am I not being shown".
       const conds: SQL[] = [];
@@ -751,7 +616,7 @@ export const leadsRouter = createTRPCRouter({
   // Single domain + its contacts (detail drawer).
   getDomain: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .query(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const domain = await ctx.db.query.leadDomainTable.findFirst({
         where: eq(leadDomainTable.id, input.id),
       });
@@ -792,7 +657,7 @@ export const leadsRouter = createTRPCRouter({
    */
   prospect: protectedProcedure
     .input(z.object({ domain: z.string().trim().min(3) }))
-    .query(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const domain = await ctx.db.query.leadDomainTable.findFirst({
         where: eq(leadDomainTable.domain, input.domain.toLowerCase()),
       });
@@ -922,12 +787,12 @@ export const leadsRouter = createTRPCRouter({
    */
   crmHistory: protectedProcedure
     .input(z.object({ domain: z.string().trim().min(3) }))
-    .query(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const row = await ctx.db.query.leadDomainTable.findFirst({
         where: eq(leadDomainTable.domain, input.domain.toLowerCase()),
         columns: { hubspotRecordId: true, domain: true },
       });
-      if (!row) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!row) throw new ORPCError("NOT_FOUND");
       if (!isHubspotConfigured) {
         return { available: false as const, reason: "HubSpot not configured" };
       }
@@ -982,44 +847,13 @@ export const leadsRouter = createTRPCRouter({
    * eventually a campaign. Returns `enrichable` so the caller can run the
    * website scrape as its own call and show it happening.
    */
-  createProspect: protectedProcedure
-    .input(z.object({ domainId: z.string().min(1) }))
-    .mutation(async ({ ctx, input }) => {
-      const membership = await ctx.db.query.memberTable.findFirst({
-        where: eq(memberTable.userId, ctx.session.user.id),
-        columns: { organizationId: true },
-      });
-      if (!membership) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "You must belong to an organization to create a prospect",
-        });
-      }
-
-      const { brand, created } = await createProspectFromLead({
-        organizationId: membership.organizationId,
-        ownerId: ctx.session.user.id,
-        domainId: input.domainId,
-      });
-
-      // Enrichment is the caller's second call rather than a background task
-      // here: a scrape that finishes after the response can only be seen by
-      // reloading, and the rep is looking at the button they just pressed.
-      return {
-        brandId: brand.id,
-        slug: brand.slug,
-        name: brand.name,
-        created,
-        enrichable: created && Boolean(brand.website),
-      };
-    }),
+  createProspect: actionProcedure(createProspectAction),
 
   requestPregenSite: protectedProcedure
     .input(z.object({ domainId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       if (!isWanderApiConfigured) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
+        throw new ORPCError("PRECONDITION_FAILED", {
           message:
             "The WanderOS API is not configured yet. Set WANDER_API_URL and WANDER_API_KEY.",
         });
@@ -1028,12 +862,11 @@ export const leadsRouter = createTRPCRouter({
         where: eq(leadDomainTable.id, input.domainId),
       });
       if (!row)
-        throw new TRPCError({ code: "NOT_FOUND", message: "Domain not in DB" });
+        throw new ORPCError("NOT_FOUND", { message: "Domain not in DB" });
       // Same suppression rule as generation. Building a preview for a company a
       // rep is already working spends a build and invites the send it exists for.
       if (row.excludeFromOutreach) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
+        throw new ORPCError("PRECONDITION_FAILED", {
           message: `${row.domain} is excluded from outreach${row.excludeReason ? ` (${row.excludeReason})` : ""}.`,
         });
       }
@@ -1044,8 +877,7 @@ export const leadsRouter = createTRPCRouter({
         ),
       });
       if (inFlight) {
-        throw new TRPCError({
-          code: "CONFLICT",
+        throw new ORPCError("CONFLICT", {
           message: `A build for ${row.domain} is already in flight (${inFlight.status ?? "requested"}).`,
         });
       }
@@ -1096,7 +928,7 @@ export const leadsRouter = createTRPCRouter({
    * nothing on the page says work is happening. Cheap enough to poll: one
    * indexed read over a table that holds tens of rows.
    */
-  pregenBuildsInFlight: protectedProcedure.query(async ({ ctx }) => {
+  pregenBuildsInFlight: protectedProcedure.handler(async ({ context: ctx }) => {
     return ctx.db
       .select({
         id: pregenBuildTable.id,
@@ -1128,7 +960,7 @@ export const leadsRouter = createTRPCRouter({
         verdict: z.enum(["send_worthy", "regenerate", "skip"]).nullable(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const [updated] = await ctx.db
         .update(pregenBuildTable)
         .set({
@@ -1143,80 +975,9 @@ export const leadsRouter = createTRPCRouter({
           verdict: pregenBuildTable.verdict,
         });
       if (!updated) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "No such build" });
+        throw new ORPCError("NOT_FOUND", { message: "No such build" });
       }
       return updated;
-    }),
-
-  /**
-   * Pull current state for this prospect's latest build.
-   *
-   * On demand only. The webhook is the delivery path and there is no reconcile
-   * sweep behind it, so this exists to unstick a build whose event was dropped —
-   * a button someone presses, not a loop. WanderOS exposes list rather than
-   * get-by-id, so this filters the list on our stored prospectId.
-   */
-  refreshPregenSite: protectedProcedure
-    .input(z.object({ domainId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      if (!isWanderApiConfigured) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: "The WanderOS API is not configured yet.",
-        });
-      }
-      const [build] = await ctx.db
-        .select()
-        .from(pregenBuildTable)
-        .where(eq(pregenBuildTable.domainId, input.domainId))
-        .orderBy(desc(pregenBuildTable.requestedAt))
-        .limit(1);
-      if (!build?.prospectId) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "No pregen build has been requested for this domain.",
-        });
-      }
-
-      // Narrow by the status we last saw where we can: the list is paginated at
-      // 100 and there is no get-by-id route, so an unfiltered walk gets slower
-      // as the prospect table grows.
-      const { prospects } = await listWebsiteProspects({ take: 100 });
-      const current = prospects.find(
-        (prospect) => prospect.id === build.prospectId,
-      );
-      if (!current) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: `WanderOS no longer lists prospect ${build.prospectId}.`,
-        });
-      }
-
-      const settled = SETTLED_PROSPECT_STATUSES.includes(current.status);
-      await ctx.db
-        .update(pregenBuildTable)
-        .set({
-          status: current.status,
-          websiteId: current.websiteId ?? build.websiteId,
-          previewUrl: current.previewUrl ?? build.previewUrl,
-          errorMessage: current.errorMessage ?? null,
-          settledAt: settled
-            ? (build.settledAt ?? new Date())
-            : build.settledAt,
-          claimedAt:
-            current.status === "CLAIMED"
-              ? (build.claimedAt ?? new Date())
-              : build.claimedAt,
-        })
-        .where(eq(pregenBuildTable.id, build.id));
-
-      if (current.previewUrl) {
-        await ctx.db
-          .update(leadDomainTable)
-          .set({ pregenSiteUrl: current.previewUrl })
-          .where(eq(leadDomainTable.id, input.domainId));
-      }
-      return { status: current.status, previewUrl: current.previewUrl ?? null };
     }),
 
   rankDomain: protectedProcedure
@@ -1227,14 +988,13 @@ export const leadsRouter = createTRPCRouter({
         persist: z.boolean().default(true),
       }),
     )
-    .mutation(async ({ input }) => {
+    .handler(async ({ input }) => {
       try {
         return await rankLeadDomain(input.domain.toLowerCase(), {
           persist: input.persist,
         });
       } catch (error) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
+        throw new ORPCError("PRECONDITION_FAILED", {
           message: error instanceof Error ? error.message : String(error),
         });
       }
@@ -1246,12 +1006,11 @@ export const leadsRouter = createTRPCRouter({
   // human is about to look at this prospect.
   capturePreview: protectedProcedure
     .input(z.object({ domain: z.string().trim().min(3) }))
-    .mutation(async ({ input }) => {
+    .handler(async ({ input }) => {
       try {
         return await capturePreviewVisual(input.domain.toLowerCase());
       } catch (error) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
+        throw new ORPCError("PRECONDITION_FAILED", {
           message: error instanceof Error ? error.message : String(error),
         });
       }
@@ -1267,19 +1026,15 @@ export const leadsRouter = createTRPCRouter({
   // button comes back.
   refreshPregenBuild: protectedProcedure
     .input(z.object({ buildId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const build = await ctx.db.query.pregenBuildTable.findFirst({
         where: eq(pregenBuildTable.id, input.buildId),
       });
       if (!build?.prospectId) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "No build to refresh",
-        });
+        throw new ORPCError("NOT_FOUND", { message: "No build to refresh" });
       }
       if (!isWanderApiConfigured) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
+        throw new ORPCError("PRECONDITION_FAILED", {
           message: "The WanderOS API is not configured.",
         });
       }
@@ -1357,26 +1112,10 @@ export const leadsRouter = createTRPCRouter({
 
   // ---- Manual enrichment (inspect-only; no DB write yet) ----
 
-  // Discovery only — raw, fault-tolerant fan-out across search/scrape providers.
-  discover: protectedProcedure
-    .input(
-      z.object({
-        domain: z.string().trim().min(1),
-        only: z
-          .array(
-            z.enum(["firecrawl", "perplexity", "tavily", "parallel", "exa"]),
-          )
-          .optional(),
-      }),
-    )
-    .mutation(async ({ input }) => {
-      return discoverDomain(input.domain, { only: input.only });
-    }),
-
   // Full enrich: discover → AI extraction. Returns BOTH for side-by-side review.
   enrich: protectedProcedure
     .input(z.object({ domain: z.string().trim().min(1) }))
-    .mutation(async ({ input }) => {
+    .handler(async ({ input }) => {
       const discovery = await discoverDomain(input.domain);
       const extraction = await extractFromDiscovery(discovery);
       return { discovery, extraction };
@@ -1406,7 +1145,7 @@ export const leadsRouter = createTRPCRouter({
         pretend: z.boolean().optional(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .handler(async ({ input }) => {
       // Every guard that decides whether copy is publishable lives in the
       // service, so the batch job and this button cannot answer differently.
       try {
@@ -1420,8 +1159,7 @@ export const leadsRouter = createTRPCRouter({
         // Exclusion and an unreadable preview are operator-actionable refusals,
         // not faults — surface the reason on the button rather than a 500.
         if (error instanceof PregenPreconditionError) {
-          throw new TRPCError({
-            code: "PRECONDITION_FAILED",
+          throw new ORPCError("PRECONDITION_FAILED", {
             message: error.message,
           });
         }
@@ -1454,10 +1192,9 @@ export const leadsRouter = createTRPCRouter({
         acknowledgeWarnings: z.boolean().default(false),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       if (!isHubspotSequencesConfigured) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
+        throw new ORPCError("PRECONDITION_FAILED", {
           message: "HubSpot is not configured",
         });
       }
@@ -1465,7 +1202,7 @@ export const leadsRouter = createTRPCRouter({
       const row = await ctx.db.query.leadDomainTable.findFirst({
         where: eq(leadDomainTable.id, input.domainId),
       });
-      if (!row) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!row) throw new ORPCError("NOT_FOUND");
 
       const contact = await ctx.db.query.leadContactTable.findFirst({
         where: and(
@@ -1497,8 +1234,7 @@ export const leadsRouter = createTRPCRouter({
         refusals.push("No preview has been built for this company");
       }
       if (refusals.length) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
+        throw new ORPCError("PRECONDITION_FAILED", {
           message: refusals.join("; "),
         });
       }
@@ -1522,8 +1258,7 @@ export const leadsRouter = createTRPCRouter({
         );
       }
       if (warnings.length && !input.acknowledgeWarnings) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
+        throw new ORPCError("PRECONDITION_FAILED", {
           message: `${warnings.join("; ")}. Re-run with acknowledgeWarnings to send anyway.`,
         });
       }
@@ -1554,8 +1289,7 @@ export const leadsRouter = createTRPCRouter({
         )
         .limit(1);
       if (inFlight) {
-        throw new TRPCError({
-          code: "CONFLICT",
+        throw new ORPCError("CONFLICT", {
           message: `${inFlight.email} at ${row.domain} is already in the sequence${
             inFlight.enrolledAt
               ? ` (enrolled ${inFlight.enrolledAt.toISOString().slice(0, 10)})`
@@ -1567,8 +1301,7 @@ export const leadsRouter = createTRPCRouter({
       // Ask the provider first: a rep may have enrolled from the CRM.
       const existing = await getContactEnrollment(contact!.hubspotContactId!);
       if (existing) {
-        throw new TRPCError({
-          code: "CONFLICT",
+        throw new ORPCError("CONFLICT", {
           message: `${contact!.email} is already in "${existing.sequenceName}", enrolled ${existing.enrolledAt.slice(0, 10)} by ${existing.enrolledByEmail}`,
         });
       }
@@ -1661,7 +1394,7 @@ export const leadsRouter = createTRPCRouter({
         undo: z.boolean().default(false),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const [updated] = await ctx.db
         .update(leadContactTable)
         .set(
@@ -1675,7 +1408,7 @@ export const leadsRouter = createTRPCRouter({
           email: leadContactTable.email,
           retiredAt: leadContactTable.retiredAt,
         });
-      if (!updated) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!updated) throw new ORPCError("NOT_FOUND");
 
       // Close out their live sequence row. Without this the partial unique
       // index on `(domainId) where status in ('queued','sent')` blocks the next
@@ -1705,12 +1438,12 @@ export const leadsRouter = createTRPCRouter({
         contactId: z.string(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const row = await ctx.db.query.leadDomainTable.findFirst({
         where: eq(leadDomainTable.id, input.domainId),
       });
       if (!row) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Domain not in DB" });
+        throw new ORPCError("NOT_FOUND", { message: "Domain not in DB" });
       }
       // A missing preview no longer blocks — refusing here made the publish path
       // untestable until hosting existed, which is the one thing this motion has
@@ -1724,8 +1457,7 @@ export const leadsRouter = createTRPCRouter({
         ),
       });
       if (!contact?.hubspotContactId) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
+        throw new ORPCError("PRECONDITION_FAILED", {
           message: "Choose a contact linked to HubSpot",
         });
       }
@@ -1741,8 +1473,7 @@ export const leadsRouter = createTRPCRouter({
         .orderBy(desc(leadSequenceTable.createdAt))
         .limit(1);
       if (!outreach?.steps?.length) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
+        throw new ORPCError("PRECONDITION_FAILED", {
           message: "Generate and review a pregen sequence first",
         });
       }
@@ -1769,8 +1500,7 @@ export const leadsRouter = createTRPCRouter({
       // meant four-touch drafts lost touches 3 and 4 to a two-touch contact
       // contract, and the copy went stale the moment that person changed jobs.
       if (!row.hubspotRecordId) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
+        throw new ORPCError("PRECONDITION_FAILED", {
           message: "This domain has no linked HubSpot company to publish to",
         });
       }
@@ -1805,20 +1535,19 @@ export const leadsRouter = createTRPCRouter({
         recipientEmail: z.string().email().optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const row = await ctx.db.query.leadDomainTable.findFirst({
         where: eq(leadDomainTable.id, input.domainId),
       });
       if (!row) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Domain not in DB" });
+        throw new ORPCError("NOT_FOUND", { message: "Domain not in DB" });
       }
       const channel = (
         row.enrichment as { contactChannel?: { bestEmail?: string } } | null
       )?.contactChannel;
       const recipient = input.recipientEmail ?? channel?.bestEmail;
       if (!recipient) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
+        throw new ORPCError("PRECONDITION_FAILED", {
           message:
             "No recipient email — run the contact resolver or pass one explicitly",
         });
@@ -1828,7 +1557,7 @@ export const leadsRouter = createTRPCRouter({
 
   // Activate the shared personalized campaign from the app — sends to everyone
   // currently queued in it. Campaign-level (not per lead).
-  launchInstantlyCampaign: protectedProcedure.mutation(async () => {
+  launchInstantlyCampaign: protectedProcedure.handler(async () => {
     return activateInstantlyCampaign();
   }),
 
@@ -1836,7 +1565,7 @@ export const leadsRouter = createTRPCRouter({
   // our row. READ-ONLY — no writes. Returns { configured:false } if no token.
   pullFromHubspot: protectedProcedure
     .input(z.object({ domain: z.string().trim().min(1) }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const domain = input.domain.toLowerCase();
 
       const ours = await ctx.db.query.leadDomainTable.findFirst({
@@ -1899,13 +1628,13 @@ export const leadsRouter = createTRPCRouter({
         enrichment: LeadEnrichmentSchema.nullable().optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const domain = input.domain.toLowerCase();
       const ours = await ctx.db.query.leadDomainTable.findFirst({
         where: eq(leadDomainTable.domain, domain),
       });
       if (!ours) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Domain not in DB" });
+        throw new ORPCError("NOT_FOUND", { message: "Domain not in DB" });
       }
 
       const company = isHubspotConfigured
@@ -1949,7 +1678,7 @@ export const leadsRouter = createTRPCRouter({
         writeToHubspot: z.boolean().default(false),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const domain = input.domain.toLowerCase();
       const valid = new Set<string>(MERGEABLE_FIELDS);
       const entries = Object.entries(input.fields).filter(([k]) =>
@@ -1981,8 +1710,7 @@ export const leadsRouter = createTRPCRouter({
       // ---- HubSpot (deliberate write of approved fields) ----
       if (input.writeToHubspot && entries.length) {
         if (!isHubspotConfigured) {
-          throw new TRPCError({
-            code: "PRECONDITION_FAILED",
+          throw new ORPCError("PRECONDITION_FAILED", {
             message: "HubSpot is not configured",
           });
         }
@@ -2021,12 +1749,12 @@ export const leadsRouter = createTRPCRouter({
   // mutation name so the existing "Resolve channel" button is unchanged.
   resolveChannel: protectedProcedure
     .input(z.object({ domainId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const row = await ctx.db.query.leadDomainTable.findFirst({
         where: eq(leadDomainTable.id, input.domainId),
       });
       if (!row) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Domain not in DB" });
+        throw new ORPCError("NOT_FOUND", { message: "Domain not in DB" });
       }
 
       const { contactChannel, channels } = await captureAndPersistChannels({
@@ -2077,12 +1805,12 @@ export const leadsRouter = createTRPCRouter({
         limit: z.number().int().min(1).max(20).default(8),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const row = await ctx.db.query.leadDomainTable.findFirst({
         where: eq(leadDomainTable.id, input.domainId),
       });
       if (!row) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Domain not in DB" });
+        throw new ORPCError("NOT_FOUND", { message: "Domain not in DB" });
       }
 
       const company = {
@@ -2168,7 +1896,7 @@ export const leadsRouter = createTRPCRouter({
         .object({ pregenOnly: z.boolean().default(true) })
         .default({ pregenOnly: true }),
     )
-    .query(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const base = ctx.db
         .select({
           owner: leadDomainTable.hubspotOwner,
@@ -2204,7 +1932,7 @@ export const leadsRouter = createTRPCRouter({
       });
     }),
 
-  pmsOptions: protectedProcedure.query(async ({ ctx }) => {
+  pmsOptions: protectedProcedure.handler(async ({ context: ctx }) => {
     const rows = await ctx.db
       .select({
         pms: leadDomainTable.pms,
@@ -2217,4 +1945,4 @@ export const leadsRouter = createTRPCRouter({
       .limit(40);
     return rows;
   }),
-});
+};

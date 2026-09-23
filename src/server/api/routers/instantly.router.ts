@@ -1,7 +1,6 @@
-import { TRPCError } from "@trpc/server";
+import { ORPCError } from "@orpc/server";
 import { z } from "zod";
-import type { TRPCRouterRecord } from "@trpc/server";
-import { protectedProcedure } from "../trpc";
+import { protectedProcedure } from "@/server/api/orpc";
 import {
   isInstantlyConfigured,
   isInstantlyError,
@@ -17,24 +16,22 @@ import {
 import type { LeadInterestStatus } from "@/server/clients/instantly.types";
 
 /**
- * Instantly tRPC Router
+ * Instantly oRPC Router
  *
  * Type-safe access to Instantly.ai API for lead management,
  * campaigns, and AI-enrichment write-back workflows.
  */
 export const instantlyRouter = {
-  testAuth: protectedProcedure.query(async () => {
+  testAuth: protectedProcedure.handler(async () => {
     if (!isInstantlyConfigured) {
-      throw new TRPCError({
-        code: "PRECONDITION_FAILED",
+      throw new ORPCError("PRECONDITION_FAILED", {
         message: "Instantly is not configured. Set INSTANTLY_API_KEY.",
       });
     }
 
     const result = await testConnection();
     if (!result.success) {
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
+      throw new ORPCError("INTERNAL_SERVER_ERROR", {
         message: `Instantly connection failed: ${result.message}`,
       });
     }
@@ -55,7 +52,7 @@ export const instantlyRouter = {
         starting_after: z.string().optional(),
       }),
     )
-    .query(async ({ input }) => {
+    .handler(async ({ input }) => {
       try {
         return await listLeads({
           campaign: input.campaign,
@@ -69,10 +66,10 @@ export const instantlyRouter = {
         });
       } catch (error) {
         if (isInstantlyError(error)) {
-          throw new TRPCError({
-            code: error.isRateLimited ? "TOO_MANY_REQUESTS" : "BAD_REQUEST",
-            message: error.message,
-          });
+          throw new ORPCError(
+            error.isRateLimited ? "TOO_MANY_REQUESTS" : "BAD_REQUEST",
+            { message: error.message },
+          );
         }
         throw error;
       }
@@ -80,10 +77,10 @@ export const instantlyRouter = {
 
   getLead: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
-    .query(async ({ input }) => {
+    .handler(async ({ input }) => {
       const lead = await getLead(input.id);
       if (!lead) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Lead not found" });
+        throw new ORPCError("NOT_FOUND", { message: "Lead not found" });
       }
       return lead;
     }),
@@ -108,7 +105,7 @@ export const instantlyRouter = {
         }),
       }),
     )
-    .mutation(async ({ input }) => {
+    .handler(async ({ input }) => {
       try {
         return await patchLead(input.id, {
           ...input.data,
@@ -119,10 +116,10 @@ export const instantlyRouter = {
         });
       } catch (error) {
         if (isInstantlyError(error)) {
-          throw new TRPCError({
-            code: error.statusCode === 404 ? "NOT_FOUND" : "BAD_REQUEST",
-            message: error.message,
-          });
+          throw new ORPCError(
+            error.statusCode === 404 ? "NOT_FOUND" : "BAD_REQUEST",
+            { message: error.message },
+          );
         }
         throw error;
       }
@@ -155,7 +152,7 @@ export const instantlyRouter = {
         skip_if_in_workspace: z.boolean().default(true),
       }),
     )
-    .mutation(async ({ input }) => {
+    .handler(async ({ input }) => {
       return await addLeadsBulk({
         ...input,
         leads: input.leads.map((l) => ({
@@ -174,7 +171,7 @@ export const instantlyRouter = {
         status: z.number().optional(),
       }),
     )
-    .query(async ({ input }) => {
+    .handler(async ({ input }) => {
       return await listCampaigns(input);
     }),
 
@@ -188,7 +185,7 @@ export const instantlyRouter = {
         exclude_total_leads_count: z.boolean().optional(),
       }),
     )
-    .query(async ({ input }) => {
+    .handler(async ({ input }) => {
       return await getCampaignAnalytics(input);
     }),
 
@@ -201,7 +198,7 @@ export const instantlyRouter = {
         search: z.string().optional(),
       }),
     )
-    .query(async ({ input }) => {
+    .handler(async ({ input }) => {
       return await listLeadLists(input);
     }),
-} satisfies TRPCRouterRecord;
+};

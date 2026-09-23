@@ -9,7 +9,7 @@ import type { WebsitePortfolioAnalysis } from "@/lib/content-analysis";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/toast";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 export function WebsitePortfolioAnalysisPanel({
   brandId,
@@ -22,7 +22,6 @@ export function WebsitePortfolioAnalysisPanel({
   pageCount: number;
   initialAnalysis: WebsitePortfolioAnalysis | null;
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const [includeSaved, setIncludeSaved] = useState(false);
   const [analysis, setAnalysis] = useState(initialAnalysis);
@@ -30,7 +29,7 @@ export function WebsitePortfolioAnalysisPanel({
     null,
   );
   const analyze = useMutation(
-    trpc.contentAnalysis.analyzeWebsitePortfolio.mutationOptions({
+    orpc.contentAnalysis.analyzeWebsitePortfolio.mutationOptions({
       onSuccess: (next) => {
         setAnalysis(next);
         toast.success("Website-system analysis ready");

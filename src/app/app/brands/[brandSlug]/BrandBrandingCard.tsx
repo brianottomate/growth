@@ -8,7 +8,7 @@ import { BrandingPanel } from "@/components/brand/BrandingPanel";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import type { BrandIdentity } from "@/server/db/brand-schema";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 /** What the site says the brand looks like, and a button to read it again. */
 export function BrandBrandingCard({
@@ -23,9 +23,8 @@ export function BrandBrandingCard({
   website: string | null;
 }) {
   const router = useRouter();
-  const trpc = useTRPC();
   const enrich = useMutation(
-    trpc.brand.enrich.mutationOptions({
+    orpc.brand.enrich.mutationOptions({
       onSuccess: () => {
         toast.success("Branding refreshed from the site");
         router.refresh();
@@ -51,7 +50,7 @@ export function BrandBrandingCard({
           variant="outline"
           size="sm"
           disabled={!website || enrich.isPending}
-          onClick={() => enrich.mutate({ id: brandId })}
+          onClick={() => enrich.mutate({ brandId })}
         >
           <RefreshCw
             className={`mr-1.5 size-3.5 ${enrich.isPending ? "animate-spin" : ""}`}

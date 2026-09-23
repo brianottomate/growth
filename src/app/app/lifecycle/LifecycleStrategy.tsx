@@ -17,7 +17,7 @@ import { parseAsStringLiteral, useQueryState } from "nuqs";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import type { LifecycleWorkspace } from "@/server/db/schema";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { ProgramDialog, type ProgramDraft } from "./ProgramDialog";
 import { StepDialog, type StepDraft } from "./StepDialog";
 
@@ -148,9 +148,10 @@ export function LifecycleStrategy({
 }: {
   brands: { id: string; name: string }[];
 }) {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const { data, isLoading } = useQuery(trpc.lifecycle.overview.queryOptions());
+  const { data, isLoading } = useQuery(
+    orpc.lifecycle.overview.queryOptions({ input: {} }),
+  );
 
   const [programOpen, setProgramOpen] = useState(false);
   const [editingProgram, setEditingProgram] = useState<ProgramDraft>();
@@ -182,16 +183,18 @@ export function LifecycleStrategy({
     });
 
   const invalidate = () =>
-    queryClient.invalidateQueries(trpc.lifecycle.overview.queryOptions());
+    queryClient.invalidateQueries(
+      orpc.lifecycle.overview.queryOptions({ input: {} }),
+    );
 
   const removeProgram = useMutation(
-    trpc.lifecycle.deleteProgram.mutationOptions({
+    orpc.lifecycle.archiveProgram.mutationOptions({
       onSuccess: invalidate,
       onError: (e) => toast.error(e.message || "Failed to delete"),
     }),
   );
   const removeStep = useMutation(
-    trpc.lifecycle.deleteStep.mutationOptions({
+    orpc.lifecycle.deleteStep.mutationOptions({
       onSuccess: invalidate,
       onError: (e) => toast.error(e.message || "Failed to delete step"),
     }),
@@ -368,7 +371,7 @@ export function LifecycleStrategy({
                     className="size-7"
                     onClick={() => {
                       if (confirm(`Delete program "${p.name}"?`)) {
-                        removeProgram.mutate({ id: p.id });
+                        removeProgram.mutate({ programId: p.id });
                       }
                     }}
                   >

@@ -14,7 +14,7 @@ import { toast } from "@/components/ui/toast";
 import { useMediaUpload } from "@/app/app/media/use-media-upload";
 import { homeNameFromFilename } from "@/lib/performance-ads";
 import type { MediaItem } from "@/server/db/schema";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 import { HomePicker, type PickableHome } from "../HomePicker";
 
@@ -40,7 +40,6 @@ export function CreativeDrop({
   campaignId?: string | null;
 }) {
   const router = useRouter();
-  const trpc = useTRPC();
   const { uploadFiles, uploading, progress } = useMediaUpload(brandId);
   const [dropped, setDropped] = useState<Dropped[]>([]);
   const [as, setAs] = useState<"statics" | "carousel">("statics");
@@ -50,7 +49,7 @@ export function CreativeDrop({
   const byName = homes.length === 0;
 
   const create = useMutation(
-    trpc.ads.createAdsFromAssets.mutationOptions({
+    orpc.ads.createAdsFromAssets.mutationOptions({
       onSuccess: (result) => {
         const bound = result.ads.filter((ad) => ad.homeName).length;
         toast.success(
@@ -113,9 +112,9 @@ export function CreativeDrop({
                 brandId,
                 mediaAssetIds: dropped.map((row) => row.item.assetId!),
                 as,
-                propertyId: homeId,
-                homeName: byName ? homeName.trim() || null : null,
-                campaignId,
+                propertyId: homeId ?? undefined,
+                homeName: byName ? homeName.trim() || undefined : undefined,
+                campaignId: campaignId ?? undefined,
               })
             }
           >

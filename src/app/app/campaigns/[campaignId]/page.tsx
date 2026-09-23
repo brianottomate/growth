@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { getSession } from "@/server/better-auth/server";
-import { HydrateClient, prefetch, trpc } from "@/trpc/server";
+import { HydrateClient, prefetch, orpc } from "@/orpc/server";
 import { CampaignDetail } from "./CampaignDetail";
 
 export const metadata: Metadata = {
@@ -18,7 +18,7 @@ export default async function CampaignDetailPage({
   if (!session?.user) redirect("/signin");
   const { campaignId } = await params;
 
-  prefetch(trpc.campaign.get.queryOptions({ id: campaignId }));
+  prefetch(orpc.campaign.get.queryOptions({ input: { id: campaignId } }));
 
   return (
     <HydrateClient>

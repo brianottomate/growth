@@ -11,7 +11,7 @@ import { ListingSamplesDialog } from "@/app/app/compositions/ListingSamplesDialo
 import { SiteImagesDialog } from "@/app/app/compositions/SiteImagesDialog";
 import { MediaPickerDialog } from "@/app/app/content/[contentId]/MediaPickerDialog";
 import type { MediaItem } from "@/server/db/schema";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 /** Seconds as m:ss, the way a clip's length is normally written. */
 function clipLength(seconds: number | null | undefined): string | null {
@@ -56,7 +56,6 @@ export function CreativePool({
   /** The step's "Ask the assistant" button, rendered by the page. */
   askAssistant?: React.ReactNode;
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -73,7 +72,7 @@ export function CreativePool({
     [pool],
   );
   const assets = useQuery({
-    ...trpc.media.byIds.queryOptions({ brandId, ids: assetIds }),
+    ...orpc.media.byIds.queryOptions({ input: { brandId, ids: assetIds } }),
     enabled: assetIds.length > 0,
   });
   const assetById = useMemo(
@@ -82,20 +81,28 @@ export function CreativePool({
   );
 
   const setPool = useMutation(
-    trpc.ads.setCampaignCreativePool.mutationOptions({
+    orpc.ads.setCampaignCreativePool.mutationOptions({
       onSettled: () => router.refresh(),
     }),
   );
 
-  const add = (item: MediaItem) => {
-    if (pool.some((existing) => existing.url === item.url)) return;
-    setPool.mutate({ campaignId, media: [...pool, item] });
-  };
-  const remove = (url: string) =>
+  // The library resolves each url again on save and its own kind wins, so
+  // only the url, the asset and a type hint travel.
+  const save = (items: MediaItem[]) =>
     setPool.mutate({
       campaignId,
-      media: pool.filter((item) => item.url !== url),
+      media: items.map((item) => ({
+        url: item.url,
+        assetId: item.assetId || undefined,
+        type: item.type === "carousel" ? undefined : item.type,
+      })),
     });
+
+  const add = (item: MediaItem) => {
+    if (pool.some((existing) => existing.url === item.url)) return;
+    save([...pool, item]);
+  };
+  const remove = (url: string) => save(pool.filter((item) => item.url !== url));
 
   const addImported = (assets: { id: string; url: string | null }[]) => {
     const fresh = assets
@@ -108,7 +115,7 @@ export function CreativePool({
         assetId: asset.id,
       }));
     if (fresh.length === 0) return;
-    setPool.mutate({ campaignId, media: [...pool, ...fresh] });
+    save([...pool, ...fresh]);
   };
 
   return (

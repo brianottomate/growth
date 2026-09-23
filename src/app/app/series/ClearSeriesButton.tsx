@@ -19,7 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 /**
  * Wipe one brand's series shelf. Typing the brand name is the gate, matching
@@ -41,10 +41,8 @@ export function ClearSeriesButton({
   const [open, setOpen] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const router = useRouter();
-  const trpc = useTRPC();
-
   const clear = useMutation(
-    trpc.series.clearForBrand.mutationOptions({
+    orpc.series.clearForBrand.mutationOptions({
       onSuccess: (result) => {
         toast.success(
           `Deleted ${result?.deleted ?? 0} series${

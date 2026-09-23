@@ -72,7 +72,7 @@ curl -s "https://growth-git-<branch>-wanderdev.vercel.app/api/dev/login?mode=tok
 `bun run smoke:preview` (`scripts/smoke-preview.ts`) does the whole loop an
 agent would: mints a session, calls `/api/lab/sharp` (a create → PNG →
 metadata round-trip — the native lib is what broke prod on the last sharp
-bump, #113), runs a tRPC batch, and walks the main `/app/*` pages with the
+bump, #113), runs an RPC call, and walks the main `/app/*` pages with the
 cookie. Exits non-zero on any failure.
 
 ```bash

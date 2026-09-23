@@ -51,13 +51,13 @@ import {
   removeStorefrontReferenceSchema,
 } from "@/server/services/storefront-reference.service";
 
-import { growthAction } from "./types";
+import { growthAction, type CapabilityContext } from "./types";
 
-const actorFrom = (ctx: { orgId: string; userId: string }) =>
+const actorFrom = (ctx: CapabilityContext) =>
   ({
     orgId: ctx.orgId,
     userId: ctx.userId,
-    kind: "agent",
+    kind: ctx.surface === "app" ? "human" : "agent",
   }) satisfies ProductStorefrontActor;
 
 export const listProductAtlasProducts = growthAction({

@@ -133,7 +133,7 @@ that outlives its PR is a few gigabytes of caches with nothing in them.
 
 ## Stack
 
-Next.js 16 (App Router, React 19) · tRPC v11 + TanStack Query (SuperJSON) · Drizzle ORM on
+Next.js 16 (App Router, React 19) · oRPC + TanStack Query · Drizzle ORM on
 Neon Postgres · Better Auth (organization/admin/username plugins) · Tailwind CSS 4 + Radix ·
 Velite for MDX · React Email + Resend · Vercel (deploy, Blob, Cron) · Vercel AI SDK +
 Anthropic. Deployed on Vercel as the **`wanderdev/growth`** project (org slug is
@@ -156,23 +156,25 @@ checklist.
 
 ## Architecture
 
-### tRPC
+### oRPC
 
 - Routers live in `src/server/api/routers/*.router.ts` and must be registered in
-  `src/server/api/root.ts` (`appRouter`). Current routers: user, ads, amplifier,
-  audience, brand, cadence, channel, channelSuggestion, content, conversion, inbox,
-  campaign, newsletter, org, outreach, planImport, instantly, leads, lifecycle,
-  listening, media, composition, mention, moment, reddit, reschedule, spend, studio,
-  twitter. Compositions save rendered PNGs through the existing R2-backed media
-  service.
-  Note: `apply` is a
-  tRPC-reserved procedure name.
+  `src/server/api/root.ts` (`appRouter`). The browser calls
+  `POST /api/rpc/<router>/<procedure>`. Compositions save rendered PNGs through
+  the existing R2-backed media service.
 - The monthly content loop (strategy targets → slot generation → workbook import →
   review → apply) is documented in `docs/content-monthly-loop.md`.
-- Procedures (`src/server/api/trpc.ts`): `publicProcedure`, `protectedProcedure`
-  (requires session), `adminProcedure` (admin in prod, unrestricted in dev).
-- Context exposes `session`, `db`, and the Better Auth `authApi`.
-- See the `trpc-patterns` skill for client/server usage conventions.
+- Procedures (`src/server/api/orpc.ts`): `publicProcedure`, `protectedProcedure`
+  (requires session), `workspaceProcedure` (active organization after a live
+  membership check), `organizationProcedure` / `organizationAccess` (explicit
+  `organizationId` input), `adminProcedure` (admin in prod, unrestricted in dev).
+- `actionProcedure(action)` serves a Growth AI action to the app. Where an
+  action already performs an operation, the router serves it instead of
+  reimplementing it, so chat, MCP and the app share one definition.
+- Context exposes `session`, `db`, `headers`, and the Better Auth `authApi`.
+- Client components import `orpc` from `@/orpc/client`; server components use
+  `serverApi`, `prefetch` and `HydrateClient` from `@/orpc/server`. See the
+  `orpc-patterns` skill.
 
 ### Database schema — domain-split with a barrel constraint
 
@@ -319,7 +321,7 @@ existing cron already wakes for** (marginal cost zero); before reaching for a ti
 interval, check whether the thing you want faster is gated by a cron at all; and if a human
 consumes the output, match the cadence to *their* hours rather than the event's.
 
-Other API routes: `api/trpc`, `api/auth/[...all]`, `api/upload`, `api/media`, `api/webhooks`,
+Other API routes: `api/rpc`, `api/auth/[...all]`, `api/upload`, `api/media`, `api/webhooks`,
 `api/instantly` (incl. the reply webhook that mirrors replies/interest onto `lead_contact`),
 `api/outreach`, `api/workflows`, `api/og`, `api/admin`, `api/plan/chat` (plan-agent
 streaming endpoint).

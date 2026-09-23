@@ -1,6 +1,10 @@
 import "server-only";
 
-import { TRPCError } from "@trpc/server";
+import { ORPCError } from "@orpc/server";
+import {
+  resolveWorkspaceOrganizationId,
+  WorkspaceAccessError,
+} from "@/server/workspace-actor";
 import {
   and,
   asc,
@@ -28,7 +32,6 @@ import {
   lifecycleStepStatusEnum,
   lifecycleStepSystemEnum,
   lifecycleWorkspaceEnum,
-  memberTable,
   touchpointChannelEnum,
   type LifecycleStepStatus,
 } from "@/server/db/schema";
@@ -121,30 +124,13 @@ export async function resolveLifecycleOrganizationId(input: {
   userId: string;
   preferredOrganizationId?: string | null;
 }) {
-  const memberships = await db.query.memberTable.findMany({
-    where: eq(memberTable.userId, input.userId),
-    columns: { organizationId: true },
-    limit: 2,
-  });
-  if (
-    input.preferredOrganizationId &&
-    memberships.some(
-      (membership) =>
-        membership.organizationId === input.preferredOrganizationId,
-    )
-  ) {
-    return input.preferredOrganizationId;
+  try {
+    return await resolveWorkspaceOrganizationId(input);
+  } catch (error) {
+    if (error instanceof WorkspaceAccessError)
+      throw new ORPCError("FORBIDDEN", { message: error.message });
+    throw error;
   }
-  if (memberships.length === 1 && memberships[0]) {
-    return memberships[0].organizationId;
-  }
-  throw new TRPCError({
-    code: "FORBIDDEN",
-    message:
-      memberships.length === 0
-        ? "No organization membership found"
-        : "Select an active organization before editing lifecycle programs",
-  });
 }
 
 async function organizationBrandIds(organizationId: string) {
@@ -168,7 +154,7 @@ async function assertBrandAccess(organizationId: string, brandId: string) {
     columns: { id: true, name: true },
   });
   if (!brand) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Brand not found" });
+    throw new ORPCError("NOT_FOUND", { message: "Brand not found" });
   }
   return brand;
 }
@@ -185,7 +171,7 @@ async function assertProgramAccess(
     ),
   });
   if (!program) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Program not found" });
+    throw new ORPCError("NOT_FOUND", { message: "Program not found" });
   }
   await assertBrandAccess(organizationId, program.brandId);
   return program;
@@ -202,7 +188,7 @@ async function assertCampaignAccess(
     ),
   });
   if (!campaign) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Campaign not found" });
+    throw new ORPCError("NOT_FOUND", { message: "Campaign not found" });
   }
   await assertBrandAccess(organizationId, campaign.brandId);
   return campaign;
@@ -216,8 +202,7 @@ async function assertValidParent(input: {
 }) {
   if (!input.parentStepId) return;
   if (input.selfId === input.parentStepId) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
+    throw new ORPCError("BAD_REQUEST", {
       message: "A step cannot branch from itself",
     });
   }
@@ -226,8 +211,7 @@ async function assertValidParent(input: {
     columns: { id: true, programId: true },
   });
   if (parent?.programId !== input.programId) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
+    throw new ORPCError("BAD_REQUEST", {
       message: "Branch parent must be a step of the same program",
     });
   }
@@ -347,7 +331,7 @@ export async function getLifecycleProgram(input: {
     },
   });
   if (!program) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Program not found" });
+    throw new ORPCError("NOT_FOUND", { message: "Program not found" });
   }
   return {
     ...program,
@@ -454,7 +438,7 @@ export async function updateLifecycleProgram(input: {
     .where(eq(lifecycleProgramTable.id, input.programId))
     .returning();
   if (!updated) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Program not found" });
+    throw new ORPCError("NOT_FOUND", { message: "Program not found" });
   }
   return updated;
 }
@@ -471,7 +455,7 @@ export async function setLifecycleProgramArchived(input: {
     .where(eq(lifecycleProgramTable.id, input.programId))
     .returning();
   if (!updated) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Program not found" });
+    throw new ORPCError("NOT_FOUND", { message: "Program not found" });
   }
   return updated;
 }
@@ -513,7 +497,7 @@ export async function updateLifecycleStep(input: {
     where: eq(lifecycleProgramStepTable.id, input.stepId),
   });
   if (!step) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Step not found" });
+    throw new ORPCError("NOT_FOUND", { message: "Step not found" });
   }
   await assertProgramAccess(input.organizationId, step.programId);
   const changes = lifecycleStepChangesSchema.parse(input.changes);
@@ -529,7 +513,7 @@ export async function updateLifecycleStep(input: {
     .where(eq(lifecycleProgramStepTable.id, step.id))
     .returning();
   if (!updated) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Step not found" });
+    throw new ORPCError("NOT_FOUND", { message: "Step not found" });
   }
   return updated;
 }
@@ -549,8 +533,7 @@ export async function linkLifecycleCampaign(input: {
       input.programId,
     );
     if (program.brandId !== campaign.brandId) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
+      throw new ORPCError("BAD_REQUEST", {
         message: "Campaign and program must belong to the same brand",
       });
     }
@@ -561,7 +544,7 @@ export async function linkLifecycleCampaign(input: {
     .where(eq(lifecycleCampaignTable.id, campaign.id))
     .returning();
   if (!updated) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Campaign not found" });
+    throw new ORPCError("NOT_FOUND", { message: "Campaign not found" });
   }
   return updated;
 }
@@ -582,7 +565,7 @@ export async function setLifecycleCampaignCleanupStatus(input: {
     .where(eq(lifecycleCampaignTable.id, campaign.id))
     .returning();
   if (!updated) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Campaign not found" });
+    throw new ORPCError("NOT_FOUND", { message: "Campaign not found" });
   }
   return updated;
 }

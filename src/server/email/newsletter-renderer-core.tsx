@@ -24,7 +24,7 @@ type ComposeGenericEmail = (
 
 // The published package exports a strongly typed registry covering every
 // Wander email. Keeping this adapter narrow prevents that entire template map
-// from leaking into Growth's tRPC output inference while runtime composition
+// from leaking into Growth's oRPC output inference while runtime composition
 // still comes from the canonical package.
 async function composeGenericEmail(props: GenericHtmlProps) {
   const designSystemEmails = await import("@wandercom/design-system-emails");

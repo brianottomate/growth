@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { HardDrive, Images, Sparkles, X } from "lucide-react";
 
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { MediaThumbnail } from "@/components/media-thumbnail";
 import { cn } from "@/components/ui/lib/utils";
@@ -42,14 +42,13 @@ export function ContentPool({
   directMedia: MediaItem[];
   spots: Spot[];
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const refresh = { onSettled: () => router.refresh() };
   const setPoolMedia = useMutation(
-    trpc.content.setPoolMedia.mutationOptions(refresh),
+    orpc.content.setPoolMedia.mutationOptions(refresh),
   );
   const setSpotMedia = useMutation(
-    trpc.content.setMedia.mutationOptions(refresh),
+    orpc.content.setMedia.mutationOptions(refresh),
   );
 
   const [pickerOpen, setPickerOpen] = useState(false);

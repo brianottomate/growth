@@ -21,7 +21,7 @@ import {
 import { CURRENT_PREGEN_BATCH } from "@/lib/pregen-batch";
 import { PREGEN_SEQUENCE_SENDER_EMAIL } from "@/lib/pregen-sequence";
 import { Button } from "@/components/ui/button";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { EnrichDrawer, HsMarker, type LeadRow } from "./EnrichDrawer";
 import {
   ProspectReviewCard,
@@ -131,8 +131,6 @@ function Pill({
 }
 
 export function LeadsClient() {
-  const trpc = useTRPC();
-
   // Every filter lives in the URL, so a view is a link. Previously all eleven
   // were useState and nothing about a filtered list was shareable.
   const [population, setPopulation] = useQueryState(
@@ -196,30 +194,30 @@ export function LeadsClient() {
 
   const limit = 50;
 
-  const stats = useQuery(trpc.leads.stats.queryOptions());
+  const stats = useQuery(orpc.leads.stats.queryOptions({ input: {} }));
   // One poll for everything build-shaped on this page: the strip up top and the
   // per-card status both read it, so neither runs its own interval.
   const buildsInFlight = useQuery(
-    trpc.leads.pregenBuildsInFlight.queryOptions(undefined, {
+    orpc.leads.pregenBuildsInFlight.queryOptions({
       refetchInterval: 30_000,
       refetchOnWindowFocus: true,
     }),
   );
-  const pmsOptions = useQuery(trpc.leads.pmsOptions.queryOptions());
+  const pmsOptions = useQuery(orpc.leads.pmsOptions.queryOptions());
   // Scoped to the pregen cohorts so the list reads as "reps with target
   // companies", not "reps who happen to own enrichment records".
   const ownerOptions = useQuery(
-    trpc.leads.ownerOptions.queryOptions({ pregenOnly: true }),
+    orpc.leads.ownerOptions.queryOptions({ input: { pregenOnly: true } }),
   );
 
   const refreshBuild = useMutation(
-    trpc.leads.refreshPregenBuild.mutationOptions({
+    orpc.leads.refreshPregenBuild.mutationOptions({
       onSettled: () => void buildsInFlight.refetch(),
     }),
   );
   const list = useQuery(
-    trpc.leads.listDomains.queryOptions(
-      {
+    orpc.leads.listDomains.queryOptions({
+      input: {
         q: q || undefined,
         source: source ?? undefined,
         pms: pms ?? undefined,
@@ -247,8 +245,8 @@ export function LeadsClient() {
         // the whole universe.
         ...POPULATIONS[population].input,
       },
-      { placeholderData: keepPreviousData },
-    ),
+      placeholderData: keepPreviousData,
+    }),
   );
 
   // A search that misses inside a narrow population is the single most common
@@ -259,10 +257,10 @@ export function LeadsClient() {
   const emptyWithQuery =
     !!q && population !== "all" && list.data?.items.length === 0;
   const elsewhere = useQuery(
-    trpc.leads.listDomains.queryOptions(
-      { q, limit: 1 },
-      { enabled: emptyWithQuery },
-    ),
+    orpc.leads.listDomains.queryOptions({
+      input: { q, limit: 1 },
+      enabled: emptyWithQuery,
+    }),
   );
   const filtersActive =
     !!q ||
@@ -292,10 +290,10 @@ export function LeadsClient() {
   // Resolve a deep-linked lead (?lead=domain) that isn't already open — search
   // for it so the drawer opens even when the lead is outside the current filter.
   const deepLink = useQuery(
-    trpc.leads.listDomains.queryOptions(
-      { q: leadParam ?? "", limit: 5 },
-      { enabled: !!leadParam && enrichLead?.domain !== leadParam },
-    ),
+    orpc.leads.listDomains.queryOptions({
+      input: { q: leadParam ?? "", limit: 5 },
+      enabled: !!leadParam && enrichLead?.domain !== leadParam,
+    }),
   );
   useEffect(() => {
     if (!leadParam || enrichLead?.domain === leadParam) return;
@@ -315,6 +313,12 @@ export function LeadsClient() {
     s?.targetMemberships.find(
       (row) => row.cohort === cohort && row.objectType === objectType,
     );
+  const sourceCount = (key: SourceKey) =>
+    key === "builtwith"
+      ? s?.inBuiltwith
+      : key === "hubspot"
+        ? s?.inHubspot
+        : s?.inInstantly;
   const enrollableCount = (cohort: HubspotPregenCohort) =>
     s?.targetEnrollable.find((row) => row.cohort === cohort);
 
@@ -325,7 +329,7 @@ export function LeadsClient() {
     if (key === "newbatch") return fmt(s.currentBatch);
     if (key === "netnew") return fmt(s.netNew);
     if (key === "send20") return fmt(s.sendBatch);
-    if (key === "previews") return fmt(s.withPregenSite);
+    if (key === "previews") return fmt(s.withPreviewUrl);
     if (key === "all") return fmt(s.domains);
     if (key === "recycled" || key === "untouched")
       return fmt(enrollableCount(key)?.enrollable);
@@ -365,7 +369,7 @@ export function LeadsClient() {
       <div className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs">
         <span className="text-muted-foreground">
           {fmt(s?.domains)} domains · {fmt(s?.contacts)} contacts ·{" "}
-          {fmt(s?.withPregenSite)} previews · {fmt(s?.ranked)} ranked ·{" "}
+          {fmt(s?.withPreviewUrl)} previews · {fmt(s?.ranked)} ranked ·{" "}
           {fmt(s?.integratedPms)} integrated PMS · {fmt(s?.untouched)} not in
           CRM
         </span>
@@ -471,7 +475,7 @@ export function LeadsClient() {
           <option value="">All sources</option>
           {(["builtwith", "hubspot", "instantly"] as SourceKey[]).map((sk) => (
             <option key={sk} value={sk}>
-              {sk} {s ? `(${fmt(s[sk])})` : ""}
+              {sk} {s ? `(${fmt(sourceCount(sk))})` : ""}
             </option>
           ))}
         </select>
@@ -984,7 +988,6 @@ function ReviewCardList({
   builds: InFlightBuild[];
   onInvalidate: () => void;
 }) {
-  const trpc = useTRPC();
   const [pending, setPending] = useState<{ id: string; kind: string } | null>(
     null,
   );
@@ -1011,25 +1014,25 @@ function ReviewCardList({
   };
 
   const resolve = useMutation(
-    trpc.leads.resolveChannel.mutationOptions({ onSettled: settle }),
+    orpc.leads.resolveChannel.mutationOptions({ onSettled: settle }),
   );
   const rank = useMutation(
-    trpc.leads.rankDomain.mutationOptions({ onSettled: settle }),
+    orpc.leads.rankDomain.mutationOptions({ onSettled: settle }),
   );
   const generate = useMutation(
-    trpc.leads.generatePregenOutreach.mutationOptions({ onSettled: settle }),
+    orpc.leads.generatePregenOutreach.mutationOptions({ onSettled: settle }),
   );
   const verify = useMutation(
-    trpc.leads.verifyDomainContacts.mutationOptions({ onSettled: settle }),
+    orpc.leads.verifyDomainContacts.mutationOptions({ onSettled: settle }),
   );
   const buildPreview = useMutation(
-    trpc.leads.requestPregenSite.mutationOptions({ onSettled: settle }),
+    orpc.leads.requestPregenSite.mutationOptions({ onSettled: settle }),
   );
   // The refusals live server-side, so a rejected enrol surfaces as an error
   // here rather than being pre-empted in the UI. That keeps one list of
   // conditions instead of a copy per surface that can drift.
   const enroll = useMutation(
-    trpc.leads.startPregenSequence.mutationOptions({
+    orpc.leads.startPregenSequence.mutationOptions({
       onSettled: settle,
       onError: (error) => window.alert(error.message),
       onSuccess: (result) =>

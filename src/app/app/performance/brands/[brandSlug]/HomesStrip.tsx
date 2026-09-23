@@ -29,7 +29,7 @@ import {
 import { cn } from "@/components/ui/lib/utils";
 import { toast } from "@/components/ui/toast";
 import { adPreviewStudioHref } from "@/lib/ad-preview-links";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 /** A home as the listing feed reports it; only what the tile and lightbox draw. */
 export type StripHome = {
@@ -91,9 +91,8 @@ export function HomesStrip({
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const open = openIndex !== null ? (shown[openIndex] ?? null) : null;
   const router = useRouter();
-  const trpc = useTRPC();
   const design = useMutation(
-    trpc.media.importUrls.mutationOptions({
+    orpc.media.importUrls.mutationOptions({
       onSuccess: (result) => {
         const asset = result.assets[0];
         if (!asset) {
@@ -110,7 +109,7 @@ export function HomesStrip({
 
   // Featuring is a saved choice on the brand: the ad previews draw from it.
   const feature = useMutation(
-    trpc.brand.setPreviewSource.mutationOptions({
+    orpc.brand.setPreviewSource.mutationOptions({
       onSuccess: (result) => {
         toast.success(
           result.featuredListingUrl
@@ -127,14 +126,14 @@ export function HomesStrip({
   const byExternal = new Map(picked.map((p) => [p.externalId, p.homeId]));
   const count = picked.length;
   const add = useMutation(
-    trpc.brand.homesAddWanderOs.mutationOptions({
+    orpc.brand.homesAddWanderOs.mutationOptions({
       onSuccess: () => router.refresh(),
       onError: (error) => toast.error(error.message),
       onSettled: () => setBusyId(null),
     }),
   );
   const drop = useMutation(
-    trpc.brand.homesRemove.mutationOptions({
+    orpc.brand.homesRemove.mutationOptions({
       onSuccess: () => router.refresh(),
       onError: (error) => toast.error(error.message),
       onSettled: () => setBusyId(null),

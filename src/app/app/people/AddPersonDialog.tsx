@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { PhotoPickerField, usePhotoPicker } from "./PhotoPicker";
 
 export function AddPersonDialog({
@@ -32,7 +32,6 @@ export function AddPersonDialog({
 }: {
   organizationId: string;
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const photoPicker = usePhotoPicker();
 
@@ -47,7 +46,7 @@ export function AddPersonDialog({
   const [copied, setCopied] = useState(false);
 
   const createPerson = useMutation(
-    trpc.org.createPerson.mutationOptions({
+    orpc.org.createPerson.mutationOptions({
       onSuccess: (res) => {
         setCreated({ email: res.email, tempPassword: res.tempPassword });
         if (res.photoRequested && !res.photoSet) {

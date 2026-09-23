@@ -31,7 +31,7 @@ import type {
   LifecycleWorkspace,
   TouchpointChannel,
 } from "@/server/db/schema";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 export type ProgramDraft = {
   id?: string;
@@ -100,7 +100,6 @@ export function ProgramDialog({
   brands: { id: string; name: string }[];
   initial?: ProgramDraft;
 }) {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
   const isEdit = Boolean(initial?.id);
 
@@ -149,10 +148,12 @@ export function ProgramDialog({
   }, [open, initial, brands]);
 
   const invalidate = () =>
-    queryClient.invalidateQueries(trpc.lifecycle.overview.queryOptions());
+    queryClient.invalidateQueries(
+      orpc.lifecycle.overview.queryOptions({ input: {} }),
+    );
 
   const create = useMutation(
-    trpc.lifecycle.createProgram.mutationOptions({
+    orpc.lifecycle.createProgram.mutationOptions({
       onSuccess: async () => {
         await invalidate();
         onOpenChange(false);
@@ -161,7 +162,7 @@ export function ProgramDialog({
     }),
   );
   const update = useMutation(
-    trpc.lifecycle.updateProgram.mutationOptions({
+    orpc.lifecycle.updateProgram.mutationOptions({
       onSuccess: async () => {
         await invalidate();
         onOpenChange(false);
@@ -187,7 +188,7 @@ export function ProgramDialog({
       targetTouchpoints: targetTouchpoints ? Number(targetTouchpoints) : null,
     };
     if (isEdit && initial?.id) {
-      update.mutate({ id: initial.id, ...shared });
+      update.mutate({ programId: initial.id, changes: shared });
     } else {
       create.mutate({ brandId, ...shared });
     }

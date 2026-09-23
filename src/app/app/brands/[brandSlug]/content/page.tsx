@@ -5,7 +5,7 @@ import { and, eq, isNull, or } from "drizzle-orm";
 import { db } from "@/server/db";
 import { brandTable, memberTable } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
-import { trpc, HydrateClient, prefetch } from "@/trpc/server";
+import { orpc, HydrateClient, prefetch } from "@/orpc/server";
 
 import { ContentBoard } from "@/app/app/content/ContentBoard";
 
@@ -50,8 +50,8 @@ export default async function BrandContentPage({
       ? sp.view
       : undefined;
 
-  prefetch(trpc.content.board.queryOptions({ brandId: brand.id }));
-  prefetch(trpc.content.assignableMembers.queryOptions());
+  prefetch(orpc.content.board.queryOptions({ input: { brandId: brand.id } }));
+  prefetch(orpc.content.assignableMembers.queryOptions());
 
   const slug = brand.slug ?? brandSlug;
   return (

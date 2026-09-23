@@ -822,7 +822,7 @@ export type ScrapeBrandChannelResult = PeerScrapeResult & {
 
 /**
  * The single entry point for an on-demand pull of one brand's posts on one
- * platform. The tRPC mutation, the agent tool and the probe all go through
+ * platform. The oRPC mutation, the agent tool and the probe all go through
  * here so the durable `content_ingest_run` row is written the same way.
  *
  * `limit` is the sample size: 5 confirms a channel is wired up and costs a

@@ -135,7 +135,7 @@ low-churn.
 ### The API surface (`/api/hubspot/v1/*`)
 
 Plain REST route handlers + zod, bearer auth from a shared secret (callers are
-wander.com and the Deno monolith — not tRPC clients). Keep it small:
+wander.com and the Deno monolith — not RPC clients). Keep it small:
 
 - `POST /inbound` — the ported router
 - `POST /companies/upsert`, `POST /contacts/upsert`

@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import {
   ChannelLogo,
   PLATFORM_META,
@@ -115,6 +115,13 @@ function latestCount(history: FollowerSnapshot[]): number | null {
   return history.reduce((a, b) => (a.capturedAt >= b.capturedAt ? a : b)).count;
 }
 
+/** A typed-in address as a full URL, or undefined when left blank. */
+function asUrl(value: string): string | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
 /**
  * A social profile we found on the web and a human accepted, but nothing has
  * confirmed yet — no provider connection and no scrape. Marked with a dot.
@@ -142,7 +149,6 @@ export function BrandChannels({
   postCountByPlatform?: Record<string, number>;
 }) {
   const router = useRouter();
-  const trpc = useTRPC();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState("details");
   const [newCount, setNewCount] = useState("");
@@ -155,24 +161,30 @@ export function BrandChannels({
   const refresh = () => router.refresh();
 
   const createM = useMutation(
-    trpc.channel.create.mutationOptions({ onSuccess: onDone }),
+    orpc.channel.create.mutationOptions({
+      onSuccess: (result) => {
+        if (result.ok) onDone();
+        else toast.error(result.reason);
+      },
+      onError: (e) => toast.error(e.message),
+    }),
   );
   const updateM = useMutation(
-    trpc.channel.update.mutationOptions({ onSuccess: onDone }),
+    orpc.channel.update.mutationOptions({ onSuccess: onDone }),
   );
   const deleteM = useMutation(
-    trpc.channel.delete.mutationOptions({ onSuccess: onDone }),
+    orpc.channel.delete.mutationOptions({ onSuccess: onDone }),
   );
   const busy = createM.isPending || updateM.isPending || deleteM.isPending;
 
   const acceptM = useMutation(
-    trpc.channelSuggestion.accept.mutationOptions({
+    orpc.channelSuggestion.accept.mutationOptions({
       onSuccess: refresh,
       onError: (e) => toast.error(e.message),
     }),
   );
   const rejectM = useMutation(
-    trpc.channelSuggestion.reject.mutationOptions({
+    orpc.channelSuggestion.reject.mutationOptions({
       onSuccess: refresh,
       onError: (e) => toast.error(e.message),
     }),
@@ -238,8 +250,21 @@ export function BrandChannels({
       connectionStatus: form.connectionStatus as never,
       followerHistory: form.followerHistory,
     };
-    if (form.id) updateM.mutate({ id: form.id, ...payload });
-    else createM.mutate({ brandId, ...payload });
+    if (form.id) {
+      updateM.mutate({ id: form.id, ...payload });
+      return;
+    }
+    createM.mutate({
+      brandId,
+      kind: payload.kind,
+      platform: payload.platform,
+      handle: form.handle.trim() || undefined,
+      profileImageUrl: asUrl(form.profileImageUrl),
+      profileUrl: asUrl(form.profileUrl),
+      manageUrl: asUrl(form.manageUrl),
+      connectionStatus: payload.connectionStatus,
+      followerCount: latestCount(form.followerHistory) ?? undefined,
+    });
   };
 
   const setKind = (kind: string) =>

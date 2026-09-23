@@ -46,7 +46,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useMediaQuery } from "@/components/ui/hooks/use-media-query";
 import { toast } from "@/components/ui/toast";
 import { ThinkingOrb, capabilityOrbState } from "@/components/thinking-orb";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { CHAT_MARKDOWN_LAYOUT } from "@/lib/chat-markdown";
 import { isApprovalSuperseded } from "@/lib/chat-approval-state";
 import { formatResolvedPublishingTime } from "@/lib/scheduling-time";
@@ -218,6 +218,7 @@ export function OverviewChat({
   seedPrompt,
   workContext,
   campaignContext,
+  contextMode,
 }: {
   threadId: string;
   initialMessages: UIMessage[];
@@ -239,6 +240,7 @@ export function OverviewChat({
   seedPrompt?: string;
   workContext?: ContentWorkContext;
   campaignContext?: AdCampaignWorkContext;
+  contextMode?: "page" | "pinned";
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -270,6 +272,7 @@ export function OverviewChat({
     workContext,
     campaignContext,
     pagePath: pathname,
+    contextMode,
   };
 
   const {
@@ -475,7 +478,6 @@ export function OverviewChat({
   }, [messages, queryClient, router]);
 
   // ---- image attachment (direct browser → R2 → AI SDK file part) ----
-  const trpc = useTRPC();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const attachmentCountRef = useRef(0);
   // Files the composer refused are reported with the next send so the
@@ -489,7 +491,7 @@ export function OverviewChat({
   >([]);
   const [dragActive, setDragActive] = useState(false);
   const createChatUploadUrl = useMutation(
-    trpc.media.createChatUploadUrl.mutationOptions(),
+    orpc.media.createChatUploadUrl.mutationOptions(),
   );
 
   const updatePendingAttachments = useCallback(
@@ -929,6 +931,26 @@ export function OverviewChat({
               </div>
             )}
 
+            {messages.some((message) =>
+              message.parts.some(
+                (part) =>
+                  isToolUIPart(part) &&
+                  part.state === "output-available" &&
+                  getToolName(part) !== "toolSearch" &&
+                  !isGrowthCapabilityId(getToolName(part)),
+              ),
+            ) && (
+              <details className="rounded-lg border px-3 py-2 text-xs text-muted-foreground">
+                <summary className="cursor-pointer">
+                  Older tool results are hidden
+                </summary>
+                <p className="mt-2">
+                  This conversation includes results from a retired tool
+                  version. Your messages remain available. Ask for a fresh read
+                  to inspect current records.
+                </p>
+              </details>
+            )}
             {messages.map((message, messageIdx) => {
               const isLastMessage = messageIdx === messages.length - 1;
               const lastTextIdx = message.parts.reduce(
@@ -1407,18 +1429,7 @@ function renderToolPart(
   if (part.state !== "output-available") return null;
 
   if (toolName === "toolSearch") return null;
-  if (!isGrowthCapabilityId(toolName)) {
-    return (
-      <div
-        key={key}
-        className="rounded-lg border bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
-      >
-        This result came from an older Growth assistant version. The surrounding
-        conversation is still available; send a new message to use the current
-        capability.
-      </div>
-    );
-  }
+  if (!isGrowthCapabilityId(toolName)) return null;
   // The envelope also carries `suggestedAction`, which is recovery guidance
   // addressed to the model ("Do not retry blindly…"). It stays in the tool
   // result the model reads and out of this card: an operator seeing it reads

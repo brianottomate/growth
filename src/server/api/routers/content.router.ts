@@ -1,44 +1,33 @@
 import type { Database } from "@/server/db";
 import { z } from "zod";
 import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
-import { TRPCError } from "@trpc/server";
+import { ORPCError } from "@orpc/server";
 
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { actionProcedure, protectedProcedure } from "@/server/api/orpc";
+import {
+  createIdea,
+  promotePlatformPost,
+  updateContentWorkItem,
+} from "@/server/ai/capabilities/content";
+import { resolveContentGrouping } from "@/server/ai/capabilities/content-strategy";
 import {
   brandTable,
-  channelPlatformEnum,
   contentAssigneeTable,
   contentCommentTable,
   contentPostTable,
-  contentStatusEnum,
   contentSuggestionTable,
   memberTable,
   platformPostTable,
   seriesTable,
 } from "@/server/db/schema";
-import {
-  archetypeForFormat,
-  platformFormatsFor,
-  validateSpot,
-} from "@/server/content/formats";
-import {
-  ContentService,
-  deliveryBlockReason,
-} from "@/server/services/content.service";
-import { generateSpotCaption } from "@/server/services/spot-generate.service";
-import { SPOT_PILL_IDS } from "@/lib/spot-pills";
+import { ContentService } from "@/server/services/content.service";
 import { displayPoster } from "@/lib/utils/media";
 import { groupPlatformThreads } from "@/lib/platform-thread";
 import {
-  approveAndScheduleSocialPost,
   deliverSocialPost,
   refreshSocialDelivery,
-  rescheduleQueuedSocialPost,
   retrySocialDelivery,
-  saveSocialFirstComment,
-  updateQueuedSocialFirstComment,
 } from "@/server/services/content-publishing.service";
-import { resolveGroupingSuggestion } from "@/server/services/content-grouping.service";
 
 type Ctx = {
   db: Database;
@@ -78,10 +67,7 @@ async function assertOrgMember(ctx: Ctx, orgId: string | null | undefined) {
       })
     : null;
   if (!orgId || !membership) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "No access to this content",
-    });
+    throw new ORPCError("FORBIDDEN", { message: "No access to this content" });
   }
 }
 
@@ -94,7 +80,6 @@ const toMember = (
     | undefined,
 ): Member | null => (u ? { id: u.id, name: u.name, image: u.image } : null);
 
-const statusEnum = z.enum(contentStatusEnum.enumValues);
 const mediaItemInput = z.object({
   url: z.string().max(2000),
   type: z.enum(["image", "video", "carousel"]),
@@ -111,13 +96,13 @@ const spotThreadItemInput = z.object({
   assetLinks: z.array(z.string().trim().min(1).max(2000)).max(30),
 });
 
-export const contentRouter = createTRPCRouter({
+export const contentRouter = {
   /**
    * Lightweight, org-scoped index for the global command palette. This stays
    * deliberately smaller than `board`: no comments, analytics, media, or
    * assignee joins. cmdk filters these rows client-side after the palette opens.
    */
-  searchIndex: protectedProcedure.query(async ({ ctx }) => {
+  searchIndex: protectedProcedure.handler(async ({ context: ctx }) => {
     const { org, brands } = await orgContext(ctx);
     if (!org) return { ideas: [], posts: [], clients: [] };
     const brandIds = brands.map((brand) => brand.id);
@@ -239,7 +224,7 @@ export const contentRouter = createTRPCRouter({
         pillar: z.string().optional(),
       }),
     )
-    .query(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const { org, brands } = await orgContext(ctx);
       if (!org) return [];
 
@@ -371,7 +356,7 @@ export const contentRouter = createTRPCRouter({
         pillar: z.string().optional(),
       }),
     )
-    .query(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const { org, brands } = await orgContext(ctx);
       if (!org) return [];
       let brandIds = brands.map((b) => b.id);
@@ -395,7 +380,10 @@ export const contentRouter = createTRPCRouter({
       const brandName = new Map(brands.map((b) => [b.id, b.name]));
 
       return spots
-        .filter((p) => p.contentPost && !p.contentPost.deletedAt)
+        .filter(
+          (p): p is typeof p & { contentPostId: string } =>
+            !!p.contentPostId && !!p.contentPost && !p.contentPost.deletedAt,
+        )
         .filter((p) =>
           input.pillar ? p.contentPost?.pillar === input.pillar : true,
         )
@@ -444,7 +432,7 @@ export const contentRouter = createTRPCRouter({
         pillar: z.string().optional(),
       }),
     )
-    .query(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const { org, brands } = await orgContext(ctx);
       if (!org) return [];
       let brandIds = brands.map((b) => b.id);
@@ -524,42 +512,9 @@ export const contentRouter = createTRPCRouter({
         .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
     }),
 
-  /** Move a content idea to a new lifecycle status (the Kanban drag target). */
-  setStatus: protectedProcedure
-    .input(z.object({ id: z.string(), status: statusEnum }))
-    .mutation(async ({ ctx, input }) => {
-      const content = await ctx.db.query.contentPostTable.findFirst({
-        where: eq(contentPostTable.id, input.id),
-        with: { brand: { columns: { organizationId: true } } },
-      });
-      if (!content) throw new TRPCError({ code: "NOT_FOUND" });
-
-      const orgId = content.brand?.organizationId;
-      const membership = orgId
-        ? await ctx.db.query.memberTable.findFirst({
-            where: and(
-              eq(memberTable.userId, ctx.session.user.id),
-              eq(memberTable.organizationId, orgId),
-            ),
-          })
-        : null;
-      if (!orgId || !membership) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "No access to this content",
-        });
-      }
-
-      await ContentService.setContentStatus({
-        contentPostId: input.id,
-        status: input.status,
-      });
-      return { id: input.id, status: input.status };
-    }),
-
   /** Org roster for the assignee picker — everyone who can own a piece/spot. */
-  assignableMembers: protectedProcedure.query(
-    async ({ ctx }): Promise<Member[]> => {
+  assignableMembers: protectedProcedure.handler(
+    async ({ context: ctx }): Promise<Member[]> => {
       const { org } = await orgContext(ctx);
       if (!org) return [];
       const members = await ctx.db.query.memberTable.findMany({
@@ -574,6 +529,12 @@ export const contentRouter = createTRPCRouter({
   ),
 
   /**
+   * Edit an idea's brief and status, and its owned spots' copy, status and
+   * schedule. A spot's status and schedule move its whole thread or Story.
+   */
+  updateWorkItem: actionProcedure(updateContentWorkItem),
+
+  /**
    * Assign / clear the idea-level owner (DRI). `ownerId: null` disowns.
    * Self-assign is just `ownerId === session.user.id`; no admin gate.
    */
@@ -581,12 +542,12 @@ export const contentRouter = createTRPCRouter({
     .input(
       z.object({ contentPostId: z.string(), ownerId: z.string().nullable() }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const content = await ctx.db.query.contentPostTable.findFirst({
         where: eq(contentPostTable.id, input.contentPostId),
         with: { brand: { columns: { organizationId: true } } },
       });
-      if (!content) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!content) throw new ORPCError("NOT_FOUND");
       await assertOrgMember(ctx, content.brand?.organizationId);
 
       await ctx.db
@@ -604,12 +565,12 @@ export const contentRouter = createTRPCRouter({
     .input(
       z.object({ contentPostId: z.string(), userIds: z.array(z.string()) }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const content = await ctx.db.query.contentPostTable.findFirst({
         where: eq(contentPostTable.id, input.contentPostId),
         with: { brand: { columns: { organizationId: true } } },
       });
-      if (!content) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!content) throw new ORPCError("NOT_FOUND");
       await assertOrgMember(ctx, content.brand?.organizationId);
 
       const ids = [...new Set(input.userIds)];
@@ -635,12 +596,12 @@ export const contentRouter = createTRPCRouter({
     .input(
       z.object({ platformPostId: z.string(), ownerId: z.string().nullable() }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const spot = await ctx.db.query.platformPostTable.findFirst({
         where: eq(platformPostTable.id, input.platformPostId),
         with: { brand: { columns: { organizationId: true } } },
       });
-      if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!spot) throw new ORPCError("NOT_FOUND");
       await assertOrgMember(ctx, spot.brand?.organizationId);
 
       await ctx.db
@@ -648,69 +609,6 @@ export const contentRouter = createTRPCRouter({
         .set({ ownerId: input.ownerId })
         .where(eq(platformPostTable.id, input.platformPostId));
       return { id: input.platformPostId, ownerId: input.ownerId };
-    }),
-
-  /**
-   * Move a single platform spot through its own status — channels ship on
-   * different days, so a spot's status is independent of the idea's. Owned
-   * spots only; scraped posts are historical record.
-   */
-  setSpotStatus: protectedProcedure
-    .input(z.object({ platformPostId: z.string(), status: statusEnum }))
-    .mutation(async ({ ctx, input }) => {
-      const spot = await ctx.db.query.platformPostTable.findFirst({
-        where: eq(platformPostTable.id, input.platformPostId),
-        with: { brand: { columns: { organizationId: true } } },
-      });
-      if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
-      await assertOrgMember(ctx, spot.brand?.organizationId);
-      if (spot.source !== "owned") {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Can't edit a scraped post",
-        });
-      }
-      await ContentService.setPublishingUnitStatus({
-        rootPlatformPostId: input.platformPostId,
-        status: input.status,
-      });
-      return { id: input.platformPostId, status: input.status };
-    }),
-
-  /**
-   * Manually set a spot's scheduled ship date (the "manual layer" until
-   * auto-publish exists — the team picks the day each channel goes out).
-   */
-  setSpotSchedule: protectedProcedure
-    .input(
-      z.object({
-        platformPostId: z.string(),
-        scheduledAt: z.string().datetime().nullable(),
-        // Also move the spot to `scheduled` — the "she queued it natively on
-        // the platform" hot action. Off for plain reschedules (calendar drag),
-        // which shouldn't silently promote a draft.
-        markScheduled: z.boolean().optional(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const spot = await ctx.db.query.platformPostTable.findFirst({
-        where: eq(platformPostTable.id, input.platformPostId),
-        with: { brand: { columns: { organizationId: true } } },
-      });
-      if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
-      await assertOrgMember(ctx, spot.brand?.organizationId);
-      if (spot.source !== "owned") {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Can't edit a scraped post",
-        });
-      }
-      await ContentService.setPublishingUnitSchedule({
-        rootPlatformPostId: input.platformPostId,
-        scheduledAt: input.scheduledAt,
-        markScheduled: input.markScheduled,
-      });
-      return { id: input.platformPostId };
     }),
 
   /** Approval-gated social publishing. Zernio owns the provider queue while
@@ -722,120 +620,35 @@ export const contentRouter = createTRPCRouter({
         mode: z.enum(["schedule", "publish_now"]),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const spot = await ctx.db.query.platformPostTable.findFirst({
         where: eq(platformPostTable.id, input.platformPostId),
         with: { brand: { columns: { organizationId: true } } },
       });
-      if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!spot) throw new ORPCError("NOT_FOUND");
       await assertOrgMember(ctx, spot.brand?.organizationId);
       try {
         return await deliverSocialPost(input);
       } catch (error) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
+        throw new ORPCError("BAD_REQUEST", {
           message: error instanceof Error ? error.message : "Could not publish",
-        });
-      }
-    }),
-
-  approveAndScheduleSocial: protectedProcedure
-    .input(
-      z.object({
-        platformPostId: z.string(),
-        scheduledAt: z.string().datetime(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const spot = await ctx.db.query.platformPostTable.findFirst({
-        where: eq(platformPostTable.id, input.platformPostId),
-        with: { brand: { columns: { organizationId: true } } },
-      });
-      if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
-      await assertOrgMember(ctx, spot.brand?.organizationId);
-      try {
-        return await approveAndScheduleSocialPost(input);
-      } catch (error) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message:
-            error instanceof Error ? error.message : "Could not schedule",
-        });
-      }
-    }),
-
-  rescheduleSocial: protectedProcedure
-    .input(
-      z.object({
-        platformPostId: z.string(),
-        scheduledAt: z.string().datetime(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const spot = await ctx.db.query.platformPostTable.findFirst({
-        where: eq(platformPostTable.id, input.platformPostId),
-        with: { brand: { columns: { organizationId: true } } },
-      });
-      if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
-      await assertOrgMember(ctx, spot.brand?.organizationId);
-      try {
-        return await rescheduleQueuedSocialPost(input);
-      } catch (error) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message:
-            error instanceof Error ? error.message : "Could not reschedule",
-        });
-      }
-    }),
-
-  setFirstComment: protectedProcedure
-    .input(
-      z.object({
-        platformPostId: z.string(),
-        firstComment: z.string().max(8_000).nullable(),
-        updateProvider: z.boolean().default(false),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const spot = await ctx.db.query.platformPostTable.findFirst({
-        where: eq(platformPostTable.id, input.platformPostId),
-        with: { brand: { columns: { organizationId: true } } },
-      });
-      if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
-      await assertOrgMember(ctx, spot.brand?.organizationId);
-      try {
-        return input.updateProvider
-          ? updateQueuedSocialFirstComment({
-              platformPostId: input.platformPostId,
-              firstComment: input.firstComment ?? "",
-            })
-          : saveSocialFirstComment(input);
-      } catch (error) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message:
-            error instanceof Error
-              ? error.message
-              : "Could not save first comment",
         });
       }
     }),
 
   refreshSocialDelivery: protectedProcedure
     .input(z.object({ platformPostId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const spot = await ctx.db.query.platformPostTable.findFirst({
         where: eq(platformPostTable.id, input.platformPostId),
         with: { brand: { columns: { organizationId: true } } },
       });
-      if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!spot) throw new ORPCError("NOT_FOUND");
       await assertOrgMember(ctx, spot.brand?.organizationId);
       try {
         return await refreshSocialDelivery(input.platformPostId);
       } catch (error) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
+        throw new ORPCError("BAD_REQUEST", {
           message:
             error instanceof Error
               ? error.message
@@ -846,49 +659,20 @@ export const contentRouter = createTRPCRouter({
 
   retrySocialDelivery: protectedProcedure
     .input(z.object({ platformPostId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const spot = await ctx.db.query.platformPostTable.findFirst({
         where: eq(platformPostTable.id, input.platformPostId),
         with: { brand: { columns: { organizationId: true } } },
       });
-      if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!spot) throw new ORPCError("NOT_FOUND");
       await assertOrgMember(ctx, spot.brand?.organizationId);
       try {
         return await retrySocialDelivery(input.platformPostId);
       } catch (error) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
+        throw new ORPCError("BAD_REQUEST", {
           message: error instanceof Error ? error.message : "Could not retry",
         });
       }
-    }),
-
-  /** Edit the Drive/external link list on a spot (the team's asset workflow). */
-  setAssetLinks: protectedProcedure
-    .input(
-      z.object({
-        platformPostId: z.string(),
-        assetLinks: z.array(z.string().trim().min(1).max(2000)).max(30),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const spot = await ctx.db.query.platformPostTable.findFirst({
-        where: eq(platformPostTable.id, input.platformPostId),
-        with: { brand: { columns: { organizationId: true } } },
-      });
-      if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
-      await assertOrgMember(ctx, spot.brand?.organizationId);
-      if (spot.source !== "owned") {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Can't edit a scraped post",
-        });
-      }
-      await ctx.db
-        .update(platformPostTable)
-        .set({ assetLinks: input.assetLinks.length ? input.assetLinks : null })
-        .where(eq(platformPostTable.id, input.platformPostId));
-      return { id: input.platformPostId };
     }),
 
   /** Attach hosted media (Blob library assets) to a spot. `assetId` links
@@ -900,56 +684,19 @@ export const contentRouter = createTRPCRouter({
         media: z.array(mediaItemInput).max(300),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const spot = await ctx.db.query.platformPostTable.findFirst({
         where: eq(platformPostTable.id, input.platformPostId),
         with: { brand: { columns: { organizationId: true } } },
       });
-      if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!spot) throw new ORPCError("NOT_FOUND");
       await assertOrgMember(ctx, spot.brand?.organizationId);
       if (spot.source !== "owned") {
-        throw new TRPCError({
-          code: "FORBIDDEN",
+        throw new ORPCError("FORBIDDEN", {
           message: "Can't edit a scraped post",
         });
       }
       return ContentService.setSpotMedia(input);
-    }),
-
-  /** Save the complete manual post editor against the version it opened from. */
-  saveSpotEditor: protectedProcedure
-    .input(
-      z.object({
-        platformPostId: z.string(),
-        expectedUpdatedAt: z.string().datetime(),
-        text: z.string().max(5000).nullable(),
-        media: z.array(mediaItemInput).max(300),
-        assetLinks: z.array(z.string().trim().min(1).max(2000)).max(30),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const spot = await ctx.db.query.platformPostTable.findFirst({
-        where: eq(platformPostTable.id, input.platformPostId),
-        with: { brand: { columns: { organizationId: true } } },
-      });
-      if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
-      await assertOrgMember(ctx, spot.brand?.organizationId);
-      if (spot.source !== "owned") {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Can't edit a scraped post",
-        });
-      }
-
-      const saved = await ContentService.saveSpotEditor(input);
-      if (!saved) {
-        throw new TRPCError({
-          code: "CONFLICT",
-          message:
-            "This post changed while you were editing. Close and reopen the editor to review the latest version.",
-        });
-      }
-      return saved;
     }),
 
   /** Save one platform publishing unit, including ordered threads or Stories. */
@@ -961,22 +708,20 @@ export const contentRouter = createTRPCRouter({
         items: z.array(spotThreadItemInput).min(1).max(25),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const root = await ctx.db.query.platformPostTable.findFirst({
         where: eq(platformPostTable.id, input.rootPlatformPostId),
         with: { brand: { columns: { organizationId: true } } },
       });
-      if (!root) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!root) throw new ORPCError("NOT_FOUND");
       await assertOrgMember(ctx, root.brand?.organizationId);
       if (root.source !== "owned") {
-        throw new TRPCError({
-          code: "FORBIDDEN",
+        throw new ORPCError("FORBIDDEN", {
           message: "Can't edit a scraped post",
         });
       }
       if (root.parentPlatformPostId) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
+        throw new ORPCError("BAD_REQUEST", {
           message: "Open the root post to edit the complete thread.",
         });
       }
@@ -984,77 +729,19 @@ export const contentRouter = createTRPCRouter({
       try {
         const saved = await ContentService.saveSpotThread(input);
         if (!saved) {
-          throw new TRPCError({
-            code: "CONFLICT",
+          throw new ORPCError("CONFLICT", {
             message:
               "This post changed while you were editing. Close and reopen the editor to review the latest version.",
           });
         }
         return saved;
       } catch (error) {
-        if (error instanceof TRPCError) throw error;
-        throw new TRPCError({
-          code: "BAD_REQUEST",
+        if (error instanceof ORPCError) throw error;
+        throw new ORPCError("BAD_REQUEST", {
           message:
             error instanceof Error ? error.message : "Could not save thread",
         });
       }
-    }),
-
-  /** Set a spot's concrete, platform-specific caption (`platform_post.text`) —
-   *  distinct from the idea-level `captionDirection` brief. */
-  setSpotText: protectedProcedure
-    .input(
-      z.object({
-        platformPostId: z.string(),
-        text: z.string().max(5000).nullable(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const spot = await ctx.db.query.platformPostTable.findFirst({
-        where: eq(platformPostTable.id, input.platformPostId),
-        with: { brand: { columns: { organizationId: true } } },
-      });
-      if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
-      await assertOrgMember(ctx, spot.brand?.organizationId);
-      if (spot.source !== "owned") {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Can't edit a scraped post",
-        });
-      }
-      const text = input.text?.trim() ? input.text : null;
-      return ContentService.setSpotText({
-        platformPostId: input.platformPostId,
-        text,
-      });
-    }),
-
-  /** AI-remix the idea brief into a platform-ready caption in the composed
-   *  brand+channel voice (fingerprint), with optional pills / free-text steer.
-   *  Side-effect-free — returns the draft; the client persists via setSpotText. */
-  generateSpotCaption: protectedProcedure
-    .input(
-      z.object({
-        platformPostId: z.string(),
-        pills: z.array(z.enum(SPOT_PILL_IDS)).max(8).optional(),
-        steer: z.string().max(500).optional(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const spot = await ctx.db.query.platformPostTable.findFirst({
-        where: eq(platformPostTable.id, input.platformPostId),
-        with: { brand: { columns: { organizationId: true } } },
-      });
-      if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
-      await assertOrgMember(ctx, spot.brand?.organizationId);
-      if (spot.source !== "owned") {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Can't generate for a scraped post",
-        });
-      }
-      return generateSpotCaption(input);
     }),
 
   /** Set the content-level media POOL (`content_post.media`). The pool VIEW is
@@ -1078,12 +765,12 @@ export const contentRouter = createTRPCRouter({
           .max(50),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const content = await ctx.db.query.contentPostTable.findFirst({
         where: eq(contentPostTable.id, input.contentPostId),
         with: { brand: { columns: { organizationId: true } } },
       });
-      if (!content) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!content) throw new ORPCError("NOT_FOUND");
       await assertOrgMember(ctx, content.brand?.organizationId);
       return ContentService.setPoolMedia({
         contentPostId: input.contentPostId,
@@ -1091,220 +778,25 @@ export const contentRouter = createTRPCRouter({
       });
     }),
 
-  /**
-   * Capture a new idea (the List's inline "+ Add idea"). Minimal by design —
-   * title + where it sits; the brief gets filled in on the detail screen.
-   */
-  create: protectedProcedure
-    .input(
-      z.object({
-        brandId: z.string(),
-        title: z.string().trim().min(1),
-        pillar: z.string().optional(),
-        seriesId: z.string().optional(),
-        plannedAt: z.string().datetime().optional(),
-        // Editorial brief — written once at the idea level (see content_post).
-        hook: z.string().optional(),
-        captionDirection: z.string().optional(),
-        visualDirection: z.string().optional(),
-        ctaText: z.string().optional(),
-        ctaKeyword: z.string().optional(),
-        kpi: z.string().optional(),
-        // Channels to fan out to immediately, as owned spots.
-        platforms: z.array(z.enum(channelPlatformEnum.enumValues)).optional(),
-        spots: z
-          .array(
-            z.object({
-              platform: z.enum(channelPlatformEnum.enumValues),
-              format: z.string().optional(),
-            }),
-          )
-          .optional(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const brand = await ctx.db.query.brandTable.findFirst({
-        where: eq(brandTable.id, input.brandId),
-        columns: { organizationId: true },
-      });
-      if (!brand) throw new TRPCError({ code: "NOT_FOUND" });
-      await assertOrgMember(ctx, brand.organizationId);
-
-      return ContentService.createIdea({
-        ...input,
-        ownerId: ctx.session.user.id,
-        createdById: ctx.session.user.id,
-      });
-    }),
-
-  /**
-   * Start with one native channel draft. Unlike `create`, this deliberately
-   * leaves contentPostId null until the operator decides the post deserves a
-   * canonical idea, cross-posts, a grouping, or a series.
-   */
-  createPlatformPost: protectedProcedure
-    .input(
-      z.object({
-        brandId: z.string(),
-        platform: z.enum(channelPlatformEnum.enumValues),
-        title: z.string().trim().min(1).optional(),
-        text: z.string().max(10_000).optional(),
-        pillar: z.string().optional(),
-        scheduledAt: z.string().datetime().optional(),
-        format: z.string().optional(),
-        referencePlatformPostId: z.string().optional(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const brand = await ctx.db.query.brandTable.findFirst({
-        where: eq(brandTable.id, input.brandId),
-        columns: { organizationId: true },
-      });
-      if (!brand) throw new TRPCError({ code: "NOT_FOUND" });
-      await assertOrgMember(ctx, brand.organizationId);
-
-      if (input.referencePlatformPostId) {
-        const reference = await ctx.db.query.platformPostTable.findFirst({
-          where: eq(platformPostTable.id, input.referencePlatformPostId),
-          columns: { id: true },
-        });
-        if (!reference) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Reference platform post not found",
-          });
-        }
-      }
-
-      return ContentService.createPlatformPost({
-        ...input,
-        ownerId: ctx.session.user.id,
-      });
-    }),
+  /** Capture a new idea: the List's inline "+ Add idea" and the drawer. */
+  create: actionProcedure(createIdea),
 
   /** Lift one platform-first draft/history item into the canonical idea layer. */
-  promotePlatformPost: protectedProcedure
-    .input(
-      z.object({
-        platformPostId: z.string(),
-        title: z.string().trim().min(1).optional(),
-        pillar: z.string().nullable().optional(),
-        seriesId: z.string().nullable().optional(),
-        crossPostPlatforms: z
-          .array(z.enum(channelPlatformEnum.enumValues))
-          .optional(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const post = await ctx.db.query.platformPostTable.findFirst({
-        where: eq(platformPostTable.id, input.platformPostId),
-        with: { brand: { columns: { organizationId: true } } },
-      });
-      if (!post) throw new TRPCError({ code: "NOT_FOUND" });
-      await assertOrgMember(ctx, post.brand?.organizationId);
-      return ContentService.promotePlatformPost({
-        ...input,
-        ownerId: ctx.session.user.id,
-        createdById: ctx.session.user.id,
-      });
-    }),
-
-  /**
-   * Edit the idea-level editorial brief (the sheet's hook/caption/CTA/KPI
-   * columns) plus title / pillar / series / plan date. Partial — only the
-   * provided keys are written.
-   */
-  updateBrief: protectedProcedure
-    .input(
-      z.object({
-        id: z.string(),
-        title: z.string().trim().min(1).optional(),
-        hook: z.string().nullable().optional(),
-        captionDirection: z.string().nullable().optional(),
-        visualDirection: z.string().nullable().optional(),
-        ctaText: z.string().nullable().optional(),
-        ctaKeyword: z.string().nullable().optional(),
-        kpi: z.string().nullable().optional(),
-        pillar: z.string().nullable().optional(),
-        seriesId: z.string().nullable().optional(),
-        plannedAt: z.string().datetime().nullable().optional(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const content = await ctx.db.query.contentPostTable.findFirst({
-        where: eq(contentPostTable.id, input.id),
-        with: { brand: { columns: { organizationId: true } } },
-      });
-      if (!content) throw new TRPCError({ code: "NOT_FOUND" });
-      await assertOrgMember(ctx, content.brand?.organizationId);
-
-      return ContentService.updateBrief(input);
-    }),
-
-  /**
-   * Fan an idea out to another channel — the "break into cross-posts" action.
-   * Creates an owned `platform_post` spot inheriting the idea's status; format
-   * defaults to the platform's primary product when not specified.
-   */
-  addSpot: protectedProcedure
-    .input(
-      z.object({
-        contentPostId: z.string(),
-        platform: z.enum(channelPlatformEnum.enumValues),
-        format: z.string().optional(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const content = await ctx.db.query.contentPostTable.findFirst({
-        where: eq(contentPostTable.id, input.contentPostId),
-        with: { brand: { columns: { organizationId: true } } },
-      });
-      if (!content) throw new TRPCError({ code: "NOT_FOUND" });
-      await assertOrgMember(ctx, content.brand?.organizationId);
-
-      const format = input.format ?? platformFormatsFor(input.platform)[0]?.id;
-      if (format) {
-        const validation = validateSpot({
-          platform: input.platform,
-          format,
-        });
-        if (!validation.ok) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: validation.errors.join("; "),
-          });
-        }
-      }
-      const [row] = await ctx.db
-        .insert(platformPostTable)
-        .values({
-          brandId: content.brandId,
-          contentPostId: input.contentPostId,
-          platform: input.platform,
-          format,
-          archetype: format ? archetypeForFormat(format) : undefined,
-          source: "owned",
-          status: content.status,
-          origin: "human",
-        })
-        .returning({ id: platformPostTable.id });
-      return { id: row?.id };
-    }),
+  promotePlatformPost: actionProcedure(promotePlatformPost),
 
   /** Remove an owned spot from an idea (cross-post undo). Scraped spots are
    *  off-limits — those are historical record, not editable plan. */
   removeSpot: protectedProcedure
     .input(z.object({ platformPostId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const spot = await ctx.db.query.platformPostTable.findFirst({
         where: eq(platformPostTable.id, input.platformPostId),
         with: { brand: { columns: { organizationId: true } } },
       });
-      if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!spot) throw new ORPCError("NOT_FOUND");
       await assertOrgMember(ctx, spot.brand?.organizationId);
       if (spot.source !== "owned") {
-        throw new TRPCError({
-          code: "FORBIDDEN",
+        throw new ORPCError("FORBIDDEN", {
           message: "Can't remove a scraped post",
         });
       }
@@ -1315,62 +807,10 @@ export const contentRouter = createTRPCRouter({
     }),
 
   /**
-   * Delete an idea outright, with the owned spots and email documents under it.
-   * Distinct from `removeSpot`, which undoes one cross-post and leaves the idea
-   * standing. Scraped spots detach and survive as published history.
-   */
-  purgeWorkItem: protectedProcedure
-    .input(z.object({ contentPostId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      const content = await ctx.db.query.contentPostTable.findFirst({
-        where: eq(contentPostTable.id, input.contentPostId),
-        columns: { id: true },
-        with: {
-          brand: { columns: { organizationId: true } },
-          platformPosts: { columns: { id: true, source: true } },
-        },
-      });
-      if (!content) throw new TRPCError({ code: "NOT_FOUND" });
-      await assertOrgMember(ctx, content.brand?.organizationId);
-
-      const blocked = await deliveryBlockReason(
-        content.platformPosts
-          .filter((spot) => spot.source === "owned")
-          .map((spot) => spot.id),
-      );
-      if (blocked) throw new TRPCError({ code: "FORBIDDEN", message: blocked });
-
-      return ContentService.purgeIdea({ contentPostId: content.id });
-    }),
-
-  /** Delete one draft (newsletter issue, platform spot) and any shell it leaves. */
-  purgeSpot: protectedProcedure
-    .input(z.object({ platformPostId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      const spot = await ctx.db.query.platformPostTable.findFirst({
-        where: eq(platformPostTable.id, input.platformPostId),
-        columns: { id: true, source: true },
-        with: { brand: { columns: { organizationId: true } } },
-      });
-      if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
-      await assertOrgMember(ctx, spot.brand?.organizationId);
-      if (spot.source !== "owned") {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Can't delete a scraped post",
-        });
-      }
-      const blocked = await deliveryBlockReason([spot.id]);
-      if (blocked) throw new TRPCError({ code: "FORBIDDEN", message: blocked });
-
-      return ContentService.purgeSpot({ platformPostId: spot.id });
-    }),
-
-  /**
    * Pending AI-proposed groupings (retroactive content_post reconstruction)
    * for review in /content/groupings. Hydrates each group's member posts.
    */
-  groupingSuggestions: protectedProcedure.query(async ({ ctx }) => {
+  groupingSuggestions: protectedProcedure.handler(async ({ context: ctx }) => {
     const { org, brands } = await orgContext(ctx);
     if (!org) return [];
     const brandIds = brands.map((b) => b.id);
@@ -1454,18 +894,7 @@ export const contentRouter = createTRPCRouter({
 
   /** Accept a grouping → create the content_post idea + link its members.
    *  Reject → mark it rejected so re-runs don't re-propose it. */
-  resolveGrouping: protectedProcedure
-    .input(z.object({ id: z.string(), accept: z.boolean() }))
-    .mutation(async ({ ctx, input }) => {
-      const { org } = await orgContext(ctx);
-      if (!org) throw new TRPCError({ code: "FORBIDDEN" });
-      return resolveGroupingSuggestion({
-        id: input.id,
-        accept: input.accept,
-        orgId: org.id,
-        userId: ctx.session.user.id,
-      });
-    }),
+  resolveGrouping: actionProcedure(resolveContentGrouping),
 
   /**
    * Manually group selected platform_posts into one content_post idea — the
@@ -1482,19 +911,19 @@ export const contentRouter = createTRPCRouter({
         theme: z.string().trim().optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const { org, brands } = await orgContext(ctx);
-      if (!org) throw new TRPCError({ code: "FORBIDDEN" });
+      if (!org) throw new ORPCError("FORBIDDEN");
       const ownedIds = new Set(brands.map((b) => b.id));
 
       const posts = await ctx.db.query.platformPostTable.findMany({
         where: inArray(platformPostTable.id, input.platformPostIds),
         columns: { id: true, brandId: true, text: true, publishedAt: true },
       });
-      if (!posts.length) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!posts.length) throw new ORPCError("NOT_FOUND");
       // The grouping must touch at least one brand the caller owns.
       if (!posts.some((p) => ownedIds.has(p.brandId))) {
-        throw new TRPCError({ code: "FORBIDDEN" });
+        throw new ORPCError("FORBIDDEN");
       }
       // Idea is per-brand; anchor it to an owned brand among the selection.
       const brandId = posts.find((p) => ownedIds.has(p.brandId))!.brandId;
@@ -1558,7 +987,7 @@ export const contentRouter = createTRPCRouter({
   // ---- Comments (light per-idea discussion) ----------------------------
   comments: protectedProcedure
     .input(z.object({ contentPostId: z.string() }))
-    .query(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const rows = await ctx.db.query.contentCommentTable.findMany({
         where: and(
           eq(contentCommentTable.contentPostId, input.contentPostId),
@@ -1580,12 +1009,12 @@ export const contentRouter = createTRPCRouter({
     .input(
       z.object({ contentPostId: z.string(), body: z.string().trim().min(1) }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const content = await ctx.db.query.contentPostTable.findFirst({
         where: eq(contentPostTable.id, input.contentPostId),
         with: { brand: { columns: { organizationId: true } } },
       });
-      if (!content) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!content) throw new ORPCError("NOT_FOUND");
       await assertOrgMember(ctx, content.brand?.organizationId);
       const [row] = await ctx.db
         .insert(contentCommentTable)
@@ -1600,17 +1029,17 @@ export const contentRouter = createTRPCRouter({
 
   deleteComment: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const c = await ctx.db.query.contentCommentTable.findFirst({
         where: eq(contentCommentTable.id, input.id),
       });
-      if (!c) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!c) throw new ORPCError("NOT_FOUND");
       if (c.authorId !== ctx.session.user.id)
-        throw new TRPCError({ code: "FORBIDDEN", message: "Not your comment" });
+        throw new ORPCError("FORBIDDEN", { message: "Not your comment" });
       await ctx.db
         .update(contentCommentTable)
         .set({ deletedAt: new Date() })
         .where(eq(contentCommentTable.id, input.id));
       return { id: input.id };
     }),
-});
+};

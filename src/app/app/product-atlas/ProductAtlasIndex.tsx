@@ -7,9 +7,9 @@ import {
   Store,
 } from "lucide-react";
 
-import type { RouterOutputs } from "@/trpc/react";
+import type { listProducts } from "@/server/services/product-storefront.service";
 
-type ProductList = RouterOutputs["productStorefront"]["listProducts"];
+type ProductList = Awaited<ReturnType<typeof listProducts>>;
 
 export function ProductAtlasIndex({ products }: { products: ProductList }) {
   return (

@@ -10,7 +10,7 @@ import { mediaVideoAnalysisTable, memberTable } from "@/server/db/schema";
 
 /**
  * Presign a direct browser → R2 PUT for one video-analysis storyboard board
- * (PNG rendered on the operator's device). Auth mirrors the tRPC analysis
+ * (PNG rendered on the operator's device). Auth mirrors the oRPC analysis
  * mutations: the caller must belong to the analysis' organization. The random
  * token keeps re-renders from colliding with (or cache-poisoning) old boards.
  */

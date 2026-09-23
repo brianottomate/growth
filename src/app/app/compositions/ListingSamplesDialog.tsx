@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/toast";
 import { cn } from "@/components/ui/lib/utils";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 /**
  * A look at the brand's listing photos before any of them enter the library.
@@ -35,23 +35,27 @@ export function ListingSamplesDialog({
     assets: { id: string; url: string | null }[],
   ) => void | Promise<void>;
 }) {
-  const trpc = useTRPC();
   const [open, setOpen] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(new Set());
 
   const samples = useQuery({
-    ...trpc.media.listingSamples.queryOptions({ brandId }),
+    ...orpc.media.listingSamples.queryOptions({ input: { brandId } }),
     enabled: open,
   });
   const homes = samples.data?.homes ?? [];
 
   const importHomes = useMutation(
-    trpc.media.importListingImages.mutationOptions({
+    orpc.media.importListingImages.mutationOptions({
       onSuccess: async (result) => {
         toast.success(
           `${result.assets.length} photo${result.assets.length === 1 ? "" : "s"} in the library`,
         );
-        await onImported(result.assets);
+        await onImported(
+          result.assets.map((asset) => ({
+            id: asset.mediaAssetId,
+            url: asset.url,
+          })),
+        );
         setOpen(false);
         setPicked(new Set());
       },
@@ -110,12 +114,12 @@ export function ListingSamplesDialog({
         ) : (
           <div className="grid max-h-[60vh] grid-cols-4 gap-2 overflow-y-auto pr-1">
             {homes.map((home) => {
-              const on = picked.has(home.id);
+              const on = picked.has(home.url);
               return (
                 <button
-                  key={home.id}
+                  key={home.url}
                   type="button"
-                  onClick={() => toggle(home.id)}
+                  onClick={() => toggle(home.url)}
                   aria-pressed={on}
                   className={cn(
                     "group relative overflow-hidden rounded-lg border text-left transition",
@@ -135,7 +139,7 @@ export function ListingSamplesDialog({
                       {home.name}
                     </div>
                     <div className="truncate text-[11px] text-muted-foreground">
-                      {home.importedAssetId
+                      {home.mediaAssetId
                         ? "Already in the library"
                         : home.place}
                     </div>
@@ -158,7 +162,7 @@ export function ListingSamplesDialog({
             disabled={homes.length === 0}
             onClick={() =>
               setPicked(
-                allPicked ? new Set() : new Set(homes.map((home) => home.id)),
+                allPicked ? new Set() : new Set(homes.map((home) => home.url)),
               )
             }
           >
@@ -171,12 +175,9 @@ export function ListingSamplesDialog({
             onClick={() =>
               importHomes.mutate({
                 brandId,
-                homes: homes
-                  .filter((home) => picked.has(home.id))
-                  .map((home) => ({
-                    imageUrl: home.imageUrl,
-                    name: home.name,
-                  })),
+                listingUrls: homes
+                  .filter((home) => picked.has(home.url))
+                  .map((home) => home.url),
               })
             }
           >

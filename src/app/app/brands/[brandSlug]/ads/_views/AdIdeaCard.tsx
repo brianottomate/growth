@@ -34,7 +34,7 @@ import { Dropzone } from "@/components/ui/dropzone";
 import { toast } from "@/components/ui/toast";
 import { MediaPickerDialog } from "@/app/app/content/[contentId]/MediaPickerDialog";
 import { useMediaUpload } from "@/app/app/media/use-media-upload";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import {
   IDEA_SHAPES,
   IDEA_SHAPE_LABELS,
@@ -97,9 +97,8 @@ export function AdIdeaCard({
     return () => window.removeEventListener("prepare-ad-creative", prepare);
   }, [ad.id]);
   const collapsed = view === "overview";
-  const trpc = useTRPC();
   const approval = useMutation(
-    trpc.ads.setAdStatus.mutationOptions({
+    orpc.ads.setAdStatus.mutationOptions({
       onSuccess: () => {
         toast.success(
           approved
@@ -135,7 +134,7 @@ export function AdIdeaCard({
   const [selectedHomeId, setSelectedHomeId] = useState(ad.homeId ?? "");
   const [photoSearch, setPhotoSearch] = useState("");
   const homeGalleries = useQuery({
-    ...trpc.ads.starterIdeaHomes.queryOptions({ campaignId }),
+    ...orpc.ads.starterIdeaHomes.queryOptions({ input: { campaignId } }),
     enabled: editor === "image" || editor === "pool" || homePickerOpen,
   });
   const homes = homeGalleries.data ?? [];
@@ -156,7 +155,7 @@ export function AdIdeaCard({
   const { uploadFiles, uploading, progress } = useMediaUpload(brandId);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const remove = useMutation(
-    trpc.ads.deleteAd.mutationOptions({
+    orpc.ads.deleteAd.mutationOptions({
       onSuccess: () => {
         setDeleteOpen(false);
         toast.success("Ad idea deleted");
@@ -166,7 +165,7 @@ export function AdIdeaCard({
     }),
   );
   const save = useMutation(
-    trpc.ads.saveIdea.mutationOptions({
+    orpc.ads.saveIdea.mutationOptions({
       onSuccess: (saved) => {
         setVersion(saved.updatedAt.toISOString());
         const nextDocument = ideaDocumentFromAd({
@@ -460,7 +459,7 @@ export function AdIdeaCard({
               })
             }
           >
-            <MessageSquare className="size-3.5" /> Work in chat
+            <MessageSquare className="size-3.5" /> Start new chat
           </Button>
           <Button
             size="sm"

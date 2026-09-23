@@ -8,7 +8,7 @@ import { BrandFilterSelect } from "@/components/brand-filter-select";
 import { SocialPreviewSelect } from "@/components/social-preview-select";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 export function WebsiteControls({
   brands,
@@ -23,9 +23,8 @@ export function WebsiteControls({
   selectedBrandSlug: string | null;
 }) {
   const router = useRouter();
-  const trpc = useTRPC();
   const sync = useMutation(
-    trpc.website.sync.mutationOptions({
+    orpc.website.sync.mutationOptions({
       onSuccess: (result) => {
         toast.success(
           `Mapped ${result.discovered.toLocaleString()} sitemap pages`,

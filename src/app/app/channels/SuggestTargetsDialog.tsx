@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
 
-import { useTRPC } from "@/trpc/react";
-import type { RouterOutputs } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
+import type { RouterOutputs } from "@/orpc/client";
 import {
   Dialog,
   DialogContent,
@@ -35,25 +35,24 @@ export function SuggestTargetsDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const [result, setResult] = useState<SuggestResult | null>(null);
   const [applied, setApplied] = useState<Set<number>>(new Set());
   const appliedAny = useRef(false);
 
   const suggest = useMutation(
-    trpc.cadence.suggestTargets.mutationOptions({
+    orpc.cadence.suggestTargets.mutationOptions({
       onSuccess: setResult,
       onError: (e) => toast.error(e.message),
     }),
   );
   const applyCadence = useMutation(
-    trpc.cadence.setCadenceTarget.mutationOptions({
+    orpc.cadence.setCadenceTarget.mutationOptions({
       onError: (e) => toast.error(e.message),
     }),
   );
   const applyMix = useMutation(
-    trpc.cadence.setMixTarget.mutationOptions({
+    orpc.cadence.setMixTarget.mutationOptions({
       onError: (e) => toast.error(e.message),
     }),
   );

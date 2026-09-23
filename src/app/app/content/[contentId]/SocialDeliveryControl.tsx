@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { cn } from "@/components/ui/lib/utils";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 const LABELS: Record<string, string> = {
   facebook: "Facebook",
@@ -41,7 +41,6 @@ export function SocialDeliveryControl({
   deliveryStatus: string | null;
   deliveryError: string | null;
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const platformLabel = LABELS[platform] ?? platform;
   const settle = {
@@ -51,7 +50,7 @@ export function SocialDeliveryControl({
     },
   };
   const deliver = useMutation(
-    trpc.content.deliverSocial.mutationOptions({
+    orpc.content.deliverSocial.mutationOptions({
       ...settle,
       onSuccess: (result) => {
         toast.success(
@@ -64,10 +63,10 @@ export function SocialDeliveryControl({
     }),
   );
   const refresh = useMutation(
-    trpc.content.refreshSocialDelivery.mutationOptions(settle),
+    orpc.content.refreshSocialDelivery.mutationOptions(settle),
   );
   const retry = useMutation(
-    trpc.content.retrySocialDelivery.mutationOptions({
+    orpc.content.retrySocialDelivery.mutationOptions({
       ...settle,
       onSuccess: () => {
         toast.success("Retry sent to Zernio");

@@ -36,7 +36,7 @@ import { newConnectToken } from "@/server/services/brand-connect.service";
 import { MediaService } from "@/server/services/media.service";
 import { enrichBrandFromWebsite } from "@/server/services/brand-enrichment.service";
 
-// ---- BRAND OPS: create + enrich, shared by tRPC and chat/MCP ----------
+// ---- BRAND OPS: create + enrich, shared by oRPC and chat/MCP ----------
 //
 // Creation and enrichment are separate operations on purpose: the dialog
 // enriches BEFORE creating (preview → save), while an agent over MCP creates

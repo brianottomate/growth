@@ -1,3 +1,4 @@
+import { WorkspaceBreadcrumbs } from "@/components/workspace-breadcrumbs";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -32,6 +33,13 @@ export default async function PerformanceBrandLayout({
   const slug = brand.slug ?? brand.id;
   return (
     <div className="space-y-5">
+      <WorkspaceBreadcrumbs
+        items={[
+          { label: "Performance", href: "/app/performance" },
+          { label: "Clients", href: "/app/performance/clients" },
+          { label: brand.name },
+        ]}
+      />
       <div className="flex flex-wrap items-center gap-3">
         <BrandLogo brand={brand} className="size-11 text-sm" />
         <div className="min-w-0 flex-1">
@@ -59,10 +67,13 @@ export default async function PerformanceBrandLayout({
               </a>
             ) : null}
             <Link href={`/app/brands/${slug}`} className="hover:underline">
-              Full brand page
+              Open brand workspace
             </Link>
-            <Link href={`/app/brands/${slug}/ads`} className="hover:underline">
-              Ads desk
+            <Link
+              href={`/app/performance/brands/${slug}/campaigns`}
+              className="hover:underline"
+            >
+              Paid campaigns
             </Link>
             <Link
               href={`/app/brands/${slug}/content`}
@@ -74,7 +85,7 @@ export default async function PerformanceBrandLayout({
               href={`/app/brands/${slug}/previews`}
               className="hover:underline"
             >
-              Previews
+              Organic previews
             </Link>
           </div>
         </div>

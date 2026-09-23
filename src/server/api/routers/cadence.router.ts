@@ -1,9 +1,9 @@
 import type { Database } from "@/server/db";
 import { z } from "zod";
 import { and, eq, isNull, sql } from "drizzle-orm";
-import { TRPCError } from "@trpc/server";
+import { ORPCError } from "@orpc/server";
 
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { protectedProcedure, actionProcedure } from "@/server/api/orpc";
 import {
   brandTable,
   cadenceTargetTable,
@@ -12,7 +12,7 @@ import {
   mixTargetTable,
 } from "@/server/db/schema";
 import { generateMonthSlots } from "@/server/services/slot-generate.service";
-import { suggestTargets } from "@/server/services/cadence-suggest.service";
+import { proposeStrategyTargets } from "@/server/ai/capabilities/operations";
 
 type Ctx = { db: Database; session: { user: { id: string } } };
 
@@ -22,11 +22,10 @@ async function assertBrandAccess(ctx: Ctx, brandId: string) {
     where: eq(brandTable.id, brandId),
   });
   if (!brand) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Brand not found" });
+    throw new ORPCError("NOT_FOUND", { message: "Brand not found" });
   }
   if (!brand.organizationId) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
+    throw new ORPCError("BAD_REQUEST", {
       message: "Cannot set strategy on a tracked/reference brand",
     });
   }
@@ -37,28 +36,20 @@ async function assertBrandAccess(ctx: Ctx, brandId: string) {
     ),
   });
   if (!membership) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "No access to this brand",
-    });
+    throw new ORPCError("FORBIDDEN", { message: "No access to this brand" });
   }
   return brand;
 }
 
 const periodEnum = z.enum(["day", "week", "month"]);
 
-export const cadenceRouter = createTRPCRouter({
+export const cadenceRouter = {
   /**
    * AI target-update proposals from own Zernio performance + peer cadences.
    * Persists nothing — the dialog applies accepted rows via
    * setCadenceTarget / setMixTarget.
    */
-  suggestTargets: protectedProcedure
-    .input(z.object({ brandId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      await assertBrandAccess(ctx, input.brandId);
-      return suggestTargets(input.brandId);
-    }),
+  suggestTargets: actionProcedure(proposeStrategyTargets),
 
   /**
    * The strategy→calendar computation: expand the brand's cadence/mix targets
@@ -75,7 +66,7 @@ export const cadenceRouter = createTRPCRouter({
         dryRun: z.boolean().optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandAccess(ctx, input.brandId);
       return generateMonthSlots({
         brandId: input.brandId,
@@ -95,7 +86,7 @@ export const cadenceRouter = createTRPCRouter({
         period: periodEnum.default("week"),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandAccess(ctx, input.brandId);
       // Brand-default rows (channelId null) upsert on the partial unique index
       // (brandId, pillar, period) WHERE channel_id IS NULL.
@@ -121,20 +112,6 @@ export const cadenceRouter = createTRPCRouter({
       return row;
     }),
 
-  removeMixTarget: protectedProcedure
-    .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      const target = await ctx.db.query.mixTargetTable.findFirst({
-        where: eq(mixTargetTable.id, input.id),
-      });
-      if (!target) throw new TRPCError({ code: "NOT_FOUND" });
-      await assertBrandAccess(ctx, target.brandId);
-      await ctx.db
-        .delete(mixTargetTable)
-        .where(eq(mixTargetTable.id, input.id));
-      return { ok: true };
-    }),
-
   // ---- Cadence targets (per channel × archetype) ----
   setCadenceTarget: protectedProcedure
     .input(
@@ -147,15 +124,14 @@ export const cadenceRouter = createTRPCRouter({
         period: periodEnum.default("week"),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandAccess(ctx, input.brandId);
       const channel = await ctx.db.query.channelTable.findFirst({
         where: eq(channelTable.id, input.channelId),
         columns: { id: true, brandId: true, platform: true },
       });
       if (channel?.brandId !== input.brandId) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
+        throw new ORPCError("BAD_REQUEST", {
           message: "Channel does not belong to this brand",
         });
       }
@@ -197,18 +173,4 @@ export const cadenceRouter = createTRPCRouter({
         .returning();
       return row;
     }),
-
-  removeCadenceTarget: protectedProcedure
-    .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      const target = await ctx.db.query.cadenceTargetTable.findFirst({
-        where: eq(cadenceTargetTable.id, input.id),
-      });
-      if (!target) throw new TRPCError({ code: "NOT_FOUND" });
-      await assertBrandAccess(ctx, target.brandId);
-      await ctx.db
-        .delete(cadenceTargetTable)
-        .where(eq(cadenceTargetTable.id, input.id));
-      return { ok: true };
-    }),
-});
+};

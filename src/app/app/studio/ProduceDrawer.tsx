@@ -21,7 +21,7 @@ import { toast } from "@/components/ui/toast";
 import { cn } from "@/components/ui/lib/utils";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { PILLAR_BY_SLUG, PILLARS } from "@/lib/pillars";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { posterForMedia } from "@/lib/media-url";
 
 const DEFAULT_PLATFORMS = ["instagram", "x", "linkedin", "facebook"] as const;
@@ -45,7 +45,6 @@ export function ProduceDrawer({
   onClose: () => void;
   onSaved?: () => void;
 }) {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
   const when = new Date(date);
 
@@ -56,12 +55,14 @@ export function ProduceDrawer({
   const brandPillars = PILLARS.filter((p) => p.brandSlug === brandSlug);
 
   const { data: channels } = useQuery(
-    trpc.studio.channels.queryOptions({ brandId }),
+    orpc.studio.channels.queryOptions({ input: { brandId } }),
   );
   const { data: references } = useQuery(
-    trpc.studio.references.queryOptions({ brandId }),
+    orpc.studio.references.queryOptions({ input: { brandId } }),
   );
-  const { data: media } = useQuery(trpc.media.list.queryOptions({ brandId }));
+  const { data: media } = useQuery(
+    orpc.media.list.queryOptions({ input: { brandId } }),
+  );
 
   // Fan-out targets: the brand's social channels, else a sensible default set.
   const targets: Target[] = useMemo(() => {
@@ -103,7 +104,7 @@ export function ProduceDrawer({
   ];
 
   const draftIdea = useMutation(
-    trpc.studio.draftIdea.mutationOptions({
+    orpc.studio.draftIdea.mutationOptions({
       onSuccess: (d) => {
         setTitle(d.title ?? "");
         setBody(d.body ?? "");
@@ -117,13 +118,15 @@ export function ProduceDrawer({
   );
 
   const createFromDraft = useMutation(
-    trpc.studio.createFromDraft.mutationOptions({
+    orpc.studio.createFromDraft.mutationOptions({
       onSuccess: async (res) => {
         toast.success(
           `Saved — ${res.platformPostCount} platform posts created`,
         );
         await queryClient.invalidateQueries(
-          trpc.studio.wheel.queryOptions({ brandId, year: when.getFullYear() }),
+          orpc.studio.wheel.queryOptions({
+            input: { brandId, year: when.getFullYear() },
+          }),
         );
         onSaved?.();
         onClose();

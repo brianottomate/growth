@@ -6,7 +6,7 @@ import { useMutation } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import type {
   ChannelBackfillPost,
   ChannelBackfillState,
@@ -73,12 +73,11 @@ export function ChannelBackfill({
   brandName: string;
   state: ChannelBackfillState;
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const [running, setRunning] = useState<string | null>(null);
 
   const scrape = useMutation(
-    trpc.channelSuggestion.scrapePosts.mutationOptions({
+    orpc.channelSuggestion.scrapePosts.mutationOptions({
       onSuccess: (r) => {
         toast.success(
           `${labelFor(state.platform)} · ${r.inserted} new, ${r.updatedExisting} refreshed via ${r.provider}`,

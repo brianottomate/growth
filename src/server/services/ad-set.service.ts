@@ -63,6 +63,7 @@ import {
   type WanderOsListing,
 } from "@/server/clients/wanderos-site.client";
 
+import { amenitySource } from "@/lib/home-amenities";
 import {
   deterministicSetCopy,
   writeAdSetCopy,
@@ -710,7 +711,23 @@ export async function buildAdSet(input: {
     bathrooms: listing.bathrooms,
     guests: listing.guests,
     rating: listing.rating,
+    amenities: (() => {
+      const detail = usable.find(
+        (row) => row.listing.id === listing.id,
+      )?.detail;
+      return amenitySource(detail?.amenities, detail?.description);
+    })(),
   });
+  // Each home's listing card copy, written once in set order so neighbouring
+  // cards lead on different amenities where the homes allow it.
+  const leadsSoFar = new Set<string>();
+  const catalogCopyById = new Map(
+    usable.map(({ listing }) => {
+      const copy = homeCatalogCopy(previewHome(listing), leadsSoFar);
+      if (copy.lead) leadsSoFar.add(copy.lead);
+      return [listing.id, copy] as const;
+    }),
+  );
   // The branded listing card for one home: the full catalog-place composition
   // (place, facts, guest-rating pill), drawn on this photo.
   const listingCard = (
@@ -721,7 +738,9 @@ export async function buildAdSet(input: {
       brandId: brand.id,
       source: { url: sourceUrl },
       formatId: "portrait",
-      copy: homeCatalogCopy(previewHome(listing)),
+      copy:
+        catalogCopyById.get(listing.id) ??
+        homeCatalogCopy(previewHome(listing)),
     }),
     type: "image",
   });

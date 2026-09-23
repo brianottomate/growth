@@ -429,12 +429,17 @@ export default async function BrandAdsPage({
               Brands
             </Link>
             <span>/</span>
-            <span className="font-medium text-foreground">{brand.name}</span>
+            <Link
+              href={`/app/brands/${brand.slug}`}
+              className="font-medium text-foreground hover:underline"
+            >
+              {brand.name}
+            </Link>
             <span>/</span>
             <span className="font-medium text-foreground">ads</span>
           </div>
           <h1 className="mt-3 text-2xl font-semibold tracking-tight">
-            {brand.name} · Ads
+            {brand.name} · Paid campaigns
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Ad channels, campaigns &amp; audiences — a launchpad. Management
@@ -452,6 +457,7 @@ export default async function BrandAdsPage({
           {brand.slug && <ImportMetaCampaignButton brandSlug={brand.slug} />}
           <NewCampaignButton
             brandId={brand.id}
+            brandSlug={brandSlug}
             brandName={brand.name}
             brandWebsite={brand.website}
             isClient={brand.relationship === "client"}

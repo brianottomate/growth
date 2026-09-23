@@ -32,7 +32,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { AD_PUSH_GOALS, type AdPushGoal } from "@/lib/ad-platforms";
 import type {
   Ad,
@@ -89,12 +89,11 @@ export function MetaPlatformCard({
   const [destinationKey, setDestinationKey] = useState("");
   const [goal, setGoal] = useState<AdPushGoal>("conversions");
   const sectionId = useId();
-  const trpc = useTRPC();
   const destinations = useQuery(
-    trpc.ads.destinations.queryOptions(
-      { brandSlug, platform: "meta" },
-      { enabled: expanded },
-    ),
+    orpc.ads.destinations.queryOptions({
+      input: { brandSlug, platform: "meta" },
+      enabled: expanded,
+    }),
   );
   // Facebook and Meta Ads connections can expose the same paying account/Page.
   const choices = (destinations.data?.destinations ?? []).filter(
@@ -642,10 +641,9 @@ function MetaSettings({
   const [scheduledEnd, setScheduledEnd] = useState(
     Boolean(effective.endAt) || pc.budgetType === "lifetime",
   );
-  const trpc = useTRPC();
   const router = useRouter();
   const save = useMutation(
-    trpc.ads.setPlatformDraft.mutationOptions({
+    orpc.ads.setPlatformDraft.mutationOptions({
       onSuccess: () => {
         onApply(draftDestination, draftGoal);
         setOpen(false);
@@ -913,8 +911,11 @@ function MetaSettings({
                   conversionScope: scope,
                   budgetMode: mode,
                 },
-                startAt: scheduledStart && start ? new Date(start) : null,
-                endAt: scheduledEnd && end ? new Date(end) : null,
+                startAt:
+                  scheduledStart && start
+                    ? new Date(start).toISOString()
+                    : null,
+                endAt: scheduledEnd && end ? new Date(end).toISOString() : null,
               })
             }
           >
@@ -1029,8 +1030,7 @@ function MetaNativePreview({
   adId: string;
   configuration?: { connectionAccountId: string; adAccountId: string };
 }) {
-  const trpc = useTRPC();
-  const preview = useMutation(trpc.ads.previewAd.mutationOptions());
+  const preview = useMutation(orpc.ads.previewAd.mutationOptions());
   return (
     <Dialog>
       <DialogTrigger asChild>

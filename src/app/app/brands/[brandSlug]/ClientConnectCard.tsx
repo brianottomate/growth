@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Copy, Link2, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 /**
  * The internal side of the client-facing links: mint the shared token, copy
@@ -24,23 +24,24 @@ const LEADSIE_SCOPES =
   "Facebook Page · Instagram · Google Ads · Google Analytics";
 
 export function ClientConnectCard({ brandId }: { brandId: string }) {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [copied, setCopied] = useState<
     "connect" | "intake" | "pitch" | "leadsie" | null
   >(null);
 
-  const status = useQuery(trpc.brand.connectStatus.queryOptions({ brandId }));
+  const status = useQuery(
+    orpc.brand.connectStatus.queryOptions({ input: { brandId } }),
+  );
   const invalidate = () =>
     queryClient.invalidateQueries({
-      queryKey: trpc.brand.connectStatus.queryKey({ brandId }),
+      queryKey: orpc.brand.connectStatus.queryKey({ input: { brandId } }),
     });
 
   const create = useMutation(
-    trpc.brand.createConnectLink.mutationOptions({ onSuccess: invalidate }),
+    orpc.brand.createConnectLink.mutationOptions({ onSuccess: invalidate }),
   );
   const regenerate = useMutation(
-    trpc.brand.regenerateConnectLink.mutationOptions({ onSuccess: invalidate }),
+    orpc.brand.regenerateConnectLink.mutationOptions({ onSuccess: invalidate }),
   );
 
   const url = status.data?.url ?? null;

@@ -1,7 +1,6 @@
 import "server-only";
 
 import { APICallError, RetryError } from "ai";
-import { TRPCError } from "@trpc/server";
 
 export type GrowthErrorCode =
   | "invalid_input"
@@ -62,13 +61,31 @@ function sanitize(message: string): string {
 
 function codeFor(error: unknown): GrowthErrorCode {
   if (error instanceof GrowthActionError) return error.code;
-  if (error instanceof TRPCError) {
+  // ORPCError and service errors such as ProductStorefrontError carry an
+  // HTTP-style code.
+  if (
+    error instanceof Error &&
+    "code" in error &&
+    typeof error.code === "string"
+  ) {
     if (error.code === "BAD_REQUEST") return "invalid_input";
     if (error.code === "FORBIDDEN" || error.code === "UNAUTHORIZED")
       return "forbidden";
     if (error.code === "NOT_FOUND") return "not_found";
     if (error.code === "TOO_MANY_REQUESTS") return "rate_limited";
     if (error.code === "CONFLICT") return "conflict";
+  }
+  // Service errors such as GoogleDriveError carry an HTTP status instead.
+  if (
+    error instanceof Error &&
+    "status" in error &&
+    typeof error.status === "number"
+  ) {
+    if (error.status === 400 || error.status === 422) return "invalid_input";
+    if (error.status === 401 || error.status === 403) return "forbidden";
+    if (error.status === 404) return "not_found";
+    if (error.status === 409) return "conflict";
+    if (error.status === 429) return "rate_limited";
   }
   if (RetryError.isInstance(error)) return "provider_unavailable";
   if (APICallError.isInstance(error)) {

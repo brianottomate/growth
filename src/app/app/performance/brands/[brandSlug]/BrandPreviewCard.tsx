@@ -16,7 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import type { BrandIdentity } from "@/server/db/brand-schema";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 import { HeroHomePicker, type HeroOption } from "./HeroHomePicker";
 
@@ -41,7 +41,6 @@ export function BrandPreviewCard({
   featuredUrl: string | null;
 }) {
   const router = useRouter();
-  const trpc = useTRPC();
   const saved = brandFonts(identity);
   const [draft, setDraft] = useState<BrandFonts | null>(null);
   const fonts = draft ?? saved;
@@ -50,7 +49,7 @@ export function BrandPreviewCard({
     (draft.heading !== saved.heading || draft.body !== saved.body);
 
   const setFonts = useMutation(
-    trpc.brand.setFonts.mutationOptions({
+    orpc.brand.setFonts.mutationOptions({
       onSuccess: () => {
         setDraft(null);
         router.refresh();

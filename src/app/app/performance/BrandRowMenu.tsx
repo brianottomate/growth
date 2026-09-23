@@ -25,7 +25,7 @@ import {
 import { toast } from "@/components/ui/toast";
 import type { BillingSummary } from "@/lib/performance-billing";
 import type { BusinessStage, DeliveryStage } from "@/lib/performance-stage";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 import { StageDialog } from "./StageDialog";
 
@@ -48,12 +48,11 @@ export function BrandRowMenu({
   delivery: DeliveryStage;
   billing: BillingSummary | null;
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
   const [staging, setStaging] = useState(false);
   const markLine = useMutation(
-    trpc.performance.markLinePaid.mutationOptions({
+    orpc.performance.markLinePaid.mutationOptions({
       onSuccess: (_cycle, input) => {
         toast.success(
           `${brandName}: ${input.line === "fee" ? "fee" : "ads"} ${input.paid ? "paid" : "reopened"}`,
@@ -64,7 +63,7 @@ export function BrandRowMenu({
     }),
   );
   const remove = useMutation(
-    trpc.brand.delete.mutationOptions({
+    orpc.brand.delete.mutationOptions({
       onSuccess: () => {
         toast.success(`${brandName} deleted`);
         setConfirming(false);

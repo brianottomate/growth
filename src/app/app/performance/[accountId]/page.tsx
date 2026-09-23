@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { getSession } from "@/server/better-auth/server";
-import { HydrateClient, prefetch, trpc } from "@/trpc/server";
+import { HydrateClient, prefetch, orpc } from "@/orpc/server";
 import { AccountDetail } from "./AccountDetail";
 
 export const metadata: Metadata = {
@@ -18,7 +18,7 @@ export default async function PerformanceAccountPage({
   if (!session?.user) redirect("/signin");
 
   const { accountId } = await params;
-  prefetch(trpc.performance.get.queryOptions({ accountId }));
+  prefetch(orpc.performance.get.queryOptions({ input: { accountId } }));
 
   return (
     <HydrateClient>

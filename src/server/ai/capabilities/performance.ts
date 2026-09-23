@@ -20,7 +20,11 @@ import {
 import "server-only";
 import { appliedEvidenceSchema } from "@/lib/applied-evidence";
 
+import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
+
+import { db } from "@/server/db";
+import { brandTable } from "@/server/db/schema";
 
 import { PUSHABLE_AD_PLATFORMS } from "@/lib/ad-platforms";
 
@@ -60,7 +64,7 @@ import { promoteBrandToClient } from "@/server/services/brand-relationship.servi
 
 import { syncZernioAds } from "@/server/services/ads-sync.service";
 
-import { growthAction } from "./types";
+import { growthAction, GrowthActionError } from "./types";
 
 const actorFrom = (ctx: { orgId: string }): PerformanceActor => ({
   orgId: ctx.orgId,
@@ -282,15 +286,30 @@ export const syncAdCampaignsAction = growthAction({
     statuses: z.array(z.string().trim().min(1)).optional(),
     limit: z.number().int().min(1).max(500).optional(),
   }),
-  execute: (input) =>
-    syncZernioAds({
+  execute: async (input, ctx) => {
+    // The Zernio sync is keyed by slug alone, so scope it here.
+    const brand = await db.query.brandTable.findFirst({
+      where: and(
+        eq(brandTable.slug, input.brandSlug),
+        eq(brandTable.organizationId, ctx.orgId),
+        isNull(brandTable.deletedAt),
+      ),
+      columns: { id: true },
+    });
+    if (!brand)
+      throw new GrowthActionError(
+        "not_found",
+        `No brand "${input.brandSlug}" in this organization.`,
+      );
+    return syncZernioAds({
       brandSlug: input.brandSlug,
       platform: input.platform,
       sinceDays: input.sinceDays,
       minSpend: input.minSpend,
       statuses: input.statuses,
       limit: input.limit,
-    }),
+    });
+  },
 });
 
 export const attachToPerformanceCycleAction = growthAction({

@@ -25,7 +25,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/toast";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import {
   type BrandLink,
   type BrandLinkCategory,
@@ -80,13 +80,12 @@ export function BrandLinksDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
-  const trpc = useTRPC();
   const [links, setLinks] = useState<BrandLink[]>(initial);
   const [label, setLabel] = useState("");
   const [url, setUrl] = useState("");
 
   const updateM = useMutation(
-    trpc.brand.update.mutationOptions({
+    orpc.brand.update.mutationOptions({
       onSuccess: () => router.refresh(),
       onError: (e) => toast.error(e.message),
     }),

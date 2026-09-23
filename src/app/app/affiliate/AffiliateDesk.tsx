@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/components/ui/lib/utils";
 import { toast } from "@/components/ui/toast";
-import { useTRPC, type RouterOutputs } from "@/trpc/react";
+import { orpc, type RouterOutputs } from "@/orpc/client";
 
 type AffiliateItem = RouterOutputs["affiliate"]["list"]["items"][number];
 
@@ -89,18 +89,17 @@ function relTime(date: Date | string | null): string {
 const LIST_INPUT = { includeDismissed: true, limit: 300 } as const;
 
 export function AffiliateDesk() {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery(
-    trpc.affiliate.list.queryOptions(LIST_INPUT),
+    orpc.affiliate.list.queryOptions({ input: LIST_INPUT }),
   );
 
   const setStatus = useMutation(
-    trpc.affiliate.setStatus.mutationOptions({
+    orpc.affiliate.setStatus.mutationOptions({
       onSuccess: async () => {
         await queryClient.invalidateQueries(
-          trpc.affiliate.list.queryOptions(LIST_INPUT),
+          orpc.affiliate.list.queryOptions({ input: LIST_INPUT }),
         );
       },
       onError: (e) => toast.error(e.message),

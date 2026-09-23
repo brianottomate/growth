@@ -3,7 +3,7 @@ import {
   compositionFormatIdSchema,
   compositionTemplateIdSchema,
 } from "./compositions";
-import { homeCatalogCopy } from "./home-ad-previews";
+import { homeCatalogCopy, place } from "./home-ad-previews";
 import {
   hotelFeedRows,
   type HotelFeedHome,
@@ -67,15 +67,27 @@ export function catalogDraft(
   homes: CatalogHome[],
   saved?: CatalogDraft | null,
 ): CatalogDraft {
+  const leads = new Set<string>();
   return {
     formats: saved?.formats ?? ["portrait"],
     primaryFormat: saved?.primaryFormat ?? "portrait",
     cards: homes
       .filter((h) => h.imageUrl)
       .map((home) => {
+        const copy = homeCatalogCopy(home, leads);
+        if (copy.lead) leads.add(copy.lead);
         const existing = saved?.cards.find((c) => c.homeId === home.id);
-        if (existing) return existing;
-        const copy = homeCatalogCopy(home);
+        if (existing) {
+          // Drafts saved before cards led on amenities still say "<name> in
+          // <place>"; nobody typed that, so it gives way. An edited headline
+          // is kept.
+          return copy.lead && isNameHeadline(existing.title, home)
+            ? {
+                ...existing,
+                title: [copy.eyebrow, copy.title].filter(Boolean).join(" "),
+              }
+            : existing;
+        }
         return {
           homeId: home.id,
           included: true,
@@ -89,6 +101,13 @@ export function catalogDraft(
       }),
   };
 }
+function isNameHeadline(title: string, home: CatalogHome) {
+  const where = place(home);
+  return (
+    title === home.name || (!!where && title === `${home.name} in ${where}`)
+  );
+}
+
 /** One feed row per included home, using only its frozen primary image. */
 export function catalogExportRows(
   homes: CatalogHome[],

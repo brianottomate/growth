@@ -1,19 +1,18 @@
-import { TRPCError } from "@trpc/server";
+import { ORPCError } from "@orpc/server";
 import { geolocation } from "@vercel/functions";
 import { z } from "zod";
 import { createHash, randomBytes } from "crypto";
 
 import { eq, and } from "drizzle-orm";
 import { userTable, verificationTable } from "@/server/db/schema";
-import { protectedProcedure } from "../trpc";
-import type { TRPCRouterRecord } from "@trpc/server";
+import { protectedProcedure } from "@/server/api/orpc";
 import { sendVerificationEmail } from "@/server/services/email.service";
 import { env } from "@/env";
 import { completeOnboardingSchema } from "@/lib/validators/onboarding";
 
 export const userRouter = {
   // Get current user profile
-  me: protectedProcedure.query(({ ctx }) => {
+  me: protectedProcedure.handler(({ context: ctx }) => {
     return ctx.db.query.userTable.findFirst({
       where: eq(userTable.id, ctx.session.user.id),
     });
@@ -28,7 +27,7 @@ export const userRouter = {
         image: z.string().url().nullable().optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const [updatedUser] = await ctx.db
         .update(userTable)
         .set(input)
@@ -36,10 +35,7 @@ export const userRouter = {
         .returning();
 
       if (!updatedUser) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "User not found",
-        });
+        throw new ORPCError("NOT_FOUND", { message: "User not found" });
       }
 
       return updatedUser;
@@ -48,7 +44,7 @@ export const userRouter = {
   // Complete onboarding
   completeOnboarding: protectedProcedure
     .input(completeOnboardingSchema)
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       // Use @vercel/functions helper for geolocation (gracefully fallback in local dev)
       let geoCountry: string | undefined;
       let geoCity: string | undefined;
@@ -85,10 +81,7 @@ export const userRouter = {
         .returning();
 
       if (!updatedUser) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "User not found",
-        });
+        throw new ORPCError("NOT_FOUND", { message: "User not found" });
       }
 
       console.log("[Onboarding] User completed onboarding:", {
@@ -102,7 +95,7 @@ export const userRouter = {
     }),
 
   // Delete user account
-  delete: protectedProcedure.mutation(async ({ ctx }) => {
+  delete: protectedProcedure.handler(async ({ context: ctx }) => {
     const userId = ctx.session.user.id;
 
     // Get user info before deletion
@@ -111,10 +104,7 @@ export const userRouter = {
     });
 
     if (!userToDelete) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "User not found",
-      });
+      throw new ORPCError("NOT_FOUND", { message: "User not found" });
     }
 
     // Delete user (cascade will handle related records)
@@ -130,7 +120,7 @@ export const userRouter = {
         email: z.string().email(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       // TODO: In production, require re-authentication or password confirmation
       const userId = ctx.session.user.id;
 
@@ -147,10 +137,7 @@ export const userRouter = {
         .returning();
 
       if (!updatedUser) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "User not found",
-        });
+        throw new ORPCError("NOT_FOUND", { message: "User not found" });
       }
 
       console.log(`[Email] Email updated, verification required`);
@@ -200,75 +187,74 @@ export const userRouter = {
     }),
 
   // Send verification email
-  sendVerificationEmail: protectedProcedure.mutation(async ({ ctx }) => {
-    const userId = ctx.session.user.id;
+  sendVerificationEmail: protectedProcedure.handler(
+    async ({ context: ctx }) => {
+      const userId = ctx.session.user.id;
 
-    const user = await ctx.db.query.userTable.findFirst({
-      where: eq(userTable.id, userId),
-    });
-
-    if (!user) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "User not found",
+      const user = await ctx.db.query.userTable.findFirst({
+        where: eq(userTable.id, userId),
       });
-    }
 
-    // Skip if email is null
-    if (!user.email) {
+      if (!user) {
+        throw new ORPCError("NOT_FOUND", { message: "User not found" });
+      }
+
+      // Skip if email is null
+      if (!user.email) {
+        return {
+          success: false,
+          message: "Please set an email address first",
+        };
+      }
+
+      // Generate secure random token (64 characters)
+      const token = randomBytes(32).toString("hex");
+
+      // Hash token before storing (SHA-256)
+      const hashedToken = createHash("sha256").update(token).digest("hex");
+
+      // Delete any existing verification tokens for this email (already checked user.email is not null)
+      await ctx.db
+        .delete(verificationTable)
+        .where(eq(verificationTable.identifier, user.email));
+
+      // Store hashed token in database with 24 hour expiry
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 24);
+
+      await ctx.db.insert(verificationTable).values({
+        id: randomBytes(16).toString("hex"),
+        identifier: user.email,
+        value: hashedToken,
+        expiresAt,
+      });
+
+      // Build verification URL with unhashed token
+      const baseUrl = env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+      const verifyUrl = `${baseUrl}/verify-email?token=${token}`;
+
+      // Send email via Resend (already checked user.email is not null)
+      const emailResult = await sendVerificationEmail(user.email, verifyUrl);
+
+      if (!emailResult.success) {
+        console.warn(
+          `[Email] Failed to send verification email:`,
+          emailResult.message,
+        );
+        return {
+          success: false,
+          message: emailResult.message || "Failed to send verification email",
+        };
+      }
+
+      console.log(`[Email] Verification email sent to ${user.email}`);
+
       return {
-        success: false,
-        message: "Please set an email address first",
+        success: true,
+        message: "Verification email sent! Check your inbox.",
       };
-    }
-
-    // Generate secure random token (64 characters)
-    const token = randomBytes(32).toString("hex");
-
-    // Hash token before storing (SHA-256)
-    const hashedToken = createHash("sha256").update(token).digest("hex");
-
-    // Delete any existing verification tokens for this email (already checked user.email is not null)
-    await ctx.db
-      .delete(verificationTable)
-      .where(eq(verificationTable.identifier, user.email));
-
-    // Store hashed token in database with 24 hour expiry
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 24);
-
-    await ctx.db.insert(verificationTable).values({
-      id: randomBytes(16).toString("hex"),
-      identifier: user.email,
-      value: hashedToken,
-      expiresAt,
-    });
-
-    // Build verification URL with unhashed token
-    const baseUrl = env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
-    const verifyUrl = `${baseUrl}/verify-email?token=${token}`;
-
-    // Send email via Resend (already checked user.email is not null)
-    const emailResult = await sendVerificationEmail(user.email, verifyUrl);
-
-    if (!emailResult.success) {
-      console.warn(
-        `[Email] Failed to send verification email:`,
-        emailResult.message,
-      );
-      return {
-        success: false,
-        message: emailResult.message || "Failed to send verification email",
-      };
-    }
-
-    console.log(`[Email] Verification email sent to ${user.email}`);
-
-    return {
-      success: true,
-      message: "Verification email sent! Check your inbox.",
-    };
-  }),
+    },
+  ),
 
   // Verify email token
   verifyEmail: protectedProcedure
@@ -277,7 +263,7 @@ export const userRouter = {
         token: z.string(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const userId = ctx.session.user.id;
 
       const user = await ctx.db.query.userTable.findFirst({
@@ -285,8 +271,7 @@ export const userRouter = {
       });
 
       if (!user?.email) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
+        throw new ORPCError("NOT_FOUND", {
           message: "User not found or email not set",
         });
       }
@@ -305,8 +290,7 @@ export const userRouter = {
       });
 
       if (!verification) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
+        throw new ORPCError("BAD_REQUEST", {
           message: "Invalid or already used verification token",
         });
       }
@@ -318,8 +302,7 @@ export const userRouter = {
           .delete(verificationTable)
           .where(eq(verificationTable.id, verification.id));
 
-        throw new TRPCError({
-          code: "BAD_REQUEST",
+        throw new ORPCError("BAD_REQUEST", {
           message: "Verification token has expired. Please request a new one.",
         });
       }
@@ -344,4 +327,4 @@ export const userRouter = {
         message: "Email verified successfully!",
       };
     }),
-} satisfies TRPCRouterRecord;
+};

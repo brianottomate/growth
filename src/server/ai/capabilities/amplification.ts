@@ -5,7 +5,7 @@ import {
 } from "./outputs/amplification";
 import "server-only";
 
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { AMPLIFICATION_ACTIONS } from "@/lib/amplification-slack";
@@ -42,6 +42,7 @@ export const listAmplifiers = growthAction({
         eq(amplifierTable.organizationId, ctx.orgId),
         isNull(amplifierTable.deletedAt),
       ),
+      orderBy: [desc(amplifierTable.createdAt)],
     });
     if (amplifiers.length === 0) {
       return { amplifiers: [], note: "Rolodex is empty." };

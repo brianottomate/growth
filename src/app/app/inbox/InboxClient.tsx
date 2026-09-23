@@ -5,7 +5,7 @@ import { useMutation } from "@tanstack/react-query";
 import { BadgeCheck } from "lucide-react";
 
 import { ListenItemActions } from "@/components/listening/ListenItemActions";
-import { useTRPC, type RouterOutputs } from "@/trpc/react";
+import { orpc, type RouterOutputs } from "@/orpc/client";
 import type {
   ZernioConversation,
   ZernioMessage,
@@ -72,8 +72,7 @@ export function InboxClient({
 }: {
   initialItems: ConversationWithThread[];
 }) {
-  const trpc = useTRPC();
-  const triage = useMutation(trpc.inbox.triageNow.mutationOptions());
+  const triage = useMutation(orpc.inbox.triageNow.mutationOptions());
 
   const scores = useMemo(() => {
     const m = new Map<string, Scored>();
@@ -252,13 +251,12 @@ function ConversationCard({
   needsReply: boolean;
   score?: Scored;
 }) {
-  const trpc = useTRPC();
   const [showFullThread, setShowFullThread] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
   const [pills, setPills] = useState<Set<Pill>>(new Set());
   const [customInstructions, setCustomInstructions] = useState("");
 
-  const draft = useMutation(trpc.inbox.draftReply.mutationOptions());
+  const draft = useMutation(orpc.inbox.draftReply.mutationOptions());
 
   // Thread is preloaded server-side — no fetch on the card. Show the last few
   // messages inline so the card is self-contained; expand for the full history.

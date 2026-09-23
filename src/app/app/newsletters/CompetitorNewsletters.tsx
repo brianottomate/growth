@@ -8,7 +8,7 @@ import { Mail, Plus } from "lucide-react";
 import { CopyButton } from "@/components/copy-button";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 export type CompetitorNewsletterRow = {
   brandId: string;
@@ -43,11 +43,10 @@ export function CompetitorNewsletters({
   rows: CompetitorNewsletterRow[];
 }) {
   const router = useRouter();
-  const trpc = useTRPC();
   const [busy, setBusy] = useState<string | null>(null);
 
-  const track = useMutation(trpc.brand.trackNewsletter.mutationOptions());
-  const untrack = useMutation(trpc.brand.untrackNewsletter.mutationOptions());
+  const track = useMutation(orpc.brand.trackNewsletter.mutationOptions());
+  const untrack = useMutation(orpc.brand.untrackNewsletter.mutationOptions());
 
   async function onTrack(row: CompetitorNewsletterRow) {
     setBusy(row.brandId);

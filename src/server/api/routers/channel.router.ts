@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { and, eq } from "drizzle-orm";
-import { TRPCError } from "@trpc/server";
+import { ORPCError } from "@orpc/server";
 
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { actionProcedure, protectedProcedure } from "@/server/api/orpc";
+import { registerBrandChannel } from "@/server/ai/capabilities/operations";
 import {
   brandTable,
   channelKindEnum,
@@ -11,7 +12,6 @@ import {
   connectionStatusEnum,
   memberTable,
 } from "@/server/db/schema";
-import { createId } from "@/server/db/utils";
 import { type db } from "@/server/db";
 import { R2 } from "@/server/clients/r2.client";
 
@@ -26,11 +26,10 @@ async function assertBrandAccess(ctx: Ctx, brandId: string) {
     where: eq(brandTable.id, brandId),
   });
   if (!brand) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Brand not found" });
+    throw new ORPCError("NOT_FOUND", { message: "Brand not found" });
   }
   if (!brand.organizationId) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
+    throw new ORPCError("BAD_REQUEST", {
       message: "Cannot add channels to a tracked/reference brand",
     });
   }
@@ -41,10 +40,7 @@ async function assertBrandAccess(ctx: Ctx, brandId: string) {
     ),
   });
   if (!membership) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "No access to this brand",
-    });
+    throw new ORPCError("FORBIDDEN", { message: "No access to this brand" });
   }
   return brand;
 }
@@ -72,8 +68,7 @@ async function uploadChannelImage(
   if (input.photo) {
     const buffer = Buffer.from(input.photo.base64Data, "base64");
     if (buffer.length > 4.5 * 1024 * 1024) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
+      throw new ORPCError("BAD_REQUEST", {
         message: `${kind === "banner" ? "Banner" : "Photo"} exceeds 4.5MB`,
       });
     }
@@ -121,30 +116,8 @@ const channelFields = {
   followerHistory: z.array(followerSnapshotSchema).max(1000).optional(),
 };
 
-export const channelRouter = createTRPCRouter({
-  create: protectedProcedure
-    .input(z.object({ brandId: z.string(), ...channelFields }))
-    .mutation(async ({ ctx, input }) => {
-      await assertBrandAccess(ctx, input.brandId);
-      const [created] = await ctx.db
-        .insert(channelTable)
-        .values({
-          id: createId("chan"),
-          brandId: input.brandId,
-          kind: input.kind,
-          platform: input.platform,
-          handle: input.handle || null,
-          profileImageUrl: input.profileImageUrl || null,
-          bannerImageUrl: input.bannerImageUrl || null,
-          profileUrl: input.profileUrl || null,
-          manageUrl: input.manageUrl || null,
-          connectionStatus: input.connectionStatus ?? "connected",
-          followerHistory: input.followerHistory ?? [],
-          followerCount: latestFollowerCount(input.followerHistory ?? []),
-        })
-        .returning();
-      return created;
-    }),
+export const channelRouter = {
+  create: actionProcedure(registerBrandChannel),
 
   update: protectedProcedure
     .input(
@@ -165,15 +138,12 @@ export const channelRouter = createTRPCRouter({
         bannerPhotoUrl: z.string().url().optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const channel = await ctx.db.query.channelTable.findFirst({
         where: eq(channelTable.id, input.id),
       });
       if (!channel) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Channel not found",
-        });
+        throw new ORPCError("NOT_FOUND", { message: "Channel not found" });
       }
       await assertBrandAccess(ctx, channel.brandId);
 
@@ -254,18 +224,15 @@ export const channelRouter = createTRPCRouter({
 
   delete: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const channel = await ctx.db.query.channelTable.findFirst({
         where: eq(channelTable.id, input.id),
       });
       if (!channel) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Channel not found",
-        });
+        throw new ORPCError("NOT_FOUND", { message: "Channel not found" });
       }
       await assertBrandAccess(ctx, channel.brandId);
       await ctx.db.delete(channelTable).where(eq(channelTable.id, input.id));
       return { id: input.id };
     }),
-});
+};

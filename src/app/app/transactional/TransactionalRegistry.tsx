@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import type { TransactionalStatus } from "@/server/db/transactional-schema";
-import type { RouterOutputs } from "@/trpc/react";
+import type { RouterOutputs } from "@/orpc/client";
 
 type RegistryMessage = RouterOutputs["transactional"]["list"][number];
 
@@ -96,24 +96,23 @@ export function TransactionalRegistry({
 }: {
   initialMessages: RegistryMessage[];
 }) {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
   const { data: messages = initialMessages } = useQuery(
-    trpc.transactional.list.queryOptions(undefined, {
-      initialData: initialMessages,
-    }),
+    orpc.transactional.list.queryOptions({ initialData: initialMessages }),
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = messages.find((m) => m.id === selectedId) ?? null;
 
   const invalidate = async () => {
-    await queryClient.invalidateQueries(trpc.transactional.list.queryFilter());
+    await queryClient.invalidateQueries({
+      queryKey: orpc.transactional.list.queryKey(),
+    });
   };
   const updateStatus = useMutation(
-    trpc.transactional.updateStatus.mutationOptions({ onSuccess: invalidate }),
+    orpc.transactional.updateStatus.mutationOptions({ onSuccess: invalidate }),
   );
   const updateNotes = useMutation(
-    trpc.transactional.updateNotes.mutationOptions({ onSuccess: invalidate }),
+    orpc.transactional.updateNotes.mutationOptions({ onSuccess: invalidate }),
   );
 
   const groups = useMemo(() => {
@@ -259,13 +258,12 @@ function MessageSheet({
   onNotesSave: (notes: string) => void;
   savingNotes: boolean;
 }) {
-  const trpc = useTRPC();
   const [notesDraft, setNotesDraft] = useState<string | null>(null);
   const { data: preview, isLoading: previewLoading } = useQuery(
-    trpc.transactional.preview.queryOptions(
-      { id: message?.id ?? "" },
-      { enabled: Boolean(message?.templateKey && message?.previewProps) },
-    ),
+    orpc.transactional.preview.queryOptions({
+      input: { id: message?.id ?? "" },
+      enabled: Boolean(message?.templateKey && message?.previewProps),
+    }),
   );
 
   if (!message) return null;

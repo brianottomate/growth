@@ -1,3 +1,5 @@
+import { campaignFocusForTurn } from "@/lib/assistant-focus";
+import { resolvePageContext } from "@/server/ai/kernel/resolve-page-context";
 import { after } from "next/server";
 import {
   claimChatTurn,
@@ -216,6 +218,7 @@ export async function POST(req: Request): Promise<Response> {
       assistantIntent,
       workContext,
       campaignContext,
+      contextMode,
       chatAttachment,
       chatAttachments,
       skippedAttachments,
@@ -231,6 +234,7 @@ export async function POST(req: Request): Promise<Response> {
       assistantIntent?: AssistantIntent;
       workContext?: ContentWorkContext;
       campaignContext?: AdCampaignWorkContext;
+      contextMode?: "page" | "pinned";
       chatAttachment?: { url?: string; mediaType?: string; fileName?: string };
       chatAttachments?: {
         url?: string;
@@ -270,10 +274,16 @@ export async function POST(req: Request): Promise<Response> {
       ? rawIntent
       : undefined;
 
+    const pageContext = await resolvePageContext(
+      pagePath ?? "",
+      membership.organizationId,
+    );
     const requestedWorkContext =
       assistantIntent?.type === "work_content_post"
         ? assistantIntent
-        : workContext;
+        : contextMode === "page"
+          ? undefined
+          : workContext;
     const workItem = requestedWorkContext?.contentPostId
       ? await db.query.contentPostTable.findFirst({
           where: and(
@@ -318,10 +328,25 @@ export async function POST(req: Request): Promise<Response> {
           )?.adWorkContext,
       )
       .find((context) => context?.adId);
-    const requestedCampaignContext =
-      assistantIntent?.type === "work_ad_campaign"
-        ? assistantIntent
-        : (savedAdContext ?? (campaignContext?.adId ? null : campaignContext));
+    const requestedCampaignContext = campaignFocusForTurn({
+      mode: contextMode,
+      intent:
+        assistantIntent?.type === "work_ad_campaign"
+          ? assistantIntent
+          : undefined,
+      page:
+        pageContext.campaign && pageContext.brand
+          ? {
+              type: "work_ad_campaign",
+              campaignId: pageContext.campaign.id,
+              brandId: pageContext.brand.id,
+              brandName: pageContext.brand.name,
+              campaignName: pageContext.campaign.name,
+            }
+          : undefined,
+      pinned: campaignContext,
+      saved: savedAdContext,
+    });
     const campaignWorkItem = requestedCampaignContext?.campaignId
       ? await db.query.campaignTable.findFirst({
           where: eq(campaignTable.id, requestedCampaignContext.campaignId),
@@ -355,7 +380,7 @@ export async function POST(req: Request): Promise<Response> {
       (assistantIntent && "brandId" in assistantIntent
         ? assistantIntent.brandId
         : null) ??
-      brandId;
+      (contextMode === "page" ? (pageContext.brand?.id ?? brandId) : brandId);
     const brand = requestedBrandId
       ? await db.query.brandTable.findFirst({
           where: and(
@@ -471,20 +496,20 @@ export async function POST(req: Request): Promise<Response> {
         : "";
     const pageContextPrompt = await composePageContextSection({
       pagePath,
+      contextMode,
       organizationId: membership.organizationId,
     });
 
     // Persisted messages are the content truth. The client contributes only its
     // final message: a fresh user turn, approval continuation, or regeneration.
     const incoming = messages[messages.length - 1]!;
-    if (
-      incoming.role === "user" &&
-      assistantIntent?.type === "work_ad_campaign" &&
-      activeAd
-    ) {
+    if (incoming.role === "user") {
       incoming.metadata = {
         ...((incoming.metadata ?? {}) as Record<string, unknown>),
         adWorkContext: activeCampaignContext,
+        workContext: activeWorkContext,
+        brandId: brand?.id,
+        contextMode,
       };
     }
     const incomingIdx = persisted.findIndex(

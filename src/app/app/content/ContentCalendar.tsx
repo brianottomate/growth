@@ -16,7 +16,7 @@ import {
 import { ChannelLogo } from "@/components/channel-logos";
 import { cn } from "@/components/ui/lib/utils";
 import { PILLAR_BY_SLUG } from "@/lib/pillars";
-import type { RouterOutputs } from "@/trpc/react";
+import type { RouterOutputs } from "@/orpc/client";
 
 type Row = RouterOutputs["content"]["schedule"][number];
 

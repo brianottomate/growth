@@ -4,13 +4,12 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 export function ProfileForm() {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const { data: user } = useQuery(trpc.user.me.queryOptions());
+  const { data: user } = useQuery(orpc.user.me.queryOptions());
 
   const [name, setName] = useState(user?.name ?? "");
   const [displayUsername, setDisplayUsername] = useState(
@@ -18,9 +17,9 @@ export function ProfileForm() {
   );
 
   const updateProfile = useMutation(
-    trpc.user.updateProfile.mutationOptions({
+    orpc.user.updateProfile.mutationOptions({
       onSuccess: () => {
-        void queryClient.invalidateQueries(trpc.user.me.queryOptions());
+        void queryClient.invalidateQueries(orpc.user.me.queryOptions());
       },
     }),
   );

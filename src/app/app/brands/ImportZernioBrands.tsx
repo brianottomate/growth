@@ -23,12 +23,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 type BrandType = "company" | "personal";
 
 export function ImportZernioBrands() {
-  const trpc = useTRPC();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
@@ -36,7 +35,7 @@ export function ImportZernioBrands() {
   const [error, setError] = useState<string | null>(null);
 
   const catalogQ = useQuery({
-    ...trpc.zernio.catalog.queryOptions(),
+    ...orpc.zernio.catalog.queryOptions(),
     enabled: open,
   });
   const profiles = useMemo(
@@ -62,7 +61,7 @@ export function ImportZernioBrands() {
   }, [open, profiles]);
 
   const importM = useMutation(
-    trpc.zernio.importProfiles.mutationOptions({
+    orpc.zernio.importProfiles.mutationOptions({
       onSuccess: () => {
         setOpen(false);
         setSelected([]);

@@ -9,7 +9,7 @@ import { Button, ButtonLink } from "@/components/ui/button";
 import { cn } from "@/components/ui/lib/utils";
 import { subredditNames } from "@/lib/subreddit";
 import type { AcquisitionShape } from "@/server/db/schema";
-import { type RouterOutputs, useTRPC } from "@/trpc/react";
+import { type RouterOutputs, orpc } from "@/orpc/client";
 
 import { SourceDialog } from "./SourceDialog";
 import { SubredditProfiles } from "./SubredditProfiles";
@@ -224,7 +224,6 @@ const PROVIDER_DASHBOARDS: Record<string, { label: string; url: string }> = {
 };
 
 function SetupTasks({ source }: { source: Source }) {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
   const terms = source.config?.alertTerms ?? [];
   const pending = terms.filter(
@@ -232,10 +231,10 @@ function SetupTasks({ source }: { source: Source }) {
   );
 
   const update = useMutation(
-    trpc.listening.updateSource.mutationOptions({
+    orpc.listening.updateSource.mutationOptions({
       onSuccess: async () => {
         await queryClient.invalidateQueries({
-          queryKey: trpc.listening.overview.queryKey(),
+          queryKey: orpc.listening.overview.queryKey(),
         });
       },
     }),

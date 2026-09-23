@@ -379,7 +379,10 @@ export const updateContentWorkItem = growthAction({
         }),
       )
       .max(12)
-      .optional(),
+      .optional()
+      .describe(
+        "status and scheduledAt move the whole publishing unit: thread replies and Story frames follow their root.",
+      ),
   }),
   execute: async (input, ctx) => {
     const content = await requireContentWorkItem(input.contentPostId, ctx);
@@ -425,21 +428,33 @@ export const updateContentWorkItem = growthAction({
           draft.status,
         ]),
       );
+      // A status on a root moves its thread or Story children with it.
       const unshipped = content.platformPosts.filter(
         (post) =>
           post.source === "owned" &&
           !SHIPPED_OR_OFF_THE_BOARD.includes(
-            requested.get(post.id) ?? post.status,
+            requested.get(post.id) ??
+              (post.parentPlatformPostId
+                ? requested.get(post.parentPlatformPostId)
+                : undefined) ??
+              post.status,
           ),
       );
       if (unshipped.length) {
+        const count = `${unshipped.length} unshipped owned spot${unshipped.length === 1 ? "" : "s"}`;
         throw new GrowthActionError(
           "invalid_input",
-          `This idea still has ${unshipped.length} unshipped owned spot${unshipped.length === 1 ? "" : "s"}: ${unshipped
-            .map((post) => `${post.id} (${post.platform}, ${post.status})`)
-            .join(
-              ", ",
-            )}. Marking only the idea published leaves the calendar showing a draft. If the operator posted these by hand, record it with publishingWrite.recordExternalPublish (it moves the spots and rolls the idea up). If it went out through Zernio, use publishingWrite.publishNow.`,
+          ctx.surface === "app"
+            ? `This idea still has ${count} (${unshipped
+                .map((post) => `${post.platform}, ${post.status}`)
+                .join(
+                  "; ",
+                )}). Mark each spot published first: the calendar and the pipeline read the spots.`
+            : `This idea still has ${count}: ${unshipped
+                .map((post) => `${post.id} (${post.platform}, ${post.status})`)
+                .join(
+                  ", ",
+                )}. Marking only the idea published leaves the calendar showing a draft. If the operator posted these by hand, record it with publishingWrite.recordExternalPublish (it moves the spots and rolls the idea up). If it went out through Zernio, use publishingWrite.publishNow.`,
         );
       }
     }
@@ -1716,6 +1731,18 @@ export const createIdea = growthAction({
       .describe(
         "What this idea physically is. Drives each spot's format — 'video' makes the Instagram spot a Reel rather than a feed image. If the title or brief says reel, short, clip, or B-roll, this is 'video'.",
       ),
+    spots: z
+      .array(
+        z.object({
+          platform: z.enum(channelPlatformEnum.enumValues),
+          format: z.string().optional(),
+        }),
+      )
+      .max(12)
+      .optional()
+      .describe(
+        "Explicit spots, in place of platforms, when a spot needs a named product or a platform appears twice, e.g. an Instagram feed post plus an 'instagram.story'. A spot without a format gets the platform's primary one.",
+      ),
   }),
   execute: async (input, ctx) => {
     // Auth at the edge: the brand must belong to the caller's org.
@@ -1728,10 +1755,10 @@ export const createIdea = growthAction({
       columns: { id: true, name: true },
     });
     if (!brand) {
-      return {
-        error:
-          "That brand isn't in your organization (or doesn't exist). Call listBrands to get a valid brandId.",
-      };
+      throw new GrowthActionError(
+        "not_found",
+        "That brand isn't in your organization (or doesn't exist). Call listBrands to get a valid brandId.",
+      );
     }
     const series = input.seriesId
       ? await db.query.seriesTable.findFirst({
@@ -1744,28 +1771,44 @@ export const createIdea = growthAction({
         })
       : null;
     if (input.seriesId && !series) {
-      return { error: "Series not found for this brand." };
+      throw new GrowthActionError(
+        "not_found",
+        "Series not found for this brand.",
+      );
     }
     if (series?.pillar && input.pillar && series.pillar !== input.pillar) {
-      return {
-        error: `This series belongs to ${series.pillar}; the new idea cannot use a conflicting pillar.`,
-      };
+      throw new GrowthActionError(
+        "invalid_input",
+        `This series belongs to ${series.pillar}; the new idea cannot use a conflicting pillar.`,
+      );
     }
 
     // Without a contentType every spot lands on its platform's primary format,
     // which makes an Instagram Reel come out as a feed image. Reuse the scrape
     // classifier so "video" resolves per-platform (instagram.reel, tiktok.video)
     // instead of duplicating that mapping here.
-    const spots = input.platforms?.length
-      ? input.platforms.map((platform) => ({
-          platform,
-          format: input.contentType
-            ? (classifyFormatFromFields(platform, {
-                content_type: input.contentType,
-              }).format ?? null)
-            : null,
-        }))
-      : undefined;
+    for (const { platform, format } of input.spots ?? []) {
+      if (!format) continue;
+      const validation = validateSpot({ platform, format });
+      if (!validation.ok) {
+        throw new GrowthActionError(
+          "invalid_input",
+          `Cannot create a ${format} spot on ${platform}: ${validation.errors.join("; ")}`,
+        );
+      }
+    }
+    const spots = input.spots?.length
+      ? input.spots
+      : input.platforms?.length
+        ? input.platforms.map((platform) => ({
+            platform,
+            format: input.contentType
+              ? (classifyFormatFromFields(platform, {
+                  content_type: input.contentType,
+                }).format ?? null)
+              : null,
+          }))
+        : undefined;
 
     const { id } = await ContentService.createIdea({
       brandId: brand.id,
@@ -1787,7 +1830,7 @@ export const createIdea = growthAction({
       id,
       title: input.title,
       brandName: brand.name,
-      platforms: input.platforms ?? [],
+      platforms: [...new Set(spots?.map((spot) => spot.platform) ?? [])],
       seriesId: series?.id ?? null,
       url: id ? `/app/content/${id}` : null,
     };
@@ -1828,13 +1871,18 @@ export const createPlatformPost = growthAction({
       ),
       columns: { id: true, name: true },
     });
-    if (!brand) return { error: "Owned brand not found." };
+    if (!brand)
+      throw new GrowthActionError("not_found", "Owned brand not found.");
     if (input.referencePlatformPostId) {
       const reference = await db.query.platformPostTable.findFirst({
         where: eq(platformPostTable.id, input.referencePlatformPostId),
         columns: { id: true },
       });
-      if (!reference) return { error: "Reference platform post not found." };
+      if (!reference)
+        throw new GrowthActionError(
+          "not_found",
+          "Reference platform post not found.",
+        );
     }
     const { id } = await ContentService.createPlatformPost({
       ...input,
@@ -1866,7 +1914,10 @@ export const publishBlogDraft = growthAction({
       with: { brand: { columns: { organizationId: true } } },
     });
     if (!post || post.brand?.organizationId !== ctx.orgId) {
-      return { error: "Owned platform post not found." };
+      throw new GrowthActionError(
+        "not_found",
+        "Owned platform post not found.",
+      );
     }
     const result = await publishBlogDraftToDato({
       platformPostId: input.platformPostId,
@@ -1899,7 +1950,10 @@ export const promotePlatformPost = growthAction({
       with: { brand: { columns: { organizationId: true } } },
     });
     if (!post || post.brand?.organizationId !== ctx.orgId) {
-      return { error: "Owned platform post not found." };
+      throw new GrowthActionError(
+        "not_found",
+        "Owned platform post not found.",
+      );
     }
     let pillar = input.pillar;
     if (input.seriesId) {
@@ -1911,11 +1965,16 @@ export const promotePlatformPost = growthAction({
         ),
         columns: { pillar: true },
       });
-      if (!series) return { error: "Series not found for this brand." };
+      if (!series)
+        throw new GrowthActionError(
+          "not_found",
+          "Series not found for this brand.",
+        );
       if (series.pillar && pillar && series.pillar !== pillar) {
-        return {
-          error: `This series belongs to ${series.pillar}; the promoted idea cannot use a conflicting pillar.`,
-        };
+        throw new GrowthActionError(
+          "invalid_input",
+          `This series belongs to ${series.pillar}; the promoted idea cannot use a conflicting pillar.`,
+        );
       }
       pillar = series.pillar ?? pillar;
     }

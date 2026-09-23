@@ -5,12 +5,13 @@ import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { Plus, X } from "lucide-react";
 
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { SimpleSelect } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
 import { ChannelLogo } from "@/components/channel-logos";
 import { cn } from "@/components/ui/lib/utils";
 import { sendAssistantIntent } from "@/lib/assistant-events";
+import { toast } from "@/components/ui/toast";
 
 // The team-facing pipeline (a deliberate subset of the 9-value enum).
 export const STATUS_OPTIONS = [
@@ -74,21 +75,16 @@ export function BriefEditor({
   status: string;
   plannedAtISO: string | null;
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const update = useMutation(
-    trpc.content.updateBrief.mutationOptions({
-      onSettled: () => router.refresh(),
-    }),
-  );
-  const setStatus = useMutation(
-    trpc.content.setStatus.mutationOptions({
+    orpc.content.updateWorkItem.mutationOptions({
+      onError: (error) => toast.error(error.message),
       onSettled: () => router.refresh(),
     }),
   );
 
   const save = (patch: Partial<Brief> & { plannedAt?: string | null }) =>
-    update.mutate({ id: contentPostId, ...patch });
+    update.mutate({ contentPostId, brief: patch });
 
   return (
     <div className="mt-5 rounded-xl border bg-card p-4">
@@ -102,7 +98,7 @@ export function BriefEditor({
               STATUS_OPTIONS.some((s) => s.value === status) ? status : "draft"
             }
             onValueChange={(v) =>
-              setStatus.mutate({ id: contentPostId, status: v as never })
+              update.mutate({ contentPostId, contentStatus: v as never })
             }
             options={STATUS_OPTIONS}
             size="sm"
@@ -204,35 +200,6 @@ function Field({
   );
 }
 
-/** Change one spot's status independently of the idea (channels ship on
- *  different days). Owned spots only — wired in for source === "owned". */
-export function SpotStatusControl({
-  platformPostId,
-  status,
-}: {
-  platformPostId: string;
-  status: string;
-}) {
-  const trpc = useTRPC();
-  const router = useRouter();
-  const setSpotStatus = useMutation(
-    trpc.content.setSpotStatus.mutationOptions({
-      onSettled: () => router.refresh(),
-    }),
-  );
-  return (
-    <SimpleSelect
-      value={STATUS_OPTIONS.some((s) => s.value === status) ? status : "draft"}
-      onValueChange={(v) =>
-        setSpotStatus.mutate({ platformPostId, status: v as never })
-      }
-      options={STATUS_OPTIONS}
-      size="sm"
-      aria-label="Spot status"
-    />
-  );
-}
-
 /**
  * Fan the idea out to another channel (the "break into cross-posts" action).
  *
@@ -305,10 +272,9 @@ export function RemoveSpotButton({
 }: {
   platformPostId: string;
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const remove = useMutation(
-    trpc.content.removeSpot.mutationOptions({
+    orpc.content.removeSpot.mutationOptions({
       onSettled: () => router.refresh(),
     }),
   );

@@ -4,7 +4,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/server/db";
 import { brandTable, memberTable } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
-import { trpc, HydrateClient, prefetch } from "@/trpc/server";
+import { orpc, HydrateClient, prefetch } from "@/orpc/server";
 import { ContentBoard } from "./ContentBoard";
 
 export default async function ContentPage({
@@ -49,8 +49,10 @@ export default async function ContentPage({
       : undefined;
 
   // Initial board (optionally brand-filtered) + the assignee roster.
-  prefetch(trpc.content.board.queryOptions({ brandId: initialBrandId }));
-  prefetch(trpc.content.assignableMembers.queryOptions());
+  prefetch(
+    orpc.content.board.queryOptions({ input: { brandId: initialBrandId } }),
+  );
+  prefetch(orpc.content.assignableMembers.queryOptions());
 
   return (
     <HydrateClient>

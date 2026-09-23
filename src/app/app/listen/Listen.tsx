@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 import { Instagram } from "./Instagram";
 import { Playbook } from "./Playbook";
@@ -32,10 +32,11 @@ export function Listen({
   defaultTab: TabId;
   initialBrandId?: string;
 }) {
-  const trpc = useTRPC();
   const [brandId, setBrandId] = useState<string | undefined>(initialBrandId);
   const { data, isLoading, isError, error } = useQuery(
-    trpc.listening.overview.queryOptions(brandId ? { brandId } : undefined),
+    orpc.listening.overview.queryOptions({
+      input: brandId ? { brandId } : undefined,
+    }),
   );
 
   const [tab, setTab] = useState<TabId>(defaultTab);

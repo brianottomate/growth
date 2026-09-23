@@ -17,7 +17,7 @@ import {
   compositionPreviewUrl,
   type PreviewSpec,
 } from "@/lib/home-ad-previews";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 type Direction = {
   verdict: "keep" | "adjust";
@@ -64,7 +64,6 @@ export function OnDemandTile({
    */
   variant?: "mock" | "canvas";
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const [assetId, setAssetId] = useState<string | null>(
     "assetId" in spec.source ? spec.source.assetId : null,
@@ -89,10 +88,10 @@ export function OnDemandTile({
   const format = getCompositionFormat(spec.formatId);
   const template = getCompositionTemplate(spec.templateId);
 
-  const importHero = useMutation(trpc.media.importUrls.mutationOptions());
-  const direct = useMutation(trpc.composition.direct.mutationOptions());
-  const freeze = useMutation(trpc.composition.freeze.mutationOptions());
-  const addPreview = useMutation(trpc.brand.addAdPreview.mutationOptions());
+  const importHero = useMutation(orpc.media.importUrls.mutationOptions());
+  const direct = useMutation(orpc.composition.direct.mutationOptions());
+  const freeze = useMutation(orpc.composition.freeze.mutationOptions());
+  const addPreview = useMutation(orpc.brand.addAdPreview.mutationOptions());
 
   const ensureAsset = async () => {
     if (assetId) return assetId;
@@ -152,8 +151,8 @@ export function OnDemandTile({
         assetTitle: `${home.name} · ${template.label} · ${format.label}`,
       });
       await addPreview.mutateAsync({
-        id: brandId,
-        assetId: asset.id,
+        brandId,
+        mediaAssetId: asset.mediaAssetId,
         homeUrl: home.url,
       });
       toast.success("Kept. It is in the previews and the library.");

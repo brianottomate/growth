@@ -41,7 +41,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import type { BrandLink } from "@/server/db/brand-schema";
 import { BrandLinksDialog } from "./BrandLinks";
 import { ZernioConnectDialog } from "./ZernioConnection";
@@ -74,13 +74,12 @@ export function BrandMenu({
   links: BrandLink[];
 }) {
   const router = useRouter();
-  const trpc = useTRPC();
   const [dialog, setDialog] = useState<DialogKind>(null);
   const openDialog = (kind: DialogKind) => setTimeout(() => setDialog(kind), 0);
   const refresh = () => router.refresh();
 
   const discoverM = useMutation(
-    trpc.channelSuggestion.discover.mutationOptions({
+    orpc.channelSuggestion.discover.mutationOptions({
       onSuccess: (r) => {
         toast.success(
           r.discovered === 0
@@ -93,7 +92,7 @@ export function BrandMenu({
     }),
   );
   const syncM = useMutation(
-    trpc.zernio.syncHistory.mutationOptions({
+    orpc.zernio.syncHistory.mutationOptions({
       onSuccess: (r) => {
         toast.success(
           `History synced · ${r.inserted} new, ${r.updated} refreshed`,
@@ -104,7 +103,7 @@ export function BrandMenu({
     }),
   );
   const cacheMediaM = useMutation(
-    trpc.media.cacheBrandPostMedia.mutationOptions({
+    orpc.media.cacheBrandPostMedia.mutationOptions({
       onSuccess: (r) => {
         toast.success(
           `Media cached · ${r.cached} file${r.cached === 1 ? "" : "s"}${r.failed ? ` · ${r.failed} unavailable` : ""}`,
@@ -115,7 +114,7 @@ export function BrandMenu({
     }),
   );
   const refreshIgM = useMutation(
-    trpc.media.refreshOwnedInstagramMedia.mutationOptions({
+    orpc.media.refreshOwnedInstagramMedia.mutationOptions({
       onSuccess: (r) => {
         toast.success(
           `Instagram refreshed · ${r.updatedExisting} posts updated · ${r.cached} files cached`,
@@ -126,7 +125,7 @@ export function BrandMenu({
     }),
   );
   const enrichM = useMutation(
-    trpc.brand.enrich.mutationOptions({
+    orpc.brand.enrich.mutationOptions({
       onSuccess: () => {
         toast.success("Enriched from website");
         refresh();
@@ -135,13 +134,13 @@ export function BrandMenu({
     }),
   );
   const promoteM = useMutation(
-    trpc.performance.promoteToClient.mutationOptions({
+    orpc.performance.promoteToClient.mutationOptions({
       onSuccess: refresh,
       onError: (e) => toast.error(e.message),
     }),
   );
   const deleteM = useMutation(
-    trpc.brand.delete.mutationOptions({ onSuccess: refresh }),
+    orpc.brand.delete.mutationOptions({ onSuccess: refresh }),
   );
 
   const busy =
@@ -202,14 +201,18 @@ export function BrandMenu({
                   {syncM.isPending ? "Syncing history…" : "Sync owned history"}
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent>
-                  {[3, 6, 12].map((monthsBack) => (
+                  {[
+                    { months: 3, daysBack: 90 },
+                    { months: 6, daysBack: 180 },
+                    { months: 12, daysBack: 365 },
+                  ].map(({ months, daysBack }) => (
                     <DropdownMenuItem
-                      key={monthsBack}
+                      key={months}
                       onSelect={() =>
-                        syncM.mutate({ brandId: brand.id, monthsBack })
+                        syncM.mutate({ brandId: brand.id, daysBack })
                       }
                     >
-                      Last {monthsBack} months
+                      Last {months} months
                     </DropdownMenuItem>
                   ))}
                 </DropdownMenuSubContent>
@@ -251,7 +254,7 @@ export function BrandMenu({
           <DropdownMenuSeparator />
           <DropdownMenuItem
             disabled={!brand.website || enrichM.isPending}
-            onSelect={() => enrichM.mutate({ id: brand.id })}
+            onSelect={() => enrichM.mutate({ brandId: brand.id })}
           >
             <Sparkles className="size-3.5" />
             {enrichM.isPending ? "Enriching…" : "Enrich from website"}
@@ -307,7 +310,6 @@ function EditBrandDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
-  const trpc = useTRPC();
   const [form, setForm] = useState({
     name: brand.name,
     tagline: brand.tagline ?? "",
@@ -316,7 +318,7 @@ function EditBrandDialog({
     logo: brand.logo ?? "",
   });
   const updateM = useMutation(
-    trpc.brand.update.mutationOptions({
+    orpc.brand.update.mutationOptions({
       onSuccess: () => {
         onOpenChange(false);
         router.refresh();

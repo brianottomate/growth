@@ -26,7 +26,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 import { ChannelLogo } from "@/components/channel-logos";
 import { PILLAR_BY_SLUG } from "@/lib/pillars";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { CampaignDialog } from "../CampaignDialog";
 import { fmtRange, STATUS_META } from "../CampaignsClient";
 import { AlignmentPanel } from "./AlignmentPanel";
@@ -48,10 +48,9 @@ const fmtDay = (d: Date | null) =>
   d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
 
 export function CampaignDetail({ campaignId }: { campaignId: string }) {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
   const { data: campaign } = useQuery(
-    trpc.campaign.get.queryOptions({ id: campaignId }),
+    orpc.campaign.get.queryOptions({ input: { id: campaignId } }),
   );
 
   const [editOpen, setEditOpen] = useState(false);
@@ -60,20 +59,20 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
   const invalidate = async () => {
     await Promise.all([
       queryClient.invalidateQueries(
-        trpc.campaign.get.queryOptions({ id: campaignId }),
+        orpc.campaign.get.queryOptions({ input: { id: campaignId } }),
       ),
-      queryClient.invalidateQueries(trpc.campaign.overview.queryOptions()),
+      queryClient.invalidateQueries(orpc.campaign.overview.queryOptions()),
       queryClient.invalidateQueries(
-        trpc.campaign.linkableContent.queryOptions({ campaignId }),
+        orpc.campaign.linkableContent.queryOptions({ input: { campaignId } }),
       ),
       queryClient.invalidateQueries(
-        trpc.campaign.alignment.queryOptions({ campaignId }),
+        orpc.campaign.alignment.queryOptions({ input: { campaignId } }),
       ),
     ]);
   };
 
   const unlink = useMutation(
-    trpc.campaign.unlinkContent.mutationOptions({
+    orpc.campaign.unlinkContent.mutationOptions({
       onSuccess: invalidate,
       onError: (e) => toast.error(e.message || "Failed to unlink"),
     }),
@@ -322,12 +321,11 @@ function LinkContentDialog({
   campaignId: string;
   onLinked: () => Promise<void>;
 }) {
-  const trpc = useTRPC();
   const [q, setQ] = useState("");
   const [picked, setPicked] = useState<Set<string>>(new Set());
 
   const { data: linkable, isLoading } = useQuery({
-    ...trpc.campaign.linkableContent.queryOptions({ campaignId }),
+    ...orpc.campaign.linkableContent.queryOptions({ input: { campaignId } }),
     enabled: open,
   });
 
@@ -339,7 +337,7 @@ function LinkContentDialog({
   }, [linkable, q]);
 
   const link = useMutation(
-    trpc.campaign.linkContent.mutationOptions({
+    orpc.campaign.linkContent.mutationOptions({
       onSuccess: async () => {
         await onLinked();
         setPicked(new Set());

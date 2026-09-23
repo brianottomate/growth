@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 
-import { useTRPC, type RouterOutputs } from "@/trpc/react";
+import { orpc, type RouterOutputs } from "@/orpc/client";
 import type { OrganicCommentItem } from "./zernio-listening";
 import { ListenItemActions } from "@/components/listening/ListenItemActions";
 
@@ -36,8 +36,7 @@ function commentContext(item: OrganicCommentItem): string {
 }
 
 export function CommentList({ items }: { items: OrganicCommentItem[] }) {
-  const trpc = useTRPC();
-  const triage = useMutation(trpc.inbox.triageComments.mutationOptions());
+  const triage = useMutation(orpc.inbox.triageComments.mutationOptions());
 
   const scores = useMemo(() => {
     const m = new Map<string, Scored>();
@@ -189,8 +188,7 @@ function CommentRow({
   item: OrganicCommentItem;
   score?: Scored;
 }) {
-  const trpc = useTRPC();
-  const draft = useMutation(trpc.inbox.draftCommentReply.mutationOptions());
+  const draft = useMutation(orpc.inbox.draftCommentReply.mutationOptions());
 
   const author =
     item.comment.from?.name ?? item.comment.from?.username ?? "Unknown";

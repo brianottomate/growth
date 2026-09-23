@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/components/ui/lib/utils";
 import { toast } from "@/components/ui/toast";
 import { authClient } from "@/server/better-auth/client";
-import { useTRPC, type RouterOutputs } from "@/trpc/react";
+import { orpc, type RouterOutputs } from "@/orpc/client";
 
 import { SparPanel } from "./SparPanel";
 
@@ -78,10 +78,9 @@ function relTime(date: Date | string): string {
 }
 
 export function Instagram() {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
   const { data, isLoading, isError, error } = useQuery(
-    trpc.mention.list.queryOptions(LIST_INPUT),
+    orpc.mention.list.queryOptions({ input: LIST_INPUT }),
   );
 
   const [filter, setFilter] = useState<string | null>(null);
@@ -90,17 +89,17 @@ export function Instagram() {
 
   const invalidate = () =>
     void queryClient.invalidateQueries(
-      trpc.mention.list.queryOptions(LIST_INPUT),
+      orpc.mention.list.queryOptions({ input: LIST_INPUT }),
     );
 
   const setStatus = useMutation(
-    trpc.mention.setStatus.mutationOptions({ onSuccess: invalidate }),
+    orpc.mention.setStatus.mutationOptions({ onSuccess: invalidate }),
   );
   const assign = useMutation(
-    trpc.mention.assign.mutationOptions({ onSuccess: invalidate }),
+    orpc.mention.assign.mutationOptions({ onSuccess: invalidate }),
   );
   const scan = useMutation(
-    trpc.listening.scanAccountWatch.mutationOptions({
+    orpc.listening.scanAccountWatch.mutationOptions({
       onSuccess: (r) => {
         invalidate();
         toast.success(
@@ -113,7 +112,7 @@ export function Instagram() {
   );
 
   const { data: members = [] } = useQuery(
-    trpc.content.assignableMembers.queryOptions(),
+    orpc.content.assignableMembers.queryOptions(),
   );
   const { data: session } = authClient.useSession();
   const currentUserId = session?.user.id ?? "";

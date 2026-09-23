@@ -8,7 +8,7 @@ import { ExternalLink, Gift, Loader2 } from "lucide-react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 import {
   blastSequenceFor,
@@ -215,7 +215,6 @@ const VERDICT_TONE: Record<string, string> = {
 };
 
 export function ProspectDetail({ domain }: { domain: string }) {
-  const trpc = useTRPC();
   const [showCrm, setShowCrm] = useState(false);
   const [previewFrameOpen, setPreviewFrameOpen] = useState(false);
   // Filled by default: the reviewer's question is almost always "what does this
@@ -223,25 +222,27 @@ export function ProspectDetail({ domain }: { domain: string }) {
   const [filled, setFilled] = useState(true);
 
   const queryClient = useQueryClient();
-  const prospect = useQuery(trpc.leads.prospect.queryOptions({ domain }));
+  const prospect = useQuery(
+    orpc.leads.prospect.queryOptions({ input: { domain } }),
+  );
   const invalidate = () =>
     queryClient.invalidateQueries({
-      queryKey: trpc.leads.prospect.queryKey({ domain }),
+      queryKey: orpc.leads.prospect.queryKey({ input: { domain } }),
     });
 
   const rank_ = useMutation(
-    trpc.leads.rankDomain.mutationOptions({ onSuccess: invalidate }),
+    orpc.leads.rankDomain.mutationOptions({ onSuccess: invalidate }),
   );
   const generate = useMutation(
-    trpc.leads.generatePregenOutreach.mutationOptions({
+    orpc.leads.generatePregenOutreach.mutationOptions({
       onSuccess: invalidate,
     }),
   );
   const capture = useMutation(
-    trpc.leads.capturePreview.mutationOptions({ onSuccess: invalidate }),
+    orpc.leads.capturePreview.mutationOptions({ onSuccess: invalidate }),
   );
   const startSequence = useMutation(
-    trpc.leads.startPregenSequence.mutationOptions({ onSuccess: invalidate }),
+    orpc.leads.startPregenSequence.mutationOptions({ onSuccess: invalidate }),
   );
   // Promote a row in the mirror into a brand a rep can actually pitch. The
   // mirror stays a mirror; this is the moment a human picks one out of it.
@@ -251,13 +252,13 @@ export function ProspectDetail({ domain }: { domain: string }) {
   // the rep watches it finish instead of finding out by reloading the brand
   // page later.
   const enrichBrand = useMutation(
-    trpc.brand.enrich.mutationOptions({ onSuccess: invalidate }),
+    orpc.brand.enrich.mutationOptions({ onSuccess: invalidate }),
   );
   const createProspect = useMutation(
-    trpc.leads.createProspect.mutationOptions({
+    orpc.leads.createProspect.mutationOptions({
       onSuccess: (result) => {
-        if (result.enrichable) {
-          enrichBrand.mutate({ id: result.brandId });
+        if (result.created) {
+          enrichBrand.mutate({ brandId: result.brandId });
         } else {
           void invalidate();
         }
@@ -266,13 +267,13 @@ export function ProspectDetail({ domain }: { domain: string }) {
   );
 
   const retire = useMutation(
-    trpc.leads.retireLeadContact.mutationOptions({ onSuccess: invalidate }),
+    orpc.leads.retireLeadContact.mutationOptions({ onSuccess: invalidate }),
   );
 
   // Live HubSpot correspondence is a provider read, so it waits to be asked for.
   // The draft's own snapshot below is what the copy was written from.
   const crm = useQuery(
-    trpc.leads.crmHistory.queryOptions({ domain }, { enabled: showCrm }),
+    orpc.leads.crmHistory.queryOptions({ input: { domain }, enabled: showCrm }),
   );
 
   if (prospect.isPending) {
@@ -475,7 +476,9 @@ export function ProspectDetail({ domain }: { domain: string }) {
                 size="sm"
                 variant="outline"
                 disabled={enrichBrand.isPending}
-                onClick={() => enrichBrand.mutate({ id: prospectBrand.id })}
+                onClick={() =>
+                  enrichBrand.mutate({ brandId: prospectBrand.id })
+                }
                 title="Re-read their website for logo, tagline and description"
               >
                 {enrichBrand.isPending

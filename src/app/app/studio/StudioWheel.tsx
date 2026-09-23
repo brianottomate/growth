@@ -15,7 +15,7 @@ import {
 import { cn } from "@/components/ui/lib/utils";
 import { PILLARS } from "@/lib/pillars";
 import { useFullBleed } from "@/lib/use-full-bleed";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { ProduceDrawer } from "./ProduceDrawer";
 
 type Brand = { id: string; name: string; slug: string | null };
@@ -47,7 +47,6 @@ const STATUS_OPACITY: Record<string, string> = {
 };
 
 export function StudioWheel({ brands }: { brands: Brand[] }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const [brandId, setBrandId] = useState(brands[0]!.id);
   const [year, setYear] = useState(2026);
@@ -75,7 +74,7 @@ export function StudioWheel({ brands }: { brands: Brand[] }) {
   );
 
   const { data, isLoading } = useQuery(
-    trpc.studio.wheel.queryOptions({ brandId, year }),
+    orpc.studio.wheel.queryOptions({ input: { brandId, year } }),
   );
 
   const yearStart = useMemo(() => new Date(year, 0, 1).getTime(), [year]);

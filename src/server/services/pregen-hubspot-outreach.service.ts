@@ -532,7 +532,7 @@ export async function generatePregenHubspotDraft(
   if (!row) throw new Error(`lead domain not found: ${domain}`);
 
   // The choke point for the exclusion rule, deliberately here rather than at
-  // each caller. The tRPC procedure, the script harness and the chat action all
+  // each caller. The oRPC procedure, the script harness and the chat action all
   // reach prospecting copy through this function, and guarding them one at a
   // time already missed the chat door once.
   if (row.excludeFromOutreach) {

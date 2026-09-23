@@ -6,7 +6,7 @@ import { RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 /**
  * Whether this client's site is one we built.
@@ -18,22 +18,23 @@ import { useTRPC } from "@/trpc/react";
  * likely to have migrated.
  */
 export function WanderOsSiteCard({ brandId }: { brandId: string }) {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [manual, setManual] = useState("");
   const [editing, setEditing] = useState(false);
 
-  const state = useQuery(trpc.brand.websiteState.queryOptions({ brandId }));
+  const state = useQuery(
+    orpc.brand.websiteState.queryOptions({ input: { brandId } }),
+  );
   const invalidate = () =>
     queryClient.invalidateQueries({
-      queryKey: trpc.brand.websiteState.queryKey({ brandId }),
+      queryKey: orpc.brand.websiteState.queryKey({ input: { brandId } }),
     });
 
   const recheck = useMutation(
-    trpc.brand.recheckWebsite.mutationOptions({ onSuccess: invalidate }),
+    orpc.brand.recheckWebsite.mutationOptions({ onSuccess: invalidate }),
   );
   const setId = useMutation(
-    trpc.brand.setWebsiteId.mutationOptions({
+    orpc.brand.setWebsiteId.mutationOptions({
       onSuccess: () => {
         setEditing(false);
         setManual("");

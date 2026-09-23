@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { getSession } from "@/server/better-auth/server";
-import { trpc, HydrateClient, prefetch } from "@/trpc/server";
+import { orpc, HydrateClient, prefetch } from "@/orpc/server";
 import { ProfileForm } from "./ProfileForm";
 import { EmailVerificationForm } from "./EmailVerificationForm";
 import { DeleteAccountButton } from "./DeleteAccountButton";
@@ -23,7 +23,7 @@ export default async function AccountPage() {
   }
 
   // Prefetch user data
-  prefetch(trpc.user.me.queryOptions());
+  prefetch(orpc.user.me.queryOptions());
 
   return (
     <HydrateClient>

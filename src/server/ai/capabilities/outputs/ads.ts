@@ -646,7 +646,17 @@ export const listAdsDestinationsOutputSchema = z.strictObject({
   platform: z.enum(["meta", "google", "linkedin"]),
 });
 
+const campaignHandoffSchema = z.strictObject({
+  brandId: z.string(),
+  campaignId: z.string(),
+  reviewPath: z.string(),
+  reviewUrl: z.string().url(),
+  state: z.enum(["draft", "pushed", "live"]),
+  nextAction: z.string(),
+});
+
 export const draftCampaignActionOutputSchema = z.strictObject({
+  handoff: campaignHandoffSchema.extend({ state: z.literal("draft") }),
   brandSlug: z.string().nullable(),
   campaign: campaignSchema,
   path: z.string(),
@@ -766,7 +776,7 @@ export const createAudienceActionOutputSchema = z.strictObject({
 });
 
 export const addAudienceUsersActionOutputSchema = z.strictObject({
-  audienceId: z.string(),
+  platformAudienceId: z.string(),
   total: z.number(),
   uploaded: z.number(),
 });
@@ -774,6 +784,7 @@ export const addAudienceUsersActionOutputSchema = z.strictObject({
 export const draftAdActionOutputSchema = draftAdSchema;
 
 export const openCampaignActionOutputSchema = z.strictObject({
+  handoff: campaignHandoffSchema,
   ads: z.array(
     z.strictObject({
       brandId: z.string(),

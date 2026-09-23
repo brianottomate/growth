@@ -12,7 +12,7 @@ import { SimpleSelect } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
 import { cn } from "@/components/ui/lib/utils";
 import type { BrandIdentity, BrandMark } from "@/server/db/schema";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 type Variants = { color: string; white: string; dark: string };
 type Tuning = NonNullable<BrandMark["tuning"]>;
@@ -44,7 +44,6 @@ export function BrandMarkCard({
   photo: string | null;
 }) {
   const router = useRouter();
-  const trpc = useTRPC();
   const [building, setBuilding] = useState(false);
   const [icon, setIcon] = useState<IconChoice>(logo ? "logo" : "none");
   const [iconAssetId, setIconAssetId] = useState<string>("");
@@ -69,7 +68,7 @@ export function BrandMarkCard({
     font === "heading" ? headingFont : font === "body" ? bodyFont : "";
 
   const library = useQuery({
-    ...trpc.media.list.queryOptions({ brandId, kind: "image" }),
+    ...orpc.media.list.queryOptions({ input: { brandId, kind: "image" } }),
     enabled: building && icon === "library",
   });
 
@@ -92,12 +91,12 @@ export function BrandMarkCard({
 
   const recipe = {
     iconAssetId: icon === "library" ? iconAssetId : null,
-    iconFrom: icon === "logo" || icon === "favicon" ? icon : undefined,
+    iconFrom: icon === "logo" || icon === "favicon" ? icon : null,
     text: text.trim() || null,
     fontFamily: fontFamily === "" ? null : fontFamily,
   };
   const critique = useMutation(
-    trpc.brand.critiqueMark.mutationOptions({
+    orpc.brand.critiqueMark.mutationOptions({
       onSuccess: (result) => setTuning(result),
       onError: (error) => toast.error(error.message),
     }),
@@ -136,13 +135,13 @@ export function BrandMarkCard({
     router.refresh();
   };
   const setMark = useMutation(
-    trpc.brand.setMark.mutationOptions({
+    orpc.brand.setMark.mutationOptions({
       onSuccess: onDone("Brand mark updated"),
       onError: (error) => toast.error(error.message),
     }),
   );
   const clearMark = useMutation(
-    trpc.brand.clearMark.mutationOptions({
+    orpc.brand.clearMark.mutationOptions({
       onSuccess: onDone("Brand mark cleared"),
       onError: (error) => toast.error(error.message),
     }),
@@ -168,7 +167,7 @@ export function BrandMarkCard({
             size="sm"
             variant="outline"
             disabled={busy || !logo}
-            onClick={() => setMark.mutate({ id: brandId, source: "logo" })}
+            onClick={() => setMark.mutate({ brandId, source: "logo" })}
           >
             Use logo
           </Button>
@@ -176,7 +175,7 @@ export function BrandMarkCard({
             size="sm"
             variant="outline"
             disabled={busy}
-            onClick={() => setMark.mutate({ id: brandId, source: "favicon" })}
+            onClick={() => setMark.mutate({ brandId, source: "favicon" })}
           >
             Use favicon
           </Button>
@@ -391,7 +390,7 @@ export function BrandMarkCard({
                 disabled={busy || (icon === "library" && !iconAssetId)}
                 onClick={() =>
                   setMark.mutate({
-                    id: brandId,
+                    brandId,
                     source: "lockup",
                     ...recipe,
                     tuning,

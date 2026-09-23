@@ -43,7 +43,7 @@ export function WorkInChatButton({
       }
     >
       <MessageSquare className="size-3.5" />
-      Work in chat
+      Start new chat
     </Button>
   );
 }

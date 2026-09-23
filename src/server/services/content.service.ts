@@ -23,7 +23,7 @@ import {
 } from "../db/schema";
 
 /**
- * Content domain logic — the transport-agnostic core. tRPC procedures call
+ * Content domain logic — the transport-agnostic core. oRPC procedures call
  * these now; the /overview chat capabilities will call the SAME functions next
  * (and an MCP / oRPC layer later) so the UI and the chat never drift.
  *
@@ -313,67 +313,6 @@ async function updateBrief(input: UpdateBriefInput): Promise<{ id: string }> {
   return { id };
 }
 
-/** Set the concrete, platform-specific caption for one spot (`platform_post.text`).
- *  Distinct from the idea-level `captionDirection` brief — this is the real copy
- *  that ships. The same handler the chat's setSpotText tool will call. */
-async function setSpotText(input: {
-  platformPostId: string;
-  text: string | null;
-}): Promise<{ id: string }> {
-  await db
-    .update(platformPostTable)
-    .set({ text: input.text })
-    .where(eq(platformPostTable.id, input.platformPostId));
-  return { id: input.platformPostId };
-}
-
-export type SaveSpotEditorInput = {
-  platformPostId: string;
-  expectedUpdatedAt: string;
-  text: string | null;
-  media: MediaItem[];
-  assetLinks: string[];
-};
-
-/**
- * Save every manual platform-post field atomically. This is deliberately
- * separate from the small chat-facing mutations: the dialog is an explicit
- * editing session and must not partially land or overwrite a newer chat edit.
- */
-async function saveSpotEditor(
-  input: SaveSpotEditorInput,
-): Promise<{ id: string; updatedAt: Date } | null> {
-  const seenMedia = new Set<string>();
-  const media = input.media.filter((item) => {
-    const key = item.assetId ?? item.url;
-    if (seenMedia.has(key)) return false;
-    seenMedia.add(key);
-    return true;
-  });
-  const assetLinks = [
-    ...new Set(input.assetLinks.map((link) => link.trim()).filter(Boolean)),
-  ];
-  const [row] = await db
-    .update(platformPostTable)
-    .set({
-      text: input.text?.trim() || null,
-      media: media.length ? media : null,
-      assetLinks: assetLinks.length ? assetLinks : null,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(platformPostTable.id, input.platformPostId),
-        eq(platformPostTable.updatedAt, new Date(input.expectedUpdatedAt)),
-      ),
-    )
-    .returning({
-      id: platformPostTable.id,
-      updatedAt: platformPostTable.updatedAt,
-    });
-  return row ?? null;
-}
-
 export type SaveSpotThreadItemInput = {
   id?: string;
   text: string | null;
@@ -580,23 +519,30 @@ async function saveSpotThread(
   });
 }
 
+type ContentStatus = (typeof contentPostTable.$inferSelect)["status"];
+
 /**
- * Schedule one platform publishing unit. Child posts are real provider jobs,
- * so they receive deterministic one-minute offsets while staying on the same
- * calendar day as the root in normal use.
+ * Move one platform publishing unit, the root and its ordered children, as a
+ * whole. Children are real provider jobs, so Story frames get deterministic
+ * one-minute schedule offsets while staying on the root's calendar day.
+ * A published row keeps a ship time it already has; otherwise it takes the
+ * given schedule, or the earlier of its saved schedule and now.
  */
-async function setPublishingUnitSchedule(input: {
+async function setPublishingUnit(input: {
   rootPlatformPostId: string;
-  scheduledAt: string | null;
-  markScheduled?: boolean;
+  status?: ContentStatus;
+  scheduledAt?: string | null;
 }): Promise<{ id: string }> {
   return withTransaction(async (tx) => {
+    const now = new Date();
     const scheduledAt = input.scheduledAt ? new Date(input.scheduledAt) : null;
     const rows = await tx
       .select({
         id: platformPostTable.id,
         sequence: platformPostTable.sequence,
         format: platformPostTable.format,
+        scheduledAt: platformPostTable.scheduledAt,
+        publishedAt: platformPostTable.publishedAt,
       })
       .from(platformPostTable)
       .where(
@@ -606,45 +552,33 @@ async function setPublishingUnitSchedule(input: {
         ),
       );
     for (const row of rows) {
-      const sequence = row.sequence ?? 0;
-      const itemSchedule = scheduledAt
-        ? isStoryFormat(row.format)
-          ? sequenceScheduledAt(scheduledAt, sequence)
-          : scheduledAt
-        : null;
+      const patch: Partial<typeof platformPostTable.$inferInsert> = {};
+      let itemSchedule = row.scheduledAt;
+      if (input.scheduledAt !== undefined) {
+        itemSchedule = scheduledAt
+          ? isStoryFormat(row.format)
+            ? sequenceScheduledAt(scheduledAt, row.sequence ?? 0)
+            : scheduledAt
+          : null;
+        patch.scheduledAt = itemSchedule;
+      }
+      if (input.status !== undefined) patch.status = input.status;
+      if (input.status === "published" && !row.publishedAt) {
+        patch.publishedAt =
+          input.scheduledAt !== undefined
+            ? (itemSchedule ?? now)
+            : itemSchedule && itemSchedule < now
+              ? itemSchedule
+              : now;
+      }
+      if (!Object.keys(patch).length) continue;
       await tx
         .update(platformPostTable)
-        .set({
-          scheduledAt: itemSchedule,
-          ...(input.markScheduled && itemSchedule
-            ? { status: "scheduled" as const }
-            : {}),
-        })
+        .set(patch)
         .where(eq(platformPostTable.id, row.id));
     }
     return { id: input.rootPlatformPostId };
   });
-}
-
-/** Move the root and every ordered child through review as one publishing unit. */
-async function setPublishingUnitStatus(input: {
-  rootPlatformPostId: string;
-  status: (typeof contentPostTable.$inferSelect)["status"];
-}): Promise<{ id: string }> {
-  const now = new Date();
-  await db
-    .update(platformPostTable)
-    .set({
-      status: input.status,
-      ...(input.status === "published" ? { publishedAt: now } : {}),
-    })
-    .where(
-      or(
-        eq(platformPostTable.id, input.rootPlatformPostId),
-        eq(platformPostTable.parentPlatformPostId, input.rootPlatformPostId),
-      ),
-    );
-  return { id: input.rootPlatformPostId };
 }
 
 /**
@@ -824,19 +758,20 @@ async function setSpotCarousel(input: {
   return { id: input.platformPostId };
 }
 
+/** Edit one owned draft. Status and schedule move its whole publishing unit. */
 async function updatePlatformDraft(input: {
   platformPostId: string;
   text?: string | null;
-  status?: (typeof contentPostTable.$inferSelect)["status"];
+  status?: ContentStatus;
   scheduledAt?: string | null;
-  markScheduled?: boolean;
   /** Re-point a spot at a different product on the same platform (image -> reel). */
   format?: string | null;
 }): Promise<{ id: string }> {
   const current = await db.query.platformPostTable.findFirst({
     where: eq(platformPostTable.id, input.platformPostId),
-    columns: { publishedAt: true, scheduledAt: true },
+    columns: { id: true, parentPlatformPostId: true },
   });
+  if (!current) throw new Error("Platform post not found");
   const patch: Record<string, unknown> = {};
   if (input.text !== undefined) patch.text = input.text?.trim() || null;
   if (input.format !== undefined) {
@@ -845,29 +780,25 @@ async function updatePlatformDraft(input: {
     // old one behind would describe the spot as a still after it became a reel.
     patch.archetype = input.format ? archetypeForFormat(input.format) : null;
   }
-  if (input.status !== undefined) patch.status = input.status;
-  if (input.scheduledAt !== undefined) {
-    patch.scheduledAt = input.scheduledAt ? new Date(input.scheduledAt) : null;
+  if (Object.keys(patch).length) {
+    await db
+      .update(platformPostTable)
+      .set(patch)
+      .where(eq(platformPostTable.id, current.id));
   }
-  if (input.markScheduled && input.scheduledAt) patch.status = "scheduled";
-  if (input.status === "published" && !current?.publishedAt) {
-    patch.publishedAt =
-      input.scheduledAt !== undefined
-        ? input.scheduledAt
-          ? new Date(input.scheduledAt)
-          : new Date()
-        : (current?.scheduledAt ?? new Date());
+  if (input.status !== undefined || input.scheduledAt !== undefined) {
+    await setPublishingUnit({
+      rootPlatformPostId: current.parentPlatformPostId ?? current.id,
+      status: input.status,
+      scheduledAt: input.scheduledAt,
+    });
   }
-  await db
-    .update(platformPostTable)
-    .set(patch)
-    .where(eq(platformPostTable.id, input.platformPostId));
-  return { id: input.platformPostId };
+  return { id: current.id };
 }
 
 async function setContentStatus(input: {
   contentPostId: string;
-  status: (typeof contentPostTable.$inferSelect)["status"];
+  status: ContentStatus;
 }): Promise<{ id: string }> {
   await db
     .update(contentPostTable)
@@ -967,11 +898,8 @@ export const ContentService = {
   updateBrief,
   addSpots,
   addSpotTargets,
-  setSpotText,
-  saveSpotEditor,
   saveSpotThread,
-  setPublishingUnitSchedule,
-  setPublishingUnitStatus,
+  setPublishingUnit,
   recordExternalPublish,
   setPoolMedia,
   setSpotMedia,

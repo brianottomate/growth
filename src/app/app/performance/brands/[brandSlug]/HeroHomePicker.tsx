@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/components/ui/lib/utils";
 import { toast } from "@/components/ui/toast";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 export type HeroOption = {
   name: string;
@@ -34,10 +34,9 @@ export function HeroHomePicker({
   featuredUrl: string | null;
 }) {
   const router = useRouter();
-  const trpc = useTRPC();
   const [open, setOpen] = useState(false);
   const feature = useMutation(
-    trpc.brand.setPreviewSource.mutationOptions({
+    orpc.brand.setPreviewSource.mutationOptions({
       onSuccess: () => {
         setOpen(false);
         router.refresh();

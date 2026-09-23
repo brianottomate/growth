@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/toast";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 export function MediaTaxonomyDialog({
   brandId,
@@ -27,9 +27,10 @@ export function MediaTaxonomyDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const taxonomyOptions = trpc.media.taxonomy.queryOptions({ brandId });
+  const taxonomyOptions = orpc.media.taxonomy.queryOptions({
+    input: { brandId },
+  });
   const { data } = useQuery(taxonomyOptions);
   const [folderName, setFolderName] = useState("");
   const [tagName, setTagName] = useState("");
@@ -39,13 +40,13 @@ export function MediaTaxonomyDialog({
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: taxonomyOptions.queryKey }),
       queryClient.invalidateQueries({
-        queryKey: trpc.media.list.queryOptions({ brandId }).queryKey,
+        queryKey: orpc.media.list.queryOptions({ input: { brandId } }).queryKey,
       }),
     ]);
   };
 
   const createFolder = useMutation(
-    trpc.media.createFolder.mutationOptions({
+    orpc.media.createFolder.mutationOptions({
       onSuccess: async () => {
         setFolderName("");
         await refresh();
@@ -54,13 +55,13 @@ export function MediaTaxonomyDialog({
     }),
   );
   const deleteFolder = useMutation(
-    trpc.media.deleteFolder.mutationOptions({
+    orpc.media.deleteFolder.mutationOptions({
       onSuccess: refresh,
       onError: (error) => toast.error(error.message),
     }),
   );
   const createTag = useMutation(
-    trpc.media.createTag.mutationOptions({
+    orpc.media.createTag.mutationOptions({
       onSuccess: async () => {
         setTagName("");
         setTagDescription("");
@@ -70,7 +71,7 @@ export function MediaTaxonomyDialog({
     }),
   );
   const deleteTag = useMutation(
-    trpc.media.deleteTag.mutationOptions({
+    orpc.media.deleteTag.mutationOptions({
       onSuccess: refresh,
       onError: (error) => toast.error(error.message),
     }),

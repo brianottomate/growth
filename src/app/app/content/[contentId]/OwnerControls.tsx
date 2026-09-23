@@ -8,7 +8,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import {
   AssigneeButton,
   useSelfAssignHotkey,
@@ -26,11 +26,10 @@ export function IdeaOwnerControl({
   members: Member[];
   currentUserId: string;
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const [owner, setOwner] = useState<Member | null>(initialOwner);
   const mut = useMutation(
-    trpc.content.setOwner.mutationOptions({
+    orpc.content.setOwner.mutationOptions({
       onSettled: () => router.refresh(),
     }),
   );
@@ -68,11 +67,10 @@ export function SpotOwnerControl({
   members: Member[];
   currentUserId: string;
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const [owner, setOwner] = useState<Member | null>(initialOwner);
   const mut = useMutation(
-    trpc.content.setSpotOwner.mutationOptions({
+    orpc.content.setSpotOwner.mutationOptions({
       onSettled: () => router.refresh(),
     }),
   );

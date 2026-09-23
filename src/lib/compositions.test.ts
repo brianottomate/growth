@@ -253,8 +253,32 @@ describe("home preview copy", () => {
       rating: 10,
     });
     expect(copy.title).toBe("Winter Park, CO");
-    expect(copy.eyebrow).toBe("Arrow Rooftop Villa 290 in");
     expect(copy.subtitle).toBe("4 bedrooms · 3 baths · 8 guests");
     expect(copy.rating).toBe(5);
+  });
+
+  // Catalog cards lead on what the home has, never "<home name> in <place>".
+  test("leads the catalog headline on the home's best amenities", () => {
+    const home = {
+      name: "Arrow Rooftop Villa 290",
+      city: "Winter Park",
+      state: "Colorado",
+      guests: 8,
+      amenities: ["Wifi", "Game Room", "Dishes", "Hot tub", "Fire pit"],
+    };
+    const copy = homeCatalogCopy(home);
+    expect(copy.eyebrow).toBe("Hot tub + game room in");
+    expect(copy.eyebrow).not.toContain(home.name);
+
+    // A neighbour already leading on the hot tub makes this one lead on its
+    // game room, so a set does not print one headline on every card.
+    expect(homeCatalogCopy(home, new Set(["hot-tub"])).eyebrow).toBe(
+      "Game room + hot tub in",
+    );
+
+    // No amenities read yet: say how many it sleeps, still not the name.
+    expect(homeCatalogCopy({ ...home, amenities: [] }).eyebrow).toBe(
+      "Sleeps 8 in",
+    );
   });
 });

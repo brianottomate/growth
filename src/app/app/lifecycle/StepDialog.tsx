@@ -29,7 +29,7 @@ import type {
   LifecycleStepSystem,
   TouchpointChannel,
 } from "@/server/db/schema";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 export type StepDraft = {
   id?: string;
@@ -115,7 +115,6 @@ export function StepDialog({
   steps: { id: string; name: string }[];
   initial?: StepDraft;
 }) {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
   const isEdit = Boolean(initial?.id);
 
@@ -157,10 +156,12 @@ export function StepDialog({
   }, [open, initial]);
 
   const invalidate = () =>
-    queryClient.invalidateQueries(trpc.lifecycle.overview.queryOptions());
+    queryClient.invalidateQueries(
+      orpc.lifecycle.overview.queryOptions({ input: {} }),
+    );
 
   const add = useMutation(
-    trpc.lifecycle.addStep.mutationOptions({
+    orpc.lifecycle.addStep.mutationOptions({
       onSuccess: async () => {
         await invalidate();
         onOpenChange(false);
@@ -169,7 +170,7 @@ export function StepDialog({
     }),
   );
   const update = useMutation(
-    trpc.lifecycle.updateStep.mutationOptions({
+    orpc.lifecycle.updateStep.mutationOptions({
       onSuccess: async () => {
         await invalidate();
         onOpenChange(false);
@@ -199,7 +200,7 @@ export function StepDialog({
       branchLabel: parentStepId === NONE ? null : branchLabel.trim() || null,
     };
     if (isEdit && initial?.id) {
-      update.mutate({ id: initial.id, ...shared });
+      update.mutate({ stepId: initial.id, changes: shared });
     } else {
       add.mutate({ programId, ...shared });
     }

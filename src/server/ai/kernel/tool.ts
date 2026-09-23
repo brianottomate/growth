@@ -9,7 +9,6 @@ import {
 } from "ai";
 import { z } from "zod";
 
-import { compactGrowthError, type GrowthErrorCode } from "./errors";
 import { capabilityErrorSchema } from "./output";
 
 export type GrowthExecutionContext = {
@@ -18,6 +17,11 @@ export type GrowthExecutionContext = {
   threadId?: string;
   surface: "overview-chat" | "mcp" | "invoke-growth" | "test";
   runId: string;
+};
+
+/** Actions also run from the app, which is not a tool surface. */
+export type GrowthActionContext = Omit<GrowthExecutionContext, "surface"> & {
+  surface: GrowthExecutionContext["surface"] | "app";
 };
 
 export type GrowthTool<INPUT = unknown, OUTPUT = unknown> = Tool<
@@ -58,9 +62,13 @@ export type GrowthWireOutput<T> = T extends Date
       : T;
 
 /** A typed service action. It is deliberately not an AI SDK tool. */
-export interface GrowthAction<INPUT = unknown, OUTPUT = unknown> {
+export interface GrowthAction<
+  INPUT = unknown,
+  OUTPUT = unknown,
+  SCHEMA extends z.ZodObject = z.ZodObject,
+> {
   description: string;
-  inputSchema: z.ZodObject;
+  inputSchema: SCHEMA;
   /**
    * What the action promises to return, when it makes one.
    *
@@ -77,7 +85,7 @@ export interface GrowthAction<INPUT = unknown, OUTPUT = unknown> {
    * describing a call the action would now refuse.
    */
   examples?: readonly unknown[];
-  run: (input: INPUT, context: GrowthExecutionContext) => Promise<OUTPUT>;
+  run: (input: INPUT, context: GrowthActionContext) => Promise<OUTPUT>;
 }
 
 export function growthAction<I extends z.ZodObject, O>(definition: {
@@ -85,8 +93,8 @@ export function growthAction<I extends z.ZodObject, O>(definition: {
   inputSchema: I;
   outputSchema: z.ZodType<NoInfer<GrowthWireOutput<O>>>;
   examples?: readonly z.input<I>[];
-  execute: (input: z.infer<I>, ctx: GrowthExecutionContext) => Promise<O>;
-}): GrowthAction<z.infer<I>, O> {
+  execute: (input: z.infer<I>, ctx: GrowthActionContext) => Promise<O>;
+}): GrowthAction<z.infer<I>, O, I> {
   return {
     description: definition.description,
     inputSchema: definition.inputSchema,
@@ -185,16 +193,7 @@ export function growthDomainTool<
   actions: Actions;
 }): GrowthTool<
   DomainInput<Actions>,
-  | { ok: true; action: keyof Actions; data: unknown }
-  | {
-      ok: false;
-      action: keyof Actions;
-      error: {
-        code: GrowthErrorCode;
-        message: string;
-        suggestedAction: string;
-      };
-    }
+  { ok: true; action: keyof Actions; data: unknown }
 > {
   const variants = Object.entries(definition.actions).map(([action, spec]) => {
     return spec.inputSchema.extend({
@@ -245,24 +244,6 @@ export async function runGrowthAction<Name extends PropertyKey, Input, Output>(
   context: GrowthExecutionContext,
 ) {
   const data = await spec.run(input, context);
-  // Older services return an error object; preserve that public failure contract.
-  if (
-    typeof data === "object" &&
-    data !== null &&
-    "error" in data &&
-    typeof data.error === "string"
-  ) {
-    const error = compactGrowthError(data.error);
-    return {
-      ok: false as const,
-      action,
-      error: {
-        code: error.code,
-        message: error.error,
-        suggestedAction: error.suggestedAction,
-      },
-    };
-  }
   return { ok: true as const, action, data };
 }
 

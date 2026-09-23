@@ -16,7 +16,7 @@ import {
 import { cn } from "@/components/ui/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/toast";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 export type PickerHome = {
   url: string;
@@ -50,9 +50,8 @@ export function PreviewSourcePicker({
 }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
-  const trpc = useTRPC();
   const set = useMutation(
-    trpc.brand.setPreviewSource.mutationOptions({
+    orpc.brand.setPreviewSource.mutationOptions({
       onSuccess: () => {
         setOpen(false);
         router.refresh();

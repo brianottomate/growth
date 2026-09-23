@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 /**
  * Delete the real campaign on the real ad account. This cascades to its ad
@@ -35,12 +35,11 @@ export function DeletePlatformCampaign({
   isLive: boolean;
   spend: number | null;
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
   const remove = useMutation(
-    trpc.ads.deletePlatformCampaign.mutationOptions({
+    orpc.ads.deletePlatformCampaign.mutationOptions({
       onSuccess: () => {
         setOpen(false);
         router.push(`/app/brands/${brandSlug}/ads`);

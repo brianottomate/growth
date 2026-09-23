@@ -6,7 +6,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Check, Sparkles, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 
 export type SuggestionLite = {
@@ -31,21 +31,20 @@ export function SuggestedChannels({
   variant?: "full" | "action" | "results";
 }) {
   const router = useRouter();
-  const trpc = useTRPC();
   const [error, setError] = useState<string | null>(null);
   const refresh = () => router.refresh();
 
   const discoverM = useMutation(
-    trpc.channelSuggestion.discover.mutationOptions({
+    orpc.channelSuggestion.discover.mutationOptions({
       onSuccess: refresh,
       onError: (e) => setError(e.message),
     }),
   );
   const acceptM = useMutation(
-    trpc.channelSuggestion.accept.mutationOptions({ onSuccess: refresh }),
+    orpc.channelSuggestion.accept.mutationOptions({ onSuccess: refresh }),
   );
   const rejectM = useMutation(
-    trpc.channelSuggestion.reject.mutationOptions({ onSuccess: refresh }),
+    orpc.channelSuggestion.reject.mutationOptions({ onSuccess: refresh }),
   );
 
   const busyId = acceptM.isPending

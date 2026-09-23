@@ -14,7 +14,7 @@ import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import type { ChannelBackfillState } from "@/server/services/peer-scrape.service";
 import { ChannelBackfill } from "./ChannelBackfill";
 import { PILLAR_BY_SLUG } from "@/lib/pillars";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { cn } from "@/lib/utils";
 
 /**
@@ -763,7 +763,6 @@ export function BrandCadence({
   /** Per-platform ingest facts + pull controls (see ChannelBackfill). */
   backfill?: Record<string, ChannelBackfillState>;
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const refresh = () => router.refresh();
 
@@ -771,7 +770,7 @@ export function BrandCadence({
   const [editing, setEditing] = useState(false);
 
   const setCadence = useMutation(
-    trpc.cadence.setCadenceTarget.mutationOptions({ onSuccess: refresh }),
+    orpc.cadence.setCadenceTarget.mutationOptions({ onSuccess: refresh }),
   );
 
   const attnRank: Record<Status, number> = {
@@ -858,12 +857,11 @@ export function BrandContentMix({
   brandId: string;
   strategy: BrandStrategy;
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const [editing, setEditing] = useState(false);
 
   const setMix = useMutation(
-    trpc.cadence.setMixTarget.mutationOptions({
+    orpc.cadence.setMixTarget.mutationOptions({
       onSuccess: () => router.refresh(),
     }),
   );

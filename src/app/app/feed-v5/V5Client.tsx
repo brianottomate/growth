@@ -27,7 +27,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { SimpleDialog } from "@/components/ui/dialog";
 import { cn } from "@/components/ui/lib/utils";
@@ -280,7 +280,6 @@ export function V5Client({
   nowISO: string;
 }) {
   const router = useRouter();
-  const trpc = useTRPC();
   const now = useMemo(() => new Date(nowISO), [nowISO]);
   const { ref, style } = useFullBleed();
 
@@ -458,7 +457,7 @@ export function V5Client({
   );
 
   const createGrouping = useMutation(
-    trpc.content.createGrouping.mutationOptions({
+    orpc.content.createGrouping.mutationOptions({
       onSuccess: () => {
         setSelected(new Set());
         setGroupOpen(false);

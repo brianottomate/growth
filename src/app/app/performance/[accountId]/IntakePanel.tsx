@@ -7,7 +7,7 @@ import { CheckCircle2, CircleDashed, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { intakeBrandRef } from "@/lib/intake-ref";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 /**
  * Submitted intakes for one account, and the apply step that promotes one
@@ -18,12 +18,11 @@ import { useTRPC } from "@/trpc/react";
  * it back as a form would only invite someone to edit a receipt.
  */
 export function IntakePanel({ accountId }: { accountId: string }) {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [openId, setOpenId] = useState<string | null>(null);
 
   const intakes = useQuery(
-    trpc.performance.intakes.queryOptions({ accountId }),
+    orpc.performance.intakes.queryOptions({ input: { accountId } }),
   );
   const rows = intakes.data ?? [];
 
@@ -91,7 +90,9 @@ export function IntakePanel({ accountId }: { accountId: string }) {
                 verifiedPageId={intake.verifiedPageId}
                 onVerified={() =>
                   void queryClient.invalidateQueries({
-                    queryKey: trpc.performance.intakes.queryKey({ accountId }),
+                    queryKey: orpc.performance.intakes.queryKey({
+                      input: { accountId },
+                    }),
                   })
                 }
               />
@@ -102,7 +103,9 @@ export function IntakePanel({ accountId }: { accountId: string }) {
                 intakeId={intake.id}
                 onApplied={() =>
                   void queryClient.invalidateQueries({
-                    queryKey: trpc.performance.intakes.queryKey({ accountId }),
+                    queryKey: orpc.performance.intakes.queryKey({
+                      input: { accountId },
+                    }),
                   })
                 }
               />
@@ -148,13 +151,12 @@ function IntakeDetail({
   intakeId: string;
   onApplied: () => void;
 }) {
-  const trpc = useTRPC();
   const preview = useQuery(
-    trpc.performance.previewIntake.queryOptions({ intakeId }),
+    orpc.performance.previewIntake.queryOptions({ input: { intakeId } }),
   );
   const [budget, setBudget] = useState("");
   const apply = useMutation(
-    trpc.performance.applyIntake.mutationOptions({ onSuccess: onApplied }),
+    orpc.performance.applyIntake.mutationOptions({ onSuccess: onApplied }),
   );
 
   if (preview.isPending) {
@@ -264,16 +266,15 @@ function VerifyAccess({
   verifiedPageId: string | null;
   onVerified: () => void;
 }) {
-  const trpc = useTRPC();
   const verify = useMutation(
-    trpc.performance.verifyIntakeAccess.mutationOptions({
+    orpc.performance.verifyIntakeAccess.mutationOptions({
       onSuccess: (result) => {
         if (result.matched) onVerified();
       },
     }),
   );
   const bind = useMutation(
-    trpc.performance.setIntakeVerifiedPage.mutationOptions({
+    orpc.performance.setIntakeVerifiedPage.mutationOptions({
       onSuccess: onVerified,
     }),
   );

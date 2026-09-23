@@ -1,3 +1,4 @@
+import { resolvePageContext } from "./resolve-page-context";
 import "server-only";
 
 import { and, eq, isNull } from "drizzle-orm";
@@ -54,7 +55,7 @@ function guidanceForPath(pathname: string): string | null {
   if (pathname.startsWith("/app/lifecycle"))
     return "This is the lifecycle workspace. Use lifecycleRead before lifecycleWrite. Customer.io and Outreach remain Growth-only provider integrations.";
   if (pathname.startsWith("/app/performance"))
-    return "This is Wander Performance: the desk for Performance by Wander, where a property manager pays a management fee plus media budget and Wander runs the marketing for their homes as their brand. Tabs: Dashboard, Clients (the brands), Campaigns, Accounts (the commercial record: plan, cycles, billed vs media). adsRead.listCampaigns and adsRead.openCampaign read the plan; performanceRead reads accounts. To set up a new client from a website, read the new-client-setup playbook and follow it. A brand page under /app/performance/brands shows the brand's ad previews: cards kept on the brand as what their ads will look like before any campaign; to make one, read the brand-ad-preview playbook and follow it.";
+    return "This is Wander Performance: the desk for Performance by Wander, where a property manager pays a management fee plus media budget and Wander runs the marketing for their homes as their brand. Sidebar: Dashboard, Clients, Prospects, Campaigns and Billing. Each client has Setup, Catalog, Campaigns, Settings and Unassigned creatives. Billing accounts describe the commercial record: plan, cycles, billed vs media. adsRead.listCampaigns and adsRead.openCampaign read the plan; performanceRead reads accounts. To set up a new client from a website, read the new-client-setup playbook and follow it. A brand page under /app/performance/brands shows the brand's ad previews: cards kept on the brand as what their ads will look like before any campaign; to make one, read the brand-ad-preview playbook and follow it.";
   if (pathname.startsWith("/app/media"))
     return "This is the media library. Growth-only Drive and upload capabilities remain available here alongside media analysis.";
   if (pathname.startsWith("/app/compositions"))
@@ -82,12 +83,17 @@ function guidanceForPath(pathname: string): string | null {
 export async function composePageContextSection(options: {
   pagePath: string | undefined;
   organizationId: string;
+  contextMode?: "page" | "pinned";
 }): Promise<string> {
   const path = getSafeInternalPath(options.pagePath ?? null);
   if (!path?.startsWith("/app")) return "";
 
   const pathname = path.split(/[?#]/)[0]!;
-  const header = `# Operator location\nThe operator currently has ${path} open in the growth workspace. When they say "this page", "this one", "here", or point at something without naming it, they mean what is on this surface.`;
+  const header = `# Operator location\nThe operator currently has ${path} open in the growth workspace. ${options.contextMode === "pinned" ? "The operator selected a pinned conversation focus. Use the verified work-item context for implicit references; this location is navigation context only. Do not silently switch to this page." : "The operator selected the current page. Resolve implicit references such as this campaign from this verified page context. Earlier conversation focus does not override it."}`;
+
+  const page = await resolvePageContext(pathname, options.organizationId);
+  if (page.label)
+    return `${header}\nVerified page context: ${page.label}. ${page.brand ? `brandId: ${page.brand.id}.` : ""} ${page.campaign ? `campaignId: ${page.campaign.id}. Read adsRead.openCampaign before editing.` : ""} ${page.platformCampaign ? `platformCampaignId: ${page.platformCampaign.id}.` : ""} ${page.home ? `homeId: ${page.home.id}.` : ""} ${page.account ? `accountId: ${page.account.id}, status: ${page.account.status}.` : ""}\n${guidanceForPath(pathname) ?? ""}`;
 
   const seriesId = /^\/app\/series\/([^/]+)$/.exec(pathname)?.[1];
   if (seriesId) {

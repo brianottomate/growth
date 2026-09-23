@@ -1,13 +1,10 @@
 import type { Database } from "@/server/db";
 import { z } from "zod";
 import { and, count, desc, eq, inArray, isNull } from "drizzle-orm";
-import { TRPCError } from "@trpc/server";
+import { ORPCError } from "@orpc/server";
 
-import { createTRPCRouter, protectedProcedure } from "../trpc";
-import {
-  computeAlignmentOverview,
-  computeCampaignAlignment,
-} from "@/server/services/ads-alignment.service";
+import { protectedProcedure } from "@/server/api/orpc";
+import { computeCampaignAlignment } from "@/server/services/ads-alignment.service";
 import {
   brandTable,
   platformCampaignTable,
@@ -28,7 +25,7 @@ async function getOrgId(ctx: Ctx) {
     where: eq(memberTable.userId, ctx.session.user.id),
   });
   if (!membership?.organizationId) {
-    throw new TRPCError({ code: "FORBIDDEN", message: "No organization" });
+    throw new ORPCError("FORBIDDEN", { message: "No organization" });
   }
   return membership.organizationId;
 }
@@ -49,7 +46,7 @@ async function assertBrandAccess(ctx: Ctx, brandId: string) {
     where: eq(brandTable.id, brandId),
   });
   if (!brand?.organizationId) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Brand not found" });
+    throw new ORPCError("NOT_FOUND", { message: "Brand not found" });
   }
   const membership = await ctx.db.query.memberTable.findFirst({
     where: and(
@@ -58,7 +55,7 @@ async function assertBrandAccess(ctx: Ctx, brandId: string) {
     ),
   });
   if (!membership) {
-    throw new TRPCError({ code: "FORBIDDEN", message: "No access to brand" });
+    throw new ORPCError("FORBIDDEN", { message: "No access to brand" });
   }
 }
 
@@ -70,7 +67,7 @@ async function assertCampaignAccess(ctx: Ctx, campaignId: string) {
       isNull(campaignTable.deletedAt),
     ),
   });
-  if (!campaign) throw new TRPCError({ code: "NOT_FOUND" });
+  if (!campaign) throw new ORPCError("NOT_FOUND");
   await assertBrandAccess(ctx, campaign.brandId);
   return campaign;
 }
@@ -97,9 +94,9 @@ const campaignFields = {
  * off it via their `campaignId`. The moment planner (/app/plan) creates
  * these too; this router is the generic CRUD + linking lane.
  */
-export const campaignRouter = createTRPCRouter({
+export const campaignRouter = {
   /** All campaigns for the org's brands, with linked-work rollups. */
-  overview: protectedProcedure.query(async ({ ctx }) => {
+  overview: protectedProcedure.handler(async ({ context: ctx }) => {
     const orgId = await getOrgId(ctx);
     const brandIds = await orgBrandIds(ctx, orgId);
     if (brandIds.length === 0) return { campaigns: [] };
@@ -155,7 +152,7 @@ export const campaignRouter = createTRPCRouter({
   /** One campaign with everything linked to it. */
   get: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .query(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const campaign = await assertCampaignAccess(ctx, input.id);
 
       const [brand, contentPosts, adCampaigns] = await Promise.all([
@@ -190,7 +187,7 @@ export const campaignRouter = createTRPCRouter({
 
   create: protectedProcedure
     .input(z.object({ brandId: z.string(), ...campaignFields }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandAccess(ctx, input.brandId);
       const { brandId, ...rest } = input;
       const [campaign] = await ctx.db
@@ -202,7 +199,7 @@ export const campaignRouter = createTRPCRouter({
 
   update: protectedProcedure
     .input(z.object({ id: z.string(), ...campaignFields }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertCampaignAccess(ctx, input.id);
       const { id, ...rest } = input;
       const [campaign] = await ctx.db
@@ -213,26 +210,10 @@ export const campaignRouter = createTRPCRouter({
       return campaign;
     }),
 
-  /** Soft-delete. Linked content keeps its rows; campaignId is cleared. */
-  archive: protectedProcedure
-    .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      await assertCampaignAccess(ctx, input.id);
-      await ctx.db
-        .update(contentPostTable)
-        .set({ campaignId: null })
-        .where(eq(contentPostTable.campaignId, input.id));
-      await ctx.db
-        .update(campaignTable)
-        .set({ deletedAt: new Date(), status: "archived" })
-        .where(eq(campaignTable.id, input.id));
-      return { ok: true };
-    }),
-
   /** Brand content not yet attached to any campaign — the link picker. */
   linkableContent: protectedProcedure
     .input(z.object({ campaignId: z.string() }))
-    .query(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const campaign = await assertCampaignAccess(ctx, input.campaignId);
       return ctx.db.query.contentPostTable.findMany({
         where: and(
@@ -259,7 +240,7 @@ export const campaignRouter = createTRPCRouter({
         contentPostIds: z.array(z.string()).min(1).max(200),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const campaign = await assertCampaignAccess(ctx, input.campaignId);
       // Same-brand only — a campaign never owns another brand's content.
       await ctx.db
@@ -276,7 +257,7 @@ export const campaignRouter = createTRPCRouter({
 
   unlinkContent: protectedProcedure
     .input(z.object({ campaignId: z.string(), contentPostId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertCampaignAccess(ctx, input.campaignId);
       await ctx.db
         .update(contentPostTable)
@@ -295,17 +276,10 @@ export const campaignRouter = createTRPCRouter({
   /** Full alignment diff for one campaign (detail page). */
   alignment: protectedProcedure
     .input(z.object({ campaignId: z.string() }))
-    .query(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertCampaignAccess(ctx, input.campaignId);
       return computeCampaignAlignment(input.campaignId);
     }),
-
-  /** Per-campaign drift rollup across the org's brands (index page). */
-  alignmentOverview: protectedProcedure.query(async ({ ctx }) => {
-    const orgId = await getOrgId(ctx);
-    const brandIds = await orgBrandIds(ctx, orgId);
-    return computeAlignmentOverview(brandIds);
-  }),
 
   /** Attach synced ad campaigns to the campaign they implement. */
   linkCampaigns: protectedProcedure
@@ -315,7 +289,7 @@ export const campaignRouter = createTRPCRouter({
         campaignIds: z.array(z.string()).min(1).max(100),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const campaign = await assertCampaignAccess(ctx, input.campaignId);
       // Same-brand only — a campaign never claims another brand's platform campaign.
       await ctx.db
@@ -332,7 +306,7 @@ export const campaignRouter = createTRPCRouter({
 
   unlinkCampaign: protectedProcedure
     .input(z.object({ campaignId: z.string(), platformCampaignId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertCampaignAccess(ctx, input.campaignId);
       await ctx.db
         .update(platformCampaignTable)
@@ -345,4 +319,4 @@ export const campaignRouter = createTRPCRouter({
         );
       return { ok: true };
     }),
-});
+};

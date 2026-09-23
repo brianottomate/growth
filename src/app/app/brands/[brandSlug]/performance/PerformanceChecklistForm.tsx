@@ -6,7 +6,7 @@ import { Copy } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import {
   CHECKLIST_SECTIONS,
   checklistProgress,
@@ -43,7 +43,6 @@ export function PerformanceChecklistForm({
     leadsie: string | null;
   };
 }) {
-  const trpc = useTRPC();
   const [values, setValues] = useState<Record<string, ChecklistValue>>(
     initial?.values ?? {},
   );
@@ -53,7 +52,7 @@ export function PerformanceChecklistForm({
   const [dirty, setDirty] = useState<Set<string>>(new Set());
 
   const save = useMutation(
-    trpc.brand.setPerformanceChecklist.mutationOptions({
+    orpc.brand.setPerformanceChecklist.mutationOptions({
       onSuccess: (res: PerformanceChecklist) => {
         setValues(res.values ?? {});
         setMeta(res.meta ?? {});

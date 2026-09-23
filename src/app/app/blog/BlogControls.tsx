@@ -8,7 +8,7 @@ import { BrandFilterSelect } from "@/components/brand-filter-select";
 import { SocialPreviewSelect } from "@/components/social-preview-select";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 export function BlogControls({
   brands,
@@ -23,10 +23,9 @@ export function BlogControls({
   selectedBrandSlug: string | null;
 }) {
   const router = useRouter();
-  const trpc = useTRPC();
   const selected = brands.find((brand) => brand.slug === selectedBrandSlug);
   const sync = useMutation(
-    trpc.blog.sync.mutationOptions({
+    orpc.blog.sync.mutationOptions({
       onSuccess: (result) => {
         toast.success(`Synced ${result.articles} blog articles`);
         router.refresh();

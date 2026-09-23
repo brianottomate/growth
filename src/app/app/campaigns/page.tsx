@@ -5,7 +5,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/server/db";
 import { brandTable, memberTable } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
-import { HydrateClient, prefetch, trpc } from "@/trpc/server";
+import { HydrateClient, prefetch, orpc } from "@/orpc/server";
 import { CampaignsClient } from "./CampaignsClient";
 
 export const metadata: Metadata = {
@@ -36,7 +36,7 @@ export default async function CampaignsPage() {
     columns: { id: true, name: true },
   });
 
-  prefetch(trpc.campaign.overview.queryOptions());
+  prefetch(orpc.campaign.overview.queryOptions());
 
   return (
     <HydrateClient>

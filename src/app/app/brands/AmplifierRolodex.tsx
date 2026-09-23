@@ -18,7 +18,7 @@ import { SimpleSelect } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import type { AmplifierHandle } from "@/server/db/amplification-schema";
 
 const TYPE_OPTIONS = [
@@ -61,20 +61,22 @@ type Amplifier = {
 };
 
 export function AmplifierRolodex() {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<Amplifier | null>(null);
   const [creating, setCreating] = useState(false);
 
-  const { data: amplifiers, isLoading } = useQuery(
-    trpc.amplifier.list.queryOptions(),
+  const { data, isLoading } = useQuery(
+    orpc.amplifier.list.queryOptions({ input: {} }),
   );
+  const amplifiers = data?.amplifiers;
 
   const invalidate = () =>
-    queryClient.invalidateQueries(trpc.amplifier.list.queryOptions());
+    queryClient.invalidateQueries(
+      orpc.amplifier.list.queryOptions({ input: {} }),
+    );
 
   const discover = useMutation(
-    trpc.amplifier.discoverHandles.mutationOptions({
+    orpc.amplifier.discoverHandles.mutationOptions({
       onSuccess: (r) => {
         void invalidate();
         toast.success(
@@ -85,7 +87,7 @@ export function AmplifierRolodex() {
     }),
   );
   const remove = useMutation(
-    trpc.amplifier.remove.mutationOptions({
+    orpc.amplifier.remove.mutationOptions({
       onSuccess: invalidate,
       onError: (e) => toast.error(e.message || "Failed to remove"),
     }),
@@ -247,7 +249,6 @@ function AmplifierDialog({
   initial?: Amplifier;
   onSaved: () => Promise<void> | void;
 }) {
-  const trpc = useTRPC();
   const isEdit = !!initial;
 
   const [name, setName] = useState("");
@@ -277,13 +278,13 @@ function AmplifierDialog({
   };
 
   const create = useMutation(
-    trpc.amplifier.create.mutationOptions({
+    orpc.amplifier.create.mutationOptions({
       onSuccess: onDone,
       onError: (e) => toast.error(e.message || "Failed to create"),
     }),
   );
   const update = useMutation(
-    trpc.amplifier.update.mutationOptions({
+    orpc.amplifier.update.mutationOptions({
       onSuccess: onDone,
       onError: (e) => toast.error(e.message || "Failed to save"),
     }),

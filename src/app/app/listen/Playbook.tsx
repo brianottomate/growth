@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
-import { useTRPC, type RouterOutputs } from "@/trpc/react";
+import { orpc, type RouterOutputs } from "@/orpc/client";
 
 type Overview = RouterOutputs["listening"]["overview"];
 
@@ -28,13 +28,12 @@ export function Playbook({
   story: Overview["story"];
   brandVoice: string | null;
 }) {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
   const save = useMutation(
-    trpc.listening.updateStory.mutationOptions({
+    orpc.listening.updateStory.mutationOptions({
       onSuccess: async () => {
         await queryClient.invalidateQueries({
-          queryKey: trpc.listening.overview.queryKey(),
+          queryKey: orpc.listening.overview.queryKey(),
         });
         toast.success("Playbook saved");
       },

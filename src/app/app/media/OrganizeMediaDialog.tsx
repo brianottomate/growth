@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SimpleSelect } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
-import { useTRPC, type RouterOutputs } from "@/trpc/react";
+import { orpc, type RouterOutputs } from "@/orpc/client";
 
 type LibraryAsset = RouterOutputs["media"]["list"][number];
 type Taxonomy = RouterOutputs["media"]["taxonomy"];
@@ -67,13 +67,12 @@ export function OrganizeMediaDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
   const moveToBrand = useMutation(
-    trpc.media.moveToBrand.mutationOptions({
+    orpc.media.moveToBrand.mutationOptions({
       onSuccess: () => {
         toast.success("Moved to the other brand's library");
-        void queryClient.invalidateQueries(trpc.media.list.queryFilter());
+        void queryClient.invalidateQueries({ queryKey: orpc.media.list.key() });
         onOpenChange(false);
       },
       onError: (error) => toast.error(error.message),
@@ -97,13 +96,15 @@ export function OrganizeMediaDialog({
       .map((assignment) => assignment.tagId),
   );
   const analysis = readAnalysis(asset.metadata);
-  const listKey = trpc.media.list.queryOptions({
-    brandId: asset.brandId,
+  const listKey = orpc.media.list.queryOptions({
+    input: {
+      brandId: asset.brandId,
+    },
   }).queryKey;
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: listKey });
   const update = useMutation(
-    trpc.media.updateMeta.mutationOptions({
+    orpc.media.updateMeta.mutationOptions({
       onSuccess: async () => {
         await refresh();
         onOpenChange(false);
@@ -112,7 +113,7 @@ export function OrganizeMediaDialog({
     }),
   );
   const analyze = useMutation(
-    trpc.media.analyze.mutationOptions({
+    orpc.media.analyze.mutationOptions({
       onSuccess: async () => {
         toast.success("Image analyzed");
         setSteer("");
@@ -284,7 +285,10 @@ export function OrganizeMediaDialog({
                 className="justify-self-start"
                 loading={analyze.isPending}
                 onClick={() =>
-                  analyze.mutate({ id: asset.id, steer: steer || undefined })
+                  analyze.mutate({
+                    mediaId: asset.id,
+                    steer: steer || undefined,
+                  })
                 }
               >
                 <Sparkles className="size-3.5" />

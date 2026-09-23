@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Check, Minus } from "lucide-react";
 
 import type { PerformanceAccountStatus } from "@/server/db/schema";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { NewAccountDialog } from "./NewAccountDialog";
 
 const STATUS_META: Record<
@@ -44,8 +44,9 @@ function Yes({ value }: { value: boolean }) {
 }
 
 export function PerformanceClient() {
-  const trpc = useTRPC();
-  const { data, isLoading } = useQuery(trpc.performance.list.queryOptions());
+  const { data, isLoading } = useQuery(
+    orpc.performance.list.queryOptions({ input: {} }),
+  );
   const accounts = data?.accounts ?? [];
 
   return (

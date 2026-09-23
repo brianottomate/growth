@@ -83,7 +83,6 @@ the targets.
 - **Re-import**: a second paste of the same month matches only leftover slots
   and flags possible duplicates by title; full diff/merge is future work
   (`plan_import.rawText` keeps the paste verbatim to enable it).
-- `apply` is a tRPC-reserved procedure name — hence `applyImport`.
 - Rejected items are remembered; slots they matched stay open.
 - Old slots minted by Reshuffle/moments are `slotKind: "anchored"|"freeflow"`
   and invisible to the cadence census — they coexist.

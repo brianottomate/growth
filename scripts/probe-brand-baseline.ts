@@ -2,7 +2,7 @@
  * LOCAL PROBE — compose the existing discovery stack into one "brand baseline"
  * run for a single brand, and measure it: wall time, provider usage, what came
  * back, what failed. The point is to learn the real shape of the workflow on a
- * live brand BEFORE building it into a tRPC mutation and an agent tool.
+ * live brand BEFORE building it into a oRPC mutation and an agent tool.
  *
  * Stages (each timed, each wrapped so one failure does not sink the rest):
  *   1. state     — read brand, channels, suggestions, post counts

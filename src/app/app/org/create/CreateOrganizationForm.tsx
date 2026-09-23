@@ -28,7 +28,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 
 import { authClient } from "@/server/better-auth/client";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 const createOrganizationSchema = z.object({
   name: z.string().min(1, "Organization name is required").max(100),
@@ -47,7 +47,6 @@ type CreateOrganizationInput = z.infer<typeof createOrganizationSchema>;
 export function CreateOrganizationForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
 
   const form = useForm<CreateOrganizationInput>({
@@ -108,7 +107,7 @@ export function CreateOrganizationForm() {
       }
 
       // Invalidate organization list query
-      void queryClient.invalidateQueries(trpc.org.list.queryOptions());
+      void queryClient.invalidateQueries(orpc.org.list.queryOptions());
 
       toast.success("Organization created successfully!");
 

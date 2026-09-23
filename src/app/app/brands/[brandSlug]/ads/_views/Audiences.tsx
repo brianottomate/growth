@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Label } from "@/components/ui/label";
 import { sendAssistantIntent } from "@/lib/assistant-events";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 type AudienceRow = {
   id: string;
@@ -77,7 +77,6 @@ export function Audiences({
   /** Extra buttons for the empty state, rendered by the page. */
   emptyActions?: React.ReactNode;
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -108,7 +107,7 @@ export function Audiences({
   };
 
   const add = useMutation(
-    trpc.ads.addAudience.mutationOptions({
+    orpc.ads.addAudience.mutationOptions({
       onSuccess: () => {
         setOpen(false);
         setName("");
@@ -118,7 +117,7 @@ export function Audiences({
     }),
   );
   const remove = useMutation(
-    trpc.ads.deleteAudience.mutationOptions({
+    orpc.ads.deleteAudience.mutationOptions({
       onSuccess: () => router.refresh(),
     }),
   );
@@ -316,9 +315,9 @@ export function Audiences({
                     add.mutate({
                       campaignId,
                       name: name.trim(),
-                      personaId: personaId || null,
-                      ageMin: ageMin ? Number(ageMin) : null,
-                      ageMax: ageMax ? Number(ageMax) : null,
+                      personaId: personaId || undefined,
+                      ageMin: ageMin ? Number(ageMin) : undefined,
+                      ageMax: ageMax ? Number(ageMax) : undefined,
                       countries: list(countries.toUpperCase()),
                       states: list(states.toUpperCase()),
                       regions: list(regions),

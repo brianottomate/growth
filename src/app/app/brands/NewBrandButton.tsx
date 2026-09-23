@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useTRPC, type RouterOutputs } from "@/trpc/react";
+import { orpc, type RouterOutputs } from "@/orpc/client";
 
 type Enrichment = RouterOutputs["brand"]["previewEnrichment"];
 
@@ -28,14 +28,13 @@ type Enrichment = RouterOutputs["brand"]["previewEnrichment"];
  */
 export function NewBrandButton() {
   const router = useRouter();
-  const trpc = useTRPC();
   const [open, setOpen] = useState(false);
   const [website, setWebsite] = useState("");
   const [name, setName] = useState("");
   const [enrichment, setEnrichment] = useState<Enrichment | null>(null);
 
   const enrich = useMutation(
-    trpc.brand.previewEnrichment.mutationOptions({
+    orpc.brand.previewEnrichment.mutationOptions({
       onSuccess: (result) => {
         setEnrichment(result);
         if (!name.trim() && result.suggestedName) {
@@ -46,7 +45,7 @@ export function NewBrandButton() {
   );
 
   const createM = useMutation(
-    trpc.brand.create.mutationOptions({
+    orpc.brand.create.mutationOptions({
       onSuccess: (brand) => {
         setOpen(false);
         setName("");

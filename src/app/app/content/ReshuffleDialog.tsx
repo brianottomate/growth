@@ -4,11 +4,11 @@ import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { SimpleDialog } from "@/components/ui/dialog";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { PILLAR_BY_SLUG } from "@/lib/pillars";
-import type { RouterOutputs } from "@/trpc/react";
+import type { RouterOutputs } from "@/orpc/client";
 
 type Proposal = RouterOutputs["reschedule"]["generate"];
 
@@ -32,13 +32,12 @@ export function ReshuffleDialog({
   onClose: () => void;
   onApplied: () => void;
 }) {
-  const trpc = useTRPC();
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [moveSel, setMoveSel] = useState<Set<number>>(new Set());
   const [slotSel, setSlotSel] = useState<Set<number>>(new Set());
 
   const generate = useMutation(
-    trpc.reschedule.generate.mutationOptions({
+    orpc.reschedule.generate.mutationOptions({
       onSuccess: (data) => {
         setProposal(data);
         setMoveSel(new Set(data.moves.map((_, i) => i)));
@@ -47,7 +46,7 @@ export function ReshuffleDialog({
     }),
   );
   const apply = useMutation(
-    trpc.reschedule.applyPlan.mutationOptions({
+    orpc.reschedule.applyPlan.mutationOptions({
       onSuccess: () => {
         onApplied();
         onClose();

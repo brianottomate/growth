@@ -7,7 +7,7 @@ import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 const useInvalidate = () => {
   const queryClient = useQueryClient();
@@ -17,14 +17,13 @@ const useInvalidate = () => {
 /** Sponsored homes are entered by wander.com URL; the monolith property id is
  *  backfilled separately, so it is not asked for here. */
 export function AddPropertyForm({ accountId }: { accountId: string }) {
-  const trpc = useTRPC();
   const invalidate = useInvalidate();
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
 
   const add = useMutation(
-    trpc.performance.addProperty.mutationOptions({
+    orpc.performance.addProperty.mutationOptions({
       onSuccess: async () => {
         await invalidate();
         setUrl("");
@@ -104,7 +103,6 @@ export function AddPropertyForm({ accountId }: { accountId: string }) {
  * customer paid will overspend the media plan by exactly that margin.
  */
 export function OpenCycleForm({ accountId }: { accountId: string }) {
-  const trpc = useTRPC();
   const invalidate = useInvalidate();
   const [open, setOpen] = useState(false);
   const now = new Date();
@@ -115,7 +113,7 @@ export function OpenCycleForm({ accountId }: { accountId: string }) {
   const [media, setMedia] = useState("");
 
   const openCycle = useMutation(
-    trpc.performance.openCycle.mutationOptions({
+    orpc.performance.openCycle.mutationOptions({
       onSuccess: async () => {
         await invalidate();
         setBilled("");
@@ -235,10 +233,9 @@ export function CycleStatusPicker({
   cycleId: string;
   status: string;
 }) {
-  const trpc = useTRPC();
   const invalidate = useInvalidate();
   const update = useMutation(
-    trpc.performance.updateCycle.mutationOptions({ onSuccess: invalidate }),
+    orpc.performance.updateCycle.mutationOptions({ onSuccess: invalidate }),
   );
 
   return (
@@ -275,13 +272,12 @@ export function PropertyIdField({
   propertyRowId: string;
   propertyId: string | null;
 }) {
-  const trpc = useTRPC();
   const invalidate = useInvalidate();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(propertyId ?? "");
 
   const update = useMutation(
-    trpc.performance.updateProperty.mutationOptions({
+    orpc.performance.updateProperty.mutationOptions({
       onSuccess: async () => {
         await invalidate();
         setEditing(false);

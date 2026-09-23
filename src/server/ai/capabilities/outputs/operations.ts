@@ -222,6 +222,7 @@ export const syncOwnedBrandContentOutputSchema = z.strictObject({
   errors: z.array(z.string()),
   inserted: z.number(),
   rehosted: z.number(),
+  runId: z.string(),
   updated: z.number(),
   videosRehosted: z.number(),
 });

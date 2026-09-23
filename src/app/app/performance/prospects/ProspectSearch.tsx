@@ -7,7 +7,7 @@ import { Check, Loader2, Search } from "lucide-react";
 
 import { cn } from "@/components/ui/lib/utils";
 import { toast } from "@/components/ui/toast";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 import { NewClientDialog } from "../NewClientDialog";
 
@@ -20,22 +20,23 @@ export function ProspectSearch({
 }: {
   prospectDomains: string[];
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const [q, setQ] = useState("");
   const term = q.trim();
   const have = new Set(prospectDomains.map((d) => d.toLowerCase()));
 
   const leads = useQuery({
-    ...trpc.leads.listDomains.queryOptions({
-      q: term,
-      limit: 8,
-      includeExcluded: true,
+    ...orpc.leads.listDomains.queryOptions({
+      input: {
+        q: term,
+        limit: 8,
+        includeExcluded: true,
+      },
     }),
     enabled: term.length >= 2,
   });
   const enrich = useMutation(
-    trpc.brand.enrich.mutationOptions({
+    orpc.brand.enrich.mutationOptions({
       // The logo and colours arrive a while after the row does; refresh again
       // so the row picks them up without anyone reloading.
       onSettled: () => router.refresh(),
@@ -43,7 +44,7 @@ export function ProspectSearch({
   );
   const [pendingId, setPendingId] = useState<string | null>(null);
   const create = useMutation(
-    trpc.leads.createProspect.mutationOptions({
+    orpc.leads.createProspect.mutationOptions({
       onMutate: (input) => setPendingId(input.domainId),
       onSuccess: (result) => {
         toast.success(
@@ -53,7 +54,7 @@ export function ProspectSearch({
         );
         // The row appears now; the site read runs behind it.
         router.refresh();
-        if (result.enrichable) enrich.mutate({ id: result.brandId });
+        if (result.created) enrich.mutate({ brandId: result.brandId });
       },
       onError: (error) => toast.error(error.message),
       onSettled: () => setPendingId(null),

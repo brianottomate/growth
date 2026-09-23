@@ -16,7 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 const PLANS = ["performance_plus", "performance_pro"] as const;
 
@@ -25,7 +25,6 @@ const PLANS = ["performance_plus", "performance_pro"] as const;
  * moment, not a prompt, so it needs a form on the page too.
  */
 export function NewAccountDialog() {
-  const trpc = useTRPC();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -40,10 +39,10 @@ export function NewAccountDialog() {
   // An account with no brand has no pitch page, no intake link and no connect
   // link, because all three are addressed by the brand. Attaching one here is
   // what keeps a hand-created customer reachable.
-  const brands = useQuery(trpc.brand.listLite.queryOptions());
+  const brands = useQuery(orpc.brand.listLite.queryOptions({ input: {} }));
 
   const create = useMutation(
-    trpc.performance.createAccount.mutationOptions({
+    orpc.performance.createAccount.mutationOptions({
       onSuccess: async (result) => {
         await queryClient.invalidateQueries({ queryKey: [["performance"]] });
         setOpen(false);
@@ -90,7 +89,7 @@ export function NewAccountDialog() {
               value={brandId}
               onChange={(event) => {
                 setBrandId(event.target.value);
-                const picked = brands.data?.find(
+                const picked = brands.data?.brands.find(
                   (row) => row.id === event.target.value,
                 );
                 if (picked && name.trim() === "") setName(picked.name);
@@ -98,7 +97,7 @@ export function NewAccountDialog() {
               className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
             >
               <option value="">No brand yet</option>
-              {(brands.data ?? []).map((row) => (
+              {(brands.data?.brands ?? []).map((row) => (
                 <option key={row.id} value={row.id}>
                   {row.name}
                   {row.relationship === "prospect" ? " (prospect)" : ""}

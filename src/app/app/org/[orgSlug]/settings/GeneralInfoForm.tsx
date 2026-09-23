@@ -19,7 +19,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 const updateOrgSchema = z.object({
   name: z.string().min(1, "Organization name is required").max(100),
@@ -41,10 +41,8 @@ interface GeneralInfoFormProps {
 
 export function GeneralInfoForm({ orgSlug }: GeneralInfoFormProps) {
   const router = useRouter();
-  const trpc = useTRPC();
-
   const { data: orgData, isLoading } = useQuery(
-    trpc.org.getBySlug.queryOptions({ slug: orgSlug }),
+    orpc.org.getBySlug.queryOptions({ input: { slug: orgSlug } }),
   );
 
   const form = useForm<UpdateOrgInput>({
@@ -56,7 +54,7 @@ export function GeneralInfoForm({ orgSlug }: GeneralInfoFormProps) {
   });
 
   const updateOrganizationMutation = useMutation(
-    trpc.org.update.mutationOptions({
+    orpc.org.update.mutationOptions({
       onSuccess: (_, variables) => {
         toast.success("Organization updated successfully!");
 

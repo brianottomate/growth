@@ -17,7 +17,7 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { SimpleSelect } from "@/components/ui/select";
 import {
@@ -49,7 +49,8 @@ import {
 import { PILLARS, PILLAR_BY_SLUG } from "@/lib/pillars";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 import type { ContentStatus } from "@/server/db/schema";
-import type { RouterOutputs } from "@/trpc/react";
+import type { RouterOutputs } from "@/orpc/client";
+import { toast } from "@/components/ui/toast";
 import { ContentCalendar } from "./ContentCalendar";
 import { ContentSheet } from "./ContentSheet";
 import { ReshuffleDialog } from "./ReshuffleDialog";
@@ -172,7 +173,6 @@ export function ContentBoard({
   /** A brand-scoped page: the filter is fixed and its control hidden. */
   lockedBrandId?: string;
 }) {
-  const trpc = useTRPC();
   const qc = useQueryClient();
   const router = useRouter();
 
@@ -220,25 +220,30 @@ export function ContentBoard({
     [selectedBrand],
   );
 
-  const boardOptions = trpc.content.board.queryOptions(input);
+  const boardOptions = orpc.content.board.queryOptions({ input: input });
   const { data: cards = [], isLoading } = useQuery(boardOptions);
   const { data: members = [] } = useQuery(
-    trpc.content.assignableMembers.queryOptions(),
+    orpc.content.assignableMembers.queryOptions(),
   );
 
   const setStatus = useMutation(
-    trpc.content.setStatus.mutationOptions({
-      onMutate: async ({ id, status }) => {
+    orpc.content.updateWorkItem.mutationOptions({
+      onMutate: async ({ contentPostId, contentStatus }) => {
         const key = boardOptions.queryKey;
         await qc.cancelQueries({ queryKey: key });
         const prev = qc.getQueryData<Card[]>(key);
         qc.setQueryData<Card[]>(key, (old) =>
-          old?.map((c) => (c.id === id ? { ...c, status } : c)),
+          old?.map((c) =>
+            c.id === contentPostId && contentStatus
+              ? { ...c, status: contentStatus }
+              : c,
+          ),
         );
         return { prev, key };
       },
-      onError: (_e, _v, context) => {
+      onError: (error, _v, context) => {
         if (context?.prev) qc.setQueryData(context.key, context.prev);
+        toast.error(error.message);
       },
       onSettled: () =>
         qc.invalidateQueries({ queryKey: boardOptions.queryKey }),
@@ -246,7 +251,7 @@ export function ContentBoard({
   );
 
   const setOwner = useMutation(
-    trpc.content.setOwner.mutationOptions({
+    orpc.content.setOwner.mutationOptions({
       onMutate: async ({ contentPostId, ownerId }) => {
         const key = boardOptions.queryKey;
         await qc.cancelQueries({ queryKey: key });
@@ -268,7 +273,7 @@ export function ContentBoard({
   );
 
   const setAssignees = useMutation(
-    trpc.content.setAssignees.mutationOptions({
+    orpc.content.setAssignees.mutationOptions({
       onMutate: async ({ contentPostId, userIds }) => {
         const key = boardOptions.queryKey;
         await qc.cancelQueries({ queryKey: key });
@@ -304,7 +309,7 @@ export function ContentBoard({
   const createBrand =
     brands.find((brand) => brand.id === createBrandId) ?? null;
   const createIdea = useMutation(
-    trpc.content.create.mutationOptions({
+    orpc.content.create.mutationOptions({
       onSettled: () =>
         qc.invalidateQueries({ queryKey: boardOptions.queryKey }),
     }),
@@ -361,9 +366,11 @@ export function ContentBoard({
   }, [cards]);
 
   // Schedule view (spot-level, date-first) — fetched lazily when active.
-  const scheduleOpts = trpc.content.schedule.queryOptions({
-    brandId: brandFilter !== "all" ? brandFilter : undefined,
-    pillar: pillarFilter !== "all" ? pillarFilter : undefined,
+  const scheduleOpts = orpc.content.schedule.queryOptions({
+    input: {
+      brandId: brandFilter !== "all" ? brandFilter : undefined,
+      pillar: pillarFilter !== "all" ? pillarFilter : undefined,
+    },
   });
   const { data: scheduleRows = [], isLoading: scheduleLoading } = useQuery({
     ...scheduleOpts,
@@ -386,12 +393,18 @@ export function ContentBoard({
   const invalidateSchedule = () =>
     qc.invalidateQueries({ queryKey: scheduleOpts.queryKey });
   const setSpotSchedule = useMutation(
-    trpc.content.setSpotSchedule.mutationOptions({
+    orpc.content.updateWorkItem.mutationOptions({
       onSettled: invalidateSchedule,
     }),
   );
-  const onReschedule = (spotId: string, dateISO: string) =>
-    setSpotSchedule.mutate({ platformPostId: spotId, scheduledAt: dateISO });
+  const onReschedule = (spotId: string, dateISO: string) => {
+    const row = scheduleRows.find((r) => r.id === spotId);
+    if (!row) return;
+    setSpotSchedule.mutate({
+      contentPostId: row.contentPostId,
+      platformDrafts: [{ platformPostId: spotId, scheduledAt: dateISO }],
+    });
+  };
 
   const byStatus = useMemo(() => {
     const m = new Map<string, Card[]>();
@@ -414,7 +427,7 @@ export function ContentBoard({
     const overStatus = e.over?.id as ContentStatus | undefined;
     const card = cards.find((c) => c.id === e.active.id);
     if (overStatus && card && card.status !== overStatus) {
-      setStatus.mutate({ id: card.id, status: overStatus });
+      setStatus.mutate({ contentPostId: card.id, contentStatus: overStatus });
     }
   };
 
@@ -1180,9 +1193,8 @@ function InlineCommentThread({
   onOpen: () => void;
   onChanged: () => void;
 }) {
-  const trpc = useTRPC();
   const qc = useQueryClient();
-  const opts = trpc.content.comments.queryOptions({ contentPostId });
+  const opts = orpc.content.comments.queryOptions({ input: { contentPostId } });
   const { data: comments = [], isLoading } = useQuery(opts);
   const [body, setBody] = useState("");
   const invalidate = () => {
@@ -1190,7 +1202,7 @@ function InlineCommentThread({
     onChanged();
   };
   const add = useMutation(
-    trpc.content.addComment.mutationOptions({
+    orpc.content.addComment.mutationOptions({
       onSuccess: () => {
         setBody("");
         invalidate();
@@ -1198,7 +1210,7 @@ function InlineCommentThread({
     }),
   );
   const del = useMutation(
-    trpc.content.deleteComment.mutationOptions({ onSuccess: invalidate }),
+    orpc.content.deleteComment.mutationOptions({ onSuccess: invalidate }),
   );
   const submit = () => {
     const t = body.trim();
@@ -1476,11 +1488,10 @@ function ScheduleRow({
   onOpen: (id: string) => void;
   onChanged: () => void;
 }) {
-  const trpc = useTRPC();
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const setStatus = useMutation(
-    trpc.content.setSpotStatus.mutationOptions({ onSettled: onChanged }),
+    orpc.content.updateWorkItem.mutationOptions({ onSettled: onChanged }),
   );
   const done = row.status === "published";
   const scheduled = row.status === "scheduled";
@@ -1537,6 +1548,7 @@ function ScheduleRow({
         <span className={cn("size-2 shrink-0 rounded-full", DOT[row.status])} />
         {row.owner && <OwnerAvatar member={row.owner} size="sm" />}
         <MarkScheduledButton
+          contentPostId={row.contentPostId}
           spotId={row.id}
           at={row.at}
           scheduled={scheduled}
@@ -1545,8 +1557,13 @@ function ScheduleRow({
         <button
           onClick={() =>
             setStatus.mutate({
-              platformPostId: row.id,
-              status: done ? "scheduled" : "published",
+              contentPostId: row.contentPostId,
+              platformDrafts: [
+                {
+                  platformPostId: row.id,
+                  status: done ? "scheduled" : "published",
+                },
+              ],
             })
           }
           className={cn(
@@ -1600,14 +1617,12 @@ function ScheduleRow({
                 Open ↗
               </a>
             )}
-            {row.contentPostId && (
-              <button
-                onClick={() => onOpen(row.contentPostId!)}
-                className="ml-auto text-muted-foreground underline hover:text-foreground"
-              >
-                Open idea →
-              </button>
-            )}
+            <button
+              onClick={() => onOpen(row.contentPostId)}
+              className="ml-auto text-muted-foreground underline hover:text-foreground"
+            >
+              Open idea →
+            </button>
           </div>
         </div>
       )}

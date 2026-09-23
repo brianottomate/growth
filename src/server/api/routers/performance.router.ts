@@ -1,206 +1,77 @@
-import { TRPCError, type TRPCRouterRecord } from "@trpc/server";
-import { and, eq } from "drizzle-orm";
 import { z } from "zod";
-
-import type { Database } from "@/server/db";
-import { memberTable } from "@/server/db/schema";
-import { syncZernioAds } from "@/server/services/ads-sync.service";
-
-import {
-  addPerformanceProperty,
-  addPerformancePropertySchema,
-  createPerformanceAccount,
-  createPerformanceAccountSchema,
-  getPerformanceAccount,
-  listPerformanceAccounts,
-  attachToPerformanceCycle,
-  attachToPerformanceCycleSchema,
-  openPerformanceCycle,
-  openPerformanceCycleSchema,
-  listSponsoredAbandonment,
-  refreshPerformanceCycleSpend,
-  sponsoredAbandonmentSchema,
-  searchAttachableCampaigns,
-  searchAttachableCampaignsSchema,
-  updatePerformanceAccount,
-  updatePerformanceAccountSchema,
-  updatePerformanceCycle,
-  updatePerformanceCycleSchema,
-  updatePerformanceProperty,
-  updatePerformancePropertySchema,
-} from "@/server/services/performance.service";
-import {
-  applyPerformanceIntake,
-  campaignPrefillFromIntake,
-  listPerformanceIntakes,
-  previewIntakeApply,
-  setIntakeVerifiedPage,
-  verifyIntakeAccess,
-} from "@/server/services/performance-intake.service";
-import {
-  promoteBrandToClient,
-  setBrandRelationship,
-  setBrandStages,
-} from "@/server/services/brand-relationship.service";
+import { setIntakeVerifiedPage } from "@/server/services/performance-intake.service";
+import { setBrandStages } from "@/server/services/brand-relationship.service";
 import { BUSINESS_STAGES, DELIVERY_STAGES } from "@/lib/performance-stage";
 import { markCycleLinePaid } from "@/server/services/performance-billing.service";
 
-import { protectedProcedure } from "../trpc";
+import { workspaceProcedure, actionProcedure } from "@/server/api/orpc";
+import {
+  listPerformanceAccountsAction,
+  getPerformanceAccountAction,
+  createPerformanceAccountAction,
+  updatePerformanceAccountAction,
+  addPerformancePropertyAction,
+  updatePerformancePropertyAction,
+  openPerformanceCycleAction,
+  updatePerformanceCycleAction,
+  searchAttachableCampaignsAction,
+  attachToPerformanceCycleAction,
+  listSponsoredAbandonmentAction,
+  refreshPerformanceCycleSpendAction,
+  listIntakesAction,
+  applyIntakeAction,
+  verifyIntakeAccessAction,
+  promoteToClientAction,
+  previewIntakeApplyAction,
+  clientCampaignContextAction,
+} from "@/server/ai/capabilities/performance";
 
 // Performance accounts (/app/performance/accounts) — the clients paying for
 // Wander to run their marketing. Replaces the "Performance Dashboard" sheet.
 // Delivery itself stays in campaign / lifecycle / amplification; this is the
 // commercial layer plus a read of what is attached to each cycle.
 
-type PerformanceContext = {
-  db: Database;
-  session: {
-    user: { id: string };
-    session: { activeOrganizationId?: string | null };
-  };
-};
-
-// Membership is re-checked against the database rather than trusted from the
-// session claim, matching ads.router and the MCP route.
-async function actorFor(ctx: PerformanceContext) {
-  const active = ctx.session.session.activeOrganizationId;
-  const membership = await ctx.db.query.memberTable.findFirst({
-    where: active
-      ? and(
-          eq(memberTable.userId, ctx.session.user.id),
-          eq(memberTable.organizationId, active),
-        )
-      : eq(memberTable.userId, ctx.session.user.id),
-    columns: { organizationId: true },
-  });
-  if (!membership) throw new TRPCError({ code: "FORBIDDEN" });
-  return { orgId: membership.organizationId };
-}
-
 export const performanceRouter = {
-  list: protectedProcedure.query(async ({ ctx }) =>
-    listPerformanceAccounts(await actorFor(ctx)),
-  ),
+  list: actionProcedure(listPerformanceAccountsAction),
 
-  get: protectedProcedure
-    .input(z.object({ accountId: z.string().min(1) }))
-    .query(async ({ ctx, input }) =>
-      getPerformanceAccount(await actorFor(ctx), input.accountId),
-    ),
+  get: actionProcedure(getPerformanceAccountAction),
 
-  createAccount: protectedProcedure
-    .input(createPerformanceAccountSchema)
-    .mutation(async ({ ctx, input }) =>
-      createPerformanceAccount(await actorFor(ctx), input),
-    ),
+  createAccount: actionProcedure(createPerformanceAccountAction),
 
-  updateAccount: protectedProcedure
-    .input(updatePerformanceAccountSchema)
-    .mutation(async ({ ctx, input }) =>
-      updatePerformanceAccount(await actorFor(ctx), input),
-    ),
+  updateAccount: actionProcedure(updatePerformanceAccountAction),
 
-  addProperty: protectedProcedure
-    .input(addPerformancePropertySchema)
-    .mutation(async ({ ctx, input }) =>
-      addPerformanceProperty(await actorFor(ctx), input),
-    ),
+  addProperty: actionProcedure(addPerformancePropertyAction),
 
-  updateProperty: protectedProcedure
-    .input(updatePerformancePropertySchema)
-    .mutation(async ({ ctx, input }) =>
-      updatePerformanceProperty(await actorFor(ctx), input),
-    ),
+  updateProperty: actionProcedure(updatePerformancePropertyAction),
 
-  openCycle: protectedProcedure
-    .input(openPerformanceCycleSchema)
-    .mutation(async ({ ctx, input }) =>
-      openPerformanceCycle(await actorFor(ctx), input),
-    ),
+  openCycle: actionProcedure(openPerformanceCycleAction),
 
-  updateCycle: protectedProcedure
-    .input(updatePerformanceCycleSchema)
-    .mutation(async ({ ctx, input }) =>
-      updatePerformanceCycle(await actorFor(ctx), input),
-    ),
+  updateCycle: actionProcedure(updatePerformanceCycleAction),
 
-  attachableCampaigns: protectedProcedure
-    .input(searchAttachableCampaignsSchema)
-    .query(async ({ ctx, input }) =>
-      searchAttachableCampaigns(await actorFor(ctx), input),
-    ),
+  attachableCampaigns: actionProcedure(searchAttachableCampaignsAction),
 
-  attach: protectedProcedure
-    .input(attachToPerformanceCycleSchema)
-    .mutation(async ({ ctx, input }) =>
-      attachToPerformanceCycle(await actorFor(ctx), input),
-    ),
+  attach: actionProcedure(attachToPerformanceCycleAction),
 
-  sponsoredAbandonment: protectedProcedure
-    .input(sponsoredAbandonmentSchema)
-    .query(async ({ ctx, input }) =>
-      listSponsoredAbandonment(await actorFor(ctx), input),
-    ),
+  sponsoredAbandonment: actionProcedure(listSponsoredAbandonmentAction),
 
-  syncCampaigns: protectedProcedure
-    .input(
-      z.object({
-        brandSlug: z.string().trim().min(1).default("wander"),
-        sinceDays: z.number().int().min(1).max(1_095).nullable().optional(),
-        minSpend: z.number().min(0).optional(),
-        limit: z.number().int().min(1).max(500).optional(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      await actorFor(ctx);
-      return syncZernioAds({ ...input, platform: "meta_ads" });
-    }),
-
-  refreshSpend: protectedProcedure
-    .input(z.object({ cycleId: z.string().min(1) }))
-    .mutation(async ({ ctx, input }) =>
-      refreshPerformanceCycleSpend(await actorFor(ctx), input.cycleId),
-    ),
+  refreshSpend: actionProcedure(refreshPerformanceCycleSpendAction),
 
   // ---- intake -------------------------------------------------------------
 
-  intakes: protectedProcedure
-    .input(z.object({ accountId: z.string().min(1) }))
-    .query(async ({ ctx, input }) =>
-      listPerformanceIntakes(await actorFor(ctx), input.accountId),
-    ),
+  intakes: actionProcedure(listIntakesAction),
 
-  previewIntake: protectedProcedure
-    .input(z.object({ intakeId: z.string().min(1) }))
-    .query(async ({ ctx, input }) =>
-      previewIntakeApply(await actorFor(ctx), input.intakeId),
-    ),
+  previewIntake: actionProcedure(previewIntakeApplyAction),
 
-  applyIntake: protectedProcedure
-    .input(
-      z.object({
-        intakeId: z.string().min(1),
-        // The operator's number wins: a client who asked us to recommend one
-        // has no budget to promote, and apply must not invent it.
-        mediaBudgetDollars: z.number().int().min(0).nullable().optional(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) =>
-      applyPerformanceIntake(await actorFor(ctx), input),
-    ),
+  applyIntake: actionProcedure(applyIntakeAction),
 
   // Read-only against Zernio: asks whether the Leadsie grant landed and
   // records the Page when exactly one name matches.
-  verifyIntakeAccess: protectedProcedure
-    .input(z.object({ intakeId: z.string().min(1) }))
-    .mutation(async ({ ctx, input }) =>
-      verifyIntakeAccess(await actorFor(ctx), input.intakeId),
-    ),
+  verifyIntakeAccess: actionProcedure(verifyIntakeAccessAction),
 
-  setIntakeVerifiedPage: protectedProcedure
+  setIntakeVerifiedPage: workspaceProcedure
     .input(z.object({ intakeId: z.string().min(1), pageId: z.string().min(1) }))
-    .mutation(async ({ ctx, input }) =>
-      setIntakeVerifiedPage(await actorFor(ctx), input),
+    .handler(async ({ context: ctx, input }) =>
+      setIntakeVerifiedPage({ orgId: ctx.workspace.orgId }, input),
     ),
 
   // ---- relationship -------------------------------------------------------
@@ -208,19 +79,10 @@ export const performanceRouter = {
   // The signature event. Creates the commercial record if a client signed
   // before ever filling the form, which is the ordinary case for a deal an AE
   // closed on a call.
-  promoteToClient: protectedProcedure
-    .input(
-      z.object({
-        brandId: z.string().min(1),
-        plan: z.string().min(1).nullable().optional(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) =>
-      promoteBrandToClient(await actorFor(ctx), input),
-    ),
+  promoteToClient: actionProcedure(promoteToClientAction),
 
   /** The ⋯ dialog: either lifecycle, any stage; the relationship follows business. */
-  setStage: protectedProcedure
+  setStage: workspaceProcedure
     .input(
       z.object({
         brandId: z.string().min(1),
@@ -228,8 +90,8 @@ export const performanceRouter = {
         delivery: z.enum(DELIVERY_STAGES).optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
-      const actor = await actorFor(ctx);
+    .handler(async ({ context: ctx, input }) => {
+      const actor = { orgId: ctx.workspace.orgId };
       // "Paid" on the brand means the fee cleared, so it lands on the cycle too.
       if (input.business === "paid") {
         await markCycleLinePaid(actor, {
@@ -242,7 +104,7 @@ export const performanceRouter = {
     }),
 
   /** One line of this month's cycle: the fee or the media, paid or reopened. */
-  markLinePaid: protectedProcedure
+  markLinePaid: workspaceProcedure
     .input(
       z.object({
         brandId: z.string().min(1),
@@ -250,25 +112,10 @@ export const performanceRouter = {
         paid: z.boolean(),
       }),
     )
-    .mutation(async ({ ctx, input }) =>
-      markCycleLinePaid(await actorFor(ctx), input),
-    ),
-
-  setBrandRelationship: protectedProcedure
-    .input(
-      z.object({
-        brandId: z.string().min(1),
-        relationship: z.enum(["internal", "client", "prospect", "reference"]),
-      }),
-    )
-    .mutation(async ({ ctx, input }) =>
-      setBrandRelationship(await actorFor(ctx), input),
+    .handler(async ({ context: ctx, input }) =>
+      markCycleLinePaid({ orgId: ctx.workspace.orgId }, input),
     ),
 
   // What a new campaign draft opens with for a Performance client.
-  campaignPrefill: protectedProcedure
-    .input(z.object({ brandId: z.string().min(1) }))
-    .query(async ({ ctx, input }) =>
-      campaignPrefillFromIntake(await actorFor(ctx), input),
-    ),
-} satisfies TRPCRouterRecord;
+  campaignPrefill: actionProcedure(clientCampaignContextAction),
+};

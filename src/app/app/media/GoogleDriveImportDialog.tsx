@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 
 import { authClient } from "@/server/better-auth/client";
-import { DRIVE_PROVIDER_ID, isDriveFolder } from "@/lib/google-drive";
+import { DRIVE_PROVIDER_ID } from "@/lib/google-drive";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -23,7 +23,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 import { cn } from "@/components/ui/lib/utils";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import type { MediaAsset } from "@/server/db/schema";
 
 type Crumb = { id: string; name: string };
@@ -47,7 +47,6 @@ export function GoogleDriveImportDialog({
   onOpenChange: (open: boolean) => void;
   onImported?: (assets: MediaAsset[]) => void | Promise<void>;
 }) {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [crumbs, setCrumbs] = useState<Crumb[]>([]);
   const [search, setSearch] = useState("");
@@ -55,21 +54,22 @@ export function GoogleDriveImportDialog({
 
   const folderId = crumbs.at(-1)?.id;
   const status = useQuery({
-    ...trpc.googleDrive.status.queryOptions(),
+    ...orpc.googleDrive.status.queryOptions({ input: {} }),
     enabled: open,
   });
   const files = useQuery({
-    ...trpc.googleDrive.browse.queryOptions({
-      ...(folderId ? { folderId } : {}),
-      ...(search.trim() ? { search: search.trim() } : {}),
-      includeFolders: true,
-      limit: 100,
+    ...orpc.googleDrive.browse.queryOptions({
+      input: {
+        ...(folderId ? { folderId } : {}),
+        ...(search.trim() ? { search: search.trim() } : {}),
+        limit: 100,
+      },
     }),
     enabled: open && Boolean(status.data?.connected),
   });
 
   const importFiles = useMutation(
-    trpc.googleDrive.importFiles.mutationOptions({
+    orpc.googleDrive.importFiles.mutationOptions({
       onSuccess: async (result) => {
         if (result.failures.length) {
           toast.error(
@@ -109,7 +109,7 @@ export function GoogleDriveImportDialog({
         : [...current, id],
     );
 
-  const rows = files.data ?? [];
+  const rows = files.data?.files ?? [];
   const busy = importFiles.isPending;
 
   return (
@@ -188,20 +188,20 @@ export function GoogleDriveImportDialog({
                 </p>
               ) : (
                 rows.map((file) => {
-                  const isFolder = isDriveFolder(file);
-                  const checked = selected.includes(file.id);
+                  const { fileId, isFolder } = file;
+                  const checked = selected.includes(fileId);
                   return (
                     <button
-                      key={file.id}
+                      key={fileId}
                       type="button"
                       onClick={() =>
                         isFolder
                           ? (setCrumbs([
                               ...crumbs,
-                              { id: file.id, name: file.name },
+                              { id: fileId, name: file.name },
                             ]),
                             setSearch(""))
-                          : toggle(file.id)
+                          : toggle(fileId)
                       }
                       className={cn(
                         "flex w-full items-center gap-2 border-b px-3 py-2 text-left text-sm last:border-b-0 hover:bg-accent/40",

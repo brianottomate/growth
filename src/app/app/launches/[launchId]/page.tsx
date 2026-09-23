@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { ORPCError } from "@orpc/server";
 import { eq } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import { memberTable } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
-import { readLaunch } from "@/server/services/launch.service";
+import { serverApi } from "@/orpc/server";
 
 import { LaunchDetail } from "./LaunchDetail";
 
@@ -23,8 +24,10 @@ export default async function LaunchPage({
   if (!membership?.organizationId) redirect("/app");
 
   const { launchId } = await params;
-  const result = await readLaunch(membership.organizationId, launchId);
-  if (!result) notFound();
+  const result = await serverApi.launch.get({ launchId }).catch((error) => {
+    if (error instanceof ORPCError && error.code === "NOT_FOUND") notFound();
+    throw error;
+  });
 
   const members = await db.query.memberTable.findMany({
     where: eq(memberTable.organizationId, membership.organizationId),

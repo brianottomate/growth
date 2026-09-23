@@ -28,7 +28,7 @@ import {
   type StorefrontSurfaceId,
 } from "@/lib/product-atlas";
 import { cn } from "@/lib/utils";
-import { useTRPC, type RouterOutputs } from "@/trpc/react";
+import { orpc, type RouterOutputs } from "@/orpc/client";
 
 type ProductDetail = RouterOutputs["productStorefront"]["getProduct"];
 type Editors = RouterOutputs["productStorefront"]["listEditors"];
@@ -53,7 +53,6 @@ export function ProductAtlasWorkspace({
   product: ProductDetail;
   editors: Editors;
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("overview");
   const [atlas, setAtlas] = useState<ProductAtlas>(product.atlas);
@@ -64,7 +63,7 @@ export function ProductAtlasWorkspace({
     useState<StorefrontSurfaceId>("apple_app_store");
 
   const saveProduct = useMutation(
-    trpc.productStorefront.updateProduct.mutationOptions({
+    orpc.productStorefront.updateProduct.mutationOptions({
       onSuccess: () => {
         toast.success("Product Atlas saved");
         router.refresh();
@@ -73,7 +72,7 @@ export function ProductAtlasWorkspace({
     }),
   );
   const createStorefront = useMutation(
-    trpc.productStorefront.createStorefront.mutationOptions({
+    orpc.productStorefront.createStorefront.mutationOptions({
       onSuccess: (created) => {
         toast.success("Storefront created");
         router.push(`/app/apps/${created.id}`);

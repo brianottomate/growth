@@ -113,18 +113,21 @@ async function main() {
       : `${sharpRes.status} ${sharpBody?.error ?? ""}`.trim(),
   );
 
-  // 3. tRPC through the same module graph the Assistant panel uses.
-  const trpcUrl = new URL("/api/trpc/org.list", origin);
-  trpcUrl.searchParams.set("batch", "1");
-  trpcUrl.searchParams.set("input", JSON.stringify({ "0": { json: null } }));
-  const trpcRes = await fetch(trpcUrl, {
-    headers: { ...bypassHeaders(), cookie },
+  // 3. RPC through the same module graph the Assistant panel uses.
+  const rpcRes = await fetch(new URL("/api/rpc/org/list", origin), {
+    method: "POST",
+    headers: {
+      ...bypassHeaders(),
+      cookie,
+      "content-type": "application/json",
+    },
+    body: "{}",
   });
-  const trpcBody = await trpcRes.text();
+  const rpcBody = await rpcRes.text();
   record(
-    "trpc org.list",
-    trpcRes.status === 200 && !trpcBody.includes('"error"'),
-    `${trpcRes.status} ${trpcBody.slice(0, 80)}`,
+    "rpc org.list",
+    rpcRes.status === 200 && !rpcBody.includes('"defined"'),
+    `${rpcRes.status} ${rpcBody.slice(0, 80)}`,
   );
 
   // 4. Authed pages: a redirect to /signin means the cookie was not honoured.

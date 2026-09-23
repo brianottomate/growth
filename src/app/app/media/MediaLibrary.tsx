@@ -65,7 +65,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SimpleSelect } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
-import { useTRPC, type RouterOutputs } from "@/trpc/react";
+import { orpc, type RouterOutputs } from "@/orpc/client";
 import { EditLinkDialog } from "./EditLinkDialog";
 import { GoogleDriveImportDialog } from "./GoogleDriveImportDialog";
 import { PhotoPickerField, usePhotoPicker } from "../people/PhotoPicker";
@@ -152,7 +152,6 @@ export function MediaLibrary({
   initialBrandId?: string | null;
   initialFolderId?: string;
 }) {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
 
   const [brandId, setBrandIdState] = useState(initialBrandId ?? brands[0]!.id);
@@ -207,9 +206,9 @@ export function MediaLibrary({
     ...(tagFilter !== "all" ? { tagId: tagFilter } : {}),
     ...(deferredSearch.trim() ? { query: deferredSearch.trim() } : {}),
   };
-  const listOpts = trpc.media.list.queryOptions(listInput);
+  const listOpts = orpc.media.list.queryOptions({ input: listInput });
   const { data: assets, isLoading } = useQuery(listOpts);
-  const taxonomyOpts = trpc.media.taxonomy.queryOptions({ brandId });
+  const taxonomyOpts = orpc.media.taxonomy.queryOptions({ input: { brandId } });
   const { data: taxonomy } = useQuery(taxonomyOpts);
 
   const invalidate = useCallback(
@@ -218,12 +217,12 @@ export function MediaLibrary({
   );
 
   const createUploadUrl = useMutation(
-    trpc.media.createUploadUrl.mutationOptions(),
+    orpc.media.createUploadUrl.mutationOptions(),
   );
   const finalizeUpload = useMutation(
-    trpc.media.finalizeUpload.mutationOptions(),
+    orpc.media.finalizeUpload.mutationOptions(),
   );
-  const failUpload = useMutation(trpc.media.failUpload.mutationOptions());
+  const failUpload = useMutation(orpc.media.failUpload.mutationOptions());
   const finalizeLinkCreate = () => {
     toast.success("Link added");
     setLinkOpen(false);
@@ -236,7 +235,7 @@ export function MediaLibrary({
   // A pasted/uploaded thumbnail can't go in until the asset row exists, so we
   // create the link first, then run a quick updateExternal to attach it.
   const updateThumb = useMutation(
-    trpc.media.updateExternal.mutationOptions({
+    orpc.media.updateExternal.mutationOptions({
       onSuccess: () => finalizeLinkCreate(),
       // The link itself was created — only the thumbnail failed; still finish.
       onError: (e) => {
@@ -246,7 +245,7 @@ export function MediaLibrary({
     }),
   );
   const createExternal = useMutation(
-    trpc.media.createExternal.mutationOptions({
+    orpc.media.createExternal.mutationOptions({
       onSuccess: (created) => {
         const p = linkThumb.payload;
         if ("photo" in p) {
@@ -261,7 +260,7 @@ export function MediaLibrary({
     }),
   );
   const deleteMedia = useMutation(
-    trpc.media.delete.mutationOptions({
+    orpc.media.delete.mutationOptions({
       onSuccess: () => {
         toast.success("Deleted");
         void invalidate();
@@ -269,7 +268,7 @@ export function MediaLibrary({
     }),
   );
   const analyzeMedia = useMutation(
-    trpc.media.analyze.mutationOptions({
+    orpc.media.analyze.mutationOptions({
       onSuccess: () => {
         toast.success("Analyzed and tagged");
         void invalidate();
@@ -433,11 +432,11 @@ export function MediaLibrary({
       onPreview={() => setPreviewAsset(asset)}
       onAnalyze={
         asset.kind === "image" || asset.kind === "video"
-          ? () => analyzeMedia.mutate({ id: asset.id })
+          ? () => analyzeMedia.mutate({ mediaId: asset.id })
           : undefined
       }
       analyzing={
-        analyzeMedia.isPending && analyzeMedia.variables?.id === asset.id
+        analyzeMedia.isPending && analyzeMedia.variables?.mediaId === asset.id
       }
       launchHref={assetLaunchHref(asset, brandId)}
     />

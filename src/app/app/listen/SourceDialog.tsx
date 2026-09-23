@@ -33,7 +33,7 @@ import type {
   ListeningTrigger,
   WatchedAccount,
 } from "@/server/db/schema";
-import { useTRPC, type RouterOutputs } from "@/trpc/react";
+import { orpc, type RouterOutputs } from "@/orpc/client";
 
 type Source = RouterOutputs["listening"]["overview"]["sources"][number];
 
@@ -120,7 +120,6 @@ export function SourceDialog({
   brandId: string;
   initial?: Source;
 }) {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
   const isEdit = Boolean(initial?.id);
 
@@ -162,11 +161,11 @@ export function SourceDialog({
 
   const invalidate = () =>
     queryClient.invalidateQueries({
-      queryKey: trpc.listening.overview.queryKey(),
+      queryKey: orpc.listening.overview.queryKey(),
     });
 
   const create = useMutation(
-    trpc.listening.createSource.mutationOptions({
+    orpc.listening.createSource.mutationOptions({
       onSuccess: async () => {
         await invalidate();
         onOpenChange(false);
@@ -176,7 +175,7 @@ export function SourceDialog({
     }),
   );
   const update = useMutation(
-    trpc.listening.updateSource.mutationOptions({
+    orpc.listening.updateSource.mutationOptions({
       onSuccess: async () => {
         await invalidate();
         onOpenChange(false);
@@ -185,7 +184,7 @@ export function SourceDialog({
     }),
   );
   const remove = useMutation(
-    trpc.listening.deleteSource.mutationOptions({
+    orpc.listening.deleteSource.mutationOptions({
       onSuccess: async () => {
         await invalidate();
         onOpenChange(false);

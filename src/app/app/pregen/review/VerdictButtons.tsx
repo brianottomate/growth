@@ -3,7 +3,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 type Verdict = "send_worthy" | "regenerate" | "skip";
 
@@ -40,7 +40,6 @@ export function VerdictButtons({
   buildId: string;
   initial: Verdict | null;
 }) {
-  const trpc = useTRPC();
   // Held locally rather than refetched: this page is a stack of ten heavy
   // iframes, and a router refresh under the reviewer would reload every one of
   // them to redraw three buttons.
@@ -48,7 +47,7 @@ export function VerdictButtons({
   const [error, setError] = useState<string | null>(null);
 
   const mutation = useMutation(
-    trpc.leads.setPregenVerdict.mutationOptions({
+    orpc.leads.setPregenVerdict.mutationOptions({
       onError: (mutationError) => {
         setError(mutationError.message);
         setVerdict(initial);

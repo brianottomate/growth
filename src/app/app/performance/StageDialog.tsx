@@ -23,7 +23,7 @@ import {
   type BusinessStage,
   type DeliveryStage,
 } from "@/lib/performance-stage";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 /** Set a brand's two stages by hand: any value in either, the tabs follow. */
 export function StageDialog({
@@ -41,13 +41,12 @@ export function StageDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const [pickedBusiness, setPickedBusiness] = useState<BusinessStage>(business);
   const [pickedDelivery, setPickedDelivery] = useState<DeliveryStage>(delivery);
   const dirty = pickedBusiness !== business || pickedDelivery !== delivery;
   const save = useMutation(
-    trpc.performance.setStage.mutationOptions({
+    orpc.performance.setStage.mutationOptions({
       onSuccess: () => {
         toast.success(
           `${brandName}: ${BUSINESS_LABEL[pickedBusiness]} · ${DELIVERY_LABEL[pickedDelivery]}`,

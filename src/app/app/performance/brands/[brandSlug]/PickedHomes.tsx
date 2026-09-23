@@ -11,7 +11,7 @@ import { Button, ButtonLink } from "@/components/ui/button";
 import { DeleteAlert } from "@/components/ui/alert-dialog";
 import { cn } from "@/components/ui/lib/utils";
 import { toast } from "@/components/ui/toast";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 /** A committed home (a `home` row), enriched from its feed listing when matched. */
 export type PickedHome = {
@@ -70,7 +70,6 @@ export function PickedHomes({
   picked: PickedHome[];
 }) {
   const router = useRouter();
-  const trpc = useTRPC();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<PickedHome | null>(null);
 
@@ -78,7 +77,7 @@ export function PickedHomes({
   const ready = count >= MIN;
 
   const remove = useMutation(
-    trpc.brand.homesRemove.mutationOptions({
+    orpc.brand.homesRemove.mutationOptions({
       onSuccess: () => router.refresh(),
       onError: (error) => toast.error(error.message),
       onSettled: () => setBusyId(null),

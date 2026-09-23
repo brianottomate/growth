@@ -7,7 +7,7 @@ import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ChannelLogo } from "@/components/channel-logos";
 import type { CampaignStatus } from "@/server/db/schema";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 export const STATUS_META: Record<
   CampaignStatus,
@@ -54,8 +54,7 @@ export function CampaignsClient({
 }: {
   brands: { id: string; name: string }[];
 }) {
-  const trpc = useTRPC();
-  const { data } = useQuery(trpc.campaign.overview.queryOptions());
+  const { data } = useQuery(orpc.campaign.overview.queryOptions());
   const campaigns = data?.campaigns ?? [];
 
   const byStatus = (s: CampaignStatus) =>

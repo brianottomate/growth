@@ -27,7 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PILLAR_BY_SLUG } from "@/lib/pillars";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { SuggestTargetsDialog } from "./SuggestTargetsDialog";
 import { PhotoPickerField, usePhotoPicker } from "../people/PhotoPicker";
 
@@ -417,7 +417,6 @@ function EditChannelDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const photoPicker = usePhotoPicker(channel.profileImageUrl);
   const bannerPicker = usePhotoPicker(channel.bannerImageUrl);
@@ -437,7 +436,7 @@ function EditChannelDialog({
         : {};
 
   const updateM = useMutation(
-    trpc.channel.update.mutationOptions({
+    orpc.channel.update.mutationOptions({
       onSuccess: () => {
         onOpenChange(false);
         router.refresh();

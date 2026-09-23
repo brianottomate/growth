@@ -18,28 +18,28 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 /** Permanent delete for one series. Its ideas survive and detach. */
 export function DeleteSeriesButton({
+  brandId,
   seriesId,
   name,
   ideas,
 }: {
+  brandId: string;
   seriesId: string;
   name: string;
   ideas: number;
 }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
-  const trpc = useTRPC();
-
   const purge = useMutation(
-    trpc.series.purge.mutationOptions({
+    orpc.series.purge.mutationOptions({
       onSuccess: (result) => {
         toast.success(
-          `Deleted “${result?.name ?? name}”${
-            result?.detachedIdeas
+          `Deleted “${result.series.name}”${
+            result.detachedIdeas
               ? `, ${result.detachedIdeas} idea(s) kept and detached`
               : ""
           }.`,
@@ -73,7 +73,7 @@ export function DeleteSeriesButton({
             Cancel
           </AlertDialogCancel>
           <AlertDialogAction
-            onClick={() => purge.mutate({ seriesId })}
+            onClick={() => purge.mutate({ brandId, seriesId })}
             disabled={purge.isPending}
             tone="destructive"
           >

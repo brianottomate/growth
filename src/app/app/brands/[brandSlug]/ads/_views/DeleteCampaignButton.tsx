@@ -20,7 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 /**
  * Delete a campaign draft. Local only — the service refuses when the campaign
@@ -34,6 +34,7 @@ export function DeleteCampaignButton({
   livePlatformCampaigns,
   compact = false,
   afterDelete = "list",
+  listPath,
 }: {
   campaignId: string;
   campaignName: string;
@@ -41,18 +42,19 @@ export function DeleteCampaignButton({
   livePlatformCampaigns: number;
   /** A ⋯ menu for a row in a list, with the delete inside it. */
   compact?: boolean;
+  listPath?: string;
   /** Where to go once it is gone: the brand's ads list, or stay and refresh. */
   afterDelete?: "list" | "refresh";
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
   const remove = useMutation(
-    trpc.ads.deleteDraftCampaign.mutationOptions({
+    orpc.ads.deleteDraftCampaign.mutationOptions({
       onSuccess: () => {
         setOpen(false);
-        if (afterDelete === "list") router.push(`/app/brands/${brandSlug}/ads`);
+        if (afterDelete === "list")
+          router.push(listPath ?? `/app/brands/${brandSlug}/ads`);
         else router.refresh();
       },
     }),

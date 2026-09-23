@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/components/ui/lib/utils";
 import { authClient } from "@/server/better-auth/client";
-import { useTRPC, type RouterOutputs } from "@/trpc/react";
+import { orpc, type RouterOutputs } from "@/orpc/client";
 
 type Mention = RouterOutputs["mention"]["list"]["mentions"][number];
 
@@ -91,10 +91,9 @@ function relTime(date: Date | string): string {
 type Filter = { type: "sub" | "term"; value: string } | null;
 
 export function Reddit() {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
   const { data, isLoading, isError, error } = useQuery(
-    trpc.mention.list.queryOptions(LIST_INPUT),
+    orpc.mention.list.queryOptions({ input: LIST_INPUT }),
   );
 
   const [filter, setFilter] = useState<Filter>(null);
@@ -104,25 +103,25 @@ export function Reddit() {
   const [justEngaged, setJustEngaged] = useState<Set<string>>(() => new Set());
 
   const setStatus = useMutation(
-    trpc.mention.setStatus.mutationOptions({
+    orpc.mention.setStatus.mutationOptions({
       onSuccess: () =>
         void queryClient.invalidateQueries(
-          trpc.mention.list.queryOptions(LIST_INPUT),
+          orpc.mention.list.queryOptions({ input: LIST_INPUT }),
         ),
     }),
   );
   const assign = useMutation(
-    trpc.mention.assign.mutationOptions({
+    orpc.mention.assign.mutationOptions({
       onSuccess: () =>
         void queryClient.invalidateQueries(
-          trpc.mention.list.queryOptions(LIST_INPUT),
+          orpc.mention.list.queryOptions({ input: LIST_INPUT }),
         ),
     }),
   );
 
   // Reuse the content org-member list + Better Auth session for claiming.
   const { data: members = [] } = useQuery(
-    trpc.content.assignableMembers.queryOptions(),
+    orpc.content.assignableMembers.queryOptions(),
   );
   const { data: session } = authClient.useSession();
   const currentUserId = session?.user.id ?? "";
@@ -198,7 +197,7 @@ export function Reddit() {
   // Refresh the queue after the spar agent records a decision out-of-band.
   const refetch = () =>
     void queryClient.invalidateQueries(
-      trpc.mention.list.queryOptions(LIST_INPUT),
+      orpc.mention.list.queryOptions({ input: LIST_INPUT }),
     );
 
   const toggle = (f: Filter) =>

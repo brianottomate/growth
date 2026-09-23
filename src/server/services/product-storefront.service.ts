@@ -2,6 +2,10 @@ import "server-only";
 
 import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
+import {
+  resolveWorkspaceOrganizationId,
+  WorkspaceAccessError,
+} from "@/server/workspace-actor";
 
 import {
   atlasWebPageIds,
@@ -120,25 +124,13 @@ export async function resolveProductOrganizationId(input: {
   userId: string;
   preferredOrganizationId?: string | null;
 }) {
-  const memberships = await db.query.memberTable.findMany({
-    where: eq(memberTable.userId, input.userId),
-    columns: { organizationId: true },
-    limit: 20,
-  });
-  if (
-    input.preferredOrganizationId &&
-    memberships.some(
-      (membership) =>
-        membership.organizationId === input.preferredOrganizationId,
-    )
-  ) {
-    return input.preferredOrganizationId;
+  try {
+    return await resolveWorkspaceOrganizationId(input);
+  } catch (error) {
+    if (error instanceof WorkspaceAccessError)
+      throw new ProductStorefrontError("FORBIDDEN", error.message);
+    throw error;
   }
-  if (memberships[0]) return memberships[0].organizationId;
-  throw new ProductStorefrontError(
-    "FORBIDDEN",
-    "No accessible organization found",
-  );
 }
 
 async function assertMembership(actor: ProductStorefrontActor) {

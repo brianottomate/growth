@@ -207,7 +207,7 @@ function ClientRow({
               href={brandAdsHref(brand)}
               className="text-[11.5px] text-sky-300 hover:underline"
             >
-              New campaign
+              View campaigns
             </Link>
           )}
         </div>

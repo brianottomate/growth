@@ -1,3 +1,7 @@
+import {
+  campaignListPath,
+  type CampaignWorkspace,
+} from "@/lib/campaign-navigation";
 import { MetaPlatformCard } from "./MetaPlatformCard";
 import type { Ad, AudienceGeographyPlan } from "@/server/db/ads-schema";
 import Link from "next/link";
@@ -25,6 +29,7 @@ import { PushToPlatform } from "./PushToPlatform";
  */
 export async function PlatformSection({
   brandSlug,
+  workspace = "brand",
   brandName = brandSlug,
   brandLogo = null,
   campaignId,
@@ -40,6 +45,7 @@ export async function PlatformSection({
   audiences,
 }: {
   brandSlug: string;
+  workspace?: CampaignWorkspace;
   brandName?: string;
   brandLogo?: string | null;
   campaignId: string;
@@ -187,7 +193,7 @@ export async function PlatformSection({
       <div className="flex flex-wrap items-center gap-2.5">
         <ChannelLogo platform={platform} className="size-5" />
         <Link
-          href={`/app/brands/${brandSlug}/ads/platform/${platformCampaign.id}`}
+          href={`${campaignListPath(brandSlug, workspace)}/platform/${platformCampaign.id}`}
           className="text-sm font-semibold hover:underline"
         >
           On {label}

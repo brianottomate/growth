@@ -19,7 +19,7 @@ import {
   type WebsiteAuditIssue,
   type WebsiteAuditResult,
 } from "@/lib/website-audit";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 const severeIssues = new Set<WebsiteAuditIssue>([
   "fetch_error",
@@ -40,11 +40,10 @@ export function WebsiteLiveAudit({
   brandName: string;
   ogToolUrl: string | null;
 }) {
-  const trpc = useTRPC();
   const [result, setResult] = useState<WebsiteAuditResult | null>(null);
   const [onlyIssues, setOnlyIssues] = useState(true);
   const audit = useMutation(
-    trpc.website.audit.mutationOptions({
+    orpc.website.audit.mutationOptions({
       onSuccess: (next) => {
         setResult(next);
         toast.success(

@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { PLANNABLE_AD_PLATFORMS } from "@/lib/ad-platforms";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 /** Plan another platform: creates its local draft row, nothing more. */
 export function PlanPlatformButton({
@@ -23,10 +23,9 @@ export function PlanPlatformButton({
   campaignId: string;
   planned: string[];
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const plan = useMutation(
-    trpc.ads.planPlatform.mutationOptions({
+    orpc.ads.planPlatform.mutationOptions({
       onSuccess: () => router.refresh(),
     }),
   );

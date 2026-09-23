@@ -20,7 +20,7 @@ export function AskAssistantButton({
   campaignName,
   focus,
   ask,
-  label = "Work in chat",
+  label = "Continue in chat",
   variant = "outline",
 }: {
   brandId: string;

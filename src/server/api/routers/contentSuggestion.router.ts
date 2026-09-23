@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { and, desc, eq, inArray, isNull, notInArray } from "drizzle-orm";
-import { TRPCError } from "@trpc/server";
+import { ORPCError } from "@orpc/server";
 
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { protectedProcedure } from "@/server/api/orpc";
 import { type db } from "@/server/db";
 import {
   brandInspirationTable,
@@ -48,8 +48,8 @@ function proposal(value: unknown) {
     : {};
 }
 
-export const contentSuggestionRouter = createTRPCRouter({
-  pending: protectedProcedure.query(async ({ ctx }) => {
+export const contentSuggestionRouter = {
+  pending: protectedProcedure.handler(async ({ context: ctx }) => {
     const brandIds = await accessibleBrandIds(ctx);
     if (!brandIds.length) return [];
     const suggestions = await ctx.db.query.contentSuggestionTable.findMany({
@@ -84,7 +84,7 @@ export const contentSuggestionRouter = createTRPCRouter({
 
   resolve: protectedProcedure
     .input(z.object({ id: z.string(), accept: z.boolean() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const allowed = new Set(await accessibleBrandIds(ctx));
       const suggestion = await ctx.db.query.contentSuggestionTable.findFirst({
         where: and(
@@ -92,9 +92,9 @@ export const contentSuggestionRouter = createTRPCRouter({
           eq(contentSuggestionTable.status, "pending"),
         ),
       });
-      if (!suggestion) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!suggestion) throw new ORPCError("NOT_FOUND");
       if (!allowed.has(suggestion.brandId)) {
-        throw new TRPCError({ code: "FORBIDDEN" });
+        throw new ORPCError("FORBIDDEN");
       }
 
       let appliedLinkId: string | null = null;
@@ -106,8 +106,7 @@ export const contentSuggestionRouter = createTRPCRouter({
           ),
         );
         if (!Object.keys(patch).length) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
+          throw new ORPCError("BAD_REQUEST", {
             message: "Classification proposal has no applicable fields",
           });
         }
@@ -117,8 +116,7 @@ export const contentSuggestionRouter = createTRPCRouter({
           .where(eq(platformPostTable.id, suggestion.subjectPostId));
       } else if (input.accept) {
         if (!suggestion.targetPostId) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
+          throw new ORPCError("BAD_REQUEST", {
             message:
               "The target post must be resolved before accepting this edge",
           });
@@ -154,4 +152,4 @@ export const contentSuggestionRouter = createTRPCRouter({
         .returning();
       return resolved;
     }),
-});
+};

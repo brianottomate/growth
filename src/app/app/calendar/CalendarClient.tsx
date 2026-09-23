@@ -11,7 +11,7 @@ import {
   Sparkles,
 } from "lucide-react";
 
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { ProduceDrawer } from "@/app/app/studio/ProduceDrawer";
 import { GenerateSlotsDialog } from "@/app/app/content/GenerateSlotsDialog";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
@@ -247,8 +247,6 @@ export function CalendarClient({
     [now],
   );
   const router = useRouter();
-  const trpc = useTRPC();
-
   // Default to the focused Month zoom — the full-fidelity grid the content team
   // reviews. Year · Detailed stays one toggle away.
   const [zoom, setZoom] = useState<Zoom>("month");
@@ -290,12 +288,12 @@ export function CalendarClient({
     Record<string, Member | null>
   >({});
   const setOwner = useMutation(
-    trpc.content.setOwner.mutationOptions({
+    orpc.content.setOwner.mutationOptions({
       onSettled: () => router.refresh(),
     }),
   );
   const setSpotOwner = useMutation(
-    trpc.content.setSpotOwner.mutationOptions({
+    orpc.content.setSpotOwner.mutationOptions({
       onSettled: () => router.refresh(),
     }),
   );

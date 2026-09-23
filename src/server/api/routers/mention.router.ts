@@ -1,4 +1,3 @@
-import type { TRPCRouterRecord } from "@trpc/server";
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
@@ -11,7 +10,7 @@ import {
 } from "@/server/db/listening-schema";
 import { postMentionToRadio } from "@/server/services/listening-notify.service";
 
-import { protectedProcedure } from "../trpc";
+import { protectedProcedure } from "@/server/api/orpc";
 
 /**
  * Mentions — persisted inbound keyword hits (F5Bot today, other providers
@@ -31,7 +30,7 @@ export const mentionRouter = {
         })
         .optional(),
     )
-    .query(async ({ input }) => {
+    .handler(async ({ input }) => {
       const rows = await db
         .select()
         .from(mentionTable)
@@ -63,7 +62,7 @@ export const mentionRouter = {
         decisionNote: z.string().trim().max(4000).nullish(),
       }),
     )
-    .mutation(async ({ input, ctx }) => {
+    .handler(async ({ input, context: ctx }) => {
       // Engaged/skipped record WHO resolved it + when; reopening ("new") clears
       // the audit so it reads as untouched again.
       const resolving = input.status !== "new";
@@ -107,7 +106,7 @@ export const mentionRouter = {
    */
   testSlack: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ input }) => {
+    .handler(async ({ input }) => {
       const channel = envSelect({
         prod: "#radio-social-listening",
         test: "#radio-slack-testing",
@@ -130,7 +129,7 @@ export const mentionRouter = {
   /** Claim/assign a mention to a teammate (null = unclaim). Drives "my queue". */
   assign: protectedProcedure
     .input(z.object({ id: z.string(), userId: z.string().nullable() }))
-    .mutation(async ({ input }) => {
+    .handler(async ({ input }) => {
       const [updated] = await db
         .update(mentionTable)
         .set({ assigneeId: input.userId })
@@ -138,4 +137,4 @@ export const mentionRouter = {
         .returning();
       return updated ?? null;
     }),
-} satisfies TRPCRouterRecord;
+};

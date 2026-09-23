@@ -11,6 +11,7 @@ import {
 import "server-only";
 
 import { waitUntil } from "@vercel/functions";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -19,6 +20,8 @@ import {
   productUpdateEmailDraftSchema,
 } from "@/lib/email-document";
 import { DIGEST_TEMPLATE_KEY } from "@/lib/listings-digest";
+import { db } from "@/server/db";
+import { memberTable } from "@/server/db/schema";
 import { extractDigest } from "@/server/services/digest-extract.service";
 import {
   createEmailSlot as createEmailSlotService,
@@ -32,7 +35,7 @@ import {
   ContentService,
   deliveryBlockReason,
 } from "@/server/services/content.service";
-import { growthAction } from "./types";
+import { growthAction, GrowthActionError } from "./types";
 
 export const getEmailDraft = growthAction({
   outputSchema: getEmailDraftOutputSchema,
@@ -40,10 +43,18 @@ export const getEmailDraft = growthAction({
     "Read the canonical subject, Markdown body, CTA, revisions, planning context, and latest generation job for one owned newsletter issue or blast. Use this when the conversation is about a specific email slot; do not treat platform_post.text as the email body.",
   inputSchema: z.object({ platformPostId: z.string() }),
   execute: async ({ platformPostId }, ctx) => {
+    const membership = await db.query.memberTable.findFirst({
+      where: and(
+        eq(memberTable.userId, ctx.userId),
+        eq(memberTable.organizationId, ctx.orgId),
+      ),
+      columns: { role: true },
+    });
     const workspace = await getEmailWorkspace({
       platformPostId,
       organizationId: ctx.orgId,
       userId: ctx.userId,
+      canDeliver: membership?.role === "owner" || membership?.role === "admin",
     });
     return {
       ...workspace,
@@ -117,10 +128,13 @@ export const createDigestFromRow = growthAction({
   execute: async (input, ctx) => {
     const { digest, notes } = await extractDigest(input.row);
     if (!digest) {
-      return {
-        error: "That paste did not contain any property listings I could read.",
-        notes,
-      };
+      throw new GrowthActionError(
+        "invalid_input",
+        [
+          "That paste did not contain any property listings I could read.",
+          ...notes,
+        ].join(" "),
+      );
     }
 
     const theme = digest.theme ?? "Property digest";
@@ -134,7 +148,7 @@ export const createDigestFromRow = growthAction({
       userId: ctx.userId,
     });
     if (!slot?.platformPostId) {
-      return { error: "Could not create the email slot for this digest." };
+      throw new Error("Could not create the email slot for this digest.");
     }
 
     await saveEmailDocument({
@@ -226,7 +240,10 @@ export const setDigestImage = growthAction({
     });
     const digest = workspace.document.digest;
     if (!digest) {
-      return { error: "That email is not a property digest." };
+      throw new GrowthActionError(
+        "invalid_input",
+        "That email is not a property digest.",
+      );
     }
 
     const wanted = new Map(
@@ -296,7 +313,11 @@ export const updateEmailDraft = growthAction({
     'Save an agreed conversational refinement to one email\'s canonical document and create a revision checkpoint. Pass only the fields that changed — but pass each changed field WHOLE: read the current value with getEmailDraft, rewrite the entire field with the change incorporated, and send the full replacement. Never attempt surgical partial edits or describe a diff; a field is replaced in its entirety. Liquid personalization tokens like {{ customer.first_name | default: "there" }} are allowed in subject and body — Customer.io expands them per recipient at delivery, and the workspace preview can simulate them.',
   inputSchema: z.object({
     platformPostId: z.string(),
-    changes: emailDocumentDraftSchema.partial(),
+    // Without the override, partial() still applies templateKey's default and
+    // an omitted template silently resets to editorial.
+    changes: emailDocumentDraftSchema
+      .extend({ templateKey: z.string().trim().min(1).max(80) })
+      .partial(),
     note: z.string().trim().max(300).optional(),
   }),
   execute: async ({ platformPostId, changes, note }, ctx) => {

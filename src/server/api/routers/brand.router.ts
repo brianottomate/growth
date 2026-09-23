@@ -2,14 +2,20 @@ import type { BrandingProfile } from "@mendable/firecrawl-js";
 import { z } from "zod";
 import { waitUntil } from "@vercel/functions";
 import { and, eq, isNull } from "drizzle-orm";
-import { TRPCError } from "@trpc/server";
+import { ORPCError } from "@orpc/server";
 
 import {
   AD_ACCOUNT_PLATFORMS,
   PUSHABLE_AD_PLATFORMS,
 } from "@/lib/ad-platforms";
 
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { actionProcedure, protectedProcedure } from "@/server/api/orpc";
+import {
+  addBrandAdPreviewAction,
+  enrichBrandAction,
+  listBrands,
+  setBrandMarkAction,
+} from "@/server/ai/capabilities/brands";
 import {
   type Brand,
   BRAND_LINK_CATEGORIES,
@@ -36,8 +42,6 @@ import {
 import { inspirationAddress } from "@/lib/inbound-email";
 import { enrichBrandFromWebsite } from "@/server/services/brand-enrichment.service";
 import {
-  addBrandAdPreview,
-  BrandAdPreviewError,
   removeBrandAdPreview,
   setBrandPreviewSource,
 } from "@/server/services/brand-ad-previews.service";
@@ -49,7 +53,6 @@ import {
 import {
   clearBrandMark,
   critiqueBrandMark,
-  setBrandMark,
 } from "@/server/services/brand-mark.service";
 import {
   brandWebsiteState,
@@ -94,8 +97,7 @@ async function userOrgIds(ctx: Ctx): Promise<string[]> {
 async function callerOrgId(ctx: Ctx): Promise<string> {
   const [orgId] = await userOrgIds(ctx);
   if (!orgId) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
+    throw new ORPCError("FORBIDDEN", {
       message: "No organization for this user",
     });
   }
@@ -108,13 +110,6 @@ async function callerOrgId(ctx: Ctx): Promise<string> {
  * - Owned brand (organizationId set): user must be a member of that org.
  * - Reference brand (organizationId NULL): user must own a brand that tracks it.
  */
-const markTuningSchema = z.object({
-  iconScale: z.number().min(0.7).max(1.4),
-  iconShift: z.number().min(-0.3).max(0.3),
-  gapScale: z.number().min(0.6).max(1.6),
-  note: z.string().max(600),
-});
-
 async function assertBrandManageable(
   ctx: Ctx,
   brandId: string,
@@ -123,17 +118,14 @@ async function assertBrandManageable(
     where: eq(brandTable.id, brandId),
   });
   if (!brand) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Brand not found" });
+    throw new ORPCError("NOT_FOUND", { message: "Brand not found" });
   }
 
   const orgIds = await userOrgIds(ctx);
 
   if (brand.organizationId) {
     if (!orgIds.includes(brand.organizationId)) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "No access to this brand",
-      });
+      throw new ORPCError("FORBIDDEN", { message: "No access to this brand" });
     }
     return brand;
   }
@@ -145,10 +137,7 @@ async function assertBrandManageable(
   });
   const ownerOrg = link?.brand?.organizationId;
   if (!ownerOrg || !orgIds.includes(ownerOrg)) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "No access to this brand",
-    });
+    throw new ORPCError("FORBIDDEN", { message: "No access to this brand" });
   }
   return brand;
 }
@@ -199,26 +188,8 @@ function slugify(name: string): string {
   );
 }
 
-export const brandRouter = createTRPCRouter({
-  /**
-   * Every owned brand, name and slug only.
-   *
-   * For pickers that have to attach something to a brand. Deliberately thin:
-   * the brands page does its own richer query, and a picker that pulled the
-   * whole row would ship logos and fingerprints to render a dropdown.
-   */
-  listLite: protectedProcedure.query(async ({ ctx }) => {
-    const [orgId] = await userOrgIds(ctx);
-    if (!orgId) return [];
-    return ctx.db.query.brandTable.findMany({
-      where: and(
-        eq(brandTable.organizationId, orgId),
-        isNull(brandTable.deletedAt),
-      ),
-      columns: { id: true, name: true, slug: true, relationship: true },
-      orderBy: (t, { asc }) => asc(t.name),
-    });
-  }),
+export const brandRouter = {
+  listLite: actionProcedure(listBrands),
 
   /**
    * Create a brand. Two scopes:
@@ -302,15 +273,14 @@ export const brandRouter = createTRPCRouter({
           .nullish(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const website = normalizeWebsite(input.website);
       const shouldEnrich = input.enrich !== false;
 
       if (input.scope === "owned") {
         const [orgId] = await userOrgIds(ctx);
         if (!orgId) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
+          throw new ORPCError("FORBIDDEN", {
             message: "You must belong to an organization to create a brand",
           });
         }
@@ -336,16 +306,14 @@ export const brandRouter = createTRPCRouter({
 
       // reference
       if (!input.ownerBrandId) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
+        throw new ORPCError("BAD_REQUEST", {
           message: "ownerBrandId is required for a tracked brand",
         });
       }
       await assertBrandManageable(ctx, input.ownerBrandId);
       const profileUrl = normalizeProfileUrl(input.profile?.url);
       if (input.profile && !profileUrl) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
+        throw new ORPCError("BAD_REQUEST", {
           message: "Profile URL must be a valid public URL",
         });
       }
@@ -383,8 +351,7 @@ export const brandRouter = createTRPCRouter({
       }
 
       if (!reference) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
+        throw new ORPCError("INTERNAL_SERVER_ERROR", {
           message: "Failed to create reference brand",
         });
       }
@@ -462,7 +429,7 @@ export const brandRouter = createTRPCRouter({
           .optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandManageable(ctx, input.id);
       const [updated] = await ctx.db
         .update(brandTable)
@@ -500,7 +467,7 @@ export const brandRouter = createTRPCRouter({
         ),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandManageable(ctx, input.id);
       const brand = await ctx.db.query.brandTable.findFirst({
         where: eq(brandTable.id, input.id),
@@ -532,39 +499,7 @@ export const brandRouter = createTRPCRouter({
       return updated?.performanceChecklist ?? { values, meta };
     }),
 
-  /**
-   * Choose the mark the brand's cards carry: the site logo, the favicon, or a
-   * lockup of an icon beside the name in the brand font. Renders the colour,
-   * white and dark variants into the library and points the brand at them.
-   */
-  setMark: protectedProcedure
-    .input(
-      z.object({
-        id: z.string(),
-        source: z.enum(["logo", "favicon", "lockup"]),
-        iconAssetId: z.string().nullish(),
-        iconFrom: z.enum(["logo", "favicon"]).nullish(),
-        text: z.string().trim().max(60).nullish(),
-        /** Omit for the brand's heading font; null for the house font. */
-        fontFamily: z.string().trim().max(80).nullish(),
-        tuning: markTuningSchema.nullish(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      await assertBrandManageable(ctx, input.id);
-      return setBrandMark({
-        brandId: input.id,
-        userId: ctx.session.user.id,
-        recipe: {
-          source: input.source,
-          iconAssetId: input.iconAssetId ?? null,
-          iconFrom: input.iconFrom ?? null,
-          text: input.text ?? null,
-          fontFamily: input.fontFamily,
-        },
-        tuning: input.tuning ?? null,
-      });
-    }),
+  setMark: actionProcedure(setBrandMarkAction),
 
   /** "Fix with AI": the art director's corrections for the lockup as edited. */
   critiqueMark: protectedProcedure
@@ -577,7 +512,7 @@ export const brandRouter = createTRPCRouter({
         fontFamily: z.string().trim().max(80).nullish(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandManageable(ctx, input.id);
       return critiqueBrandMark({
         brandId: input.id,
@@ -592,7 +527,7 @@ export const brandRouter = createTRPCRouter({
     }),
 
   /** Every Google Fonts family, most popular first, for the font picker. */
-  fontCatalog: protectedProcedure.query(() => googleFontCatalog()),
+  fontCatalog: protectedProcedure.handler(() => googleFontCatalog()),
 
   /**
    * Pick the heading and body fonts the brand's cards are set in. Both null
@@ -606,7 +541,7 @@ export const brandRouter = createTRPCRouter({
         body: z.string().trim().min(1).max(80).nullable(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandManageable(ctx, input.id);
       try {
         return await setBrandFonts({
@@ -617,7 +552,7 @@ export const brandRouter = createTRPCRouter({
         });
       } catch (error) {
         if (error instanceof BrandFontError) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+          throw new ORPCError("BAD_REQUEST", { message: error.message });
         }
         throw error;
       }
@@ -625,48 +560,17 @@ export const brandRouter = createTRPCRouter({
 
   clearMark: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandManageable(ctx, input.id);
       await clearBrandMark(input.id);
       return { id: input.id };
     }),
 
-  /**
-   * Keep a frozen card as one of the brand's ad previews: what their ads will
-   * look like, shown on the Performance brand page before any campaign.
-   */
-  addAdPreview: protectedProcedure
-    .input(
-      z.object({
-        id: z.string(),
-        assetId: z.string().min(1),
-        homeUrl: z.string().url().nullish(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      await assertBrandManageable(ctx, input.id);
-      try {
-        const previews = await addBrandAdPreview({
-          brandId: input.id,
-          assetId: input.assetId,
-          userId: ctx.session.user.id,
-          homeUrl: input.homeUrl ?? null,
-        });
-        return { id: input.id, count: previews.length };
-      } catch (error) {
-        if (error instanceof BrandAdPreviewError) {
-          throw new TRPCError({
-            code: error.status === 404 ? "NOT_FOUND" : "UNPROCESSABLE_CONTENT",
-            message: error.message,
-          });
-        }
-        throw error;
-      }
-    }),
+  addAdPreview: actionProcedure(addBrandAdPreviewAction),
 
   removeAdPreview: protectedProcedure
     .input(z.object({ id: z.string(), assetId: z.string().min(1) }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandManageable(ctx, input.id);
       const previews = await removeBrandAdPreview({
         brandId: input.id,
@@ -687,7 +591,7 @@ export const brandRouter = createTRPCRouter({
         sourceUrl: z.string().url().nullable(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandManageable(ctx, input.id);
       return setBrandPreviewSource({
         brandId: input.id,
@@ -708,7 +612,7 @@ export const brandRouter = createTRPCRouter({
         sourceUrl: z.string().url().nullable(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const orgId = await callerOrgId(ctx);
       return setHomeHero({
         homeId: input.homeId,
@@ -732,7 +636,7 @@ export const brandRouter = createTRPCRouter({
         sortOrder: z.number().int().min(0).nullish(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const orgId = await callerOrgId(ctx);
       return setHomeMedia({
         ...input,
@@ -761,7 +665,7 @@ export const brandRouter = createTRPCRouter({
           .max(10),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const orgId = await callerOrgId(ctx);
       return setHomeCarousel({
         homeId: input.homeId,
@@ -771,26 +675,7 @@ export const brandRouter = createTRPCRouter({
       });
     }),
 
-  /** Scrape the brand's website and refresh its fields. Runs inline. */
-  enrich: protectedProcedure
-    .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      const brand = await assertBrandManageable(ctx, input.id);
-      if (!brand.website) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Add a website URL before enriching",
-        });
-      }
-      const result = await enrichBrandById(brand.id);
-      if (!result) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Could not read that website",
-        });
-      }
-      return result.brand;
-    }),
+  enrich: actionProcedure(enrichBrandAction),
 
   /**
    * Scrape a website WITHOUT saving anything — the dialog's Enrich button.
@@ -799,15 +684,14 @@ export const brandRouter = createTRPCRouter({
    */
   previewEnrichment: protectedProcedure
     .input(z.object({ website: z.string().trim().min(3).max(2000) }))
-    .mutation(async ({ input }) => {
+    .handler(async ({ input }) => {
       const website = normalizeWebsite(input.website);
       if (!website) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Enter a URL" });
+        throw new ORPCError("BAD_REQUEST", { message: "Enter a URL" });
       }
       const enrichment = await enrichBrandFromWebsite(website);
       if (!enrichment) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
+        throw new ORPCError("BAD_REQUEST", {
           message: "Could not read that website",
         });
       }
@@ -825,11 +709,10 @@ export const brandRouter = createTRPCRouter({
   /** Soft-delete an owned brand. Use `untrack` for reference brands. */
   delete: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const brand = await assertBrandManageable(ctx, input.id);
       if (!brand.organizationId) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
+        throw new ORPCError("BAD_REQUEST", {
           message: "Reference brands are removed by untracking them",
         });
       }
@@ -843,7 +726,7 @@ export const brandRouter = createTRPCRouter({
   /** What a purge would destroy, and anything blocking it. Read-only. */
   previewPurge: protectedProcedure
     .input(z.object({ brandId: z.string() }))
-    .query(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandManageable(ctx, input.brandId);
       return previewBrandPurge(input.brandId);
     }),
@@ -855,7 +738,7 @@ export const brandRouter = createTRPCRouter({
    */
   purge: protectedProcedure
     .input(z.object({ brandId: z.string(), confirmName: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandManageable(ctx, input.brandId);
       return purgeBrand(input);
     }),
@@ -863,13 +746,12 @@ export const brandRouter = createTRPCRouter({
   /** Stop tracking a reference brand (deletes the link, not the brand). */
   untrack: protectedProcedure
     .input(z.object({ inspirationId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const link = await ctx.db.query.brandInspirationTable.findFirst({
         where: eq(brandInspirationTable.id, input.inspirationId),
       });
       if (!link) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
+        throw new ORPCError("NOT_FOUND", {
           message: "Tracking link not found",
         });
       }
@@ -890,7 +772,7 @@ export const brandRouter = createTRPCRouter({
    */
   trackNewsletter: protectedProcedure
     .input(z.object({ brandId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandManageable(ctx, input.brandId);
       const address = inspirationAddress(input.brandId);
 
@@ -930,7 +812,7 @@ export const brandRouter = createTRPCRouter({
    *  ingested issues are kept. */
   untrackNewsletter: protectedProcedure
     .input(z.object({ brandId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandManageable(ctx, input.brandId);
       await ctx.db
         .update(channelTable)
@@ -957,14 +839,14 @@ export const brandRouter = createTRPCRouter({
    */
   websiteState: protectedProcedure
     .input(z.object({ brandId: z.string() }))
-    .query(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandManageable(ctx, input.brandId);
       return brandWebsiteState(input.brandId);
     }),
 
   recheckWebsite: protectedProcedure
     .input(z.object({ brandId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandManageable(ctx, input.brandId);
       return recheckBrandWebsite(input.brandId);
     }),
@@ -976,14 +858,14 @@ export const brandRouter = createTRPCRouter({
         websiteId: z.string().trim().max(40).nullable(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandManageable(ctx, input.brandId);
       return setBrandWebsiteId(input);
     }),
 
   connectStatus: protectedProcedure
     .input(z.object({ brandId: z.string() }))
-    .query(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const brand = await assertBrandManageable(ctx, input.brandId);
       return {
         url: brand.connectToken ? brandConnectUrl(brand.connectToken) : null,
@@ -1002,7 +884,7 @@ export const brandRouter = createTRPCRouter({
 
   createConnectLink: protectedProcedure
     .input(z.object({ brandId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandManageable(ctx, input.brandId);
       const result = await ensureBrandConnect(input.brandId, {
         name: ctx.session.user.name ?? null,
@@ -1013,7 +895,7 @@ export const brandRouter = createTRPCRouter({
 
   regenerateConnectLink: protectedProcedure
     .input(z.object({ brandId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandManageable(ctx, input.brandId);
       const result = await regenerateBrandConnectToken(input.brandId, {
         name: ctx.session.user.name ?? null,
@@ -1035,7 +917,7 @@ export const brandRouter = createTRPCRouter({
         discover: z.boolean().default(true),
       }),
     )
-    .query(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandManageable(ctx, input.brandId);
       return listBrandAdAccounts(input.brandId, { discover: input.discover });
     }),
@@ -1050,7 +932,7 @@ export const brandRouter = createTRPCRouter({
         isAllowed: z.boolean(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandManageable(ctx, input.brandId);
       return setBrandAdAccountAllowed({
         ...input,
@@ -1068,11 +950,10 @@ export const brandRouter = createTRPCRouter({
         minSpend: z.number().min(0).optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const brand = await assertBrandManageable(ctx, input.brandId);
       if (!brand.slug) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
+        throw new ORPCError("BAD_REQUEST", {
           message: "Only owned brands can sync ads",
         });
       }
@@ -1108,7 +989,7 @@ export const brandRouter = createTRPCRouter({
         externalId: z.string().min(1),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const brand = await assertBrandManageable(ctx, input.brandId);
       const home = await addWanderOsHome({
         brandId: brand.id,
@@ -1129,12 +1010,11 @@ export const brandRouter = createTRPCRouter({
         text: z.string().trim().min(1).max(20_000),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const brand = await assertBrandManageable(ctx, input.brandId);
       const shells = await parseHomeShells(input.text);
       if (shells.length === 0) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
+        throw new ORPCError("BAD_REQUEST", {
           message: "No homes found in that text.",
         });
       }
@@ -1148,8 +1028,8 @@ export const brandRouter = createTRPCRouter({
   /** Setup: drop a committed home. The feed still carries it; this un-picks it. */
   homesRemove: protectedProcedure
     .input(z.object({ brandId: z.string().min(1), homeId: z.string().min(1) }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const brand = await assertBrandManageable(ctx, input.brandId);
       return removeBrandHome({ brandId: brand.id, homeId: input.homeId });
     }),
-});
+};

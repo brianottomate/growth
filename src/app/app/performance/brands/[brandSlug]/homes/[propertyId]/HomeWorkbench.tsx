@@ -8,7 +8,7 @@ import { ChevronLeft, ChevronRight, EyeOff, X } from "lucide-react";
 import { cn } from "@/components/ui/lib/utils";
 import { toast } from "@/components/ui/toast";
 import type { HomeDetail, HomePhoto } from "@/server/services/homes.service";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 const MAX_CAROUSEL = 10;
 
@@ -26,7 +26,6 @@ const photoRef = (photo: HomePhoto) =>
 /** Choose the hero and ordered source photos for new campaign ads. */
 export function HomeWorkbench({ home }: { home: HomeDetail }) {
   const router = useRouter();
-  const trpc = useTRPC();
   const [order, setOrder] = useState<string[]>(
     home.carousel.map((photo) => photo.key),
   );
@@ -38,19 +37,19 @@ export function HomeWorkbench({ home }: { home: HomeDetail }) {
 
   const onError = (error: { message: string }) => toast.error(error.message);
   const setHero = useMutation(
-    trpc.brand.setHomeHero.mutationOptions({
+    orpc.brand.setHomeHero.mutationOptions({
       onSuccess: () => router.refresh(),
       onError,
     }),
   );
   const setMedia = useMutation(
-    trpc.brand.setHomeMedia.mutationOptions({
+    orpc.brand.setHomeMedia.mutationOptions({
       onSuccess: () => router.refresh(),
       onError,
     }),
   );
   const saveCarousel = useMutation(
-    trpc.brand.setHomeCarousel.mutationOptions({
+    orpc.brand.setHomeCarousel.mutationOptions({
       onSuccess: () => router.refresh(),
       onError,
     }),

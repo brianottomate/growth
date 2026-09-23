@@ -20,7 +20,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useMediaQuery } from "@/components/ui/hooks/use-media-query";
 import { cn } from "@/lib/utils";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import {
   ASSISTANT_INTENT_EVENT,
   type AssistantIntent,
@@ -58,12 +58,19 @@ export function OverviewAssistantPopup({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [open, setOpen] = useState(false);
-  const [intentBrandId, setIntentBrandId] = useState<string | null>(null);
-  const [campaignContext, setCampaignContext] =
-    useState<AdCampaignWorkContext | null>(null);
-  const [workContext, setWorkContext] = useState<ContentWorkContext | null>(
-    null,
-  );
+  const [focusByThread, setFocusByThread] = useState<
+    Record<
+      string,
+      {
+        brandId?: string;
+        campaign?: AdCampaignWorkContext;
+        work?: ContentWorkContext;
+      }
+    >
+  >({});
+  const [scopeByThread, setScopeByThread] = useState<
+    Record<string, "page" | "pinned">
+  >({});
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const creatingInitialThread = useRef(false);
   const creatingCampaignThread = useRef(false);
@@ -71,24 +78,24 @@ export function OverviewAssistantPopup({
     threadId: string;
     intent: AssistantIntent;
   } | null>(null);
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const desktop = useMediaQuery("(min-width: 1280px)");
+  const desktop = useMediaQuery("(min-width: 1024px)");
   const nextMode = pathname === "/app/next";
-  const queryBrandId = searchParams.get("brandId") ?? intentBrandId;
-  const brandSlug = /^\/app\/brands\/([^/]+)$/.exec(pathname)?.[1];
+  const pageQuery = useQuery(
+    orpc.creativeWork.pageContext.queryOptions({ input: { path: pathname } }),
+  );
+  const queryBrandId = searchParams.get("brandId");
   const activeBrand =
-    brands.find((brand) => brand.id === queryBrandId) ??
-    brands.find((brand) => brand.slug === brandSlug);
-  const threadsQuery = useQuery(trpc.creativeWork.listThreads.queryOptions());
+    pageQuery.data?.brand ?? brands.find((brand) => brand.id === queryBrandId);
+  const threadsQuery = useQuery(orpc.creativeWork.listThreads.queryOptions());
   const createThread = useMutation(
-    trpc.creativeWork.createThread.mutationOptions({
+    orpc.creativeWork.createThread.mutationOptions({
       onSuccess: (thread) => {
         creatingInitialThread.current = false;
         setActiveThreadId(thread.id);
-        void queryClient.invalidateQueries(
-          trpc.creativeWork.listThreads.queryFilter(),
-        );
+        void queryClient.invalidateQueries({
+          queryKey: orpc.creativeWork.listThreads.queryKey(),
+        });
       },
       onError: () => {
         creatingInitialThread.current = false;
@@ -96,11 +103,66 @@ export function OverviewAssistantPopup({
     }),
   );
   const threadQuery = useQuery({
-    ...trpc.creativeWork.getThread.queryOptions({
-      threadId: activeThreadId ?? "",
+    ...orpc.creativeWork.getThread.queryOptions({
+      input: {
+        threadId: activeThreadId ?? "",
+      },
     }),
     enabled: !!activeThreadId,
   });
+
+  const savedFocus = threadQuery.data?.messages
+    .slice()
+    .reverse()
+    .map(
+      (message) =>
+        message.metadata as
+          | {
+              adWorkContext?: AdCampaignWorkContext;
+              workContext?: ContentWorkContext;
+              brandId?: string;
+              contextMode?: "page" | "pinned";
+            }
+          | undefined,
+    )
+    .find((metadata) => metadata?.contextMode || metadata?.adWorkContext);
+  const savedCampaignContext = savedFocus?.adWorkContext;
+  const savedContextMode = savedFocus?.contextMode;
+  const threadFocus = activeThreadId
+    ? focusByThread[activeThreadId]
+    : undefined;
+  const pinnedCampaign = threadFocus
+    ? threadFocus.campaign
+    : savedCampaignContext;
+  const pinnedWork = threadFocus ? threadFocus.work : savedFocus?.workContext;
+  const pinnedBrand = brands.find(
+    (brand) =>
+      brand.id === (threadFocus ? threadFocus.brandId : savedFocus?.brandId),
+  );
+  const pinnedLabel = pinnedCampaign
+    ? `${pinnedCampaign.brandName} · ${pinnedCampaign.campaignName}${pinnedCampaign.adId ? " · Selected ad" : ""}`
+    : pinnedWork
+      ? `${pinnedWork.brandName} · ${pinnedWork.contentTitle}`
+      : pinnedBrand?.name;
+  const contextMode =
+    (activeThreadId && scopeByThread[activeThreadId]) ||
+    savedContextMode ||
+    (savedCampaignContext ? "pinned" : "page");
+  const selectScope = (scope: "page" | "pinned") => {
+    if (activeThreadId)
+      setScopeByThread((previous) => ({
+        ...previous,
+        [activeThreadId]: scope,
+      }));
+  };
+  const effectiveBrand =
+    contextMode === "pinned"
+      ? brands.find(
+          (brand) =>
+            brand.id ===
+            (pinnedCampaign?.brandId ?? pinnedWork?.brandId ?? pinnedBrand?.id),
+        )
+      : activeBrand;
 
   // The assistant home lists sessions as links; opening one selects it in this
   // dock instead of routing to a second chat surface. An unknown id is ignored
@@ -141,10 +203,15 @@ export function OverviewAssistantPopup({
   useEffect(() => {
     const receiveIntent = (event: Event) => {
       const intent = (event as CustomEvent<AssistantIntent>).detail;
-      // Not every intent is brand-scoped — the leads pipeline is deliberately
-      // global (its own Postgres schema, no organizationId), so a prospect
-      // handed to the assistant carries no brand to select.
-      setIntentBrandId("brandId" in intent ? (intent.brandId ?? null) : null);
+      const focus = {
+        brandId: "brandId" in intent ? intent.brandId : undefined,
+        campaign: intent.type === "work_ad_campaign" ? intent : undefined,
+        work: intent.type === "work_content_post" ? intent : undefined,
+      };
+      const pin = (threadId: string) => {
+        setFocusByThread((previous) => ({ ...previous, [threadId]: focus }));
+        setScopeByThread((previous) => ({ ...previous, [threadId]: "pinned" }));
+      };
       if (intent.type === "work_ad_campaign" && intent.newThread) {
         if (creatingCampaignThread.current) return;
         creatingCampaignThread.current = true;
@@ -153,7 +220,7 @@ export function OverviewAssistantPopup({
           {
             onSuccess: (thread) => {
               setThreadIntent({ threadId: thread.id, intent });
-              setWorkContext(null);
+              pin(thread.id);
             },
             onError: () =>
               toast.error(
@@ -164,36 +231,14 @@ export function OverviewAssistantPopup({
             },
           },
         );
-      }
-      if (intent.type === "work_ad_campaign") {
-        setCampaignContext({
-          type: intent.type,
-          brandId: intent.brandId,
-          brandName: intent.brandName,
-          adId: intent.adId,
-          campaignId: intent.campaignId,
-          campaignName: intent.campaignName,
-          focus: intent.focus,
-        });
-      }
-      if (intent.type === "work_content_post") {
-        setWorkContext({
-          type: intent.type,
-          brandId: intent.brandId,
-          brandName: intent.brandName,
-          contentPostId: intent.contentPostId,
-          contentTitle: intent.contentTitle,
-          platformPostId: intent.platformPostId,
-          platform: intent.platform,
-        });
-      }
+      } else if (activeThreadId) pin(activeThreadId);
       setOpen(true);
       window.localStorage.setItem("growth_assistant_open", "true");
     };
     window.addEventListener(ASSISTANT_INTENT_EVENT, receiveIntent);
     return () =>
       window.removeEventListener(ASSISTANT_INTENT_EVENT, receiveIntent);
-  }, [createThread.mutate]);
+  }, [createThread.mutate, activeThreadId]);
 
   const setVisible = (next: boolean) => {
     setOpen(next);
@@ -227,10 +272,10 @@ export function OverviewAssistantPopup({
         aria-label="Growth assistant"
         aria-hidden={!open}
         className={cn(
-          "fixed inset-3 z-50 flex flex-col overflow-hidden rounded-2xl border bg-background shadow-2xl transition-[width,opacity,transform] duration-200 xl:static xl:inset-auto xl:z-auto xl:h-svh xl:shrink-0 xl:rounded-none xl:border-y-0 xl:border-r-0 xl:shadow-none",
+          "fixed inset-x-2 top-[38svh] bottom-2 z-50 flex flex-col overflow-hidden rounded-2xl border bg-background shadow-2xl transition-[width,opacity,transform] duration-200 lg:static lg:inset-auto lg:z-auto lg:h-svh lg:shrink-0 lg:rounded-none lg:border-y-0 lg:border-r-0 lg:shadow-none",
           open
-            ? "translate-y-0 opacity-100 xl:w-[472px]"
-            : "pointer-events-none invisible translate-y-2 opacity-0 xl:visible xl:w-0 xl:translate-y-0 xl:border-l-0",
+            ? "translate-y-0 opacity-100 lg:w-[400px] xl:w-[472px]"
+            : "pointer-events-none invisible translate-y-2 opacity-0 lg:visible lg:w-0 lg:translate-y-0 lg:border-l-0",
         )}
       >
         <header className="flex h-12 shrink-0 items-center gap-3 border-b px-3">
@@ -289,17 +334,13 @@ export function OverviewAssistantPopup({
                   : "Assistant"}
               </h2>
             )}
-            <button
-              type="button"
-              onClick={() => void copyThreadId()}
-              disabled={!activeThreadId}
-              title={activeThreadId ?? undefined}
-              className="block max-w-full truncate text-[11px] text-muted-foreground hover:text-foreground disabled:pointer-events-none"
-            >
-              {activeThreadId
-                ? `Persistent session · ${activeThreadId}`
-                : "Persistent session · context · create · inspect"}
-            </button>
+            <p className="truncate text-[11px] text-muted-foreground">
+              {contextMode === "pinned"
+                ? (pinnedLabel ?? "Conversation focus")
+                : (pageQuery.data?.label ??
+                  activeBrand?.name ??
+                  "Current workspace")}
+            </p>
           </div>
           <Button
             type="button"
@@ -309,7 +350,10 @@ export function OverviewAssistantPopup({
             onClick={() =>
               createThread.mutate({
                 brandId: activeBrand?.id,
-                contentPostId: workContext?.contentPostId,
+                contentPostId:
+                  contextMode === "pinned"
+                    ? pinnedWork?.contentPostId
+                    : undefined,
               })
             }
             disabled={createThread.isPending}
@@ -330,10 +374,78 @@ export function OverviewAssistantPopup({
             onClick={() => setVisible(false)}
             aria-label="Collapse assistant"
           >
-            <PanelRightClose className="hidden size-4 xl:block" />
-            <X className="size-4 xl:hidden" />
+            <PanelRightClose className="hidden size-4 lg:block" />
+            <X className="size-4 lg:hidden" />
           </Button>
         </header>
+        <div className="space-y-1 border-b px-3 py-2 text-xs">
+          <p className="truncate" title={pageQuery.data?.label ?? pathname}>
+            Page: {pageQuery.data?.label ?? pathname}
+          </p>
+          {pinnedLabel && (
+            <p className="truncate" title={pinnedLabel}>
+              Conversation focus: {pinnedLabel}
+            </p>
+          )}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="rounded border px-2 py-1 aria-pressed:bg-accent"
+              aria-pressed={contextMode === "page"}
+              onClick={() => selectScope("page")}
+            >
+              Use current page
+            </button>
+            {pageQuery.data?.brand && (
+              <button
+                type="button"
+                className="rounded border px-2 py-1"
+                onClick={() => {
+                  const page = pageQuery.data;
+                  if (!page?.brand) return;
+                  if (!activeThreadId) return;
+                  const brand = page.brand;
+                  setFocusByThread((previous) => ({
+                    ...previous,
+                    [activeThreadId]: {
+                      brandId: brand.id,
+                      campaign: page.campaign
+                        ? {
+                            type: "work_ad_campaign",
+                            brandId: brand.id,
+                            brandName: brand.name,
+                            campaignId: page.campaign.id,
+                            campaignName: page.campaign.name,
+                          }
+                        : undefined,
+                    },
+                  }));
+                  selectScope("pinned");
+                }}
+              >
+                {pageQuery.data.campaign ? "Pin campaign" : "Pin brand"}
+              </button>
+            )}
+            {pinnedLabel && (
+              <button
+                type="button"
+                className="rounded border px-2 py-1 aria-pressed:bg-accent"
+                aria-pressed={contextMode === "pinned"}
+                onClick={() => selectScope("pinned")}
+              >
+                Keep conversation focus
+              </button>
+            )}
+          </div>
+          {contextMode === "pinned" &&
+            pinnedLabel &&
+            pageQuery.data?.label &&
+            pinnedLabel !== pageQuery.data.label && (
+              <p className="text-amber-700 dark:text-amber-300">
+                Your next message uses the conversation focus above.
+              </p>
+            )}
+        </div>
         <div className="min-h-0 flex-1">
           {activeThreadId && threadQuery.data ? (
             <OverviewChat
@@ -347,24 +459,33 @@ export function OverviewAssistantPopup({
               }
               onInitialIntentConsumed={() => setThreadIntent(null)}
               onThreadFinish={() => {
-                void queryClient.invalidateQueries(
-                  trpc.creativeWork.getThread.queryFilter({
-                    threadId: activeThreadId,
+                void queryClient.invalidateQueries({
+                  queryKey: orpc.creativeWork.getThread.queryKey({
+                    input: {
+                      threadId: activeThreadId,
+                    },
                   }),
-                );
-                void queryClient.invalidateQueries(
-                  trpc.creativeWork.listThreads.queryFilter(),
-                );
+                });
+                void queryClient.invalidateQueries({
+                  queryKey: orpc.creativeWork.listThreads.queryKey(),
+                });
               }}
               userName={userName}
               active={open}
               mode={nextMode ? "next" : "overview"}
-              brandId={activeBrand?.id}
-              brandName={activeBrand?.name}
+              brandId={effectiveBrand?.id}
+              brandName={effectiveBrand?.name}
+              contextMode={contextMode}
               intent={searchParams.get("intent") ?? undefined}
               seedPrompt={searchParams.get("prompt") ?? undefined}
-              workContext={workContext ?? undefined}
-              campaignContext={campaignContext ?? undefined}
+              workContext={
+                contextMode === "pinned" ? (pinnedWork ?? undefined) : undefined
+              }
+              campaignContext={
+                contextMode === "pinned"
+                  ? (pinnedCampaign ?? undefined)
+                  : undefined
+              }
             />
           ) : (
             <div className="grid h-full place-items-center text-muted-foreground">

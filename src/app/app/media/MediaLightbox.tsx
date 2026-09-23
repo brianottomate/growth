@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { RouterOutputs } from "@/trpc/react";
+import type { RouterOutputs } from "@/orpc/client";
 
 type LibraryAsset = RouterOutputs["media"]["list"][number];
 

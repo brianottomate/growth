@@ -14,7 +14,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { useMutation } from "@tanstack/react-query";
 import { authClient } from "@/server/better-auth/client";
 
@@ -26,11 +26,10 @@ export function DeleteAccountButton({
   userId: _userId,
 }: DeleteAccountButtonProps) {
   const router = useRouter();
-  const trpc = useTRPC();
   const [isDeleting, setIsDeleting] = useState(false);
 
   const deleteAccount = useMutation(
-    trpc.user.delete.mutationOptions({
+    orpc.user.delete.mutationOptions({
       onSuccess: async () => {
         // Sign out after successful deletion
         await authClient.signOut();

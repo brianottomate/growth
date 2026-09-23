@@ -34,7 +34,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import { cn } from "@/components/ui/lib/utils";
 import type { BrandIdentity } from "@/server/db/brand-schema";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { ListingSamplesDialog } from "./ListingSamplesDialog";
 import { SiteImagesDialog } from "./SiteImagesDialog";
 
@@ -125,7 +125,6 @@ export function CompositionWorkbench({
    */
   adPreviewTarget?: { back: string | null } | null;
 }) {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
   const router = useRouter();
   const [templateId, setTemplateId] = useState<CompositionTemplateId>(
@@ -171,7 +170,9 @@ export function CompositionWorkbench({
 
   // Reopening: the stored identity becomes the form, once, when it arrives.
   const reopened = useQuery({
-    ...trpc.composition.open.queryOptions({ assetId: openAssetId ?? "" }),
+    ...orpc.composition.open.queryOptions({
+      input: { assetId: openAssetId ?? "" },
+    }),
     enabled: Boolean(openAssetId),
     staleTime: Infinity,
   });
@@ -235,10 +236,12 @@ export function CompositionWorkbench({
   const has = (key: CompositionFieldKey) =>
     fields.some((field) => field.key === key);
 
-  const sourceListOptions = trpc.media.list.queryOptions({
-    brandId,
-    kind: "image",
-    ...(sourceSearch.trim() ? { query: sourceSearch.trim() } : {}),
+  const sourceListOptions = orpc.media.list.queryOptions({
+    input: {
+      brandId,
+      kind: "image",
+      ...(sourceSearch.trim() ? { query: sourceSearch.trim() } : {}),
+    },
   });
   const { data: assets, isLoading } = useQuery(sourceListOptions);
   const hostedAssets = useMemo(
@@ -352,7 +355,7 @@ export function CompositionWorkbench({
   }, [brandId, canRender, formatId, imagePosition, spec, templateId]);
 
   const replaceCard = useMutation(
-    trpc.ads.replaceAdMedia.mutationOptions({
+    orpc.ads.replaceAdMedia.mutationOptions({
       onSuccess: () => {
         toast.success(
           replaceTarget?.back ? (
@@ -372,7 +375,7 @@ export function CompositionWorkbench({
     }),
   );
   const addAdPreview = useMutation(
-    trpc.brand.addAdPreview.mutationOptions({
+    orpc.brand.addAdPreview.mutationOptions({
       onSuccess: () => {
         if (adPreviewTarget?.back) {
           toast.success("Kept as an ad preview");
@@ -386,16 +389,20 @@ export function CompositionWorkbench({
     }),
   );
   const freeze = useMutation(
-    trpc.composition.freeze.mutationOptions({
+    orpc.composition.freeze.mutationOptions({
       onSuccess: async (asset) => {
         if (replaceTarget) {
           replaceCard.mutate({
             adId: replaceTarget.adId,
             index: replaceTarget.index,
-            mediaAssetId: asset.id,
+            mediaAssetId: asset.mediaAssetId,
           });
         } else if (adPreviewTarget) {
-          addAdPreview.mutate({ id: brandId, assetId: asset.id, homeUrl });
+          addAdPreview.mutate({
+            brandId,
+            mediaAssetId: asset.mediaAssetId,
+            homeUrl,
+          });
         } else {
           toast.success("Frozen into the media library");
         }
@@ -410,7 +417,7 @@ export function CompositionWorkbench({
   // Words from the brand, on request: the blueprint's fields filled from their
   // voice and the home behind the photo. The art director then judges them.
   const writeCopy = useMutation(
-    trpc.composition.writeCopy.mutationOptions({
+    orpc.composition.writeCopy.mutationOptions({
       onSuccess: (copy) => {
         setTitle(copy.title);
         setEyebrow(copy.eyebrow ?? "");
@@ -429,7 +436,7 @@ export function CompositionWorkbench({
   );
 
   const direct = useMutation(
-    trpc.composition.direct.mutationOptions({
+    orpc.composition.direct.mutationOptions({
       onSuccess: async (result) => {
         setTitle(result.title);
         if (has("subtitle")) setSubtitle(result.subtitle ?? "");
@@ -454,12 +461,12 @@ export function CompositionWorkbench({
   );
 
   const extend = useMutation(
-    trpc.composition.extend.mutationOptions({
+    orpc.composition.extend.mutationOptions({
       onSuccess: async (result) => {
         await queryClient.invalidateQueries({
           queryKey: sourceListOptions.queryKey,
         });
-        chooseSource(result.id);
+        chooseSource(result.mediaAssetId);
         toast.success(
           result.reused
             ? "Already extended once; switched to that photo"

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Check, ImageDown } from "lucide-react";
 
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 /**
  * Pull a live ad's creative into the brand's media library. Platform CDN
@@ -16,10 +16,9 @@ export function ImportCreativeButton({
 }: {
   platformAdId: string;
 }) {
-  const trpc = useTRPC();
   const [done, setDone] = useState(false);
   const importCreative = useMutation(
-    trpc.ads.importAdCreative.mutationOptions({
+    orpc.ads.importAdCreative.mutationOptions({
       onSuccess: () => setDone(true),
     }),
   );

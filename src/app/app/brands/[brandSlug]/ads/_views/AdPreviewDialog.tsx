@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 export type PreviewAd = {
   id: string;
@@ -54,19 +54,18 @@ export function AdPreviewDialog({
   open: boolean;
   onOpenChange: (next: boolean) => void;
 }) {
-  const trpc = useTRPC();
   const [surface, setSurface] = useState<AdMockSurface>("facebook");
   const [card, setCard] = useState(0);
   const [showMeta, setShowMeta] = useState(false);
 
   const destinations = useQuery(
-    trpc.ads.destinations.queryOptions(
-      { brandSlug, platform: "meta" },
-      { enabled: open && showMeta },
-    ),
+    orpc.ads.destinations.queryOptions({
+      input: { brandSlug, platform: "meta" },
+      enabled: open && showMeta,
+    }),
   );
   const destination = destinations.data?.destinations[0];
-  const metaPreview = useMutation(trpc.ads.previewAd.mutationOptions());
+  const metaPreview = useMutation(orpc.ads.previewAd.mutationOptions());
 
   const isVideo = ad.media[0]?.type === "video";
 

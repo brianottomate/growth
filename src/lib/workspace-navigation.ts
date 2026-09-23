@@ -1,6 +1,11 @@
 import { getSafeInternalPath } from "./auth-utils";
 
 export const WORKSPACE_SURFACES = [
+  "performance",
+  "performance_clients",
+  "performance_campaigns",
+  "performance_prospects",
+  "performance_accounts",
   "overview",
   "next",
   "review",
@@ -40,6 +45,11 @@ export const WORKSPACE_SURFACES = [
 export type WorkspaceSurface = (typeof WORKSPACE_SURFACES)[number];
 
 export const WORKSPACE_ROUTES = {
+  performance: "/app/performance",
+  performance_clients: "/app/performance/clients",
+  performance_campaigns: "/app/performance/campaigns",
+  performance_prospects: "/app/performance/prospects",
+  performance_accounts: "/app/performance/accounts",
   overview: "/app/next",
   next: "/app/next",
   review: "/app/review",

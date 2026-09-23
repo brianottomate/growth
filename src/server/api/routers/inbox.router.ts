@@ -1,7 +1,6 @@
-import type { TRPCRouterRecord } from "@trpc/server";
 import { z } from "zod";
 
-import { protectedProcedure } from "../trpc";
+import { protectedProcedure } from "@/server/api/orpc";
 import {
   getZernioConversationMessages,
   getZernioPostComments,
@@ -27,7 +26,7 @@ export const inboxRouter = {
    * (intent / priority / suggested-action). Nothing is persisted — the ranking
    * lives in the client until the next run.
    */
-  triageNow: protectedProcedure.mutation(async () => {
+  triageNow: protectedProcedure.handler(async () => {
     const { conversations } = await listAllDmConversations({
       perPlatformLimit: 50,
     });
@@ -55,7 +54,7 @@ export const inboxRouter = {
         limit: z.number().int().min(1).max(100).optional(),
       }),
     )
-    .query(async ({ input }) => {
+    .handler(async ({ input }) => {
       const { messages } = await getZernioConversationMessages(
         input.conversationId,
         { accountId: input.accountId, limit: input.limit ?? 50 },
@@ -81,7 +80,7 @@ export const inboxRouter = {
         ),
       }),
     )
-    .mutation(async ({ input }) => {
+    .handler(async ({ input }) => {
       return triageComments(input.comments);
     }),
 
@@ -99,7 +98,7 @@ export const inboxRouter = {
         customInstructions: z.string().max(500).optional(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .handler(async ({ input }) => {
       const draft = await draftCommentReply(input);
       return { draft };
     }),
@@ -113,7 +112,7 @@ export const inboxRouter = {
         limit: z.number().int().min(1).max(100).optional(),
       }),
     )
-    .query(async ({ input }) => {
+    .handler(async ({ input }) => {
       const { comments } = await getZernioPostComments(input.postId, {
         accountId: input.accountId,
         limit: input.limit ?? 50,
@@ -134,8 +133,8 @@ export const inboxRouter = {
         customInstructions: z.string().max(500).optional(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .handler(async ({ input }) => {
       const draft = await draftDmReply(input);
       return { draft };
     }),
-} satisfies TRPCRouterRecord;
+};

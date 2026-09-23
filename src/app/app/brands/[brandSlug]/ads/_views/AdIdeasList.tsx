@@ -3,6 +3,34 @@ import { ideaDocumentFromAd } from "@/lib/ad-idea-studio";
 import { isImportedMetaCatalog } from "@/lib/meta-import";
 import { AdIdeaCard } from "./AdIdeaCard";
 
+// The list files every ad under its creative type, the way a shared drive
+// would: all-homes carousels first, then statics, then each home's carousel,
+// then video and anything else. A jump bar names every group with its count,
+// so nine ads never read as the three slides of the first one.
+const GROUPS = [
+  { id: "all-homes", label: "All-homes carousels" },
+  { id: "statics", label: "Statics" },
+  { id: "home-carousels", label: "Home carousels" },
+  { id: "video", label: "Video" },
+  { id: "other", label: "Other" },
+] as const;
+type GroupId = (typeof GROUPS)[number]["id"];
+
+function groupOf(ad: {
+  name: string;
+  content: AdContent;
+  homeId?: string | null;
+}): GroupId {
+  if (!("media" in ad.content)) return "other";
+  if (ad.content.media.some((m) => m.type === "video")) return "video";
+  const format = ad.content.format;
+  if (format && format !== "static" && format !== "carousel") return "other";
+  const role = ideaDocumentFromAd({ name: ad.name, content: ad.content }).role;
+  if (role === "hero_static") return "statics";
+  if (role === "hero_carousel" || !ad.homeId) return "all-homes";
+  return "home-carousels";
+}
+
 export function AdIdeasList({
   ads,
   homeOrder,
@@ -61,6 +89,34 @@ export function AdIdeasList({
           Number("format" in b.content && b.content.format === "carousel")
         : 0),
   );
+  const groups = GROUPS.map((group) => ({
+    ...group,
+    ads: ordered.filter((ad) => groupOf(ad) === group.id),
+  })).filter((group) => group.ads.length > 0);
+  const renderAd = (ad: (typeof ordered)[number]) =>
+    "media" in ad.content &&
+    ad.content.media.every((m) => m.type === "image") &&
+    (!ad.content.format ||
+      ad.content.format === "static" ||
+      ad.content.format === "carousel") ? (
+      <AdIdeaCard
+        key={ad.id}
+        campaignId={campaignId}
+        brandId={brandId}
+        brandName={brandName}
+        brandLogo={brandLogo}
+        deliveryState={states[ad.id]}
+        ad={{
+          id: ad.id,
+          name: ad.name,
+          content: ad.content,
+          updatedAt: ad.updatedAt.toISOString(),
+          homeId: ad.homeId,
+        }}
+      />
+    ) : (
+      <div key={ad.id}>{fallback(ad.id)}</div>
+    );
   return (
     <section aria-labelledby="ad-ideas-heading" className="space-y-4">
       <div>
@@ -86,31 +142,39 @@ export function AdIdeasList({
           No ads yet. Add an ad or a starter set to begin.
         </p>
       ) : (
-        ordered.map((ad) =>
-          "media" in ad.content &&
-          ad.content.media.every((m) => m.type === "image") &&
-          (!ad.content.format ||
-            ad.content.format === "static" ||
-            ad.content.format === "carousel") ? (
-            <AdIdeaCard
-              key={ad.id}
-              campaignId={campaignId}
-              brandId={brandId}
-              brandName={brandName}
-              brandLogo={brandLogo}
-              deliveryState={states[ad.id]}
-              ad={{
-                id: ad.id,
-                name: ad.name,
-                content: ad.content,
-                updatedAt: ad.updatedAt.toISOString(),
-                homeId: ad.homeId,
-              }}
-            />
-          ) : (
-            <div key={ad.id}>{fallback(ad.id)}</div>
-          ),
-        )
+        <>
+          <nav
+            aria-label="Ad types"
+            className="sticky top-0 z-10 -mx-1 flex flex-wrap gap-1.5 bg-background/95 px-1 py-2 backdrop-blur"
+          >
+            {groups.map((group) => (
+              <a
+                key={group.id}
+                href={`#ads-${group.id}`}
+                className="rounded-full border px-3 py-1 text-xs text-muted-foreground hover:text-foreground"
+              >
+                {group.label}{" "}
+                <span className="tabular-nums">· {group.ads.length}</span>
+              </a>
+            ))}
+          </nav>
+          {groups.map((group) => (
+            <section
+              key={group.id}
+              id={`ads-${group.id}`}
+              aria-labelledby={`ads-${group.id}-heading`}
+              className="scroll-mt-14 space-y-3"
+            >
+              <h3
+                id={`ads-${group.id}-heading`}
+                className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
+              >
+                {group.label} · {group.ads.length}
+              </h3>
+              {group.ads.map(renderAd)}
+            </section>
+          ))}
+        </>
       )}
       {catalogs.length > 0 && (
         <section

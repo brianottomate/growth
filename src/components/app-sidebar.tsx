@@ -44,7 +44,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useTheme } from "@/components/ui/theme";
 import { authClient } from "@/server/better-auth/client";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { NAV_GROUPS, type NavItem } from "@/components/app-nav";
 
 interface AppSidebarProps {
@@ -64,8 +64,7 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const trpc = useTRPC();
-  const { data: orgs } = useQuery(trpc.org.list.queryOptions());
+  const { data: orgs } = useQuery(orpc.org.list.queryOptions());
   const { themeMode, setTheme } = useTheme();
 
   const isActive = (item: NavItem) =>

@@ -180,13 +180,13 @@ export default async function BrandPage({
               href={`/app/brands/${brand.slug}/previews`}
               className="text-muted-foreground hover:underline"
             >
-              Previews
+              Organic previews
             </Link>
             <Link
               href={`/app/brands/${brand.slug}/setup`}
               className="text-muted-foreground hover:underline"
             >
-              Setup
+              Connections
             </Link>
             <Link
               href="/app/channels"

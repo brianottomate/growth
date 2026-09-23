@@ -1,4 +1,3 @@
-import type { TRPCRouterRecord } from "@trpc/server";
 import { revalidateTag } from "next/cache";
 import { z } from "zod";
 
@@ -9,7 +8,7 @@ import {
   SPEND_TRACKER_CACHE_TAG,
 } from "@/server/services/spend-tracker/spend-tracker.service";
 
-import { adminProcedure, protectedProcedure } from "../trpc";
+import { adminProcedure, protectedProcedure } from "@/server/api/orpc";
 
 // Spend Tracker (/app/spend) — marketing unit-economics dashboard, ported from
 // Brian's wander-growth-tracker. Global scope (org-wide Wander view, no brand
@@ -24,19 +23,21 @@ const windowInput = z.object({
 });
 
 export const spendRouter = {
-  dashboard: protectedProcedure.input(windowInput).query(async ({ input }) => {
-    const { startDate, endDate } = resolveSpendWindow(input);
-    const { summary } = await getSpendTracker(startDate, endDate);
-    return { window: { startDate, endDate }, summary };
-  }),
+  dashboard: protectedProcedure
+    .input(windowInput)
+    .handler(async ({ input }) => {
+      const { startDate, endDate } = resolveSpendWindow(input);
+      const { summary } = await getSpendTracker(startDate, endDate);
+      return { window: { startDate, endDate }, summary };
+    }),
 
-  trends: protectedProcedure.input(windowInput).query(async ({ input }) => {
+  trends: protectedProcedure.input(windowInput).handler(async ({ input }) => {
     const { startDate, endDate } = resolveSpendWindow(input);
     const { rows } = await getSpendTracker(startDate, endDate);
     return { window: { startDate, endDate }, series: buildSpendTrend(rows) };
   }),
 
-  health: protectedProcedure.input(windowInput).query(async ({ input }) => {
+  health: protectedProcedure.input(windowInput).handler(async ({ input }) => {
     const { startDate, endDate } = resolveSpendWindow(input);
     const { summary } = await getSpendTracker(startDate, endDate);
     return {
@@ -46,8 +47,8 @@ export const spendRouter = {
     };
   }),
 
-  refresh: adminProcedure.mutation(async () => {
+  refresh: adminProcedure.handler(async () => {
     revalidateTag(SPEND_TRACKER_CACHE_TAG, "max");
     return { revalidated: true, at: new Date().toISOString() };
   }),
-} satisfies TRPCRouterRecord;
+};

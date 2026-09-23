@@ -23,7 +23,12 @@ const WINDOW_DAYS = 28;
  * The cadence/mix math is the shared cadence.service (same source as
  * /brands/[slug]); this page layers the voice fingerprint on top.
  */
-export default async function ChannelsPage() {
+export default async function ChannelsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ brand?: string }>;
+}) {
+  const { brand } = await searchParams;
   const session = await getSession();
   if (!session?.user) redirect("/signin");
 
@@ -41,6 +46,7 @@ export default async function ChannelsPage() {
   const brands = await db.query.brandTable.findMany({
     where: and(
       eq(brandTable.organizationId, org.id),
+      brand ? eq(brandTable.id, brand) : undefined,
       isNull(brandTable.deletedAt),
     ),
     columns: { id: true, name: true },

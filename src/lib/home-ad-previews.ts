@@ -1,4 +1,5 @@
 import type { CompositionFormatId } from "@/lib/compositions";
+import { amenityHook } from "@/lib/home-amenities";
 import { usStateCode } from "@/lib/us-states";
 
 // On-demand ad previews from one home. Client-safe: the brand page builds the
@@ -26,6 +27,8 @@ export type HomeForPreview = {
    * the listing card shows it out of 5, so anything above 5 is halved.
    */
   rating?: number | null;
+  /** WanderOS amenity labels, when the listing detail was read. */
+  amenities?: string[] | null;
 };
 
 /** A feed rating on the card's five-point scale, or null when there is none. */
@@ -41,7 +44,7 @@ export function ratingOutOfFive(
 
 const BUTTON = "Find your next escape";
 
-function place(home: HomeForPreview) {
+export function place(home: HomeForPreview) {
   // "Winter Park, CO": the feed says "Colorado", the cards say the code.
   const state = usStateCode(home.state) ?? home.state;
   return [home.city, state].filter(Boolean).join(", ");
@@ -170,9 +173,20 @@ export type HomeCatalogCopy = {
   title: string;
   subtitle: string;
   rating: number | null;
+  /** The amenity the headline leads on, so a set can vary its leads. */
+  lead: string | null;
 };
 
-export function homeCatalogCopy(home: HomeForPreview): HomeCatalogCopy {
+/**
+ * The card leads on what the home has, never on its name: "Hot tub + game
+ * room in Winter Park, CO". The name is on the listing the ad links to. A home
+ * whose amenities were never read says how many it sleeps; the name is the
+ * last resort.
+ */
+export function homeCatalogCopy(
+  home: HomeForPreview,
+  avoid?: ReadonlySet<string>,
+): HomeCatalogCopy {
   const where = place(home);
   const facts = [
     home.bedrooms
@@ -184,11 +198,15 @@ export function homeCatalogCopy(home: HomeForPreview): HomeCatalogCopy {
     home.guests ? `${home.guests} guests` : null,
   ].filter((part): part is string => Boolean(part));
   const rating = ratingOutOfFive(home.rating);
+  const hook = amenityHook(home.amenities, avoid);
+  const lead =
+    hook?.hook ?? (home.guests ? `Sleeps ${home.guests}` : home.name);
   return {
-    eyebrow: where ? `${home.name} in` : home.name,
-    title: where || home.name,
+    eyebrow: where ? `${lead} in` : lead,
+    title: where,
     subtitle: facts.join(" · "),
     rating,
+    lead: hook?.lead ?? null,
   };
 }
 

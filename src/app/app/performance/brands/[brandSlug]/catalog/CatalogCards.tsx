@@ -24,6 +24,8 @@ import {
   type CatalogHome,
   type CatalogExport,
 } from "@/lib/catalog-studio";
+import { amenityHeadlineOptions } from "@/lib/home-amenities";
+import { place } from "@/lib/home-ad-previews";
 
 async function readResponse<T = unknown>(response: Response): Promise<T> {
   const body: unknown = await response.json();
@@ -518,6 +520,25 @@ export function CatalogCards({ brandId }: { brandId: string }) {
                         }
                       />
                     </label>
+                    {selectedHome && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {amenityHeadlineOptions(
+                          selectedHome.amenities,
+                          place(selectedHome),
+                        ).map((option) => (
+                          <button
+                            key={option}
+                            type="button"
+                            onClick={() =>
+                              setDetails({ ...details, title: option })
+                            }
+                            className={`rounded-full border px-2.5 py-1 text-xs ${option === details.title ? "border-foreground bg-foreground text-background" : "text-muted-foreground hover:text-foreground"}`}
+                          >
+                            {option}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     <label className="block space-y-1 text-sm">
                       Facts
                       <Input

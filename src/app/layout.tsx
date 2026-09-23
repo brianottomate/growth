@@ -10,7 +10,7 @@ import { Toaster } from "@/components/ui/toast";
 import { AnalyticsProvider } from "@/contexts/AnalyticsContext";
 import { rootMetadata } from "@/lib/metadata";
 
-import { TRPCReactProvider } from "@/trpc/react";
+import { QueryProvider } from "@/orpc/react";
 
 export const metadata = rootMetadata;
 
@@ -32,13 +32,13 @@ export default function RootLayout({
       className={cn(instrumentSans.variable, geistMono.variable)}
     >
       <body className="min-h-screen bg-surface-primary font-sans text-primary antialiased">
-        <TRPCReactProvider>
+        <QueryProvider>
           <ThemeProvider>
             <AnalyticsProvider>
               <NuqsAdapter>{children}</NuqsAdapter>
             </AnalyticsProvider>
           </ThemeProvider>
-        </TRPCReactProvider>
+        </QueryProvider>
         <Toaster />
       </body>
     </html>

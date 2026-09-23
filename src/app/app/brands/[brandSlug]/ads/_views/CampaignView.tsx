@@ -1,3 +1,10 @@
+import { WorkspaceBreadcrumbs } from "@/components/workspace-breadcrumbs";
+import {
+  campaignListPath,
+  campaignPath,
+  type CampaignWorkspace,
+} from "@/lib/campaign-navigation";
+import { workspaceActor } from "@/server/workspace-actor";
 import { starterGenerationStatus } from "@/server/services/starter-ad-generation.service";
 import { listBrandHomes } from "@/server/services/homes.service";
 import { isImportedMetaCatalog } from "@/lib/meta-import";
@@ -7,7 +14,7 @@ import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { Radio } from "lucide-react";
 
 import { db } from "@/server/db";
-import { memberTable, platformAdTable } from "@/server/db/schema";
+import { platformAdTable } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { campaignPrefillFromIntake } from "@/server/services/performance-intake.service";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
@@ -46,20 +53,19 @@ import { WorkInChatButton } from "./WorkInChatButton";
 export async function CampaignView({
   brandSlug,
   campaignId,
+  workspace = "brand",
 }: {
   brandSlug: string;
   campaignId: string;
   group?: "home" | "format";
+  workspace?: CampaignWorkspace;
 }) {
   const session = await getSession();
   if (!session?.user) redirect("/signin");
 
-  const membership = await db.query.memberTable.findFirst({
-    where: eq(memberTable.userId, session.user.id),
-    with: { organization: true },
-  });
-  const org = membership?.organization;
-  if (!org) notFound();
+  const actor = await workspaceActor();
+  if (!actor) notFound();
+  const org = { id: actor.orgId };
 
   // A read that fails is logged before it becomes a 404, so a broken query
   // never masquerades as a missing campaign.
@@ -187,22 +193,35 @@ export async function CampaignView({
   return (
     <div className="space-y-8">
       <header className="space-y-3">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Link href="/app/brands" className="hover:underline">
-            Brands
-          </Link>
-          <span>/</span>
-          <Link href={`/app/brands/${brandSlug}`} className="hover:underline">
-            {brandName}
-          </Link>
-          <span>/</span>
-          <Link
-            href={`/app/brands/${brandSlug}/ads`}
-            className="hover:underline"
-          >
-            Ads
-          </Link>
-        </div>
+        <WorkspaceBreadcrumbs
+          items={[
+            {
+              label: workspace === "performance" ? "Clients" : "Brands",
+              href:
+                workspace === "performance"
+                  ? "/app/performance/clients"
+                  : "/app/brands",
+            },
+            {
+              label: brandName,
+              href:
+                workspace === "performance"
+                  ? `/app/performance/brands/${brandSlug}`
+                  : `/app/brands/${brandSlug}`,
+            },
+            {
+              label: "Paid campaigns",
+              href: campaignListPath(brandSlug, workspace),
+            },
+            { label: campaign.name },
+          ]}
+        />
+        <Link
+          className="text-sm underline"
+          href={`${campaignPath(brandSlug, campaignId, workspace)}/by-home`}
+        >
+          Review by home
+        </Link>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2.5">
@@ -248,6 +267,7 @@ export async function CampaignView({
           </div>
           <div className="flex items-center gap-2">
             <DeleteCampaignButton
+              listPath={campaignListPath(brandSlug, workspace)}
               campaignId={campaign.id}
               campaignName={campaign.name}
               brandSlug={brandSlug}
@@ -392,6 +412,7 @@ export async function CampaignView({
               <div className="space-y-2">
                 {planned.map((platformCampaign) => (
                   <PlatformSection
+                    workspace={workspace}
                     brandName={brandName}
                     brandLogo={brand.logo}
                     key={platformCampaign.id}

@@ -5,7 +5,7 @@ import { useMutation } from "@tanstack/react-query";
 
 import { toast } from "@/components/ui/toast";
 import { matchWatchlist, X_WATCHLIST } from "@/lib/x-watchlist";
-import { useTRPC, type RouterOutputs } from "@/trpc/react";
+import { orpc, type RouterOutputs } from "@/orpc/client";
 
 import { ListenItemActions } from "@/components/listening/ListenItemActions";
 
@@ -180,8 +180,7 @@ function Btn({
 }
 
 export function XListening() {
-  const trpc = useTRPC();
-  const scan = useMutation(trpc.twitter.scanNow.mutationOptions());
+  const scan = useMutation(orpc.twitter.scanNow.mutationOptions());
 
   const [stored, setStored] = useState<StoredScan | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -567,8 +566,7 @@ function TweetCard({
 }
 
 function DraftComposer({ scored }: { scored: ScannedTweet }) {
-  const trpc = useTRPC();
-  const draft = useMutation(trpc.twitter.draftReply.mutationOptions());
+  const draft = useMutation(orpc.twitter.draftReply.mutationOptions());
   const [pills, setPills] = useState<Set<ComposerPill>>(new Set());
 
   const togglePill = (id: ComposerPill) =>

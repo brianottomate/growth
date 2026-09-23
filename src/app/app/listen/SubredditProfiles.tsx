@@ -23,7 +23,7 @@ import {
   type SubredditProfile,
   type SubredditStance,
 } from "@/lib/subreddit";
-import { useTRPC, type RouterOutputs } from "@/trpc/react";
+import { orpc, type RouterOutputs } from "@/orpc/client";
 
 type Source = RouterOutputs["listening"]["overview"]["sources"][number];
 
@@ -57,17 +57,16 @@ function relDate(iso: string): string {
 export function SubredditProfiles({ source }: { source: Source }) {
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState("");
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
 
   const profiles = subredditProfiles(source.config?.subreddits);
   const invalidate = () =>
     queryClient.invalidateQueries({
-      queryKey: trpc.listening.overview.queryKey(),
+      queryKey: orpc.listening.overview.queryKey(),
     });
 
   const evaluate = useMutation(
-    trpc.listening.evaluateSubreddit.mutationOptions({
+    orpc.listening.evaluateSubreddit.mutationOptions({
       onSuccess: async (_d, vars) => {
         await invalidate();
         toast.success(`Evaluated r/${vars.name}`);
@@ -76,13 +75,13 @@ export function SubredditProfiles({ source }: { source: Source }) {
     }),
   );
   const save = useMutation(
-    trpc.listening.setSubredditProfile.mutationOptions({
+    orpc.listening.setSubredditProfile.mutationOptions({
       onSuccess: () => void invalidate(),
       onError: (e) => toast.error(e.message || "Save failed"),
     }),
   );
   const remove = useMutation(
-    trpc.listening.removeSubreddit.mutationOptions({
+    orpc.listening.removeSubreddit.mutationOptions({
       onSuccess: () => void invalidate(),
       onError: (e) => toast.error(e.message || "Remove failed"),
     }),

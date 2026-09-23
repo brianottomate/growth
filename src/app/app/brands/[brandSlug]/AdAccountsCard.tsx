@@ -10,7 +10,7 @@ import {
   adPlatformByAllowlistPlatform,
   type AdAccountPlatform,
 } from "@/lib/ad-platforms";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 type Row = {
   platform: AdAccountPlatform;
@@ -40,25 +40,24 @@ export function AdAccountsCard({
   brandId: string;
   brandSlug: string;
 }) {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
 
   const registryQuery = useQuery(
-    trpc.brand.adAccounts.queryOptions({ brandId, discover: false }),
+    orpc.brand.adAccounts.queryOptions({ input: { brandId, discover: false } }),
   );
   const discoverQuery = useQuery(
-    trpc.brand.adAccounts.queryOptions({ brandId, discover: true }),
+    orpc.brand.adAccounts.queryOptions({ input: { brandId, discover: true } }),
   );
 
   const decide = useMutation(
-    trpc.brand.setAdAccountAllowed.mutationOptions({
+    orpc.brand.setAdAccountAllowed.mutationOptions({
       onSuccess: () =>
         queryClient.invalidateQueries({
-          queryKey: trpc.brand.adAccounts.queryKey({ brandId }),
+          queryKey: orpc.brand.adAccounts.queryKey({ input: { brandId } }),
         }),
     }),
   );
-  const sync = useMutation(trpc.brand.syncRecentAds.mutationOptions());
+  const sync = useMutation(orpc.brand.syncRecentAds.mutationOptions());
 
   // Discovery is the fuller answer once it lands; until then the registry is
   // what we know. `discovered` is meaningless on the registry-only read (it

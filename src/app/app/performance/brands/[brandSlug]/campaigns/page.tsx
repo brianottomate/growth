@@ -31,7 +31,7 @@ export default async function PerformanceBrandCampaignsPage({
         <SectionLabel>
           Campaigns{campaigns.length ? ` · ${campaigns.length}` : ""}
         </SectionLabel>
-        <NewCampaignButton brandId={brand.id} />
+        <NewCampaignButton brandSlug={brandSlug} />
       </div>
       {deskBrand && campaigns.length > 0 ? (
         <ul className={cn(panel, "divide-y")}>

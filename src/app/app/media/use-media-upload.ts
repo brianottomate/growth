@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { toast } from "@/components/ui/toast";
 import {
   createImageThumbnail,
@@ -44,14 +44,13 @@ export type UploadProgress = { key: string; name: string; fraction: number };
  * other writer and sits in the library forever.
  */
 export function useMediaUpload(brandId: string) {
-  const trpc = useTRPC();
   const createUploadUrl = useMutation(
-    trpc.media.createUploadUrl.mutationOptions(),
+    orpc.media.createUploadUrl.mutationOptions(),
   );
   const finalizeUpload = useMutation(
-    trpc.media.finalizeUpload.mutationOptions(),
+    orpc.media.finalizeUpload.mutationOptions(),
   );
-  const failUpload = useMutation(trpc.media.failUpload.mutationOptions());
+  const failUpload = useMutation(orpc.media.failUpload.mutationOptions());
   const [uploading, setUploading] = useState(0);
   const [progress, setProgress] = useState<UploadProgress[]>([]);
 

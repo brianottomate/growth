@@ -10,9 +10,9 @@ import {
   isNull,
   lte,
 } from "drizzle-orm";
-import { TRPCError } from "@trpc/server";
+import { ORPCError } from "@orpc/server";
 
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { protectedProcedure } from "@/server/api/orpc";
 import {
   brandInspirationTable,
   brandTable,
@@ -42,11 +42,9 @@ async function assertBrandAccess(ctx: Ctx, brandId: string) {
   const brand = await ctx.db.query.brandTable.findFirst({
     where: eq(brandTable.id, brandId),
   });
-  if (!brand)
-    throw new TRPCError({ code: "NOT_FOUND", message: "Brand not found" });
+  if (!brand) throw new ORPCError("NOT_FOUND", { message: "Brand not found" });
   if (!brand.organizationId) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
+    throw new ORPCError("BAD_REQUEST", {
       message: "Cannot author content for a tracked/reference brand",
     });
   }
@@ -57,10 +55,7 @@ async function assertBrandAccess(ctx: Ctx, brandId: string) {
     ),
   });
   if (!membership) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "No access to this brand",
-    });
+    throw new ORPCError("FORBIDDEN", { message: "No access to this brand" });
   }
   return brand;
 }
@@ -80,7 +75,7 @@ function parseJsonLoose<T>(text: string): T {
   return JSON.parse(slice) as T;
 }
 
-export const studioRouter = createTRPCRouter({
+export const studioRouter = {
   /**
    * The year wheel: pillar-tagged organic series + planned main pieces, plus a
    * paid lane of campaigns. Pillars themselves come from the static registry
@@ -93,7 +88,7 @@ export const studioRouter = createTRPCRouter({
         year: z.number().int().min(2020).max(2100),
       }),
     )
-    .query(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandAccess(ctx, input.brandId);
       const yearStart = new Date(input.year, 0, 1);
       const yearEnd = new Date(input.year, 11, 31, 23, 59, 59);
@@ -181,7 +176,7 @@ export const studioRouter = createTRPCRouter({
   /** Social channels for the brand (fan-out targets in Produce). */
   channels: protectedProcedure
     .input(z.object({ brandId: z.string() }))
-    .query(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandAccess(ctx, input.brandId);
       return ctx.db.query.channelTable.findMany({
         where: and(
@@ -204,7 +199,7 @@ export const studioRouter = createTRPCRouter({
    */
   references: protectedProcedure
     .input(z.object({ brandId: z.string() }))
-    .query(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const brand = await assertBrandAccess(ctx, input.brandId);
 
       const own = await ctx.db.query.platformPostTable.findMany({
@@ -281,11 +276,10 @@ export const studioRouter = createTRPCRouter({
         steer: z.string().max(500).optional(), // optional human nudge
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const brand = await assertBrandAccess(ctx, input.brandId);
       if (!isClaudeConfigured) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
+        throw new ORPCError("PRECONDITION_FAILED", {
           message: "Claude is not configured (ANTHROPIC_API_KEY missing)",
         });
       }
@@ -364,8 +358,7 @@ export const studioRouter = createTRPCRouter({
         }>(text);
         return draft;
       } catch {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
+        throw new ORPCError("INTERNAL_SERVER_ERROR", {
           message: "Could not parse the AI draft. Try again.",
         });
       }
@@ -408,7 +401,7 @@ export const studioRouter = createTRPCRouter({
           .min(1),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandAccess(ctx, input.brandId);
 
       // Optional new series.
@@ -443,8 +436,7 @@ export const studioRouter = createTRPCRouter({
         })
         .returning();
       if (!content) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
+        throw new ORPCError("INTERNAL_SERVER_ERROR", {
           message: "Failed to create content",
         });
       }
@@ -467,4 +459,4 @@ export const studioRouter = createTRPCRouter({
 
       return { id: content.id, platformPostCount: input.posts.length };
     }),
-});
+};

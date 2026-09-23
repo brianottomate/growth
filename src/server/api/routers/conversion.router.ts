@@ -1,9 +1,9 @@
 import type { Database } from "@/server/db";
 import { z } from "zod";
 import { eq, inArray } from "drizzle-orm";
-import { TRPCError } from "@trpc/server";
+import { ORPCError } from "@orpc/server";
 
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { protectedProcedure } from "@/server/api/orpc";
 import {
   brandTable,
   conversionEventTable,
@@ -23,7 +23,7 @@ async function getOrgId(ctx: Ctx) {
     where: eq(memberTable.userId, ctx.session.user.id),
   });
   if (!membership?.organizationId) {
-    throw new TRPCError({ code: "FORBIDDEN", message: "No organization" });
+    throw new ORPCError("FORBIDDEN", { message: "No organization" });
   }
   return membership.organizationId;
 }
@@ -40,11 +40,11 @@ async function assertMappingAccess(ctx: Ctx, mappingId: string) {
   const mapping = await ctx.db.query.conversionMappingTable.findFirst({
     where: eq(conversionMappingTable.id, mappingId),
   });
-  if (!mapping) throw new TRPCError({ code: "NOT_FOUND" });
+  if (!mapping) throw new ORPCError("NOT_FOUND");
   const orgId = await getOrgId(ctx);
   const brandIds = await orgBrandIds(ctx, orgId);
   if (!brandIds.includes(mapping.brandId)) {
-    throw new TRPCError({ code: "FORBIDDEN", message: "No access to mapping" });
+    throw new ORPCError("FORBIDDEN", { message: "No access to mapping" });
   }
   return mapping;
 }
@@ -52,13 +52,13 @@ async function assertMappingAccess(ctx: Ctx, mappingId: string) {
 const statusSchema = z.enum(conversionStatusEnum.enumValues);
 const modeSchema = z.enum(conversionModeEnum.enumValues);
 
-export const conversionRouter = createTRPCRouter({
+export const conversionRouter = {
   /**
    * The full conversion-tracking matrix for the org: canonical events (the
    * intent spine) + per-platform mappings with their feeding events and ad
    * channel. The /app/ads page assembles event×platform cells from this.
    */
-  matrix: protectedProcedure.query(async ({ ctx }) => {
+  matrix: protectedProcedure.handler(async ({ context: ctx }) => {
     const orgId = await getOrgId(ctx);
     const brandIds = await orgBrandIds(ctx, orgId);
     if (brandIds.length === 0) return { events: [], mappings: [] };
@@ -82,7 +82,7 @@ export const conversionRouter = createTRPCRouter({
   /** Flip a mapping's reality status (and stamp when it was checked). */
   setStatus: protectedProcedure
     .input(z.object({ id: z.string(), status: statusSchema }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertMappingAccess(ctx, input.id);
       const [updated] = await ctx.db
         .update(conversionMappingTable)
@@ -102,7 +102,7 @@ export const conversionRouter = createTRPCRouter({
         notes: z.string().max(2000).nullish(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertMappingAccess(ctx, input.id);
       const { id, ...rest } = input;
       const [updated] = await ctx.db
@@ -112,4 +112,4 @@ export const conversionRouter = createTRPCRouter({
         .returning();
       return updated;
     }),
-});
+};

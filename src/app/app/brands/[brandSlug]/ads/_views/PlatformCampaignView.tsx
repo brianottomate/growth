@@ -1,3 +1,9 @@
+import { workspaceActor } from "@/server/workspace-actor";
+
+import {
+  campaignListPath,
+  type CampaignWorkspace,
+} from "@/lib/campaign-navigation";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { and, eq, isNull } from "drizzle-orm";
@@ -8,7 +14,6 @@ import {
   brandTable,
   platformCampaignTable,
   campaignTable,
-  memberTable,
 } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
@@ -28,20 +33,19 @@ import { ImportCreativeButton } from "./ImportCreativeButton";
  */
 export async function PlatformCampaignView({
   brandSlug,
+  workspace = "brand",
   platformCampaignId,
 }: {
   brandSlug: string;
+  workspace?: CampaignWorkspace;
   platformCampaignId: string;
 }) {
   const session = await getSession();
   if (!session?.user) redirect("/signin");
 
-  const membership = await db.query.memberTable.findFirst({
-    where: eq(memberTable.userId, session.user.id),
-    with: { organization: true },
-  });
-  const org = membership?.organization;
-  if (!org) notFound();
+  const actor = await workspaceActor();
+  if (!actor) notFound();
+  const org = { id: actor.orgId };
 
   const brand = await db.query.brandTable.findFirst({
     where: and(
@@ -100,16 +104,30 @@ export async function PlatformCampaignView({
     <div className="mx-auto w-full max-w-5xl space-y-6 p-6">
       <header className="space-y-3">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Link href="/app/brands" className="hover:underline">
-            Brands
+          <Link
+            href={
+              workspace === "performance"
+                ? "/app/performance/clients"
+                : "/app/brands"
+            }
+            className="hover:underline"
+          >
+            {workspace === "performance" ? "Clients" : "Brands"}
           </Link>
           <span>/</span>
-          <Link href={`/app/brands/${brandSlug}`} className="hover:underline">
+          <Link
+            href={
+              workspace === "performance"
+                ? `/app/performance/brands/${brandSlug}`
+                : `/app/brands/${brandSlug}`
+            }
+            className="hover:underline"
+          >
             {brand.name}
           </Link>
           <span>/</span>
           <Link
-            href={`/app/brands/${brandSlug}/ads`}
+            href={campaignListPath(brandSlug, workspace)}
             className="hover:underline"
           >
             Ads
@@ -143,6 +161,7 @@ export async function PlatformCampaignView({
             </p>
             <div className="mt-2">
               <CampaignLink
+                workspace={workspace}
                 brandId={brand.id}
                 brandSlug={brandSlug}
                 platformCampaignId={platformCampaign.id}

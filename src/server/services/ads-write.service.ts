@@ -15,7 +15,7 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 
-import { and, desc, eq, isNotNull, isNull } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
 
 import {
   adWriteIdempotencyKey,
@@ -1207,10 +1207,17 @@ export async function syncBrandPlatformAudiences(input: {
         const externalId =
           audience.platformAudienceId ?? audience.id ?? audience._id;
         if (!externalId || !audience.name) continue;
+        const zernioId = audience.id ?? audience._id;
         const existing = await db.query.platformAudienceTable.findFirst({
           where: and(
             eq(platformAudienceTable.channelId, channel.id),
-            eq(platformAudienceTable.externalId, externalId),
+            or(
+              eq(platformAudienceTable.externalId, externalId),
+              // A row created in Growth before Meta returned its id.
+              zernioId
+                ? sql`${platformAudienceTable.definition}->>'id' = ${zernioId}`
+                : undefined,
+            ),
           ),
           columns: { id: true },
         });
@@ -1399,11 +1406,11 @@ export async function createAdAudience(
   });
 
   // Mirror the platform asset locally so it is visible on the brand's ads
-  // page and linked to the first-party target it fulfils.
-  const externalId =
-    (typeof provider.id === "string" ? provider.id : undefined) ??
-    (typeof provider._id === "string" ? provider._id : undefined) ??
-    null;
+  // page and linked to the first-party target it fulfils. Same shape as the
+  // sync: externalId is the platform's id, definition is Zernio's record
+  // (whose id the member upload needs).
+  const audience = provider.audience;
+  const externalId = audience?.platformAudienceId ?? null;
   const channel = await db.query.channelTable.findFirst({
     where: and(
       eq(channelTable.brandId, destination.brand.id),
@@ -1427,6 +1434,7 @@ export async function createAdAudience(
         type: input.type === "lookalike" ? "lookalike" : "custom",
         source: input.type === "lookalike" ? "lookalike_seed" : "customer_list",
         externalId,
+        definition: audience ?? null,
       })
       .returning();
   }
@@ -1447,9 +1455,47 @@ export async function createAdAudience(
  * log the rows themselves.
  */
 export async function addAdAudienceUsers(input: {
-  audienceId: string;
+  platformAudienceId: string;
+  organizationId: string;
   users: ZernioAudienceUser[];
 }) {
+  const [row] = await db
+    .select({
+      definition: platformAudienceTable.definition,
+      organizationId: brandTable.organizationId,
+    })
+    .from(platformAudienceTable)
+    .innerJoin(brandTable, eq(brandTable.id, platformAudienceTable.brandId))
+    .where(
+      and(
+        eq(platformAudienceTable.id, input.platformAudienceId),
+        isNull(brandTable.deletedAt),
+      ),
+    )
+    .limit(1);
+  if (!row || row.organizationId !== input.organizationId) {
+    throw new Error("Audience not found in this organization");
+  }
+  const record = (row.definition ?? {}) as Record<string, unknown>;
+  const zernioId =
+    typeof record.id === "string"
+      ? record.id
+      : typeof record._id === "string"
+        ? record._id
+        : null;
+  // Audiences made directly in Meta are listed with no Zernio id, and the
+  // upload endpoint only addresses Zernio's own records.
+  if (!zernioId) {
+    throw new Error(
+      "This audience was not created through Zernio, so it cannot take member uploads here. Create a customer_list audience with createAudience and upload to that.",
+    );
+  }
+  if (typeof record.type === "string" && record.type !== "customer_list") {
+    throw new Error(
+      `Only customer_list audiences take member uploads; this one is ${record.type}.`,
+    );
+  }
+  const audienceId = zernioId;
   let uploaded = 0;
   try {
     for (
@@ -1461,7 +1507,7 @@ export async function addAdAudienceUsers(input: {
         offset,
         offset + ZERNIO_AUDIENCE_USERS_MAX_PER_REQUEST,
       );
-      await addUsersToZernioAdAudience(input.audienceId, chunk);
+      await addUsersToZernioAdAudience(audienceId, chunk);
       uploaded += chunk.length;
     }
   } catch (error) {
@@ -1469,7 +1515,11 @@ export async function addAdAudienceUsers(input: {
       `Audience upload failed after ${uploaded}/${input.users.length} members: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
-  return { audienceId: input.audienceId, uploaded, total: input.users.length };
+  return {
+    platformAudienceId: input.platformAudienceId,
+    uploaded,
+    total: input.users.length,
+  };
 }
 
 /**

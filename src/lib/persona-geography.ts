@@ -3,7 +3,7 @@ import { z } from "zod";
 /**
  * A persona's structured demand geography: where the guests we want come FROM.
  * The reusable, brand-level source a campaign audience derives from. Kept in
- * one place so the tRPC router, the AI capability, and the editor agree on the
+ * one place so the oRPC router, the AI capability, and the editor agree on the
  * shape. Mirrors a campaign audience's geography on purpose.
  */
 export const demandGeographySchema = z.object({

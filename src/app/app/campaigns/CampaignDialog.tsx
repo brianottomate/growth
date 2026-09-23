@@ -27,7 +27,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import { platformLabel } from "@/components/channel-logos";
 import type { ChannelPlatform, CampaignStatus } from "@/server/db/schema";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 export type CampaignDraft = {
   id?: string;
@@ -105,7 +105,6 @@ export function CampaignDialog({
   brands: { id: string; name: string }[];
   initial?: CampaignDraft;
 }) {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
   const isEdit = Boolean(initial?.id);
 
@@ -142,16 +141,16 @@ export function CampaignDialog({
   }, [open, initial, brands]);
 
   const invalidate = async () => {
-    await queryClient.invalidateQueries(trpc.campaign.overview.queryOptions());
+    await queryClient.invalidateQueries(orpc.campaign.overview.queryOptions());
     if (initial?.id) {
       await queryClient.invalidateQueries(
-        trpc.campaign.get.queryOptions({ id: initial.id }),
+        orpc.campaign.get.queryOptions({ input: { id: initial.id } }),
       );
     }
   };
 
   const create = useMutation(
-    trpc.campaign.create.mutationOptions({
+    orpc.campaign.create.mutationOptions({
       onSuccess: async () => {
         await invalidate();
         onOpenChange(false);
@@ -160,7 +159,7 @@ export function CampaignDialog({
     }),
   );
   const update = useMutation(
-    trpc.campaign.update.mutationOptions({
+    orpc.campaign.update.mutationOptions({
       onSuccess: async () => {
         await invalidate();
         onOpenChange(false);

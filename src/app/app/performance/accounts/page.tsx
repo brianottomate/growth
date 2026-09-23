@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { getSession } from "@/server/better-auth/server";
-import { HydrateClient, prefetch, trpc } from "@/trpc/server";
+import { HydrateClient, prefetch, orpc } from "@/orpc/server";
 import { PerformanceClient } from "../PerformanceClient";
 
 export const metadata: Metadata = {
@@ -16,7 +16,7 @@ export default async function PerformancePage() {
   const session = await getSession();
   if (!session?.user) redirect("/signin");
 
-  prefetch(trpc.performance.list.queryOptions());
+  prefetch(orpc.performance.list.queryOptions({ input: {} }));
 
   return (
     <HydrateClient>

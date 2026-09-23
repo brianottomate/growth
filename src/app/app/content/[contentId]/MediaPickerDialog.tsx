@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, Expand, Film, Image as ImageIcon } from "lucide-react";
 
-import { useTRPC, type RouterOutputs } from "@/trpc/react";
+import { orpc, type RouterOutputs } from "@/orpc/client";
 import { MediaLightbox } from "@/app/app/media/MediaLightbox";
 import { useMediaUpload } from "@/app/app/media/use-media-upload";
 import { SimpleDialog } from "@/components/ui/dialog";
@@ -37,9 +37,8 @@ export function MediaPickerDialog({
   onPick: (item: MediaItem) => void;
   existingAssetIds: string[];
 }) {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const listOptions = trpc.media.list.queryOptions({ brandId });
+  const listOptions = orpc.media.list.queryOptions({ input: { brandId } });
   const { data: assets = [], isLoading } = useQuery({
     ...listOptions,
     enabled: open,

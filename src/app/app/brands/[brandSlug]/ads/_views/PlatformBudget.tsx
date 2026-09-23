@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 import { money } from "./format";
 
@@ -29,7 +29,6 @@ export function PlatformBudget({
   budget: number | null;
   budgetType: string | null;
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState(budget != null ? String(budget) : "");
@@ -38,7 +37,7 @@ export function PlatformBudget({
   );
 
   const save = useMutation(
-    trpc.ads.setPlatformDraft.mutationOptions({
+    orpc.ads.setPlatformDraft.mutationOptions({
       onSuccess: () => {
         setOpen(false);
         router.refresh();

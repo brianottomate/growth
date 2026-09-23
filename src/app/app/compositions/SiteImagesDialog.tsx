@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/toast";
 import { cn } from "@/components/ui/lib/utils";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 /**
  * The images on the brand's own site, read on demand. Nothing enters the
@@ -34,13 +34,12 @@ export function SiteImagesDialog({
   ) => void | Promise<void>;
   label?: string;
 }) {
-  const trpc = useTRPC();
   const [open, setOpen] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [failed, setFailed] = useState<Set<string>>(new Set());
 
   const scrape = useQuery({
-    ...trpc.media.siteImages.queryOptions({ brandId }),
+    ...orpc.media.siteImages.queryOptions({ input: { brandId } }),
     enabled: open,
     staleTime: 5 * 60 * 1000,
   });
@@ -51,7 +50,7 @@ export function SiteImagesDialog({
   );
 
   const importImages = useMutation(
-    trpc.media.importUrls.mutationOptions({
+    orpc.media.importUrls.mutationOptions({
       onSuccess: async (result) => {
         toast.success(
           `${result.assets.length} image${result.assets.length === 1 ? "" : "s"} in the library`,

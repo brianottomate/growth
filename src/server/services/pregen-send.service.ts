@@ -3,7 +3,9 @@ import "server-only";
 import { and, eq, isNull } from "drizzle-orm";
 
 import { PREGEN_SEQUENCE_SENDER_EMAIL } from "@/lib/pregen-sequence";
-import { createCaller } from "@/server/api/root";
+import { createRouterClient } from "@orpc/server";
+
+import { appRouter } from "@/server/api/root";
 import { db } from "@/server/db";
 import { leadContactTable, leadDomainTable } from "@/server/db/leads-schema";
 import { storedContactMentions } from "@/server/services/lead-correspondence";
@@ -79,12 +81,14 @@ export async function enrolPregenDomains(
   // protectedProcedure only checks that a session user exists; the mutations
   // themselves never read it. The caller's gate is the authentication here, so
   // the caller carries a synthetic identity naming the invoking surface.
-  const caller = createCaller({
-    db,
-    session: { user: options.actor },
-    authApi: null,
-    headers: new Headers(),
-  } as never);
+  const caller = createRouterClient(appRouter, {
+    context: {
+      db,
+      session: { user: options.actor },
+      authApi: null,
+      headers: new Headers(),
+    } as never,
+  });
 
   const results: PregenSendResult[] = [];
   for (const domain of domains) {

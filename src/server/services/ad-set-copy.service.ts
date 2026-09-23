@@ -4,14 +4,22 @@ import { anthropic } from "@ai-sdk/anthropic";
 import { Output, generateText } from "ai";
 import { z } from "zod";
 
+import {
+  amenityHook,
+  amenitySource,
+  rankAmenities,
+  type RankedAmenity,
+} from "@/lib/home-amenities";
+
 // The words an ad set runs on, written from what the client's own site says.
 //
-// Two surfaces, two rules. The PRIMARY TEXT is the caption above the image:
-// the feed cuts it off after about 125 characters, behind a "more", so it is
-// one or two short sentences that hook and name the place, not a feature dump.
-// The CARD is drawn into the image by the renderer, which cannot draw most
-// emoji and has no room for a paragraph, so it gets a short line and nothing
-// else. The features live in the composition, not the caption.
+// Two surfaces, two rules. The PRIMARY TEXT is the caption above the image,
+// and it follows the team's post template: a hook line with one emoji, emoji
+// bullets for the amenities, the facts, a short paragraph, a closing line. The
+// feed shows the first line or two before "more", so the hook carries the
+// ad on its own. The CARD is drawn into the image by the renderer, which
+// cannot draw most emoji and has no room for a paragraph, so it gets a short
+// line and nothing else.
 //
 // Everything is grounded in the listing: its amenity labels and its own
 // description. The model is told to use nothing else, because an invented
@@ -19,11 +27,11 @@ import { z } from "zod";
 
 const MODEL = "claude-sonnet-5";
 
-/** The feed truncates primary text past this, so the caption is written to it. */
-const BODY_MAX = 125;
+/** Under the 1,200 the ad editor accepts, with room for an operator's edit. */
+const BODY_MAX = 900;
 
 const HomeCopySchema = z.object({
-  /** The caption: one or two short sentences, under what the feed truncates. */
+  /** The caption, in the per-home template. */
   primaryText: z.string().min(20).max(BODY_MAX),
   /** Meta's headline, under the image. */
   headline: z.string().max(60),
@@ -65,34 +73,88 @@ const facts = (home: CopyHome) =>
     .filter(Boolean)
     .join(" · ");
 
+/** The template's facts bullet: "🛏️ 4 bedrooms · 3.5 bathrooms · Sleeps 12". */
+const factsBullet = (home: CopyHome) => {
+  const line = [
+    home.bedrooms ? `${home.bedrooms} bedrooms` : null,
+    home.bathrooms ? `${home.bathrooms} bathrooms` : null,
+    home.guests ? `Sleeps ${home.guests}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return line ? `🛏️ ${line}` : null;
+};
+
+const town = (place: string) => place.split(",")[0]?.trim() ?? "";
+
+/** Amenities most of the set shares, best first: what the portfolio can promise. */
+function sharedAmenities(homes: CopyHome[]) {
+  const counts = new Map<string, { row: RankedAmenity; n: number }>();
+  for (const home of homes) {
+    for (const row of rankAmenities(
+      amenitySource(home.amenities, home.description),
+    )) {
+      const seen = counts.get(row.key);
+      counts.set(row.key, { row, n: (seen?.n ?? 0) + 1 });
+    }
+  }
+  return [...counts.values()]
+    .filter(({ n }) => n * 2 >= homes.length)
+    .map(({ row }) => row);
+}
+
 /**
  * Copy from the facts alone: the deterministic first pass, and the model's
- * fallback. Home name as the headline and the on-card title, the body from
- * the facts and amenities. No persuasion; that is the AI copy pass's job.
+ * fallback. Already in the post template's shape, with bullets from the real
+ * amenity labels, so a shell reads like the finished caption and the AI pass
+ * only has to write the hook and the paragraph.
  */
 export function deterministicSetCopy(
   homes: CopyHome[],
   brandName: string,
 ): AdSetCopy {
   const where = homes[0]?.place ?? "";
+  const place = town(where);
+  const shared = sharedAmenities(homes).slice(0, 4);
+  const sleepsUpTo = Math.max(0, ...homes.map((home) => home.guests ?? 0));
+  const setText = [
+    `Your next ${place ? `${place} ` : ""}escape starts here 🏡`,
+    place ? `🏡 Homes in ${place}` : null,
+    ...shared.map((row) => row.bullet),
+    sleepsUpTo >= 8 ? `👨‍👩‍👧‍👦 Homes that sleep up to ${sleepsUpTo}` : null,
+    "",
+    `Book direct with ${brandName}.`,
+  ]
+    .filter((line) => line !== null)
+    .join("\n");
+  const setHeadline = (
+    place ? `Your ${place} escape starts here` : brandName
+  ).slice(0, 60);
   return {
-    homes: homes.map((home) => ({
-      // A shell's body is one factual line, under Meta's limit on purpose: it
-      // says what the home is and gets out of the way, so the copy pass has
-      // room to write the pitch. The old fact-dump overflowed and read broken.
-      primaryText:
-        [facts(home), home.place].filter(Boolean).join(" · ") || home.name,
-      headline: home.name.slice(0, 60),
-      cardTitle: home.name.slice(0, 52),
-    })),
-    portfolioPrimaryText: `${homes.length} homes${where ? ` in ${where}` : ""}, booked direct with ${brandName}.`,
-    portfolioHeadline: where
-      ? `Stay in ${where}`.slice(0, 60)
-      : brandName.slice(0, 60),
-    catalogPrimaryText: `Find your ${where || "next"} stay with ${brandName}.`,
-    catalogHeadline: where
-      ? `Homes in ${where}`.slice(0, 60)
-      : brandName.slice(0, 60),
+    homes: homes.map((home) => {
+      const labels = amenitySource(home.amenities, home.description);
+      const hook = amenityHook(labels);
+      return {
+        primaryText: [
+          `Your ${town(home.place) ? `${town(home.place)} ` : ""}getaway starts here 🏡`,
+          ...rankAmenities(labels)
+            .slice(0, 5)
+            .map((row) => row.bullet),
+          factsBullet(home),
+          "",
+          `Book ${home.name} direct with ${brandName}.`,
+        ]
+          .filter((line) => line !== null)
+          .join("\n")
+          .slice(0, BODY_MAX),
+        headline: home.name.slice(0, 60),
+        cardTitle: (hook?.hook ?? home.name).slice(0, 52),
+      };
+    }),
+    portfolioPrimaryText: setText,
+    portfolioHeadline: setHeadline,
+    catalogPrimaryText: setText,
+    catalogHeadline: setHeadline,
   };
 }
 
@@ -121,14 +183,42 @@ export async function writeAdSetCopy(input: {
       output: Output.object({ schema: SetCopySchema }),
       system: [
         "You write paid-social ad copy for a vacation-rental manager.",
-        "Use ONLY the facts given for each home. Never invent an amenity, a rating, a distance, a price or availability. If a home has no hot tub listed, it has no hot tub.",
+        "Use ONLY the facts given for each home. Never invent an amenity, a rating, a distance, a price or availability. If a home has no hot tub listed, it has no hot tub. Never call an amenity private unless the facts say so.",
         "",
-        `primaryText is the caption above the image, and the feed cuts it off after about ${BODY_MAX} characters. Write ONE or TWO short sentences, at most about 110 characters in total, that name the place and give the single best reason to stay. No bullet lists, no line breaks, no feature dumps: the image already carries the facts. At most one emoji, and only if it earns its place.`,
+        "Every primaryText follows the team's post template, one item per line:",
+        "1. A hook line naming the place, ending with one fitting emoji.",
+        "2. Four to six amenity bullets, each starting with an emoji. Lead with the amenities a guest would book for (hot tub, pool, game room, views, fire pit) before the utilities; never list wifi, linens or kitchen basics.",
+        "3. For a single home, a facts bullet: 🛏️ 4 bedrooms · 3.5 bathrooms · Sleeps 12.",
+        "4. A blank line, then one or two sentences on who the home is for and what a stay feels like, taken from their description.",
+        "5. A short closing line, such as “Your next mountain getaway awaits.”",
         "",
-        "headline is the short line under the image. No emoji.",
-        "cardTitle is drawn INTO the image by a renderer that cannot draw emoji and has little room: at most six words, no emoji, no punctuation at the end.",
+        "Example for one home:",
+        "Escape to luxury in the heart of Winter Park 🏔️",
+        "♨️ Private rooftop hot tub + fire pit",
+        "🌊 Riverfront location with mountain views",
+        "🎱 Game room with pool table + air hockey",
+        "🔥 Outdoor grill",
+        "🛏️ 4 bedrooms · 3.5 bathrooms · Sleeps 12",
         "",
-        "Vary the openings across homes. Do not start every home the same way.",
+        "With two king master suites, a fun bunk room, and plenty of space to gather, this villa is made for cozy nights and mountain adventures.",
+        "Your next mountain getaway awaits.",
+        "",
+        "Example for the catalog and portfolio captions:",
+        "Your next mountain escape starts here 🏔️",
+        "🏡 Luxury homes in Winter Park",
+        "✨ Spacious homes made for groups",
+        "♨️ Private hot tubs + outdoor spaces",
+        "🎿 Minutes from the best of Winter Park",
+        "",
+        "Whether you're planning a family escape, a ski trip with friends, or a long weekend in the mountains, find a home made for unforgettable stays.",
+        "Your mountain getaway awaits.",
+        "",
+        "The examples show the shape and tone only; their amenities are not facts about these homes. A portfolio or catalog bullet may only claim what most of the homes have.",
+        "",
+        "headline is the short line under the image. No emoji. For the catalog and portfolio, never write “Homes in <place>”: lead on what the homes offer.",
+        "cardTitle is drawn INTO the image by a renderer that cannot draw emoji and has little room: at most six words, no emoji, no punctuation at the end. Lead on the home's best amenity, not its name.",
+        "",
+        "Vary the hooks across homes. Do not start every home the same way.",
         "No exclamation marks, no all-caps, no hashtags, no invented superlatives.",
       ].join("\n"),
       prompt: [

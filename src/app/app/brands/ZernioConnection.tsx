@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 /**
  * Map one owned brand to one Zernio profile; its connected accounts become
@@ -39,13 +39,12 @@ export function ZernioConnectDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const [profileId, setProfileId] = useState(currentProfileId ?? "");
   const [error, setError] = useState<string | null>(null);
 
   const catalogQ = useQuery({
-    ...trpc.zernio.catalog.queryOptions(),
+    ...orpc.zernio.catalog.queryOptions(),
     enabled: open,
   });
   const catalog = catalogQ.data;
@@ -65,7 +64,7 @@ export function ZernioConnectDialog({
   }, [catalog?.profiles, currentProfileId, open, profileId]);
 
   const connectM = useMutation(
-    trpc.zernio.connectProfile.mutationOptions({
+    orpc.zernio.connectProfile.mutationOptions({
       onSuccess: () => {
         onOpenChange(false);
         setError(null);

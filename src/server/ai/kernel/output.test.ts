@@ -62,24 +62,21 @@ describe("Growth output boundary", () => {
     ).toBe(false);
   });
 
-  test("legacy service errors become structured failure envelopes", async () => {
+  test("a successful result may carry its own error field", async () => {
     const tool = growthDomainTool({
       description: "Read",
       actions: {
         get: growthAction({
           description: "Get",
           inputSchema: z.object({}),
-          outputSchema: z.object({ id: z.string() }),
-          execute: async (): Promise<unknown> => ({
-            error: "Record not found",
-            id: null,
-          }),
+          outputSchema: z.object({ id: z.string(), error: z.string() }),
+          execute: async () => ({ id: "vid_1", error: "Transcode failed" }),
         }),
       },
     });
     expect(await tool.run({ action: "get" }, context)).toMatchObject({
-      ok: false,
-      error: { code: "tool_failed" },
+      ok: true,
+      data: { id: "vid_1", error: "Transcode failed" },
     });
   });
 

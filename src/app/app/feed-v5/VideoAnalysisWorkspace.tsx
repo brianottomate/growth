@@ -27,7 +27,7 @@ import {
   renderVideoStoryboard,
   type StoryboardProgress,
 } from "@/lib/video-storyboard";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import type { V5Entry } from "./V5Client";
 
 export const VIDEO_DETAIL_VIEWS = [
@@ -147,26 +147,27 @@ export function VideoAnalysisWorkspace({
   onViewChange: (view: VideoDetailView) => void;
   onActionConsumed: () => void;
 }) {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
   const videoRef = useRef<HTMLVideoElement>(null);
   const automaticRun = useRef<string | null>(null);
   const [progress, setProgress] = useState<StoryboardProgress | null>(null);
   const [pendingSeekMs, setPendingSeekMs] = useState<number | null>(null);
   const media = entry.media[mediaIndex];
-  const queryOptions = trpc.media.videoAnalysis.queryOptions({
-    platformPostId: entry.id,
-    mediaIndex,
+  const queryOptions = orpc.media.videoAnalysis.queryOptions({
+    input: {
+      platformPostId: entry.id,
+      mediaIndex,
+    },
   });
   const analysisQuery = useQuery(queryOptions);
   const prepare = useMutation(
-    trpc.media.prepareVideoAnalysis.mutationOptions(),
+    orpc.media.prepareVideoAnalysis.mutationOptions(),
   );
   const saveRender = useMutation(
-    trpc.media.saveVideoAnalysisRender.mutationOptions(),
+    orpc.media.saveVideoAnalysisRender.mutationOptions(),
   );
   const complete = useMutation(
-    trpc.media.completeVideoAnalysis.mutationOptions(),
+    orpc.media.completeVideoAnalysis.mutationOptions(),
   );
   const busy = prepare.isPending || saveRender.isPending || complete.isPending;
   const analysis = analysisQuery.data;

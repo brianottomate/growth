@@ -18,7 +18,7 @@ import { toast } from "@/components/ui/toast";
 import type { HomeCatalogCopy, PreviewSpec } from "@/lib/home-ad-previews";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 import type { AdPreviewCard } from "@/server/services/brand-ad-previews.service";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 import { OnDemandTile } from "./OnDemandTile";
 import {
@@ -102,7 +102,6 @@ export function AdPreviewsSection({
   };
 }) {
   const [surface, setSurface] = useState<AdMockSurface>("facebook");
-  const trpc = useTRPC();
   const router = useRouter();
   // The Studio works from a library copy of the photo, so opening an
   // on-demand card imports its hero first (or finds the earlier import).
@@ -136,7 +135,7 @@ export function AdPreviewsSection({
         };
   };
   const remove = useMutation(
-    trpc.brand.removeAdPreview.mutationOptions({
+    orpc.brand.removeAdPreview.mutationOptions({
       onSuccess: () => {
         toast.success(
           "Removed from the previews; the card stays in the library",

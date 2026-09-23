@@ -17,7 +17,7 @@ Separation costs no token plumbing, because the plugin registers its providers i
 
 ```
 UI (GoogleDriveImportDialog)
-  └─ tRPC googleDrive.{status,browse,importFiles,importFolder}
+  └─ oRPC googleDrive.{status,browse,importFiles,importFolder}
        └─ google-drive.service   ← getAccessToken("google-drive") (refresh)
             └─ google-drive.client (thin, origin-checked fetch on Drive v3)
                  └─ MediaService.importImageBuffer → R2 + media_asset row

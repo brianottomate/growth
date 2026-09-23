@@ -48,7 +48,7 @@ export function ByHomeView({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const back = `/app/brands/${brandSlug}/ads/${campaignId}`;
+  const back = pathname.replace(/\/by-home$/, "");
 
   const sections: {
     key: string;

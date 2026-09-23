@@ -9,7 +9,7 @@ import type { DiscoveryResult } from "./lead-discovery.service";
  * via a single AI synthesis pass (generateText + Output.object, matching the
  * wander-fit.ts pattern). No DB write; returns the typed object for inspection.
  *
- * Callable from tRPC and scripts.
+ * Callable from oRPC and scripts.
  */
 
 const EXTRACTION_MODEL = "claude-sonnet-5";
@@ -204,7 +204,7 @@ export async function extractFromDiscovery(
   };
 }
 
-/** Convenience: discover + extract in one call (used by the tRPC enrich mutation). */
+/** Convenience: discover + extract in one call (used by the oRPC enrich mutation). */
 export async function discoverAndExtract(
   discovery: DiscoveryResult,
 ): Promise<ExtractionResult> {

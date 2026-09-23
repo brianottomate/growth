@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 /**
  * Launch/Pause. Resuming a campaign starts real spend, so the click routes
@@ -32,12 +32,11 @@ export function DeliverySwitch({
   hasExternalId: boolean;
   spendLine: string;
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
 
   const toggle = useMutation(
-    trpc.ads.setCampaignDelivery.mutationOptions({
+    orpc.ads.setCampaignDelivery.mutationOptions({
       onSuccess: () => {
         setConfirming(false);
         router.refresh();

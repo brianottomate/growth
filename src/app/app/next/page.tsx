@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Loader2, MessageSquare, Users } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 /**
  * The assistant's home. The conversation itself lives in the persistent dock
@@ -16,10 +16,9 @@ import { useTRPC } from "@/trpc/react";
  * second create path here.
  */
 export default function NextPage() {
-  const trpc = useTRPC();
   const searchParams = useSearchParams();
   const activeThreadId = searchParams.get("thread");
-  const threadsQuery = useQuery(trpc.creativeWork.listThreads.queryOptions());
+  const threadsQuery = useQuery(orpc.creativeWork.listThreads.queryOptions());
 
   return (
     <div className="space-y-6">

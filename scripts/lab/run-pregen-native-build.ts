@@ -12,7 +12,7 @@ import { runBuildToCompletion } from "../../src/server/services/pregen/pipeline"
 //
 //   bun --conditions=react-server scripts/lab/run-pregen-native-build.ts <domain-or-url>
 //
-// The tRPC mutation is the same thing behind an auth check and an `after()`
+// The oRPC mutation is the same thing behind an auth check and an `after()`
 // chain, which needs a request context. This is the lab entry point: same
 // steps, same checkpoints, same rows, no server.
 

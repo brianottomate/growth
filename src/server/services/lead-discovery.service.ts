@@ -18,7 +18,7 @@ import {
  * domain and return the RAW results, fault-tolerant and inspectable. No AI,
  * no DB. This is the input to lead-extraction.service.ts.
  *
- * Callable from tRPC and from scripts (plain args in, plain object out).
+ * Callable from oRPC and from scripts (plain args in, plain object out).
  */
 
 export type ProviderResult =

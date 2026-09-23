@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
-import { useTRPC, type RouterOutputs } from "@/trpc/react";
+import { orpc, type RouterOutputs } from "@/orpc/client";
 
 type Group = RouterOutputs["content"]["groupingSuggestions"][number];
 
@@ -147,7 +147,7 @@ function GroupCard({
   status,
 }: {
   g: Group;
-  onResolve: (id: string, accept: boolean) => void;
+  onResolve: (group: { id: string; brandId: string }, accept: boolean) => void;
   status?: "accepted" | "rejected";
 }) {
   const [showAmp, setShowAmp] = useState(false);
@@ -224,13 +224,13 @@ function GroupCard({
           ) : (
             <>
               <button
-                onClick={() => onResolve(g.id, true)}
+                onClick={() => onResolve(g, true)}
                 className="rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-500"
               >
                 Accept
               </button>
               <button
-                onClick={() => onResolve(g.id, false)}
+                onClick={() => onResolve(g, false)}
                 className="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-accent"
               >
                 Reject
@@ -288,8 +288,7 @@ function GroupCard({
 }
 
 export function GroupingsClient() {
-  const trpc = useTRPC();
-  const opts = trpc.content.groupingSuggestions.queryOptions();
+  const opts = orpc.content.groupingSuggestions.queryOptions();
   const { data: groups = [], isLoading } = useQuery(opts);
 
   // Keep accepted/rejected rows in the list (just badge them) until reload, so
@@ -299,21 +298,28 @@ export function GroupingsClient() {
     Record<string, "accepted" | "rejected">
   >({});
   const resolve = useMutation(
-    trpc.content.resolveGrouping.mutationOptions({
+    orpc.content.resolveGrouping.mutationOptions({
       onError: (_err, vars) =>
         setResolved((prev) => {
           const next = { ...prev };
-          delete next[vars.id];
+          delete next[vars.proposalId];
           return next;
         }),
     }),
   );
-  const onResolve = (id: string, accept: boolean) => {
+  const onResolve = (
+    group: { id: string; brandId: string },
+    accept: boolean,
+  ) => {
     setResolved((prev) => ({
       ...prev,
-      [id]: accept ? "accepted" : "rejected",
+      [group.id]: accept ? "accepted" : "rejected",
     }));
-    resolve.mutate({ id, accept });
+    resolve.mutate({
+      brandId: group.brandId,
+      proposalId: group.id,
+      decision: accept ? "accept" : "reject",
+    });
   };
 
   const [filter, setFilter] = useState<ContentFilter>("all");

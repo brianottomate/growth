@@ -1,8 +1,9 @@
 import { and, eq } from "drizzle-orm";
-import { TRPCError } from "@trpc/server";
+import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { actionProcedure, protectedProcedure } from "@/server/api/orpc";
+import { syncOwnedBrandContent } from "@/server/ai/capabilities/operations";
 import { brandTable, memberTable } from "@/server/db/schema";
 import { type db } from "@/server/db";
 import { createId } from "@/server/db/utils";
@@ -10,12 +11,6 @@ import {
   connectBrandToZernioProfile,
   getZernioBrandCatalog,
 } from "@/server/services/zernio-brand.service";
-import { syncBrandContent } from "@/server/services/content-sync.service";
-import {
-  failContentIngestRun,
-  finishContentIngestRun,
-  startContentIngestRun,
-} from "@/server/services/platform-post-ingest.service";
 
 async function assertOwnedBrandAccess(
   ctx: {
@@ -27,11 +22,9 @@ async function assertOwnedBrandAccess(
   const brand = await ctx.db.query.brandTable.findFirst({
     where: eq(brandTable.id, brandId),
   });
-  if (!brand)
-    throw new TRPCError({ code: "NOT_FOUND", message: "Brand not found" });
+  if (!brand) throw new ORPCError("NOT_FOUND", { message: "Brand not found" });
   if (!brand.organizationId) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
+    throw new ORPCError("BAD_REQUEST", {
       message: "Tracked brands do not receive Zernio workspace profiles",
     });
   }
@@ -42,10 +35,7 @@ async function assertOwnedBrandAccess(
     ),
   });
   if (!membership) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "No access to this brand",
-    });
+    throw new ORPCError("FORBIDDEN", { message: "No access to this brand" });
   }
   return brand;
 }
@@ -61,46 +51,15 @@ function slugify(name: string) {
   );
 }
 
-export const zernioRouter = createTRPCRouter({
-  catalog: protectedProcedure.query(() => getZernioBrandCatalog()),
+export const zernioRouter = {
+  catalog: protectedProcedure.handler(() => getZernioBrandCatalog()),
 
   /** Explicit owned-brand history fetch. No cron or automatic refresh. */
-  syncHistory: protectedProcedure
-    .input(
-      z.object({
-        brandId: z.string(),
-        monthsBack: z.number().int().min(1).max(12).default(6),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      await assertOwnedBrandAccess(ctx, input.brandId);
-      const to = new Date();
-      const from = new Date(to);
-      from.setUTCMonth(from.getUTCMonth() - input.monthsBack);
-      const runId = await startContentIngestRun({
-        brandId: input.brandId,
-        requestedById: ctx.session.user.id,
-        mode: "owned_backfill",
-        provider: "zernio+x_api",
-        requestedFrom: from,
-        requestedTo: to,
-      });
-      try {
-        const result = await syncBrandContent({
-          brandId: input.brandId,
-          monthsBack: input.monthsBack,
-        });
-        await finishContentIngestRun(runId, result);
-        return { runId, ...result };
-      } catch (error) {
-        await failContentIngestRun(runId, error);
-        throw error;
-      }
-    }),
+  syncHistory: actionProcedure(syncOwnedBrandContent),
 
   connectProfile: protectedProcedure
     .input(z.object({ brandId: z.string(), profileId: z.string().min(1) }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertOwnedBrandAccess(ctx, input.brandId);
       try {
         return await connectBrandToZernioProfile(
@@ -108,14 +67,17 @@ export const zernioRouter = createTRPCRouter({
           input.profileId,
         );
       } catch (error) {
-        throw new TRPCError({
-          code:
-            error instanceof Error && error.message.includes("already assigned")
-              ? "CONFLICT"
-              : "BAD_REQUEST",
-          message:
-            error instanceof Error ? error.message : "Could not connect Zernio",
-        });
+        throw new ORPCError(
+          error instanceof Error && error.message.includes("already assigned")
+            ? "CONFLICT"
+            : "BAD_REQUEST",
+          {
+            message:
+              error instanceof Error
+                ? error.message
+                : "Could not connect Zernio",
+          },
+        );
       }
     }),
 
@@ -133,21 +95,19 @@ export const zernioRouter = createTRPCRouter({
           .max(50),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const membership = await ctx.db.query.memberTable.findFirst({
         where: eq(memberTable.userId, ctx.session.user.id),
       });
       if (!membership) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
+        throw new ORPCError("FORBIDDEN", {
           message: "You must belong to an organization to import brands",
         });
       }
 
       const catalog = await getZernioBrandCatalog();
       if (!catalog.configured) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
+        throw new ORPCError("PRECONDITION_FAILED", {
           message: "Zernio is not configured",
         });
       }
@@ -215,8 +175,7 @@ export const zernioRouter = createTRPCRouter({
           });
         } catch (error) {
           await ctx.db.delete(brandTable).where(eq(brandTable.id, brand.id));
-          throw new TRPCError({
-            code: "BAD_REQUEST",
+          throw new ORPCError("BAD_REQUEST", {
             message:
               error instanceof Error
                 ? error.message
@@ -227,4 +186,4 @@ export const zernioRouter = createTRPCRouter({
 
       return { imported, skipped };
     }),
-});
+};

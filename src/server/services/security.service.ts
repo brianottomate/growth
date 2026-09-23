@@ -1,6 +1,6 @@
 import "server-only";
 
-import { TRPCError } from "@trpc/server";
+import { ORPCError } from "@orpc/server";
 import { and, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/server/db";
@@ -58,14 +58,10 @@ export async function loadOrganizationWithAccess(
   ]);
 
   if (!organization) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Organization not found",
-    });
+    throw new ORPCError("NOT_FOUND", { message: "Organization not found" });
   }
   if (!membership) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
+    throw new ORPCError("FORBIDDEN", {
       message: "You don't have access to this organization",
     });
   }

@@ -39,7 +39,7 @@ The command validates the full body and evidence, then writes `preview.html`,
 ## Move the preview into Growth
 
 Use the assistant's approval-gated `createProductUpdateDraft` capability, or
-the equivalent `newsletter.createProductUpdateDraft` tRPC mutation, with the
+the equivalent `newsletter.createProductUpdateDraft` oRPC mutation, with the
 validated proposal fields and the correct Growth brand ID. This creates the
 content slot, canonical document, and first immutable revision together.
 

@@ -12,7 +12,7 @@ import {
   ImageUpload,
   type ImageUploadResult,
 } from "@/components/ui/upload/ImageUpload";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 /**
  * User profile image upload component.
@@ -21,12 +21,10 @@ import { useTRPC } from "@/trpc/react";
 export function UserProfileImageUpload() {
   const [uploading, setUploading] = useState(false);
   const router = useRouter();
-  const trpc = useTRPC();
-
-  const { data: user } = useQuery(trpc.user.me.queryOptions());
+  const { data: user } = useQuery(orpc.user.me.queryOptions());
 
   const updateProfileMutation = useMutation(
-    trpc.user.updateProfile.mutationOptions({
+    orpc.user.updateProfile.mutationOptions({
       onSuccess: () => {
         toast.success("Profile image updated successfully");
         router.refresh();

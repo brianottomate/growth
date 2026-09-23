@@ -19,7 +19,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import type { BrandIdentity } from "@/server/db/brand-schema";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 const MATCHES_SHOWN = 60;
 
@@ -77,11 +77,10 @@ function FontField({
   disabled: boolean;
   onChange: (family: string) => void;
 }) {
-  const trpc = useTRPC();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const catalog = useQuery({
-    ...trpc.brand.fontCatalog.queryOptions(),
+    ...orpc.brand.fontCatalog.queryOptions(),
     enabled: open,
     staleTime: Infinity,
   });

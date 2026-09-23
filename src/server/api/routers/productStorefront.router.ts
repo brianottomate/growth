@@ -1,66 +1,43 @@
-import { TRPCError } from "@trpc/server";
+import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
 import {
   ProductStorefrontError,
-  assignStorefrontManager,
-  assignStorefrontManagerSchema,
-  confirmStorefrontSchema,
-  confirmStorefrontUpToDate,
-  copyStorefrontContent,
-  copyStorefrontContentSchema,
-  createProduct,
-  createProductSchema,
-  createStorefront,
-  createStorefrontSchema,
-  getProduct,
-  getStorefront,
   listProductBrandAssets,
   listProductEditors,
-  listProducts,
-  listStorefronts,
-  markStorefrontStale,
-  markStorefrontStaleSchema,
-  resolveProductOrganizationId,
-  updateProduct,
-  updateProductSchema,
-  updateStorefront,
-  updateStorefrontSchema,
   type ProductStorefrontActor,
 } from "@/server/services/product-storefront.service";
-import {
-  captureStorefrontReference,
-  captureStorefrontReferenceSchema,
-  listStorefrontReferenceBrands,
-  listStorefrontReferences,
-  removeStorefrontReference,
-  removeStorefrontReferenceSchema,
-} from "@/server/services/storefront-reference.service";
+import { listStorefrontReferenceBrands } from "@/server/services/storefront-reference.service";
 
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { workspaceProcedure, actionProcedure } from "@/server/api/orpc";
+import {
+  readProductAtlas,
+  readProductStorefront,
+  listProductStorefronts,
+  listProductStorefrontReferences,
+  createProductAtlasProduct,
+  updateProductAtlas,
+  createProductStorefront,
+  updateProductStorefront,
+  markProductStorefrontStale,
+  confirmProductStorefrontCurrent,
+  assignProductStorefrontManager,
+  copySiblingStorefrontContent,
+  captureProductStorefrontReference,
+  removeProductStorefrontReference,
+} from "@/server/ai/capabilities/product-storefront";
 
 function mapServiceError(error: unknown): never {
   if (error instanceof ProductStorefrontError) {
-    throw new TRPCError({
-      code: error.code,
-      message: error.message,
-      cause: error,
-    });
+    throw new ORPCError(error.code, { message: error.message, cause: error });
   }
   throw error;
 }
 
-async function actorFor(ctx: {
-  session: {
-    user: { id: string };
-    session: { activeOrganizationId?: string | null };
-  };
-}): Promise<ProductStorefrontActor> {
-  const orgId = await resolveProductOrganizationId({
-    userId: ctx.session.user.id,
-    preferredOrganizationId: ctx.session.session.activeOrganizationId,
-  });
-  return { orgId, userId: ctx.session.user.id, kind: "human" };
+function actorFor(ctx: {
+  workspace: { orgId: string; userId: string };
+}): ProductStorefrontActor {
+  return { ...ctx.workspace, kind: "human" };
 }
 
 const run = async <T>(
@@ -68,97 +45,40 @@ const run = async <T>(
   operation: (actor: ProductStorefrontActor) => Promise<T>,
 ) => {
   try {
-    return await operation(await actorFor(ctx));
+    return await operation(actorFor(ctx));
   } catch (error) {
     mapServiceError(error);
   }
 };
 
-export const productStorefrontRouter = createTRPCRouter({
-  listProducts: protectedProcedure.query(({ ctx }) =>
-    run(ctx, (actor) => listProducts(actor)),
-  ),
-  getProduct: protectedProcedure
-    .input(z.object({ productId: z.string() }))
-    .query(({ ctx, input }) =>
-      run(ctx, (actor) => getProduct(actor, input.productId)),
-    ),
-  listStorefronts: protectedProcedure.query(({ ctx }) =>
-    run(ctx, (actor) => listStorefronts(actor)),
-  ),
-  getStorefront: protectedProcedure
-    .input(z.object({ storefrontId: z.string() }))
-    .query(({ ctx, input }) =>
-      run(ctx, (actor) => getStorefront(actor, input.storefrontId)),
-    ),
-  listEditors: protectedProcedure.query(({ ctx }) =>
+export const productStorefrontRouter = {
+  getProduct: actionProcedure(readProductAtlas),
+  listStorefronts: actionProcedure(listProductStorefronts),
+  getStorefront: actionProcedure(readProductStorefront),
+  listEditors: workspaceProcedure.handler(({ context: ctx }) =>
     run(ctx, (actor) => listProductEditors(actor)),
   ),
-  listBrandAssets: protectedProcedure
+  listBrandAssets: workspaceProcedure
     .input(z.object({ brandId: z.string() }))
-    .query(({ ctx, input }) =>
+    .handler(({ context: ctx, input }) =>
       run(ctx, (actor) => listProductBrandAssets(actor, input.brandId)),
     ),
-  listReferenceBrands: protectedProcedure
+  listReferenceBrands: workspaceProcedure
     .input(z.object({ storefrontId: z.string().min(1) }))
-    .query(({ ctx, input }) =>
+    .handler(({ context: ctx, input }) =>
       run(ctx, (actor) =>
         listStorefrontReferenceBrands(actor, input.storefrontId),
       ),
     ),
-  listReferences: protectedProcedure
-    .input(z.object({ storefrontId: z.string().min(1) }))
-    .query(({ ctx, input }) =>
-      run(ctx, (actor) => listStorefrontReferences(actor, input.storefrontId)),
-    ),
-  createProduct: protectedProcedure
-    .input(createProductSchema)
-    .mutation(({ ctx, input }) =>
-      run(ctx, (actor) => createProduct(actor, input)),
-    ),
-  updateProduct: protectedProcedure
-    .input(updateProductSchema)
-    .mutation(({ ctx, input }) =>
-      run(ctx, (actor) => updateProduct(actor, input)),
-    ),
-  createStorefront: protectedProcedure
-    .input(createStorefrontSchema)
-    .mutation(({ ctx, input }) =>
-      run(ctx, (actor) => createStorefront(actor, input)),
-    ),
-  updateStorefront: protectedProcedure
-    .input(updateStorefrontSchema)
-    .mutation(({ ctx, input }) =>
-      run(ctx, (actor) => updateStorefront(actor, input)),
-    ),
-  markStale: protectedProcedure
-    .input(markStorefrontStaleSchema)
-    .mutation(({ ctx, input }) =>
-      run(ctx, (actor) => markStorefrontStale(actor, input)),
-    ),
-  confirmUpToDate: protectedProcedure
-    .input(confirmStorefrontSchema)
-    .mutation(({ ctx, input }) =>
-      run(ctx, (actor) => confirmStorefrontUpToDate(actor, input)),
-    ),
-  assignManager: protectedProcedure
-    .input(assignStorefrontManagerSchema)
-    .mutation(({ ctx, input }) =>
-      run(ctx, (actor) => assignStorefrontManager(actor, input)),
-    ),
-  copySiblingContent: protectedProcedure
-    .input(copyStorefrontContentSchema)
-    .mutation(({ ctx, input }) =>
-      run(ctx, (actor) => copyStorefrontContent(actor, input)),
-    ),
-  captureReference: protectedProcedure
-    .input(captureStorefrontReferenceSchema)
-    .mutation(({ ctx, input }) =>
-      run(ctx, (actor) => captureStorefrontReference(actor, input)),
-    ),
-  removeReference: protectedProcedure
-    .input(removeStorefrontReferenceSchema)
-    .mutation(({ ctx, input }) =>
-      run(ctx, (actor) => removeStorefrontReference(actor, input)),
-    ),
-});
+  listReferences: actionProcedure(listProductStorefrontReferences),
+  createProduct: actionProcedure(createProductAtlasProduct),
+  updateProduct: actionProcedure(updateProductAtlas),
+  createStorefront: actionProcedure(createProductStorefront),
+  updateStorefront: actionProcedure(updateProductStorefront),
+  markStale: actionProcedure(markProductStorefrontStale),
+  confirmUpToDate: actionProcedure(confirmProductStorefrontCurrent),
+  assignManager: actionProcedure(assignProductStorefrontManager),
+  copySiblingContent: actionProcedure(copySiblingStorefrontContent),
+  captureReference: actionProcedure(captureProductStorefrontReference),
+  removeReference: actionProcedure(removeProductStorefrontReference),
+};

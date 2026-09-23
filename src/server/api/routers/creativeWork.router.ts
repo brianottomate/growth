@@ -1,9 +1,10 @@
-import { TRPCError } from "@trpc/server";
+import { ORPCError } from "@orpc/server";
 import { and, desc, eq, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 
 import { CREATIVE_IMAGE_MODEL_IDS } from "@/lib/creative-image-models";
-import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
+import { resolvePageContext } from "@/server/ai/kernel/resolve-page-context";
+import { workspaceProcedure, protectedProcedure } from "@/server/api/orpc";
 import { type db } from "@/server/db";
 import {
   assistantMessageTable,
@@ -12,13 +13,11 @@ import {
   contentPostTable,
   creativeRunTable,
   memberTable,
-  productionPacketTable,
 } from "@/server/db/schema";
 import { isFalConfigured } from "@/server/clients/fal.client";
 import { isGeminiImageConfigured } from "@/server/clients/gemini-image.client";
 import {
   acceptCreativeCandidate,
-  createProductionPacket,
   refreshCreativeRun,
   submitPacketForImageGeneration,
 } from "@/server/services/creative-work.service";
@@ -31,7 +30,7 @@ async function membershipForUser(database: Database, userId: string) {
     columns: { organizationId: true },
   });
   if (!membership) {
-    throw new TRPCError({ code: "FORBIDDEN", message: "No organization" });
+    throw new ORPCError("FORBIDDEN", { message: "No organization" });
   }
   return membership;
 }
@@ -53,17 +52,22 @@ async function accessibleThread(
     ),
   });
   if (!thread)
-    throw new TRPCError({ code: "NOT_FOUND", message: "Session not found" });
+    throw new ORPCError("NOT_FOUND", { message: "Session not found" });
   return thread;
 }
 
-export const creativeWorkRouter = createTRPCRouter({
-  configuration: protectedProcedure.query(() => ({
+export const creativeWorkRouter = {
+  pageContext: workspaceProcedure
+    .input(z.object({ path: z.string() }))
+    .handler(({ input, context }) =>
+      resolvePageContext(input.path, context.workspace.orgId),
+    ),
+  configuration: protectedProcedure.handler(() => ({
     falConfigured: isFalConfigured,
     googleConfigured: isGeminiImageConfigured,
   })),
 
-  listThreads: protectedProcedure.query(async ({ ctx }) => {
+  listThreads: protectedProcedure.handler(async ({ context: ctx }) => {
     const membership = await membershipForUser(ctx.db, ctx.session.user.id);
     return ctx.db.query.assistantThreadTable.findMany({
       where: and(
@@ -95,7 +99,7 @@ export const creativeWorkRouter = createTRPCRouter({
         contentPostId: z.string().optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const membership = await membershipForUser(ctx.db, ctx.session.user.id);
       let contentBrandId: string | undefined;
       if (input.contentPostId) {
@@ -108,7 +112,7 @@ export const creativeWorkRouter = createTRPCRouter({
           with: { brand: { columns: { organizationId: true } } },
         });
         if (content?.brand?.organizationId !== membership.organizationId) {
-          throw new TRPCError({ code: "FORBIDDEN" });
+          throw new ORPCError("FORBIDDEN");
         }
         contentBrandId = content.brandId;
       }
@@ -121,11 +125,10 @@ export const creativeWorkRouter = createTRPCRouter({
           ),
           columns: { id: true },
         });
-        if (!brand) throw new TRPCError({ code: "FORBIDDEN" });
+        if (!brand) throw new ORPCError("FORBIDDEN");
       }
       if (input.brandId && contentBrandId && input.brandId !== contentBrandId) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
+        throw new ORPCError("BAD_REQUEST", {
           message: "Content does not belong to that brand",
         });
       }
@@ -140,8 +143,7 @@ export const creativeWorkRouter = createTRPCRouter({
         })
         .returning();
       if (!thread) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
+        throw new ORPCError("INTERNAL_SERVER_ERROR", {
           message: "Could not create session",
         });
       }
@@ -150,7 +152,7 @@ export const creativeWorkRouter = createTRPCRouter({
 
   getThread: protectedProcedure
     .input(z.object({ threadId: z.string() }))
-    .query(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const membership = await membershipForUser(ctx.db, ctx.session.user.id);
       const thread = await accessibleThread(
         ctx.db,
@@ -165,159 +167,6 @@ export const creativeWorkRouter = createTRPCRouter({
       return { thread, messages: messages.map((row) => row.message) };
     }),
 
-  renameThread: protectedProcedure
-    .input(
-      z.object({
-        threadId: z.string(),
-        title: z.string().trim().min(1).max(120),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const membership = await membershipForUser(ctx.db, ctx.session.user.id);
-      const thread = await accessibleThread(
-        ctx.db,
-        input.threadId,
-        membership.organizationId,
-        ctx.session.user.id,
-      );
-      if (thread.createdBy !== ctx.session.user.id)
-        throw new TRPCError({ code: "FORBIDDEN" });
-      const [updated] = await ctx.db
-        .update(assistantThreadTable)
-        .set({ title: input.title })
-        .where(eq(assistantThreadTable.id, thread.id))
-        .returning();
-      return updated;
-    }),
-
-  setThreadContext: protectedProcedure
-    .input(
-      z.object({
-        threadId: z.string(),
-        brandId: z.string().nullable().optional(),
-        contentPostId: z.string().nullable().optional(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const membership = await membershipForUser(ctx.db, ctx.session.user.id);
-      const thread = await accessibleThread(
-        ctx.db,
-        input.threadId,
-        membership.organizationId,
-        ctx.session.user.id,
-      );
-      if (thread.createdBy !== ctx.session.user.id)
-        throw new TRPCError({ code: "FORBIDDEN" });
-      if (input.brandId) {
-        const brand = await ctx.db.query.brandTable.findFirst({
-          where: and(
-            eq(brandTable.id, input.brandId),
-            eq(brandTable.organizationId, membership.organizationId),
-            isNull(brandTable.deletedAt),
-          ),
-          columns: { id: true },
-        });
-        if (!brand) throw new TRPCError({ code: "FORBIDDEN" });
-      }
-      if (input.contentPostId) {
-        const content = await ctx.db.query.contentPostTable.findFirst({
-          where: and(
-            eq(contentPostTable.id, input.contentPostId),
-            isNull(contentPostTable.deletedAt),
-          ),
-          columns: { brandId: true },
-          with: { brand: { columns: { organizationId: true } } },
-        });
-        if (
-          content?.brand?.organizationId !== membership.organizationId ||
-          (input.brandId && content.brandId !== input.brandId)
-        ) {
-          throw new TRPCError({ code: "FORBIDDEN" });
-        }
-      }
-      const [updated] = await ctx.db
-        .update(assistantThreadTable)
-        .set({
-          ...(input.brandId !== undefined
-            ? { pinnedBrandId: input.brandId }
-            : {}),
-          ...(input.contentPostId !== undefined
-            ? { activeContentPostId: input.contentPostId }
-            : {}),
-        })
-        .where(eq(assistantThreadTable.id, thread.id))
-        .returning();
-      return updated;
-    }),
-
-  deleteThread: protectedProcedure
-    .input(z.object({ threadId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      const membership = await membershipForUser(ctx.db, ctx.session.user.id);
-      const thread = await accessibleThread(
-        ctx.db,
-        input.threadId,
-        membership.organizationId,
-        ctx.session.user.id,
-      );
-      if (thread.createdBy !== ctx.session.user.id)
-        throw new TRPCError({ code: "FORBIDDEN" });
-      await ctx.db
-        .delete(assistantThreadTable)
-        .where(eq(assistantThreadTable.id, thread.id));
-      return { ok: true as const };
-    }),
-
-  listPackets: protectedProcedure
-    .input(
-      z.object({
-        threadId: z.string().optional(),
-        brandId: z.string().optional(),
-      }),
-    )
-    .query(async ({ ctx, input }) => {
-      const membership = await membershipForUser(ctx.db, ctx.session.user.id);
-      return ctx.db.query.productionPacketTable.findMany({
-        where: and(
-          eq(productionPacketTable.organizationId, membership.organizationId),
-          input.threadId
-            ? eq(productionPacketTable.threadId, input.threadId)
-            : undefined,
-          input.brandId
-            ? eq(productionPacketTable.brandId, input.brandId)
-            : undefined,
-        ),
-        orderBy: [desc(productionPacketTable.createdAt)],
-        limit: 50,
-      });
-    }),
-
-  createPacket: protectedProcedure
-    .input(
-      z.object({
-        brandId: z.string(),
-        contentPostId: z.string().optional(),
-        threadId: z.string().optional(),
-        title: z.string().trim().min(1).max(160),
-        purpose: z.string().trim().optional(),
-        prompt: z.string().trim().min(1),
-        negativePrompt: z.string().trim().optional(),
-        aspectRatio: z.string().trim().optional(),
-        outputFormat: z.string().trim().optional(),
-        suggestedTool: z.string().trim().optional(),
-        instructions: z.string().trim().optional(),
-        referenceMediaAssetIds: z.array(z.string()).max(12).optional(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const membership = await membershipForUser(ctx.db, ctx.session.user.id);
-      return createProductionPacket({
-        ...input,
-        organizationId: membership.organizationId,
-        userId: ctx.session.user.id,
-      });
-    }),
-
   submitImage: protectedProcedure
     .input(
       z.object({
@@ -325,7 +174,7 @@ export const creativeWorkRouter = createTRPCRouter({
         modelProfile: z.enum(CREATIVE_IMAGE_MODEL_IDS),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const membership = await membershipForUser(ctx.db, ctx.session.user.id);
       return submitPacketForImageGeneration({
         ...input,
@@ -336,7 +185,7 @@ export const creativeWorkRouter = createTRPCRouter({
 
   latestRunForPacket: protectedProcedure
     .input(z.object({ packetId: z.string() }))
-    .query(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const membership = await membershipForUser(ctx.db, ctx.session.user.id);
       return (
         (await ctx.db.query.creativeRunTable.findFirst({
@@ -349,23 +198,9 @@ export const creativeWorkRouter = createTRPCRouter({
       );
     }),
 
-  getRun: protectedProcedure
-    .input(z.object({ runId: z.string() }))
-    .query(async ({ ctx, input }) => {
-      const membership = await membershipForUser(ctx.db, ctx.session.user.id);
-      const run = await ctx.db.query.creativeRunTable.findFirst({
-        where: and(
-          eq(creativeRunTable.id, input.runId),
-          eq(creativeRunTable.organizationId, membership.organizationId),
-        ),
-      });
-      if (!run) throw new TRPCError({ code: "NOT_FOUND" });
-      return run;
-    }),
-
   refreshRun: protectedProcedure
     .input(z.object({ runId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const membership = await membershipForUser(ctx.db, ctx.session.user.id);
       return refreshCreativeRun({
         runId: input.runId,
@@ -380,7 +215,7 @@ export const creativeWorkRouter = createTRPCRouter({
         candidateIndex: z.number().int().min(0).max(8),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const membership = await membershipForUser(ctx.db, ctx.session.user.id);
       return acceptCreativeCandidate({
         ...input,
@@ -388,4 +223,4 @@ export const creativeWorkRouter = createTRPCRouter({
         userId: ctx.session.user.id,
       });
     }),
-});
+};

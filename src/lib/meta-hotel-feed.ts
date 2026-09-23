@@ -4,6 +4,8 @@
 //
 // Catalog exports enrich address fields from the warehouse before freezing.
 
+import { rankAmenities } from "./home-amenities";
+
 export type HotelFeedHome = {
   streetAddress?: string | null;
   streetAddress2?: string | null;
@@ -26,6 +28,8 @@ export type HotelFeedHome = {
   guests?: number | null;
   /** Cheapest nightly rate in whole dollars. */
   nightlyFrom?: number | null;
+  /** WanderOS amenity labels, when the listing detail was read. */
+  amenities?: string[] | null;
 };
 
 export type HotelFeedRow = {
@@ -82,6 +86,11 @@ const COUNTRY_NAMES: Record<string, string> = {
   MX: "Mexico",
 };
 
+const listSentence = (items: string[]) =>
+  items.length < 2
+    ? (items[0] ?? "")
+    : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
+
 const plural = (n: number, one: string, many: string) =>
   `${n} ${n === 1 ? one : many}`;
 
@@ -93,8 +102,15 @@ export function hotelFeedDescription(home: HotelFeedHome): string {
     home.bathrooms ? plural(home.bathrooms, "bath", "baths") : null,
     home.guests ? `sleeps ${home.guests}` : null,
   ].filter((part): part is string => Boolean(part));
+  // Lead on what the home has; the name is already the row's title.
+  const selling = rankAmenities(home.amenities)
+    .slice(0, 3)
+    .map((row) => row.hook.toLowerCase());
+  const opener = selling.length
+    ? `${listSentence(selling)}${where ? ` in ${where}` : ""}.`
+    : `${home.name}${where ? ` in ${where}` : ""}.`;
   const parts = [
-    `${home.name}${where ? ` in ${where}` : ""}.`,
+    opener,
     facts.length > 0 ? `${facts.join(", ")}.` : null,
     home.nightlyFrom
       ? `From $${home.nightlyFrom.toLocaleString("en-US")} a night.`

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { Pencil, X } from "lucide-react";
 
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { Button } from "@/components/ui/button";
 import { DeleteAlert } from "@/components/ui/alert-dialog";
 import { toast } from "@/components/ui/toast";
@@ -54,7 +54,6 @@ export function PeopleManager({
   pending: PendingRow[];
   currentUserId: string;
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const [editTarget, setEditTarget] = useState<MemberRow | null>(null);
   const [removeTarget, setRemoveTarget] = useState<MemberRow | null>(null);
@@ -62,7 +61,7 @@ export function PeopleManager({
   const refresh = () => router.refresh();
 
   const removeMember = useMutation(
-    trpc.org.removeMember.mutationOptions({
+    orpc.org.removeMember.mutationOptions({
       onSuccess: () => {
         toast.success("Member removed");
         setRemoveTarget(null);
@@ -73,7 +72,7 @@ export function PeopleManager({
   );
 
   const cancelInvitation = useMutation(
-    trpc.org.cancelInvitation.mutationOptions({
+    orpc.org.cancelInvitation.mutationOptions({
       onSuccess: () => {
         toast.success("Invitation canceled");
         refresh();

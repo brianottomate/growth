@@ -1,9 +1,9 @@
 import type { Database } from "@/server/db";
 import { z } from "zod";
 import { and, eq, inArray } from "drizzle-orm";
-import { TRPCError } from "@trpc/server";
+import { ORPCError } from "@orpc/server";
 
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { protectedProcedure } from "@/server/api/orpc";
 import {
   brandTable,
   channelPlatformEnum,
@@ -30,7 +30,7 @@ async function assertBrandAccess(ctx: Ctx, brandId: string) {
     columns: { organizationId: true },
   });
   if (!brand?.organizationId) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Brand not found" });
+    throw new ORPCError("NOT_FOUND", { message: "Brand not found" });
   }
   const membership = await ctx.db.query.memberTable.findFirst({
     where: and(
@@ -38,17 +38,17 @@ async function assertBrandAccess(ctx: Ctx, brandId: string) {
       eq(memberTable.organizationId, brand.organizationId),
     ),
   });
-  if (!membership) throw new TRPCError({ code: "FORBIDDEN" });
+  if (!membership) throw new ORPCError("FORBIDDEN");
 }
 
 const VALID_PLATFORMS = new Set<string>(channelPlatformEnum.enumValues);
 const noon = (ymd: string) => new Date(`${ymd}T12:00:00`);
 
-export const rescheduleRouter = createTRPCRouter({
+export const rescheduleRouter = {
   /** Generate a reshuffle proposal (no writes) — moves + slot fills to review. */
   generate: protectedProcedure
     .input(z.object({ brandId: z.string(), year: z.number().int() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandAccess(ctx, input.brandId);
       const { plan, spots } = await generateReschedule(
         input.brandId,
@@ -75,7 +75,7 @@ export const rescheduleRouter = createTRPCRouter({
 
   /** Apply the accepted moves + slots. Moves re-date owned spots; slots mint
    *  empty `status:"slot"` placeholders (idea + one channel spot) on the day.
-   *  (Named `applyPlan` — `apply` is a tRPC-reserved procedure name.) */
+   *  */
   applyPlan: protectedProcedure
     .input(
       z.object({
@@ -91,7 +91,7 @@ export const rescheduleRouter = createTRPCRouter({
         ),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandAccess(ctx, input.brandId);
 
       let moved = 0;
@@ -160,4 +160,4 @@ export const rescheduleRouter = createTRPCRouter({
 
       return { moved, created };
     }),
-});
+};

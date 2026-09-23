@@ -3,12 +3,12 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { OwnerAvatar } from "@/components/assignment/assignee";
 import { PILLAR_BY_SLUG } from "@/lib/pillars";
 import { cn } from "@/components/ui/lib/utils";
-import type { RouterOutputs } from "@/trpc/react";
+import type { RouterOutputs } from "@/orpc/client";
 
 type Row = RouterOutputs["content"]["grid"][number];
 
@@ -76,9 +76,8 @@ export function ContentSheet({
   pillar?: string;
   onOpen: (id: string) => void;
 }) {
-  const trpc = useTRPC();
   const { data: rows = [], isLoading } = useQuery(
-    trpc.content.grid.queryOptions({ brandId, pillar }),
+    orpc.content.grid.queryOptions({ input: { brandId, pillar } }),
   );
 
   // Month "workbooks" derived from the rows' effective publish dates.

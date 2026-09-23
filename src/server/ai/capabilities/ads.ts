@@ -1,3 +1,5 @@
+import { env } from "@/env";
+import { campaignPath } from "@/lib/campaign-navigation";
 import {
   adsScopeOutputSchema,
   topAdsOutputSchema,
@@ -270,6 +272,7 @@ export const draftCampaignAction = growthAction({
       ),
     landingUrl: z.string().url().optional(),
     goal: z.string().trim().max(200).optional(),
+    description: z.string().trim().max(2000).optional(),
     budget: z
       .number()
       .int()
@@ -278,11 +281,35 @@ export const draftCampaignAction = growthAction({
       .describe("Total intended budget in whole dollars."),
     campaignId: z.string().trim().min(1).optional(),
   }),
-  execute: async (input, ctx) =>
-    createDraftCampaign({
+  execute: async (input, ctx) => {
+    const result = await createDraftCampaign({
       ...input,
       organizationId: ctx.orgId,
-    }),
+    });
+    return {
+      ...result,
+      handoff: {
+        reviewUrl: new URL(
+          campaignPath(
+            result.brandSlug ?? result.campaign.brandId,
+            result.campaign.id,
+            "performance",
+          ),
+          env.NEXT_PUBLIC_BASE_URL,
+        ).href,
+        brandId: result.campaign.brandId,
+        campaignId: result.campaign.id,
+        reviewPath: campaignPath(
+          result.brandSlug ?? result.campaign.brandId,
+          result.campaign.id,
+          "performance",
+        ),
+        state: "draft" as const,
+        nextAction:
+          "Review the creative, audience and platform plan in Growth. Provider push and delivery require in-app approval.",
+      },
+    };
+  },
 });
 
 export const createSpecializedMetaDraftAction = growthAction({
@@ -473,13 +500,13 @@ export const createAudienceAction = growthAction({
 export const addAudienceUsersAction = growthAction({
   outputSchema: addAudienceUsersActionOutputSchema,
   description:
-    "Upload members (plaintext email and/or phone; Zernio hashes server-side) to an existing customer_list audience. Batches of 10,000 per request; partial progress is reported on failure so a retry can resume rather than duplicate.",
+    "Upload members (plaintext email and/or phone; Zernio hashes server-side) to a customer_list audience created through createAudience. Audiences made directly in Meta cannot take uploads. Batches of 10,000 per request; partial progress is reported on failure so a retry can resume rather than duplicate.",
   inputSchema: z.object({
-    audienceId: z
+    platformAudienceId: z
       .string()
       .trim()
       .min(1)
-      .describe("The platform audience id returned by createAudience."),
+      .describe("The platformAudienceId (paud_…) returned by createAudience."),
     users: z
       .array(
         z.object({
@@ -490,7 +517,8 @@ export const addAudienceUsersAction = growthAction({
       .min(1)
       .max(50_000),
   }),
-  execute: async (input) => addAdAudienceUsers(input),
+  execute: async (input, ctx) =>
+    addAdAudienceUsers({ ...input, organizationId: ctx.orgId }),
 });
 
 export const draftAdAction = growthAction({
@@ -689,7 +717,36 @@ export const openCampaignAction = growthAction({
       .min(1)
       .describe("A camp_ id, from the campaign URL or adsRead.listCampaigns."),
   }),
-  execute: async (input, ctx) => getDraftCampaign(ctx.orgId, input.campaignId),
+  execute: async (input, ctx) => {
+    const result = await getDraftCampaign(ctx.orgId, input.campaignId);
+    return {
+      ...result,
+      handoff: {
+        reviewUrl: new URL(
+          campaignPath(
+            result.brand.slug ?? result.brand.id,
+            result.campaign.id,
+            "performance",
+          ),
+          env.NEXT_PUBLIC_BASE_URL,
+        ).href,
+        brandId: result.brand.id,
+        campaignId: result.campaign.id,
+        reviewPath: campaignPath(
+          result.brand.slug ?? result.brand.id,
+          result.campaign.id,
+          "performance",
+        ),
+        state: result.platformCampaigns.some((row) => row.status === "live")
+          ? ("live" as const)
+          : result.platformCampaigns.some((row) => row.externalId)
+            ? ("pushed" as const)
+            : ("draft" as const),
+        nextAction:
+          "Review this campaign in Growth. Provider changes require the in-app approval flow; local draft edits remain available here.",
+      },
+    };
+  },
 });
 
 export const previewAdAction = growthAction({
@@ -863,6 +920,11 @@ export const addAudienceAction = growthAction({
       .max(20)
       .optional()
       .describe('ISO country codes, e.g. ["US"].'),
+    states: z
+      .array(z.string().trim().length(2))
+      .max(60)
+      .optional()
+      .describe('US state codes, e.g. ["CO"]. Send regions alongside them.'),
     regions: z
       .array(z.string().trim().min(1).max(100))
       .max(60)
@@ -870,6 +932,7 @@ export const addAudienceAction = growthAction({
       .describe(
         'Region/state names, e.g. ["California"] — resolved to platform geo keys at push.',
       ),
+    cities: z.array(z.string().trim().min(1).max(120)).max(100).optional(),
     keywords: z
       .array(z.string().trim().min(1).max(80))
       .max(50)
@@ -893,8 +956,16 @@ export const addAudienceAction = growthAction({
       ageMin: input.ageMin ?? null,
       ageMax: input.ageMax ?? null,
       geography:
-        input.countries?.length || input.regions?.length
-          ? { countries: input.countries, regions: input.regions }
+        input.countries?.length ||
+        input.states?.length ||
+        input.regions?.length ||
+        input.cities?.length
+          ? {
+              countries: input.countries,
+              states: input.states?.map((code) => code.toUpperCase()),
+              regions: input.regions,
+              cities: input.cities,
+            }
           : null,
       keywords: input.keywords ?? null,
       organizationId: ctx.orgId,
@@ -911,7 +982,9 @@ export const updateAudienceAction = growthAction({
     ageMin: z.number().int().min(13).max(100).nullish(),
     ageMax: z.number().int().min(13).max(100).nullish(),
     countries: z.array(z.string().length(2)).max(20).optional(),
+    states: z.array(z.string().trim().length(2)).max(60).optional(),
     regions: z.array(z.string().trim().min(1).max(100)).max(60).optional(),
+    cities: z.array(z.string().trim().min(1).max(120)).max(100).optional(),
     keywords: z.array(z.string().trim().min(1).max(80)).max(50).optional(),
   }),
   examples: [
@@ -927,8 +1000,16 @@ export const updateAudienceAction = growthAction({
       ageMin: input.ageMin,
       ageMax: input.ageMax,
       geography:
-        input.countries !== undefined || input.regions !== undefined
-          ? { countries: input.countries, regions: input.regions }
+        input.countries !== undefined ||
+        input.states !== undefined ||
+        input.regions !== undefined ||
+        input.cities !== undefined
+          ? {
+              countries: input.countries,
+              states: input.states?.map((code) => code.toUpperCase()),
+              regions: input.regions,
+              cities: input.cities,
+            }
           : undefined,
       keywords: input.keywords,
       organizationId: ctx.orgId,
@@ -1017,22 +1098,24 @@ export const setPlatformDraftAction = growthAction({
       .number()
       .int()
       .positive()
-      .optional()
-      .describe("Whole currency units — the number the push will send."),
-    budgetType: z.enum(["daily", "lifetime"]).optional(),
+      .nullish()
+      .describe(
+        "Whole currency units — the number the push will send. null clears it.",
+      ),
+    budgetType: z.enum(["daily", "lifetime"]).nullish(),
     startAt: z
       .string()
       .datetime()
-      .optional()
+      .nullish()
       .describe(
-        "Optional ISO start; overrides the campaign. For Meta, set startWhenLaunched false when scheduling, true to start on launch.",
+        "Optional ISO start; overrides the campaign, null clears it. For Meta, set startWhenLaunched false when scheduling, true to start on launch.",
       ),
     endAt: z
       .string()
       .datetime()
-      .optional()
+      .nullish()
       .describe(
-        "ISO end for this platform's flight. REQUIRED by a lifetime budget — the push refuses one without an end date, and this is the only place to set it.",
+        "ISO end for this platform's flight, null clears it. REQUIRED by a lifetime budget — the push refuses one without an end date, and this is the only place to set it.",
       ),
     google: z
       .object({
@@ -1070,9 +1153,14 @@ export const setPlatformDraftAction = growthAction({
           .describe(
             "No end date; daily budgets only. False allows a scheduled or inherited end.",
           ),
-        pixelId: z.string().trim().min(1).optional(),
-        customEventType: z.string().trim().min(1).optional(),
-        customConversionId: z.string().trim().min(1).optional(),
+        pixelId: z
+          .string()
+          .trim()
+          .max(64)
+          .optional()
+          .describe("Empty string drops the override."),
+        customEventType: z.string().trim().max(64).optional(),
+        customConversionId: z.string().trim().max(64).optional(),
         conversionScope: z
           .enum(["host", "pixel"])
           .optional()
@@ -1111,8 +1199,8 @@ export const setPlatformDraftAction = growthAction({
     setPlatformDraft({
       ...input,
       organizationId: ctx.orgId,
-      ...(startAt ? { startAt: new Date(startAt) } : {}),
-      ...(endAt ? { endAt: new Date(endAt) } : {}),
+      startAt: startAt == null ? startAt : new Date(startAt),
+      endAt: endAt == null ? endAt : new Date(endAt),
     }),
 });
 
@@ -1269,6 +1357,8 @@ export const buildAdSetAction = growthAction({
       propertyIds: input.propertyIds,
       count: input.count,
       userId: ctx.userId,
+      // A person drawing the set writes the words after the cards look right.
+      copy: ctx.surface === "app" ? "defer" : "ai",
     });
     return { ok: true as const, ...result };
   },
@@ -1498,7 +1588,7 @@ export const setPlacementCopyAction = growthAction({
         body: input.body === "" ? null : input.body,
         callToAction: input.callToAction === "" ? null : input.callToAction,
       },
-      via: "ai",
+      via: ctx.surface === "app" ? "manual" : "ai",
     }),
 });
 

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { OwnerAvatar } from "@/components/assignment/assignee";
 
 const rel = (iso: string) => {
@@ -30,15 +30,14 @@ export function CommentThread({
   contentPostId: string;
   currentUserId: string;
 }) {
-  const trpc = useTRPC();
   const qc = useQueryClient();
-  const opts = trpc.content.comments.queryOptions({ contentPostId });
+  const opts = orpc.content.comments.queryOptions({ input: { contentPostId } });
   const { data: comments = [] } = useQuery(opts);
   const invalidate = () => qc.invalidateQueries({ queryKey: opts.queryKey });
 
   const [body, setBody] = useState("");
   const add = useMutation(
-    trpc.content.addComment.mutationOptions({
+    orpc.content.addComment.mutationOptions({
       onSuccess: () => {
         setBody("");
         void invalidate();
@@ -46,7 +45,7 @@ export function CommentThread({
     }),
   );
   const del = useMutation(
-    trpc.content.deleteComment.mutationOptions({ onSuccess: invalidate }),
+    orpc.content.deleteComment.mutationOptions({ onSuccess: invalidate }),
   );
 
   const submit = () => {

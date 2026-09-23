@@ -1,7 +1,6 @@
-import type { TRPCRouterRecord } from "@trpc/server";
 import { z } from "zod";
 
-import { protectedProcedure } from "../trpc";
+import { protectedProcedure } from "@/server/api/orpc";
 import {
   DRAFT_PILLS,
   INTENT_TAGS,
@@ -15,7 +14,7 @@ export const redditRouter = {
    * runs them through Claude Haiku 4.5 for relevance scoring.
    * Returns the scored list sorted by relevance (desc).
    */
-  scanNow: protectedProcedure.mutation(async () => {
+  scanNow: protectedProcedure.handler(async () => {
     return scanAndScore();
   }),
 
@@ -45,8 +44,8 @@ export const redditRouter = {
         customInstructions: z.string().max(500).optional(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .handler(async ({ input }) => {
       const draft = await draftReplyForPost(input);
       return { draft };
     }),
-} satisfies TRPCRouterRecord;
+};

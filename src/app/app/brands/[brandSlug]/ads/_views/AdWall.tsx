@@ -45,7 +45,7 @@ import {
   cardCapacity,
 } from "@/lib/performance-ads";
 import type { MediaItem } from "@/server/db/schema";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 import {
   HomePicker,
@@ -246,7 +246,6 @@ export function AdTile({
   allowHomeBinding?: boolean;
 }) {
   const router = useRouter();
-  const trpc = useTRPC();
   const [card, setCard] = useState(0);
   const [editing, setEditing] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -265,13 +264,13 @@ export function AdTile({
   const onError = (error: { message: string }) => toast.error(error.message);
   const refresh = () => router.refresh();
   const setStatus = useMutation(
-    trpc.ads.setAdStatus.mutationOptions({ onSuccess: refresh, onError }),
+    orpc.ads.setAdStatus.mutationOptions({ onSuccess: refresh, onError }),
   );
   const setTextOnly = useMutation(
-    trpc.ads.setAdTextOnly.mutationOptions({ onSuccess: refresh, onError }),
+    orpc.ads.setAdTextOnly.mutationOptions({ onSuccess: refresh, onError }),
   );
   const setCopy = useMutation(
-    trpc.ads.setAdCopy.mutationOptions({
+    orpc.ads.setAdCopy.mutationOptions({
       onSuccess: () => {
         toast.success("Copy saved.");
         setEditing(false);
@@ -281,10 +280,10 @@ export function AdTile({
     }),
   );
   const editCards = useMutation(
-    trpc.ads.editAdCards.mutationOptions({ onSuccess: refresh, onError }),
+    orpc.ads.editAdCards.mutationOptions({ onSuccess: refresh, onError }),
   );
   const setHome = useMutation(
-    trpc.ads.setAdHome.mutationOptions({
+    orpc.ads.setAdHome.mutationOptions({
       onSuccess: (result) => {
         toast.success(
           result.homeName
@@ -297,7 +296,7 @@ export function AdTile({
     }),
   );
   const remove = useMutation(
-    trpc.ads.deleteAd.mutationOptions({ onSuccess: refresh, onError }),
+    orpc.ads.deleteAd.mutationOptions({ onSuccess: refresh, onError }),
   );
 
   const capacity = cardCapacity(ad.format);

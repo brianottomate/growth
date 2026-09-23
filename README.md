@@ -9,7 +9,7 @@ It started from a T3 SaaS starter, but the center of gravity is now Wander-speci
 - Gives the growth team an operational workspace for brands, channels, content, campaigns, newsletters, lifecycle programs, media, mentions, and leads.
 - Syncs and enriches lead data across Customer.io, BigQuery, Minerva, Outreach, HubSpot, and Instantly.
 - Runs scheduled growth jobs on Vercel Cron for Meta, Reddit/listening, and comprehensive growth syncs.
-- Stores durable growth assets in Neon/Postgres with Drizzle ORM and exposes app workflows through tRPC and Next.js route handlers.
+- Stores durable growth assets in Neon/Postgres with Drizzle ORM and exposes app workflows through oRPC and Next.js route handlers.
 - Provides AI-assisted planning and overview surfaces for growth operations.
 
 ## Core Stack
@@ -17,7 +17,7 @@ It started from a T3 SaaS starter, but the center of gravity is now Wander-speci
 - **Framework**: Next.js 16, App Router, React 19
 - **Runtime/package manager**: Bun
 - **Database**: Neon Postgres with Drizzle ORM
-- **API layer**: tRPC v11 with TanStack Query
+- **API layer**: oRPC with TanStack Query
 - **Auth**: Better Auth with organization support
 - **Styling**: Tailwind CSS 4, Radix UI, Wander design-system packages
 - **Content**: Velite/MDX for marketing/blog content
@@ -146,7 +146,7 @@ Important categories:
 
 ## Architecture Notes
 
-- tRPC routers are registered in `src/server/api/root.ts`.
+- oRPC routers are registered in `src/server/api/root.ts`.
 - Database schema exports are centralized in `src/server/db/schema.ts`.
 - Domain schemas live in `src/server/db/*-schema.ts`.
 - Business logic belongs in `src/server/services/`.
@@ -171,7 +171,7 @@ This repo still uses the T3 starter foundation:
 
 - Better Auth user/session/account/organization tables
 - Drizzle with Neon Postgres
-- tRPC procedures and routers
+- oRPC procedures and routers
 - Tailwind/Radix component primitives
 - Velite MDX blog support
 - React Email and Resend support

@@ -17,7 +17,7 @@ import { brandTable } from "@/server/db/schema";
 
 /**
  * Ad-performance analytics over the Zernio ad tree — the shared logic behind
- * both the /overview chat capabilities (adsScope / topAds) and the `ads` tRPC
+ * both the /overview chat capabilities (adsScope / topAds) and the `ads` oRPC
  * router that powers the interactive cards. Single source of truth so the chat
  * answer and the in-place refetch can never drift.
  *

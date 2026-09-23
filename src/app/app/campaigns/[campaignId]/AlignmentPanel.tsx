@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import { ChannelLogo } from "@/components/channel-logos";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 const VERDICT_META = {
   ok: { icon: CheckCircle2, cls: "text-emerald-600", label: "Live" },
@@ -40,27 +40,26 @@ export function AlignmentPanel({
   campaignId: string;
   onChanged: () => Promise<void>;
 }) {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery(
-    trpc.campaign.alignment.queryOptions({ campaignId }),
+    orpc.campaign.alignment.queryOptions({ input: { campaignId } }),
   );
 
   const invalidate = async () => {
     await queryClient.invalidateQueries(
-      trpc.campaign.alignment.queryOptions({ campaignId }),
+      orpc.campaign.alignment.queryOptions({ input: { campaignId } }),
     );
     await onChanged();
   };
 
   const linkCampaigns = useMutation(
-    trpc.campaign.linkCampaigns.mutationOptions({
+    orpc.campaign.linkCampaigns.mutationOptions({
       onSuccess: invalidate,
       onError: (e) => toast.error(e.message || "Failed to link"),
     }),
   );
   const unlinkCampaign = useMutation(
-    trpc.campaign.unlinkCampaign.mutationOptions({
+    orpc.campaign.unlinkCampaign.mutationOptions({
       onSuccess: invalidate,
       onError: (e) => toast.error(e.message || "Failed to unlink"),
     }),

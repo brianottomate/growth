@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { and, desc, eq, ilike } from "drizzle-orm";
-import { TRPCError } from "@trpc/server";
+import { and, eq, ilike } from "drizzle-orm";
+import { ORPCError } from "@orpc/server";
 
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { protectedProcedure, actionProcedure } from "@/server/api/orpc";
 import {
   brandInspirationTable,
   brandTable,
@@ -12,11 +12,10 @@ import {
 } from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
 import { type db } from "@/server/db";
-import { discoverAndSaveSuggestions } from "@/server/services/social-discovery.service";
 import {
-  ScrapeSetupError,
-  scrapeBrandChannel,
-} from "@/server/services/peer-scrape.service";
+  discoverBrandChannels,
+  scrapeBrandPosts,
+} from "@/server/ai/capabilities/operations";
 
 type Ctx = { db: typeof db; session: { user: { id: string } } };
 
@@ -36,16 +35,12 @@ async function assertBrandManageable(ctx: Ctx, brandId: string) {
   const brand = await ctx.db.query.brandTable.findFirst({
     where: eq(brandTable.id, brandId),
   });
-  if (!brand)
-    throw new TRPCError({ code: "NOT_FOUND", message: "Brand not found" });
+  if (!brand) throw new ORPCError("NOT_FOUND", { message: "Brand not found" });
 
   const orgIds = await userOrgIds(ctx);
   if (brand.organizationId) {
     if (!orgIds.includes(brand.organizationId)) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "No access to this brand",
-      });
+      throw new ORPCError("FORBIDDEN", { message: "No access to this brand" });
     }
     return brand;
   }
@@ -55,40 +50,18 @@ async function assertBrandManageable(ctx: Ctx, brandId: string) {
   });
   const ownerOrg = link?.brand?.organizationId;
   if (!ownerOrg || !orgIds.includes(ownerOrg)) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "No access to this brand",
-    });
+    throw new ORPCError("FORBIDDEN", { message: "No access to this brand" });
   }
   return brand;
 }
 
-export const channelSuggestionRouter = createTRPCRouter({
-  /** Pending suggestions for a brand, highest-confidence first. */
-  list: protectedProcedure
-    .input(z.object({ brandId: z.string() }))
-    .query(async ({ ctx, input }) => {
-      await assertBrandManageable(ctx, input.brandId);
-      return ctx.db.query.channelSuggestionTable.findMany({
-        where: and(
-          eq(channelSuggestionTable.brandId, input.brandId),
-          eq(channelSuggestionTable.status, "pending"),
-        ),
-        orderBy: [desc(channelSuggestionTable.confidence)],
-      });
-    }),
-
+export const channelSuggestionRouter = {
   /**
    * Discover + persist handle suggestions for a brand. Unverified on purpose:
    * the reviewer confirms by opening the link, and the first scrape after
    * acceptance proves the profile and fills follower counts.
    */
-  discover: protectedProcedure
-    .input(z.object({ brandId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      await assertBrandManageable(ctx, input.brandId);
-      return discoverAndSaveSuggestions(input.brandId);
-    }),
+  discover: actionProcedure(discoverBrandChannels),
 
   /**
    * On-demand pull of a brand's recent posts for one platform into
@@ -98,51 +71,17 @@ export const channelSuggestionRouter = createTRPCRouter({
    * only ingest new posts. Works for peer brands (the access check mirrors
    * discover/accept).
    */
-  scrapePosts: protectedProcedure
-    .input(
-      z.object({
-        brandId: z.string(),
-        platform: z.enum(["instagram", "facebook", "linkedin", "x"]),
-        sinceDays: z.number().int().min(1).max(93).optional(),
-        limit: z.number().int().min(1).max(100).optional(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      await assertBrandManageable(ctx, input.brandId);
-      try {
-        return await scrapeBrandChannel({
-          brandId: input.brandId,
-          platform: input.platform,
-          sinceDays: input.sinceDays,
-          limit: input.limit,
-          requestedById: ctx.session.user.id,
-        });
-      } catch (error) {
-        if (error instanceof ScrapeSetupError) {
-          throw new TRPCError({
-            code:
-              error.code === "missing_profile_url"
-                ? "BAD_REQUEST"
-                : "PRECONDITION_FAILED",
-            message: error.message,
-          });
-        }
-        throw error;
-      }
-    }),
+  scrapePosts: actionProcedure(scrapeBrandPosts),
 
   /** Accept a suggestion → create the channel + mark accepted. */
   accept: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const suggestion = await ctx.db.query.channelSuggestionTable.findFirst({
         where: eq(channelSuggestionTable.id, input.id),
       });
       if (!suggestion) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Suggestion not found",
-        });
+        throw new ORPCError("NOT_FOUND", { message: "Suggestion not found" });
       }
       await assertBrandManageable(ctx, suggestion.brandId);
 
@@ -196,15 +135,12 @@ export const channelSuggestionRouter = createTRPCRouter({
   /** Reject a suggestion (remembered — won't be re-proposed). */
   reject: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const suggestion = await ctx.db.query.channelSuggestionTable.findFirst({
         where: eq(channelSuggestionTable.id, input.id),
       });
       if (!suggestion) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Suggestion not found",
-        });
+        throw new ORPCError("NOT_FOUND", { message: "Suggestion not found" });
       }
       await assertBrandManageable(ctx, suggestion.brandId);
       await ctx.db
@@ -217,4 +153,4 @@ export const channelSuggestionRouter = createTRPCRouter({
         .where(eq(channelSuggestionTable.id, input.id));
       return { ok: true };
     }),
-});
+};

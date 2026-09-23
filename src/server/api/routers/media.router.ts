@@ -1,9 +1,14 @@
 import { scrapeSiteImages } from "@/server/clients/firecrawl.client";
 import { z } from "zod";
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
-import { TRPCError } from "@trpc/server";
+import { ORPCError } from "@orpc/server";
 
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { actionProcedure, protectedProcedure } from "@/server/api/orpc";
+import {
+  analyzeMediaAsset,
+  importListingPhotos,
+  listListingPhotos,
+} from "@/server/ai/capabilities/operations";
 import {
   brandTable,
   brandInspirationTable,
@@ -24,8 +29,6 @@ import {
   importRemoteImage,
   storyboardDescriptorSchema,
 } from "@/server/services/media.service";
-import { brandListings } from "@/server/services/wanderos-listings.service";
-import { analyzeStoredMediaAsset } from "@/server/services/media-asset-analysis.service";
 import {
   refreshInstagramPostMedia,
   refreshInstagramProfileMedia,
@@ -52,11 +55,9 @@ async function assertBrandAccess(ctx: Ctx, brandId: string) {
   const brand = await ctx.db.query.brandTable.findFirst({
     where: eq(brandTable.id, brandId),
   });
-  if (!brand)
-    throw new TRPCError({ code: "NOT_FOUND", message: "Brand not found" });
+  if (!brand) throw new ORPCError("NOT_FOUND", { message: "Brand not found" });
   if (!brand.organizationId) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
+    throw new ORPCError("BAD_REQUEST", {
       message: "Cannot attach media to a tracked/reference brand",
     });
   }
@@ -67,10 +68,7 @@ async function assertBrandAccess(ctx: Ctx, brandId: string) {
     ),
   });
   if (!membership) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "No access to this brand",
-    });
+    throw new ORPCError("FORBIDDEN", { message: "No access to this brand" });
   }
   return brand;
 }
@@ -80,8 +78,7 @@ async function assertMediaAccess(ctx: Ctx, mediaId: string) {
   const asset = await ctx.db.query.mediaAssetTable.findFirst({
     where: eq(mediaAssetTable.id, mediaId),
   });
-  if (!asset)
-    throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
+  if (!asset) throw new ORPCError("NOT_FOUND", { message: "Media not found" });
   await assertBrandAccess(ctx, asset.brandId);
   return asset;
 }
@@ -92,8 +89,7 @@ async function assertPostVisible(ctx: Ctx, platformPostId: string) {
     where: eq(platformPostTable.id, platformPostId),
     with: { brand: { columns: { organizationId: true } } },
   });
-  if (!post)
-    throw new TRPCError({ code: "NOT_FOUND", message: "Post not found" });
+  if (!post) throw new ORPCError("NOT_FOUND", { message: "Post not found" });
   if (post.brand?.organizationId) {
     await assertBrandAccess(ctx, post.brandId);
     return { ...post, visibleOrganizationId: post.brand.organizationId };
@@ -122,14 +118,10 @@ async function assertPostVisible(ctx: Ctx, platformPostId: string) {
       })
     : null;
   if (!tracked) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "No access to this post",
-    });
+    throw new ORPCError("FORBIDDEN", { message: "No access to this post" });
   }
   if (!tracked.brand.organizationId) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
+    throw new ORPCError("FORBIDDEN", {
       message: "Tracked brand has no owning organization",
     });
   }
@@ -156,7 +148,7 @@ const videoFrameSchema = z.object({
 
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024; // 25MB
 
-export const mediaRouter = createTRPCRouter({
+export const mediaRouter = {
   /**
    * Presign a transient chat attachment for direct browser → R2 upload. Not a
    * media_asset — used by the /overview chat composer to attach the image to a
@@ -192,7 +184,7 @@ export const mediaRouter = createTRPCRouter({
           }
         }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       return MediaService.createChatR2Upload({
         ...input,
         userId: ctx.session.user.id,
@@ -206,7 +198,7 @@ export const mediaRouter = createTRPCRouter({
         mediaIndex: z.number().int().min(0).max(20),
       }),
     )
-    .query(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const post = await assertPostVisible(ctx, input.platformPostId);
       return getVideoAnalysis({
         organizationId: post.visibleOrganizationId,
@@ -222,7 +214,7 @@ export const mediaRouter = createTRPCRouter({
         mediaIndex: z.number().int().min(0).max(20),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const post = await assertPostVisible(ctx, input.platformPostId);
       return prepareVideoAnalysis({
         organizationId: post.visibleOrganizationId,
@@ -243,13 +235,12 @@ export const mediaRouter = createTRPCRouter({
         frames: z.array(videoFrameSchema).min(1).max(300),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const analysis = await ctx.db.query.mediaVideoAnalysisTable.findFirst({
         where: eq(mediaVideoAnalysisTable.id, input.analysisId),
       });
       if (!analysis)
-        throw new TRPCError({
-          code: "NOT_FOUND",
+        throw new ORPCError("NOT_FOUND", {
           message: "Video analysis not found",
         });
       const post = await assertPostVisible(ctx, analysis.platformPostId);
@@ -261,13 +252,12 @@ export const mediaRouter = createTRPCRouter({
 
   completeVideoAnalysis: protectedProcedure
     .input(z.object({ analysisId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const analysis = await ctx.db.query.mediaVideoAnalysisTable.findFirst({
         where: eq(mediaVideoAnalysisTable.id, input.analysisId),
       });
       if (!analysis)
-        throw new TRPCError({
-          code: "NOT_FOUND",
+        throw new ORPCError("NOT_FOUND", {
           message: "Video analysis not found",
         });
       const post = await assertPostVisible(ctx, analysis.platformPostId);
@@ -287,7 +277,7 @@ export const mediaRouter = createTRPCRouter({
         query: z.string().trim().max(200).optional(),
       }),
     )
-    .query(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandAccess(ctx, input.brandId);
       // Settle abandoned uploads first: a successful PUT whose finalize never
       // ran should appear, and a genuine failure should say so rather than
@@ -298,68 +288,8 @@ export const mediaRouter = createTRPCRouter({
       return MediaService.list(input);
     }),
 
-  /**
-   * A look at the brand's listing photos without importing any: hero and
-   * thumbnail URLs straight from their WanderOS feed, marked where the library
-   * already holds one. The picker shows these; only what the operator ticks
-   * is imported, so sampling a site does not fill the library with it.
-   */
-  listingSamples: protectedProcedure
-    .input(
-      z.object({
-        brandId: z.string(),
-        limit: z.number().int().min(1).max(48).default(24),
-      }),
-    )
-    .query(async ({ ctx, input }) => {
-      await assertBrandAccess(ctx, input.brandId);
-      const brand = await ctx.db.query.brandTable.findFirst({
-        where: eq(brandTable.id, input.brandId),
-        columns: { id: true, website: true },
-      });
-      const listings = (
-        await brandListings({
-          id: input.brandId,
-          website: brand?.website ?? null,
-        })
-      )
-        .filter((row) => row.imageUrl)
-        .slice(0, input.limit);
-      const urls = listings.map((row) => row.imageUrl!);
-      const imported =
-        urls.length > 0
-          ? await ctx.db.query.mediaAssetTable.findMany({
-              where: and(
-                eq(mediaAssetTable.brandId, input.brandId),
-                eq(mediaAssetTable.status, "ready"),
-                isNull(mediaAssetTable.deletedAt),
-                sql`${mediaAssetTable.metadata} ->> 'sourceUrl' in (${sql.join(
-                  urls.map((url) => sql`${url}`),
-                  sql`, `,
-                )})`,
-              ),
-              columns: { id: true, metadata: true },
-            })
-          : [];
-      const importedByUrl = new Map(
-        imported.map((row) => [
-          (row.metadata as { sourceUrl?: string } | null)?.sourceUrl ?? "",
-          row.id,
-        ]),
-      );
-      return {
-        hasSite: Boolean(brand?.website),
-        homes: listings.map((row) => ({
-          id: row.id,
-          name: row.name,
-          url: row.url,
-          imageUrl: row.imageUrl!,
-          thumbUrl: row.thumbUrl ?? row.imageUrl!,
-          place: [row.city, row.state].filter(Boolean).join(", "),
-          importedAssetId: importedByUrl.get(row.imageUrl!) ?? null,
-        })),
-      };
-    }),
+  /** The brand's WanderOS listing heroes, marked where the library holds one. */
+  listingSamples: actionProcedure(listListingPhotos),
 
   /**
    * The images on the brand's own website, read on demand, marked where the
@@ -367,7 +297,7 @@ export const mediaRouter = createTRPCRouter({
    */
   siteImages: protectedProcedure
     .input(z.object({ brandId: z.string(), url: z.string().url().optional() }))
-    .query(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandAccess(ctx, input.brandId);
       const brand = await ctx.db.query.brandTable.findFirst({
         where: eq(brandTable.id, input.brandId),
@@ -425,7 +355,7 @@ export const mediaRouter = createTRPCRouter({
           .max(60),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandAccess(ctx, input.brandId);
       const assets: { id: string; url: string | null }[] = [];
       for (const image of input.images) {
@@ -449,38 +379,7 @@ export const mediaRouter = createTRPCRouter({
    * Import the listing photos the operator ticked. Idempotent per URL: a hero
    * already in the library is returned rather than imported twice.
    */
-  importListingImages: protectedProcedure
-    .input(
-      z.object({
-        brandId: z.string(),
-        homes: z
-          .array(
-            z.object({ imageUrl: z.string().url(), name: z.string().min(1) }),
-          )
-          .min(1)
-          .max(48),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      await assertBrandAccess(ctx, input.brandId);
-      const assets: { id: string; url: string | null; name: string }[] = [];
-      // Sequential: each import is a download and an R2 write.
-      for (const home of input.homes) {
-        const asset =
-          (await findImportedImage({
-            brandId: input.brandId,
-            url: home.imageUrl,
-          })) ??
-          (await importRemoteImage({
-            brandId: input.brandId,
-            uploadedBy: ctx.session.user.id,
-            url: home.imageUrl,
-            title: home.name,
-          }));
-        assets.push({ id: asset.id, url: asset.url, name: home.name });
-      }
-      return { assets };
-    }),
+  importListingImages: actionProcedure(importListingPhotos),
 
   /**
    * Library metadata for a set of assets, for callers holding ids rather than
@@ -498,7 +397,7 @@ export const mediaRouter = createTRPCRouter({
         ids: z.array(z.string().min(1)).max(100),
       }),
     )
-    .query(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandAccess(ctx, input.brandId);
       if (input.ids.length === 0) return [];
       const rows = await ctx.db.query.mediaAssetTable.findMany({
@@ -549,7 +448,7 @@ export const mediaRouter = createTRPCRouter({
 
   taxonomy: protectedProcedure
     .input(z.object({ brandId: z.string() }))
-    .query(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandAccess(ctx, input.brandId);
       const [folders, tags] = await Promise.all([
         ctx.db.query.mediaFolderTable.findMany({
@@ -572,7 +471,7 @@ export const mediaRouter = createTRPCRouter({
         description: z.string().trim().max(300).optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandAccess(ctx, input.brandId);
       const [folder] = await ctx.db
         .insert(mediaFolderTable)
@@ -600,7 +499,7 @@ export const mediaRouter = createTRPCRouter({
    */
   moveToBrand: protectedProcedure
     .input(z.object({ mediaId: z.string(), brandId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const asset = await assertMediaAccess(ctx, input.mediaId);
       if (asset.brandId === input.brandId) return asset;
       await assertBrandAccess(ctx, input.brandId);
@@ -622,37 +521,14 @@ export const mediaRouter = createTRPCRouter({
       });
     }),
 
-  updateFolder: protectedProcedure
-    .input(
-      z.object({
-        id: z.string(),
-        name: z.string().trim().min(1).max(100),
-        description: z.string().trim().max(300).nullable().optional(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const folder = await ctx.db.query.mediaFolderTable.findFirst({
-        where: eq(mediaFolderTable.id, input.id),
-      });
-      if (!folder)
-        throw new TRPCError({ code: "NOT_FOUND", message: "Folder not found" });
-      await assertBrandAccess(ctx, folder.brandId);
-      const [updated] = await ctx.db
-        .update(mediaFolderTable)
-        .set({ name: input.name, description: input.description })
-        .where(eq(mediaFolderTable.id, input.id))
-        .returning();
-      return updated;
-    }),
-
   deleteFolder: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const folder = await ctx.db.query.mediaFolderTable.findFirst({
         where: eq(mediaFolderTable.id, input.id),
       });
       if (!folder)
-        throw new TRPCError({ code: "NOT_FOUND", message: "Folder not found" });
+        throw new ORPCError("NOT_FOUND", { message: "Folder not found" });
       await assertBrandAccess(ctx, folder.brandId);
       await ctx.db
         .delete(mediaFolderTable)
@@ -668,7 +544,7 @@ export const mediaRouter = createTRPCRouter({
         description: z.string().trim().max(300).optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandAccess(ctx, input.brandId);
       const [tag] = await ctx.db
         .insert(mediaTagTable)
@@ -681,37 +557,13 @@ export const mediaRouter = createTRPCRouter({
       return tag;
     }),
 
-  updateTag: protectedProcedure
-    .input(
-      z.object({
-        id: z.string(),
-        name: z.string().trim().min(1).max(60),
-        description: z.string().trim().max(300).nullable().optional(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const tag = await ctx.db.query.mediaTagTable.findFirst({
-        where: eq(mediaTagTable.id, input.id),
-      });
-      if (!tag)
-        throw new TRPCError({ code: "NOT_FOUND", message: "Tag not found" });
-      await assertBrandAccess(ctx, tag.brandId);
-      const [updated] = await ctx.db
-        .update(mediaTagTable)
-        .set({ name: input.name, description: input.description })
-        .where(eq(mediaTagTable.id, input.id))
-        .returning();
-      return updated;
-    }),
-
   deleteTag: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const tag = await ctx.db.query.mediaTagTable.findFirst({
         where: eq(mediaTagTable.id, input.id),
       });
-      if (!tag)
-        throw new TRPCError({ code: "NOT_FOUND", message: "Tag not found" });
+      if (!tag) throw new ORPCError("NOT_FOUND", { message: "Tag not found" });
       await assertBrandAccess(ctx, tag.brandId);
       await ctx.db.delete(mediaTagTable).where(eq(mediaTagTable.id, input.id));
       return { id: input.id };
@@ -737,7 +589,7 @@ export const mediaRouter = createTRPCRouter({
           .optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandAccess(ctx, input.brandId);
       return MediaService.createR2Upload({
         ...input,
@@ -750,7 +602,7 @@ export const mediaRouter = createTRPCRouter({
     .input(
       z.object({ mediaId: z.string(), reason: z.string().max(500).optional() }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertMediaAccess(ctx, input.mediaId);
       return MediaService.failR2Upload(input.mediaId, input.reason);
     }),
@@ -767,7 +619,7 @@ export const mediaRouter = createTRPCRouter({
         storyboard: storyboardDescriptorSchema.optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertMediaAccess(ctx, input.mediaId);
       return MediaService.finalizeR2Upload(input);
     }),
@@ -783,7 +635,7 @@ export const mediaRouter = createTRPCRouter({
         sourceProvider: z.string().max(60).optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandAccess(ctx, input.brandId);
       return MediaService.createExternal({
         ...input,
@@ -800,7 +652,7 @@ export const mediaRouter = createTRPCRouter({
         mediaIndexes: z.array(z.number().int().min(0)).min(1).max(20),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const destination = await assertBrandAccess(
         ctx,
         input.destinationBrandId,
@@ -810,7 +662,7 @@ export const mediaRouter = createTRPCRouter({
         with: { brand: { columns: { organizationId: true } } },
       });
       if (!source) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Post not found" });
+        throw new ORPCError("NOT_FOUND", { message: "Post not found" });
       }
 
       if (source.brand?.organizationId !== destination.organizationId) {
@@ -828,8 +680,7 @@ export const mediaRouter = createTRPCRouter({
           ),
         });
         if (!tracked) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
+          throw new ORPCError("FORBIDDEN", {
             message: "This post is not visible to the destination brand",
           });
         }
@@ -841,8 +692,7 @@ export const mediaRouter = createTRPCRouter({
           uploadedBy: ctx.session.user.id,
         });
       } catch (error) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
+        throw new ORPCError("BAD_REQUEST", {
           message:
             error instanceof Error ? error.message : "Could not save media",
         });
@@ -852,13 +702,12 @@ export const mediaRouter = createTRPCRouter({
   /** On-demand durable previews for volatile social CDN media; not a library save. */
   stabilizePostMedia: protectedProcedure
     .input(z.object({ platformPostId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertPostVisible(ctx, input.platformPostId);
       try {
         return await MediaService.stabilizePostMedia(input.platformPostId);
       } catch (error) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
+        throw new ORPCError("BAD_REQUEST", {
           message:
             error instanceof Error
               ? error.message
@@ -870,11 +719,10 @@ export const mediaRouter = createTRPCRouter({
   /** Re-fetch one public Instagram post to renew its media URLs and previews. */
   refreshInstagramPost: protectedProcedure
     .input(z.object({ platformPostId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const post = await assertPostVisible(ctx, input.platformPostId);
       if (post.platform !== "instagram" || !post.externalUrl) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
+        throw new ORPCError("BAD_REQUEST", {
           message: "This post has no refreshable Instagram permalink",
         });
       }
@@ -890,8 +738,7 @@ export const mediaRouter = createTRPCRouter({
           videoCacheFailed: cached.failed,
         };
       } catch (error) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
+        throw new ORPCError("BAD_REQUEST", {
           message:
             error instanceof Error
               ? error.message
@@ -903,13 +750,12 @@ export const mediaRouter = createTRPCRouter({
   /** Explicitly cache full owned-post media for durable Timeline playback. */
   cacheBrandPostMedia: protectedProcedure
     .input(z.object({ brandId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandAccess(ctx, input.brandId);
       try {
         return await MediaService.cacheBrandPostMedia(input.brandId);
       } catch (error) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
+        throw new ORPCError("BAD_REQUEST", {
           message:
             error instanceof Error ? error.message : "Could not cache media",
         });
@@ -919,7 +765,7 @@ export const mediaRouter = createTRPCRouter({
   /** Re-fetch an owned Instagram profile, then cache its fresh full media. */
   refreshOwnedInstagramMedia: protectedProcedure
     .input(z.object({ brandId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertBrandAccess(ctx, input.brandId);
       const channel = await ctx.db.query.channelTable.findFirst({
         where: and(
@@ -928,8 +774,7 @@ export const mediaRouter = createTRPCRouter({
         ),
       });
       if (!channel?.profileUrl) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
+        throw new ORPCError("BAD_REQUEST", {
           message:
             "Add the owned Instagram profile URL before refreshing media",
         });
@@ -946,8 +791,7 @@ export const mediaRouter = createTRPCRouter({
           cacheFailed: cached.failed,
         };
       } catch (error) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
+        throw new ORPCError("BAD_REQUEST", {
           message:
             error instanceof Error
               ? error.message
@@ -974,19 +818,17 @@ export const mediaRouter = createTRPCRouter({
         thumbnailUrl: z.string().url().nullable().optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const asset = await assertMediaAccess(ctx, input.id);
       if (asset.provider !== "external") {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
+        throw new ORPCError("BAD_REQUEST", {
           message: "Only linked assets can be edited here",
         });
       }
       if (input.thumbnail) {
         const bytes = Buffer.byteLength(input.thumbnail.base64Data, "base64");
         if (bytes > MAX_IMAGE_BYTES) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
+          throw new ORPCError("BAD_REQUEST", {
             message: "Thumbnail too large",
           });
         }
@@ -1005,7 +847,7 @@ export const mediaRouter = createTRPCRouter({
         humanTagIds: z.array(z.string()).max(50).optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const asset = await assertMediaAccess(ctx, input.id);
       if (input.folderId) {
         const folder = await ctx.db.query.mediaFolderTable.findFirst({
@@ -1015,8 +857,7 @@ export const mediaRouter = createTRPCRouter({
           ),
         });
         if (!folder)
-          throw new TRPCError({
-            code: "BAD_REQUEST",
+          throw new ORPCError("BAD_REQUEST", {
             message: "Folder does not belong to this brand",
           });
       }
@@ -1028,41 +869,19 @@ export const mediaRouter = createTRPCRouter({
           ),
         });
         if (tags.length !== new Set(input.humanTagIds).size)
-          throw new TRPCError({
-            code: "BAD_REQUEST",
+          throw new ORPCError("BAD_REQUEST", {
             message: "One or more tags do not belong to this brand",
           });
       }
       return MediaService.updateMeta(input);
     }),
 
-  analyze: protectedProcedure
-    .input(
-      z.object({
-        id: z.string(),
-        steer: z.string().trim().max(500).optional(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const asset = await assertMediaAccess(ctx, input.id);
-      if ((asset.kind !== "image" && asset.kind !== "video") || !asset.url) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Only ready images and videos can be analyzed",
-        });
-      }
-      const brand = await assertBrandAccess(ctx, asset.brandId);
-      return analyzeStoredMediaAsset({
-        mediaId: asset.id,
-        brandName: brand.name,
-        steer: input.steer,
-      });
-    }),
+  analyze: actionProcedure(analyzeMediaAsset),
 
   delete: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await assertMediaAccess(ctx, input.id);
       return MediaService.delete(input.id);
     }),
-});
+};

@@ -141,6 +141,11 @@ export class BrandAdPreviewError extends Error {
   ) {
     super(message);
   }
+
+  /** Read by the kernel's error grading. */
+  get code() {
+    return this.status === 404 ? "NOT_FOUND" : "BAD_REQUEST";
+  }
 }
 
 /**

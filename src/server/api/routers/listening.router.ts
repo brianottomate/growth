@@ -1,4 +1,4 @@
-import { TRPCError, type TRPCRouterRecord } from "@trpc/server";
+import { ORPCError } from "@orpc/server";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 
@@ -18,7 +18,7 @@ import { createId } from "@/server/db/utils";
 import { scanAccountWatchSources } from "@/server/services/instagram-watch.service";
 import { evaluateSubreddit as evaluateSubredditProfile } from "@/server/services/subreddit-eval.service";
 
-import { protectedProcedure } from "../trpc";
+import { protectedProcedure } from "@/server/api/orpc";
 
 // Listening STRATEGY config: the editable brand "story" (shared signal + reply
 // judgment) and the per-source rows. Voice itself is read from brandFingerprint
@@ -121,8 +121,7 @@ async function assertOwnedBrand(userId: string, brandId: string) {
     (candidate) => candidate.id === brandId,
   );
   if (!brand) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
+    throw new ORPCError("FORBIDDEN", {
       message: "You do not have access to this brand",
     });
   }
@@ -135,10 +134,7 @@ async function assertSourceManageable(userId: string, sourceId: string) {
     columns: { brandId: true },
   });
   if (!source) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Listening source not found",
-    });
+    throw new ORPCError("NOT_FOUND", { message: "Listening source not found" });
   }
   await assertOwnedBrand(userId, source.brandId);
 }
@@ -201,7 +197,7 @@ export const listeningRouter = {
   /** Brand story + voice + all listening sources for the strategic view. */
   overview: protectedProcedure
     .input(z.object({ brandId: z.string().optional() }).optional())
-    .query(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const brands = await ownedBrandsForUser(ctx.session.user.id);
       if (brands.length === 0) {
         return {
@@ -217,8 +213,7 @@ export const listeningRouter = {
         ? brands.find((brand) => brand.id === input.brandId)
         : undefined;
       if (input?.brandId && !requested) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
+        throw new ORPCError("FORBIDDEN", {
           message: "You do not have access to this brand",
         });
       }
@@ -266,7 +261,7 @@ export const listeningRouter = {
 
   updateStory: protectedProcedure
     .input(z.object({ brandId: z.string(), story: StorySchema }))
-    .mutation(async ({ input, ctx }) => {
+    .handler(async ({ input, context: ctx }) => {
       await assertOwnedBrand(ctx.session.user.id, input.brandId);
       const [updated] = await db
         .update(brandTable)
@@ -297,7 +292,7 @@ export const listeningRouter = {
         }),
       }),
     )
-    .mutation(async ({ input, ctx }) => {
+    .handler(async ({ input, context: ctx }) => {
       await assertSourceManageable(ctx.session.user.id, input.id);
       const [updated] = await db
         .update(listeningSourceTable)
@@ -323,7 +318,7 @@ export const listeningRouter = {
         voiceOverride: VoiceOverrideSchema.optional(),
       }),
     )
-    .mutation(async ({ input, ctx }) => {
+    .handler(async ({ input, context: ctx }) => {
       await assertOwnedBrand(ctx.session.user.id, input.brandId);
       const [created] = await db
         .insert(listeningSourceTable)
@@ -350,7 +345,7 @@ export const listeningRouter = {
 
   deleteSource: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ input, ctx }) => {
+    .handler(async ({ input, context: ctx }) => {
       await assertSourceManageable(ctx.session.user.id, input.id);
       await db
         .delete(listeningSourceTable)
@@ -366,7 +361,7 @@ export const listeningRouter = {
    */
   scanAccountWatch: protectedProcedure
     .input(z.object({ sourceId: z.string().optional() }).optional())
-    .mutation(async ({ input, ctx }) => {
+    .handler(async ({ input, context: ctx }) => {
       if (input?.sourceId) {
         await assertSourceManageable(ctx.session.user.id, input.sourceId);
       }
@@ -383,7 +378,7 @@ export const listeningRouter = {
    */
   evaluateSubreddit: protectedProcedure
     .input(z.object({ sourceId: z.string(), name: z.string().min(1) }))
-    .mutation(async ({ input, ctx }) => {
+    .handler(async ({ input, context: ctx }) => {
       await assertSourceManageable(ctx.session.user.id, input.sourceId);
       const fresh = await evaluateSubredditProfile(input.name);
       return mutateSubreddit(input.sourceId, fresh.name, (prev) => ({
@@ -397,7 +392,7 @@ export const listeningRouter = {
   /** Upsert a subreddit profile from the editor (manual edits win). */
   setSubredditProfile: protectedProcedure
     .input(z.object({ sourceId: z.string(), profile: SubredditProfileSchema }))
-    .mutation(async ({ input, ctx }) => {
+    .handler(async ({ input, context: ctx }) => {
       await assertSourceManageable(ctx.session.user.id, input.sourceId);
       return mutateSubreddit(input.sourceId, input.profile.name, (prev) => ({
         ...(prev ?? {}),
@@ -409,9 +404,9 @@ export const listeningRouter = {
   /** Drop a subreddit from a source. */
   removeSubreddit: protectedProcedure
     .input(z.object({ sourceId: z.string(), name: z.string().min(1) }))
-    .mutation(async ({ input, ctx }) => {
+    .handler(async ({ input, context: ctx }) => {
       await assertSourceManageable(ctx.session.user.id, input.sourceId);
       await mutateSubreddit(input.sourceId, input.name, () => null);
       return { name: input.name };
     }),
-} satisfies TRPCRouterRecord;
+};

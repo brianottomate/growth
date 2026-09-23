@@ -3,8 +3,8 @@
 import { Fragment, useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 
-import { useTRPC } from "@/trpc/react";
-import type { RouterOutputs } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
+import type { RouterOutputs } from "@/orpc/client";
 import {
   Dialog,
   DialogContent,
@@ -41,8 +41,6 @@ export function GenerateSlotsDialog({
   /** "YYYY-MM" — preselect a month (e.g. a per-month Generate CTA). */
   initialMonth?: string;
 }) {
-  const trpc = useTRPC();
-
   const nextMonth = () => {
     const d = new Date();
     const m = d.getMonth() + 2;
@@ -68,13 +66,13 @@ export function GenerateSlotsDialog({
   };
 
   const dryRun = useMutation(
-    trpc.cadence.generateMonthSlots.mutationOptions({
+    orpc.cadence.generateMonthSlots.mutationOptions({
       onSuccess: (res) => setPreview({ rows: res.rows, mix: res.mix }),
       onError: (e) => toast.error(e.message),
     }),
   );
   const generate = useMutation(
-    trpc.cadence.generateMonthSlots.mutationOptions({
+    orpc.cadence.generateMonthSlots.mutationOptions({
       onSuccess: (res) => {
         toast.success(`Created ${res.created} slots for ${month}`);
         setPreview(null);

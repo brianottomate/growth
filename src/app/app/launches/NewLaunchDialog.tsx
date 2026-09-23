@@ -16,14 +16,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { launchTierGuidance, type LaunchTier } from "@/lib/launch";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 export function NewLaunchDialog({
   products,
 }: {
   products: { id: string; name: string }[];
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -32,10 +31,10 @@ export function NewLaunchDialog({
   const [targetDate, setTargetDate] = useState("");
 
   const create = useMutation(
-    trpc.launch.create.mutationOptions({
-      onSuccess: (launch) => {
+    orpc.launch.create.mutationOptions({
+      onSuccess: (result) => {
         setOpen(false);
-        router.push(`/app/launches/${launch.id}`);
+        router.push(result.appUrl);
       },
     }),
   );

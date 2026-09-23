@@ -1,10 +1,15 @@
+import { workspaceActor } from "@/server/workspace-actor";
 import "server-only";
 
 import { cache } from "react";
 import { and, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/server/db";
-import { brandTable, mediaAssetTable, memberTable } from "@/server/db/schema";
+import {
+  brandTable,
+  mediaAssetTable,
+  organizationTable,
+} from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { loadPerformanceDesk } from "@/server/services/performance-desk.service";
 
@@ -17,11 +22,12 @@ export const loadPerformanceBrand = cache(async (brandSlug: string) => {
   const session = await getSession();
   if (!session?.user)
     return { session: null, org: null, brand: null, deskBrand: null };
-  const membership = await db.query.memberTable.findFirst({
-    where: eq(memberTable.userId, session.user.id),
-    with: { organization: true },
-  });
-  const org = membership?.organization ?? null;
+  const actor = await workspaceActor();
+  const org = actor
+    ? await db.query.organizationTable.findFirst({
+        where: eq(organizationTable.id, actor.orgId),
+      })
+    : null;
   if (!org) return { session, org: null, brand: null, deskBrand: null };
 
   const [brand, desk] = await Promise.all([

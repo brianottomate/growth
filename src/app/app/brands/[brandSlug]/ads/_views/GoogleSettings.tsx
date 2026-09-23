@@ -8,7 +8,7 @@ import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 type GoogleConfig = {
   campaignType?: "search" | "display";
@@ -41,7 +41,6 @@ export function GoogleSettings({
    */
   compact?: boolean;
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [campaignType, setCampaignType] = useState<"search" | "display">(
@@ -53,7 +52,7 @@ export function GoogleSettings({
   );
 
   const save = useMutation(
-    trpc.ads.setPlatformDraft.mutationOptions({
+    orpc.ads.setPlatformDraft.mutationOptions({
       onSuccess: () => {
         setOpen(false);
         router.refresh();
@@ -64,7 +63,7 @@ export function GoogleSettings({
   // Read-only against Google: mines the brand's own site for terms and prices
   // them. The cost number is what the Google budget should be capped at —
   // beyond the point of owning the brand's terms, the money buys nothing.
-  const research = useMutation(trpc.ads.researchKeywords.mutationOptions());
+  const research = useMutation(orpc.ads.researchKeywords.mutationOptions());
   const addKeyword = (keyword: string) =>
     setKeywords((current) =>
       lines(current).includes(keyword)

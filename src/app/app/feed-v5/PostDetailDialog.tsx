@@ -47,7 +47,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
 import { cn } from "@/components/ui/lib/utils";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import type { V5Brand, V5Entry, V5Media } from "./V5Client";
 import {
@@ -88,7 +88,6 @@ export function PostDetailDialog({
   ownedBrands: V5Brand[];
   onOpenChange: (open: boolean) => void;
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const [mediaView, setMediaView] = useState<"carousel" | "grid">("grid");
   const [videoParams, setVideoParams] = useQueryStates(
@@ -116,7 +115,7 @@ export function PostDetailDialog({
   }, [entry, defaultBrand?.id]);
 
   const capture = useMutation(
-    trpc.media.captureFromPost.mutationOptions({
+    orpc.media.captureFromPost.mutationOptions({
       onSuccess: (result) => {
         toast.success(
           `${result.captured} media item${result.captured === 1 ? "" : "s"} saved to the library`,
@@ -126,7 +125,7 @@ export function PostDetailDialog({
     }),
   );
   const stabilize = useMutation(
-    trpc.media.stabilizePostMedia.mutationOptions({
+    orpc.media.stabilizePostMedia.mutationOptions({
       onSuccess: (result) => {
         router.refresh();
         if (result.stabilized) {
@@ -145,7 +144,7 @@ export function PostDetailDialog({
     }),
   );
   const refreshInstagram = useMutation(
-    trpc.media.refreshInstagramPost.mutationOptions({
+    orpc.media.refreshInstagramPost.mutationOptions({
       onSuccess: (result) => {
         router.refresh();
         toast.success(

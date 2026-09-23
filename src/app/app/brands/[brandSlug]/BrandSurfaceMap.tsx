@@ -62,7 +62,7 @@ export function BrandSurfaceMap({
     {
       title: "Distribution",
       description: "Owned social, ad, newsletter, and blog channels.",
-      href: "/app/channels",
+      href: `/app/channels?brand=${encodeURIComponent(brandId)}`,
       icon: Radio,
       facts: [fact(summary.channels, "channel")],
       state: summary.channels > 0 ? "mapped" : "empty",
@@ -79,7 +79,7 @@ export function BrandSurfaceMap({
     {
       title: "Owned surfaces",
       description: "The persistent website map and dated editorial stream.",
-      href: "/app/website",
+      href: `/app/website?brand=${encodeURIComponent(brandSlug)}`,
       icon: Globe2,
       facts: [
         fact(summary.webPages, "web page"),
@@ -96,7 +96,7 @@ export function BrandSurfaceMap({
       title: "Apps & marketplaces",
       description:
         "Persistent store pages, connector discovery, and their marketing placements.",
-      href: "/app/apps",
+      href: `/app/apps?brand=${encodeURIComponent(brandId)}`,
       icon: AppWindow,
       facts: ["6 surface types", "Freshness workflow"],
       state: "mapped",
@@ -121,7 +121,7 @@ export function BrandSurfaceMap({
     {
       title: "Creative library",
       description: "Reusable media with human organization and AI analysis.",
-      href: "/app/media",
+      href: `/app/media?brand=${encodeURIComponent(brandId)}`,
       icon: GalleryVerticalEnd,
       facts: [fact(summary.mediaAssets, "asset")],
       state: summary.mediaAssets > 0 ? "mapped" : "empty",

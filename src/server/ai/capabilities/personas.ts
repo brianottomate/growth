@@ -47,23 +47,23 @@ async function requirePersona(personaId: string, orgId: string) {
 
 const personaFields = {
   name: z.string().trim().min(1).max(200),
-  description: z.string().trim().max(2000).optional(),
+  description: z.string().trim().max(2000).nullish(),
   ageRanges: z
     .array(z.string().trim().min(1).max(40))
     .max(10)
-    .optional()
+    .nullish()
     .describe('Loose prose, e.g. ["30-50"]. Planning only, never targeting.'),
   geographies: z
     .array(z.string().trim().min(1).max(100))
     .max(20)
-    .optional()
+    .nullish()
     .describe('Loose prose, e.g. ["California", "big US cities"].'),
   demandGeography: demandGeographySchema
     .nullish()
     .describe(
       "The demand side, structured: where the guests we want come FROM. This is the reusable source a campaign audience derives from; supply geography (where the homes are) is not this. Fill it from your own reasoning or a blob looked up elsewhere and note the `source`.",
     ),
-  notes: z.string().trim().max(4000).optional(),
+  notes: z.string().trim().max(4000).nullish(),
 };
 
 export const listPersonas = growthAction({
@@ -112,7 +112,8 @@ export const createPersona = growthAction({
 
 export const updatePersona = growthAction({
   outputSchema: updatePersonaOutputSchema,
-  description: "Update a persona's fields. Only the fields sent are changed.",
+  description:
+    "Update a persona's fields. Only the fields sent are changed; null clears one.",
   inputSchema: z.object({
     personaId: z.string().trim().min(1),
     name: personaFields.name.optional(),

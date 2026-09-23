@@ -18,7 +18,7 @@ import {
   type StorefrontSurfaceId,
 } from "@/lib/product-atlas";
 import { cn } from "@/lib/utils";
-import type { RouterOutputs } from "@/trpc/react";
+import type { RouterOutputs } from "@/orpc/client";
 
 type Storefronts = RouterOutputs["productStorefront"]["listStorefronts"];
 

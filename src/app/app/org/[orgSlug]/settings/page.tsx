@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { getSession } from "@/server/better-auth/server";
-import { HydrateClient, prefetch, trpc, trpcApi } from "@/trpc/server";
+import { HydrateClient, prefetch, orpc, serverApi } from "@/orpc/server";
 import { GeneralInfoForm } from "./GeneralInfoForm";
 import { DeleteOrganizationButton } from "./DeleteOrganizationButton";
 import { OrganizationLogoUpload } from "./OrganizationLogoUpload";
@@ -28,10 +28,10 @@ export default async function OrganizationSettingsPage({
 
   const { orgSlug } = await params;
 
-  prefetch(trpc.org.getBySlug.queryOptions({ slug: orgSlug }));
+  prefetch(orpc.org.getBySlug.queryOptions({ input: { slug: orgSlug } }));
 
   // Fetch organization data to pass to OrganizationLogoUpload
-  const caller = await trpcApi();
+  const caller = serverApi;
   const orgData = await caller.org.getBySlug({ slug: orgSlug });
 
   return (

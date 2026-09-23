@@ -1,7 +1,6 @@
-import type { TRPCRouterRecord } from "@trpc/server";
 import { z } from "zod";
 
-import { protectedProcedure } from "../trpc";
+import { protectedProcedure } from "@/server/api/orpc";
 import {
   DRAFT_PILLS,
   INTENT_TAGS,
@@ -12,7 +11,7 @@ import {
 } from "@/server/services/twitter-monitor.service";
 
 export const twitterRouter = {
-  scanNow: protectedProcedure.mutation(async () => {
+  scanNow: protectedProcedure.handler(async () => {
     return scanAndScoreTweets();
   }),
 
@@ -36,8 +35,8 @@ export const twitterRouter = {
         customInstructions: z.string().max(500).optional(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .handler(async ({ input }) => {
       const draft = await draftTweetReplyForPost(input);
       return { draft };
     }),
-} satisfies TRPCRouterRecord;
+};

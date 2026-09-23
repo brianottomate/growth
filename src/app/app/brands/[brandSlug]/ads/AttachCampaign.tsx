@@ -7,7 +7,7 @@ import { Link2, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 /**
  * Adopt one platform campaign under a first-party campaign — the bridge
@@ -28,16 +28,15 @@ export function AttachCampaign({
   platformCampaignId: string;
   suggestedName: string;
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(suggestedName);
 
   const options = useQuery(
-    trpc.ads.campaigns.queryOptions({ brandId }, { enabled: open }),
+    orpc.ads.campaigns.queryOptions({ input: { brandId }, enabled: open }),
   );
   const attach = useMutation(
-    trpc.ads.attachPlatformCampaign.mutationOptions({
+    orpc.ads.attachPlatformCampaign.mutationOptions({
       onSuccess: (result) => {
         setOpen(false);
         if (result.path) router.push(result.path);

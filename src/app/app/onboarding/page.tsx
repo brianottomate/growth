@@ -15,7 +15,7 @@ import {
   completeOnboardingSchema,
   type CompleteOnboarding,
 } from "@/lib/validators/onboarding";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 // Simple progress indicator
 function ProgressIndicator({
@@ -52,7 +52,6 @@ function ProgressIndicator({
  */
 export default function OnboardingPage() {
   const router = useRouter();
-  const trpc = useTRPC();
   const [step, setStep] = useState(0);
 
   // Detect browser timezone once on mount (IANA format, e.g., "America/New_York")
@@ -74,7 +73,7 @@ export default function OnboardingPage() {
   });
 
   const completeOnboarding = useMutation(
-    trpc.user.completeOnboarding.mutationOptions({
+    orpc.user.completeOnboarding.mutationOptions({
       onSuccess: () => {
         toast.success("Welcome! Let's get started.");
         router.push("/app");

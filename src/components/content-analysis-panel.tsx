@@ -12,7 +12,7 @@ import type {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 export function ContentAnalysisPanel({
   id,
@@ -25,7 +25,6 @@ export function ContentAnalysisPanel({
   initialAnalysis: ContentAnalysis | null;
   sourceUrl?: string | null;
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const [analysis, setAnalysis] = useState(initialAnalysis);
   const [steer, setSteer] = useState("");
@@ -33,7 +32,7 @@ export function ContentAnalysisPanel({
     null,
   );
   const analyze = useMutation(
-    trpc.contentAnalysis.analyze.mutationOptions({
+    orpc.contentAnalysis.analyze.mutationOptions({
       onSuccess: (next) => {
         setAnalysis(next);
         setSteer("");

@@ -11,7 +11,7 @@ import { growthAction } from "./types";
 /**
  * Recent social mentions from the listening pipeline. Like `leads`, the
  * listening tables are single-tenant/global here, so this mirrors the
- * `mention.list` tRPC query rather than scoping by org.
+ * `mention.list` oRPC query rather than scoping by org.
  */
 export const recentMentions = growthAction({
   outputSchema: recentMentionsOutputSchema,

@@ -13,7 +13,7 @@ import {
   type LinkedInCallToAction,
   type LinkedInCostType,
 } from "@/lib/zernio-ads";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 type LinkedInConfig = {
   organizationId?: string;
@@ -36,7 +36,6 @@ export function LinkedInSettings({
   platformCampaignId: string;
   config: LinkedInConfig | undefined;
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [organizationId, setOrganizationId] = useState(
@@ -53,7 +52,7 @@ export function LinkedInSettings({
   );
 
   const save = useMutation(
-    trpc.ads.setPlatformDraft.mutationOptions({
+    orpc.ads.setPlatformDraft.mutationOptions({
       onSuccess: () => {
         setOpen(false);
         router.refresh();

@@ -85,6 +85,8 @@ export const readLaunchAction = growthAction({
       series: result.series,
       campaigns: result.campaigns,
       posts: result.posts,
+      features: result.features,
+      unknownStoryIds: result.unknownStoryIds,
       next: result.missing,
       appUrl: `/app/launches/${launchId}`,
     };
@@ -246,18 +248,24 @@ export const setLaunchFeaturesAction = growthAction({
 export const setLaunchDeliverableAction = growthAction({
   outputSchema: setLaunchDeliverableActionOutputSchema,
   description:
-    "Set ONE surface's row on a launch: owner, ready-by date, status, or a note. Creates the row if that surface has none. Keep ownerName as the person's real name even when they have no Growth account; only set ownerId when the member is certain, never guessed.",
+    "Set ONE surface's row on a launch: owner, ready-by date, status, or a note. Creates the row if that surface has none; null clears a field. Keep ownerName as the person's real name even when they have no Growth account; only set ownerId when the member is certain, never guessed.",
   inputSchema: z.object({
     launchId: z.string(),
     surface: z.enum(launchSurfaces),
-    ownerName: z.string().trim().max(160).optional(),
-    ownerId: z.string().optional(),
-    readyBy: z.string().date().optional(),
+    ownerName: z.string().trim().max(160).nullish(),
+    ownerId: z.string().nullish(),
+    readyBy: z.string().date().nullish(),
     status: z.enum(launchDeliverableStatuses).optional(),
-    note: z.string().trim().max(1_000).optional(),
+    note: z.string().trim().max(1_000).nullish(),
   }),
-  execute: async ({ launchId, surface, ...patch }, ctx) => {
+  execute: async ({ launchId, surface, ...fields }, ctx) => {
     await requireLaunch(ctx.orgId, launchId);
+    // A key sent as undefined is cleared by setDeliverable; a missing key is kept.
+    const patch = Object.fromEntries(
+      Object.entries(fields)
+        .filter(([, v]) => v !== undefined)
+        .map(([k, v]) => [k, v ?? undefined]),
+    );
     await setDeliverable(ctx.orgId, launchId, surface, patch);
     return {
       action: "saved" as const,

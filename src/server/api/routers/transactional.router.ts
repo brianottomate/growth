@@ -1,8 +1,8 @@
-import { TRPCError } from "@trpc/server";
+import { ORPCError } from "@orpc/server";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { protectedProcedure } from "@/server/api/orpc";
 import type { db } from "@/server/db";
 import { brandTable, memberTable } from "@/server/db/schema";
 import {
@@ -16,7 +16,7 @@ async function orgBrandIds(database: typeof db, userId: string) {
     where: eq(memberTable.userId, userId),
   });
   if (!membership) {
-    throw new TRPCError({ code: "FORBIDDEN", message: "No organization." });
+    throw new ORPCError("FORBIDDEN", { message: "No organization." });
   }
   const brands = await database.query.brandTable.findMany({
     where: and(
@@ -41,13 +41,13 @@ async function requireOwnedMessage(
     ),
   });
   if (!message || !brandIds.includes(message.brandId)) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Message not found." });
+    throw new ORPCError("NOT_FOUND", { message: "Message not found." });
   }
   return message;
 }
 
-export const transactionalRouter = createTRPCRouter({
-  list: protectedProcedure.query(async ({ ctx }) => {
+export const transactionalRouter = {
+  list: protectedProcedure.handler(async ({ context: ctx }) => {
     const brandIds = await orgBrandIds(ctx.db, ctx.session.user.id);
     if (!brandIds.length) return [];
     return ctx.db.query.transactionalMessageTable.findMany({
@@ -69,7 +69,7 @@ export const transactionalRouter = createTRPCRouter({
         status: z.enum(transactionalStatusEnum.enumValues),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await requireOwnedMessage(ctx.db, ctx.session.user.id, input.id);
       const [updatedRow] = await ctx.db
         .update(transactionalMessageTable)
@@ -81,7 +81,7 @@ export const transactionalRouter = createTRPCRouter({
 
   updateNotes: protectedProcedure
     .input(z.object({ id: z.string(), notes: z.string().max(10_000) }))
-    .mutation(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       await requireOwnedMessage(ctx.db, ctx.session.user.id, input.id);
       const [updatedRow] = await ctx.db
         .update(transactionalMessageTable)
@@ -93,7 +93,7 @@ export const transactionalRouter = createTRPCRouter({
 
   preview: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .query(async ({ ctx, input }) => {
+    .handler(async ({ context: ctx, input }) => {
       const message = await requireOwnedMessage(
         ctx.db,
         ctx.session.user.id,
@@ -116,4 +116,4 @@ export const transactionalRouter = createTRPCRouter({
         message.previewProps,
       );
     }),
-});
+};

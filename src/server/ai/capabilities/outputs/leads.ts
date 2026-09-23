@@ -3,12 +3,30 @@ import { z } from "zod";
 /** Wire results for this capability. Dates are ISO strings after JSON normalization. */
 export const leadsSummaryOutputSchema = z.strictObject({
   contacts: z.number(),
+  currentBatch: z.number().optional(),
   domains: z.number().optional(),
+  inBuiltwith: z.number().optional(),
   inHubspot: z.number().optional(),
   inInstantly: z.number().optional(),
+  integratedPms: z.number().optional(),
   netNew: z.number(),
   ranked: z.number().optional(),
   sendBatch: z.number().optional(),
+  targetEnrollable: z.array(
+    z.strictObject({
+      cohort: z.string(),
+      enrollable: z.number(),
+      linked: z.number(),
+    }),
+  ),
+  targetMemberships: z.array(
+    z.strictObject({
+      cohort: z.string(),
+      count: z.number(),
+      linked: z.number(),
+      objectType: z.string(),
+    }),
+  ),
   topPms: z.array(
     z.strictObject({ count: z.number(), pms: z.string().nullable() }),
   ),
@@ -51,11 +69,11 @@ export const leadsSequenceOutputSchema = z.union([
 ]);
 
 export const leadsRewriteSequenceOutputSchema = z.strictObject({
-  angle: z.string(),
+  angle: z.string().nullable(),
   changed: z.string(),
   domain: z.string(),
   note: z.string(),
-  outreachId: z.string().nullable(),
+  outreachId: z.string(),
   status: z.literal("draft"),
   touches: z.array(
     z.strictObject({

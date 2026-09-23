@@ -7,7 +7,7 @@ import { Loader2, TriangleAlert } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 const ROWS: { key: string; label: string }[] = [
   { key: "channels", label: "Channels" },
@@ -38,17 +38,16 @@ export function PurgeBrandCard({
   brandId: string;
   brandName: string;
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
 
   const preview = useQuery({
-    ...trpc.brand.previewPurge.queryOptions({ brandId }),
+    ...orpc.brand.previewPurge.queryOptions({ input: { brandId } }),
     enabled: open,
   });
   const purge = useMutation(
-    trpc.brand.purge.mutationOptions({
+    orpc.brand.purge.mutationOptions({
       onSuccess: () => router.push("/app/brands"),
     }),
   );

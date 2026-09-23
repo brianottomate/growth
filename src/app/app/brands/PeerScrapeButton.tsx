@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "@/components/ui/toast";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 type ScrapePlatform = "instagram" | "facebook" | "linkedin" | "x";
 
@@ -38,11 +38,10 @@ export function PeerScrapeButton({
   channels: { platform: string; profileUrl: string | null }[];
 }) {
   const router = useRouter();
-  const trpc = useTRPC();
   const [runningDays, setRunningDays] = useState<number | null>(null);
 
   const scrape = useMutation(
-    trpc.channelSuggestion.scrapePosts.mutationOptions(),
+    orpc.channelSuggestion.scrapePosts.mutationOptions(),
   );
 
   // Only channels we have a mapper for AND a page link to scrape.

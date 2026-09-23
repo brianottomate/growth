@@ -11,7 +11,7 @@ import { cn } from "@/components/ui/lib/utils";
 import { toast } from "@/components/ui/toast";
 import type { HotelFeedHome } from "@/lib/meta-hotel-feed";
 import { MAX_SET_HOMES } from "@/lib/performance-ads";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 import { HomePicker } from "../HomePicker";
 import { AddAdDialog } from "./AddAdDialog";
@@ -72,11 +72,10 @@ export function AdPreviewsWorkspace({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const trpc = useTRPC();
   const [count, setCount] = useState(DEFAULT_COUNT);
   const [campaignId, setCampaignId] = useState(campaigns[0]?.id ?? "");
   const build = useMutation(
-    trpc.ads.buildAdSet.mutationOptions({
+    orpc.ads.buildAdSet.mutationOptions({
       onSuccess: (result) => {
         toast.success(
           `Drew ${result.ads.length} ads from ${result.homes.length} home${result.homes.length === 1 ? "" : "s"}${
@@ -91,7 +90,7 @@ export function AdPreviewsWorkspace({
     }),
   );
   const writeCopy = useMutation(
-    trpc.ads.writeSetCopy.mutationOptions({
+    orpc.ads.writeSetCopy.mutationOptions({
       onSuccess: (result) => {
         toast.success(
           result.updated > 0
@@ -104,12 +103,14 @@ export function AdPreviewsWorkspace({
     }),
   );
   const attach = useMutation(
-    trpc.ads.attachAdSet.mutationOptions({
+    orpc.ads.attachAdSet.mutationOptions({
       onSuccess: (result) => {
         toast.success(
           `${result.attached} ad${result.attached === 1 ? "" : "s"} now in ${result.campaignName}.`,
         );
-        router.push(`/app/brands/${brandSlug}/ads/${result.campaignId}`);
+        router.push(
+          `/app/performance/brands/${brandSlug}/campaigns/${result.campaignId}`,
+        );
       },
       onError: (error) => toast.error(error.message),
     }),
@@ -209,9 +210,8 @@ export function AdPreviewsWorkspace({
                       ? {
                           brandId,
                           propertyIds: pickedHomes.map((h) => h.id),
-                          copy: "defer",
                         }
-                      : { brandId, count, copy: "defer" },
+                      : { brandId, count },
                   )
                 }
                 shape="round"
@@ -348,8 +348,8 @@ export function AdPreviewsWorkspace({
           )}
         >
           {hasSite
-            ? "Nothing here yet. Build the set, add an ad, or drop finished creatives."
-            : "Nothing here yet. Add an ad, or drop finished creatives."}
+            ? "No unassigned creatives. Ads attached to a campaign live in Campaigns. Build a set, add an ad, or drop finished creatives here."
+            : "No unassigned creatives. View Campaigns for assigned ads, or add an ad here."}
         </p>
       )}
     </div>

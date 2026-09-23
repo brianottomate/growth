@@ -27,7 +27,7 @@ import {
   type StorefrontContent,
 } from "@/lib/product-atlas";
 import { cn } from "@/lib/utils";
-import { useTRPC, type RouterOutputs } from "@/trpc/react";
+import { orpc, type RouterOutputs } from "@/orpc/client";
 
 import { StorefrontPreview } from "./StorefrontPreview";
 import { StorefrontReferences } from "./StorefrontReferences";
@@ -54,7 +54,6 @@ export function StorefrontEditor({
   assets: Assets;
   siblings: Sibling[];
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("preview");
   const [content, setContent] = useState<StorefrontContent>(storefront.content);
@@ -82,31 +81,31 @@ export function StorefrontEditor({
     router.refresh();
   };
   const updateMutation = useMutation(
-    trpc.productStorefront.updateStorefront.mutationOptions({
+    orpc.productStorefront.updateStorefront.mutationOptions({
       onSuccess: () => refresh("Saved and marked stale"),
       onError: (error) => toast.error(error.message),
     }),
   );
   const staleMutation = useMutation(
-    trpc.productStorefront.markStale.mutationOptions({
+    orpc.productStorefront.markStale.mutationOptions({
       onSuccess: () => refresh("Marked stale"),
       onError: (error) => toast.error(error.message),
     }),
   );
   const confirmMutation = useMutation(
-    trpc.productStorefront.confirmUpToDate.mutationOptions({
+    orpc.productStorefront.confirmUpToDate.mutationOptions({
       onSuccess: () => refresh("Confirmed up to date"),
       onError: (error) => toast.error(error.message),
     }),
   );
   const managerMutation = useMutation(
-    trpc.productStorefront.assignManager.mutationOptions({
+    orpc.productStorefront.assignManager.mutationOptions({
       onSuccess: () => refresh("Manager updated"),
       onError: (error) => toast.error(error.message),
     }),
   );
   const copyMutation = useMutation(
-    trpc.productStorefront.copySiblingContent.mutationOptions({
+    orpc.productStorefront.copySiblingContent.mutationOptions({
       onSuccess: () => refresh("Sibling content copied and marked stale"),
       onError: (error) => toast.error(error.message),
     }),

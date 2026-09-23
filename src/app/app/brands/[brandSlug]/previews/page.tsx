@@ -1,3 +1,4 @@
+import { WorkspaceBreadcrumbs } from "@/components/workspace-breadcrumbs";
 import { notFound, redirect } from "next/navigation";
 import { and, desc, eq, inArray, isNull, notInArray, or } from "drizzle-orm";
 
@@ -155,14 +156,23 @@ export default async function BrandPreviewsPage({
   });
 
   return (
-    <PreviewsClient
-      brand={{
-        name: brand.name,
-        slug: brand.slug ?? brandSlug,
-        logo: brand.logo,
-      }}
-      ideas={ordered}
-      picking={ids.length === 0}
-    />
+    <>
+      <WorkspaceBreadcrumbs
+        items={[
+          { label: "Brands", href: "/app/brands" },
+          { label: brand.name, href: `/app/brands/${brand.slug ?? brandSlug}` },
+          { label: "Organic previews" },
+        ]}
+      />
+      <PreviewsClient
+        brand={{
+          name: brand.name,
+          slug: brand.slug ?? brandSlug,
+          logo: brand.logo,
+        }}
+        ideas={ordered}
+        picking={ids.length === 0}
+      />
+    </>
   );
 }

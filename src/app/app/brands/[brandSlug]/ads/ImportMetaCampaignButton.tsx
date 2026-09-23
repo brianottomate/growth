@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -16,10 +16,9 @@ export function ImportMetaCampaignButton({ brandSlug }: { brandSlug: string }) {
   const [open, setOpen] = useState(false),
     [externalCampaignId, setId] = useState(""),
     [name, setName] = useState("");
-  const trpc = useTRPC(),
-    router = useRouter();
+  const router = useRouter();
   const save = useMutation(
-    trpc.ads.importMetaCampaign.mutationOptions({
+    orpc.ads.importMetaCampaign.mutationOptions({
       onSuccess: (r) => {
         setOpen(false);
         router.push(r.path);

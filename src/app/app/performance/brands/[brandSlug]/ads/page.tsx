@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
@@ -11,7 +12,9 @@ import { MAX_SET_HOMES } from "@/lib/performance-ads";
 import { AdPreviewsWorkspace, type WorkspaceHome } from "./AdPreviewsWorkspace";
 import { toMatrixHomes } from "./matrix/build";
 
-export const metadata: Metadata = { title: "Ads · Wander Performance" };
+export const metadata: Metadata = {
+  title: "Unassigned creatives · Wander Performance",
+};
 export const dynamic = "force-dynamic";
 
 /**
@@ -104,19 +107,32 @@ export default async function PerformanceBrandAdsPage({
   const slug = brand.slug ?? brand.id;
 
   return (
-    <AdPreviewsWorkspace
-      brandId={brand.id}
-      brandSlug={slug}
-      brandName={brand.name}
-      brandLogo={avatarUrl}
-      homes={homes}
-      withoutPhoto={withoutPhoto}
-      initialPicked={initialPicked}
-      matrixHomes={matrixHomes}
-      campaigns={campaigns}
-      hasSite={listings.length > 0}
-      website={brand.website}
-      focusHomeId={focused}
-    />
+    <>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-lg font-semibold">
+          Unassigned creatives · {drafted.length}
+        </h1>
+        <Link
+          className="text-sm underline"
+          href={`/app/performance/brands/${slug}/campaigns`}
+        >
+          View campaign ads
+        </Link>
+      </div>
+      <AdPreviewsWorkspace
+        brandId={brand.id}
+        brandSlug={slug}
+        brandName={brand.name}
+        brandLogo={avatarUrl}
+        homes={homes}
+        withoutPhoto={withoutPhoto}
+        initialPicked={initialPicked}
+        matrixHomes={matrixHomes}
+        campaigns={campaigns}
+        hasSite={listings.length > 0}
+        website={brand.website}
+        focusHomeId={focused}
+      />
+    </>
   );
 }

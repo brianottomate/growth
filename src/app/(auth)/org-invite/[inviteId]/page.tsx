@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Building2 } from "lucide-react";
 
-import { trpcApi } from "@/trpc/server";
+import { serverApi } from "@/orpc/server";
 import {
   Card,
   CardContent,
@@ -26,7 +26,7 @@ export async function generateMetadata({
   const { inviteId } = await params;
 
   try {
-    const caller = await trpcApi();
+    const caller = serverApi;
     const invitation = await caller.org.getOrgInvite({
       invitationId: inviteId,
     });
@@ -49,7 +49,7 @@ export default async function InvitePage({ params }: InvitePageProps) {
   let invitation = null;
   let errorMessage: string | null = null;
 
-  const caller = await trpcApi();
+  const caller = serverApi;
 
   try {
     invitation = await caller.org.getOrgInvite({ invitationId: inviteId });

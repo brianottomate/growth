@@ -7,7 +7,7 @@ import { toast } from "sonner";
 
 import { cn } from "@/components/ui/lib/utils";
 import { platformLabel } from "@/components/channel-logos";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 type StoryDeliveryItem = {
   deliveryExternalId?: string | null;
@@ -30,7 +30,6 @@ export function StoryDeliveryControl({
   connected: boolean;
   items: StoryDeliveryItem[];
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const settle = {
     onSuccess: () => router.refresh(),
@@ -41,7 +40,7 @@ export function StoryDeliveryControl({
     },
   };
   const deliver = useMutation(
-    trpc.content.deliverSocial.mutationOptions({
+    orpc.content.deliverSocial.mutationOptions({
       ...settle,
       onSuccess: (result) => {
         const handedOffCount =
@@ -54,10 +53,10 @@ export function StoryDeliveryControl({
     }),
   );
   const refresh = useMutation(
-    trpc.content.refreshSocialDelivery.mutationOptions(settle),
+    orpc.content.refreshSocialDelivery.mutationOptions(settle),
   );
   const retry = useMutation(
-    trpc.content.retrySocialDelivery.mutationOptions({
+    orpc.content.retrySocialDelivery.mutationOptions({
       ...settle,
       onSuccess: () => {
         toast.success("Failed Story frames sent back to Zernio");

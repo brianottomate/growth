@@ -269,7 +269,7 @@ export const PLATFORM_NODES: PlatformNode[] = [
     description: "Growth platform — CIO/Outreach sync, analytics",
     kind: "repo",
     platform: "growth",
-    tech: "Next.js + Bun + tRPC",
+    tech: "Next.js + Bun + oRPC",
     repo: "wandercom/growth",
   },
   {

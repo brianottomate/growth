@@ -20,7 +20,7 @@ page gives the assistant context. It does not fence the assistant into one
 feature.
 
 "Everything is editable through chat" is a direction, not a claim that every
-tRPC procedure is already an AI action. Growth exposes a domain only when its
+oRPC procedure is already an AI action. Growth exposes a domain only when its
 model-facing vocabulary, policy, and operator outcome are clear. Provider sends,
 publishes, deletes, campaign changes, and other irreversible operations need an
 explicit policy and approval path.

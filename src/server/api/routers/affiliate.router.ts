@@ -1,4 +1,3 @@
-import type { TRPCRouterRecord } from "@trpc/server";
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
@@ -11,7 +10,7 @@ import {
 } from "@/server/db/affiliate-schema";
 import { postAffiliateItemToRadio } from "@/server/services/affiliate-notify.service";
 
-import { protectedProcedure } from "../trpc";
+import { protectedProcedure } from "@/server/api/orpc";
 
 /**
  * Affiliate ops desk — the triage queue for the in-house affiliate program
@@ -20,7 +19,7 @@ import { protectedProcedure } from "../trpc";
  * the mention-queue grammar from /app/listen.
  */
 export const affiliateRouter = {
-  overview: protectedProcedure.query(async () => {
+  overview: protectedProcedure.handler(async () => {
     const programs = await db
       .select()
       .from(partnerProgramTable)
@@ -38,7 +37,7 @@ export const affiliateRouter = {
         })
         .optional(),
     )
-    .query(async ({ input }) => {
+    .handler(async ({ input }) => {
       const rows = await db
         .select()
         .from(affiliateItemTable)
@@ -70,7 +69,7 @@ export const affiliateRouter = {
         decisionNote: z.string().trim().max(4000).nullish(),
       }),
     )
-    .mutation(async ({ input, ctx }) => {
+    .handler(async ({ input, context: ctx }) => {
       const resolving = input.status !== "open";
 
       const patch: Partial<typeof affiliateItemTable.$inferInsert> = {
@@ -100,7 +99,7 @@ export const affiliateRouter = {
   /** Claim/assign an item to a teammate (null = unclaim). */
   assign: protectedProcedure
     .input(z.object({ id: z.string(), userId: z.string().nullable() }))
-    .mutation(async ({ input }) => {
+    .handler(async ({ input }) => {
       const [updated] = await db
         .update(affiliateItemTable)
         .set({ assigneeId: input.userId })
@@ -115,7 +114,7 @@ export const affiliateRouter = {
    */
   testSlack: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ input }) => {
+    .handler(async ({ input }) => {
       const [item] = await db
         .select()
         .from(affiliateItemTable)
@@ -128,4 +127,4 @@ export const affiliateRouter = {
         ? { success: true as const, channel: result.channel }
         : { success: false as const, error: result.error };
     }),
-} satisfies TRPCRouterRecord;
+};

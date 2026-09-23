@@ -25,7 +25,7 @@ import {
   type PushableAdPlatform,
 } from "@/lib/ad-platforms";
 import { campaignDraftName } from "@/lib/performance-ads";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 
 /**
  * Creates a local draft and lands on its canvas. Deliberately minimal — a
@@ -37,17 +37,18 @@ const DEFAULT_BUDGET_USD = 1000;
 
 export function NewCampaignButton({
   brandId,
+  brandSlug,
   brandName,
   brandWebsite,
   isClient = false,
 }: {
   brandId: string;
+  brandSlug: string;
   brandName: string;
   brandWebsite?: string | null;
   /** Only a paying client has an intake to prefill from. */
   isClient?: boolean;
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   // Born in the house convention, editable from the first keystroke.
@@ -71,7 +72,7 @@ export function NewCampaignButton({
   // are advertising, on the intake form. Retyping it is how the number in the
   // campaign drifts from the number they agreed to.
   const prefill = useQuery({
-    ...trpc.performance.campaignPrefill.queryOptions({ brandId }),
+    ...orpc.performance.campaignPrefill.queryOptions({ input: { brandId } }),
     // Wander's own brands have no intake behind them, so this would be a
     // round trip to be told nothing.
     enabled: open && isClient,
@@ -93,7 +94,7 @@ export function NewCampaignButton({
     : null;
 
   const create = useMutation(
-    trpc.ads.createDraft.mutationOptions({
+    orpc.ads.createDraft.mutationOptions({
       onSuccess: (result) => {
         setOpen(false);
         router.push(result.path);
@@ -241,14 +242,14 @@ export function NewCampaignButton({
             loading={create.isPending}
             onClick={() =>
               create.mutate({
-                brandId,
+                brandSlug,
                 name: name.trim(),
                 platforms,
-                landingUrl: landingUrl.trim() || null,
-                description: description.trim() || null,
+                landingUrl: landingUrl.trim() || undefined,
+                description: description.trim() || undefined,
                 budget:
                   budget === "" || !Number.isFinite(Number(budget))
-                    ? null
+                    ? undefined
                     : Math.max(0, Math.round(Number(budget))),
               })
             }

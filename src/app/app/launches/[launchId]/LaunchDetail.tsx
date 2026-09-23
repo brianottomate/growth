@@ -12,10 +12,9 @@ import {
   type LaunchDeliverableStatus,
 } from "@/lib/launch";
 import { Input } from "@/components/ui/input";
-import { useTRPC } from "@/trpc/react";
-import type { readLaunch } from "@/server/services/launch.service";
+import { orpc, type RouterOutputs } from "@/orpc/client";
 
-type LaunchData = NonNullable<Awaited<ReturnType<typeof readLaunch>>>;
+type LaunchData = RouterOutputs["launch"]["get"];
 type Member = { id: string; name: string | null; email: string | null };
 
 const DELIVERABLE_STATUS_STYLES: Record<LaunchDeliverableStatus, string> = {
@@ -32,11 +31,10 @@ export function LaunchDetail({
   initial: LaunchData;
   members: Member[];
 }) {
-  const trpc = useTRPC();
   const router = useRouter();
 
   const query = useQuery({
-    ...trpc.launch.get.queryOptions({ launchId: initial.launch.id }),
+    ...orpc.launch.get.queryOptions({ input: { launchId: initial.launch.id } }),
     initialData: initial,
   });
   const data = query.data;
@@ -47,13 +45,13 @@ export function LaunchDetail({
   };
 
   const setDeliverable = useMutation(
-    trpc.launch.setDeliverable.mutationOptions({ onSuccess: refresh }),
+    orpc.launch.setDeliverable.mutationOptions({ onSuccess: refresh }),
   );
   const setFields = useMutation(
-    trpc.launch.setFields.mutationOptions({ onSuccess: refresh }),
+    orpc.launch.setFields.mutationOptions({ onSuccess: refresh }),
   );
   const setFeatures = useMutation(
-    trpc.launch.setFeatures.mutationOptions({ onSuccess: refresh }),
+    orpc.launch.setFeatures.mutationOptions({ onSuccess: refresh }),
   );
 
   const {
@@ -62,7 +60,7 @@ export function LaunchDetail({
     series,
     campaigns,
     posts,
-    missing,
+    next,
     features,
     unknownStoryIds,
   } = data;
@@ -119,9 +117,9 @@ export function LaunchDetail({
         )}
       </header>
 
-      {missing.length > 0 && (
+      {next.length > 0 && (
         <section className="space-y-1.5 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
-          {missing.map((move) => (
+          {next.map((move) => (
             <p
               key={move}
               className="flex items-start gap-2 text-sm text-amber-200"

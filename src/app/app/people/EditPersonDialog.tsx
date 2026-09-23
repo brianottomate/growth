@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SimpleSelect } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
-import { useTRPC } from "@/trpc/react";
+import { orpc } from "@/orpc/client";
 import { PhotoPickerField, usePhotoPicker } from "./PhotoPicker";
 
 type OrgRole = "owner" | "admin" | "member";
@@ -54,7 +54,6 @@ export function EditPersonDialog({
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }) {
-  const trpc = useTRPC();
   const photoPicker = usePhotoPicker(member?.image ?? null);
   const [name, setName] = useState(member?.name ?? "");
   const [role, setRole] = useState<OrgRole>(member?.role ?? "member");
@@ -74,7 +73,7 @@ export function EditPersonDialog({
   }, [member?.id, open]);
 
   const resetPassword = useMutation(
-    trpc.org.resetPassword.mutationOptions({
+    orpc.org.resetPassword.mutationOptions({
       onSuccess: (res) => {
         setNewPassword(res.tempPassword);
         setCopied(false);
@@ -84,7 +83,7 @@ export function EditPersonDialog({
   );
 
   const updatePerson = useMutation(
-    trpc.org.updatePerson.mutationOptions({
+    orpc.org.updatePerson.mutationOptions({
       onSuccess: () => {
         toast.success("Saved");
         onOpenChange(false);

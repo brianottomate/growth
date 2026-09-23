@@ -350,6 +350,7 @@ export default async function SeriesDetailPage({
           </span>
         ))}
         <DeleteSeriesButton
+          brandId={series.brandId}
           seriesId={series.id}
           name={series.name}
           ideas={installments.length}
