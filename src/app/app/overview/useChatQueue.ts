@@ -29,6 +29,10 @@ export function useChatQueue({
 }) {
   const [state, setState] = useState<ChatTurnSnapshot | null>(null);
   const [saving, setSaving] = useState(false);
+  // The input this client just sent. Until a poll sees the server claim it,
+  // the snapshot still says "queued", and the pending panel would show the
+  // message twice: running in the transcript and queued below it.
+  const [inFlightId, setInFlightId] = useState<string | null>(null);
   const dispatching = useRef(false);
   const accepting = useRef(false);
   const unacknowledged = useRef<{ key: string; id: string } | null>(null);
@@ -124,6 +128,7 @@ export function useChatQueue({
     const next = state.inputs.find((input) => input.status === "queued");
     if (!next || !next.owned) return;
     dispatching.current = true;
+    setInFlightId(next.id);
     setMessages(state.messages);
     void send(next.payload.message, {
       body: { ...next.payload.context, inputId: next.id, threadId },
@@ -131,6 +136,7 @@ export function useChatQueue({
       .catch(() => undefined)
       .finally(() => {
         dispatching.current = false;
+        setInFlightId(null);
         void refresh().catch(() => undefined);
       });
   }, [active, state, status, send, setMessages, threadId, refresh]);
@@ -195,5 +201,16 @@ export function useChatQueue({
     },
     [command, clearError],
   );
-  return { state, saving, enqueue, control, refresh };
+  const shown =
+    state && inFlightId
+      ? {
+          ...state,
+          inputs: state.inputs.map((input) =>
+            input.id === inFlightId && input.status === "queued"
+              ? { ...input, status: "running" as const }
+              : input,
+          ),
+        }
+      : state;
+  return { state: shown, saving, enqueue, control, refresh };
 }
