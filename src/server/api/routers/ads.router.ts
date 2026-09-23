@@ -73,11 +73,17 @@ export const adsRouter = {
 
   /** The copy pass: AI words onto the drafts already drawn. Headline/body only. */
   writeSetCopy: workspaceProcedure
-    .input(z.object({ brandId: z.string().min(1) }))
+    .input(
+      z.object({
+        brandId: z.string().min(1),
+        campaignId: z.string().min(1).optional(),
+      }),
+    )
     .handler(async ({ context: ctx, input }) =>
       writeSetCopy({
         brandId: input.brandId,
         orgId: ctx.workspace.orgId,
+        campaignId: input.campaignId,
       }),
     ),
 

@@ -1716,14 +1716,26 @@ export async function unfreezePlacement(input: {
 export async function writeSetCopy(input: {
   brandId: string;
   orgId: string;
+  /**
+   * One campaign's ads instead of the brand's catalog set. Asked for by name,
+   * so approved ads are rewritten too: the pass never touches their artwork.
+   */
+  campaignId?: string;
 }): Promise<{ brandId: string; updated: number }> {
   const brand = await requireOwnedBrand(input);
   const ads = await db.query.adTable.findMany({
-    where: and(eq(adTable.brandId, brand.id), isNull(adTable.campaignId)),
+    where: and(
+      eq(adTable.brandId, brand.id),
+      input.campaignId
+        ? eq(adTable.campaignId, input.campaignId)
+        : isNull(adTable.campaignId),
+    ),
     with: { home: { columns: { externalId: true, name: true, url: true } } },
   });
   const drafts = ads.filter(
-    (ad) => ad.status !== "approved" && ad.type === "creative",
+    (ad) =>
+      ad.type === "creative" &&
+      (Boolean(input.campaignId) || ad.status !== "approved"),
   );
   if (drafts.length === 0) return { brandId: brand.id, updated: 0 };
 
