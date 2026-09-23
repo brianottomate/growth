@@ -87,22 +87,21 @@ maps the Conditional form's buckets.
 2. ~~Subscribe the Wander Page to the app for `leadgen` and assign the app in
    Leads Access.~~ Done 2026-09-23; a test lead reached the webhook in 4 s.
    HubSpot workflow `1887873568` disabled the same day.
-3. Run one day alongside Make with `META_LEADGEN_ROUTE_FROM` unset: CAPI
-   events flow, HubSpot writes stay with Make. Compare `leads.meta_leadgen_lead`
-   to Make's run history by leadgen id.
-4. Turn the Make Meta→HubSpot scenarios off, note the time, and set
-   `META_LEADGEN_ROUTE_FROM` in Doppler `wander-growth/prd` to that instant
-   (ISO, e.g. `2026-09-25T16:00:00Z`). Leads created before it stay Make's, so
-   nothing Make already handed to HubSpot is routed twice. Redeploy so the env
-   change is picked up.
-5. In Meta Events Manager (dataset 340) confirm `Marketing Qualified Lead`
-   arrives from "Wander Growth"; configure the CRM funnel (target = MQL); set the
-   qualified-leads ad set's conversion event. Its own campaign (error #1885760:
-   a CBO campaign's ad sets must share one optimization goal).
-6. Retire the HubSpot bridge: disable HubSpot Ads → Conversion event
-   "HubSpot - Marketing Qualified Lead" and workflow `1887873568`. Keep the other
-   stage events (Deep Dive Scheduled, Closed Won…); Meta joins them on the same
+3. ~~Turn Make off and route from Growth.~~ 2026-09-23: all ten Make
+   "Meta→HubSpot v2" scenarios deactivated; `META_LEADGEN_ROUTE_FROM` =
+   `2026-09-23T21:22:55Z` (the earliest final Make run); the two leads Make
+   handled after it are stamped `routed_at` with `last_error` "routed by Make
+   before cutover". Live from v1.0.131; first routed leads verified in HubSpot.
+   Make never watched the "…- No less than 5" Matt/Nick forms, so their older
+   leads never reached HubSpot; not backfilled (the goal is CAPI).
+4. ~~Retire the HubSpot bridge.~~ Workflow `1887873568` and the HubSpot Ads
+   conversion event "HubSpot - Marketing Qualified Lead" are off. The other stage
+   events (Deep Dive Scheduled, Closed Won…) stay on; Meta joins them on the same
    lead id.
+5. `Marketing Qualified Lead` is Active on dataset 340 from the Conversions API.
+   Still open (Brooke): configure the CRM funnel (target = MQL) and point the
+   qualified-leads ad set at it, in its own campaign (error #1885760: a CBO
+   campaign's ad sets must share one optimization goal).
 
 Later: Growth writes to HubSpot itself instead of through the inbound router,
 and takes over the remaining Make scenarios (below).
