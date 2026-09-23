@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { ideaSource } from "@/lib/ad-idea-studio";
+import { isFeedPlacement } from "@/lib/meta-placement-plan";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 import { Loader2, MessageSquare } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -533,7 +534,7 @@ export function AdIdeaCard({
           </fieldset>
           {isStatic &&
             savedState.document.intendedPlacements?.some(
-              (p) => !p.endsWith("-feed"),
+              (p) => !isFeedPlacement(p),
             ) &&
             !exportShapes.includes("story") && (
               <p className="text-sm text-muted-foreground">

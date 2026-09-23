@@ -50,21 +50,99 @@ export const META_PLACEMENTS = [
     surface: "story",
     kind: "reel",
   },
+  {
+    id: "facebook-marketplace",
+    label: "Facebook Marketplace",
+    publisher: "facebook",
+    position: "marketplace",
+    surface: "facebook",
+    kind: "feed",
+  },
+  {
+    id: "facebook-video-feeds",
+    label: "Facebook Video Feeds",
+    publisher: "facebook",
+    position: "video_feeds",
+    surface: "facebook",
+    kind: "feed",
+  },
+  {
+    id: "facebook-right-column",
+    label: "Facebook Right Column",
+    publisher: "facebook",
+    position: "right_hand_column",
+    surface: "facebook",
+    kind: "feed",
+  },
+  {
+    id: "facebook-profile-feed",
+    label: "Facebook Profile Feed",
+    publisher: "facebook",
+    position: "profile_feed",
+    surface: "facebook",
+    kind: "feed",
+  },
+  {
+    id: "facebook-notification",
+    label: "Facebook Notifications",
+    publisher: "facebook",
+    position: "notification",
+    surface: "facebook",
+    kind: "feed",
+  },
+  {
+    id: "instagram-explore",
+    label: "Instagram Explore",
+    publisher: "instagram",
+    position: "explore",
+    surface: "instagram",
+    kind: "feed",
+  },
+  {
+    id: "instagram-explore-home",
+    label: "Instagram Explore Home",
+    publisher: "instagram",
+    position: "explore_home",
+    surface: "instagram",
+    kind: "feed",
+  },
+  {
+    id: "instagram-profile-feed",
+    label: "Instagram Profile Feed",
+    publisher: "instagram",
+    position: "profile_feed",
+    surface: "instagram",
+    kind: "feed",
+  },
+  {
+    id: "instagram-profile-reel",
+    label: "Instagram Profile Reels",
+    publisher: "instagram",
+    position: "profile_reels",
+    surface: "story",
+    kind: "reel",
+  },
 ] as const;
 export type MetaPlacement = (typeof META_PLACEMENTS)[number]["id"];
-export const metaPlacementSchema = z.enum([
-  "facebook-feed",
-  "instagram-feed",
-  "facebook-story",
-  "instagram-story",
-  "facebook-reel",
-  "instagram-reel",
-]);
+const META_PLACEMENT_IDS = META_PLACEMENTS.map((p) => p.id) as [
+  MetaPlacement,
+  ...MetaPlacement[],
+];
+export const metaPlacementSchema = z.enum(META_PLACEMENT_IDS);
+/**
+ * Every Facebook and Instagram surface except in-stream video and search,
+ * which is how the Performance team runs Meta by hand.
+ */
+export const META_DEFAULT_PLACEMENTS: MetaPlacement[] = [...META_PLACEMENT_IDS];
 export const metaPlacementPlanSchema = z
   .array(metaPlacementSchema)
   .min(1)
-  .max(6)
+  .max(META_PLACEMENTS.length)
   .refine((p) => new Set(p).size === p.length, "Choose each placement once");
+/** Feed-shaped placements take the baseline card; the rest need a 9:16. */
+export function isFeedPlacement(id: MetaPlacement) {
+  return META_PLACEMENTS.find((p) => p.id === id)?.kind === "feed";
+}
 export function metaProviderPlacements(ids: MetaPlacement[]) {
   const selected = META_PLACEMENTS.filter((p) => ids.includes(p.id));
   return {
@@ -120,7 +198,7 @@ export function metaPlacementMedia(
           "Published artwork does not match the approved exports. Reopen and approve the idea again.",
       };
     if (
-      !id.endsWith("-feed") &&
+      !isFeedPlacement(id) &&
       content.media.length === 1 &&
       studio.approval.renders.story?.[0]?.url !== content.media[0]?.story?.url
     )
@@ -131,7 +209,7 @@ export function metaPlacementMedia(
       };
   }
   if (!content.media.length) return { media: [], issue: "Add creative." };
-  if (id.endsWith("-feed")) return { media: content.media, issue: null };
+  if (isFeedPlacement(id)) return { media: content.media, issue: null };
   // A carousel delivers its canonical cards across placements. The preview
   // preserves those exact assets; it must not substitute alternate Story files.
   if (content.media.length > 1) return { media: content.media, issue: null };

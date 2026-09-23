@@ -4,6 +4,7 @@ import { env } from "@/env";
 import { AD_PLATFORM_SPECS } from "@/lib/ad-platforms";
 import { classifyFormatFromFields } from "@/server/content/formats";
 import type { MediaItem, PostStats } from "@/server/db/content-schema";
+import type { ExistingCustomConversion } from "@/lib/performance-ads";
 
 const ZERNIO_API_BASE = "https://zernio.com/api/v1";
 
@@ -1481,6 +1482,16 @@ export type CreateZernioCustomConversionInput = {
  * not mint a duplicate with none of the original's optimisation history.
  * https://docs.zernio.com/ad-campaigns/create-custom-conversion
  */
+export async function listZernioCustomConversions(input: {
+  accountId: string;
+  adAccountId: string;
+}): Promise<ExistingCustomConversion[]> {
+  const result = await zernioFetch<{ data?: ExistingCustomConversion[] }>(
+    `/accounts/${encodeURIComponent(input.accountId)}/custom-conversions?adAccountId=${encodeURIComponent(input.adAccountId)}`,
+  );
+  return result.data ?? [];
+}
+
 export async function createZernioCustomConversion(
   input: CreateZernioCustomConversionInput,
 ): Promise<{ customConversionId: string; reused: boolean }> {

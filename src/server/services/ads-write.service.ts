@@ -3,6 +3,8 @@ import { metaTrackingDefaults } from "./meta-tracking-defaults";
 import { resolveMetaSchedule, metaScheduleIssue } from "@/lib/meta-schedule";
 import { adsConnectionProfile } from "./ads-connection-profile";
 import {
+  META_DEFAULT_PLACEMENTS,
+  isFeedPlacement,
   metaPlacementPlanSchema,
   metaPlacementMedia,
   metaProviderPlacements,
@@ -48,6 +50,7 @@ import {
   createZernioAdAudience,
   createZernioAdCampaign,
   createZernioCustomConversion,
+  listZernioCustomConversions,
   deleteZernioCampaign,
   createZernioStandaloneAd,
   duplicateZernioMetaCampaign,
@@ -79,9 +82,11 @@ import {
   adFormatFor,
   hostScopedConversionRule,
   performanceConversionName,
+  reusableCustomConversion,
   audienceLabelForPlan,
   performanceAdName,
   performanceAdSetName,
+  performanceCampaignName,
 } from "@/lib/performance-ads";
 import {
   adAccountTable,
@@ -2415,6 +2420,7 @@ export async function metaPromotedObjectFor(args: {
     pixelId?: string;
     customEventType?: string;
     customConversionId?: string;
+    conversionScope?: "host" | "pixel";
   };
   /** A dry run must not provision anything, so it optimises on the event. */
   validateOnly: boolean;
@@ -2444,6 +2450,12 @@ export async function metaPromotedObjectFor(args: {
   ) {
     return onEvent;
   }
+  if (meta.conversionScope === "pixel") {
+    warnings.push(
+      `${brand.name} optimises on the raw ${meta.customEventType} event on pixel ${meta.pixelId}; Meta will credit it with bookings made on any Wander site`,
+    );
+    return onEvent;
+  }
 
   const host = normalizeDomain(brand.website);
   if (!host) {
@@ -2462,7 +2474,7 @@ export async function metaPromotedObjectFor(args: {
     name,
     pixelId: meta.pixelId,
     customEventType: meta.customEventType,
-    rule: hostScopedConversionRule(host),
+    rule: hostScopedConversionRule(host, meta.customEventType),
   });
   warnings.push(
     `Meta optimises on ${name} (${meta.customEventType} on ${host}), ${
@@ -2483,6 +2495,18 @@ export function metaRequiresCampaignShell(
   useCbo: boolean,
 ) {
   return useCbo || audienceCount > 1;
+}
+
+/** Meta shows headline and primary text together, so the same line twice reads as a bug. */
+export function headlineRepeatsBody(
+  content: Pick<AdCreativeContent, "headline" | "body">,
+) {
+  const headline = content.headline?.trim();
+  const firstLine = content.body
+    ?.split("\n")
+    .find((line) => line.trim())
+    ?.trim();
+  return Boolean(headline && firstLine && headline === firstLine);
 }
 
 async function pushToMeta(args: PushArgs) {
@@ -2528,7 +2552,9 @@ async function pushToMeta(args: PushArgs) {
     settings.meta ?? {},
     await metaTrackingDefaults(brand.id, destination.adAccount.id),
   );
-  const planned = metaPlacementPlanSchema.safeParse(meta.placements);
+  const planned = metaPlacementPlanSchema.safeParse(
+    meta.placements ?? META_DEFAULT_PLACEMENTS,
+  );
   if (!planned.success)
     throw new Error("Choose delivery placements in Meta setup before pushing.");
   const placementPlan = planned.data;
@@ -2542,31 +2568,60 @@ async function pushToMeta(args: PushArgs) {
       const issue = metaPlacementMedia(content, placement).issue;
       if (issue) throw new Error(`${ad.name}: ${issue}`);
     }
+    if (headlineRepeatsBody(content)) {
+      throw new Error(
+        `${ad.name}: the headline repeats the first line of the primary text. Give it its own headline.`,
+      );
+    }
   }
   const useCbo = (meta.budgetMode ?? "cbo") === "cbo";
   const promotedObject = await metaPromotedObjectFor({
     brand,
     meta,
     validateOnly: Boolean(input.validateOnly),
-    ensureCustomConversion: (conversion) =>
-      createZernioCustomConversion({
+    ensureCustomConversion: async (conversion) => {
+      const existing = await listZernioCustomConversions({
+        accountId: input.connectionAccountId,
+        adAccountId: destination.adAccount.id,
+      });
+      const reuse = reusableCustomConversion(existing, conversion);
+      if (reuse) return { customConversionId: reuse, reused: true };
+      return createZernioCustomConversion({
         accountId: input.connectionAccountId,
         adAccountId: destination.adAccount.id,
         ...conversion,
-      }),
+      });
+    },
     warnings,
   });
 
   const isCarousel = (content: AdCreativeContent) =>
     !isVideoContent(content) && (content.media?.length ?? 0) >= 2;
 
-  // Zernio rejects a Meta ad with no call to action, on every shape.
-  const metaCallToAction = (content: AdCreativeContent) =>
-    content.callToAction ?? META_DEFAULT_CALL_TO_ACTION;
-
-  // House naming at every level below the campaign (the campaign carries the
-  // name it was drafted with). An ad already in the convention keeps its name.
+  // Zernio rejects a Meta ad with no call to action, on every shape. A
+  // Performance client's ads always book; a stored LEARN_MORE is overridden.
   const isClient = brand.relationship === "client";
+  const overriddenCta = usable.filter(
+    ({ content }) =>
+      isClient &&
+      content.callToAction &&
+      content.callToAction !== META_DEFAULT_CALL_TO_ACTION,
+  );
+  if (overriddenCta.length > 0) {
+    warnings.push(
+      `${overriddenCta.length} ad(s) had a call to action other than ${META_DEFAULT_CALL_TO_ACTION}; client ads push with ${META_DEFAULT_CALL_TO_ACTION}`,
+    );
+  }
+  const metaCallToAction = (content: AdCreativeContent) =>
+    isClient
+      ? META_DEFAULT_CALL_TO_ACTION
+      : (content.callToAction ?? META_DEFAULT_CALL_TO_ACTION);
+
+  // House naming at every level. A campaign, ad set or ad already in the
+  // convention keeps its name; anything else is renamed on the way out.
+  const metaCampaignName = campaign.name.startsWith("META_")
+    ? campaign.name
+    : performanceCampaignName({ customer: brand.name, isClient });
   const adSetNameFor = (audience: PlanAudience | null) =>
     performanceAdSetName({
       customer: brand.name,
@@ -2619,7 +2674,7 @@ async function pushToMeta(args: PushArgs) {
     if (!card || content.media.length !== 1 || card.type === "video") {
       return undefined;
     }
-    if (!card.story || !placementPlan.some((p) => !p.endsWith("-feed")))
+    if (!card.story || !placementPlan.some((p) => !isFeedPlacement(p)))
       return undefined;
     return {
       defaultImageUrl: card.url,
@@ -2628,7 +2683,7 @@ async function pushToMeta(args: PushArgs) {
           imageUrl: card.story.url,
           placements: {
             ...metaProviderPlacements(
-              placementPlan.filter((p) => !p.endsWith("-feed")),
+              placementPlan.filter((p) => !isFeedPlacement(p)),
             ),
           },
         },
@@ -2697,10 +2752,10 @@ async function pushToMeta(args: PushArgs) {
     adAccountId: destination.adAccount.id,
     ...(setArgs.existingCampaignId
       ? { existingCampaignId: setArgs.existingCampaignId }
-      : { campaignName: campaign.name }),
+      : { campaignName: metaCampaignName }),
     name: setArgs.existingCampaignId
       ? adSetNameFor(setArgs.audience)
-      : campaign.name,
+      : metaCampaignName,
     adSetName: adSetNameFor(setArgs.audience),
     goal: input.goal,
     // Under CBO the campaign owns the money; an ad set that also sends a

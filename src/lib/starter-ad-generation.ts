@@ -4,14 +4,17 @@ import {
   ideaDocumentSchema,
   type IdeaDocument,
 } from "./ad-idea-studio";
-import { metaPlacementSchema } from "./meta-placement-plan";
+import { META_PLACEMENTS, metaPlacementSchema } from "./meta-placement-plan";
 import type { StarterHome } from "./starter-ad-ideas";
 
 export const starterGenerationSchema = z.object({
   campaignId: z.string().min(1),
   source: z.enum(["featured", "brand"]).default("featured"),
   homeIds: z.array(z.string().min(1)).max(10),
-  intendedPlacements: z.array(metaPlacementSchema).min(1).max(6),
+  intendedPlacements: z
+    .array(metaPlacementSchema)
+    .min(1)
+    .max(META_PLACEMENTS.length),
 });
 export const generatedCopySchema = z.object({
   headline: z.string().min(1).max(70),

@@ -15,6 +15,7 @@ import {
   performanceNamePrefix,
   performancePeriod,
   hostScopedConversionRule,
+  reusableCustomConversion,
   performanceConversionName,
 } from "./performance-ads";
 
@@ -269,10 +270,65 @@ describe("conversion scoping", () => {
     ).toBe("META_WANDER_PURCHASE");
   });
 
-  it("writes the rule in Meta's grammar", () => {
-    expect(hostScopedConversionRule("winterparkescapes.com")).toEqual({
-      url: { i_contains: "winterparkescapes.com" },
+  it("filters on the pixel event as well as the host", () => {
+    expect(
+      hostScopedConversionRule("winterparkescapes.com", "PURCHASE"),
+    ).toEqual({
+      and: [
+        { event: { eq: "Purchase" } },
+        { or: [{ URL: { i_contains: "winterparkescapes.com" } }] },
+      ],
     });
+  });
+
+  // Live on act 885632589057558, 2026-09-23.
+  const live = [
+    {
+      id: "2507264646442315",
+      name: "META_PERF+LEGACY+RNR_PURCHASE",
+      rule: { url: { i_contains: "legacy-rnr.wanderos.com" } },
+      pixelId: "340252052212435",
+      isArchived: false,
+    },
+    {
+      id: "1066307389475867",
+      name: "WPE Purchase",
+      rule: {
+        and: [
+          { event: { eq: "Purchase" } },
+          { or: [{ URL: { i_contains: "winterparkescapes.com" } }] },
+        ],
+      },
+      pixelId: "340252052212435",
+      isArchived: false,
+    },
+    {
+      id: "1073503405284403",
+      name: "META_PERF+WINTER+PARK+ESCAPES_PURCHASE",
+      rule: { url: { i_contains: "winterparkescapes.com" } },
+      pixelId: "340252052212435",
+      isArchived: true,
+    },
+  ];
+
+  it("reuses a live conversion with the same rule under any name", () => {
+    expect(
+      reusableCustomConversion(live, {
+        name: "META_PERF+WINTER+PARK+ESCAPES_PURCHASE",
+        pixelId: "340252052212435",
+        rule: hostScopedConversionRule("winterparkescapes.com", "PURCHASE"),
+      }),
+    ).toBe("1066307389475867");
+  });
+
+  it("refuses to reuse our name when its rule is different", () => {
+    expect(() =>
+      reusableCustomConversion(live, {
+        name: "META_PERF+LEGACY+RNR_PURCHASE",
+        pixelId: "340252052212435",
+        rule: hostScopedConversionRule("legacy-rnr.wanderos.com", "PURCHASE"),
+      }),
+    ).toThrow(/archive it in Events Manager/);
   });
 });
 

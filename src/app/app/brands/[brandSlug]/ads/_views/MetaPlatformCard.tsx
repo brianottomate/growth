@@ -13,6 +13,7 @@ import {
   importedPlacementLabel,
 } from "@/lib/meta-preview";
 import {
+  META_DEFAULT_PLACEMENTS,
   META_PLACEMENTS,
   metaPlacementMedia,
   type MetaPlacement,
@@ -151,7 +152,7 @@ export function MetaPlatformCard({
     ...meta,
   });
   const scheduleError = metaScheduleIssue(schedule, pc.budgetType);
-  const placementPlan = meta?.placements ?? [];
+  const placementPlan = meta?.placements ?? META_DEFAULT_PLACEMENTS;
   const missingCreative = creativeAds.some(
     (ad) =>
       "media" in ad.content &&
@@ -364,8 +365,13 @@ export function MetaPlatformCard({
                   <dt className="text-muted-foreground">Conversion</dt>
                   <dd>
                     {meta?.customConversionId ||
-                      meta?.customEventType ||
-                      "Not configured"}
+                      (meta?.customEventType
+                        ? `${meta.customEventType} · ${
+                            meta.conversionScope === "pixel"
+                              ? "raw pixel"
+                              : "client site"
+                          }`
+                        : "Not configured")}
                   </dd>
                 </dl>
               </div>
@@ -604,11 +610,14 @@ function MetaSettings({
     meta?.importReviewed ?? false,
   );
   const [placements, setPlacements] = useState<MetaPlacement[]>(
-    meta?.placements ?? [],
+    meta?.placements ?? META_DEFAULT_PLACEMENTS,
   );
   const [pixel, setPixel] = useState(meta?.pixelId ?? "");
   const [event, setEvent] = useState(meta?.customEventType ?? "");
   const [conversion, setConversion] = useState(meta?.customConversionId ?? "");
+  const [scope, setScope] = useState<"host" | "pixel">(
+    meta?.conversionScope ?? "host",
+  );
   const [mode, setMode] = useState<"cbo" | "abo">(meta?.budgetMode ?? "cbo");
   const dateValue = (d: Date | null) =>
     d
@@ -668,10 +677,11 @@ function MetaSettings({
           setAmount(pc.budget?.toString() ?? "");
           setBudgetType(pc.budgetType === "lifetime" ? "lifetime" : "daily");
           setImportReviewed(meta?.importReviewed ?? false);
-          setPlacements(meta?.placements ?? []);
+          setPlacements(meta?.placements ?? META_DEFAULT_PLACEMENTS);
           setPixel(meta?.pixelId ?? "");
           setEvent(meta?.customEventType ?? "");
           setConversion(meta?.customConversionId ?? "");
+          setScope(meta?.conversionScope ?? "host");
           setMode(meta?.budgetMode ?? "cbo");
           setStart(dateValue(effective.startAt));
           setEnd(dateValue(effective.endAt));
@@ -797,6 +807,17 @@ function MetaSettings({
           />
         </label>
         <label className="space-y-1 text-sm">
+          Optimise on
+          <select
+            className="w-full rounded border bg-background p-2"
+            value={scope}
+            onChange={(e) => setScope(e.target.value as "host" | "pixel")}
+          >
+            <option value="host">This client&apos;s site only</option>
+            <option value="pixel">Raw pixel event (all Wander sites)</option>
+          </select>
+        </label>
+        <label className="space-y-1 text-sm">
           Custom conversion ID (optional)
           <Input
             value={conversion}
@@ -889,6 +910,7 @@ function MetaSettings({
                   pixelId: pixel.trim(),
                   customEventType: event.trim(),
                   customConversionId: conversion.trim(),
+                  conversionScope: scope,
                   budgetMode: mode,
                 },
                 startAt: scheduledStart && start ? new Date(start) : null,

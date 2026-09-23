@@ -6,8 +6,18 @@ export function metaPreviewPlacements(
   _content: AdCreativeContent,
   planned: MetaPlacement[],
 ) {
-  return planned;
+  // Marketplace, Explore, profile feeds and the rest render the same card as
+  // the feed or reel beside them, so the preview shows the distinct surfaces.
+  return planned.filter((id) => PREVIEWED.has(id));
 }
+const PREVIEWED = new Set<MetaPlacement>([
+  "facebook-feed",
+  "instagram-feed",
+  "facebook-story",
+  "instagram-story",
+  "facebook-reel",
+  "instagram-reel",
+]);
 export const metaPreviewMedia = metaPlacementMedia;
 export function importedPlacementLabel(adSets: Record<string, unknown>[]) {
   if (!adSets.length) return "Imported placements · review source settings";

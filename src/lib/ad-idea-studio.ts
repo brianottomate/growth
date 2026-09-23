@@ -1,4 +1,4 @@
-import { metaPlacementSchema } from "./meta-placement-plan";
+import { META_PLACEMENTS, metaPlacementSchema } from "./meta-placement-plan";
 import { z } from "zod";
 import type {
   AdCreativeContent,
@@ -56,7 +56,10 @@ export const ideaDocumentSchema = z
     role: z.enum(["hero_carousel", "hero_static", "home_carousel"]),
     shapes: z.array(ideaShapeSchema).min(1).max(4),
     exportShapes: z.array(ideaShapeSchema).max(4).optional(),
-    intendedPlacements: z.array(metaPlacementSchema).max(6).optional(),
+    intendedPlacements: z
+      .array(metaPlacementSchema)
+      .max(META_PLACEMENTS.length)
+      .optional(),
     copy: ideaCopySchema,
     copyOverrides: z.partialRecord(ideaShapeSchema, ideaCopySchema),
     pool: z.array(ideaSourceSchema).optional(),

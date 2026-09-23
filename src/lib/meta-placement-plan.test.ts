@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
+  META_DEFAULT_PLACEMENTS,
   metaPlacementMedia,
   metaProviderPlacements,
 } from "./meta-placement-plan";
@@ -23,6 +24,38 @@ describe("Meta placement delivery", () => {
       publisherPlatforms: ["facebook"],
       facebookPositions: ["facebook_reels"],
     });
+  });
+  it("defaults to every Facebook and Instagram surface but in-stream and search", () => {
+    expect(metaProviderPlacements(META_DEFAULT_PLACEMENTS)).toEqual({
+      publisherPlatforms: ["facebook", "instagram"],
+      facebookPositions: [
+        "feed",
+        "story",
+        "facebook_reels",
+        "marketplace",
+        "video_feeds",
+        "right_hand_column",
+        "profile_feed",
+        "notification",
+      ],
+      instagramPositions: [
+        "stream",
+        "story",
+        "reels",
+        "explore",
+        "explore_home",
+        "profile_feed",
+        "profile_reels",
+      ],
+    });
+  });
+  it("gives feed-shaped surfaces the baseline card", () => {
+    expect(metaPlacementMedia(content, "instagram-explore").media).toEqual(
+      content.media,
+    );
+    expect(
+      metaPlacementMedia(content, "instagram-profile-reel").issue,
+    ).toContain("9:16");
   });
   it("does not substitute a feed crop for missing vertical artwork", () => {
     expect(metaPlacementMedia(content, "facebook-feed").media).toEqual(

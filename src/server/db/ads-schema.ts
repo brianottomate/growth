@@ -294,6 +294,13 @@ export type PlatformCampaignSettings = {
      */
     customConversionId?: string;
     /**
+     * What a client ad set optimises on when no conversion is pinned. "host"
+     * (the default) scopes the event to the client's own site; "pixel" runs
+     * on the raw fleet-wide event, which also credits bookings made on other
+     * Wander sites. Meta freezes the choice once the ad set is published.
+     */
+    conversionScope?: "host" | "pixel";
+    /**
      * Where the budget lives. CBO puts it on the campaign and lets Meta move
      * it between ad sets; ABO gives each ad set its own fixed budget.
      * Defaults to CBO.

@@ -12,11 +12,8 @@
  */
 
 export const PERFORMANCE_AD_DEFAULTS = {
-  /**
-   * Meta removed BOOK_NOW, and LEARN_MORE reads as a content click on a
-   * property page. SEE_DETAILS is what the live build uses.
-   */
-  callToAction: "SEE_DETAILS",
+  /** Every Performance ad books (Brooke, 2026-09-23). */
+  callToAction: "BOOK_NOW",
 
   /**
    * VALUE, not OFFSITE_CONVERSIONS. Nightly rates across a portfolio vary by
@@ -29,11 +26,10 @@ export const PERFORMANCE_AD_DEFAULTS = {
   objective: "OUTCOME_SALES",
 
   /**
-   * Budget lives on the ad set, never the campaign. A Performance campaign
-   * gains audiences as the customer's spend grows (see audiencePlanFor), and
-   * CBO would silently reallocate a customer's money across them.
+   * Budget lives on the campaign (CBO), Brooke's call on 2026-09-23. Meta
+   * cannot switch a published campaign between CBO and ad set budgets.
    */
-  budgetLevel: "adset",
+  budgetLevel: "campaign",
 
   /**
    * Meta turns these on by default and they visibly mangle the creative —
@@ -254,11 +250,80 @@ export function performanceConversionName(input: {
   ].join("_");
 }
 
-/** Meta conversion rule: any URL on the host, in Meta's own grammar. */
+/**
+ * Meta conversion rule: the pixel event, fired on the host. The event clause
+ * matters: a rule on the URL alone counts every page load on the host as a
+ * conversion. Same shape Brooke built by hand for Winter Park Escapes.
+ */
 export function hostScopedConversionRule(
   host: string,
+  customEventType: string,
 ): Record<string, unknown> {
-  return { url: { i_contains: host } };
+  return {
+    and: [
+      { event: { eq: pixelEventName(customEventType) } },
+      { or: [{ URL: { i_contains: host } }] },
+    ],
+  };
+}
+
+/** PURCHASE → Purchase, COMPLETE_REGISTRATION → CompleteRegistration. */
+function pixelEventName(customEventType: string) {
+  return customEventType
+    .trim()
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join("");
+}
+
+export type ExistingCustomConversion = {
+  id: string;
+  name: string;
+  rule: unknown;
+  customEventType?: string;
+  pixelId?: string;
+  isArchived?: boolean;
+};
+
+/**
+ * Which live conversion to reuse. Any conversion on the pixel with the same
+ * rule serves, whatever it is called. A conversion that holds our name with
+ * a different rule is an error: Meta rules cannot be edited and Zernio
+ * reuses by name, so re-pushing would keep optimising on the wrong rule.
+ */
+export function reusableCustomConversion(
+  existing: ExistingCustomConversion[],
+  want: { name: string; pixelId: string; rule: Record<string, unknown> },
+): string | null {
+  const live = existing.filter(
+    (c) => !c.isArchived && c.pixelId === want.pixelId,
+  );
+  const same = live.find(
+    (c) => normalizedRule(c.rule) === normalizedRule(want.rule),
+  );
+  if (same) return same.id;
+  const named = live.find((c) => c.name === want.name);
+  if (named) {
+    throw new Error(
+      `Custom conversion ${want.name} (${named.id}) exists with a different rule than ${JSON.stringify(want.rule)}. Meta will not edit a rule: archive it in Events Manager, then push again.`,
+    );
+  }
+  return null;
+}
+
+function normalizedRule(rule: unknown): string {
+  const walk = (value: unknown): unknown =>
+    Array.isArray(value)
+      ? value.map(walk)
+      : value && typeof value === "object"
+        ? Object.fromEntries(
+            Object.entries(value)
+              .map(([key, inner]) => [key.toLowerCase(), walk(inner)] as const)
+              .sort(([a], [b]) => a.localeCompare(b)),
+          )
+        : value;
+  return JSON.stringify(walk(rule));
 }
 
 export type PerformanceAdFormat =

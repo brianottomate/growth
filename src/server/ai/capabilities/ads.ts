@@ -1073,7 +1073,16 @@ export const setPlatformDraftAction = growthAction({
         pixelId: z.string().trim().min(1).optional(),
         customEventType: z.string().trim().min(1).optional(),
         customConversionId: z.string().trim().min(1).optional(),
-        budgetMode: z.enum(["cbo", "abo"]).optional(),
+        conversionScope: z
+          .enum(["host", "pixel"])
+          .optional()
+          .describe(
+            "Client brands only. host (default) optimises on a conversion scoped to the client's site; pixel optimises on the raw pixel event, which also counts bookings on other Wander sites. Use pixel only when the operator asks for it.",
+          ),
+        budgetMode: z
+          .enum(["cbo", "abo"])
+          .optional()
+          .describe("cbo (default) is how Performance campaigns run."),
         placements: metaPlacementPlanSchema.optional(),
         importReviewed: z.boolean().optional(),
       })

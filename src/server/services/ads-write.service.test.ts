@@ -10,6 +10,7 @@ import {
   googlePauseOutcome,
   googleDisplayImages,
   matchResponseAdsToPlan,
+  headlineRepeatsBody,
   metaPromotedObjectFor,
   tagMetaAdUtms,
   videoPayloadFor,
@@ -638,7 +639,12 @@ describe("what a Meta ad set optimises toward", () => {
         name: "META_PERF+WINTER+PARK+ESCAPES_PURCHASE",
         pixelId: "340252052212435",
         customEventType: "PURCHASE",
-        rule: { url: { i_contains: "winterparkescapes.com" } },
+        rule: {
+          and: [
+            { event: { eq: "Purchase" } },
+            { or: [{ URL: { i_contains: "winterparkescapes.com" } }] },
+          ],
+        },
       },
     ]);
     expect(warnings).toEqual([
@@ -673,6 +679,19 @@ describe("what a Meta ad set optimises toward", () => {
     expect(result).toEqual(purchase);
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toMatch(/no website/);
+  });
+
+  it("runs a client on the raw pixel event when the operator chose pixel scope", async () => {
+    const warnings: string[] = [];
+    const result = await metaPromotedObjectFor({
+      brand: client,
+      meta: { ...purchase, conversionScope: "pixel" },
+      validateOnly: false,
+      ensureCustomConversion: neverCalled,
+      warnings,
+    });
+    expect(result).toEqual(purchase);
+    expect(warnings[0]).toMatch(/any Wander site/);
   });
 
   it("provisions nothing on a dry run", async () => {
@@ -769,5 +788,22 @@ describe("Google draft display crops", () => {
     expect(() => googleDisplayImages(undefined, undefined)).toThrow(
       "needs landscape and square",
     );
+  });
+});
+
+describe("Meta headline and primary text", () => {
+  it("flags a headline that is the primary text's first line", () => {
+    expect(
+      headlineRepeatsBody({
+        headline: "Wake up in Sonoma 🍷",
+        body: "\nWake up in Sonoma 🍷\n\n🏡 Ten private acres",
+      }),
+    ).toBe(true);
+    expect(
+      headlineRepeatsBody({
+        headline: "Ten private acres in the Sonoma hills",
+        body: "Wake up in Sonoma 🍷\n\n🏡 Ten private acres",
+      }),
+    ).toBe(false);
   });
 });
