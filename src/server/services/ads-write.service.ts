@@ -1995,12 +1995,22 @@ function textAds(ads: Ad[]) {
   );
 }
 
+/** Explicit reviewed crops take precedence over the single creative fallback. */
+export function googleDisplayImages(
+  images: { landscape: string; square: string } | undefined,
+  fallback: string | undefined,
+) {
+  if (images) return images;
+  if (fallback) return { landscape: fallback, square: fallback };
+  throw new Error("Google Display needs landscape and square images");
+}
+
 /**
  * Push the plan to one platform: COMPILE the campaign, its audiences and its
  * ads into that platform's shape, through the draft platform_campaign row —
  * which is where the authoritative budget and settings live, so the push
- * takes no numbers of its own. Everything is created PAUSED; spend starts
- * only when setCampaignDelivery flips it, separately.
+ * takes no numbers of its own. Meta creates paused. Google creates then
+ * pauses; a failed pause returns the live status and an explicit warning.
  */
 export async function pushDraftToPlatform(
   input: {
@@ -2296,7 +2306,7 @@ async function pushToGoogle(args: PushArgs) {
       "Set a landing URL on the campaign, or a link URL on an ad",
     );
   }
-  if (campaignType === "display" && !creative) {
+  if (campaignType === "display" && !creative && !google.images) {
     throw new Error("A Google Display campaign needs a creative ad's image");
   }
 
@@ -2332,11 +2342,8 @@ async function pushToGoogle(args: PushArgs) {
       startDate,
       endDate,
       images:
-        campaignType === "display" && creative
-          ? {
-              landscape: creative.content.media[0]!.url,
-              square: creative.content.media[0]!.url,
-            }
+        campaignType === "display"
+          ? googleDisplayImages(google.images, creative?.content.media[0]?.url)
           : undefined,
     },
     context,

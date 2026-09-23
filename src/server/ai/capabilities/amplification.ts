@@ -1,3 +1,8 @@
+import {
+  listAmplifiersOutputSchema,
+  requestAmplificationOutputSchema,
+  notifyAmplificationOutputSchema,
+} from "./outputs/amplification";
 import "server-only";
 
 import { and, eq, inArray, isNull } from "drizzle-orm";
@@ -27,6 +32,7 @@ import { growthAction } from "./types";
  */
 
 export const listAmplifiers = growthAction({
+  outputSchema: listAmplifiersOutputSchema,
   description:
     "List the org's amplifier rolodex with each contact's ask history (planned/asked/confirmed/fulfilled counts). Use this to ground who to recruit before calling requestAmplification.",
   inputSchema: z.object({}),
@@ -73,6 +79,7 @@ export const listAmplifiers = growthAction({
 });
 
 export const requestAmplification = growthAction({
+  outputSchema: requestAmplificationOutputSchema,
   description:
     "Plan human amplification for ONE platform post. Creates or updates one target per amplifier without contacting anyone. For repost or quote actions, amplifiers linked to an owned brand with a matching channel also get a linked draft. Use notifyAmplification separately, with approval, to send a Slack request.",
   inputSchema: z.object({
@@ -210,6 +217,7 @@ export const requestAmplification = growthAction({
 });
 
 export const notifyAmplification = growthAction({
+  outputSchema: notifyAmplificationOutputSchema,
   description:
     "Send one planned amplification request to the configured Slack channel and tag the amplifier by stored Slack member ID. This is an external message and requires explicit approval. Idempotent after Slack returns a persisted message receipt.",
   inputSchema: z.object({ targetId: z.string() }),

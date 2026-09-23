@@ -3,6 +3,7 @@ import type { UIMessage } from "ai";
 
 import {
   approvalHasExpired,
+  isApprovalDenial,
   validateApprovalContinuation,
 } from "./approval-continuation";
 
@@ -51,4 +52,35 @@ describe("approvalHasExpired", () => {
       }),
     ).toBe(true);
   });
+});
+
+test("expired actions may be denied, while mixed or approved responses still require a fresh approval", () => {
+  const denial = {
+    id: "m",
+    role: "assistant",
+    parts: [
+      {
+        type: "tool-adsWrite__push",
+        toolCallId: "c",
+        state: "approval-responded",
+        input: { campaignId: "x" },
+        approval: { id: "a", approved: false },
+      },
+    ],
+  } as UIMessage;
+  expect(isApprovalDenial(denial)).toBe(true);
+  expect(
+    isApprovalDenial({
+      ...denial,
+      parts: [
+        {
+          ...denial.parts[0],
+          approval: { id: "a", approved: true },
+        } as UIMessage["parts"][number],
+      ],
+    }),
+  ).toBe(false);
+  expect(isApprovalDenial({ id: "m", role: "assistant", parts: [] })).toBe(
+    false,
+  );
 });

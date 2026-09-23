@@ -1,3 +1,8 @@
+import {
+  leadsSummaryOutputSchema,
+  leadsSequenceOutputSchema,
+  leadsRewriteSequenceOutputSchema,
+} from "./outputs/leads";
 import "server-only";
 
 import { z } from "zod";
@@ -20,6 +25,7 @@ import { growthAction, GrowthActionError } from "./types";
  * `leads.stats` tRPC query the /app/leads page already shows.
  */
 export const leadsSummary = growthAction({
+  outputSchema: leadsSummaryOutputSchema,
   description:
     "Headline numbers for the lead prospecting database: total domains and contacts, HubSpot and Instantly coverage, ranked prospects, send-batch membership, the untouched expansion pool, the net-new sendable cohort, and the top PMS platforms. Use for 'how big is the leads pool / how many leads are we ready to send / what PMS do prospects use' questions.",
   inputSchema: z.object({}),
@@ -93,6 +99,7 @@ export const leadsSummary = growthAction({
  * in chat before steering it.
  */
 export const leadsSequence = growthAction({
+  outputSchema: leadsSequenceOutputSchema,
   description:
     "Read the latest generated outreach sequence for one lead domain: the angle, what it personalized on, and every touch with its subject, body and send day. Use for 'show me the sequence for example.com' or before rewriting one.",
   inputSchema: z.object({
@@ -154,6 +161,7 @@ export const leadsSequence = growthAction({
  * publishing stays a separate, explicit human action.
  */
 export const leadsRewriteSequence = growthAction({
+  outputSchema: leadsRewriteSequenceOutputSchema,
   description:
     "Rewrite the outreach sequence for one lead domain, steered by an instruction (e.g. 'lead with the call Halli logged', 'drop the proof point'). Pass `touch` to change one touch and keep the rest. Re-checks all four touches against the copy-policy gate and saves as a DRAFT. Works before a real preview exists, in which case the draft is marked as written against a stand-in and cannot be published. Never publishes to HubSpot and never enrolls anyone.",
   inputSchema: z.object({

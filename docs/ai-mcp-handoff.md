@@ -542,3 +542,44 @@ Before approving a new AI or MCP action, ask:
 
 If those answers are clear, adding the capability is usually mechanical. If
 they are not, the domain contract needs more product work first.
+
+
+## Tool selection and retired actions
+
+Native chat exposes individual `capability__action` operations. Each operation
+advertises only its own required inputs and success output. Anthropic BM25 tool
+search discovers deferred operations. Workspace overview, brand listing,
+next options and job status stay eager. Discovery wraps the shared runtime after
+membership, approval and receipt hooks are installed. Saved grouped approvals
+receive a temporary compatibility tool for the exact pending action.
+
+MCP advertises the same individually scoped operations with per-operation hints
+and surface policy. Provider search belongs to native chat and the invoke facade;
+external MCP hosts manage discovery themselves. Clients should refresh tools/list
+after this catalog cutover. Saved completed grouped results remain readable.
+
+Eight long-running operations return a job handle: channel discovery, post
+scraping, owned-content sync, website sync, blog sync, image analysis, storefront
+reference capture and Drive import. Workers run through Next after() and the
+shared receipt runtime. `operationRead__status` returns the original validated
+result. Runs belong to their initiating user and organization. Platform timeouts
+become interrupted after the execution window; inspect saved state before retrying.
+This uses Vercel's bounded request lifetime and has no automatic job retry.
+
+The app watches completed write receipts every 30 seconds while visible, and on
+focus or chat completion. It invalidates affected query domains and refreshes
+server components, covering MCP writes and background completion even with chat
+closed. Accepted jobs do not signal a completed write. Failed receipts also
+refresh because a write can complete before output validation fails.
+
+Brand enrichment and intake application return source evidence and exact saved
+field values. Chat shows an expandable changes-and-sources card. Extracted website
+text and intake submissions are source material, not independently verified facts.
+
+Brand offboarding uses the brand settings UI. `brandWrite.previewPurge` and
+`brandWrite.purge` were removed from AI definitions and output contracts.
+Standard Meta and all Google creation uses local drafts followed by `push`.
+`createGoogle` and `createMetaDraft` were removed; the narrower
+`createSpecializedMetaDraft` preserves lead generation, lead conversion,
+app promotion and catalog sales until the draft compiler supports those goals.
+Google platform settings preserve separate display-image crops through push.

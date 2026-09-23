@@ -1,3 +1,13 @@
+import {
+  getEmailDraftOutputSchema,
+  createEmailSlotOutputSchema,
+  createDigestFromRowOutputSchema,
+  setDigestImageOutputSchema,
+  updateEmailDraftOutputSchema,
+  createProductUpdateDraftOutputSchema,
+  generateEmailDraftOutputSchema,
+  deleteEmailDraftOutputSchema,
+} from "./outputs/email";
 import "server-only";
 
 import { waitUntil } from "@vercel/functions";
@@ -25,6 +35,7 @@ import {
 import { growthAction } from "./types";
 
 export const getEmailDraft = growthAction({
+  outputSchema: getEmailDraftOutputSchema,
   description:
     "Read the canonical subject, Markdown body, CTA, revisions, planning context, and latest generation job for one owned newsletter issue or blast. Use this when the conversation is about a specific email slot; do not treat platform_post.text as the email body.",
   inputSchema: z.object({ platformPostId: z.string() }),
@@ -42,6 +53,7 @@ export const getEmailDraft = growthAction({
 });
 
 export const createEmailSlot = growthAction({
+  outputSchema: createEmailSlotOutputSchema,
   description:
     "Create one empty newsletter issue or one-off blast as a Growth content-calendar slot after the operator has chosen the premise and timing. This deliberately does not generate the full email; generation happens only for an individually selected slot.",
   inputSchema: z.object({
@@ -71,6 +83,7 @@ export const createEmailSlot = growthAction({
 });
 
 export const createDigestFromRow = growthAction({
+  outputSchema: createDigestFromRowOutputSchema,
   description:
     "Turn a pasted block of property listings into a newsletter issue: reads the homes, their locations, guest counts, nightly rates and links, creates the email slot, and saves a digest document that previews as the real email. Use this whenever an operator pastes something that lists Wander homes for a send, in any shape — a spreadsheet row, a list from an email, a few typed lines. Pass what they pasted VERBATIM; do not re-type, reorder or summarize it, and do not fill in prices or links yourself. One digest per call.",
   inputSchema: z.object({
@@ -186,6 +199,7 @@ export const createDigestFromRow = growthAction({
 });
 
 export const setDigestImage = growthAction({
+  outputSchema: setDigestImageOutputSchema,
   description:
     "Attach a photo to one home in a property digest. Use this when the operator pastes back an image URL for a specific home, or picks one from the media library. Match on the home's name as it appears in the digest; case and surrounding whitespace do not matter. Report which homes are still without a photo afterwards.",
   inputSchema: z.object({
@@ -277,6 +291,7 @@ export const setDigestImage = growthAction({
 });
 
 export const updateEmailDraft = growthAction({
+  outputSchema: updateEmailDraftOutputSchema,
   description:
     'Save an agreed conversational refinement to one email\'s canonical document and create a revision checkpoint. Pass only the fields that changed — but pass each changed field WHOLE: read the current value with getEmailDraft, rewrite the entire field with the change incorporated, and send the full replacement. Never attempt surgical partial edits or describe a diff; a field is replaced in its entirety. Liquid personalization tokens like {{ customer.first_name | default: "there" }} are allowed in subject and body — Customer.io expands them per recipient at delivery, and the workspace preview can simulate them.',
   inputSchema: z.object({
@@ -320,6 +335,7 @@ export const updateEmailDraft = growthAction({
 });
 
 export const createProductUpdateDraft = growthAction({
+  outputSchema: createProductUpdateDraftOutputSchema,
   description:
     "Create one finished, previewable product-update email from verified repository evidence. Each claim must cite an exact repository and commit or pull-request ref. Use this after inspecting the relevant product repositories locally; omit internal-only changes. Creates a frozen Growth revision but never resolves recipients or sends.",
   inputSchema: z.object({
@@ -341,6 +357,7 @@ export const createProductUpdateDraft = growthAction({
 });
 
 export const generateEmailDraft = growthAction({
+  outputSchema: generateEmailDraftOutputSchema,
   description:
     "Start one deliberate AI draft or refinement job for the selected newsletter issue or blast. Never use this to batch-write a bank of slots. The job uses the slot brief, brand voice, current draft, and optional refinement instruction.",
   inputSchema: z.object({
@@ -369,6 +386,7 @@ export const generateEmailDraft = growthAction({
 });
 
 export const deleteEmailDraft = growthAction({
+  outputSchema: deleteEmailDraftOutputSchema,
   description:
     "Permanently delete one email draft: the spot, its canonical document, and its revisions. This is a real delete and cannot be undone. If the draft was the only thing rendered for its content idea, that idea goes too, so the pipeline does not keep counting an empty shell. An email with a delivery record is refused, because a sent message stays in the send ledger.",
   inputSchema: z.object({ platformPostId: z.string() }),

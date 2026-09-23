@@ -1,4 +1,6 @@
 import "server-only";
+import { mcpOutputSchema } from "@/server/mcp/result-contract";
+import { NEXT_OPTIONS_URI } from "@/server/mcp/next-options-ui";
 
 import type { AuthInfo, McpServer } from "@modelcontextprotocol/server";
 import { anthropic } from "@ai-sdk/anthropic";
@@ -27,12 +29,12 @@ import {
   GROWTH_TOOL_LOOP_CACHE_TTL,
   withGrowthRollingCache,
 } from "../kernel/prompt-cache";
-import { growthActionPolicies } from "../kernel/policy";
+import { anthropicTools } from "../kernel/anthropic-tools";
+import { policyForGrowthTool } from "../kernel/policy";
 import { buildGrowthToolRuntime } from "../kernel/runtime";
 import { runtimeClockSection } from "../kernel/runtime-clock";
 import { summarizeGrowthUsage } from "../kernel/usage";
 import type { GrowthExecutionContext, GrowthTool } from "../kernel/tool";
-import { socialPostPreviewOutputSchema } from "./social-post-preview";
 import { SOCIAL_POST_PREVIEW_URI } from "@/server/mcp/social-post-preview-ui";
 
 type ToolContext = { http?: { authInfo?: AuthInfo } };
@@ -116,6 +118,19 @@ const invokeGrowthInput = z.object({
     .describe("The growth workspace question or operation to complete."),
 });
 
+export const invokeGrowthOutputSchema = z.union([
+  z.object({
+    response: z.string(),
+    finishReason: z.string(),
+    steps: z.number().int().nonnegative(),
+  }),
+  z.object({
+    error: z.string(),
+    code: z.string(),
+    suggestedAction: z.string(),
+  }),
+]);
+
 const INVOKE_GROWTH_PERSONA = `You are Growth, invoked as one coarse-grained MCP tool.
 Use the detailed Growth workspace tools to answer the request with live organization data.
 You may read, draft, plan, and apply authorized workspace changes. Prefer acting over producing another suggestion layer when the request is clear.
@@ -130,6 +145,7 @@ function registerInvokeGrowth(server: McpServer, toolSet: ToolSet) {
       description:
         "Delegate a natural-language growth workspace question or operation to Growth. It can use the same organization-scoped read and write tools exposed individually by this MCP.",
       inputSchema: invokeGrowthInput.shape,
+      outputSchema: mcpOutputSchema(invokeGrowthOutputSchema),
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
@@ -184,7 +200,7 @@ function registerInvokeGrowth(server: McpServer, toolSet: ToolSet) {
             { role: "user", content: input.request },
           ],
           allowSystemInMessages: true,
-          tools: runtime.tools,
+          tools: anthropicTools(runtime.tools),
           toolsContext: runtime.toolsContext,
           toolApproval: runtime.toolApproval,
           stopWhen: stepCountIs(8),
@@ -215,7 +231,7 @@ function registerInvokeGrowth(server: McpServer, toolSet: ToolSet) {
         return {
           isError: true,
           content: [{ type: "text" as const, text: JSON.stringify(compact) }],
-          structuredContent: { ...compact },
+          structuredContent: compact,
         };
       }
     },
@@ -225,24 +241,11 @@ function registerInvokeGrowth(server: McpServer, toolSet: ToolSet) {
 /** Project native AI SDK tools onto the authenticated OAuth MCP surface. */
 export function registerMcpTools(server: McpServer, toolSet: ToolSet) {
   for (const [name, definition] of Object.entries(toolSet)) {
-    const policies = Object.values(
-      (
-        growthActionPolicies as Record<
-          string,
-          Record<
-            string,
-            {
-              consequence: string;
-              reversible: boolean;
-              idempotent: boolean;
-            }
-          >
-        >
-      )[name] ?? {},
-    );
+    const policy = policyForGrowthTool(name);
     const nativeDefinition = definition as GrowthTool<unknown, unknown>;
     const inputSchema = nativeDefinition.transportInputSchema;
     const rendersSocialPostPreview = name === "renderSocialPosts";
+    const outputSchema = mcpOutputSchema(nativeDefinition.resultSchema);
     server.registerTool(
       name,
       {
@@ -252,20 +255,22 @@ export function registerMcpTools(server: McpServer, toolSet: ToolSet) {
             ? definition.description
             : undefined,
         inputSchema,
-        ...(rendersSocialPostPreview
-          ? { outputSchema: socialPostPreviewOutputSchema }
-          : {}),
+        outputSchema,
         annotations: {
-          readOnlyHint: policies.every((policy) =>
-            policy.consequence.endsWith("read"),
-          ),
-          destructiveHint: policies.some(
-            (policy) =>
-              !policy.reversible && !policy.consequence.endsWith("read"),
-          ),
-          idempotentHint: policies.every((policy) => policy.idempotent),
+          readOnlyHint: policy.consequence.endsWith("read"),
+          destructiveHint:
+            !policy.reversible && !policy.consequence.endsWith("read"),
+          idempotentHint: policy.idempotent,
           openWorldHint: name === "researchRead",
         },
+        ...(name === "presentNextOptions"
+          ? {
+              _meta: {
+                ui: { resourceUri: NEXT_OPTIONS_URI },
+                "openai/outputTemplate": NEXT_OPTIONS_URI,
+              },
+            }
+          : {}),
         ...(rendersSocialPostPreview
           ? {
               _meta: {

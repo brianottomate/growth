@@ -1,5 +1,7 @@
 import "server-only";
 
+import { growthOperation } from "@/lib/growth-capabilities";
+
 import type {
   GROWTH_CAPABILITY_ACTIONS,
   GrowthCapabilityId,
@@ -55,10 +57,12 @@ const write = (
 });
 
 export const growthActionPolicies = {
+  operationRead: { status: read() },
   workspaceOverview: { overview: read() },
   navigateWorkspace: { navigate: read() },
   prepareProductionPacket: { prepare: write() },
   renderSocialPosts: { render: read() },
+  presentNextOptions: { present: read() },
   // Delegates to the blog sub-agent, which writes DRAFTS in the production
   // CMS. provider-write because the effect lands in DatoCMS, not our DB;
   // not reversible from here because undo means editing in Dato.
@@ -92,17 +96,6 @@ export const growthActionPolicies = {
     addAdPreview: write({ idempotent: true }),
     // A merge into the brand's settings JSONB; the same patch twice is a no-op.
     setPerformanceSettings: write({ idempotent: true }),
-    previewPurge: read(),
-    // Offboarding. Deletes rows, R2 bytes and the Zernio connection, none of
-    // which come back, so it is approval-gated and kept off MCP: a hard delete
-    // of a client's data should happen where a person is watching.
-    purge: write({
-      consequence: "provider-write",
-      approval: "user",
-      idempotent: false,
-      reversible: false,
-      surfaces: APPROVAL_PRODUCT,
-    }),
   },
   productAtlasRead: { list: read(), get: read() },
   productAtlasWrite: { create: write(), update: write({ idempotent: true }) },
@@ -357,14 +350,7 @@ export const growthActionPolicies = {
       reversible: true,
       surfaces: APPROVAL_PRODUCT,
     }),
-    createMetaDraft: write({
-      consequence: "provider-write",
-      approval: "user",
-      idempotent: true,
-      reversible: false,
-      surfaces: APPROVAL_PRODUCT,
-    }),
-    createGoogle: write({
+    createSpecializedMetaDraft: write({
       consequence: "provider-write",
       approval: "user",
       idempotent: true,
@@ -544,18 +530,20 @@ export function policyForGrowthTool(
   name: string,
   input?: unknown,
 ): GrowthActionPolicy {
+  const operation = growthOperation(name);
   const policies = (
     growthActionPolicies as Record<string, Record<string, GrowthActionPolicy>>
-  )[name];
+  )[operation.capability];
   if (!policies)
     throw new Error(`Missing Growth capability policy for ${name}`);
   const action =
-    typeof input === "object" &&
+    operation.action ??
+    (typeof input === "object" &&
     input !== null &&
     "action" in input &&
     typeof input.action === "string"
       ? input.action
-      : undefined;
+      : undefined);
   if (!action) return Object.values(policies)[0]!;
   const policy = policies[action];
   if (!policy)

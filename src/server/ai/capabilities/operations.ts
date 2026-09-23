@@ -1,3 +1,28 @@
+import {
+  discoverBrandChannelsOutputSchema,
+  scrapeBrandPostsOutputSchema,
+  syncOwnedBrandContentOutputSchema,
+  syncBrandWebsiteOutputSchema,
+  syncBrandBlogOutputSchema,
+  proposeContentGroupingsOutputSchema,
+  analyzeMediaAssetOutputSchema,
+  saveChatMediaToLibraryOutputSchema,
+  listPublishingConnectionsOutputSchema,
+  openTimelinePostOutputSchema,
+  analyzeTimelineVideoOutputSchema,
+  getSharedSessionOutputSchema,
+  listMediaLibraryOutputSchema,
+  listMediaAnalysesOutputSchema,
+  getMediaAnalysisOutputSchema,
+  proposeStrategyTargetsOutputSchema,
+  getStrategyTargetsOutputSchema,
+  createChannelCadenceOutputSchema,
+  updateChannelCadenceOutputSchema,
+  createBrandMixOutputSchema,
+  updateBrandMixOutputSchema,
+  setSeriesCadenceOutputSchema,
+  registerBrandChannelOutputSchema,
+} from "./outputs/operations";
 import "server-only";
 
 import { z } from "zod";
@@ -124,6 +149,7 @@ const brandMixInput = z.object({
 });
 
 export const discoverBrandChannels = growthAction({
+  outputSchema: discoverBrandChannelsOutputSchema,
   description:
     "Discover official social handles for an owned or tracked brand from its website and web search, then save them as pending, unverified suggestions with confidence and source evidence for review. Confirm a suggestion by reading its profile URL, or accept it and run a small scrape, which proves the profile exists. Use only when the operator asks to discover or refresh channels.",
   inputSchema: z.object({ brandId: z.string() }),
@@ -134,6 +160,7 @@ export const discoverBrandChannels = growthAction({
 });
 
 export const scrapeBrandPosts = growthAction({
+  outputSchema: scrapeBrandPostsOutputSchema,
   description:
     "Pull recent public posts for one owned or tracked brand and platform into the canonical timeline. Use limit=5 first to confirm a channel is wired up cheaply (scraping bills per record; Instagram always returns its latest ~12), then a larger limit and sinceDays for a real backfill. The durable ingest run records progress and failures; new posts also receive pending classification suggestions.",
   inputSchema: z.object({
@@ -156,6 +183,7 @@ export const scrapeBrandPosts = growthAction({
 });
 
 export const syncOwnedBrandContent = growthAction({
+  outputSchema: syncOwnedBrandContentOutputSchema,
   description:
     "Sync owned social history from the brand's connected providers into the canonical timeline. Use when the operator asks to refresh or backfill owned content.",
   inputSchema: z.object({
@@ -169,6 +197,7 @@ export const syncOwnedBrandContent = growthAction({
 });
 
 export const syncBrandWebsite = growthAction({
+  outputSchema: syncBrandWebsiteOutputSchema,
   description:
     "Refresh the structural website map from an owned brand's sitemap, including page-type rollups and lightweight metadata. This maps the surface; it does not create pages.",
   inputSchema: z.object({ brandId: z.string() }),
@@ -181,6 +210,7 @@ export const syncBrandWebsite = growthAction({
 });
 
 export const syncBrandBlog = growthAction({
+  outputSchema: syncBrandBlogOutputSchema,
   description:
     "Refresh an owned brand's dated editorial stream from its discovered RSS or Atom feed. Use for explicit blog refresh requests.",
   inputSchema: z.object({ brandId: z.string() }),
@@ -197,6 +227,7 @@ export const syncBrandBlog = growthAction({
 });
 
 export const proposeContentGroupings = growthAction({
+  outputSchema: proposeContentGroupingsOutputSchema,
   description:
     "Analyze an owned brand's existing posts and propose only two grouping outcomes: multiple channel executions/amplifications of one canonical idea, or multiple distinct ideas forming a series. Existing brand pillars may classify either outcome. It creates pending proposals that can be discussed and resolved in chat or Review.",
   inputSchema: z.object({
@@ -212,6 +243,7 @@ export const proposeContentGroupings = growthAction({
 });
 
 export const analyzeMediaAsset = growthAction({
+  outputSchema: analyzeMediaAssetOutputSchema,
   description:
     "Analyze one ready image or video in an owned brand's media library using the brand's human-managed tag vocabulary. Saves literal visual analysis, suggested managed tags, alt text, and optional human steering; for video it also saves the transcript and a creative teardown (summary, hook, structure, pacing, key beats, reusable lessons), read from the storyboard cut at upload. It does not invent a campaign strategy.",
   inputSchema: z.object({
@@ -230,6 +262,7 @@ export const analyzeMediaAsset = growthAction({
 });
 
 export const saveChatMediaToLibrary = growthAction({
+  outputSchema: saveChatMediaToLibraryOutputSchema,
   description:
     "Save pasted chat media (images, GIFs, or videos) into an owned brand's durable media library without needing a content work item, then auto-analyze each image and video against the brand's managed tag vocabulary so it arrives tagged (video also gets a transcript and creative teardown). Use only when the operator explicitly asks to save, upload, or keep pasted media in the library or media pool. Pass the complete media array for the current turn; when the operator refers to attachments from an earlier turn, omit media and the server resolves the newest owned attachments in this conversation.",
   inputSchema: z.object({
@@ -334,6 +367,7 @@ export const saveChatMediaToLibrary = growthAction({
 });
 
 export const listPublishingConnections = growthAction({
+  outputSchema: listPublishingConnectionsOutputSchema,
   description:
     "Read the owned publishing connections for one brand, including platform, handle, connection status, and delivery provider such as Zernio. Use this for questions like whether LinkedIn is connected, whether Zernio is configured for a brand, or where a channel will publish. This reads workspace connection metadata; it does not contact or modify the provider.",
   inputSchema: z.object({ brandId: z.string() }),
@@ -371,6 +405,7 @@ export const listPublishingConnections = growthAction({
 });
 
 export const openTimelinePost = growthAction({
+  outputSchema: openTimelinePostOutputSchema,
   description:
     "Open one exact timeline post in Growth. Optionally select a media item and a reel view. Use when the operator asks to inspect, show, open, or navigate to a specific post or reel.",
   inputSchema: z.object({
@@ -398,6 +433,7 @@ export const openTimelinePost = growthAction({
 });
 
 export const analyzeTimelineVideo = growthAction({
+  outputSchema: analyzeTimelineVideoOutputSchema,
   description:
     "Prepare one timeline video for permanent browser-local storyboard analysis, then navigate the operator to the exact reel and start it. Use only after an explicit request because it copies the source video and persists derived boards, transcript, and creative analysis.",
   inputSchema: z.object({
@@ -439,6 +475,7 @@ export const analyzeTimelineVideo = growthAction({
  * creativeWork.getThread applies for the owner's own UI.
  */
 export const getSharedSession = growthAction({
+  outputSchema: getSharedSessionOutputSchema,
   description:
     "Read one shared assistant session by its ath_ id: its title and the messages in order, with each tool call named. Use when the operator refers to another session by id. Private sessions are refused — only sessions explicitly shared inside the organization can be read.",
   inputSchema: z.object({
@@ -515,6 +552,7 @@ const SEARCH_WINDOW = 200;
  * had nothing to reach for.
  */
 export const listMediaLibrary = growthAction({
+  outputSchema: listMediaLibraryOutputSchema,
   description:
     "List the most recent media-library assets for an owned brand, newest first, each with the url an ad creative or content attachment takes. This is the library itself, not saved analyses — reach for it whenever the operator says to use, pick, or reuse something already saved. Search scans a recent window rather than the whole library; the result says so when it was truncated. Assets with no resolvable url are counted separately and left out, since they cannot be used.",
   inputSchema: z.object({
@@ -588,6 +626,7 @@ export const listMediaLibrary = growthAction({
 });
 
 export const listMediaAnalyses = growthAction({
+  outputSchema: listMediaAnalysesOutputSchema,
   description:
     "List saved image and durable video analyses visible to the organization, optionally narrowed to one owned brand.",
   inputSchema: z.object({ brandId: z.string().optional() }),
@@ -648,6 +687,7 @@ export const listMediaAnalyses = growthAction({
 });
 
 export const getMediaAnalysis = growthAction({
+  outputSchema: getMediaAnalysisOutputSchema,
   description:
     "Read one saved image or durable video analysis by its canonical ID.",
   inputSchema: z.object({
@@ -692,6 +732,7 @@ export const getMediaAnalysis = growthAction({
 });
 
 export const proposeStrategyTargets = growthAction({
+  outputSchema: proposeStrategyTargetsOutputSchema,
   description:
     "Compare an owned brand's current cadence and mix targets with recent own performance and tracked-peer behavior. Returns evidence-backed target changes without saving them, so the human can review what the system learned before applying strategy changes.",
   inputSchema: z.object({ brandId: z.string() }),
@@ -706,6 +747,7 @@ export const proposeStrategyTargets = growthAction({
 });
 
 export const getStrategyTargets = growthAction({
+  outputSchema: getStrategyTargetsOutputSchema,
   description:
     "Read the current channel cadence and brand-default content-mix targets for one owned brand.",
   inputSchema: z.object({ brandId: z.string() }),
@@ -797,6 +839,7 @@ async function saveChannelCadence(
 }
 
 export const createChannelCadence = growthAction({
+  outputSchema: createChannelCadenceOutputSchema,
   description:
     "Create the first recurring cadence baseline for one owned publishing channel after the operator explicitly agrees to a proposed baseline. Supports every publishing platform documented in the input schema. This is a reversible configuration creation, so the operator's conversational instruction is sufficient and no second approval card is needed. Use only platform-valid archetypes.",
   inputSchema: channelCadenceInput,
@@ -804,6 +847,7 @@ export const createChannelCadence = growthAction({
 });
 
 export const updateChannelCadence = growthAction({
+  outputSchema: updateChannelCadenceOutputSchema,
   description:
     "Replace an existing owned publishing-channel cadence with a complete reviewed target set. Supports every publishing platform documented in the input schema. Use only after reading the current cadence and explaining the before/after change; omitted formats are removed.",
   inputSchema: channelCadenceInput,
@@ -862,6 +906,7 @@ async function saveBrandMix(
 }
 
 export const createBrandMix = growthAction({
+  outputSchema: createBrandMixOutputSchema,
   description:
     "Create the first brand-default pillar mix after proposing a complete 100% allocation and receiving explicit conversational agreement. This reversible configuration creation does not need a second approval card.",
   inputSchema: brandMixInput,
@@ -869,6 +914,7 @@ export const createBrandMix = growthAction({
 });
 
 export const updateBrandMix = growthAction({
+  outputSchema: updateBrandMixOutputSchema,
   description:
     "Replace an existing brand-default pillar mix with a complete 100% allocation. Explain the before/after change first; omitted pillars are removed.",
   inputSchema: brandMixInput,
@@ -903,6 +949,7 @@ const seriesCadenceInput = z.object({
 });
 
 export const setSeriesCadence = growthAction({
+  outputSchema: setSeriesCadenceOutputSchema,
   description:
     "Set an editorial series' own recurring publishing rhythm (e.g. one blog article and one Instagram video_short per week). Replaces the series' prior cadence; channel baselines are untouched. The slot generator then creates series-attached slots carrying the series' pillar.",
   inputSchema: seriesCadenceInput,
@@ -962,6 +1009,7 @@ const registerChannelInput = z.object({
 });
 
 export const registerBrandChannel = growthAction({
+  outputSchema: registerBrandChannelOutputSchema,
   description:
     "Register an owned publishing channel (social handle, blog, or newsletter) for a brand so it is tracked in Growth. Registration only records the surface — delivery-provider wiring (e.g. Zernio) is connected later from the Channels page. Use when the user names a handle or channel URL that is not yet tracked.",
   inputSchema: registerChannelInput,

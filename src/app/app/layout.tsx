@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { and, eq, isNull } from "drizzle-orm";
 
+import { WorkspaceChanges } from "./WorkspaceChanges";
 import { AppSidebar } from "@/components/app-sidebar";
 import { CommandMenu } from "@/components/command-menu";
 import { AUTH_RETURN_TO_HEADER, getSafeInternalPath } from "@/lib/auth-utils";
@@ -53,6 +54,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <SidebarProvider>
+      <WorkspaceChanges />
       <AppSidebar
         orgName={membership?.organization?.name ?? "—"}
         orgSlug={membership?.organization?.slug ?? undefined}

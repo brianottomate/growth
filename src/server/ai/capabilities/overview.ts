@@ -1,3 +1,4 @@
+import { workspaceOverviewOutputSchema } from "./outputs/overview";
 import "server-only";
 
 import { z } from "zod";
@@ -15,6 +16,7 @@ import { recentMentions } from "./listening";
  * another capability that calls others.
  */
 export const workspaceOverview = growthTool({
+  resultSchema: workspaceOverviewOutputSchema,
   description:
     "One-shot snapshot of the whole growth workspace: brand count, content pipeline by status, how many posts await a human, leads headline numbers, and the count of engage-worthy social mentions. Call this FIRST for broad 'give me an overview / what's going on / catch me up' questions, then drill in with the more specific tools.",
   inputSchema: z.object({ action: z.literal("overview") }),

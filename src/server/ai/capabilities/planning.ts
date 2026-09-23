@@ -1,3 +1,7 @@
+import {
+  previewTwoWeekSlotsOutputSchema,
+  generateTwoWeekSlotsOutputSchema,
+} from "./outputs/planning";
 import "server-only";
 
 import { z } from "zod";
@@ -21,6 +25,7 @@ function twoWeekWindow(startDateISO?: string) {
 }
 
 export const previewTwoWeekSlots = growthAction({
+  outputSchema: previewTwoWeekSlotsOutputSchema,
   description:
     "Preview the concrete empty content slots implied by an owned brand's active cadence and content-mix targets for the next 14 days. Saves nothing. Use after nextForBrand says the brand is ready to plan; summarize the result briefly before offering to create it.",
   inputSchema: z.object({
@@ -65,6 +70,7 @@ export const previewTwoWeekSlots = growthAction({
 });
 
 export const generateTwoWeekSlots = growthAction({
+  outputSchema: generateTwoWeekSlotsOutputSchema,
   description:
     "Create the approved 14-day set of empty content slots implied by an owned brand's active cadence and content-mix targets. This is idempotent and only tops up missing cadence slots. Use only after previewTwoWeekSlots and explicit operator agreement.",
   inputSchema: z.object({

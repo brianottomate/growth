@@ -7,7 +7,11 @@ import {
 } from "ai";
 import { z } from "zod";
 
-import { MCP_TOOLS, OVERVIEW_TOOLS } from "@/server/ai/capabilities";
+import {
+  MCP_TOOLS,
+  NATIVE_TOOLS,
+  OVERVIEW_TOOLS,
+} from "@/server/ai/capabilities";
 import { composeGrowthContext } from "@/server/ai/kernel/context";
 import {
   completeAssistantRun,
@@ -17,6 +21,7 @@ import {
   growthActionPolicies,
   policyForGrowthTool,
 } from "@/server/ai/kernel/policy";
+import { assertOutputContract } from "@/server/ai/kernel/output-contract";
 import { GROWTH_CAPABILITY_ACTIONS } from "@/lib/growth-capabilities";
 import { buildGrowthToolRuntime } from "@/server/ai/kernel/runtime";
 import {
@@ -112,7 +117,9 @@ async function executeTool<I, O>(
 async function main() {
   const contractsOnly = process.argv.includes("--contracts-only");
   const overviewNames = Object.keys(OVERVIEW_TOOLS).sort();
-  const policyNames = Object.keys(growthActionPolicies).sort();
+  const policyNames = Object.keys(growthActionPolicies)
+    .filter((name) => name !== "operationRead")
+    .sort();
   assert(
     JSON.stringify(overviewNames) === JSON.stringify(policyNames),
     "Every tool must have exactly one policy entry",
@@ -125,6 +132,7 @@ async function main() {
   for (const [name, definition] of Object.entries(OVERVIEW_TOOLS)) {
     assert("run" in definition, `${name} is not a native Growth tool`);
     const nativeDefinition = definition as GrowthTool<unknown, unknown>;
+    assertOutputContract(`${name} result`, nativeDefinition.resultSchema);
     const modelSchema = (await asSchema(
       definition.inputSchema as FlexibleSchema<unknown>,
     ).jsonSchema) as JsonSchemaObject | undefined;
@@ -175,6 +183,7 @@ async function main() {
       for (const [action, spec] of Object.entries(
         nativeDefinition.actions ?? {},
       )) {
+        assertOutputContract(`${name}.${action} data`, spec.outputSchema);
         assert(
           spec.description.trim().length > 0,
           `${name}.${action} has no description`,
@@ -192,6 +201,29 @@ async function main() {
           );
         }
       }
+    }
+  }
+
+  for (const [surface, toolSet] of [
+    ["overview-chat", NATIVE_TOOLS],
+    ["mcp", MCP_TOOLS],
+  ] as const) {
+    for (const [name, definition] of Object.entries(toolSet)) {
+      assertOutputContract(`${surface} ${name}`, definition.resultSchema);
+      assert(
+        policyForGrowthTool(name).surfaces.includes(surface),
+        `${name} is exposed on a forbidden surface`,
+      );
+      assertProviderObjectSchema(
+        `${name} operation schema`,
+        z.toJSONSchema(definition.transportInputSchema) as JsonSchemaObject,
+      );
+      if (name.includes("__"))
+        assert(
+          !(z.toJSONSchema(definition.transportInputSchema) as JsonSchemaObject)
+            .properties?.action,
+          `${name} must not accept an alternate action`,
+        );
     }
   }
 
@@ -282,9 +314,15 @@ async function main() {
   if (contractsOnly) {
     console.log(
       JSON.stringify({
-        tools: overviewNames.length,
+        tools: Object.keys(NATIVE_TOOLS).length,
+        domainDefinitions: overviewNames.length,
         mcpTools: Object.keys(MCP_TOOLS).length,
         schemas: "valid",
+        outputContracts: "complete",
+        actionContracts: Object.values(OVERVIEW_TOOLS).reduce(
+          (total, tool) => total + Object.keys(tool.actions ?? {}).length,
+          0,
+        ),
         actionPolicy: "valid",
         contextCharacters: composed.manifest.characters,
       }),
@@ -410,7 +448,8 @@ async function main() {
 
   console.log(
     JSON.stringify({
-      tools: overviewNames.length,
+      tools: Object.keys(NATIVE_TOOLS).length,
+      domainDefinitions: overviewNames.length,
       mcpTools: Object.keys(MCP_TOOLS).length,
       realBrands: first.data.brands.length,
       receiptReplay: true,

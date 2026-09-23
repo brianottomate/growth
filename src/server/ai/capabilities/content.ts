@@ -1,3 +1,28 @@
+import {
+  getContentWorkItemOutputSchema,
+  searchContentWorkItemsOutputSchema,
+  updateContentWorkItemOutputSchema,
+  setPlatformPostFirstCommentOutputSchema,
+  setPlatformPostThreadOutputSchema,
+  addContentCrossPostOutputSchema,
+  attachChatImageToContentOutputSchema,
+  makeCarouselFromPoolOutputSchema,
+  prepareContentMediaUploadsOutputSchema,
+  finishContentMediaUploadsOutputSchema,
+  importRemoteImagesToContentOutputSchema,
+  suggestMediaForContentOutputSchema,
+  attachLibraryMediaToContentOutputSchema,
+  freezeCompositionToLibraryOutputSchema,
+  recoverArchiveMediaToContentOutputSchema,
+  contentPipelineSummaryOutputSchema,
+  upcomingContentOutputSchema,
+  productionQueueOutputSchema,
+  createIdeaOutputSchema,
+  createPlatformPostOutputSchema,
+  publishBlogDraftOutputSchema,
+  promotePlatformPostOutputSchema,
+  deleteContentWorkItemOutputSchema,
+} from "./outputs/content";
 import "server-only";
 
 import { z } from "zod";
@@ -125,6 +150,7 @@ const ADD_A_SPOT_HINT =
   "To post on a platform this work item has no spot for, add one with contentWrite.createPlatformPost or contentWrite.addCrossPost rather than editing a draft that does not exist.";
 
 export const getContentWorkItem = growthAction({
+  outputSchema: getContentWorkItemOutputSchema,
   description:
     "Read one canonical content work item with its brief, media pool, platform drafts, local schedule, provider receipt/status, connection readiness, and deterministic production-readiness checklist. Call this FIRST when the active conversation is about finishing or refining a content item. A deliveryExternalId is proof that Zernio accepted the post; scheduledAt alone is local intent.",
   inputSchema: z.object({ contentPostId: z.string() }),
@@ -215,6 +241,7 @@ export const getContentWorkItem = growthAction({
 });
 
 export const searchContentWorkItems = growthAction({
+  outputSchema: searchContentWorkItemsOutputSchema,
   description:
     "Search the current organization's canonical content ideas and their owned platform drafts by title, hook, copy, brand, platform, or format. Use this before creating an idea when the operator refers to existing work by name or intent.",
   inputSchema: z.object({
@@ -316,6 +343,7 @@ export const searchContentWorkItems = growthAction({
 });
 
 export const updateContentWorkItem = growthAction({
+  outputSchema: updateContentWorkItemOutputSchema,
   description:
     "Apply agreed edits to a canonical content brief and/or its existing owned platform drafts. Use concrete copy and dates agreed in conversation; do not use this merely to save vague suggestions.",
   inputSchema: z.object({
@@ -465,6 +493,7 @@ export const updateContentWorkItem = growthAction({
 });
 
 export const setPlatformPostFirstComment = growthAction({
+  outputSchema: setPlatformPostFirstCommentOutputSchema,
   description:
     "Prepare or clear the local first comment for one owned Instagram or LinkedIn post. This only changes Growth's draft. If the post is already queued in Zernio, use publishingWrite.updateFirstComment with approval to change the provider job.",
   inputSchema: z.object({
@@ -486,6 +515,7 @@ export const setPlatformPostFirstComment = growthAction({
 });
 
 export const setPlatformPostThread = growthAction({
+  outputSchema: setPlatformPostThreadOutputSchema,
   description:
     "Create or replace the ordered native posts inside one owned X or Threads draft. This is one platform rendering with linked reply posts, not a content series and not several cross-posts. Use after getWorkItem when the operator asks for a thread, multiple tweets, multiple Threads posts, or asks to split numbered copy into native posts. Pass clean post text without 1/2/3 markers.",
   inputSchema: z.object({
@@ -574,6 +604,7 @@ export const setPlatformPostThread = growthAction({
 });
 
 export const addContentCrossPost = growthAction({
+  outputSchema: addContentCrossPostOutputSchema,
   description:
     "Add one or more agreed channel renderings to an existing canonical content work item. Creates empty owned drafts for the selected platforms; use updateContentWorkItem afterward to write channel-native copy. Read the brief first and pass contentType, so a video idea gets a Reel rather than a feed image.",
   inputSchema: z.object({
@@ -612,6 +643,7 @@ export const addContentCrossPost = growthAction({
 });
 
 export const attachChatImageToContent = growthAction({
+  outputSchema: attachChatImageToContentOutputSchema,
   description:
     "Save one or more pasted chat images into the active brand's durable media library and attach them to the active content pool, selected platform drafts, or every owned draft. Use only when the operator explicitly asks to use, save, or attach images. Pass the complete images array for the current turn. When they refer to images from an earlier turn, omit images, imageUrl, and mimeType; the server resolves the complete image set from the newest user message with owned attachments.",
   inputSchema: z.object({
@@ -753,6 +785,7 @@ export const attachChatImageToContent = growthAction({
 });
 
 export const makeCarouselFromPool = growthAction({
+  outputSchema: makeCarouselFromPoolOutputSchema,
   description:
     "Turn ordered media (images, GIFs, or mini videos) already in a content work item's media pool into one or more owned platform carousels. Call getWorkItem first, preserve the operator's requested order (or the pool order when they say all/these), and provide the asset IDs separately for each target platform post so platform limits can differ. Per-platform media rules are enforced at publish time.",
   inputSchema: z.object({
@@ -861,6 +894,7 @@ const uploadImageMimeType = z.enum([
 ]);
 
 export const prepareContentMediaUploads = growthAction({
+  outputSchema: prepareContentMediaUploadsOutputSchema,
   description:
     "Prepare direct uploads for local image files produced in Claude Code, Claude Design, or another creative tool. Returns short-lived presigned PUT URLs; the MCP host should PUT each local file with the exact Content-Type, then call finishUpload with the returned media IDs in carousel order.",
   inputSchema: z.object({
@@ -912,6 +946,7 @@ export const prepareContentMediaUploads = growthAction({
 });
 
 export const finishContentMediaUploads = growthAction({
+  outputSchema: finishContentMediaUploadsOutputSchema,
   description:
     "Verify and finalize direct image uploads prepared by prepareUpload, then attach them to the content media pool in the provided order. Safe to retry: already-ready media is reused and pool attachment dedupes by asset ID.",
   inputSchema: z.object({
@@ -982,6 +1017,7 @@ export const finishContentMediaUploads = growthAction({
 });
 
 export const importRemoteImagesToContent = growthAction({
+  outputSchema: importRemoteImagesToContentOutputSchema,
   description:
     "Import public image URLs from a cloud design or artifact workflow into Growth's durable media library and the selected content pool. Growth downloads and rehosts each image so expiring source URLs do not break later. The input order becomes the pool/carousel order.",
   inputSchema: z.object({
@@ -1079,6 +1115,7 @@ async function attachMediaItem(
  * without mutating the library or silently recovering archived bytes.
  */
 export const suggestMediaForContent = growthAction({
+  outputSchema: suggestMediaForContentOutputSchema,
   description:
     "Retrieve media options for an active content work item from three honest lanes: ready assets already in the brand library, media found on the brand's historical platform posts, and the brief/context needed to write one strong AI image-generation prompt. Call after getContentWorkItem when the operator asks what visual or media to use. Return at most one recommendation per lane in your answer, explain why it fits, and distinguish immediately usable library media from archive media that still needs recovery. Never recommend a library asset solely from its dimensions, filename, or recency: it needs semantic evidence in its title, alt text, or tags.",
   inputSchema: z.object({
@@ -1205,6 +1242,7 @@ export const suggestMediaForContent = growthAction({
 });
 
 export const attachLibraryMediaToContent = growthAction({
+  outputSchema: attachLibraryMediaToContentOutputSchema,
   description:
     "Attach a chosen, ready asset that already exists in the active brand's media library to the content pool and optionally selected or all owned platform drafts. Use the mediaAssetId returned by suggestMediaForContent.",
   inputSchema: z.object({
@@ -1252,6 +1290,7 @@ export const attachLibraryMediaToContent = growthAction({
 });
 
 export const freezeCompositionToLibrary = growthAction({
+  outputSchema: freezeCompositionToLibraryOutputSchema,
   description:
     "Render a composition blueprint over an owned library image and save the PNG as a reusable media asset (a card). templateId picks the layout: catalog-copy is the feed card (home name + facts over a dark gradient), catalog-review a guest quote with stars (rating 1-5), tall-statement and tall-welcome for stories, photo-only the bare photo. formatId picks the canvas (portrait 4:5 for feeds, story 9:16, square, landscape). focal {x,y} in percent keeps that point of the photo in frame; scrim is a dark hex tint for the gradient; mark picks the brand mark tone (auto is right). Run contentMediaWrite.directComposition first and freeze its corrected values: that is how a card gets judged before it is kept. Freezing only creates the asset; attachLibraryMedia or adsWrite.replaceAdCard put it somewhere.",
   inputSchema: freezeCompositionSchema,
@@ -1376,6 +1415,7 @@ async function requireOwnedBrandId(brandId: string, ctx: CapabilityContext) {
 }
 
 export const recoverArchiveMediaToContent = growthAction({
+  outputSchema: recoverArchiveMediaToContentOutputSchema,
   description:
     "Recover one chosen media item from the active brand's own historical platform-post archive into its durable media library, then attach it to the active content pool and optionally selected or all owned platform drafts. Use the platformPostId and mediaIndex returned by suggestMediaForContent. This preserves the original media type; recovering a video does not extract a still frame.",
   inputSchema: z.object({
@@ -1431,6 +1471,7 @@ export const recoverArchiveMediaToContent = growthAction({
 });
 
 export const contentPipelineSummary = growthAction({
+  outputSchema: contentPipelineSummaryOutputSchema,
   description:
     "Summarize the content pipeline for the organization: a count of content posts grouped by status (slot, draft, discovered, pending_review, approved, scheduled, published, rejected, archived). Use for 'what's in the pipeline / how much is scheduled / what needs review' questions.",
   inputSchema: z.object({}),
@@ -1480,6 +1521,7 @@ export const contentPipelineSummary = growthAction({
 });
 
 export const upcomingContent = growthAction({
+  outputSchema: upcomingContentOutputSchema,
   description:
     "List content planned inside a bounded upcoming window, soonest first. Defaults to the next 14 days and can focus one owned brand. Use for 'what's next / what's planned in the next two weeks / what's on the calendar' questions.",
   inputSchema: z.object({
@@ -1564,6 +1606,7 @@ export const upcomingContent = growthAction({
 });
 
 export const productionQueue = growthAction({
+  outputSchema: productionQueueOutputSchema,
   description:
     "List canonical content work items in the next 14 days with deterministic readiness checks and the next incomplete production step. Use for 'what should I work on?', 'what is blocked?', or after planning to move from slots into execution.",
   inputSchema: z.object({
@@ -1630,6 +1673,7 @@ export const productionQueue = growthAction({
 });
 
 export const createIdea = growthAction({
+  outputSchema: createIdeaOutputSchema,
   description:
     "Create a new content idea — a draft on the /app/content board — for one of the org's brands. Search contentRead first when the operator may be referring to existing work, so this does not create a duplicate. Optionally create it directly inside an existing series, seed the editorial brief (hook, captionDirection, ctaText, pillar, plannedAt), and fan it out to channels (instagram, tiktok, x, facebook, youtube, threads, pinterest, linkedin) as spots. This writes to the workspace: gather the essentials (which brand, a title, ideally a hook and channels), reflect the idea back in one line, and call it once the operator agrees. If you don't already have a brandId, call listBrands first. An idea can start from anything the operator gives you — turn that into the fields.",
   inputSchema: z.object({
@@ -1751,6 +1795,7 @@ export const createIdea = growthAction({
 });
 
 export const createPlatformPost = growthAction({
+  outputSchema: createPlatformPostOutputSchema,
   description:
     "Create one platform-native draft for an owned brand without creating a canonical content idea. Use this as the default when the operator says they want to post something on one channel, react to a specific observed post, or fill one concrete date. It can be promoted later into a content idea, series, grouping, or cross-post plan. This writes to the workspace and requires approval.",
   inputSchema: z.object({
@@ -1809,6 +1854,7 @@ export const createPlatformPost = growthAction({
 });
 
 export const publishBlogDraft = growthAction({
+  outputSchema: publishBlogDraftOutputSchema,
   description:
     "Push a drafted blog platform post into the wander.com CMS (DatoCMS) as a DRAFT article: converts the markdown draft to structured text, uploads the hero image, and links the spot to the created item. Never publishes; a human reviews and publishes in the Dato editor. Requires drafted text and a hero image on the spot or its idea pool.",
   inputSchema: z.object({
@@ -1835,6 +1881,7 @@ export const publishBlogDraft = growthAction({
 });
 
 export const promotePlatformPost = growthAction({
+  outputSchema: promotePlatformPostOutputSchema,
   description:
     "Promote an existing standalone platform post into a canonical content idea. Optionally attach it to a series and add cross-post renderings. Use only after the operator decides the post should become reusable structure. This writes to the workspace and requires approval.",
   inputSchema: z.object({
@@ -1887,6 +1934,7 @@ export const promotePlatformPost = growthAction({
 });
 
 export const deleteContentWorkItem = growthAction({
+  outputSchema: deleteContentWorkItemOutputSchema,
   description:
     "Permanently delete one content idea and the owned drafts under it, including any email document. This is a real delete and cannot be undone; prefer setting status to archived when the work might still matter. Scraped posts are never deleted, they detach and stay as published history. A draft that already has a delivery record is refused.",
   inputSchema: z.object({ contentPostId: z.string() }),

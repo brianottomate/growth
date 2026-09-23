@@ -1,13 +1,19 @@
 "use client";
+import { appliedEvidenceSchema } from "@/lib/applied-evidence";
+import { AppliedEvidenceCard } from "./AppliedEvidenceCard";
+import { OperationJobCard } from "./OperationJobCard";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useChatQueue } from "./useChatQueue";
+import { ChatQueue } from "./ChatQueue";
+import { ChatNextOptions } from "./ChatNextOptions";
 import { usePathname, useRouter } from "next/navigation";
 import { useChat } from "@ai-sdk/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   DefaultChatTransport,
-  getToolName,
+  getToolName as rawToolName,
   isToolUIPart,
   lastAssistantMessageIsCompleteWithApprovalResponses,
   type ToolUIPart,
@@ -61,6 +67,7 @@ import {
 import {
   GROWTH_CAPABILITY_LABELS,
   isGrowthCapabilityId,
+  growthOperation,
 } from "@/lib/growth-capabilities";
 import {
   ASSISTANT_INTENT_EVENT,
@@ -122,7 +129,13 @@ import {
  * into the app's home screen.
  */
 
+function getToolName(part: Parameters<typeof rawToolName>[0]) {
+  return growthOperation(rawToolName(part)).capability;
+}
+
 function toolAction(part: ToolUIPart) {
+  const operation = growthOperation(rawToolName(part));
+  if (operation.action) return operation.action;
   const input = (part as { input?: unknown }).input;
   if (typeof input !== "object" || input === null || !("action" in input))
     return undefined;
@@ -261,11 +274,11 @@ export function OverviewChat({
 
   const {
     messages,
-    sendMessage,
+    sendMessage: sendRawMessage,
+    setMessages,
+    clearError,
     status,
     error,
-    stop,
-    regenerate,
     addToolApprovalResponse,
   } = useChat({
     id: `overview-${threadId}`,
@@ -287,14 +300,73 @@ export function OverviewChat({
         );
       });
       if (saved) {
-        void queryClient.invalidateQueries();
+        window.dispatchEvent(new Event("growth:write"));
         router.refresh();
       }
       onThreadFinish?.();
     },
   });
 
-  const busy = status === "submitted" || status === "streaming";
+  const queue = useChatQueue({
+    threadId,
+    status,
+    send: sendRawMessage,
+    setMessages,
+    clearError,
+    active,
+  });
+  const busy =
+    status === "submitted" ||
+    status === "streaming" ||
+    Boolean(queue.state?.activeTurnId);
+  const enqueue = queue.enqueue;
+  const sendMessage = useCallback(
+    async (
+      message: {
+        text?: string;
+        files?: Array<{
+          type: "file";
+          mediaType: string;
+          url: string;
+          filename?: string;
+        }>;
+      },
+      options?: { body?: Record<string, unknown> },
+      steer = false,
+    ) => {
+      return enqueue(
+        {
+          message: {
+            id: crypto.randomUUID(),
+            role: "user",
+            parts: [
+              ...(message.text
+                ? [{ type: "text" as const, text: message.text }]
+                : []),
+              ...(message.files ?? []),
+            ],
+          },
+          context: { ...requestBodyRef.current, ...options?.body },
+        },
+        steer,
+      );
+    },
+    [enqueue],
+  );
+  const retryResponse = async () => {
+    const failed = queue.state?.inputs
+      .slice()
+      .reverse()
+      .find((item) => item.owned && item.status === "failed");
+    if (failed) {
+      if (await queue.control("retry", failed.id))
+        await queue.control("resume");
+    } else {
+      await sendMessage({
+        text: "Resume the previous request using its saved results and corrections. Avoid repeating completed actions.",
+      });
+    }
+  };
   const isEmpty = messages.length === 0;
   const navigatedCalls = useRef(new Set<string>());
   const reconciledCalls = useRef(new Set<string>());
@@ -333,16 +405,12 @@ export function OverviewChat({
 
   const submitAssistantIntent = useCallback(
     (assistantIntent: AssistantIntent) => {
-      if (busy) {
-        toast.info("The assistant is still working");
-        return;
-      }
       void sendMessage(
         { text: assistantIntent.visibleText },
         { body: { assistantIntent } },
       );
     },
-    [busy, sendMessage],
+    [sendMessage],
   );
 
   useEffect(() => {
@@ -385,7 +453,7 @@ export function OverviewChat({
           !reconciledCalls.current.has(key)
         ) {
           reconciledCalls.current.add(key);
-          void queryClient.invalidateQueries();
+          window.dispatchEvent(new Event("growth:write"));
           router.refresh();
           continue;
         }
@@ -710,9 +778,8 @@ export function OverviewChat({
   // Starter chips send a plain text prompt (no attachment).
   const send = (text: string) => {
     const trimmed = text.trim();
-    if (!trimmed || busy) return;
+    if (!trimmed || queue.saving) return;
     void sendMessage({ text: trimmed });
-    setInput("");
   };
 
   const readyAttachments = pendingAttachments.filter(
@@ -723,12 +790,12 @@ export function OverviewChat({
     (attachment) => attachment.uploading,
   );
   const canSend =
-    !busy &&
+    !queue.saving &&
     !attachmentsUploading &&
     (input.trim().length > 0 || readyAttachments.length > 0);
 
   // The composer sends text and every ready attachment as one durable turn.
-  const submitComposer = () => {
+  const submitComposer = async (steer = false) => {
     if (!canSend) return;
     const chatAttachments = readyAttachments.map((attachment) => ({
       url: attachment.hostedUrl,
@@ -745,7 +812,7 @@ export function OverviewChat({
         : "");
     const skippedAttachments = skippedAttachmentsRef.current;
     skippedAttachmentsRef.current = [];
-    void sendMessage(
+    const accepted = await sendMessage(
       {
         text: visibleText,
         ...(chatAttachments.length > 0
@@ -767,18 +834,25 @@ export function OverviewChat({
             },
           }
         : undefined,
+      steer,
     );
-    setInput("");
-    for (const attachment of pendingAttachments) {
-      releasePreview(attachment.previewUrl);
+    if (!accepted) {
+      skippedAttachmentsRef.current = skippedAttachments;
+      return;
     }
-    attachmentCountRef.current = 0;
-    setPendingAttachments([]);
+    setInput((current) => (current === input ? "" : current));
+    for (const attachment of readyAttachments)
+      releasePreview(attachment.previewUrl);
+    updatePendingAttachments((current) =>
+      current.filter(
+        (item) => !readyAttachments.some((sent) => sent.id === item.id),
+      ),
+    );
   };
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    submitComposer();
+    void submitComposer();
   };
 
   const copyMessageText = (message: UIMessage) => {
@@ -962,7 +1036,7 @@ export function OverviewChat({
                               tone="muted"
                               className="h-6 w-6"
                               title="Regenerate"
-                              onClick={() => void regenerate()}
+                              onClick={() => void retryResponse()}
                             >
                               <RefreshCw className="h-3 w-3" />
                             </Button>
@@ -983,13 +1057,13 @@ export function OverviewChat({
             )}
             {error && (
               <div className="space-y-2 rounded-md border border-destructive/30 bg-destructive/5 p-3">
-                <p className="text-xs text-destructive">
+                <p className="text-xs [overflow-wrap:anywhere] text-destructive">
                   Something went wrong. {error.message}
                 </p>
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => void regenerate()}
+                  onClick={() => void retryResponse()}
                 >
                   <RefreshCw className="mr-1.5 h-3 w-3" />
                   Try again
@@ -1084,6 +1158,17 @@ export function OverviewChat({
                 </span>
               </div>
             )}
+            <ChatNextOptions
+              messages={messages}
+              disabled={busy || queue.saving}
+              choose={(option) => {
+                if (option.kind === "detail") {
+                  setInput(option.text);
+                  textareaRef.current?.focus();
+                } else send(option.text);
+              }}
+            />
+            <ChatQueue state={queue.state} control={queue.control} />
             <Textarea
               ref={textareaRef}
               value={input}
@@ -1091,7 +1176,7 @@ export function OverviewChat({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
-                  submitComposer();
+                  void submitComposer();
                 }
               }}
               onPaste={handlePaste}
@@ -1125,26 +1210,40 @@ export function OverviewChat({
               >
                 <Paperclip className="h-4 w-4" />
               </Button>
-              {busy ? (
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  onClick={() => void stop()}
-                  aria-label="Stop generating"
-                >
-                  <Square className="h-3.5 w-3.5" />
-                </Button>
-              ) : (
+              <div className="flex items-center gap-2">
+                {busy &&
+                  queue.state?.activeTurnId &&
+                  canSend &&
+                  readyAttachments.length === 0 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void submitComposer(true)}
+                    >
+                      Steer
+                    </Button>
+                  )}
+                {busy && (
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    onClick={() => void queue.control("stop")}
+                    aria-label="Stop generating"
+                  >
+                    <Square className="h-3.5 w-3.5" />
+                  </Button>
+                )}
                 <Button
                   type="submit"
-                  size="icon"
+                  size={busy ? "sm" : "icon"}
                   disabled={!canSend}
-                  aria-label="Send"
+                  aria-label={busy ? "Queue message" : "Send"}
                 >
-                  <ArrowUp className="h-4 w-4" />
+                  {busy ? "Queue" : <ArrowUp className="h-4 w-4" />}
                 </Button>
-              )}
+              </div>
             </div>
           </div>
         </form>
@@ -1277,7 +1376,11 @@ function renderToolPart(
   if (part.state === "input-streaming" || part.state === "input-available") {
     if (!isRunning) {
       return (
-        <p key={key} className="text-xs text-destructive" role="alert">
+        <p
+          key={key}
+          className="text-xs [overflow-wrap:anywhere] text-destructive"
+          role="alert"
+        >
           {toolLabel(toolName, action)} did not finish. Generation ended before
           a result was received. Try again.
         </p>
@@ -1293,13 +1396,17 @@ function renderToolPart(
   }
   if (part.state === "output-error") {
     return (
-      <p key={key} className="text-xs text-destructive">
+      <p
+        key={key}
+        className="text-xs [overflow-wrap:anywhere] text-destructive"
+      >
         {toolLabel(toolName, action)} failed: {part.errorText}
       </p>
     );
   }
   if (part.state !== "output-available") return null;
 
+  if (toolName === "toolSearch") return null;
   if (!isGrowthCapabilityId(toolName)) {
     return (
       <div
@@ -1330,6 +1437,20 @@ function renderToolPart(
     );
   }
   const output = envelope.data;
+  if (
+    typeof output === "object" &&
+    output !== null &&
+    "status" in output &&
+    output.status === "started" &&
+    "runId" in output &&
+    typeof output.runId === "string"
+  ) {
+    return (
+      <OperationJobCard key={key} runId={output.runId} onPrompt={onPrompt} />
+    );
+  }
+  const audit = appliedEvidenceSchema.safeParse(output);
+  if (audit.success) return <AppliedEvidenceCard key={key} {...audit.data} />;
   const outputAction = envelope.action || action;
   const presentationKey = `${toolName}.${outputAction}`;
 
@@ -1436,6 +1557,8 @@ function renderToolPart(
           output={output as ProductionPacketOutput}
         />
       );
+    case "presentNextOptions.present":
+      return null;
     case "contentRead.suggestMedia":
       return (
         <MediaSuggestionsCard
@@ -1701,7 +1824,11 @@ type CreatedIdeaOutput = {
 /** Success card for a created idea — links straight to the idea page. */
 function CreatedIdeaCard({ output }: { output: CreatedIdeaOutput }) {
   if (output?.error) {
-    return <p className="text-xs text-destructive">{output.error}</p>;
+    return (
+      <p className="text-xs [overflow-wrap:anywhere] text-destructive">
+        {output.error}
+      </p>
+    );
   }
   return (
     <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
@@ -1754,7 +1881,11 @@ function AudienceTargetMutationCard({
   output: AudienceTargetMutationOutput;
 }) {
   if (output?.error) {
-    return <p className="text-xs text-destructive">{output.error}</p>;
+    return (
+      <p className="text-xs [overflow-wrap:anywhere] text-destructive">
+        {output.error}
+      </p>
+    );
   }
   const target = output.target;
   const targets = output.targets ?? (target ? [target] : []);

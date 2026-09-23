@@ -5,10 +5,12 @@
  * handling all key off this one public ID/action map.
  */
 export const GROWTH_CAPABILITY_ACTIONS = {
+  operationRead: ["status"],
   workspaceOverview: ["overview"],
   navigateWorkspace: ["navigate"],
   prepareProductionPacket: ["prepare"],
   renderSocialPosts: ["render"],
+  presentNextOptions: ["present"],
   blogAgent: ["run"],
   newsletterAgent: ["run"],
   brandRead: ["list", "getMap", "next"],
@@ -20,8 +22,6 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "setMark",
     "addAdPreview",
     "setPerformanceSettings",
-    "previewPurge",
-    "purge",
   ],
   productAtlasRead: ["list", "get"],
   productAtlasWrite: ["create", "update"],
@@ -162,10 +162,9 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "push",
     "setDelivery",
     "deletePlatformCampaign",
-    "createMetaDraft",
+    "createSpecializedMetaDraft",
     "createAudience",
     "addAudienceUsers",
-    "createGoogle",
     "boostMetaPost",
     "duplicateMetaCampaign",
   ],
@@ -232,10 +231,12 @@ export const GROWTH_CAPABILITY_ACTIONS = {
 export type GrowthCapabilityId = keyof typeof GROWTH_CAPABILITY_ACTIONS;
 
 export const GROWTH_CAPABILITY_LABELS = {
+  operationRead: "Checking operation progress",
   workspaceOverview: "Reading workspace overview",
   navigateWorkspace: "Opening workspace",
   prepareProductionPacket: "Preparing production packet",
   renderSocialPosts: "Rendering social posts",
+  presentNextOptions: "Offering next steps",
   blogAgent: "Working on the blog",
   newsletterAgent: "Working on the newsletter",
   brandRead: "Reading brands",
@@ -287,4 +288,10 @@ export function isGrowthCapabilityId(
   value: string,
 ): value is GrowthCapabilityId {
   return value in GROWTH_CAPABILITY_ACTIONS;
+}
+
+/** Canonical names also render persisted grouped calls from older conversations. */
+export function growthOperation(name: string) {
+  const [capability, action] = name.split("__");
+  return { capability: capability ?? name, action };
 }

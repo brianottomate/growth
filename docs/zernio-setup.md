@@ -61,14 +61,16 @@ kernel:
 - `adsRead.listDestinations` resolves an owned brand to its active Zernio
   connection and intersects Zernio's live ad-account enumeration with the
   brand-scoped `ad_account` allowlist.
-- `adsWrite.createMetaDraft` supports a single image campaign tree and forces
-  `status: PAUSED`. `validateOnly` uses Meta's dry run. Meta still uploads the
-  referenced image while validating, so the action retains provider-write
-  policy and operator approval.
-- `adsWrite.createGoogle` supports Search and Display. Search requires at least
-  one keyword. Display requires both landscape and square images. Zernio does
-  not document paused creation or a dry run for Google, so approval may create
-  a spend-capable campaign.
+- Standard campaigns use `adsWrite.draftCampaign`, `planPlatform`,
+  `setPlatformDraft`, then approval-gated `push`. Meta creates paused.
+- `adsWrite.createSpecializedMetaDraft` covers lead generation, lead conversion,
+  app promotion and catalog sales, which the local draft compiler does not yet
+  support. It forces `status: PAUSED`. Its validate-only mode still uploads
+  referenced media, so validation also requires approval.
+- Google Search and Display use the same draft workflow. Set `google.images`
+  in `setPlatformDraft` to preserve separate landscape and square crops.
+  Google creates then pauses in a second call; a failed pause leaves a
+  spend-capable campaign and returns an explicit warning.
 - `adsWrite.boostMetaPost` preserves the existing post engagement. Zernio
   launches boosts active, which makes the approval card the final spend gate.
 - `adsWrite.duplicateMetaCampaign` deep-copies only a campaign found in the
@@ -76,7 +78,7 @@ kernel:
 
 Create and boost calls send Zernio's `Idempotency-Key` header. The key is stable
 for one assistant run and exact payload, which makes provider retries safe for
-24 hours. The direct OAuth MCP projection does not expose `adsWrite` because
+24 hours. The direct OAuth MCP projection excludes spend-capable actions because
 that route does not yet implement the in-app approval continuation.
 
 ## Guardrails

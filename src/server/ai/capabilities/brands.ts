@@ -1,3 +1,10 @@
+import {
+  listBrandsOutputSchema,
+  createBrandActionOutputSchema,
+  addBrandAdPreviewActionOutputSchema,
+  setPerformanceSettingsActionOutputSchema,
+  enrichBrandActionOutputSchema,
+} from "./outputs/brands";
 import "server-only";
 
 import { z } from "zod";
@@ -8,8 +15,6 @@ import { brandTable } from "@/server/db/schema";
 import {
   createOwnedBrand,
   enrichBrandById,
-  previewBrandPurge,
-  purgeBrand,
 } from "@/server/services/brand-ops.service";
 import {
   createProspectFromLead,
@@ -42,6 +47,7 @@ export async function orgBrandIds(orgId: string): Promise<string[]> {
 }
 
 export const listBrands = growthAction({
+  outputSchema: listBrandsOutputSchema,
   description:
     "List the brands in the current organization (id, name, tagline). Use when the operator asks about brands or you need a brand's name/id.",
   inputSchema: z.object({}),
@@ -58,6 +64,7 @@ export const listBrands = growthAction({
 });
 
 export const createBrandAction = growthAction({
+  outputSchema: createBrandActionOutputSchema,
   description:
     "Create an owned brand (a client or Wander property) with just a name and optional website. The brand is connectable from birth (its client connect link exists immediately). Enrichment is a separate step — call brandWrite.enrich afterwards to pull the logo, tagline, and description from the website.",
   inputSchema: z.object({
@@ -83,6 +90,7 @@ export const createBrandAction = growthAction({
 });
 
 export const addBrandAdPreviewAction = growthAction({
+  outputSchema: addBrandAdPreviewActionOutputSchema,
   description:
     "Keep a frozen card as one of the brand's ad previews: what their ads will look like, shown inside feed mocks on the Performance brand page before any campaign exists. mediaAssetId is a card from contentMediaWrite.freezeComposition; homeUrl is the listing it shows when known. Saving the same card again moves it to the front. Read the brand-ad-preview playbook for the whole job.",
   inputSchema: z.object({
@@ -120,6 +128,7 @@ export const addBrandAdPreviewAction = growthAction({
 });
 
 export const setPerformanceSettingsAction = growthAction({
+  outputSchema: setPerformanceSettingsActionOutputSchema,
   description:
     "Set a Performance client's live settings on the brand: report emails, invoice email, UGC permission, the client's creative and guest-list folders, the catalog / carousel / hero creative folders, the ad copies doc, dedicated newsletter, influencer, social posts, and hand-counted bookings. Send only the keys to change; an empty string clears one. This is the only writer besides an applied intake, which fills empty cells and never overwrites, so replacing a value the client gave is your decision to make and to say.",
   inputSchema: z.object({
@@ -198,6 +207,7 @@ export const setBrandRelationshipAction = growthAction({
 });
 
 export const enrichBrandAction = growthAction({
+  outputSchema: enrichBrandActionOutputSchema,
   description:
     "Scrape a brand's website (Firecrawl) and write the logo, tagline, description, and page metadata onto the brand. Idempotent — re-running refreshes the same fields. Pass website to set or override the brand's URL in the same step.",
   inputSchema: z.object({
@@ -220,6 +230,8 @@ export const enrichBrandAction = growthAction({
     const result = await enrichBrandById(input.brandId, input.website);
     if (!result) throw new Error("Could not read that website");
     return {
+      evidence: result.evidence,
+      applied: result.applied,
       brandId: result.brand.id,
       name: result.brand.name,
       tagline: result.brand.tagline,
@@ -299,7 +311,7 @@ export const setBrandMarkAction = growthAction({
   },
 });
 
-/** Brand ownership check shared by the purge pair. */
+/** Require membership in the brand organization before targeted changes. */
 async function assertOwnedBrand(brandId: string, orgId: string) {
   const brand = await db.query.brandTable.findFirst({
     where: and(
@@ -311,30 +323,3 @@ async function assertOwnedBrand(brandId: string, orgId: string) {
   if (!brand) throw new Error("Brand not found in this organization.");
   return brand;
 }
-
-export const previewBrandPurgeAction = growthAction({
-  description:
-    "Show exactly what purging a brand would destroy: row counts per table, plus anything that blocks the purge (Performance accounts and partner programs are financial records and must be detached first). Read-only. Always call this before brandWrite.purge and show the operator the counts.",
-  inputSchema: z.object({ brandId: z.string().trim().min(1) }),
-  execute: async (input, ctx) => {
-    await assertOwnedBrand(input.brandId, ctx.orgId);
-    return previewBrandPurge(input.brandId);
-  },
-});
-
-export const purgeBrandAction = growthAction({
-  description:
-    "Permanently delete a brand and everything under it: channels, campaigns, ads, audiences, content, media bytes in R2, the ad-account allowlist, and the Zernio profile with its connected accounts. This is offboarding, not archiving, and it CANNOT be undone. `confirmName` must match the brand's name exactly. Call brandWrite.previewPurge first and show the operator what will go. Never call this on your own initiative.",
-  inputSchema: z.object({
-    brandId: z.string().trim().min(1),
-    confirmName: z
-      .string()
-      .trim()
-      .min(1)
-      .describe("Must equal the brand's name exactly, typed by the operator."),
-  }),
-  execute: async (input, ctx) => {
-    await assertOwnedBrand(input.brandId, ctx.orgId);
-    return purgeBrand(input);
-  },
-});

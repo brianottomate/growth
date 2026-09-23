@@ -1,3 +1,50 @@
+import {
+  adsScopeOutputSchema,
+  topAdsOutputSchema,
+  listAdsDestinationsOutputSchema,
+  draftCampaignActionOutputSchema,
+  createSpecializedMetaDraftActionOutputSchema,
+  boostMetaPostActionOutputSchema,
+  duplicateMetaCampaignActionOutputSchema,
+  createAudienceActionOutputSchema,
+  addAudienceUsersActionOutputSchema,
+  draftAdActionOutputSchema,
+  openCampaignActionOutputSchema,
+  previewAdActionOutputSchema,
+  importCreativeActionOutputSchema,
+  linkAudienceActionOutputSchema,
+  listCampaignsActionOutputSchema,
+  replaceAdCardActionOutputSchema,
+  addAudienceActionOutputSchema,
+  updateAudienceActionOutputSchema,
+  planPlatformActionOutputSchema,
+  setCreativePoolActionOutputSchema,
+  setPlatformDraftActionOutputSchema,
+  attachCampaignActionOutputSchema,
+  pullPlatformAudiencesActionOutputSchema,
+  deleteCampaignDraftActionOutputSchema,
+  deleteAudienceActionOutputSchema,
+  deleteAdDraftActionOutputSchema,
+  pushDraftActionOutputSchema,
+  setDeliveryActionOutputSchema,
+  deletePlatformCampaignActionOutputSchema,
+  buildAdSetActionOutputSchema,
+  addAdShellActionOutputSchema,
+  createAdsFromAssetsActionOutputSchema,
+  setAdHomeActionOutputSchema,
+  editAdCardsActionOutputSchema,
+  attachAdSetActionOutputSchema,
+  setAdStatusActionOutputSchema,
+  setAdCopyActionOutputSchema,
+  setPlacementCopyActionOutputSchema,
+  clearPlacementActionOutputSchema,
+  freezePlacementActionOutputSchema,
+  unfreezePlacementActionOutputSchema,
+  saveIdeaActionOutputSchema,
+  ideaHomePhotosActionOutputSchema,
+  importMetaCampaignActionOutputSchema,
+  ideaContextActionOutputSchema,
+} from "./outputs/ads";
 import { adChatContext } from "@/server/services/ad-chat-context.service";
 import {
   importMetaCampaign,
@@ -28,7 +75,6 @@ import {
 } from "@/server/services/ads-analytics.service";
 import {
   boostMetaPost,
-  createGoogleAd,
   createMetaAdDraft,
   deletePlatformCampaign,
   duplicateMetaCampaign,
@@ -107,6 +153,7 @@ const windowSchema = {
 };
 
 export const adsScope = growthAction({
+  outputSchema: adsScopeOutputSchema,
   description:
     "CHEAP lay-of-the-land for Wander's Meta (Facebook) ad performance over a window (default last 365 days): totals (impressions/clicks/CTR/spend/engagement), spend-by-month, and breakdowns by objective (OUTCOME_SALES≈consumer marketplace vs OUTCOME_LEADS≈PM/WanderOS) and by ad DESTINATION (audit / os / marketplace / lead-form / …). Includes flags like hasAuditAds. CALL THIS FIRST for any 'which ads / ad performance / what are we running / are we driving to X' question — it grounds your follow-ups (e.g. it tells you instantly that we've run zero audit-destination ads). Then call topAds to drill in.",
   inputSchema: z.object(windowSchema),
@@ -115,6 +162,7 @@ export const adsScope = growthAction({
 });
 
 export const topAds = growthAction({
+  outputSchema: topAdsOutputSchema,
   description:
     "Ranked top Wander Meta ads for a window, by a chosen metric (impressions | clicks | ctr | engagement | spend), with creative copy + thumbnail + destination. Optionally filter by objective (e.g. OUTCOME_LEADS for the PM/WanderOS funnel) or destination. Use AFTER adsScope once the scope is narrowed. CTR ranking applies a 5k-impression delivery floor. Returns at most `limit` ads (default 15).",
   inputSchema: z.object({
@@ -184,6 +232,7 @@ const schedulingSchema = {
 };
 
 export const listAdsDestinations = growthAction({
+  outputSchema: listAdsDestinationsOutputSchema,
   description:
     "List the active Zernio Meta, Google or LinkedIn connection and the live provider ad accounts that are explicitly allowlisted for one owned brand. Use this before any adsWrite action; never guess either account id. Each Meta destination carries the Facebook Page it runs as (pageId) and runsAsBrandPage; a false value means the connection cannot access the brand Page. Performance clients may use an explicitly shared managing-brand connection with their own Page identity. trackingDefaults contains the verified pixelId and customEventType inherited for this paying account; use these for campaign setup unless the operator requests an override.",
   inputSchema: z.object({
@@ -198,8 +247,9 @@ export const listAdsDestinations = growthAction({
 });
 
 export const draftCampaignAction = growthAction({
+  outputSchema: draftCampaignActionOutputSchema,
   description:
-    "Create a LOCAL campaign draft — the editable first-party object shown at /app/brands/{brandSlug}/ads/{campaignId}. Nothing touches any ad platform: per-platform campaigns are created later by the push, which is a separate operator-approved step. Use adsWrite.createMetaDraft when the user explicitly wants a campaign created directly ON the provider instead.",
+    "Create a LOCAL campaign draft — the editable first-party object shown at /app/brands/{brandSlug}/ads/{campaignId}. Nothing touches any ad platform: per-platform campaigns are created later by the push, which is a separate operator-approved step. Use planPlatform and setPlatformDraft to prepare delivery, then push after operator approval.",
   inputSchema: z.object({
     brandSlug: destinationSchema.brandSlug,
     name: z
@@ -235,9 +285,10 @@ export const draftCampaignAction = growthAction({
     }),
 });
 
-export const createMetaAdDraftAction = growthAction({
+export const createSpecializedMetaDraftAction = growthAction({
+  outputSchema: createSpecializedMetaDraftActionOutputSchema,
   description:
-    "Create a complete Meta campaign, ad set, and ad through Zernio — single-image via imageUrl, or a 2–10 card carousel via carouselCards. The campaign is forced to PAUSED so it cannot spend until activated in a separate operator step. Set validateOnly to check Meta's tree without creating it. Requires explicit operator approval even for validation because Meta uploads referenced media during dry runs.",
+    "Create a specialized Meta campaign for lead generation, lead conversion, app promotion, or catalog sales through Zernio. Standard traffic, engagement, awareness, video views, and conversion campaigns must use draftCampaign then push. Create a campaign, ad set, and ad — single-image via imageUrl, or a 2–10 card carousel via carouselCards. The campaign is forced to PAUSED so it cannot spend until activated in a separate operator step. Set validateOnly to check Meta's tree without creating it. Requires explicit operator approval even for validation because Meta uploads referenced media during dry runs.",
   inputSchema: z
     .object({
       ...destinationSchema,
@@ -246,13 +297,8 @@ export const createMetaAdDraftAction = growthAction({
       adSetName: z.string().trim().min(1).max(255).optional(),
       adName: z.string().trim().min(1).max(255).optional(),
       goal: z.enum([
-        "engagement",
-        "traffic",
-        "awareness",
-        "video_views",
         "lead_generation",
         "lead_conversion",
-        "conversions",
         "app_promotion",
         "catalog_sales",
       ]),
@@ -331,51 +377,8 @@ export const createMetaAdDraftAction = growthAction({
     }),
 });
 
-export const createGoogleAdAction = growthAction({
-  description:
-    'Create one Google Search or Display campaign tree through Zernio, then pause it. Google\'s create call has no validate-only and no paused option, so the pause is a second call — the result carries a warning, and a status of "live", if it did not land. Use traffic for click-optimized delivery; conversion-goal creation is unsupported. Requires explicit operator approval.',
-  inputSchema: z.object({
-    ...destinationSchema,
-    name: z.string().trim().min(1).max(255),
-    campaignType: z.enum(["search", "display"]),
-    goal: z.enum(["engagement", "traffic", "awareness", "video_views"]),
-    budgetAmount: z
-      .number()
-      .positive()
-      .describe("Budget in whole currency units, never cents."),
-    budgetType: budgetTypeSchema,
-    headline: z.string().trim().min(1).max(30),
-    body: z.string().trim().min(1).max(90),
-    linkUrl: z.string().url(),
-    keywords: z.array(z.string().trim().min(1)).min(1).max(20).optional(),
-    negativeKeywords: z.array(z.string().trim().min(1)).max(20).optional(),
-    additionalHeadlines: z
-      .array(z.string().trim().min(1).max(30))
-      .max(14)
-      .optional(),
-    additionalDescriptions: z
-      .array(z.string().trim().min(1).max(90))
-      .max(3)
-      .optional(),
-    images: z
-      .object({
-        landscape: z.string().url(),
-        square: z.string().url(),
-      })
-      .optional()
-      .describe("Required for Display: one 1.91:1 and one 1:1 image."),
-    businessName: z.string().trim().min(1).max(25).optional(),
-    targeting: targetingSchema.optional(),
-    ...schedulingSchema,
-  }),
-  execute: async (input, ctx) =>
-    createGoogleAd(input, {
-      organizationId: ctx.orgId,
-      runId: ctx.runId,
-    }),
-});
-
 export const boostMetaPostAction = growthAction({
+  outputSchema: boostMetaPostActionOutputSchema,
   description:
     "Boost one existing Facebook or Instagram post through Zernio while preserving its engagement. Zernio launches the created Meta hierarchy ACTIVE, so approval starts a spend-capable campaign immediately. Provide exactly one provider post identifier. Requires explicit operator approval.",
   inputSchema: z.object({
@@ -408,6 +411,7 @@ export const boostMetaPostAction = growthAction({
 });
 
 export const duplicateMetaCampaignAction = growthAction({
+  outputSchema: duplicateMetaCampaignActionOutputSchema,
   description:
     "Deep-copy one Meta campaign already visible inside the named brand's allowlisted account. Zernio creates the copied campaign PAUSED and syncs the copy back into the ad tree. Requires explicit operator approval.",
   inputSchema: z.object({
@@ -424,6 +428,7 @@ export const duplicateMetaCampaignAction = growthAction({
 });
 
 export const createAudienceAction = growthAction({
+  outputSchema: createAudienceActionOutputSchema,
   description:
     "Create a Meta custom audience (customer_list or lookalike) on an allowlisted ad account through Zernio. No spend, but a provider write — and the endpoint is NOT idempotent, so a failure must be reported to the operator, never retried. Lookalikes require sourceAudienceId, country, and ratio (0.01–0.20).",
   inputSchema: z.object({
@@ -466,6 +471,7 @@ export const createAudienceAction = growthAction({
 });
 
 export const addAudienceUsersAction = growthAction({
+  outputSchema: addAudienceUsersActionOutputSchema,
   description:
     "Upload members (plaintext email and/or phone; Zernio hashes server-side) to an existing customer_list audience. Batches of 10,000 per request; partial progress is reported on failure so a retry can resume rather than duplicate.",
   inputSchema: z.object({
@@ -488,6 +494,7 @@ export const addAudienceUsersAction = growthAction({
 });
 
 export const draftAdAction = growthAction({
+  outputSchema: draftAdActionOutputSchema,
   description:
     "Add a drafted ad to a LOCAL campaign — a suggestion the push transforms per platform. Local only. Type creative (default) carries copy plus media: one image, several images (a carousel, in order), or a video — for Meta. Media the operator attached this turn can be passed by its chat url directly; it is saved into the brand's library and its video poster resolved for you. Type text is a pool of headlines and descriptions, for Google/OpenAI.",
   inputSchema: z
@@ -519,7 +526,7 @@ export const draftAdAction = growthAction({
         .url()
         .optional()
         .describe(
-          "creative only: shorthand for imageUrls with a single entry — the shape createMetaDraft uses.",
+          "creative only: shorthand for imageUrls with a single entry — the single-image creative shape.",
         ),
       videoUrl: z
         .string()
@@ -672,6 +679,7 @@ export const draftAdAction = growthAction({
 // it was standing on. These close that.
 
 export const openCampaignAction = growthAction({
+  outputSchema: openCampaignActionOutputSchema,
   description:
     "Read one first-party campaign in full: its brief, ad sets and their audiences, drafted and live ads, and any per-platform campaigns the push created. Use this before editing a campaign so you are working from its current state rather than what was said earlier in the conversation.",
   inputSchema: z.object({
@@ -685,6 +693,7 @@ export const openCampaignAction = growthAction({
 });
 
 export const previewAdAction = growthAction({
+  outputSchema: previewAdActionOutputSchema,
   description:
     "Render Meta's own previews of a DRAFTED creative ad before anything exists on the platform — real iframes from Meta's preview API. The Facebook page the ad runs as resolves from the connection automatically; pass pageId only to override. Returns preview URLs to open; nothing is created and nothing spends. Image and carousel ads only; video previews need a push first.",
   inputSchema: z.object({
@@ -712,6 +721,7 @@ export const previewAdAction = growthAction({
 });
 
 export const importCreativeAction = growthAction({
+  outputSchema: importCreativeActionOutputSchema,
   description:
     "Import a live ad's creative into the brand media library, durably (R2). Platform CDN urls expire, so a proven creative must be imported before drafts can reuse it. Dedupes by source url; a video ad imports its poster only.",
   inputSchema: z.object({
@@ -730,6 +740,7 @@ export const importCreativeAction = growthAction({
 });
 
 export const linkAudienceAction = growthAction({
+  outputSchema: linkAudienceActionOutputSchema,
   description:
     "Link a platform audience asset (a synced lookalike, customer list, or pixel audience) to the plan audience it fulfils, so the push targets that asset. This is how a pre-existing asset — including one seeded from Wander's own lists in the same ad account — becomes targetable by a campaign. Pass audienceId null to unlink. Local rows only.",
   inputSchema: z.object({
@@ -750,6 +761,7 @@ export const linkAudienceAction = growthAction({
 });
 
 export const listCampaignsAction = growthAction({
+  outputSchema: listCampaignsActionOutputSchema,
   description:
     "List a brand's per-platform campaigns, including ones sync pulled that are not attached to any first-party campaign. Use it to find a campaign id, or to see what is waiting to be attached.",
   inputSchema: z.object({
@@ -808,6 +820,7 @@ export const draftAdsFromHomesAction = growthAction({
 });
 
 export const replaceAdCardAction = growthAction({
+  outputSchema: replaceAdCardActionOutputSchema,
   description:
     "Put a different library asset in one card slot of a LOCAL draft ad (index 0 is the first card; a single-image ad has one). Use it after freezing a corrected composition to swap the card that looked wrong. Local only; a pushed ad keeps the platform's copy.",
   inputSchema: z.object({
@@ -831,6 +844,7 @@ export const replaceAdCardAction = growthAction({
 });
 
 export const addAudienceAction = growthAction({
+  outputSchema: addAudienceActionOutputSchema,
   description:
     "Add an audience to a LOCAL campaign: one buyable narrowing (one age window, one geography, optional keyword suggestions) that the push compiles to a Meta ad set / Google ad group. Default to ONE audience and ONE ad set per campaign. Reuse or update the existing audience. Only propose or create multiple audiences when the operator explicitly requests a split or experiment. Local only, and an audience carries NO money — budgets live on the platform draft. Omit everything but the name for broad targeting, which is a legitimate and often correct choice.",
   inputSchema: z.object({
@@ -888,6 +902,7 @@ export const addAudienceAction = growthAction({
 });
 
 export const updateAudienceAction = growthAction({
+  outputSchema: updateAudienceActionOutputSchema,
   description:
     "Update a campaign audience's fields — name, age window, geography, or keyword suggestions. Only the fields sent are changed. Local only. Budgets live on the platform draft (setPlatformDraft), never on an audience.",
   inputSchema: z.object({
@@ -921,6 +936,7 @@ export const updateAudienceAction = growthAction({
 });
 
 export const planPlatformAction = growthAction({
+  outputSchema: planPlatformActionOutputSchema,
   description:
     "Plan a platform for a LOCAL campaign: creates the draft platform campaign row that holds that platform's authoritative budget and settings. Local only; idempotent per platform. Does not require Zernio, a connected ad account, or listDestinations. Account connection is needed later for pushing, not planning.",
   inputSchema: z.object({
@@ -932,6 +948,7 @@ export const planPlatformAction = growthAction({
 });
 
 export const setCreativePoolAction = growthAction({
+  outputSchema: setCreativePoolActionOutputSchema,
   description:
     "Replace a campaign's shared creative pool — the images and videos its ads draw from, picked once rather than per ad. Chat attachments are promoted into the media library on the way in. Local only.",
   inputSchema: z.object({
@@ -987,6 +1004,7 @@ export const setCreativePoolAction = growthAction({
 });
 
 export const setPlatformDraftAction = growthAction({
+  outputSchema: setPlatformDraftActionOutputSchema,
   description:
     "Set a platform draft's AUTHORITATIVE budget and its platform-specific settings before pushing: Google needs a campaign type (a search campaign without keywords is rejected at push — its keywords derive from the audiences' suggestions unless overridden here); Meta takes pixel, conversion event, placements, budget mode, and optional schedule controls (startWhenLaunched/runUntilPaused). Daily budgets need no dates; lifetime budgets need an end. Read listDestinations for verified trackingDefaults instead of guessing a pixel; LinkedIn takes the authoring Company Page id, a manual bid and the CTA, all optional. Also the only place to set flight dates, which a lifetime budget requires. Local only.",
   inputSchema: z.object({
@@ -1019,6 +1037,12 @@ export const setPlatformDraftAction = growthAction({
     google: z
       .object({
         campaignType: z.enum(["search", "display"]).optional(),
+        images: z
+          .object({ landscape: z.string().url(), square: z.string().url() })
+          .optional()
+          .describe(
+            "Display crops: separate 1.91:1 landscape and 1:1 square images. Omit to use the creative image for both.",
+          ),
         keywords: z.array(z.string().trim().min(1)).max(200).optional(),
         negativeKeywords: z.array(z.string().trim().min(1)).max(200).optional(),
         additionalHeadlines: z
@@ -1084,6 +1108,7 @@ export const setPlatformDraftAction = growthAction({
 });
 
 export const attachCampaignAction = growthAction({
+  outputSchema: attachCampaignActionOutputSchema,
   description:
     "Attach a per-platform campaign that sync pulled to a first-party campaign, either an existing one or a new one minted from its name. This is how a campaign nobody authored here gets a parent so its spend rolls up. Local only.",
   inputSchema: z.object({
@@ -1112,6 +1137,7 @@ export const attachCampaignAction = growthAction({
 });
 
 export const pullPlatformAudiencesAction = growthAction({
+  outputSchema: pullPlatformAudiencesActionOutputSchema,
   description:
     "Mirror the custom audiences already sitting in a brand's allowlisted ad accounts into Growth, so ad sets can target what the client built before they connected. Reads the provider; writes only Growth's own mirror rows and changes nothing on the platform.",
   inputSchema: z.object({ brandSlug: destinationSchema.brandSlug }),
@@ -1123,6 +1149,7 @@ export const pullPlatformAudiencesAction = growthAction({
 });
 
 export const deleteCampaignDraftAction = growthAction({
+  outputSchema: deleteCampaignDraftActionOutputSchema,
   description:
     "Delete a LOCAL campaign draft with its ad sets and ads. Refused once a per-platform campaign exists for it — delete that on the platform first. Nothing on any ad platform is touched.",
   inputSchema: z.object({ campaignId: z.string().trim().min(1) }),
@@ -1131,6 +1158,7 @@ export const deleteCampaignDraftAction = growthAction({
 });
 
 export const deleteAudienceAction = growthAction({
+  outputSchema: deleteAudienceActionOutputSchema,
   description:
     "Delete a campaign audience. Refused once it is compiled to a live ad set. Local only.",
   inputSchema: z.object({ audienceId: z.string().trim().min(1) }),
@@ -1139,6 +1167,7 @@ export const deleteAudienceAction = growthAction({
 });
 
 export const deleteAdDraftAction = growthAction({
+  outputSchema: deleteAdDraftActionOutputSchema,
   description:
     "Delete a drafted ad, whether it sits on the brand's set or in a campaign. Local only — the platform ads it compiled to keep running and keep their history.",
   inputSchema: z.object({ adId: z.string().trim().min(1) }),
@@ -1147,6 +1176,7 @@ export const deleteAdDraftAction = growthAction({
 });
 
 export const pushDraftAction = growthAction({
+  outputSchema: pushDraftActionOutputSchema,
   description:
     "COMPILE a LOCAL campaign onto one platform: each audience becomes an ad set / ad group, every creative ad runs under each, and region names resolve to real platform geo keys. Budget, dates and settings come from the platform DRAFT row (set them with setPlatformDraft first), so this takes no numbers of its own. Everything is created PAUSED; adsWrite.setDelivery starts spend separately. Set validateOnly for a dry run — Meta only, single audience only. LinkedIn: campaign group → campaign (the ad set) → creative. ONE push sends every creative ad, same as Meta — the first opens the campaign and the rest are attached to it, one provider call each. Do not split a campaign across several pushes or ask the operator to pick a subset. LinkedIn targets at country level only, and its goals are engagement / traffic / awareness / video_views. Call adsRead.listDestinations first for the account ids; never guess them.",
   inputSchema: z.object({
@@ -1169,6 +1199,7 @@ export const pushDraftAction = growthAction({
 });
 
 export const setDeliveryAction = growthAction({
+  outputSchema: setDeliveryActionOutputSchema,
   description:
     "Start or pause delivery of a per-platform campaign. Setting status to active STARTS SPEND on the client's ad account immediately. Requires explicit operator approval, and pausing is the reverse of the same action.",
   inputSchema: z.object({
@@ -1183,6 +1214,7 @@ export const setDeliveryAction = growthAction({
 });
 
 export const deletePlatformCampaignAction = growthAction({
+  outputSchema: deletePlatformCampaignActionOutputSchema,
   description:
     "Delete a campaign on the ad account itself, cascading to its ad sets and ads on the platform. Reporting history goes with it and this cannot be undone. Pausing via adsWrite.setDelivery is usually what is wanted instead. Requires explicit operator approval.",
   inputSchema: z.object({
@@ -1197,6 +1229,7 @@ export const deletePlatformCampaignAction = growthAction({
 });
 
 export const buildAdSetAction = growthAction({
+  outputSchema: buildAdSetActionOutputSchema,
   description:
     "Draw a Performance client's whole ad set: a static and a carousel per home, then BOTH a portfolio carousel and a catalog ad, which is the house plan and is not negotiable. Name the homes (propertyIds, WanderOS listing ids in portfolio order) or name a count ('build me five statics and five carousels' is count 5): the homes on the client's Performance record come first and their site's own order fills the rest, and the result says which were chosen. Writes the captions in one pass from each home's own amenities and description, walks each home's carousel through its real room photos, and lands every ad as a draft against the brand with no campaign. Rebuilding replaces the last set and leaves anything already approved alone. Bind or swap a home afterwards with setAdHome.",
   inputSchema: z
@@ -1233,6 +1266,7 @@ export const buildAdSetAction = growthAction({
 });
 
 export const addAdShellAction = growthAction({
+  outputSchema: addAdShellActionOutputSchema,
   description:
     "Add one empty ad of a declared format (static, carousel, catalog or video), bound to one of their homes by WanderOS listing id, or by name alone when the brand's site is not connected. Lands on the brand's wall, or straight in a campaign when campaignId is given. The creative comes afterwards with editAdCards, by upload into the library or from it. Use this when the operator wants the ads to exist first and fill them in, or wants an ad the build does not make.",
   inputSchema: z.object({
@@ -1272,6 +1306,7 @@ export const addAdShellAction = growthAction({
 });
 
 export const createAdsFromAssetsAction = growthAction({
+  outputSchema: createAdsFromAssetsActionOutputSchema,
   description:
     "Turn finished creatives already in the media library into drafted ads in one go: 'statics' makes one static per asset, 'carousel' makes one carousel of them all in the order given (2 to 10). The home each ad is about is read off the filename when it follows the export convention (Brand_Home_Format_...) and matches a home on their site; pass propertyId to bind them all to one home instead. Files that name no home make ads that wait to be bound.",
   inputSchema: z.object({
@@ -1306,6 +1341,7 @@ export const createAdsFromAssetsAction = growthAction({
 });
 
 export const setAdHomeAction = growthAction({
+  outputSchema: setAdHomeActionOutputSchema,
   description:
     "Bind a drafted ad to one of the client's homes (WanderOS listing id), or by name alone when their site is not connected, or unbind it with neither. The link moves to that home's page unless someone typed one by hand, a name in the house convention follows the home, and the wall files the ad under it. This is how an ad is retrofitted onto a different home.",
   inputSchema: z.object({
@@ -1326,6 +1362,7 @@ export const setAdHomeAction = growthAction({
 });
 
 export const editAdCardsAction = growthAction({
+  outputSchema: editAdCardsActionOutputSchema,
   description:
     "One change to a drafted ad's cards. With a library asset: replace the card at an index, append a card, remove one, move one. Per placement: setStory pins a 9:16 library asset to a card for stories and reels, clearStory drops it, makeStory derives one from the card's baseline (auto picks the best method: re-render when the card came from a composition, extend the photo past its edges via outpaint, else a centred crop; or name crop/extend/render). A static holds one card, a carousel two to ten (one while it is being filled), a video ad one clip. Works on ads in the brand's set and on ads in a campaign that has not been pushed.",
   inputSchema: z.object({
@@ -1370,6 +1407,7 @@ export const editAdCardsAction = growthAction({
 });
 
 export const attachAdSetAction = growthAction({
+  outputSchema: attachAdSetActionOutputSchema,
   description:
     "Put the brand's approved drafted ads, or the ones named, into a campaign so the push can send them. Refuses an ad with no creative. Local only; nothing reaches a platform until adsWrite.push.",
   inputSchema: z.object({
@@ -1382,6 +1420,7 @@ export const attachAdSetAction = growthAction({
 });
 
 export const setAdStatusAction = growthAction({
+  outputSchema: setAdStatusActionOutputSchema,
   description:
     "Approve an ad, freezing image compositions into media assets, or reopen it as an editable draft. Supply expectedUpdatedAt from the latest read. This never publishes to a platform.",
   inputSchema: z.object({
@@ -1402,6 +1441,7 @@ export const setAdStatusAction = growthAction({
 });
 
 export const setAdCopyAction = growthAction({
+  outputSchema: setAdCopyActionOutputSchema,
   description:
     "Rewrite the words on one drafted ad: its headline, its primary text, or both. The cards are left alone. Emoji belong in primary text and never in the words drawn onto a card.",
   inputSchema: z.object({
@@ -1429,6 +1469,7 @@ const PLACEMENT_KEY_DESC =
   ".";
 
 export const setPlacementCopyAction = growthAction({
+  outputSchema: setPlacementCopyActionOutputSchema,
   description:
     "Override the words for ONE placement of one ad, leaving the base and every other placement alone. Use for copy that should differ on, say, the story but not the feed. A field left out inherits the base; send an empty string to clear one override back to the base.",
   inputSchema: z.object({
@@ -1453,6 +1494,7 @@ export const setPlacementCopyAction = growthAction({
 });
 
 export const clearPlacementAction = growthAction({
+  outputSchema: clearPlacementActionOutputSchema,
   description:
     "Drop every override on ONE placement of one ad, back to a live render of the base. Refuses nothing; a cell that was already rendering is unchanged.",
   inputSchema: z.object({
@@ -1468,6 +1510,7 @@ export const clearPlacementAction = growthAction({
 });
 
 export const freezePlacementAction = growthAction({
+  outputSchema: freezePlacementActionOutputSchema,
   description:
     "Freeze ONE placement of one ad: pin the copy and files the push will take for it, so a later base edit cannot move it. A story cell derives its 9:16; the feed shapes pin the base asset. Freezing does not push anything; it marks a cell decided. Read the returned fit before you freeze copy that is over a platform limit.",
   inputSchema: z.object({
@@ -1484,6 +1527,7 @@ export const freezePlacementAction = growthAction({
 });
 
 export const unfreezePlacementAction = growthAction({
+  outputSchema: unfreezePlacementActionOutputSchema,
   description:
     "Unfreeze ONE placement of one ad, keeping its pinned copy and files as an ordinary override so it can be edited again.",
   inputSchema: z.object({
@@ -1499,6 +1543,7 @@ export const unfreezePlacementAction = growthAction({
 });
 
 export const saveIdeaAction = growthAction({
+  outputSchema: saveIdeaActionOutputSchema,
   description:
     "Save an editable image ad idea: shared ad copy, ordered source images, per-image composition recipes and shape overrides. Read the campaign first for the current updatedAt and ideaStudio document. Preserves recipes and returns the ad to draft; does not publish or materialize renders.",
   inputSchema: ideaSaveSchema,
@@ -1507,6 +1552,7 @@ export const saveIdeaAction = growthAction({
 });
 
 export const ideaHomePhotosAction = growthAction({
+  outputSchema: ideaHomePhotosActionOutputSchema,
   description:
     "Read the full home gallery for a campaign ad idea. To shortlist candidates, add source references to the ideaStudio document pool using saveIdea; selected slides live separately in cards.",
   inputSchema: z.object({ adId: z.string().min(1) }),
@@ -1515,6 +1561,7 @@ export const ideaHomePhotosAction = growthAction({
 });
 
 export const importMetaCampaignAction = growthAction({
+  outputSchema: importMetaCampaignActionOutputSchema,
   description:
     "Read a live Meta campaign from this brand’s allowlisted account and copy its ads, original artwork and audiences into a NEW local draft. Preserve raw creative and delivery settings, explicitly mark unsupported mappings, and leave the live campaign unchanged. Repeated imports return the existing copy.",
   inputSchema: importMetaCampaignSchema,
@@ -1523,6 +1570,7 @@ export const importMetaCampaignAction = growthAction({
 });
 
 export const ideaContextAction = growthAction({
+  outputSchema: ideaContextActionOutputSchema,
   description:
     "Read one ad's current editable document, version, ordered source-image URLs (including size variants), brand voice and facts for every represented home. Use before saveIdea. Image URLs are references; inspect them visually before making composition decisions.",
   inputSchema: z.object({

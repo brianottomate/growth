@@ -261,6 +261,7 @@ export type PlatformCampaignSettings = {
   google?: {
     /** Zernio supports search and display; the type decides everything else. */
     campaignType?: "search" | "display";
+    images?: { landscape: string; square: string };
     /**
      * Structured keywords the compile derived (or the operator overrode).
      * Seeded from the plan audiences' keyword suggestions.

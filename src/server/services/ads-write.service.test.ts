@@ -8,6 +8,7 @@ import {
   metaPageIdFromConnection,
   connectionRunsAsBrandPage,
   googlePauseOutcome,
+  googleDisplayImages,
   matchResponseAdsToPlan,
   metaPromotedObjectFor,
   tagMetaAdUtms,
@@ -745,4 +746,28 @@ it("keeps campaign budgets on the campaign with any audience count", () => {
     expect(metaRequiresCampaignShell(count, true)).toBe(true);
   expect(metaRequiresCampaignShell(1, false)).toBe(false);
   expect(metaRequiresCampaignShell(2, false)).toBe(true);
+});
+
+describe("Google draft display crops", () => {
+  it("preserves distinct reviewed crops instead of overwriting them with the ad image", () => {
+    const images = {
+      landscape: "https://example.com/wide.jpg",
+      square: "https://example.com/square.jpg",
+    };
+    expect(
+      googleDisplayImages(images, "https://example.com/creative.jpg"),
+    ).toEqual(images);
+    expect(googleDisplayImages(images, undefined)).toEqual(images);
+  });
+  it("keeps existing single-image drafts usable and rejects missing media", () => {
+    expect(
+      googleDisplayImages(undefined, "https://example.com/ad.jpg"),
+    ).toEqual({
+      landscape: "https://example.com/ad.jpg",
+      square: "https://example.com/ad.jpg",
+    });
+    expect(() => googleDisplayImages(undefined, undefined)).toThrow(
+      "needs landscape and square",
+    );
+  });
 });

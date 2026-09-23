@@ -38,6 +38,7 @@ export const socialPostPreviewOutputSchema = z.object({
 });
 
 export const renderSocialPosts = growthTool({
+  resultSchema: socialPostPreviewOutputSchema,
   description:
     "Render one to six exact social posts as platform-aware inline previews. Use after another Growth read returns platform post IDs and the operator asks to show, compare, or preview the proposed posts.",
   inputSchema: z.object({

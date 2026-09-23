@@ -1,3 +1,4 @@
+import { blogAgentOutputSchema } from "./outputs/blog";
 import "server-only";
 
 import { z } from "zod";
@@ -21,6 +22,7 @@ import { growthTool } from "./types";
  * duration of one task, and returns the trail of what it actually called.
  */
 export const blogAgent = growthTool({
+  resultSchema: blogAgentOutputSchema,
   description:
     "Delegate a wander.com blog task to the DatoCMS blog agent. It can inspect the blog schema, read or review a full article, create a separate full-body draft, safely replace an existing draft body from Markdown, patch metadata, upload the operator's current chat image, and append body blocks, then report back with a preview link. Use for any 'review/create/edit/add to the blog' request. It works in DRAFTS only — it cannot publish. Give it a complete task description in one go, plus the article id when the task concerns an existing post.",
   inputSchema: z.object({

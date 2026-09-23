@@ -1,3 +1,4 @@
+import type { QueuedPayload } from "@/lib/chat-turns";
 import type { UIMessage } from "ai";
 import { relations } from "drizzle-orm";
 import { index, pgEnum, pgTable, uniqueIndex } from "drizzle-orm/pg-core";
@@ -34,6 +35,10 @@ export const assistantThreadTable = pgTable(
     activeContentPostId: t
       .text()
       .references(() => contentPostTable.id, { onDelete: "set null" }),
+    activeTurnId: t.text(),
+    activeTurnExpiresAt: t.timestamp(),
+    queuePaused: t.boolean().default(false).notNull(),
+    stopRequested: t.boolean().default(false).notNull(),
     visibility: assistantThreadVisibilityEnum().default("private").notNull(),
     title: t.text().default("New session").notNull(),
     createdAt: t
@@ -88,6 +93,46 @@ export const assistantMessageTable = pgTable(
     index("assistant_message_thread_created_idx").on(
       table.threadId,
       table.createdAt,
+    ),
+  ],
+);
+
+/** Accepted operator input survives navigation and is claimed under the thread lock. */
+export const assistantInputTable = pgTable(
+  "assistant_input",
+  (t) => ({
+    id: t.text().primaryKey(),
+    sequence: t.integer().generatedAlwaysAsIdentity().notNull(),
+    threadId: t
+      .text()
+      .references(() => assistantThreadTable.id, { onDelete: "cascade" })
+      .notNull(),
+    createdBy: t
+      .text()
+      .references(() => userTable.id, { onDelete: "cascade" })
+      .notNull(),
+    status: t
+      .text({
+        enum: [
+          "queued",
+          "steering",
+          "running",
+          "completed",
+          "failed",
+          "cancelled",
+        ],
+      })
+      .default("queued")
+      .notNull(),
+    targetTurnId: t.text(),
+    payload: t.jsonb().$type<QueuedPayload>().notNull(),
+    error: t.text(),
+    createdAt: t.timestamp().defaultNow().notNull(),
+  }),
+  (table) => [
+    index("assistant_input_thread_sequence_idx").on(
+      table.threadId,
+      table.sequence,
     ),
   ],
 );

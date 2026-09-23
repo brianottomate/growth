@@ -1,3 +1,7 @@
+import {
+  listPlaybooksActionOutputSchema,
+  readPlaybookActionOutputSchema,
+} from "./outputs/playbooks";
 import "server-only";
 
 import { z } from "zod";
@@ -12,6 +16,7 @@ import { growthAction, GrowthActionError } from "./types";
  * order with the existing tools, stopping where the playbook says to stop.
  */
 export const listPlaybooksAction = growthAction({
+  outputSchema: listPlaybooksActionOutputSchema,
   description:
     "The playbooks available: id, title, kind and summary. procedure playbooks are step-by-step jobs to follow with the other tools (setting up a new client, for one); the rest ground product claims and reply methodology.",
   inputSchema: z.object({
@@ -32,6 +37,7 @@ export const listPlaybooksAction = growthAction({
 });
 
 export const readPlaybookAction = growthAction({
+  outputSchema: readPlaybookActionOutputSchema,
   description:
     "The full text of one playbook by id. Read a procedure playbook before starting the job it describes, then follow its steps in order and report each one as it lands.",
   inputSchema: z.object({ id: z.string().min(1) }),

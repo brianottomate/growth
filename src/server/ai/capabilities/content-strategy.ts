@@ -1,3 +1,12 @@
+import {
+  getContentStrategyOutputSchema,
+  saveContentPillarOutputSchema,
+  saveContentSeriesOutputSchema,
+  organizeContentIdeasOutputSchema,
+  resolveContentGroupingOutputSchema,
+  deleteContentSeriesOutputSchema,
+  clearContentSeriesOutputSchema,
+} from "./outputs/content-strategy";
 import "server-only";
 
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
@@ -48,6 +57,7 @@ async function requireBrandContentIdeas(
 }
 
 export const getContentStrategy = growthAction({
+  outputSchema: getContentStrategyOutputSchema,
   description:
     "Read one brand's content strategy vocabulary and structure: brand-specific pillars and target mix, recurring series with cadence, installments, and first-post gaps, plus pending grouping proposals awaiting review. Use this before discussing pillars, series, editorial arcs, recurring formats, or whether past posts should be grouped.",
   inputSchema: z.object({ brandId: z.string() }),
@@ -243,6 +253,7 @@ export const getContentStrategy = growthAction({
 });
 
 export const saveContentPillar = growthAction({
+  outputSchema: saveContentPillarOutputSchema,
   description:
     "Create a new brand-specific content pillar or update an existing pillar's name, description, or color after agreeing on the change. Pillar slugs are stable because content posts and mix targets reference them.",
   inputSchema: z.object({
@@ -270,6 +281,7 @@ export const saveContentPillar = growthAction({
 });
 
 export const saveContentSeries = growthAction({
+  outputSchema: saveContentSeriesOutputSchema,
   description:
     "Create a new recurring content series or update an existing series for one owned brand after the arc, theme, and rough timing are agreed. A series groups distinct content ideas under a shared editorial arc; it is not the same as a retrospective grouping proposal.",
   inputSchema: z.object({
@@ -408,6 +420,7 @@ export const saveContentSeries = growthAction({
 });
 
 export const organizeContentIdeas = growthAction({
+  outputSchema: organizeContentIdeasOutputSchema,
   description:
     "Apply an agreed structural relationship to existing canonical content ideas: place them in an existing series, classify standalone ideas under a pillar, or remove them from a series. This does not merge raw channel posts; retrospective same-idea proposals use resolveContentGrouping.",
   inputSchema: z
@@ -518,6 +531,7 @@ export const organizeContentIdeas = growthAction({
 });
 
 export const resolveContentGrouping = growthAction({
+  outputSchema: resolveContentGroupingOutputSchema,
   description:
     "Accept or reject one pending retrospective grouping proposal after discussing it. Accepting a same-idea proposal creates one canonical idea over its channel executions and amplifications. Accepting a series proposal creates one series with one idea per distinct post. Either outcome can be classified under an existing pillar.",
   inputSchema: z.object({
@@ -546,6 +560,7 @@ export const resolveContentGrouping = growthAction({
 });
 
 export const deleteContentSeries = growthAction({
+  outputSchema: deleteContentSeriesOutputSchema,
   description:
     "Permanently delete one content series. This is a real delete, not an archive: the series row is gone and cannot be restored. Ideas that sat in the series survive and simply lose their series, so use this to remove editorial structure that was never right, not to remove the work underneath it.",
   inputSchema: z.object({ brandId: z.string(), seriesId: z.string() }),
@@ -576,6 +591,7 @@ export const deleteContentSeries = growthAction({
 });
 
 export const clearContentSeries = growthAction({
+  outputSchema: clearContentSeriesOutputSchema,
   description:
     "Permanently delete EVERY content series for one owned brand, for a clean slate. Irreversible. Ideas survive and detach. Only run this when the operator has asked to clear or reset the series shelf for that brand; to remove one series use deleteSeries.",
   inputSchema: z.object({ brandId: z.string() }),

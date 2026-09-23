@@ -1,4 +1,24 @@
+import { brandForAssistant } from "./brand-output";
+import {
+  listPerformanceAccountsActionOutputSchema,
+  getPerformanceAccountActionOutputSchema,
+  listIntakesActionOutputSchema,
+  previewIntakeApplyActionOutputSchema,
+  verifyIntakeAccessActionOutputSchema,
+  createPerformanceAccountActionOutputSchema,
+  updatePerformanceAccountActionOutputSchema,
+  addPerformancePropertyActionOutputSchema,
+  updatePerformancePropertyActionOutputSchema,
+  openPerformanceCycleActionOutputSchema,
+  updatePerformanceCycleActionOutputSchema,
+  searchAttachableCampaignsActionOutputSchema,
+  refreshPerformanceCycleSpendActionOutputSchema,
+  listSponsoredAbandonmentActionOutputSchema,
+  syncAdCampaignsActionOutputSchema,
+  attachToPerformanceCycleActionOutputSchema,
+} from "./outputs/performance";
 import "server-only";
+import { appliedEvidenceSchema } from "@/lib/applied-evidence";
 
 import { z } from "zod";
 
@@ -47,6 +67,7 @@ const actorFrom = (ctx: { orgId: string }): PerformanceActor => ({
 });
 
 export const listPerformanceAccountsAction = growthAction({
+  outputSchema: listPerformanceAccountsActionOutputSchema,
   description:
     "List Performance accounts (the commercial record of each property manager paying Wander to run performance marketing for their homes) with their properties and recent billing cycles.",
   inputSchema: z.object({}),
@@ -54,6 +75,7 @@ export const listPerformanceAccountsAction = growthAction({
 });
 
 export const getPerformanceAccountAction = growthAction({
+  outputSchema: getPerformanceAccountActionOutputSchema,
   description:
     "Read one Performance account completely: contact, plan, the homes on the record, every billing cycle, report list, and the delivery attached to each cycle (campaigns, lifecycle campaigns, amplification targets).",
   inputSchema: z.object({ accountId: z.string().min(1) }),
@@ -90,6 +112,7 @@ export const clientCampaignContextAction = growthAction({
 });
 
 export const listIntakesAction = growthAction({
+  outputSchema: listIntakesActionOutputSchema,
   description:
     "List the onboarding forms a Performance client has filed for one account, newest first: what they answered, the budget they agreed to, whether it has been applied, and whether their ad access has been verified.",
   inputSchema: z.object({ accountId: z.string().min(1) }),
@@ -99,11 +122,23 @@ export const listIntakesAction = growthAction({
 });
 
 export const previewIntakeApplyAction = growthAction({
+  outputSchema: previewIntakeApplyActionOutputSchema,
   description:
     "Show exactly what applying an intake would write: the billing period and budget, which homes are new, and anything blocking it. Read-only. Always call this before applyIntake and show the operator the result.",
   inputSchema: z.object({ intakeId: z.string().min(1) }),
   examples: [{ intakeId: "pint_01" }],
-  execute: (input, ctx) => previewIntakeApply(actorFrom(ctx), input.intakeId),
+  execute: async (input, ctx) => {
+    const preview = await previewIntakeApply(actorFrom(ctx), input.intakeId);
+    return {
+      ...preview,
+      intake: {
+        ...preview.intake,
+        brand: preview.intake.brand
+          ? brandForAssistant(preview.intake.brand)
+          : null,
+      },
+    };
+  },
 });
 
 export const applyIntakeAction = growthAction({
@@ -114,6 +149,7 @@ export const applyIntakeAction = growthAction({
     mediaBudgetDollars: z.number().int().min(0).nullable().optional(),
   }),
   outputSchema: z.object({
+    ...appliedEvidenceSchema.shape,
     intakeId: z.string(),
     /** One line per record that changed, in the order they were written. */
     written: z.array(z.string()),
@@ -126,6 +162,7 @@ export const applyIntakeAction = growthAction({
 });
 
 export const verifyIntakeAccessAction = growthAction({
+  outputSchema: verifyIntakeAccessActionOutputSchema,
   description:
     "Check whether the client's Leadsie grant has landed: reads the Pages and ad accounts Wander's Meta connection can now manage and records the match when exactly one Page name looks like theirs. Reads the provider and writes only Growth's own verification stamps.",
   inputSchema: z.object({ intakeId: z.string().min(1) }),
@@ -150,6 +187,7 @@ export const promoteToClientAction = growthAction({
 });
 
 export const createPerformanceAccountAction = growthAction({
+  outputSchema: createPerformanceAccountActionOutputSchema,
   description:
     "Onboard a performance customer. Commercial record only — payment is handled offline; link a brand row separately if their scraped identity exists.",
   inputSchema: createPerformanceAccountSchema,
@@ -157,6 +195,7 @@ export const createPerformanceAccountAction = growthAction({
 });
 
 export const updatePerformanceAccountAction = growthAction({
+  outputSchema: updatePerformanceAccountActionOutputSchema,
   description:
     "Update a performance account's contact, plan, status, brand link, or notes.",
   inputSchema: updatePerformanceAccountSchema,
@@ -164,6 +203,7 @@ export const updatePerformanceAccountAction = growthAction({
 });
 
 export const addPerformancePropertyAction = growthAction({
+  outputSchema: addPerformancePropertyActionOutputSchema,
   description:
     "Add one of the client's homes to a Performance account. The monolith propertyId can be backfilled later; rows without it have no booking attribution yet.",
   inputSchema: addPerformancePropertySchema,
@@ -171,6 +211,7 @@ export const addPerformancePropertyAction = growthAction({
 });
 
 export const updatePerformancePropertyAction = growthAction({
+  outputSchema: updatePerformancePropertyActionOutputSchema,
   description:
     "Update a home's title, notes, or backfill its monolith property id (the booking-attribution join key).",
   inputSchema: updatePerformancePropertySchema,
@@ -178,6 +219,7 @@ export const updatePerformancePropertyAction = growthAction({
 });
 
 export const openPerformanceCycleAction = growthAction({
+  outputSchema: openPerformanceCycleActionOutputSchema,
   description:
     "Open a billing cycle (YYYY-MM, unique per account). Record billedAmount and mediaBudget separately — reports must be honest about which number spend is measured against.",
   inputSchema: openPerformanceCycleSchema,
@@ -185,6 +227,7 @@ export const openPerformanceCycleAction = growthAction({
 });
 
 export const updatePerformanceCycleAction = growthAction({
+  outputSchema: updatePerformanceCycleActionOutputSchema,
   description:
     "Update a cycle's status (planned → live → reporting → closed), amounts, dates, or notes.",
   inputSchema: updatePerformanceCycleSchema,
@@ -192,6 +235,7 @@ export const updatePerformanceCycleAction = growthAction({
 });
 
 export const searchAttachableCampaignsAction = growthAction({
+  outputSchema: searchAttachableCampaignsActionOutputSchema,
   description:
     "Find platform ad campaigns that are not yet attached to any performance cycle, newest first. Use this before attaching so the campaign is chosen by id rather than guessed from its name.",
   inputSchema: searchAttachableCampaignsSchema,
@@ -199,6 +243,7 @@ export const searchAttachableCampaignsAction = growthAction({
 });
 
 export const refreshPerformanceCycleSpendAction = growthAction({
+  outputSchema: refreshPerformanceCycleSpendActionOutputSchema,
   description:
     "Recompute one cycle's observed spend from the campaigns attached to it. Reads the unrounded per-campaign figures, so it answers whether a customer is being overspent against their media budget.",
   inputSchema: z.object({ cycleId: z.string().min(1) }),
@@ -207,6 +252,7 @@ export const refreshPerformanceCycleSpendAction = growthAction({
 });
 
 export const listSponsoredAbandonmentAction = growthAction({
+  outputSchema: listSponsoredAbandonmentActionOutputSchema,
   description:
     "Guests who abandoned checkout (or wishlisted) on a Performance client's homes, hottest first. Joined on the listing id the tracked event carries, never on property name. Use this to answer what a customer's boosted homes produced and to hand BDRs a follow-up list. Read-only; it does not contact anyone.",
   inputSchema: sponsoredAbandonmentSchema,
@@ -214,6 +260,7 @@ export const listSponsoredAbandonmentAction = growthAction({
 });
 
 export const syncAdCampaignsAction = growthAction({
+  outputSchema: syncAdCampaignsActionOutputSchema,
   description:
     "Pull ad campaigns from Zernio into Growth so they can be attached to a performance cycle, then reprice every cycle's observed spend. Bounded to recent campaigns by default because the provider returns every campaign an account has ever had; widen with sinceDays or drop the window with sinceDays null. Reads the provider and writes only our own mirror rows.",
   inputSchema: z.object({
@@ -247,6 +294,7 @@ export const syncAdCampaignsAction = growthAction({
 });
 
 export const attachToPerformanceCycleAction = growthAction({
+  outputSchema: attachToPerformanceCycleActionOutputSchema,
   description:
     "Attach one delivery row to a performance cycle so it counts toward the customer's report, or detach it with cycleId null. Kind 'campaign' is the one to use for an ad campaign that already exists on the platform: platform campaigns reach a cycle through a campaign, and this creates or reuses a wrapper campaign when the platform campaign has none. This tags existing delivery; it never creates ads or sends anything.",
   inputSchema: attachToPerformanceCycleSchema,

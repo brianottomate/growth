@@ -1,4 +1,5 @@
 import "server-only";
+import { registerNextOptionsResource } from "./next-options-ui";
 
 import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
 
@@ -29,6 +30,7 @@ export function createGrowthMcpServer() {
   });
 
   registerMcpTools(server, MCP_TOOLS);
+  registerNextOptionsResource(server);
   registerSocialPostPreviewResource(server, socialPostPreviewResourceDomains());
   return server;
 }

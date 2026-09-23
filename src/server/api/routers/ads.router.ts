@@ -686,6 +686,9 @@ export const adsRouter = {
         google: z
           .object({
             campaignType: z.enum(["search", "display"]).optional(),
+            images: z
+              .object({ landscape: z.string().url(), square: z.string().url() })
+              .optional(),
             keywords: z.array(z.string().trim().min(1)).max(200).optional(),
             negativeKeywords: z
               .array(z.string().trim().min(1))

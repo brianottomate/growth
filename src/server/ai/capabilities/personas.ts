@@ -1,3 +1,9 @@
+import {
+  listPersonasOutputSchema,
+  createPersonaOutputSchema,
+  updatePersonaOutputSchema,
+  deletePersonaOutputSchema,
+} from "./outputs/personas";
 import "server-only";
 
 import { z } from "zod";
@@ -61,6 +67,7 @@ const personaFields = {
 };
 
 export const listPersonas = growthAction({
+  outputSchema: listPersonasOutputSchema,
   description:
     "List a brand's personas — the stable 'who we talk to' layer, the people counterpart of content pillars.",
   inputSchema: z.object({ brandId: z.string().trim().min(1) }),
@@ -77,6 +84,7 @@ export const listPersonas = growthAction({
 });
 
 export const createPersona = growthAction({
+  outputSchema: createPersonaOutputSchema,
   description:
     "Create a persona under an owned brand. Personas are few and stable — check the existing list before adding one; a geography or age variant of an existing persona is a campaign audience, not a new persona.",
   inputSchema: z.object({
@@ -103,6 +111,7 @@ export const createPersona = growthAction({
 });
 
 export const updatePersona = growthAction({
+  outputSchema: updatePersonaOutputSchema,
   description: "Update a persona's fields. Only the fields sent are changed.",
   inputSchema: z.object({
     personaId: z.string().trim().min(1),
@@ -126,6 +135,7 @@ export const updatePersona = growthAction({
 });
 
 export const deletePersona = growthAction({
+  outputSchema: deletePersonaOutputSchema,
   description:
     "Soft-delete a persona. Campaign audiences that pointed at it keep their lineage.",
   inputSchema: z.object({ personaId: z.string().trim().min(1) }),

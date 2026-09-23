@@ -1,3 +1,4 @@
+import { navigateWorkspaceOutputSchema } from "./outputs/navigation";
 import "server-only";
 
 import { z } from "zod";
@@ -19,6 +20,7 @@ const surfaceSchema = z.enum(WORKSPACE_SURFACES);
  * other adapters (including MCP) receive the canonical app URL to open.
  */
 export const navigateWorkspace = growthTool({
+  resultSchema: navigateWorkspaceOutputSchema,
   description:
     'Navigate the operator to a Growth surface. Use only when the operator explicitly asks to open, show, take them to, or switch to a page. The current page is context, not a capability boundary: complete the requested workspace operation first when possible, then navigate to the best inspection or editing surface. When the operator means ONE specific record — this campaign, this content item, this brand\'s ads — use surface "path" with that record\'s own path, which earlier write results already gave you as `path` or `url` (for example /app/brands/<slug>/ads/<campaignId>). A named surface is the INDEX of its kind, so "take me to the campaign" answered with surface "campaigns" lands on the list of every campaign and looks like a half-working navigation. Prefer a named surface only when the operator means the index itself, or when no specific record is in play. For a specific brand map or brand-aware Next conversation, pass a brandId from brandRead.list. The in-app client follows the returned route; MCP clients receive the same canonical URL.',
   inputSchema: z.object({

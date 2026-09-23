@@ -1,3 +1,4 @@
+import { prepareProductionPacketOutputSchema } from "./outputs/production";
 import "server-only";
 
 import { z } from "zod";
@@ -6,6 +7,7 @@ import { createProductionPacket } from "@/server/services/creative-work.service"
 import { growthTool } from "./types";
 
 export const prepareProductionPacket = growthTool({
+  resultSchema: prepareProductionPacketOutputSchema,
   description:
     "Save a complete, provider-neutral production packet after the operator and assistant have developed a usable creative direction. This is the first-class handoff for Claude Design, ChatGPT, a video editor, an agency, or Growth's optional Fal experiment. Preserve the operator's reviewed intent; include enough visual and execution detail that another tool can produce the asset without reconstructing the conversation. Do not call while the brief is still vague.",
   inputSchema: z.object({

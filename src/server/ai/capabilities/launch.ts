@@ -1,3 +1,13 @@
+import {
+  listLaunchesActionOutputSchema,
+  readLaunchActionOutputSchema,
+  createLaunchActionOutputSchema,
+  setLaunchBriefActionOutputSchema,
+  setLaunchFieldsActionOutputSchema,
+  setLaunchFeaturesActionOutputSchema,
+  setLaunchDeliverableActionOutputSchema,
+  attachLaunchDeliverableActionOutputSchema,
+} from "./outputs/launch";
 import "server-only";
 
 import { z } from "zod";
@@ -49,6 +59,7 @@ async function requireLaunch(orgId: string, launchId: string) {
 }
 
 export const listLaunchesAction = growthAction({
+  outputSchema: listLaunchesActionOutputSchema,
   description:
     "List this organization's launches with tier, target date, status, and how many deliverables are ready. Start here when the operator mentions a launch, a ship date, or a product moment.",
   inputSchema: z.object({}),
@@ -59,6 +70,7 @@ export const listLaunchesAction = growthAction({
 });
 
 export const readLaunchAction = growthAction({
+  outputSchema: readLaunchActionOutputSchema,
   description:
     "Read ONE launch in full: brief, per-surface deliverables with their owners and resolved drafts, linked series/campaigns/posts, and the concrete next moves it is still missing. Use this before any launch write so the next move is grounded.",
   inputSchema: z.object({ launchId: z.string() }),
@@ -80,6 +92,7 @@ export const readLaunchAction = growthAction({
 });
 
 export const createLaunchAction = growthAction({
+  outputSchema: createLaunchActionOutputSchema,
   description:
     "Create a launch for one product. Tier 1 is a full campaign (6 weeks lead), tier 2 is email + enablement + social (2 weeks), tier 3 is changelog + email (1 week); most things are tier 3. Seeds the deliverable rows that tier implies, each with no owner yet. Ask for the product and the customer-visible date before calling.",
   inputSchema: z.object({
@@ -126,6 +139,7 @@ export const createLaunchAction = growthAction({
 });
 
 export const setLaunchBriefAction = growthAction({
+  outputSchema: setLaunchBriefActionOutputSchema,
   description:
     "Merge fields into a launch's brief: the one line, up to three provable claims, what we are deliberately not saying, the changelog entry, audience, objections, success layers, and the atlas story ids this ships. Partial by design — write the fields you actually have and leave the rest alone.",
   inputSchema: z.object({
@@ -149,6 +163,7 @@ export const setLaunchBriefAction = growthAction({
 });
 
 export const setLaunchFieldsAction = growthAction({
+  outputSchema: setLaunchFieldsActionOutputSchema,
   description:
     "Set a launch's own fields: name, tier, target date, maturity, status, marketing owner, or release theme. Setting status to shipped stamps the ship time.",
   inputSchema: z.object({
@@ -181,6 +196,7 @@ export const setLaunchFieldsAction = growthAction({
 });
 
 export const setLaunchFeaturesAction = growthAction({
+  outputSchema: setLaunchFeaturesActionOutputSchema,
   description:
     "Set which of the product's features (Product Atlas stories) this launch ships. Replaces the list, so pass every feature that belongs, and read the launch first to see what the product actually has. An empty list means the product itself is launching rather than features of it.",
   inputSchema: z.object({
@@ -228,6 +244,7 @@ export const setLaunchFeaturesAction = growthAction({
 });
 
 export const setLaunchDeliverableAction = growthAction({
+  outputSchema: setLaunchDeliverableActionOutputSchema,
   description:
     "Set ONE surface's row on a launch: owner, ready-by date, status, or a note. Creates the row if that surface has none. Keep ownerName as the person's real name even when they have no Growth account; only set ownerId when the member is certain, never guessed.",
   inputSchema: z.object({
@@ -252,6 +269,7 @@ export const setLaunchDeliverableAction = growthAction({
 });
 
 export const attachLaunchDeliverableAction = growthAction({
+  outputSchema: attachLaunchDeliverableActionOutputSchema,
   description:
     "Point one launch surface at the Growth object that fulfils it — a content_post, an email_document, a production_packet, a platform_post, or a plain URL. This only records the link; draft the thing itself with the content, email, or blog capabilities first, then attach it here.",
   inputSchema: z.object({

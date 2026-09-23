@@ -1,4 +1,8 @@
 import "server-only";
+import {
+  appliedEvidenceSchema,
+  type AppliedEvidence,
+} from "@/lib/applied-evidence";
 
 import { advanceDeliveryStage } from "./brand-relationship.service";
 
@@ -540,6 +544,23 @@ export async function applyPerformanceIntake(
   const intake = preview.intake;
   const answers = intake.answers;
   const written: string[] = [];
+  const applied: AppliedEvidence["applied"] = [];
+  const record = (
+    targetType: AppliedEvidence["applied"][number]["targetType"],
+    targetId: string,
+    patch: Record<string, unknown>,
+  ) => {
+    for (const [field, value] of Object.entries(patch))
+      if (value !== undefined)
+        applied.push({
+          targetType,
+          targetId,
+          field,
+          value: JSON.parse(
+            JSON.stringify(value),
+          ) as AppliedEvidence["applied"][number]["value"],
+        });
+  };
 
   // 1. Contact details onto the commercial record. The free-text corrections
   //    field is gone from the form (an AE handles those), so what carries over
@@ -563,6 +584,7 @@ export async function applyPerformanceIntake(
     .update(performanceAccountTable)
     .set(accountPatch)
     .where(eq(performanceAccountTable.id, intake.accountId));
+  record("account", intake.accountId, accountPatch);
   written.push("Account marked active");
 
   // 2. Money onto the cycle, which is what reconciliation reads.
@@ -573,14 +595,24 @@ export async function applyPerformanceIntake(
         .update(performanceCycleTable)
         .set({ mediaBudget: budget })
         .where(eq(performanceCycleTable.id, preview.cycleId));
+      record("cycle", preview.cycleId, { mediaBudget: budget });
       written.push(`Set ${preview.period} media budget to $${budget}`);
     } else {
-      await db.insert(performanceCycleTable).values({
-        accountId: intake.accountId,
-        period: preview.period,
-        mediaBudget: budget,
-        status: "planned",
-      });
+      const [createdCycle] = await db
+        .insert(performanceCycleTable)
+        .values({
+          accountId: intake.accountId,
+          period: preview.period,
+          mediaBudget: budget,
+          status: "planned",
+        })
+        .returning();
+      if (createdCycle)
+        record("cycle", createdCycle.id, {
+          period: preview.period,
+          mediaBudget: budget,
+          status: "planned",
+        });
       written.push(`Opened cycle ${preview.period} at $${budget}`);
     }
   } else {
@@ -595,7 +627,17 @@ export async function applyPerformanceIntake(
       ? await listingAddressMap(intake.brand)
       : new Map<string, PropertyAddress>();
     const rows = withPropertyAddresses(preview.newProperties, addresses);
-    await db.insert(performancePropertyTable).values(rows);
+    const added = await db
+      .insert(performancePropertyTable)
+      .values(rows)
+      .returning();
+    for (const property of added)
+      record("property", property.id, {
+        title: property.title,
+        siteUrl: property.siteUrl,
+        city: property.city,
+        state: property.state,
+      });
     const located = rows.filter((row) => row.state !== null).length;
     written.push(
       `Added ${rows.length} home(s)${located > 0 ? `, ${located} with a location` : ""}`,
@@ -611,8 +653,21 @@ export async function applyPerformanceIntake(
       orgId: actor.orgId,
       answers,
     });
-    if (filled.length > 0)
+    if (filled.length > 0) {
+      const updated = await db.query.brandTable.findFirst({
+        where: eq(brandTable.id, intake.brand.id),
+        columns: { performanceSettings: true },
+      });
+      const settings = updated?.performanceSettings as Record<
+        string,
+        unknown
+      > | null;
+      for (const field of filled)
+        record("brand", intake.brand.id, {
+          [`performanceSettings.${field}`]: settings?.[field] ?? null,
+        });
       written.push(`Settings filled: ${filled.join(", ")}`);
+    }
   }
 
   await db
@@ -625,7 +680,28 @@ export async function applyPerformanceIntake(
     })
     .where(eq(performanceIntakeTable.id, intake.id));
 
-  return { intakeId: intake.id, written };
+  const evidence: AppliedEvidence["evidence"] = [
+    {
+      sourceType: "intake",
+      sourceId: intake.id,
+      sourceUrl: null,
+      observedAt: new Date().toISOString(),
+      method: "client-submission",
+    },
+  ];
+  if (input.mediaBudgetDollars != null)
+    evidence.push({
+      sourceType: "operator",
+      sourceId: actor.orgId,
+      sourceUrl: null,
+      observedAt: new Date().toISOString(),
+      method: "operator-override",
+    });
+  return {
+    intakeId: intake.id,
+    written,
+    ...appliedEvidenceSchema.parse({ evidence, applied }),
+  };
 }
 
 // ---- ACCESS VERIFICATION ---------------------------------------------------

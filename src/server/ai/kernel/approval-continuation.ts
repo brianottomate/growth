@@ -99,3 +99,19 @@ export function approvalHasExpired(input: {
 }): boolean {
   return input.now.getTime() - input.createdAt.getTime() > APPROVAL_TTL_MS;
 }
+
+/** Expiry can forbid execution while still allowing the operator to dismiss an action. */
+export function isApprovalDenial(message: UIMessage) {
+  const responses = message.parts.filter(
+    (part) => isToolUIPart(part) && part.state === "approval-responded",
+  );
+  return (
+    responses.length > 0 &&
+    responses.every(
+      (part) =>
+        isToolUIPart(part) &&
+        part.state === "approval-responded" &&
+        part.approval.approved === false,
+    )
+  );
+}

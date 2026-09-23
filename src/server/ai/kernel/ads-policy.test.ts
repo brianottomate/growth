@@ -16,8 +16,7 @@ const SPEND_CAPABLE = [
   "push",
   "setDelivery",
   "deletePlatformCampaign",
-  "createMetaDraft",
-  "createGoogle",
+  "createSpecializedMetaDraft",
   "boostMetaPost",
   "duplicateMetaCampaign",
 ] as const satisfies readonly AdsWriteAction[];
@@ -60,9 +59,8 @@ describe("ads action policy", () => {
     expect(adsWrite.setDelivery.undoWith).toBe("adsWrite.setDelivery");
   });
 
-  it("pushing creates paused, so the push itself cannot start spend", () => {
-    // If this ever needs `approval` relaxed, the push has stopped being the
-    // safe half of the pair and setDelivery is no longer the only spend gate.
+  it("pushing retains its receipt and explicit deletion recovery", () => {
+    // Google creates before pausing, so push itself remains approval-gated.
     expect(adsWrite.push.undoWith).toBe("adsWrite.deletePlatformCampaign");
     expect(adsWrite.push.idempotent).toBe(true);
   });

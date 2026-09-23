@@ -33,7 +33,9 @@ the user's live organization membership on every request. There is no parallel
 connector table and no fallback to the browser session's active or first org.
 
 The MCP tools and the in-app Growth assistant are projections of the same
-native AI SDK 7 catalog in `src/server/ai/capabilities`. MCP exposes connector-safe capabilities and omits open-world `researchRead` and in-app
+native AI SDK 7 catalog in `src/server/ai/capabilities`. Executable names use
+`capability__action`, with required fields and policy hints for that operation.
+Hosts should refresh their tool catalog after this naming cutover. MCP exposes connector-safe capabilities and omits open-world `researchRead` and in-app
 `driveRead`. The `adsWrite` domain exposes its local actions, including
 `setAdStatus` (freeze/reopen) and `planPlatform` (local platform draft). Read-only,
 destructive, and idempotency annotations are derived from the same action policy
@@ -131,3 +133,17 @@ references; JSON URLs alone are not image input. The in-app ad card's Work in ch
 action starts a fresh thread and supplies numbered contact sheets as model image
 inputs, including size-specific source variants. It preserves ad focus in the
 thread and leaves approval and publishing to the existing workflow.
+
+### Conversation choices and result contracts
+
+`presentNextOptions` returns grounded answer, request, and editable-detail
+choices with an inline MCP Apps resource. Selection sends an ordinary user
+message through the host. The same contract drives native chat choices.
+
+Domain result schemas advertise action-specific success envelopes and
+structured failures. Every action and native tool declares a complete result
+contract, enforced after JSON normalization and before receipts or transport.
+Provider extension metadata remains explicit JSON; domain records have named
+fields. See [output contracts](ai-output-contracts.md) for coverage and recovery,
+and [chat turn control](chat-turn-control.md) for queue, steering, approval
+boundaries, migration, and verification details.

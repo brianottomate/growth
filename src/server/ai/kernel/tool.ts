@@ -10,18 +10,15 @@ import {
 import { z } from "zod";
 
 import { compactGrowthError, type GrowthErrorCode } from "./errors";
+import { capabilityErrorSchema } from "./output";
 
-export const growthExecutionContextSchema = z.object({
-  orgId: z.string().min(1),
-  userId: z.string().min(1),
-  threadId: z.string().min(1).optional(),
-  surface: z.enum(["overview-chat", "mcp", "invoke-growth", "test"]),
-  runId: z.string().min(1),
-});
-
-export type GrowthExecutionContext = z.infer<
-  typeof growthExecutionContextSchema
->;
+export type GrowthExecutionContext = {
+  orgId: string;
+  userId: string;
+  threadId?: string;
+  surface: "overview-chat" | "mcp" | "invoke-growth" | "test";
+  runId: string;
+};
 
 export type GrowthTool<INPUT = unknown, OUTPUT = unknown> = Tool<
   INPUT,
@@ -34,6 +31,7 @@ export type GrowthTool<INPUT = unknown, OUTPUT = unknown> = Tool<
   validationSchema: z.ZodType<INPUT>;
   /** Provider-safe schema advertised by transports such as the OAuth MCP. */
   transportInputSchema: z.ZodType<unknown>;
+  resultSchema: z.ZodTypeAny;
   /**
    * The actions this capability was compiled from, for anything that needs to
    * see the definitions rather than the flattened result: the contract gate,
@@ -42,19 +40,35 @@ export type GrowthTool<INPUT = unknown, OUTPUT = unknown> = Tool<
   actions?: Record<string, GrowthAction<never, unknown>>;
 };
 
+/** JSON representation of a service result at the model/MCP boundary. */
+export type GrowthWireOutput<T> = T extends Date
+  ? string
+  : T extends readonly (infer Item)[]
+    ? GrowthWireOutput<Item>[]
+    : T extends object
+      ? {
+          [
+            Key in keyof T as undefined extends T[Key] ? never : Key
+          ]: GrowthWireOutput<T[Key]>;
+        } & {
+          [
+            Key in keyof T as undefined extends T[Key] ? Key : never
+          ]?: GrowthWireOutput<Exclude<T[Key], undefined>>;
+        }
+      : T;
+
 /** A typed service action. It is deliberately not an AI SDK tool. */
 export interface GrowthAction<INPUT = unknown, OUTPUT = unknown> {
   description: string;
-  inputSchema: z.ZodTypeAny;
+  inputSchema: z.ZodObject;
   /**
    * What the action promises to return, when it makes one.
    *
-   * Optional because the catalog predates it. Where it is declared, the
-   * envelope's `data` stops being `unknown` to everything downstream, and a
-   * result that drifts from the promise is reported instead of being handed to
-   * a model as if it were fine.
+   * Required wire contract: dates have already become ISO strings and undefined
+   * object fields have been omitted. Advertised through MCP and checked by the
+   * contract gate; trusted service results are not revalidated during execution.
    */
-  outputSchema?: z.ZodTypeAny;
+  outputSchema: z.ZodTypeAny;
   /**
    * Calls that must stay valid, checked by `bun run ai:contracts`.
    *
@@ -66,19 +80,17 @@ export interface GrowthAction<INPUT = unknown, OUTPUT = unknown> {
   run: (input: INPUT, context: GrowthExecutionContext) => Promise<OUTPUT>;
 }
 
-export function growthAction<I extends z.ZodTypeAny, O>(definition: {
+export function growthAction<I extends z.ZodObject, O>(definition: {
   description: string;
   inputSchema: I;
-  outputSchema?: z.ZodType<O>;
+  outputSchema: z.ZodType<NoInfer<GrowthWireOutput<O>>>;
   examples?: readonly z.input<I>[];
   execute: (input: z.infer<I>, ctx: GrowthExecutionContext) => Promise<O>;
 }): GrowthAction<z.infer<I>, O> {
   return {
     description: definition.description,
     inputSchema: definition.inputSchema,
-    ...(definition.outputSchema
-      ? { outputSchema: definition.outputSchema }
-      : {}),
+    outputSchema: definition.outputSchema,
     ...(definition.examples ? { examples: definition.examples } : {}),
     run: definition.execute,
   };
@@ -98,21 +110,6 @@ function providerRootObjectSchema<Input>(
   validationSchema: z.ZodType<Input>,
   variants: z.ZodObject[],
 ) {
-  const actions = variants.flatMap((variant) => {
-    const action = z.toJSONSchema(variant.shape.action) as {
-      const?: unknown;
-      enum?: unknown[];
-    };
-    const values =
-      typeof action.const === "string"
-        ? [action.const]
-        : (action.enum ?? []).filter(
-            (value): value is string => typeof value === "string",
-          );
-    if (values.length === 0)
-      throw new Error("Every domain action must use z.literal()");
-    return values;
-  });
   const fields = new Map<string, z.ZodTypeAny[]>();
   for (const variant of variants) {
     const variantShape: Record<string, z.ZodTypeAny> = variant.shape;
@@ -180,17 +177,6 @@ function providerRootObjectSchema<Input>(
   };
 }
 
-export function actionUnionTransportSchemas<Input>(
-  validationSchema: z.ZodType<Input>,
-) {
-  if (!(validationSchema instanceof z.ZodDiscriminatedUnion))
-    throw new Error("Expected an action-discriminated union");
-  return providerRootObjectSchema<Input>(
-    validationSchema as unknown as z.ZodType<Input>,
-    validationSchema.options as z.ZodObject[],
-  );
-}
-
 /** Construct one direct native AI SDK capability from plain service actions. */
 export function growthDomainTool<
   const Actions extends Record<string, GrowthAction<never, unknown>>,
@@ -211,8 +197,6 @@ export function growthDomainTool<
     }
 > {
   const variants = Object.entries(definition.actions).map(([action, spec]) => {
-    if (!(spec.inputSchema instanceof z.ZodObject))
-      throw new Error(`Growth domain action ${action} must use z.object()`);
     return spec.inputSchema.extend({
       action: z.literal(action).describe(spec.description),
     });
@@ -228,53 +212,58 @@ export function growthDomainTool<
     description: definition.description,
     inputSchema: validationSchema,
     actions: definition.actions,
+    resultSchema: z.union([
+      ...Object.entries(definition.actions).map(([action, spec]) =>
+        z.object({
+          ok: z.literal(true),
+          action: z.literal(action),
+          data: spec.outputSchema,
+        }),
+      ),
+    ] as unknown as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]]),
     ...transport,
     execute: async (input, context) => {
-      const action = String(input.action);
-      const spec = definition.actions[action];
-      if (!spec) throw new Error(`Unknown Growth domain action: ${action}`);
-      const { action: _, ...payload } = input;
-      const executable = spec as unknown as GrowthAction<
-        typeof payload,
-        unknown
-      >;
-      const data = await executable.run(payload, context);
-      // An action that declared a shape is held to it. Reported rather than
-      // thrown: the work already happened, and a caller learning that the
-      // result is off-contract is more useful than losing it. Tighten to a
-      // refusal once every action in a domain declares one.
-      if (spec.outputSchema) {
-        const checked = spec.outputSchema.safeParse(data);
-        if (!checked.success) {
-          console.error(
-            `${action} returned something its output schema does not describe`,
-            checked.error.issues.map((issue) => ({
-              path: issue.path.join("."),
-              message: issue.message,
-            })),
-          );
-        }
-      }
-      if (
-        typeof data === "object" &&
-        data !== null &&
-        "error" in data &&
-        typeof data.error === "string"
-      ) {
-        const error = compactGrowthError(data.error);
-        return {
-          ok: false as const,
-          action: input.action,
-          error: {
-            code: error.code,
-            message: error.error,
-            suggestedAction: error.suggestedAction,
-          },
-        };
-      }
-      return { ok: true as const, action: input.action, data };
+      const { action, ...payload } = input;
+      return runGrowthAction(
+        action,
+        definition.actions[action] as unknown as GrowthAction<
+          typeof payload,
+          unknown
+        >,
+        payload,
+        context,
+      );
     },
   });
+}
+
+/** Domain and individual tools share the same result envelope. */
+export async function runGrowthAction<Name extends PropertyKey, Input, Output>(
+  action: Name,
+  spec: GrowthAction<Input, Output>,
+  input: Input,
+  context: GrowthExecutionContext,
+) {
+  const data = await spec.run(input, context);
+  // Older services return an error object; preserve that public failure contract.
+  if (
+    typeof data === "object" &&
+    data !== null &&
+    "error" in data &&
+    typeof data.error === "string"
+  ) {
+    const error = compactGrowthError(data.error);
+    return {
+      ok: false as const,
+      action,
+      error: {
+        code: error.code,
+        message: error.error,
+        suggestedAction: error.suggestedAction,
+      },
+    };
+  }
+  return { ok: true as const, action, data };
 }
 
 /**
@@ -287,27 +276,29 @@ export function growthTool<I extends z.ZodTypeAny, O>(definition: {
   inputSchema: I;
   modelInputSchema?: FlexibleSchema<z.infer<I>>;
   transportInputSchema?: z.ZodType<unknown>;
+  resultSchema: z.ZodTypeAny;
   actions?: Record<string, GrowthAction<never, unknown>>;
   execute: (input: z.infer<I>, ctx: GrowthExecutionContext) => Promise<O>;
 }): GrowthTool<z.infer<I>, O> {
+  const resultSchema = z.union([
+    definition.resultSchema,
+    capabilityErrorSchema,
+  ]);
+  const run = definition.execute;
   const nativeTool = tool({
     description: definition.description,
     inputSchema: definition.modelInputSchema ?? definition.inputSchema,
-    contextSchema: growthExecutionContextSchema,
     execute: (
       input: z.infer<I>,
       options: ToolExecutionOptions<GrowthExecutionContext>,
-    ) =>
-      definition.execute(
-        input,
-        growthExecutionContextSchema.parse(options.context),
-      ),
+    ) => run(input, options.context),
   } as unknown as Tool<z.infer<I>, O, GrowthExecutionContext>);
   return Object.assign(nativeTool, {
-    run: definition.execute,
+    run,
     validationSchema: definition.inputSchema,
     transportInputSchema:
       definition.transportInputSchema ?? definition.inputSchema,
+    resultSchema,
     ...(definition.actions ? { actions: definition.actions } : {}),
   }) as unknown as GrowthTool<z.infer<I>, O>;
 }

@@ -1,3 +1,4 @@
+import { newsletterAgentOutputSchema } from "./outputs/newsletter";
 import "server-only";
 
 import { z } from "zod";
@@ -15,6 +16,7 @@ import { growthTool } from "./types";
  * the assistant would otherwise have to drive four tools itself.
  */
 export const newsletterAgent = growthTool({
+  resultSchema: newsletterAgentOutputSchema,
   description:
     "Delegate a newsletter task to the newsletter agent. It can read an issue, create a new one, rewrite subject/preheader/body/CTA, and save revisions, then report where to review it. Use for multi-step newsletter work; for a single known edit to a known draft, emailWrite is more direct. It works in DRAFTS only — it cannot send or schedule.",
   inputSchema: z.object({

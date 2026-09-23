@@ -1,3 +1,4 @@
+import { diagnoseAlignmentOutputSchema } from "./outputs/alignment";
 import "server-only";
 
 import { anthropic } from "@ai-sdk/anthropic";
@@ -53,6 +54,7 @@ Your job: identify where INTENT and ACTUAL diverge and suggest what to update. R
 - If grounding shows full alignment, return an empty findings array and say so in the summary.`;
 
 export const diagnoseAlignment = growthAction({
+  outputSchema: diagnoseAlignmentOutputSchema,
   description:
     "Diagnose paid-strategy alignment: compares each campaign's planned platforms (draft platform campaigns), budget and dates against platform reality synced via Zernio, and returns ranked misalignments with concrete suggested updates. Use for 'are our ads running what we planned', 'what's misaligned', 'what should we update on paid'. Read-only — it suggests, it does not change anything.",
   inputSchema: z.object({}),

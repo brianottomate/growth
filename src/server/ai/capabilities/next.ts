@@ -1,3 +1,4 @@
+import { nextForBrandOutputSchema } from "./outputs/next";
 import "server-only";
 
 import { z } from "zod";
@@ -19,6 +20,7 @@ import { productionQueue, upcomingContent } from "./content";
 
 /** One grounded answer to “what is next for this brand?” */
 export const nextForBrand = growthAction({
+  outputSchema: nextForBrandOutputSchema,
   description:
     "Read one owned brand's readiness and the next 14 days in a single call: mapped surfaces, owned post history, active content mix and cadence targets, and already planned content. Call this FIRST for 'what's next for this brand?', before recommending setup, research, or planning work.",
   inputSchema: z.object({ brandId: z.string() }),
@@ -37,8 +39,20 @@ export const nextForBrand = growthAction({
       db
         .select({
           count: count(),
-          earliest: sql<Date | null>`min(coalesce(${platformPostTable.publishedAt}, ${platformPostTable.createdAt}))`,
-          latest: sql<Date | null>`max(coalesce(${platformPostTable.publishedAt}, ${platformPostTable.createdAt}))`,
+          earliest:
+            sql<Date | null>`min(coalesce(${platformPostTable.publishedAt}, ${platformPostTable.createdAt}))`.mapWith(
+              (value: string | null) =>
+                value === null
+                  ? null
+                  : platformPostTable.createdAt.mapFromDriverValue(value),
+            ),
+          latest:
+            sql<Date | null>`max(coalesce(${platformPostTable.publishedAt}, ${platformPostTable.createdAt}))`.mapWith(
+              (value: string | null) =>
+                value === null
+                  ? null
+                  : platformPostTable.createdAt.mapFromDriverValue(value),
+            ),
         })
         .from(platformPostTable)
         .where(

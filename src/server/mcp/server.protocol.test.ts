@@ -48,8 +48,29 @@ async function assertToolCatalog(client: Client) {
   expect(names).toContain("workspaceOverview");
   expect(names).toContain("invoke_growth");
   expect(names).toContain("renderSocialPosts");
-  expect(names).not.toContain("researchRead");
-  expect(names).not.toContain("driveRead");
+  expect(names).toContain("presentNextOptions");
+  for (const tool of tools) {
+    expect(tool.outputSchema?.type).toBe("object");
+  }
+  expect(
+    tools.find((tool) => tool.name === "presentNextOptions")?._meta?.ui,
+  ).toEqual({ resourceUri: "ui://wander-growth/next-options/v1.html" });
+  const nextOptions = await client.readResource({
+    uri: "ui://wander-growth/next-options/v1.html",
+  });
+  expect(nextOptions.contents[0]?.mimeType).toBe("text/html;profile=mcp-app");
+  expect(names.some((name) => name.startsWith("researchRead"))).toBe(false);
+  expect(names.some((name) => name.startsWith("driveRead"))).toBe(false);
+  expect(names).not.toContain("discoverTools");
+  expect(names).toContain("sourceSyncWrite__syncWebsite");
+  expect(names).not.toContain("adsWrite__push");
+  expect(names).not.toContain("brandWrite__purge");
+  expect(names).toContain("operationRead__status");
+  const brandSchema = JSON.stringify(
+    tools.find((tool) => tool.name === "brandWrite__create")?.inputSchema,
+  );
+  expect(brandSchema).not.toContain('"purge"');
+  expect(brandSchema).not.toContain('"previewPurge"');
 
   const previewTool = tools.find((tool) => tool.name === "renderSocialPosts");
   expect(previewTool?._meta?.ui).toEqual({
@@ -68,6 +89,8 @@ async function assertToolCatalog(client: Client) {
   ).toContain("Social posts");
 }
 
+// These integration tests compile the complete catalog on their first request.
+// Allow cold compilation while concurrent repository checks are using the CPU.
 describe("Growth MCP protocol compatibility", () => {
   test("advertises OAuth resource discovery to unauthenticated clients", async () => {
     const { GET } = await import("@/app/api/mcp/route");
@@ -105,7 +128,7 @@ describe("Growth MCP protocol compatibility", () => {
     expect(client.getNegotiatedProtocolVersion()).toBe("2026-07-28");
     await assertToolCatalog(client);
     await client.close();
-  });
+  }, 20_000);
 
   test("retains the stateless 2025 fallback", async () => {
     const client = new Client({
@@ -116,5 +139,5 @@ describe("Growth MCP protocol compatibility", () => {
     expect(client.getNegotiatedProtocolVersion()).not.toBe("2026-07-28");
     await assertToolCatalog(client);
     await client.close();
-  });
+  }, 20_000);
 });

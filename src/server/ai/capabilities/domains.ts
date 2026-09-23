@@ -8,8 +8,7 @@ import {
   importMetaCampaignAction,
   boostMetaPostAction,
   createAudienceAction,
-  createGoogleAdAction,
-  createMetaAdDraftAction,
+  createSpecializedMetaDraftAction,
   deleteAdDraftAction,
   deleteAudienceAction,
   deleteCampaignDraftAction,
@@ -61,8 +60,6 @@ import { getBrandMap } from "./brand-map";
 import {
   createBrandAction,
   enrichBrandAction,
-  previewBrandPurgeAction,
-  purgeBrandAction,
   listBrands,
   createProspectAction,
   setBrandRelationshipAction,
@@ -197,7 +194,7 @@ export const brandRead = growthDomainTool({
 
 export const brandWrite = growthDomainTool({
   description:
-    "Create an owned brand, enrich one from its website (logo, tagline, description), or purge one on offboarding. Create first, enrich second: they are deliberately separate steps. Purge is irreversible and needs previewPurge first.",
+    "Create an owned brand and update its identity or settings. Create first, enrich second. Brand offboarding is available in the brand settings UI.",
   actions: {
     create: createBrandAction,
     createProspect: createProspectAction,
@@ -206,8 +203,6 @@ export const brandWrite = growthDomainTool({
     setMark: setBrandMarkAction,
     addAdPreview: addBrandAdPreviewAction,
     setPerformanceSettings: setPerformanceSettingsAction,
-    previewPurge: previewBrandPurgeAction,
-    purge: purgeBrandAction,
   },
 });
 
@@ -415,7 +410,7 @@ export const adsRead = growthDomainTool({
 
 export const adsWrite = growthDomainTool({
   description:
-    'Build and ship paid campaigns. TWO LAYERS: the first-party draft (draftCampaign, draftAd, addAdSet and the rest) is local rows only, touches no ad platform, and needs no approval — start there for "make a campaign" unless the user asks for the platform by name. Only push, setDelivery and the create* actions reach Meta, Google or LinkedIn, and those are account-allowlisted and approval-gated. Everything is created paused except boostMetaPost and createGoogle; setDelivery is what starts spend.',
+    "Build paid campaigns as local drafts, then planPlatform, setPlatformDraft and push with operator approval. Google push creates then pauses, so a failed pause may leave it live. Specialized Meta goals use createSpecializedMetaDraft. Custom audience operations, boosting and delivery changes require approval. boostMetaPost starts spend immediately.",
   actions: {
     draftCampaign: draftCampaignAction,
     draftAd: draftAdAction,
@@ -450,10 +445,9 @@ export const adsWrite = growthDomainTool({
     push: pushDraftAction,
     setDelivery: setDeliveryAction,
     deletePlatformCampaign: deletePlatformCampaignAction,
-    createMetaDraft: createMetaAdDraftAction,
+    createSpecializedMetaDraft: createSpecializedMetaDraftAction,
     createAudience: createAudienceAction,
     addAudienceUsers: addAudienceUsersAction,
-    createGoogle: createGoogleAdAction,
     boostMetaPost: boostMetaPostAction,
     duplicateMetaCampaign: duplicateMetaCampaignAction,
   },

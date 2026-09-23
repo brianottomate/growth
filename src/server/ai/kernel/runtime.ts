@@ -14,10 +14,7 @@ import { db } from "@/server/db";
 import { assistantToolReceiptTable, memberTable } from "@/server/db/schema";
 import { compactGrowthError } from "./errors";
 import { policyForGrowthTool, type GrowthActionPolicy } from "./policy";
-import {
-  growthExecutionContextSchema,
-  type GrowthExecutionContext,
-} from "./tool";
+import type { GrowthExecutionContext } from "./tool";
 
 export interface GrowthRuntimeIdentity {
   orgId: string;
@@ -25,37 +22,8 @@ export interface GrowthRuntimeIdentity {
   threadId?: string;
 }
 
-export type JsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | JsonValue[]
-  | { [key: string]: JsonValue };
-
-export function normalizeGrowthJson(value: unknown): JsonValue {
-  if (value === null || typeof value === "string" || typeof value === "boolean")
-    return value;
-  if (typeof value === "number") {
-    if (!Number.isFinite(value))
-      throw new Error("Tool output contains a non-finite number");
-    return value;
-  }
-  if (value instanceof Date) return value.toISOString();
-  if (Array.isArray(value)) {
-    return value.map((child) =>
-      child === undefined ? null : normalizeGrowthJson(child),
-    );
-  }
-  if (typeof value === "object") {
-    const result: Record<string, JsonValue> = {};
-    for (const [key, child] of Object.entries(value)) {
-      if (child !== undefined) result[key] = normalizeGrowthJson(child);
-    }
-    return result;
-  }
-  throw new Error(`Tool output is not JSON-safe (${typeof value})`);
-}
+export { normalizeGrowthJson } from "./output";
+import { normalizeGrowthJson, type JsonValue } from "./output";
 
 function isErrorOutput(
   value: JsonValue,
@@ -72,17 +40,17 @@ function isErrorOutput(
   );
 }
 
-function failureOutput(error: unknown, action?: string): JsonValue {
+function failureOutput(error: unknown, action?: string) {
   const compact = compactGrowthError(error);
-  return normalizeGrowthJson({
-    ok: false,
+  return {
+    ok: false as const,
     ...(action ? { action } : {}),
     error: {
       code: compact.code,
       message: compact.error,
       suggestedAction: compact.suggestedAction,
     },
-  });
+  };
 }
 
 async function assertOrganizationAccess(context: GrowthExecutionContext) {
@@ -108,7 +76,7 @@ async function executeWithReceipt(input: {
     options: ToolExecutionOptions<GrowthExecutionContext>,
   ) => unknown;
 }): Promise<JsonValue> {
-  const context = growthExecutionContextSchema.parse(input.options.context);
+  const context = input.options.context;
   const startedAt = new Date();
   const normalizedInput = normalizeGrowthJson(input.value);
   const [created] = await db
@@ -193,9 +161,7 @@ async function executeWithReceipt(input: {
       .update(assistantToolReceiptTable)
       .set({
         status: "failed",
-        error: isErrorOutput(output)
-          ? output.error
-          : { message: "Tool failed" },
+        error: output.error,
         output,
         finishedAt,
         durationMs: finishedAt.getTime() - startedAt.getTime(),
@@ -208,6 +174,7 @@ async function executeWithReceipt(input: {
 /** Add receipts, compact errors, and execute-time org access to native tools. */
 export function withGrowthExecution<Tools extends ToolSet>(
   tools: Tools,
+  beforeExecute?: () => Promise<void>,
 ): {
   [Name in keyof Tools]: Tool<
     InferToolInput<Tools[Name]>,
@@ -226,8 +193,9 @@ export function withGrowthExecution<Tools extends ToolSet>(
             ? async (
                 value: unknown,
                 options: ToolExecutionOptions<GrowthExecutionContext>,
-              ) =>
-                executeWithReceipt({
+              ) => {
+                await beforeExecute?.();
+                return executeWithReceipt({
                   name,
                   policy: policyForGrowthTool(name, value),
                   value,
@@ -236,7 +204,8 @@ export function withGrowthExecution<Tools extends ToolSet>(
                     value: unknown,
                     executionOptions: ToolExecutionOptions<GrowthExecutionContext>,
                   ) => unknown,
-                })
+                });
+              }
             : undefined,
         },
       ];
@@ -249,13 +218,14 @@ export function buildGrowthToolRuntime<Tools extends ToolSet>(input: {
   identity: GrowthRuntimeIdentity;
   runId: string;
   surface: GrowthExecutionContext["surface"];
+  beforeExecute?: () => Promise<void>;
 }) {
-  const tools = withGrowthExecution(input.tools);
-  const context = growthExecutionContextSchema.parse({
+  const tools = withGrowthExecution(input.tools, input.beforeExecute);
+  const context: GrowthExecutionContext = {
     ...input.identity,
     runId: input.runId,
     surface: input.surface,
-  });
+  };
   const toolsContext = Object.fromEntries(
     Object.keys(tools).map((name) => [name, context]),
   ) as { [Name in keyof Tools]: GrowthExecutionContext };
@@ -266,6 +236,7 @@ export function buildGrowthToolRuntime<Tools extends ToolSet>(input: {
     toolApproval: (options: {
       toolCall: { toolName: string; input: unknown };
     }) =>
+      options.toolCall.toolName !== "toolSearch" &&
       policyForGrowthTool(options.toolCall.toolName, options.toolCall.input)
         .approval === "user"
         ? ("user-approval" as const)

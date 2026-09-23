@@ -1,3 +1,12 @@
+import {
+  scheduleSocialPostOutputSchema,
+  publishSocialPostNowOutputSchema,
+  rescheduleSocialPostOutputSchema,
+  updateScheduledFirstCommentOutputSchema,
+  recordExternalPublishOutputSchema,
+  proposeLivePostOutputSchema,
+  applyLivePostMatchActionOutputSchema,
+} from "./outputs/publishing";
 import "server-only";
 
 import { eq } from "drizzle-orm";
@@ -43,6 +52,7 @@ async function requireOwnedSocialPost(platformPostId: string, orgId: string) {
 }
 
 export const scheduleSocialPost = growthAction({
+  outputSchema: scheduleSocialPostOutputSchema,
   description:
     "Approve one complete social publishing unit and schedule it in Zernio. This creates an external provider job and requires explicit approval. A successful Zernio receipt, not the local calendar update, advances the post to scheduled.",
   inputSchema: z.object({
@@ -68,6 +78,7 @@ export const scheduleSocialPost = growthAction({
 });
 
 export const publishSocialPostNow = growthAction({
+  outputSchema: publishSocialPostNowOutputSchema,
   description:
     "Approve one complete social publishing unit and publish it through Zernio now. This is an immediate external provider write and requires explicit approval.",
   inputSchema: z.object({ platformPostId: z.string() }),
@@ -82,6 +93,7 @@ export const publishSocialPostNow = growthAction({
 });
 
 export const rescheduleSocialPost = growthAction({
+  outputSchema: rescheduleSocialPostOutputSchema,
   description:
     "Move an existing scheduled Zernio job to a new future time without publishing newer local draft copy or media. Requires explicit approval.",
   inputSchema: z.object({
@@ -101,6 +113,7 @@ export const rescheduleSocialPost = growthAction({
 });
 
 export const updateScheduledFirstComment = growthAction({
+  outputSchema: updateScheduledFirstCommentOutputSchema,
   description:
     "Replace the first comment on an existing scheduled Instagram or LinkedIn Zernio job. This changes the provider job and requires explicit approval.",
   inputSchema: z.object({
@@ -117,6 +130,7 @@ export const updateScheduledFirstComment = growthAction({
 const PLATFORMS_WITHOUT_PERMALINKS = ["newsletter", "other"];
 
 export const recordExternalPublish = growthAction({
+  outputSchema: recordExternalPublishOutputSchema,
   description:
     "Record that an owned post already went out OUTSIDE Wander Growth — posted by hand in the app, or sent straight from Customer.io. Local receipt only: no provider job is created and no send-ledger row is written. Use this whenever the operator says something is already live; setting the idea's status alone leaves the calendar, the Feed and the pipeline counts still reading draft, because they read the spot's status. Ask which day it went out and, on a platform that has permalinks, ask for the link before calling this — the ship date is what the calendar and every cadence read afterwards, and the link is the only way analytics ever finds the post again. Refuses a spot with a queued Zernio job: reschedule or publish that one instead.",
   inputSchema: z.object({
@@ -208,6 +222,7 @@ export const recordExternalPublish = growthAction({
 });
 
 export const proposeLivePost = growthAction({
+  outputSchema: proposeLivePostOutputSchema,
   description:
     "Work out which live post a planned spot became, for a spot the team posted by hand. Reads the unclaimed live posts on that account near the planned date and asks the model which one it is, returning the candidate, a confidence and the reasoning. Writes nothing. Use before publishingWrite.applyLivePostMatch, and use it instead of asking the operator for a permalink they would have to go find.",
   inputSchema: z.object({
@@ -243,6 +258,7 @@ export const proposeLivePost = growthAction({
 });
 
 export const applyLivePostMatchAction = growthAction({
+  outputSchema: applyLivePostMatchActionOutputSchema,
   description:
     "Confirm that a planned spot and a live post are the same post, and fold them into one row. The planned spot keeps the idea and inherits the provider id, permalink, ship time, caption, media and stats; the duplicate live row is removed. The idea rolls up to published once nothing owned under it is still waiting. Irreversible, so confirm the permalink with the operator first.",
   inputSchema: z.object({

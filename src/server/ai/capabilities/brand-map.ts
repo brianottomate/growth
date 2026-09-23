@@ -1,3 +1,4 @@
+import { getBrandMapOutputSchema } from "./outputs/brand-map";
 import "server-only";
 
 import { z } from "zod";
@@ -9,6 +10,7 @@ import { getBrandSurfaceSummary } from "@/server/services/brand-map.service";
 import { growthAction } from "./types";
 
 export const getBrandMap = growthAction({
+  outputSchema: getBrandMapOutputSchema,
   description:
     "Read the shared Brand Map for one brand or every owned brand: live counts for channels, audience targets, website pages, blog articles, media, canonical content ideas, series, tracked peers, strategy targets, and pending structural reviews. Use this before cross-surface brand questions, when deciding what context is mapped vs missing, or before proposing what the team should do next.",
   inputSchema: z.object({

@@ -1,4 +1,5 @@
 import "server-only";
+import { appliedEvidenceSchema } from "@/lib/applied-evidence";
 
 import type { BrandIdentity } from "@/server/db/brand-schema";
 
@@ -33,10 +34,7 @@ import {
 } from "@/server/clients/zernio.client";
 import { newConnectToken } from "@/server/services/brand-connect.service";
 import { MediaService } from "@/server/services/media.service";
-import {
-  enrichBrandFromWebsite,
-  type BrandEnrichment,
-} from "@/server/services/brand-enrichment.service";
+import { enrichBrandFromWebsite } from "@/server/services/brand-enrichment.service";
 
 // ---- BRAND OPS: create + enrich, shared by tRPC and chat/MCP ----------
 //
@@ -133,7 +131,7 @@ export async function createOwnedBrand(input: {
 export async function enrichBrandById(
   brandId: string,
   websiteOverride?: string | null,
-): Promise<{ brand: Brand; enrichment: BrandEnrichment } | null> {
+) {
   const existing = await db.query.brandTable.findFirst({
     where: eq(brandTable.id, brandId),
     columns: { id: true, website: true },
@@ -145,21 +143,40 @@ export async function enrichBrandById(
   const enrichment = await enrichBrandFromWebsite(website);
   if (!enrichment) return null;
 
+  const patch = {
+    website,
+    ...(enrichment.tagline && { tagline: enrichment.tagline }),
+    ...(enrichment.description && { description: enrichment.description }),
+    ...(enrichment.logo && { logo: enrichment.logo }),
+    ...(enrichment.brandIdentity && {
+      brandIdentity: enrichment.brandIdentity,
+    }),
+    websiteMeta: enrichment.websiteMeta,
+  };
   const [brand] = await db
     .update(brandTable)
-    .set({
-      website,
-      ...(enrichment.tagline && { tagline: enrichment.tagline }),
-      ...(enrichment.description && { description: enrichment.description }),
-      ...(enrichment.logo && { logo: enrichment.logo }),
-      ...(enrichment.brandIdentity && {
-        brandIdentity: enrichment.brandIdentity,
-      }),
-      websiteMeta: enrichment.websiteMeta,
-    })
+    .set(patch)
     .where(eq(brandTable.id, brandId))
     .returning();
-  return { brand: brand!, enrichment };
+  if (!brand) throw new Error("Brand enrichment was not saved");
+  const audit = appliedEvidenceSchema.parse({
+    evidence: [
+      {
+        sourceType: "website",
+        sourceId: website,
+        sourceUrl: website,
+        observedAt: new Date().toISOString(),
+        method: "website-extraction",
+      },
+    ],
+    applied: Object.keys(patch).map((field) => ({
+      targetType: "brand",
+      targetId: brand.id,
+      field,
+      value: brand[field as keyof typeof patch],
+    })),
+  });
+  return { brand, enrichment, ...audit };
 }
 
 // ---- BRAND PURGE: offboarding ------------------------------------------
