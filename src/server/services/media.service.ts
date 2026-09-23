@@ -658,16 +658,7 @@ export async function capturePostMedia(input: {
   for (const index of indexes) {
     const prior = byIndex.get(index);
     if (prior) {
-      if (prior.deletedAt) {
-        const [restored] = await db
-          .update(mediaAssetTable)
-          .set({ deletedAt: null })
-          .where(eq(mediaAssetTable.id, prior.id))
-          .returning();
-        if (restored) assets.push(restored);
-      } else {
-        assets.push(prior);
-      }
+      assets.push(prior);
       continue;
     }
 
@@ -1104,15 +1095,18 @@ export async function updateExternal(input: {
   return updated ?? null;
 }
 
-/** Soft-delete the row and best-effort-delete the underlying bytes. */
+/**
+ * Delete the row and best-effort-delete the underlying bytes. Hard: a stamped
+ * row would outlive its bytes and point at nothing. Also clears rows an older
+ * soft delete left behind, so it reads past `deletedAt`.
+ */
 export async function deleteMedia(id: string) {
-  const asset = await getMedia(id);
+  const asset = await db.query.mediaAssetTable.findFirst({
+    where: eq(mediaAssetTable.id, id),
+  });
   if (!asset) return { id };
 
-  await db
-    .update(mediaAssetTable)
-    .set({ deletedAt: new Date() })
-    .where(eq(mediaAssetTable.id, id));
+  await db.delete(mediaAssetTable).where(eq(mediaAssetTable.id, id));
 
   if (asset.provider === "r2" && asset.r2Key) {
     R2.delete(asset.r2Key).catch((error) =>

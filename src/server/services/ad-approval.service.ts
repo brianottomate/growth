@@ -28,7 +28,7 @@ import {
   renderComposition,
   resolveCompositionContext,
 } from "./composition.service";
-import { importImageBuffer } from "./media.service";
+import { deleteMedia, importImageBuffer } from "./media.service";
 
 /** Freeze all sizes before the atomic transition. Failed/stale renders never approve an ad. */
 export async function transitionAdApproval(input: {
@@ -167,13 +167,8 @@ export async function transitionAdApproval(input: {
         "This ad changed during approval. Review it and approve again.",
       );
   } catch (error) {
-    // Uncommitted exports cannot be referenced by this ad. Hide them from the library;
-    // keep object bytes for recovery and eventual storage garbage collection.
-    for (const id of generated)
-      await db
-        .update(mediaAssetTable)
-        .set({ deletedAt: new Date() })
-        .where(eq(mediaAssetTable.id, id));
+    // Uncommitted exports cannot be referenced by this ad, so they go.
+    for (const id of generated) await deleteMedia(id);
     throw error;
   }
   if (input.status === "drawn" && previous) {
@@ -205,17 +200,17 @@ export async function transitionAdApproval(input: {
             union all select to_jsonb(p)::text from media_asset p where p.id <> ${asset.assetId}
           ) refs where position(${asset.assetId} in payload) > 0 or position(${asset.url} in payload) > 0 limit 1
         `);
-        if (!shared && otherUse.rows.length === 0)
-          await db
-            .update(mediaAssetTable)
-            .set({ deletedAt: new Date() })
-            .where(
-              and(
-                eq(mediaAssetTable.id, asset.assetId),
-                eq(mediaAssetTable.brandId, brand.id),
-                sql`${mediaAssetTable.metadata}->'adApproval'->>'adId' = ${ad.id}`,
-              ),
-            );
+        if (!shared && otherUse.rows.length === 0) {
+          const own = await db.query.mediaAssetTable.findFirst({
+            where: and(
+              eq(mediaAssetTable.id, asset.assetId),
+              eq(mediaAssetTable.brandId, brand.id),
+              sql`${mediaAssetTable.metadata}->'adApproval'->>'adId' = ${ad.id}`,
+            ),
+            columns: { id: true },
+          });
+          if (own) await deleteMedia(own.id);
+        }
       }
     }
   }
