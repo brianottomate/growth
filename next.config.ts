@@ -13,6 +13,10 @@ const config: NextConfig = {
   turbopack: {
     root: process.cwd(),
   },
+  // `bun run build` type-checks with `tsc --noEmit` before `next build`. Next's
+  // own check ran out of memory on Vercel's build container once the oRPC
+  // router landed; run apart, each step fits.
+  typescript: { ignoreBuildErrors: true },
   /** Enable MDX pages */
   pageExtensions: ["ts", "tsx", "md", "mdx"],
 
