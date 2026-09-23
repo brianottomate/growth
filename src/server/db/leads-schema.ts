@@ -831,6 +831,56 @@ export const hubspotWebhookEventTable = leadsSchema.table(
   ],
 );
 
+/**
+ * One row per Meta lead-ad submission, whether it arrived by Page webhook or
+ * by the polling cron. The unique leadgen id is the dedupe key between the
+ * two paths, and the two sent-at stamps keep the qualified-lead CAPI event
+ * and the inbound-router handoff to exactly once each.
+ */
+export const metaLeadgenLeadTable = leadsSchema.table(
+  "meta_leadgen_lead",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("mlead")),
+    leadgenId: t.text().notNull(),
+    pageId: t.text().notNull(),
+    formId: t.text(),
+    formName: t.text(),
+    adId: t.text(),
+    campaignName: t.text(),
+    receivedVia: t.text().notNull(), // "webhook" | "poll"
+    leadCreatedAt: t.timestamp(),
+
+    fieldData: t.jsonb().$type<{ name: string; values: string[] }[]>(),
+    email: t.text(),
+    units: t.integer(),
+    qualified: t.boolean(),
+
+    capiSentAt: t.timestamp(),
+    routedAt: t.timestamp(),
+    lastError: t.text(),
+
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .$onUpdateFn(() => new Date())
+      .notNull(),
+  }),
+  (table) => [
+    uniqueIndex("meta_leadgen_lead_leadgen_id_idx").on(table.leadgenId),
+    index("meta_leadgen_lead_form_idx").on(table.formId),
+    index("meta_leadgen_lead_created_idx").on(table.createdAt),
+  ],
+);
+
+export type MetaLeadgenLead = typeof metaLeadgenLeadTable.$inferSelect;
+
 export type HubspotWebhookEvent = typeof hubspotWebhookEventTable.$inferSelect;
 export type HubspotWebhookEventInsert =
   typeof hubspotWebhookEventTable.$inferInsert;

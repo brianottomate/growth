@@ -485,7 +485,7 @@ export async function osInboundLeadRouter({
   onboardingComplete?: boolean;
   /** Caller is not production (e.g. wander.com preview) — Slack goes to the testing channel. */
   test?: boolean;
-}): Promise<void> {
+}): Promise<{ contactId: string | null; companyId: string | null }> {
   // Step 1: Search contact by email
   let contact: Awaited<ReturnType<typeof findContactByEmail>> = null;
   try {
@@ -835,7 +835,7 @@ export async function osInboundLeadRouter({
   }
 
   if (isListedSource && officialInboundUnits < 20) {
-    return;
+    return { contactId, companyId };
   }
 
   // Small footer identifying where this message came from — debugging aid for
@@ -863,4 +863,5 @@ export async function osInboundLeadRouter({
       slackResult.error,
     );
   }
+  return { contactId, companyId };
 }

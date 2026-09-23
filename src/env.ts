@@ -72,6 +72,11 @@ export const env = createEnv({
     FB_SYSUSER_TOKEN: z.string().optional(), // Meta system user token (preferred)
     META_ACCESS_TOKEN: z.string().optional(), // Meta access token (fallback)
     META_AD_ACCOUNT_ID: z.string().optional(), // Meta ad account ID (e.g. act_885632...)
+    // Meta lead ads → growth (app "Wander Growth Leads" 2121713918736592)
+    META_LEADS_ACCESS_TOKEN: z.string().optional(), // system user token: leads_retrieval, pages_manage_metadata, pixel CAPI
+    META_LEADS_APP_SECRET: z.string().optional(), // verifies X-Hub-Signature-256 on the leadgen webhook
+    META_LEADGEN_VERIFY_TOKEN: z.string().optional(), // hub.verify_token for the webhook subscription handshake
+    META_LEADGEN_ROUTE_FROM: z.iso.datetime({ offset: true }).optional(), // hand leads created at/after this instant to the inbound router; unset while Make still does it
     // Google Ads — interim spend-tracker connector until Zernio adds Google
     // (creds to be handed off from Brian's Railway env; connector is a no-op until set)
     GOOGLE_ADS_CLIENT_ID: z.string().optional(),
@@ -217,6 +222,10 @@ export const env = createEnv({
     FB_SYSUSER_TOKEN: process.env.FB_SYSUSER_TOKEN,
     META_ACCESS_TOKEN: process.env.META_ACCESS_TOKEN,
     META_AD_ACCOUNT_ID: process.env.META_AD_ACCOUNT_ID,
+    META_LEADS_ACCESS_TOKEN: process.env.META_LEADS_ACCESS_TOKEN,
+    META_LEADS_APP_SECRET: process.env.META_LEADS_APP_SECRET,
+    META_LEADGEN_VERIFY_TOKEN: process.env.META_LEADGEN_VERIFY_TOKEN,
+    META_LEADGEN_ROUTE_FROM: process.env.META_LEADGEN_ROUTE_FROM,
     // Google Ads (spend-tracker connector)
     GOOGLE_ADS_CLIENT_ID: process.env.GOOGLE_ADS_CLIENT_ID,
     GOOGLE_ADS_CLIENT_SECRET: process.env.GOOGLE_ADS_CLIENT_SECRET,
