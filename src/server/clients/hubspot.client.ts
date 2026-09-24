@@ -1872,6 +1872,20 @@ export async function listOwners(
 }
 
 /**
+ * One active owner by user email, case-insensitive. `null` when no active
+ * owner has that email — archived owners are deliberately excluded so a lead
+ * is never assigned to a deactivated rep.
+ */
+export async function findOwnerByEmail(
+  email: string,
+): Promise<HubspotOwner | null> {
+  const needle = email.trim().toLowerCase();
+  if (!needle) return null;
+  const owners = await listOwners();
+  return owners.find((o) => o.email?.toLowerCase() === needle) ?? null;
+}
+
+/**
  * One owner by id, checking the active list first and the archived one
  * second so a deactivated rep still resolves to a name. `null` when unknown.
  */

@@ -56,6 +56,7 @@ export async function POST(request: NextRequest) {
     firstName,
     lastName,
     phone,
+    salesRepEmail,
     test,
   } = parsed.data;
   const effectiveIntentMeta = intentMeta ?? intentOnboarding;
@@ -93,6 +94,7 @@ export async function POST(request: NextRequest) {
       firstName,
       lastName,
       phone,
+      salesRepEmail,
       test,
     }),
   );
