@@ -163,6 +163,12 @@ export const inboundBody = z.object({
   onboardingComplete: z.boolean().optional(),
   intentOnboarding: z.string().trim().optional(),
 
+  // HubSpot user email of the rep this lead should go to. When it resolves to
+  // an active owner, it replaces round-robin assignment entirely (including
+  // the international/Spanish override); otherwise the router logs and falls
+  // back to the normal round-robin rather than failing the lead.
+  salesRepEmail: z.string().trim().pipe(z.email()).optional(),
+
   // Caller is not production (e.g. a wander.com preview deployment): the Slack
   // notification goes to #radio-slack-testing instead of the live channel.
   // HubSpot writes are unaffected — same split as the pre-gateway behavior.

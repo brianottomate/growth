@@ -21,6 +21,7 @@ import {
   createDeal,
   findCompany,
   findContactByEmail,
+  findOwnerByEmail,
   newestAssociatedDeal,
   nextRepInRR,
   resolveHsLabel,
@@ -467,6 +468,7 @@ export async function osInboundLeadRouter({
   orgId,
   orgName,
   onboardingComplete,
+  salesRepEmail,
   test,
 }: {
   email: string;
@@ -483,6 +485,7 @@ export async function osInboundLeadRouter({
   orgId?: string | null;
   orgName?: string | null;
   onboardingComplete?: boolean;
+  salesRepEmail?: string | null;
   /** Caller is not production (e.g. wander.com preview) — Slack goes to the testing channel. */
   test?: boolean;
 }): Promise<{ contactId: string | null; companyId: string | null }> {
@@ -622,33 +625,58 @@ export async function osInboundLeadRouter({
   const isListedSource =
     source === "Wander Listed Application" || intentMeta === "WANDER_LISTED";
 
-  // Listed inbound goes to the BDRs, wOS inbound to the AEs. The source
-  // also picks which `inbound_outbound` value the deficit count is measured
-  // against, so a rep's Listed load never offsets their wOS load.
-  try {
-    aeForRR =
-      (await nextRepInRR(
-        officialInboundUnits,
-        isListedSource && officialInboundUnits < 200 ? "BDR" : "AE",
-        isListedSource ? "Listed" : "OS",
-      )) ?? HS_USER_IDS.KYLE;
-  } catch (err) {
-    console.error(
-      "❌ [inbound-router] osInboundLeadRouter: round-robin AE lookup failed",
-      err,
-    );
+  // Explicit rep override: the caller named the rep, so the round-robin (and
+  // the international/Spanish override below) is bypassed entirely. Only an
+  // active HubSpot owner qualifies; an unknown or archived email is logged
+  // and the lead takes the normal round-robin rather than being dropped.
+  let overrideOwnerId: string | null = null;
+  if (salesRepEmail) {
+    try {
+      overrideOwnerId = (await findOwnerByEmail(salesRepEmail))?.id ?? null;
+      if (!overrideOwnerId) {
+        console.error(
+          `❌ [inbound-router] osInboundLeadRouter: salesRepEmail ${salesRepEmail} is not an active HubSpot owner; falling back to round-robin`,
+        );
+      }
+    } catch (err) {
+      console.error(
+        "❌ [inbound-router] osInboundLeadRouter: salesRepEmail owner lookup failed; falling back to round-robin",
+        err,
+      );
+    }
   }
 
-  // International or Spanish-language inbound leads route to Kris instead of the
-  // normal round-robin — but only for leads we're actually reassigning
-  // (tagAsInbound) that have at least 10 units. Active/closed-won/resubmission
-  // leads keep their existing owner; sub-10-unit leads stay on the normal RR.
-  if (
-    tagAsInbound &&
-    officialInboundUnits >= 10 &&
-    (isInternationalPhone(phone) || source.toLowerCase().includes("spanish"))
-  ) {
-    aeForRR = HS_USER_IDS.KRIS;
+  if (overrideOwnerId) {
+    aeForRR = overrideOwnerId;
+  } else {
+    // Listed inbound goes to the BDRs, wOS inbound to the AEs. The source
+    // also picks which `inbound_outbound` value the deficit count is measured
+    // against, so a rep's Listed load never offsets their wOS load.
+    try {
+      aeForRR =
+        (await nextRepInRR(
+          officialInboundUnits,
+          isListedSource && officialInboundUnits < 200 ? "BDR" : "AE",
+          isListedSource ? "Listed" : "OS",
+        )) ?? HS_USER_IDS.KYLE;
+    } catch (err) {
+      console.error(
+        "❌ [inbound-router] osInboundLeadRouter: round-robin AE lookup failed",
+        err,
+      );
+    }
+
+    // International or Spanish-language inbound leads route to Kris instead of the
+    // normal round-robin — but only for leads we're actually reassigning
+    // (tagAsInbound) that have at least 10 units. Active/closed-won/resubmission
+    // leads keep their existing owner; sub-10-unit leads stay on the normal RR.
+    if (
+      tagAsInbound &&
+      officialInboundUnits >= 10 &&
+      (isInternationalPhone(phone) || source.toLowerCase().includes("spanish"))
+    ) {
+      aeForRR = HS_USER_IDS.KRIS;
+    }
   }
 
   // Upsert contact + company and associate them. Errors are caught internally per operation.
@@ -721,6 +749,13 @@ export async function osInboundLeadRouter({
     ...(siteUrl ? [`*Site:* ${esc(siteUrl)}`] : []),
     `*Properties:* ${officialInboundUnits}`,
     ...(pmsMeta ? [`*PMS:* ${esc(pmsMeta)}`] : []),
+    ...(salesRepEmail
+      ? [
+          `*Meeting Booked For:* ${
+            overrideOwnerId ? slackMention(overrideOwnerId) : esc(salesRepEmail)
+          }`,
+        ]
+      : []),
     ...(intentMeta ? [`*Intent:* ${esc(intentMeta)}`] : []),
     ...(queryParams ? [`*URL params:* \`${esc(queryParams)}\``] : []),
     `\n`,
