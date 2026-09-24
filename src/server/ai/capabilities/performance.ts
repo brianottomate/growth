@@ -138,7 +138,7 @@ export const featuredHomesAction = growthAction({
 
 export const suggestFeaturedHomesAction = growthAction({
   description:
-    "Suggest which homes a Performance brand should feature: its hallmark homes, ranked on direct-site bookings over 12 months, then how the home sells across all channels over 90 days, then reviews, with one look at the shortlist's hero photos to break ties. Returns the picks and the scored shortlist. Read-only: show the operator the picks with their numbers, and feature them with performanceWrite.updateHome only after they agree. Open nights are context, never a reason to drop a home: a booked-out hallmark home still earns the click.",
+    "Suggest which homes a Performance brand should feature: its hallmark homes, ranked on direct-site bookings over 12 months, then how the home sells across all channels over 90 days, then reviews, with one look at the shortlist's hero photos to break ties. Returns the picks and the scored shortlist. Read-only itself; when the operator asked for featured homes, feature the picks with performanceWrite.updateHome straight away and show the numbers, since featuring is reversible and reviewed on the Setup page. Open nights are context, never a reason to drop a home: a booked-out hallmark home still earns the click.",
   inputSchema: z.object({
     brandId: brandIdInput,
     count: z
