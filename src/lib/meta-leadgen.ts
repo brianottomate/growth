@@ -151,6 +151,19 @@ export function isQualified(units: number | null): boolean {
   return units !== null && units >= QUALIFIED_MIN_UNITS;
 }
 
+const NOT_A_BOOKING_SITE =
+  /airbnb\.|vrbo\.|facebook\.com|instagram\.com|sites\.google\.com/i;
+
+/**
+ * The booking-site answer, or null when it isn't one. Most answers are an
+ * Airbnb/VRBO/social link or a sentence, and the router looks up the HubSpot
+ * company by this domain (Make dropped the same answers).
+ */
+function bookingSite(raw: string | null): string | null {
+  if (!raw || /[\s@]/.test(raw) || !raw.includes(".")) return null;
+  return NOT_A_BOOKING_SITE.test(raw) ? null : raw;
+}
+
 /** The contact fields the inbound router needs, pulled from Meta's field names. */
 export function leadContact(fields: LeadFieldData) {
   const fullName = answer(fields, (n) => n === "full_name");
@@ -169,9 +182,11 @@ export function leadContact(fields: LeadFieldData) {
       fields,
       (n) => n === "phone_number" || n === "work_phone_number",
     ),
-    siteUrl: answer(
-      fields,
-      (n) => n.includes("direct_booking") || n.startsWith("comparte_el_link"),
+    siteUrl: bookingSite(
+      answer(
+        fields,
+        (n) => n.includes("direct_booking") || n.startsWith("comparte_el_link"),
+      ),
     ),
     pms: answer(fields, (n) => n.includes("pms")),
   };

@@ -36,19 +36,17 @@ import {
 type ReceivedVia = "webhook" | "poll";
 
 const HOUR = 3_600_000;
-/** How long a ledger row keeps retrying. */
+/** How far back the backfill drains unfinished ledger rows. */
 const RETRY_WINDOW = 7 * 24 * HOUR;
-/** A failed handoff retries for a day, then stops so Slack isn't paged hourly. */
-const ROUTE_RETRY_WINDOW = 24 * HOUR;
 
 /**
  * Leads created before `META_LEADGEN_ROUTE_FROM` stay with Make, so turning
  * routing on never replays a lead Make already handed to HubSpot.
  */
-function routeCutoff(now = Date.now()): Date | null {
-  if (!env.META_LEADGEN_ROUTE_FROM) return null;
-  const from = new Date(env.META_LEADGEN_ROUTE_FROM).getTime();
-  return new Date(Math.max(from, now - ROUTE_RETRY_WINDOW));
+function routeCutoff(): Date | null {
+  return env.META_LEADGEN_ROUTE_FROM
+    ? new Date(env.META_LEADGEN_ROUTE_FROM)
+    : null;
 }
 
 function shouldRoute(row: MetaLeadgenLead, leadCreatedAt: Date | null) {
@@ -94,7 +92,7 @@ function isDone(row: MetaLeadgenLead): boolean {
 type Step = "capiSentAt" | "routedAt";
 
 /**
- * Stamp a step before doing it, so a webhook worker and the cron racing on
+ * Stamp a step before doing it, so a webhook redelivery and a backfill racing on
  * the same lead can't both send. A failed step releases its claim.
  */
 async function claim(rowId: string, step: Step): Promise<boolean> {
@@ -157,7 +155,7 @@ async function routeLead(
 /**
  * Fetch, qualify and act on one lead. Idempotent: the CAPI event and the router
  * handoff each run once, stamped on the row, so webhook redeliveries and the
- * polling cron can both call this freely.
+ * backfill script can both call this freely.
  */
 export async function processLead({
   leadgenId,
@@ -275,9 +273,9 @@ export async function processNotifications(
 }
 
 /**
- * Safety net for dropped webhooks (and the only path until the Page is
- * subscribed): read every active form's leads since `hoursBack` and process
- * anything not finished. Meta accepts CAPI events up to 7 days old.
+ * Backfill for leads the webhook missed (`scripts/backfill-meta-leadgen.ts`):
+ * read every active form's leads since `hoursBack` and process anything not
+ * finished, then drain unfinished ledger rows up to 7 days old.
  */
 export async function pollRecentLeads({ hoursBack }: { hoursBack: number }) {
   const pageToken = await fetchPageAccessToken();

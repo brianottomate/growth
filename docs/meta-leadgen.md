@@ -1,7 +1,7 @@
 # Meta lead ads → Growth
 
 Meta Lead Ads submissions for WanderOS now land in Growth directly: a Page
-webhook plus an hourly retry cron. Growth qualifies each lead from its form
+webhook, with a manual backfill script for anything it misses. Growth qualifies each lead from its form
 answers and sends the qualified-lead event to Meta itself. This replaces the
 Make.com "Meta→HubSpot v2" scenarios and the HubSpot lifecycle-stage bridge
 that never fired.
@@ -15,7 +15,7 @@ wander, wander.com, tracking and sites) is tracked in
 | Piece | Where |
 | --- | --- |
 | Webhook (handshake + signed POST) | `src/app/api/webhooks/meta-leadgen/route.ts` |
-| Retry rail, hourly on `:00` | `src/app/api/cron/meta-leadgen/route.ts` (`?hoursBack=` up to 168 for a backfill) |
+| Backfill (manual) | `bun run meta-leadgen:backfill --hours 24` under `doppler run --config prd` (up to 168 h) |
 | Qualification rules, signature, payload parsing | `src/lib/meta-leadgen.ts` (+ tests) |
 | Graph + Conversions API client | `src/server/clients/meta-leadgen.client.ts` |
 | Orchestration, idempotency | `src/server/services/meta-leadgen.service.ts` |
@@ -29,12 +29,14 @@ the unit count → if 10+ send `Marketing Qualified Lead` to pixel
 round robin, Slack).
 
 Each step claims its stamp (`capi_sent_at`, `routed_at`) with a conditional
-update before it runs, so a webhook worker and the cron racing on one lead
-can't both send; a failed step releases the claim and the cron retries it. A
-handoff only counts when HubSpot returns a contact id (the router swallows its
-own HubSpot errors). The cron re-reads the last 3 h of every active form, then
-drains any unfinished ledger row up to 7 days old; a failed handoff stops
-retrying after 24 h so Slack isn't paged hourly.
+update before it runs, so a webhook redelivery and a backfill run on the same
+lead can't both send; a failed step releases the claim and records
+`last_error`. A handoff only counts when HubSpot returns a contact id (the
+router swallows its own HubSpot errors). Nothing retries on its own: run
+`bun run meta-leadgen:backfill --hours N` (under `doppler run --config prd`),
+which re-reads every active form's last N hours and drains any unfinished
+ledger row up to 7 days old. The hourly cron was dropped 2026-09-24 in favour
+of this.
 
 ### Qualification
 
@@ -69,7 +71,8 @@ maps the Conditional form's buckets.
   `META_LEADS_APP_SECRET`, `META_LEADGEN_VERIFY_TOKEN`.
 - Page **Leads Access → CRMs** lists Wander Growth Leads (assigned
   2026-09-23). Without it Meta verifies the callback but never POSTs a lead;
-  Graph reads still work through the system user, so only the cron delivers.
+  Graph reads still work through the system user, so only the backfill
+  delivers.
 - The Page carries 68 active forms, 62 of them marketplace guest waitlists.
   Only forms that ask the unit question are routed to HubSpot
   (`isOperatorLead`). The separate "WanderOS" Page `1035111979680271` has OS

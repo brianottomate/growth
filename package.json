@@ -18,6 +18,7 @@
     "db:apply:brand-ad-previews": "bun --conditions=react-server scripts/apply-brand-ad-previews-schema.ts",
     "db:apply:launch": "bun --conditions=react-server scripts/apply-launch-schema.ts",
     "db:apply:meta-leadgen": "bun --conditions=react-server scripts/apply-meta-leadgen-schema.ts",
+    "meta-leadgen:backfill": "bun --conditions=react-server scripts/backfill-meta-leadgen.ts",
     "db:apply:cycle-paid-columns": "bun --conditions=react-server scripts/apply-cycle-paid-columns.ts",
     "db:apply:lifecycle-split": "bun --conditions=react-server scripts/apply-lifecycle-split.ts",
     "db:apply:pregen-verdict": "bun --conditions=react-server scripts/apply-pregen-verdict-schema.ts",

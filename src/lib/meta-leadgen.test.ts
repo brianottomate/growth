@@ -143,3 +143,14 @@ test("guest waitlist leads are not operator leads, so they are never routed", ()
     ]),
   ).toBe(true);
 });
+
+test("only a real booking site reaches HubSpot's company lookup", () => {
+  const site = (answer: string) =>
+    leadContact([field("share_your_direct_booking_site_url", answer)]).siteUrl;
+  expect(site("www.watsonmountain.com")).toBe("www.watsonmountain.com");
+  expect(site("https://www.airbnb.com/rooms/123")).toBeNull();
+  expect(site("vrbo.com/12345")).toBeNull();
+  expect(site("facebook.com/mycabins")).toBeNull();
+  expect(site("i only have a listing on airbnb")).toBeNull();
+  expect(site("none")).toBeNull();
+});

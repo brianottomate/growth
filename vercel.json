@@ -55,10 +55,6 @@
     {
       "path": "/api/cron/pregen-send-queue",
       "schedule": "0 15 * * *"
-    },
-    {
-      "path": "/api/cron/meta-leadgen",
-      "schedule": "0 * * * *"
     }
   ]
 }
