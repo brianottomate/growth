@@ -730,11 +730,9 @@ export async function osInboundLeadRouter({
   const slackText =
     source === "Onboarding"
       ? resolveOnboardingSlackHeadline(onboardingComplete, orgId)
-      : source === "Wander Listed Application"
-        ? `:wander: *New Wander Listed Application*`
-        : pmsMeta
-          ? `:wander: *New Meta Form Submission*`
-          : `:wander: *New WanderOS Email Signup*`;
+      : source.includes("Meta")
+        ? `:wander: *New Meta Form Submission*`
+        : `:wander: *New Inbound Activity*`;
 
   const headerLines = [slackText, `*Source:* ${esc(source)}`];
 
