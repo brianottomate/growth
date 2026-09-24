@@ -749,6 +749,13 @@ export async function osInboundLeadRouter({
     ...(siteUrl ? [`*Site:* ${esc(siteUrl)}`] : []),
     `*Properties:* ${officialInboundUnits}`,
     ...(pmsMeta ? [`*PMS:* ${esc(pmsMeta)}`] : []),
+    ...(salesRepEmail
+      ? [
+          `*Meeting Booked For:* ${
+            overrideOwnerId ? slackMention(overrideOwnerId) : esc(salesRepEmail)
+          }`,
+        ]
+      : []),
     ...(intentMeta ? [`*Intent:* ${esc(intentMeta)}`] : []),
     ...(queryParams ? [`*URL params:* \`${esc(queryParams)}\``] : []),
     `\n`,
