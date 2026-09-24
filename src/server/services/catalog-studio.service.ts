@@ -12,6 +12,7 @@ import {
 import { fetchWanderOsListingDetail } from "@/server/clients/wanderos-site.client";
 import {
   catalogArtworkIssues,
+  catalogCardCopy,
   catalogDraft,
   catalogExportRows,
   type CatalogCard,
@@ -61,6 +62,7 @@ async function catalogRows(brandId: string) {
       amenities: true,
       description: true,
       galleryCache: true,
+      rating: true,
       catalogTitle: true,
       catalogSubtitle: true,
       catalogTemplateId: true,
@@ -124,6 +126,9 @@ async function catalogHomes(brand: CatalogBrand, refresh = false) {
           ...home,
           amenities: row.amenities ?? home.amenities,
           gallery: row.galleryCache ?? home.gallery,
+          // Ingestion keeps the rating on the row; the cached inventory can
+          // predate it.
+          rating: row.rating ?? home.rating,
         }
       : home;
   });
@@ -455,8 +460,7 @@ export async function renderCatalogExport(
                 sourceMediaAssetId: sourceId,
                 templateId: card.templateId,
                 formatId: format,
-                title: card.title,
-                subtitle: card.subtitle,
+                ...catalogCardCopy(card),
                 imagePosition: card.imagePosition,
                 mark: card.showLogo ? "auto" : "none",
                 assetTitle: `${home.name} · ${format}`,

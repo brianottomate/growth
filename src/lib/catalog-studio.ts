@@ -4,7 +4,7 @@ import {
   compositionTemplateIdSchema,
   type CompositionFormatId,
 } from "./compositions";
-import { homeCatalogCopy } from "./home-ad-previews";
+import { homeCatalogCopy, ratingOutOfFive } from "./home-ad-previews";
 import {
   hotelFeedRows,
   type HotelFeedHome,
@@ -29,6 +29,8 @@ export const catalogCardSchema = z.object({
   subtitle: z.string().max(220),
   imagePosition: z.enum(["top", "center", "bottom"]),
   showLogo: z.boolean(),
+  /** The home's guest rating out of 5, for the catalog-place pill. */
+  rating: z.number().nullable().optional(),
 });
 export type CatalogCard = z.infer<typeof catalogCardSchema>;
 export type CatalogDraft = {
@@ -39,7 +41,7 @@ export type CatalogDraft = {
 /**
  * One home's catalog decisions, as its `home` row stores them. Anything null
  * or absent is the default the card computes: the amenity headline, the
- * bed/bath/guest line, the hero photo, the catalog-copy template.
+ * bed/bath/guest line, the hero photo, the catalog-place template.
  */
 export type CatalogOverrides = {
   title?: string | null;
@@ -110,14 +112,44 @@ export function catalogDraft(
             : {}),
           imageUrl: o.image?.url ?? home.imageUrl!,
           ...(o.image ? { assetId: o.image.assetId } : {}),
-          templateId: o.templateId ?? "catalog-copy",
+          // The listing card: place statement, facts and the rating pill.
+          templateId: o.templateId ?? "catalog-place",
           title:
             o.title ?? [copy.eyebrow, copy.title].filter(Boolean).join(" "),
           subtitle: o.subtitle ?? copy.subtitle,
           imagePosition: o.imagePosition ?? "center",
           showLogo: o.showLogo ?? true,
+          rating: ratingOutOfFive(home.rating),
         };
       }),
+  };
+}
+
+/**
+ * The copy fields a card's template draws. The card stores one headline
+ * ("Rooftop deck in Louisville, KY") so editing and every template share it.
+ * Catalog-place sets the lead-in and the place apart, so there the headline
+ * splits on its last " in ": the lead-in keeps the "in", which the renderer
+ * hands over to the place line. A headline with no " in " is all place.
+ */
+export function catalogCardCopy(card: CatalogCard): {
+  title: string;
+  eyebrow?: string;
+  subtitle: string;
+  rating?: number;
+} {
+  const base = {
+    subtitle: card.subtitle,
+    ...(card.rating ? { rating: card.rating } : {}),
+  };
+  if (card.templateId !== "catalog-place")
+    return { ...base, title: card.title };
+  const at = card.title.lastIndexOf(" in ");
+  if (at <= 0) return { ...base, title: card.title };
+  return {
+    ...base,
+    eyebrow: card.title.slice(0, at + 3),
+    title: card.title.slice(at + 4),
   };
 }
 

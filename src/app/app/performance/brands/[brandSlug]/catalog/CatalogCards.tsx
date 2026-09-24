@@ -16,6 +16,7 @@ import { MediaPickerDialog } from "@/app/app/content/[contentId]/MediaPickerDial
 import { COMPOSITION_FORMATS, COMPOSITION_TEMPLATES } from "@/lib/compositions";
 import {
   catalogArtworkIssues,
+  catalogCardCopy,
   type CatalogCard,
   type CatalogDraft,
   type CatalogHome,
@@ -38,15 +39,18 @@ async function readResponse<T = unknown>(response: Response): Promise<T> {
 const PORTRAIT = COMPOSITION_FORMATS.find((f) => f.id === "portrait")!;
 function preview(brandId: string, card: CatalogCard) {
   if (card.mode === "finished") return card.finishedArtwork?.url;
+  const copy = catalogCardCopy(card);
   const params = new URLSearchParams({
     brandId,
     templateId: card.templateId,
     formatId: PORTRAIT.id,
-    title: card.title,
-    subtitle: card.subtitle,
+    title: copy.title,
+    subtitle: copy.subtitle,
     imagePosition: card.imagePosition,
     mark: card.showLogo ? "auto" : "none",
   });
+  if (copy.eyebrow) params.set("eyebrow", copy.eyebrow);
+  if (copy.rating) params.set("rating", String(copy.rating));
   params.set(
     card.assetId ? "sourceMediaAssetId" : "sourceUrl",
     card.assetId ?? card.imageUrl,

@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import {
   catalogArtworkIssues,
+  catalogCardCopy,
   catalogDraft,
   catalogExportRows,
   catalogFeedCsv,
@@ -37,7 +38,7 @@ test("a card is its defaults until its row overrides a field", () => {
   // A null override is the default, not an empty line.
   expect(draft.cards[0]?.subtitle).toBe("8 guests");
   expect(draft.cards[1]?.included).toBe(true);
-  expect(draft.cards[1]?.templateId).toBe("catalog-copy");
+  expect(draft.cards[1]?.templateId).toBe("catalog-place");
 });
 test("a card draws on the home's hero unless it has its own library image", () => {
   const own = { assetId: "media_1", url: "https://media.example.com/own.jpg" };
@@ -96,7 +97,7 @@ test("finished artwork keeps the composition underneath it", () => {
     format: "portrait",
   });
   expect(draft.cards[0]?.imageUrl).toBe(homes[0]!.imageUrl);
-  expect(draft.cards[0]?.templateId).toBe("catalog-copy");
+  expect(draft.cards[0]?.templateId).toBe("catalog-place");
   expect(catalogArtworkIssues(draft)).toEqual([]);
 });
 test("finished artwork requires an original and cannot silently generate other export sizes", () => {
@@ -116,4 +117,32 @@ test("finished artwork requires an original and cannot silently generate other e
   card.included = true;
   card.mode = "compose";
   expect(catalogArtworkIssues(draft)).toEqual([]);
+});
+
+test("catalog-place splits the headline into lead-in and place", () => {
+  const card = {
+    homeId: "h",
+    included: true,
+    imageUrl: "https://example.com/a.jpg",
+    templateId: "catalog-place" as const,
+    title: "Speakeasy-Chic Suite in Louisville, KY",
+    subtitle: "4 bedrooms",
+    imagePosition: "center" as const,
+    showLogo: true,
+    rating: 4.9,
+  };
+  expect(catalogCardCopy(card)).toEqual({
+    eyebrow: "Speakeasy-Chic Suite in",
+    title: "Louisville, KY",
+    subtitle: "4 bedrooms",
+    rating: 4.9,
+  });
+  // No " in ": the whole headline is the place line.
+  expect(catalogCardCopy({ ...card, title: "Louisville, KY" }).title).toBe(
+    "Louisville, KY",
+  );
+  // Other templates draw the headline whole.
+  expect(catalogCardCopy({ ...card, templateId: "catalog-copy" }).title).toBe(
+    card.title,
+  );
 });
