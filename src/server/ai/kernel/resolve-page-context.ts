@@ -41,6 +41,20 @@ export async function resolvePageContext(
           columns: { id: true, name: true, slug: true },
         })
       : undefined;
+  // Brand pages under /app/performance carry the slug, not the account id.
+  // Resolve the brand's account here so the agent is not left listing every
+  // account to find it. Kept out of `label`, which names what the URL names.
+  const brandAccount =
+    !account && brand
+      ? await db.query.performanceAccountTable.findFirst({
+          where: and(
+            eq(performanceAccountTable.brandId, brand.id),
+            eq(performanceAccountTable.organizationId, organizationId),
+            isNull(performanceAccountTable.deletedAt),
+          ),
+          columns: { id: true, name: true, brandId: true, status: true },
+        })
+      : undefined;
   const platformCampaign =
     brand && route.platformCampaignId
       ? await db.query.platformCampaignTable.findFirst({
@@ -81,7 +95,7 @@ export async function resolvePageContext(
     campaign: campaign ?? null,
     platformCampaign: platformCampaign ?? null,
     home: home ?? null,
-    account: account ?? null,
+    account: account ?? brandAccount ?? null,
     label:
       [
         brand?.name,

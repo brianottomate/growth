@@ -20,11 +20,11 @@ import {
 import "server-only";
 import { appliedEvidenceSchema } from "@/lib/applied-evidence";
 
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/server/db";
-import { brandTable } from "@/server/db/schema";
+import { brandTable, homeTable } from "@/server/db/schema";
 
 import { PUSHABLE_AD_PLATFORMS } from "@/lib/ad-platforms";
 
@@ -63,6 +63,13 @@ import {
 import { promoteBrandToClient } from "@/server/services/brand-relationship.service";
 
 import { syncZernioAds } from "@/server/services/ads-sync.service";
+import {
+  addWanderOsHome,
+  HomeError,
+  listBrandHomes,
+  removeBrandHome,
+} from "@/server/services/homes.service";
+import { requireOwnedBrand } from "./brand-access";
 
 import { growthAction, GrowthActionError } from "./types";
 
@@ -85,6 +92,111 @@ export const getPerformanceAccountAction = growthAction({
   inputSchema: z.object({ accountId: z.string().min(1) }),
   execute: (input, ctx) =>
     getPerformanceAccount(actorFrom(ctx), input.accountId),
+});
+
+const brandIdInput = z
+  .string()
+  .startsWith("brand_")
+  .describe("The brand_ ID from the page context or a brand lookup.");
+
+export const featuredHomesAction = growthAction({
+  description:
+    "The homes picked as featured for a Performance brand: the grid on its Setup page, in display order. Ads, previews and the setup checklist work from these homes only.",
+  inputSchema: z.object({ brandId: brandIdInput }),
+  outputSchema: z.object({
+    homes: z.array(
+      z.object({
+        homeId: z.string(),
+        listingId: z.string().nullable(),
+        name: z.string(),
+        url: z.string(),
+        place: z.string(),
+        bedrooms: z.number().nullable(),
+        guests: z.number().nullable(),
+      }),
+    ),
+  }),
+  examples: [{ brandId: "brand_winterpark" }],
+  execute: async (input, ctx) => {
+    const brand = await requireOwnedBrand(input.brandId, ctx);
+    const homes = await listBrandHomes(brand.id);
+    return {
+      homes: homes.map((home) => ({
+        homeId: home.id,
+        listingId: home.source === "wanderos" ? home.externalId : null,
+        name: home.name,
+        url: home.url,
+        place: [home.city, home.state].filter(Boolean).join(", "),
+        bedrooms: home.bedrooms,
+        guests: home.guests,
+      })),
+    };
+  },
+});
+
+const featureResultSchema = z.object({
+  featured: z.array(
+    z.object({ listingId: z.string(), homeId: z.string(), name: z.string() }),
+  ),
+  failed: z.array(z.object({ listingId: z.string(), reason: z.string() })),
+});
+
+export const featureHomesAction = growthAction({
+  description:
+    "Feature homes for a Performance brand: pick them onto its Setup page grid, which is what ads and previews draw from. Pass WanderOS listing ids from mediaLibraryRead.listingPhotos. Idempotent: a home already featured is refreshed. This only picks homes; it makes no ads. Undo with unfeatureHomes.",
+  inputSchema: z.object({
+    brandId: brandIdInput,
+    listingIds: z.array(z.string().min(1)).min(1).max(24),
+  }),
+  outputSchema: featureResultSchema,
+  examples: [{ brandId: "brand_winterpark", listingIds: ["611347385"] }],
+  execute: async (input, ctx) => {
+    const brand = await requireOwnedBrand(input.brandId, ctx);
+    const result: z.infer<typeof featureResultSchema> = {
+      featured: [],
+      failed: [],
+    };
+    // Sequential: each pick reads the feed and fetches that home's gallery.
+    for (const listingId of new Set(input.listingIds)) {
+      try {
+        const home = await addWanderOsHome({
+          brandId: brand.id,
+          website: brand.website,
+          externalId: listingId,
+        });
+        result.featured.push({ listingId, homeId: home.id, name: home.name });
+      } catch (error) {
+        if (!(error instanceof HomeError)) throw error;
+        result.failed.push({ listingId, reason: error.message });
+      }
+    }
+    return result;
+  },
+});
+
+export const unfeatureHomesAction = growthAction({
+  description:
+    "Take homes off a Performance brand's featured set. The homes stay on record with their catalog cards and heroes; they just leave the Setup grid.",
+  inputSchema: z.object({
+    brandId: brandIdInput,
+    listingIds: z.array(z.string().min(1)).min(1).max(24),
+  }),
+  outputSchema: z.object({ unfeatured: z.array(z.string()) }),
+  examples: [{ brandId: "brand_winterpark", listingIds: ["611347385"] }],
+  execute: async (input, ctx) => {
+    const brand = await requireOwnedBrand(input.brandId, ctx);
+    const rows = await db.query.homeTable.findMany({
+      where: and(
+        eq(homeTable.brandId, brand.id),
+        inArray(homeTable.externalId, input.listingIds),
+        isNull(homeTable.deletedAt),
+      ),
+      columns: { id: true, externalId: true },
+    });
+    for (const row of rows)
+      await removeBrandHome({ brandId: brand.id, homeId: row.id });
+    return { unfeatured: rows.map((row) => row.externalId) };
+  },
 });
 
 export const clientCampaignContextAction = growthAction({

@@ -120,6 +120,7 @@ export const growthActionPolicies = {
     searchAttachableCampaigns: read(),
     sponsoredAbandonment: read(),
     clientCampaignContext: read(),
+    featuredHomes: read(),
     intakes: read(),
     previewIntakeApply: read(),
   },
@@ -154,6 +155,17 @@ export const growthActionPolicies = {
     syncCampaigns: write({
       consequence: "background-run",
       idempotent: true,
+    }),
+    // Flips `featured` on our own home rows after reading the brand's site
+    // feed. Un-featuring keeps the row, so each is the other's undo.
+    featureHomes: write({
+      idempotent: true,
+      consequence: "provider-read",
+      undoWith: "performanceWrite.unfeatureHomes",
+    }),
+    unfeatureHomes: write({
+      idempotent: true,
+      undoWith: "performanceWrite.featureHomes",
     }),
   },
   personaWrite: {

@@ -334,13 +334,26 @@ export function OverviewAssistantPopup({
                   : "Assistant"}
               </h2>
             )}
-            <p className="truncate text-[11px] text-muted-foreground">
-              {contextMode === "pinned"
-                ? (pinnedLabel ?? "Conversation focus")
-                : (pageQuery.data?.label ??
-                  activeBrand?.name ??
-                  "Current workspace")}
-            </p>
+            <div className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+              <p className="truncate">
+                {contextMode === "pinned"
+                  ? (pinnedLabel ?? "Conversation focus")
+                  : (pageQuery.data?.label ??
+                    activeBrand?.name ??
+                    "Current workspace")}
+              </p>
+              {/* Shown so a screenshot of the chat names its thread; click copies. */}
+              {activeThreadId && (
+                <button
+                  type="button"
+                  onClick={() => void copyThreadId()}
+                  className="shrink-0 rounded font-mono text-[10px] text-muted-foreground/70 hover:text-foreground"
+                  title="Copy thread ID"
+                >
+                  {activeThreadId}
+                </button>
+              )}
+            </div>
           </div>
           <Button
             type="button"

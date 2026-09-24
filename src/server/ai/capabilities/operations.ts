@@ -54,6 +54,7 @@ import {
   channelPlatformEnum,
   channelTable,
   connectionStatusEnum,
+  homeTable,
   mediaAssetTable,
   mediaVideoAnalysisTable,
   mixTargetTable,
@@ -1130,6 +1131,8 @@ export const OPERATION_TOOLS = {
 } as const;
 
 const listingPhotoShape = z.object({
+  /** The WanderOS listing id: what performanceWrite.featureHomes and adsWrite.buildAdSet take. */
+  listingId: z.string(),
   name: z.string(),
   url: z.string(),
   imageUrl: z.string(),
@@ -1137,6 +1140,8 @@ const listingPhotoShape = z.object({
   place: z.string(),
   /** Set when this hero is already in the library; use it instead of importing. */
   mediaAssetId: z.string().nullable(),
+  /** Already picked on the Performance setup page. */
+  featured: z.boolean(),
 });
 
 /**
@@ -1145,7 +1150,7 @@ const listingPhotoShape = z.object({
  */
 export const listListingPhotos = growthAction({
   description:
-    "The homes on an owned brand's WanderOS site with each one's hero photo URL, straight from the site's feed. Search by home name, listing ID or URL with query; paginate with offset/nextOffset to reach the whole portfolio. Nothing is imported. Use it to see what there is to work with, then mediaLibraryWrite.importListingPhotos for the ones worth keeping, or adsWrite.draftAdsFromHomes to turn them into cards in one step. Empty for a brand whose website is not a WanderOS site.",
+    "The homes on an owned brand's WanderOS site with each one's listing id, hero photo URL, and whether it is already featured, straight from the site's feed. Search by home name, listing ID or URL with query; paginate with offset/nextOffset to reach the whole portfolio. One unfiltered call returns up to 48 homes, so read the portfolio once rather than searching home by home. Nothing is imported. Use it to see what there is to work with, then mediaLibraryWrite.importListingPhotos for the ones worth keeping, or adsWrite.draftAdsFromHomes to turn them into cards in one step. Empty for a brand whose website is not a WanderOS site.",
   inputSchema: z.object({
     brandId: z.string(),
     query: z.string().trim().max(200).optional(),
@@ -1173,11 +1178,22 @@ export const listListingPhotos = growthAction({
             .includes(query.toLowerCase()),
       );
     const listings = matching.slice(offset, offset + limit);
-    const imported = await Promise.all(
-      listings.map((row) =>
-        findImportedImage({ brandId: brand.id, url: row.imageUrl! }),
+    const [imported, featuredRows] = await Promise.all([
+      Promise.all(
+        listings.map((row) =>
+          findImportedImage({ brandId: brand.id, url: row.imageUrl! }),
+        ),
       ),
-    );
+      db.query.homeTable.findMany({
+        where: and(
+          eq(homeTable.brandId, brand.id),
+          eq(homeTable.featured, true),
+          isNull(homeTable.deletedAt),
+        ),
+        columns: { externalId: true },
+      }),
+    ]);
+    const featured = new Set(featuredRows.map((row) => row.externalId));
     return {
       brandId: brand.id,
       hasSite: Boolean(brand.website),
@@ -1187,12 +1203,14 @@ export const listListingPhotos = growthAction({
           ? offset + listings.length
           : null,
       homes: listings.map((row, index) => ({
+        listingId: row.id,
         name: row.name,
         url: row.url,
         imageUrl: row.imageUrl!,
         thumbUrl: row.thumbUrl ?? row.imageUrl!,
         place: [row.city, row.state].filter(Boolean).join(", "),
         mediaAssetId: imported[index]?.id ?? null,
+        featured: featured.has(row.id),
       })),
     };
   },

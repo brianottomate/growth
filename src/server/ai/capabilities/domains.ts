@@ -180,6 +180,9 @@ import {
   updatePerformanceCycleAction,
   updatePerformancePropertyAction,
   clientCampaignContextAction,
+  featuredHomesAction,
+  featureHomesAction,
+  unfeatureHomesAction,
   listIntakesAction,
   previewIntakeApplyAction,
   applyIntakeAction,
@@ -252,6 +255,7 @@ export const performanceRead = growthDomainTool({
     searchAttachableCampaigns: searchAttachableCampaignsAction,
     sponsoredAbandonment: listSponsoredAbandonmentAction,
     clientCampaignContext: clientCampaignContextAction,
+    featuredHomes: featuredHomesAction,
     intakes: listIntakesAction,
     previewIntakeApply: previewIntakeApplyAction,
   },
@@ -259,7 +263,7 @@ export const performanceRead = growthDomainTool({
 
 export const performanceWrite = growthDomainTool({
   description:
-    "Manage Performance accounts: onboard clients, add their homes, open and update billing cycles, and attach existing delivery (campaigns, lifecycle campaigns, amplification targets) to a cycle. Never creates ads or sends anything.",
+    "Manage Performance accounts: onboard clients, add their homes, feature homes on a brand's Setup page, open and update billing cycles, and attach existing delivery (campaigns, lifecycle campaigns, amplification targets) to a cycle. Never creates ads or sends anything.",
   actions: {
     createAccount: createPerformanceAccountAction,
     updateAccount: updatePerformanceAccountAction,
@@ -273,6 +277,8 @@ export const performanceWrite = growthDomainTool({
     promoteToClient: promoteToClientAction,
     applyIntake: applyIntakeAction,
     verifyIntakeAccess: verifyIntakeAccessAction,
+    featureHomes: featureHomesAction,
+    unfeatureHomes: unfeatureHomesAction,
   },
 });
 
