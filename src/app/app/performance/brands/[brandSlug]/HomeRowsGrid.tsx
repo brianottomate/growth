@@ -17,7 +17,8 @@ export type RowHome = {
   externalId: string;
   name: string;
   url: string;
-  heroSourceUrl: string | null;
+  /** The hero's gallery thumbnail; the full file is too heavy for a tile. */
+  heroThumbUrl: string | null;
   featured: boolean;
   facts: string;
 };
@@ -107,10 +108,10 @@ export function HomeRowsGrid({
                 href={`/app/performance/brands/${brandSlug}/homes/${home.externalId}`}
                 className="block"
               >
-                {home.heroSourceUrl ? (
+                {home.heroThumbUrl ? (
                   // oxlint-disable-next-line nextjs/no-img-element
                   <img
-                    src={home.heroSourceUrl}
+                    src={home.heroThumbUrl}
                     alt={home.name}
                     loading="lazy"
                     className="aspect-[4/3] w-full bg-muted object-cover transition-opacity group-hover:opacity-90"

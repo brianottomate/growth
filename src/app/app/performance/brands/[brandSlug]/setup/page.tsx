@@ -101,15 +101,22 @@ export default async function PerformanceBrandHomesPage({
   // The picker offers the featured homes once there are any, else them all.
   const withHero = heroHomes.filter((home) => home.heroSourceUrl);
   const featuredWithHero = withHero.filter((home) => home.featured);
+  const slug = brand.slug ?? brand.id;
+  // Tiles draw the hero's gallery thumbnail, a fifth the weight of the file.
+  const heroThumb = (home: {
+    heroSourceUrl: string | null;
+    galleryCache?: { url: string; thumbUrl: string }[] | null;
+  }) =>
+    home.galleryCache?.find((photo) => photo.url === home.heroSourceUrl)
+      ?.thumbUrl ?? home.heroSourceUrl;
   const heroOptions = (
     featuredWithHero.length > 0 ? featuredWithHero : withHero
   ).map((home) => ({
     name: home.name,
     url: home.url,
     imageUrl: home.heroSourceUrl!,
-    thumbUrl: null,
+    thumbUrl: heroThumb(home),
   }));
-  const slug = brand.slug ?? brand.id;
   const factsOf = (home: {
     bedrooms: number | null;
     guests: number | null;
@@ -224,7 +231,7 @@ export default async function PerformanceBrandHomesPage({
             externalId: home.externalId,
             name: home.name,
             url: home.url,
-            heroSourceUrl: home.heroSourceUrl,
+            heroThumbUrl: heroThumb(home),
             featured: home.featured,
             facts: factsOf(home),
           }))}

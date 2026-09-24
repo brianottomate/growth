@@ -39,6 +39,16 @@ const CTA = "Explore your next escape";
 // and last feed card, image-hero between, tall-statement on the story
 // canvas), plus the catalog card.
 const STARTER: Card[] = [
+  // Squares first, then the tall story, then the wide landscape.
+  {
+    templateId: "catalog-copy",
+    formatId: "portrait",
+    label: "Catalog",
+    fields: (home, brandName) => ({
+      title: home?.name ?? brandName,
+      subtitle: home?.facts ?? "",
+    }),
+  },
   {
     templateId: "hero-overlay",
     formatId: "portrait",
@@ -65,15 +75,6 @@ const STARTER: Card[] = [
     formatId: "landscape",
     label: "Landscape",
     fields: (home, brandName) => ({ title: home?.name ?? brandName, cta: CTA }),
-  },
-  {
-    templateId: "catalog-copy",
-    formatId: "portrait",
-    label: "Catalog",
-    fields: (home, brandName) => ({
-      title: home?.name ?? brandName,
-      subtitle: home?.facts ?? "",
-    }),
   },
 ];
 
