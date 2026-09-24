@@ -93,6 +93,9 @@ export default async function PerformanceBrandHomesPage({
           heroSourceUrl: home.imageUrl ?? null,
           featured: false,
         }));
+  // The hero's own row, for the card's facts, photos and link. Absent when
+  // the hero is a library photo or the brand is not ingested yet.
+  const heroRow = rows.find((home) => home.url === brand.featuredListingUrl);
   const previewHome = resolvePreviewHome({
     brandName: brand.name,
     featuredListingUrl: brand.featuredListingUrl,
@@ -183,7 +186,15 @@ export default async function PerformanceBrandHomesPage({
       />
       <HeroCard
         brandId={brand.id}
-        hero={previewHome}
+        hero={
+          previewHome
+            ? {
+                name: previewHome.name,
+                imageUrl: previewHome.imageUrl,
+                ...(heroRow ? heroCardDetail(heroRow, slug) : {}),
+              }
+            : null
+        }
         options={heroOptions}
         heroUrl={brand.featuredListingUrl}
       />
@@ -287,4 +298,36 @@ export default async function PerformanceBrandHomesPage({
       )}
     </div>
   );
+}
+
+/** What the hero card shows beyond the photo, read from the hero's row. */
+function heroCardDetail(
+  home: Awaited<ReturnType<typeof listAllBrandHomes>>[number],
+  slug: string,
+) {
+  // Some feeds rate out of 10; the card reads out of 5 like the listing.
+  const rating =
+    home.rating == null
+      ? null
+      : home.rating > 5
+        ? home.rating / 2
+        : home.rating;
+  return {
+    place: [home.city, home.state].filter(Boolean).join(", ") || null,
+    facts: [
+      home.bedrooms ? `${home.bedrooms} bd` : null,
+      home.bathrooms ? `${home.bathrooms} ba` : null,
+      home.guests ? `${home.guests} guests` : null,
+      rating ? `★${rating.toFixed(1)}` : null,
+      home.nightlyFrom ? `from $${home.nightlyFrom}/night` : null,
+    ]
+      .filter(Boolean)
+      .join(" · "),
+    photos: (home.galleryCache ?? [])
+      .filter((photo) => photo.url !== home.heroSourceUrl)
+      .slice(0, 5)
+      .map((photo) => photo.thumbUrl || photo.url),
+    photoCount: home.galleryCache?.length ?? 0,
+    href: `/app/performance/brands/${slug}/homes/${home.externalId}`,
+  };
 }

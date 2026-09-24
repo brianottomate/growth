@@ -115,11 +115,16 @@ export function PickedHomes({
           </span>
         </div>
         {ready ? (
-          <ButtonLink href={campaignsHref} size="sm">
+          <ButtonLink href={campaignsHref} size="sm" variant="outline">
             Continue to Campaigns
           </ButtonLink>
         ) : (
-          <Button size="sm" disabled title="Pick at least three homes">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled
+            title="Pick at least three homes"
+          >
             Continue to Campaigns
           </Button>
         )}

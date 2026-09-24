@@ -446,6 +446,7 @@ export async function listAllBrandHomes(brandId: string) {
       bathrooms: true,
       guests: true,
       rating: true,
+      nightlyFrom: true,
       heroSourceUrl: true,
       featured: true,
       galleryCache: true,
