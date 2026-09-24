@@ -68,6 +68,14 @@ export type SetUpClientIntent = {
   visibleText: string;
 };
 
+/** "Suggest featured homes": the chat ranks the brand's homes and proposes a set. */
+export type SuggestFeaturedHomesIntent = {
+  type: "suggest_featured_homes";
+  brandId: string;
+  brandName: string;
+  visibleText: string;
+};
+
 /** "Define personas for this brand": the chat reads the brand and proposes them. */
 export type DefinePersonasIntent = {
   type: "define_personas";
@@ -118,6 +126,7 @@ export type AssistantIntent =
   | WorkCatalogHomeIntent
   | StartClientCampaignIntent
   | DefinePersonasIntent
+  | SuggestFeaturedHomesIntent
   | SetUpClientIntent
   | PlanTwoWeeksIntent
   | WorkContentIntent

@@ -68,6 +68,7 @@ import {
   setHomeFeatured,
   setHomeHero,
 } from "@/server/services/homes.service";
+import { suggestFeaturedHomes } from "@/server/services/featured-home-suggestions.service";
 import { requireOwnedBrand } from "./brand-access";
 
 import { growthAction, GrowthActionError } from "./types";
@@ -132,6 +133,49 @@ export const featuredHomesAction = growthAction({
         heroSourceUrl: home.heroSourceUrl,
       })),
     };
+  },
+});
+
+export const suggestFeaturedHomesAction = growthAction({
+  description:
+    "Suggest which homes a Performance brand should feature: its hallmark homes, ranked on direct-site bookings over 12 months, then how the home sells across all channels over 90 days, then reviews, with one look at the shortlist's hero photos to break ties. Returns the picks and the scored shortlist. Read-only: show the operator the picks with their numbers, and feature them with performanceWrite.updateHome only after they agree. Open nights are context, never a reason to drop a home: a booked-out hallmark home still earns the click.",
+  inputSchema: z.object({
+    brandId: brandIdInput,
+    count: z
+      .number()
+      .int()
+      .min(3)
+      .max(6)
+      .default(5)
+      .describe(
+        "How many to feature. Spend goes further on a few strong bets.",
+      ),
+  }),
+  outputSchema: z.object({
+    picks: z.array(z.string()),
+    candidates: z.array(
+      z.object({
+        homeId: z.string(),
+        listingId: z.string(),
+        name: z.string(),
+        directBookings: z.number(),
+        directValue: z.number(),
+        sold90: z.number().nullable(),
+        open60: z.number().nullable(),
+        reviews: z.number(),
+        reviewScore: z.number().nullable(),
+        picked: z.boolean(),
+      }),
+    ),
+  }),
+  examples: [{ brandId: "brand_winterpark", count: 5 }],
+  execute: async (input, ctx) => {
+    const brand = await requireOwnedBrand(input.brandId, ctx);
+    return suggestFeaturedHomes({
+      brandId: brand.id,
+      brandName: brand.name,
+      count: input.count,
+    });
   },
 });
 

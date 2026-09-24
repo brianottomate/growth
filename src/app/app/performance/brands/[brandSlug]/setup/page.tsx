@@ -20,7 +20,8 @@ import { HomeRowsGrid } from "../HomeRowsGrid";
 import { HomesStrip } from "../HomesStrip";
 import { AddHomesByHand } from "../AddHomesByHand";
 import { PickedHomes, type PickedHome } from "../PickedHomes";
-import { loadPerformanceBrand } from "../_data";
+import { brandTabHref, loadPerformanceBrand } from "../_data";
+import { ButtonLink } from "@/components/ui/button";
 import { resolvePreviewHome } from "../_preview-home";
 
 export const metadata: Metadata = { title: "Setup · Wander Performance" };
@@ -201,8 +202,13 @@ export default async function PerformanceBrandHomesPage({
         identity={brand.brandIdentity ?? null}
         previewHome={previewHome}
       />
-      {committed.length > 0 ? (
-        <PickedHomes brandId={brand.id} brandSlug={slug} picked={pickedHomes} />
+      {committed.length > 0 || feedRows.length > 0 ? (
+        <PickedHomes
+          brandId={brand.id}
+          brandName={brand.name}
+          brandSlug={slug}
+          picked={pickedHomes}
+        />
       ) : null}
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <SectionLabel>
@@ -211,18 +217,13 @@ export default async function PerformanceBrandHomesPage({
             ? ` · ${feedRows.length || homes.length}`
             : ""}
         </SectionLabel>
-        <div className="flex items-center gap-3 text-[11.5px]">
-          {brand.website ? (
-            <a
-              href={brand.website}
-              target="_blank"
-              rel="noreferrer"
-              className="text-sky-300 hover:underline"
-            >
-              Their site
-            </a>
-          ) : null}
-        </div>
+        <ButtonLink
+          href={brandTabHref(slug, "catalog")}
+          size="sm"
+          variant="outline"
+        >
+          Continue to Catalog
+        </ButtonLink>
       </div>
       {feedRows.length > 0 ? (
         <HomeRowsGrid

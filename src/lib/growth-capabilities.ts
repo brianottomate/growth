@@ -45,6 +45,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "sponsoredAbandonment",
     "clientCampaignContext",
     "featuredHomes",
+    "suggestFeaturedHomes",
     "intakes",
     "previewIntakeApply",
   ],

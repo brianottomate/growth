@@ -5,12 +5,13 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { Loader2, Trash2 } from "lucide-react";
+import { Loader2, MessageSquare, Trash2 } from "lucide-react";
 
 import { Button, ButtonLink } from "@/components/ui/button";
 import { DeleteAlert } from "@/components/ui/alert-dialog";
 import { cn } from "@/components/ui/lib/utils";
 import { toast } from "@/components/ui/toast";
+import { sendAssistantIntent } from "@/lib/assistant-events";
 import { orpc } from "@/orpc/client";
 
 /** A committed home (a `home` row), enriched from its feed listing when matched. */
@@ -62,10 +63,12 @@ function factsLine(home: PickedHome): string {
  */
 export function PickedHomes({
   brandId,
+  brandName,
   brandSlug,
   picked,
 }: {
   brandId: string;
+  brandName: string;
   brandSlug: string;
   picked: PickedHome[];
 }) {
@@ -99,7 +102,7 @@ export function PickedHomes({
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-baseline gap-2">
           <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-            In focus
+            Featured homes
           </span>
           <span
             className={cn(
@@ -123,10 +126,26 @@ export function PickedHomes({
       </div>
 
       {picked.length === 0 ? (
-        <p className="rounded-xl border border-dashed px-3 py-6 text-center text-xs text-muted-foreground">
-          Nothing in focus yet. Tick homes below to build the set the ads run
-          on.
-        </p>
+        <div className="space-y-3 rounded-xl border border-dashed px-3 py-6 text-center text-xs text-muted-foreground">
+          <p>
+            No featured homes yet. Tick homes below, or let the chat rank them
+            on bookings and reviews and suggest a set.
+          </p>
+          <Button
+            size="sm"
+            onClick={() =>
+              sendAssistantIntent({
+                type: "suggest_featured_homes",
+                brandId,
+                brandName,
+                visibleText: `Suggest which ${brandName} homes to feature.`,
+              })
+            }
+          >
+            <MessageSquare className="size-3.5" />
+            Suggest featured homes
+          </Button>
+        </div>
       ) : (
         <div className="grid gap-2.5 sm:grid-cols-2">
           {picked.map((home) => {

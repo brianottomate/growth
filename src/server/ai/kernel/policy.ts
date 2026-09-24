@@ -123,6 +123,8 @@ export const growthActionPolicies = {
     sponsoredAbandonment: read(),
     clientCampaignContext: read(),
     featuredHomes: read(),
+    // BigQuery reads plus one look at the shortlist's hero photos.
+    suggestFeaturedHomes: read("model-read"),
     intakes: read(),
     previewIntakeApply: read(),
   },
