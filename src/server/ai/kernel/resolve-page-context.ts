@@ -38,7 +38,12 @@ export async function resolvePageContext(
                 )
               : eq(brandTable.id, account!.brandId!),
           ),
-          columns: { id: true, name: true, slug: true },
+          columns: {
+            id: true,
+            name: true,
+            slug: true,
+            featuredListingUrl: true,
+          },
         })
       : undefined;
   // Brand pages under /app/performance carry the slug, not the account id.

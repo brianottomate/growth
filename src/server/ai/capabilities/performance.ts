@@ -112,6 +112,7 @@ export const featuredHomesAction = growthAction({
         place: z.string(),
         bedrooms: z.number().nullable(),
         guests: z.number().nullable(),
+        heroSourceUrl: z.string().nullable(),
       }),
     ),
   }),
@@ -128,6 +129,7 @@ export const featuredHomesAction = growthAction({
         place: [home.city, home.state].filter(Boolean).join(", "),
         bedrooms: home.bedrooms,
         guests: home.guests,
+        heroSourceUrl: home.heroSourceUrl,
       })),
     };
   },

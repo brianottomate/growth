@@ -95,7 +95,7 @@ export async function composePageContextSection(options: {
 
   const page = await resolvePageContext(pathname, options.organizationId);
   if (page.label)
-    return `${header}\nVerified page context: ${page.label}. ${page.brand ? `brandId: ${page.brand.id}.` : ""} ${page.campaign ? `campaignId: ${page.campaign.id}. Read adsRead.openCampaign before editing.` : ""} ${page.platformCampaign ? `platformCampaignId: ${page.platformCampaign.id}.` : ""} ${page.home ? `homeId: ${page.home.id}.` : ""} ${page.account ? `accountId: ${page.account.id}, status: ${page.account.status}.` : ""}\n${guidanceForPath(pathname) ?? ""}`;
+    return `${header}\nVerified page context: ${page.label}. ${page.brand ? `brandId: ${page.brand.id}. Brand hero: ${page.brand.featuredListingUrl ?? "none set"}.` : ""} ${page.campaign ? `campaignId: ${page.campaign.id}. Read adsRead.openCampaign before editing.` : ""} ${page.platformCampaign ? `platformCampaignId: ${page.platformCampaign.id}.` : ""} ${page.home ? `homeId: ${page.home.id}.` : ""} ${page.account ? `accountId: ${page.account.id}, status: ${page.account.status}.` : ""}\n${guidanceForPath(pathname) ?? ""}`;
 
   const seriesId = /^\/app\/series\/([^/]+)$/.exec(pathname)?.[1];
   if (seriesId) {

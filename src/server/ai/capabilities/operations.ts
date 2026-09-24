@@ -1144,6 +1144,8 @@ const listingPhotoShape = z.object({
   mediaAssetId: z.string().nullable(),
   /** Already picked on the Performance setup page. */
   featured: z.boolean(),
+  /** The photo the home's ads lead with, set at ingestion from the site's cover. */
+  heroSourceUrl: z.string().nullable(),
 });
 
 /**
@@ -1152,12 +1154,12 @@ const listingPhotoShape = z.object({
  */
 export const listListingPhotos = growthAction({
   description:
-    "The homes on an owned brand's WanderOS site with each one's homeId, listing id, hero photo URL, and whether it is already featured, straight from the site's feed. Search by home name, listing ID or URL with query; paginate with offset/nextOffset to reach the whole portfolio. One unfiltered call returns up to 48 homes, so read the portfolio once rather than searching home by home. Nothing is imported. Use it to see what there is to work with, then mediaLibraryWrite.importListingPhotos for the ones worth keeping, or adsWrite.draftAdsFromHomes to turn them into cards in one step. Empty for a brand whose website is not a WanderOS site.",
+    "The homes on an owned brand's WanderOS site with each one's homeId, listing id, feed cover URL, its hero photo, and whether it is already featured, straight from the site's feed. Search by home name, listing ID or URL with query; paginate with offset/nextOffset to reach the whole portfolio. One unfiltered call returns up to 100 homes, so read the portfolio once rather than paging or searching home by home. Nothing is imported. Use it to see what there is to work with, then mediaLibraryWrite.importListingPhotos for the ones worth keeping, or adsWrite.draftAdsFromHomes to turn them into cards in one step. Empty for a brand whose website is not a WanderOS site.",
   inputSchema: z.object({
     brandId: z.string(),
     query: z.string().trim().max(200).optional(),
     offset: z.number().int().min(0).default(0),
-    limit: z.number().int().min(1).max(48).default(24),
+    limit: z.number().int().min(1).max(100).default(100),
   }),
   outputSchema: z.object({
     brandId: z.string(),
@@ -1191,7 +1193,12 @@ export const listListingPhotos = growthAction({
           eq(homeTable.brandId, brand.id),
           isNull(homeTable.deletedAt),
         ),
-        columns: { id: true, externalId: true, featured: true },
+        columns: {
+          id: true,
+          externalId: true,
+          featured: true,
+          heroSourceUrl: true,
+        },
       }),
     ]);
     const rowByListing = new Map(homeRows.map((row) => [row.externalId, row]));
@@ -1213,6 +1220,7 @@ export const listListingPhotos = growthAction({
         place: [row.city, row.state].filter(Boolean).join(", "),
         mediaAssetId: imported[index]?.id ?? null,
         featured: rowByListing.get(row.id)?.featured ?? false,
+        heroSourceUrl: rowByListing.get(row.id)?.heroSourceUrl ?? null,
       })),
     };
   },
