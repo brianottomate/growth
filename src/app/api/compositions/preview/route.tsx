@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { compositionPreviewSchema } from "@/lib/compositions";
+import { compositionPreviewFromParams } from "@/lib/compositions";
 import { getSession } from "@/server/better-auth/server";
 import {
   CompositionAccessError,
@@ -19,29 +19,7 @@ export async function GET(request: NextRequest) {
   }
 
   const params = request.nextUrl.searchParams;
-  // A photo by URL instead of a library asset: the on-demand previews on the
-  // brand page draw straight from a client's listing feed. The service checks
-  // the host; here it only has to be present when no asset is.
-  const sourceUrl = params.get("sourceUrl") || null;
-  const parsed = compositionPreviewSchema.safeParse({
-    brandId: params.get("brandId"),
-    templateId: params.get("templateId"),
-    formatId: params.get("formatId"),
-    sourceMediaAssetId: params.get("sourceMediaAssetId") || undefined,
-    title: params.get("title"),
-    subtitle: params.get("subtitle") || undefined,
-    eyebrow: params.get("eyebrow") || undefined,
-    cta: params.get("cta") || undefined,
-    accent: params.get("accent") || undefined,
-    imagePosition: params.get("imagePosition") || "center",
-    focal:
-      params.get("focalX") && params.get("focalY")
-        ? { x: Number(params.get("focalX")), y: Number(params.get("focalY")) }
-        : undefined,
-    scrim: params.get("scrim") || undefined,
-    rating: params.get("rating") ? Number(params.get("rating")) : undefined,
-    mark: params.get("mark") || "auto",
-  });
+  const { sourceUrl, parsed } = compositionPreviewFromParams(params);
   if (!parsed.success) {
     return NextResponse.json(
       { error: parsed.error.issues[0]?.message ?? "Invalid composition" },

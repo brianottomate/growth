@@ -33,6 +33,10 @@ import {
   performanceSettingsPatchSchema,
   setPerformanceSettings,
 } from "@/server/services/performance-settings.service";
+import {
+  draftBrandStory,
+  setBrandStory,
+} from "@/server/services/brand-story.service";
 import { growthAction } from "./types";
 
 /** Brand ids for the org — shared by other org-scoped capabilities. */
@@ -135,22 +139,26 @@ export const addBrandAdPreviewAction = growthAction({
  */
 export const updateBrandAction = growthAction({
   description:
-    "Update an owned brand's fields. Send only the keys to change. heroHomeId sets the brand's hero, the one home that stands for the brand in its previews; null clears it. heroImageUrl picks which photo the previews draw: one of the hero home's photos, or a library image; without it the hero home's own hero photo is used. Nothing is chosen on the brand's behalf, so a brand with no hero shows none until one is set.",
+    "Update an owned brand's fields. Send only the keys to change. story is the brand story: the short brief every creative prompt for this brand reads (what makes it itself, who books, voice, what to avoid); send the whole new text, keeping everything still true, and keep it brief. heroHomeId sets the brand's hero, the one home that stands for the brand in its previews; null clears it. heroImageUrl picks which photo the previews draw: one of the hero home's photos, or a library image; without it the hero home's own hero photo is used. Nothing is chosen on the brand's behalf, so a brand with no hero shows none until one is set.",
   inputSchema: z
     .object({
       brandId: z.string().min(1),
       heroHomeId: z.string().min(1).nullable().optional(),
       heroImageUrl: z.string().url().nullable().optional(),
+      story: z.string().max(4000).nullable().optional(),
     })
     .refine(
       (value) =>
-        value.heroHomeId !== undefined || value.heroImageUrl !== undefined,
+        value.heroHomeId !== undefined ||
+        value.heroImageUrl !== undefined ||
+        value.story !== undefined,
       { message: "Send at least one field to change." },
     ),
   outputSchema: z.object({
     brandId: z.string(),
     heroListingUrl: z.string().nullable(),
     heroImageUrl: z.string().nullable(),
+    story: z.string().nullable(),
   }),
   examples: [{ brandId: "brand_winterpark", heroHomeId: "home_01" }],
   execute: async (input, ctx) => {
@@ -164,6 +172,7 @@ export const updateBrandAction = growthAction({
         id: true,
         featuredListingUrl: true,
         previewSourceUrl: true,
+        story: true,
       },
     });
     if (!brand)
@@ -191,12 +200,41 @@ export const updateBrandAction = growthAction({
       listingUrl = home.url;
       sourceUrl = input.heroImageUrl ?? home.heroSourceUrl;
     }
-    await setBrandPreviewSource({ brandId: brand.id, listingUrl, sourceUrl });
+    if (input.heroHomeId !== undefined || input.heroImageUrl !== undefined)
+      await setBrandPreviewSource({ brandId: brand.id, listingUrl, sourceUrl });
+    const story =
+      input.story !== undefined
+        ? (await setBrandStory({ brandId: brand.id, story: input.story })).story
+        : brand.story;
     return {
       brandId: brand.id,
       heroListingUrl: listingUrl,
       heroImageUrl: sourceUrl,
+      story,
     };
+  },
+});
+
+export const draftBrandStoryAction = growthAction({
+  description:
+    "Draft the brand story from what the brand already shows (its site identity, its homes, and a few things guests said) and save it. Use it once at setup, or when the operator asks to start the story over; to add to an existing story, use brandWrite.update with story instead.",
+  inputSchema: z.object({ brandId: z.string().min(1) }),
+  outputSchema: z.object({ story: z.string().nullable() }),
+  examples: [{ brandId: "brand_winterpark" }],
+  execute: async (input, ctx) => {
+    const brand = await db.query.brandTable.findFirst({
+      where: and(
+        eq(brandTable.id, input.brandId),
+        eq(brandTable.organizationId, ctx.orgId),
+        isNull(brandTable.deletedAt),
+      ),
+      columns: { id: true },
+    });
+    if (!brand)
+      throw new Error(
+        "That brand is not available in the active organization.",
+      );
+    return draftBrandStory({ brandId: brand.id });
   },
 });
 

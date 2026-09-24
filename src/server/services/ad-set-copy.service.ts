@@ -1,4 +1,5 @@
 import "server-only";
+import { brandStorySection } from "@/server/ai/prompts";
 
 import { anthropic } from "@ai-sdk/anthropic";
 import { Output, generateText } from "ai";
@@ -167,6 +168,8 @@ export function deterministicSetCopy(
  */
 export async function writeAdSetCopy(input: {
   brandName: string;
+  /** The brand story every creative prompt for the brand reads. */
+  brandStory: string | null;
   homes: CopyHome[];
 }): Promise<AdSetCopy> {
   if (input.homes.length === 0) {
@@ -220,6 +223,10 @@ export async function writeAdSetCopy(input: {
         "",
         "Vary the hooks across homes. Do not start every home the same way.",
         "No exclamation marks, no all-caps, no hashtags, no invented superlatives.",
+        brandStorySection({
+          brandName: input.brandName,
+          story: input.brandStory,
+        }),
       ].join("\n"),
       prompt: [
         `Property manager: ${input.brandName}`,

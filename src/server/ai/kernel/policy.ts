@@ -98,6 +98,11 @@ export const growthActionPolicies = {
     setPerformanceSettings: write({ idempotent: true }),
     // Plain brand fields; writing the old values back is the undo.
     update: write({ idempotent: true, undoWith: "brandWrite.update" }),
+    // Writes the story from one model call; undo by writing the old text back.
+    draftStory: write({
+      consequence: "model-write",
+      undoWith: "brandWrite.update",
+    }),
   },
   productAtlasRead: { list: read(), get: read() },
   productAtlasWrite: { create: write(), update: write({ idempotent: true }) },
@@ -125,6 +130,8 @@ export const growthActionPolicies = {
     featuredHomes: read(),
     // BigQuery reads plus one look at the shortlist's hero photos.
     suggestFeaturedHomes: read("model-read"),
+    // Renders cards onto sheets and asks one model call; writes nothing.
+    reviewPortfolio: read("model-read"),
     intakes: read(),
     previewIntakeApply: read(),
   },

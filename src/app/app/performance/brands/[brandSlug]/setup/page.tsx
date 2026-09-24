@@ -15,6 +15,7 @@ import {
 } from "@/server/services/homes.service";
 
 import { SectionLabel } from "../../../_components";
+import { BrandStoryCard } from "../BrandStoryCard";
 import { HeroCard } from "../HeroCard";
 import { HomeRowsGrid } from "../HomeRowsGrid";
 import { HomesStrip } from "../HomesStrip";
@@ -184,6 +185,7 @@ export default async function PerformanceBrandHomesPage({
         identity={brand.brandIdentity ?? null}
         website={brand.website}
       />
+      <BrandStoryCard brandId={brand.id} story={brand.story} />
       <HeroCard
         brandId={brand.id}
         hero={

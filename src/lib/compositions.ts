@@ -387,3 +387,33 @@ export function getCompositionMetadata(
 ) {
   return { ...getCompositionIdentity(spec), renderedAt };
 }
+
+/**
+ * A preview URL's query as a composition: what `/api/compositions/preview`
+ * draws, and what a server-side render of the same URL draws. `sourceUrl` is
+ * a photo by URL instead of a library asset; the service checks its host.
+ */
+export function compositionPreviewFromParams(params: URLSearchParams) {
+  return {
+    sourceUrl: params.get("sourceUrl") || null,
+    parsed: compositionPreviewSchema.safeParse({
+      brandId: params.get("brandId"),
+      templateId: params.get("templateId"),
+      formatId: params.get("formatId"),
+      sourceMediaAssetId: params.get("sourceMediaAssetId") || undefined,
+      title: params.get("title"),
+      subtitle: params.get("subtitle") || undefined,
+      eyebrow: params.get("eyebrow") || undefined,
+      cta: params.get("cta") || undefined,
+      accent: params.get("accent") || undefined,
+      imagePosition: params.get("imagePosition") || "center",
+      focal:
+        params.get("focalX") && params.get("focalY")
+          ? { x: Number(params.get("focalX")), y: Number(params.get("focalY")) }
+          : undefined,
+      scrim: params.get("scrim") || undefined,
+      rating: params.get("rating") ? Number(params.get("rating")) : undefined,
+      mark: params.get("mark") || "auto",
+    }),
+  };
+}

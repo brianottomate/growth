@@ -41,6 +41,10 @@ import {
   setHomeMedia,
 } from "@/server/services/homes.service";
 import { inspirationAddress } from "@/lib/inbound-email";
+import {
+  draftBrandStory,
+  setBrandStory,
+} from "@/server/services/brand-story.service";
 import { enrichBrandFromWebsite } from "@/server/services/brand-enrichment.service";
 import {
   removeBrandAdPreview,
@@ -606,6 +610,27 @@ export const brandRouter = {
    * brand's organization, so a home id is enough. Null clears the pick back
    * to the first photo on their feed.
    */
+  /** Setup: save the brand story as the operator edited it. */
+  setStory: protectedProcedure
+    .input(
+      z.object({
+        brandId: z.string().min(1),
+        story: z.string().max(4000).nullable(),
+      }),
+    )
+    .handler(async ({ context: ctx, input }) => {
+      const brand = await assertBrandManageable(ctx, input.brandId);
+      return setBrandStory({ brandId: brand.id, story: input.story });
+    }),
+
+  /** Setup: draft the brand story from the site, the homes and the guests. */
+  draftStory: protectedProcedure
+    .input(z.object({ brandId: z.string().min(1) }))
+    .handler(async ({ context: ctx, input }) => {
+      const brand = await assertBrandManageable(ctx, input.brandId);
+      return draftBrandStory({ brandId: brand.id });
+    }),
+
   /** Setup: tick a home into the featured set, or out of it. */
   homesSetFeatured: protectedProcedure
     .input(z.object({ homeId: z.string().min(1), featured: z.boolean() }))

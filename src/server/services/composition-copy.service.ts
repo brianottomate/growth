@@ -1,4 +1,5 @@
 import "server-only";
+import { brandStorySection } from "@/server/ai/prompts";
 
 import { anthropic } from "@ai-sdk/anthropic";
 import { generateText, Output } from "ai";
@@ -77,6 +78,7 @@ export async function writeCompositionCopy(input: {
       website: true,
       tagline: true,
       description: true,
+      story: true,
       organizationId: true,
       brandIdentity: true,
       brandFingerprint: true,
@@ -148,6 +150,7 @@ export async function writeCompositionCopy(input: {
         "You write the words printed on a paid-social ad card for a vacation-rental brand. Use only the facts given. Never invent amenities, ratings, distances, prices or availability. No exclamation marks, no all-caps, no emoji, no hashtags.",
         "Write in the brand's own voice when you are told what it is; otherwise plain, warm and specific.",
         "Return null for any field the layout does not use.",
+        brandStorySection({ brandName: brand.name, story: brand.story }),
       ].join("\n"),
       prompt: [
         `Brand: ${brand.name}${brand.tagline ? ` — ${brand.tagline}` : ""}.`,

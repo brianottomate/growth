@@ -139,6 +139,7 @@ type OwnedBrand = {
   id: string;
   name: string;
   website: string | null;
+  story: string | null;
   relationship: string | null;
 };
 
@@ -152,7 +153,13 @@ async function requireOwnedBrand(input: {
       eq(brandTable.organizationId, input.orgId),
       isNull(brandTable.deletedAt),
     ),
-    columns: { id: true, name: true, website: true, relationship: true },
+    columns: {
+      id: true,
+      name: true,
+      website: true,
+      relationship: true,
+      story: true,
+    },
   });
   if (!brand) throw new AdSetError(404, "Brand not found");
   return brand;
@@ -173,6 +180,7 @@ async function requireOwnedAd(
           website: true,
           relationship: true,
           organizationId: true,
+          story: true,
         },
       },
     },
@@ -651,7 +659,11 @@ export async function buildAdSet(input: {
   // look right.
   const copy =
     input.copy === "ai"
-      ? await writeAdSetCopy({ brandName: brand.name, homes: copyHomes })
+      ? await writeAdSetCopy({
+          brandName: brand.name,
+          brandStory: brand.story,
+          homes: copyHomes,
+        })
       : deterministicSetCopy(copyHomes, brand.name);
 
   const plan = buildPerformanceAdPlan({
@@ -1778,6 +1790,7 @@ export async function writeSetCopy(input: {
   const orderedIds = externalIds.filter((id) => homeById.has(id));
   const copy = await writeAdSetCopy({
     brandName: brand.name,
+    brandStory: brand.story,
     homes: orderedIds.map((id) => homeById.get(id)!),
   });
   const copyByHome = new Map(

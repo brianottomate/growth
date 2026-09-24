@@ -6,6 +6,7 @@ import { ImageResponse } from "next/og";
 import {
   type CompositionSpec,
   type FreezeCompositionInput,
+  compositionPreviewFromParams,
   compositionSpecSchema,
   getCompositionFormat,
   getCompositionIdentity,
@@ -1860,4 +1861,27 @@ export async function openComposition(input: {
     assetTitle: asset.title ?? "Composition",
     direction: direction ?? null,
   };
+}
+
+/**
+ * Draw a composition preview URL (`/api/compositions/preview?...`) on the
+ * server, as the route would for this user, and return the PNG. For reviews
+ * that need to see drafted cards whose only image is their recipe URL.
+ */
+export async function renderCompositionUrl(userId: string, url: string) {
+  const { sourceUrl, parsed } = compositionPreviewFromParams(
+    new URL(url, "http://local").searchParams,
+  );
+  if (!parsed.success)
+    throw new Error(parsed.error.issues[0]?.message ?? "Invalid composition");
+  const context = await resolveCompositionContext(userId, parsed.data, {
+    sourceUrl,
+  });
+  const response = renderComposition(
+    parsed.data,
+    await loadCompositionSource(context),
+  );
+  // Copy the bytes: Buffer.from(arrayBuffer) is a view onto memory the
+  // renderer reuses, so a kept buffer turned into the next card's pixels.
+  return Buffer.from(new Uint8Array(await response.arrayBuffer()));
 }

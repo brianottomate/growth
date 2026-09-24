@@ -25,6 +25,7 @@
     "db:apply:pregen-verdict": "bun --conditions=react-server scripts/apply-pregen-verdict-schema.ts",
     "db:apply:persona-demand-geography": "bun --conditions=react-server scripts/apply-persona-demand-geography.ts",
     "db:apply:home-gallery-cache": "bun --conditions=react-server scripts/apply-home-gallery-cache.ts",
+    "db:apply:brand-story": "bun --conditions=react-server scripts/apply-brand-story.ts",
     "hubspot:import:companies": "bun --conditions=react-server scripts/import-hubspot-company-export.ts",
     "hubspot:process:webhooks": "bun --conditions=react-server scripts/process-hubspot-webhook-backlog.ts",
     "hubspot:build:sales-email-corpus": "bun --conditions=react-server scripts/build-hubspot-sales-email-corpus.ts",

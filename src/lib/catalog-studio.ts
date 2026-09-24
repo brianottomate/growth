@@ -153,6 +153,32 @@ export function catalogCardCopy(card: CatalogCard): {
   };
 }
 
+/**
+ * The URL a card draws at: its finished artwork, or its composition on the
+ * portrait canvas the catalog runs in. Shared by the Catalog tab and the
+ * server-side portfolio review, so both see the same card.
+ */
+export function catalogCardPreviewUrl(brandId: string, card: CatalogCard) {
+  if (card.mode === "finished") return card.finishedArtwork?.url;
+  const copy = catalogCardCopy(card);
+  const params = new URLSearchParams({
+    brandId,
+    templateId: card.templateId,
+    formatId: "portrait",
+    title: copy.title,
+    subtitle: copy.subtitle,
+    imagePosition: card.imagePosition,
+    mark: card.showLogo ? "auto" : "none",
+  });
+  if (copy.eyebrow) params.set("eyebrow", copy.eyebrow);
+  if (copy.rating) params.set("rating", String(copy.rating));
+  params.set(
+    card.assetId ? "sourceMediaAssetId" : "sourceUrl",
+    card.assetId ?? card.imageUrl,
+  );
+  return `/api/compositions/preview?${params}`;
+}
+
 /** One feed row per included home, using only its frozen primary image. */
 export function catalogExportRows(
   homes: CatalogHome[],

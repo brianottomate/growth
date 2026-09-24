@@ -10,6 +10,7 @@ import { brandAvatarUrl, loadPerformanceBrand } from "../_data";
 import { MAX_SET_HOMES } from "@/lib/performance-ads";
 
 import { AdPreviewsWorkspace, type WorkspaceHome } from "./AdPreviewsWorkspace";
+import { ReviewInChatButton } from "../ReviewInChatButton";
 import { toMatrixHomes } from "./matrix/build";
 
 export const metadata: Metadata = {
@@ -112,12 +113,21 @@ export default async function PerformanceBrandAdsPage({
         <h1 className="text-lg font-semibold">
           Unassigned creatives · {drafted.length}
         </h1>
-        <Link
-          className="text-sm underline"
-          href={`/app/performance/brands/${slug}/campaigns`}
-        >
-          View campaign ads
-        </Link>
+        <div className="flex items-center gap-3">
+          {drafted.length > 0 ? (
+            <ReviewInChatButton
+              brandId={brand.id}
+              brandName={brand.name}
+              surface="ads"
+            />
+          ) : null}
+          <Link
+            className="text-sm underline"
+            href={`/app/performance/brands/${slug}/campaigns`}
+          >
+            View campaign ads
+          </Link>
+        </div>
       </div>
       <AdPreviewsWorkspace
         brandId={brand.id}

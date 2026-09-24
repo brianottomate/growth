@@ -16,7 +16,7 @@ import { MediaPickerDialog } from "@/app/app/content/[contentId]/MediaPickerDial
 import { COMPOSITION_FORMATS, COMPOSITION_TEMPLATES } from "@/lib/compositions";
 import {
   catalogArtworkIssues,
-  catalogCardCopy,
+  catalogCardPreviewUrl,
   type CatalogCard,
   type CatalogDraft,
   type CatalogHome,
@@ -25,6 +25,7 @@ import {
 import { amenityHeadlineOptions } from "@/lib/home-amenities";
 import { place } from "@/lib/home-ad-previews";
 import { sendAssistantIntent } from "@/lib/assistant-events";
+import { ReviewInChatButton } from "../ReviewInChatButton";
 
 async function readResponse<T = unknown>(response: Response): Promise<T> {
   const body: unknown = await response.json();
@@ -37,26 +38,7 @@ async function readResponse<T = unknown>(response: Response): Promise<T> {
   return body as T;
 }
 const PORTRAIT = COMPOSITION_FORMATS.find((f) => f.id === "portrait")!;
-function preview(brandId: string, card: CatalogCard) {
-  if (card.mode === "finished") return card.finishedArtwork?.url;
-  const copy = catalogCardCopy(card);
-  const params = new URLSearchParams({
-    brandId,
-    templateId: card.templateId,
-    formatId: PORTRAIT.id,
-    title: copy.title,
-    subtitle: copy.subtitle,
-    imagePosition: card.imagePosition,
-    mark: card.showLogo ? "auto" : "none",
-  });
-  if (copy.eyebrow) params.set("eyebrow", copy.eyebrow);
-  if (copy.rating) params.set("rating", String(copy.rating));
-  params.set(
-    card.assetId ? "sourceMediaAssetId" : "sourceUrl",
-    card.assetId ?? card.imageUrl,
-  );
-  return `/api/compositions/preview?${params}`;
-}
+const preview = catalogCardPreviewUrl;
 export function CatalogCards({
   brandId,
   brandName = "",
@@ -218,6 +200,11 @@ export function CatalogCards({
               {draft.cards.length} homes included
             </span>
             <div className="flex gap-2">
+              <ReviewInChatButton
+                brandId={brandId}
+                brandName={brandName}
+                surface="catalog"
+              />
               <Button
                 variant="outline"
                 disabled={busy}

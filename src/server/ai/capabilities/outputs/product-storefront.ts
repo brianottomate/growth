@@ -433,6 +433,7 @@ const brandSchema = z.strictObject({
   deliveryStageAt: z.iso.datetime().nullable(),
   description: z.string().nullable(),
   featuredListingUrl: z.string().nullable(),
+  story: z.string().nullable(),
   followerCount: z.number().nullable(),
   id: z.string(),
   industryResearch: industryResearchSchema.nullable(),

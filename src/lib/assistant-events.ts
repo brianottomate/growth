@@ -68,6 +68,17 @@ export type SetUpClientIntent = {
   visibleText: string;
 };
 
+/** "Review in chat": the chat reviews a whole set of creative and fixes what it finds. */
+export type ReviewPortfolioIntent = {
+  type: "review_portfolio";
+  brandId: string;
+  brandName: string;
+  surface: "catalog" | "ads";
+  /** For ads: the campaign under review; absent for the draft set. */
+  campaignId?: string;
+  visibleText: string;
+};
+
 /** "Suggest featured homes": the chat ranks the brand's homes and proposes a set. */
 export type SuggestFeaturedHomesIntent = {
   type: "suggest_featured_homes";
@@ -127,6 +138,7 @@ export type AssistantIntent =
   | StartClientCampaignIntent
   | DefinePersonasIntent
   | SuggestFeaturedHomesIntent
+  | ReviewPortfolioIntent
   | SetUpClientIntent
   | PlanTwoWeeksIntent
   | WorkContentIntent

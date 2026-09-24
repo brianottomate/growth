@@ -69,6 +69,7 @@ import {
   setHomeHero,
 } from "@/server/services/homes.service";
 import { suggestFeaturedHomes } from "@/server/services/featured-home-suggestions.service";
+import { reviewPortfolio } from "@/server/services/portfolio-review.service";
 import { requireOwnedBrand } from "./brand-access";
 
 import { growthAction, GrowthActionError } from "./types";
@@ -174,7 +175,50 @@ export const suggestFeaturedHomesAction = growthAction({
     return suggestFeaturedHomes({
       brandId: brand.id,
       brandName: brand.name,
+      brandStory: brand.story,
       count: input.count,
+    });
+  },
+});
+
+export const reviewPortfolioAction = growthAction({
+  description:
+    "Review a brand's creative as a set: every included catalog card (surface catalog), or every ad of a campaign or of the brand's draft set with no campaign (surface ads). Renders the cards onto numbered sheets and returns an overall read plus up to twelve surgical notes, each naming one card by homeId or adId. Changes nothing itself. Present the overall read, then apply the notes you agree with directly, one card at a time, with the per-card tools (adsWrite.editCatalogCard and adsWrite.setHomeHero for catalog cards; adsWrite.setAdCopy, adsWrite.replaceAdCard or adsWrite.editAdCards for ads), and report what changed in a short list. If a note reveals something about the brand as a whole, add it to the brand story with brandWrite.update.",
+  inputSchema: z.object({
+    brandId: brandIdInput,
+    surface: z.enum(["catalog", "ads"]),
+    campaignId: z
+      .string()
+      .optional()
+      .describe("For surface ads: the campaign. Omit for the draft set."),
+  }),
+  outputSchema: z.object({
+    surface: z.enum(["catalog", "ads"]),
+    reviewed: z.number(),
+    skipped: z.number(),
+    /** Cards that would not render; worth fixing before anything else. */
+    unrendered: z.array(z.string()),
+    overall: z.string(),
+    notes: z.array(
+      z.object({
+        number: z.number(),
+        name: z.string(),
+        homeId: z.string().optional(),
+        adId: z.string().optional(),
+        note: z.string(),
+      }),
+    ),
+  }),
+  examples: [{ brandId: "brand_winterpark", surface: "catalog" }],
+  execute: async (input, ctx) => {
+    const brand = await requireOwnedBrand(input.brandId, ctx);
+    return reviewPortfolio({
+      userId: ctx.userId,
+      brandId: brand.id,
+      brandName: brand.name,
+      brandStory: brand.story,
+      surface: input.surface,
+      campaignId: input.campaignId,
     });
   },
 });

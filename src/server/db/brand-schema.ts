@@ -353,10 +353,18 @@ export const brandTable = pgTable(
     /**
      * The home an operator chose to stand for the brand: its listing URL on
      * their site. The Performance brand page draws the on-demand ad previews
-     * from it. Null means nobody has picked yet and the page falls back to
-     * the first home on their feed, saying so.
+     * from it. Null means nobody has picked a hero yet; nothing is guessed
+     * in its place.
      */
     featuredListingUrl: t.text(),
+    /**
+     * The brand story: a short, plain-language brief of what makes this
+     * brand itself, who books it and why, and the creative taste it wants.
+     * Drafted by AI at setup, edited by the operator, and updated by the
+     * agent as it learns from corrections. Injected into every creative
+     * prompt for the brand. Null until drafted.
+     */
+    story: t.text(),
     /**
      * The photo the on-demand ad previews are drawn on: a home's hero on
      * their WanderOS site or a library image, by URL. Picking a home sets

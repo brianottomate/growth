@@ -69,6 +69,7 @@ import {
   addBrandAdPreviewAction,
   setPerformanceSettingsAction,
   updateBrandAction,
+  draftBrandStoryAction,
 } from "./brands";
 import { listPlaybooksAction, readPlaybookAction } from "./playbooks";
 import { CONTENT_STRATEGY_TOOLS } from "./content-strategy";
@@ -184,6 +185,7 @@ import {
   featuredHomesAction,
   updateHomeAction,
   suggestFeaturedHomesAction,
+  reviewPortfolioAction,
   listIntakesAction,
   previewIntakeApplyAction,
   applyIntakeAction,
@@ -210,6 +212,7 @@ export const brandWrite = growthDomainTool({
     addAdPreview: addBrandAdPreviewAction,
     setPerformanceSettings: setPerformanceSettingsAction,
     update: updateBrandAction,
+    draftStory: draftBrandStoryAction,
   },
 });
 
@@ -259,6 +262,7 @@ export const performanceRead = growthDomainTool({
     clientCampaignContext: clientCampaignContextAction,
     featuredHomes: featuredHomesAction,
     suggestFeaturedHomes: suggestFeaturedHomesAction,
+    reviewPortfolio: reviewPortfolioAction,
     intakes: listIntakesAction,
     previewIntakeApply: previewIntakeApplyAction,
   },
