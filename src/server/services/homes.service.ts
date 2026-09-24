@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { anthropic } from "@ai-sdk/anthropic";
 import { generateText, Output } from "ai";
 import { z } from "zod";
@@ -20,11 +20,11 @@ import {
   normalizeListingUrl,
 } from "./wanderos-listings.service";
 
-// One home, as a page can work with it: the row, the feed's live facts, and
-// its photos with whatever has been decided about them.
+// One home, as a page can work with it: the row and its photos with whatever
+// has been decided about them.
 //
-// `ingestBrandHomes` gives every listing a row up front; `ensureHome` still
-// creates one on the spot for a home opened before its brand was ingested.
+// `ingestBrandHomes` gives every listing a row up front and is what syncs a
+// row from the feed. Pages read rows; opening a home never writes.
 
 export class HomeError extends Error {
   constructor(
@@ -70,12 +70,10 @@ export type HomeDetail = {
   heroSourceUrl: string | null;
   /** Every photo worth showing: the feed's, plus uploads, minus the excluded. */
   photos: HomePhoto[];
-  /** The hero, or null while the creatives fall back to the first photo. */
+  /** The hero, or null until one is set. */
   hero: HomePhoto | null;
   /** The carousel, in the order it runs. */
   carousel: HomePhoto[];
-  /** True when the feed no longer carries this listing. */
-  offFeed: boolean;
 };
 
 /** The row for one feed listing, created on first sight and refreshed after. */
@@ -105,12 +103,18 @@ export async function ensureHome(input: {
       source: "wanderos",
       externalId: listing.id,
       ...facts,
+      // The site's own cover photo is the client's pick, so a home starts
+      // with it as its hero instead of every reader guessing one later.
+      heroSourceUrl: listing.imageUrl ?? null,
     })
     .onConflictDoUpdate({
       target: [homeTable.brandId, homeTable.externalId],
       // The feed owns these, so a later read wins. Decisions (the hero, the
-      // media rows) are not in this set and survive every refresh.
-      set: facts,
+      // media rows) survive every refresh: the hero is only filled when empty.
+      set: {
+        ...facts,
+        heroSourceUrl: sql`coalesce(${homeTable.heroSourceUrl}, excluded.hero_source_url)`,
+      },
     })
     .returning();
   return row!;
@@ -131,11 +135,11 @@ async function brandFor(input: { brandSlug: string; orgId: string }) {
 }
 
 /**
- * One home for a page: its row, the feed's current facts, and its photos.
+ * One home for a page: its row and its photos. Read only.
  *
- * The feed's gallery is read live and merged with the stored rows, so a photo
- * nobody has touched still shows up and a photo somebody ordered, cropped or
- * excluded keeps that decision. Uploaded library photos are appended.
+ * The stored gallery is merged with the media rows, so a photo nobody has
+ * touched still shows up and a photo somebody ordered, cropped or excluded
+ * keeps that decision. Uploaded library photos are appended.
  */
 export async function loadBrandHome(input: {
   brandSlug: string;
@@ -148,25 +152,16 @@ export async function loadBrandHome(input: {
   const brand = await brandFor(input);
   if (!brand) throw new HomeError(404, "Brand not found");
 
-  const listings = await brandListings({
-    id: brand.id,
-    website: brand.website,
-  });
-  const listing = listings.find((row) => row.id === input.propertyId) ?? null;
-
-  // A home already on the record but gone from the feed still opens, so a
-  // campaign that references it does not dead-end.
-  const existing = await db.query.homeTable.findFirst({
+  // The row is the home. Ingestion keeps it in step with the feed, so the
+  // page reads it as is and a home gone from the feed still opens.
+  const row = await db.query.homeTable.findFirst({
     where: and(
       eq(homeTable.brandId, brand.id),
       eq(homeTable.externalId, input.propertyId),
       isNull(homeTable.deletedAt),
     ),
   });
-  if (!listing && !existing) throw new HomeError(404, "Home not found");
-  const row = listing
-    ? await ensureHome({ brandId: brand.id, listing })
-    : existing!;
+  if (!row) throw new HomeError(404, "Home not found");
 
   const stored = await db.query.homeMediaTable.findMany({
     where: eq(homeMediaTable.homeId, row.id),
@@ -188,20 +183,8 @@ export async function loadBrandHome(input: {
     ),
   );
 
-  // The search feed carries a preview set, around five. The listing's own
-  // endpoint carries the gallery the property page shows, forty-odd for a
-  // large home, grouped by room. Fall back to the preview when it fails.
-  const websiteId = listing ? await brandWebsiteId(brand.id) : null;
-  const detail = websiteId
-    ? await listWanderOsListingPhotos({
-        websiteId,
-        propertyId: input.propertyId,
-      })
-    : [];
-  const gallery =
-    detail.length > 0
-      ? detail
-      : (listing?.gallery ?? []).map((photo) => ({ ...photo, room: null }));
+  // The listing's full gallery, grouped by room, as ingestion stored it.
+  const gallery = row.galleryCache ?? [];
 
   const hero = row.heroSourceUrl;
   const feedPhotos: HomePhoto[] = gallery.flatMap((photo) => {
@@ -213,7 +196,7 @@ export async function loadBrandHome(input: {
         url: photo.url,
         thumbUrl: decided?.thumbUrl ?? photo.thumbUrl,
         from: "feed" as const,
-        room: photo.room,
+        room: photo.room ?? null,
         role: decided?.role ?? "gallery",
         sortOrder: decided?.sortOrder ?? null,
         assetId: null,
@@ -257,21 +240,20 @@ export async function loadBrandHome(input: {
       id: row.id,
       brandId: row.brandId,
       externalId: row.externalId,
-      name: listing?.name ?? row.name,
-      url: listing?.url ?? row.url,
-      city: listing?.city ?? row.city,
-      state: listing?.state ?? row.state,
-      country: listing?.country ?? row.country,
-      bedrooms: listing?.bedrooms ?? row.bedrooms,
-      bathrooms: listing?.bathrooms ?? row.bathrooms,
-      guests: listing?.guests ?? row.guests,
-      rating: listing?.rating ?? row.rating,
-      nightlyFrom: listing?.nightlyFrom ?? row.nightlyFrom,
+      name: row.name,
+      url: row.url,
+      city: row.city,
+      state: row.state,
+      country: row.country,
+      bedrooms: row.bedrooms,
+      bathrooms: row.bathrooms,
+      guests: row.guests,
+      rating: row.rating,
+      nightlyFrom: row.nightlyFrom,
       heroSourceUrl: row.heroSourceUrl,
       photos,
       hero: photos.find((photo) => photo.isHero) ?? null,
       carousel,
-      offFeed: !listing,
     },
   };
 }
@@ -285,7 +267,7 @@ export async function brandHomeRows(brandId: string) {
   return new Map(rows.map((row) => [row.externalId, row]));
 }
 
-/** Which photo the ads draw on. Null clears it back to the feed's first. */
+/** Which photo the ads draw on. Null clears it; nothing is guessed in its place. */
 export async function setHomeHero(input: {
   homeId: string;
   orgId: string;
@@ -447,6 +429,30 @@ export type BrandHome = {
   galleryCache: { url: string; thumbUrl: string }[] | null;
 };
 
+/** Every home on the record for a brand, featured or not, for the setup grid. */
+export async function listAllBrandHomes(brandId: string) {
+  return db.query.homeTable.findMany({
+    where: and(eq(homeTable.brandId, brandId), isNull(homeTable.deletedAt)),
+    orderBy: (home, { asc: a }) => [a(home.createdAt), a(home.name)],
+    columns: {
+      id: true,
+      source: true,
+      externalId: true,
+      name: true,
+      url: true,
+      city: true,
+      state: true,
+      bedrooms: true,
+      bathrooms: true,
+      guests: true,
+      rating: true,
+      heroSourceUrl: true,
+      featured: true,
+      galleryCache: true,
+    },
+  });
+}
+
 /** Every featured home for a brand, newest picks last, for the setup grid. */
 export async function listBrandHomes(brandId: string): Promise<BrandHome[]> {
   const rows = await db.query.homeTable.findMany({
@@ -505,12 +511,32 @@ export async function addWanderOsHome(input: {
   // Picking a home is a deliberate, one-at-a-time act, so the extra detail
   // fetch here is off the render path. It caches the full gallery the search
   // feed does not carry, so the setup cards show the real photo count.
-  await refreshHomeGalleryCache({
-    brandId: input.brandId,
-    homeId: row.id,
-    externalId: listing.id,
-  });
+  // An ingested home already has its gallery. Only a home picked before its
+  // brand was ingested needs the detail read here.
+  if (!row.galleryCache?.length)
+    await refreshHomeGalleryCache({
+      brandId: input.brandId,
+      homeId: row.id,
+      externalId: listing.id,
+    });
   return row;
+}
+
+/**
+ * Feature one home, or take it out of the featured set. The row keeps
+ * everything else either way. One home per call, like a tick on its tile.
+ */
+export async function setHomeFeatured(input: {
+  homeId: string;
+  orgId: string;
+  featured: boolean;
+}) {
+  const home = await ownedHome(input);
+  await db
+    .update(homeTable)
+    .set({ featured: input.featured })
+    .where(eq(homeTable.id, home.id));
+  return { homeId: home.id, featured: input.featured };
 }
 
 /**
@@ -536,6 +562,7 @@ export async function refreshHomeGalleryCache(input: {
       galleryCache: photos.map((photo) => ({
         url: photo.url,
         thumbUrl: photo.thumbUrl,
+        room: photo.room,
       })),
     })
     .where(eq(homeTable.id, input.homeId));
@@ -545,8 +572,8 @@ export async function refreshHomeGalleryCache(input: {
  * Give every listing on a brand's feed a row, with what the search feed does
  * not carry: the full gallery, the amenity labels and the description, from
  * one listing-detail read per home. Photos stay URLs; nothing is re-hosted.
- * Decisions (hero, featured, catalog overrides) are never written, so it is
- * safe to rerun. `only` limits the run to some listing ids, for a canary.
+ * Decisions (featured, catalog overrides) are never written and a chosen
+ * hero is kept; the site's cover only fills a home with none. Safe to rerun. `only` limits the run to some listing ids, for a canary.
  */
 export async function ingestBrandHomes(input: {
   brandId: string;
@@ -575,6 +602,15 @@ export async function ingestBrandHomes(input: {
             websiteId,
             propertyId: listing.id,
           });
+          // The feed's cover is a resized copy of one gallery photo. While the
+          // hero is still that cover, point it at the gallery's own file so
+          // the home page can mark it among the photos.
+          const cover =
+            row.heroSourceUrl === listing.imageUrl
+              ? detail.photos.find((photo) =>
+                  sameAsset(photo.url, row.heroSourceUrl),
+                )
+              : undefined;
           // A detail read that comes back empty keeps what the row had.
           const set = {
             ...(detail.photos.length
@@ -582,9 +618,11 @@ export async function ingestBrandHomes(input: {
                   galleryCache: detail.photos.map((photo) => ({
                     url: photo.url,
                     thumbUrl: photo.thumbUrl,
+                    room: photo.room,
                   })),
                 }
               : {}),
+            ...(cover ? { heroSourceUrl: cover.url } : {}),
             ...(detail.amenities.length ? { amenities: detail.amenities } : {}),
             ...(detail.description ? { description: detail.description } : {}),
           };
@@ -601,6 +639,16 @@ export async function ingestBrandHomes(input: {
     );
   }
   return { listings: selected.length, withDetail, failed };
+}
+
+/**
+ * Two URLs for one photo at different sizes. WanderOS serves each asset as
+ * `https://assets.wander.com/<assetId>/<size>.webp`.
+ */
+function sameAsset(a: string, b: string | null) {
+  if (!b) return false;
+  const dir = (url: string) => url.slice(0, url.lastIndexOf("/"));
+  return dir(a) === dir(b);
 }
 
 /** One typed-in home, before it is a row. Only the name is required. */

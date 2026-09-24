@@ -36,6 +36,7 @@ import {
   parseHomeShells,
   removeBrandHome,
   setHomeCarousel,
+  setHomeFeatured,
   setHomeHero,
   setHomeMedia,
 } from "@/server/services/homes.service";
@@ -605,6 +606,14 @@ export const brandRouter = {
    * brand's organization, so a home id is enough. Null clears the pick back
    * to the first photo on their feed.
    */
+  /** Setup: tick a home into the featured set, or out of it. */
+  homesSetFeatured: protectedProcedure
+    .input(z.object({ homeId: z.string().min(1), featured: z.boolean() }))
+    .handler(async ({ context: ctx, input }) => {
+      const orgId = await callerOrgId(ctx);
+      return setHomeFeatured({ ...input, orgId });
+    }),
+
   setHomeHero: protectedProcedure
     .input(
       z.object({

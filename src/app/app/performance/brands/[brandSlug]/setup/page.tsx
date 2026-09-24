@@ -5,15 +5,18 @@ import { db } from "@/server/db";
 import { mediaAssetTable } from "@/server/db/schema";
 import { inArray } from "drizzle-orm";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
-import { cn } from "@/components/ui/lib/utils";
 import { brandHomeInventory } from "@/server/services/home-inventory.service";
 import { RefreshHomes } from "../RefreshHomes";
-import { listBrandHomes } from "@/server/services/homes.service";
+import {
+  listAllBrandHomes,
+  listBrandHomes,
+} from "@/server/services/homes.service";
 
-import { panel, SectionLabel } from "../../../_components";
+import { SectionLabel } from "../../../_components";
+import { HeroCard } from "../HeroCard";
+import { HomeRowsGrid } from "../HomeRowsGrid";
 import { HomesStrip } from "../HomesStrip";
 import { AddHomesByHand } from "../AddHomesByHand";
 import { PickedHomes, type PickedHome } from "../PickedHomes";
@@ -24,8 +27,8 @@ export const metadata: Metadata = { title: "Setup · Wander Performance" };
 export const dynamic = "force-dynamic";
 
 /**
- * Every home on the client's WanderOS site: browse them, pick the set the ads
- * run on, and feature the one that stands for the brand. A brand with no feed
+ * Every home on the client's record: browse them, feature the set the ads
+ * run on, and choose the hero that stands for the brand. A brand with no feed
  * pastes its homes in by hand instead. This is where a signed client's homes
  * are set up; the catalog cards have their own tab.
  */
@@ -41,11 +44,19 @@ export default async function PerformanceBrandHomesPage({
     return <div className="text-muted-foreground">No organization found.</div>;
   if (!brand) notFound();
 
-  const [inventory, committed] = await Promise.all([
-    brandHomeInventory({ id: brand.id, website: brand.website }),
+  const [rows, committed] = await Promise.all([
+    listAllBrandHomes(brand.id),
     listBrandHomes(brand.id),
   ]);
-  const homes = inventory.homes;
+  // Ingested brands work from their rows. The live feed is read only for a
+  // brand not ingested yet, which still browses it through `HomesStrip`.
+  const feedRows = rows.filter((home) => home.source === "wanderos");
+  const inventory =
+    feedRows.length > 0
+      ? null
+      : await brandHomeInventory({ id: brand.id, website: brand.website });
+  const homes = inventory?.homes ?? [];
+  const withPhoto = homes.filter((home) => home.imageUrl);
   const marks = brand.brandMark
     ? await db.query.mediaAssetTable.findMany({
         where: inArray(
@@ -63,68 +74,85 @@ export default async function PerformanceBrandHomesPage({
         dark: markUrl(brand.brandMark.variants.dark),
       }
     : null;
-  const withPhoto = homes.filter((home) => home.imageUrl);
-  // The hero picker offers the picked homes; before any are picked, the feed.
-  const feedWithPhoto = homes.filter((home) => home.imageUrl);
-  const pickedIds = new Set(committed.map((home) => home.externalId));
-  const pickedListings = feedWithPhoto.filter((home) => pickedIds.has(home.id));
-  const heroOptions = (
-    pickedListings.length > 0 ? pickedListings : feedWithPhoto
-  ).map((home) => ({
-    name: home.name,
-    url: home.url,
-    imageUrl: home.imageUrl!,
-    thumbUrl: home.thumbUrl ?? null,
-  }));
-  const previewHome = await resolvePreviewHome({
-    brandId: brand.id,
+
+  // The homes a hero can come from: the rows, or for a brand not ingested
+  // yet, the feed with each listing's own cover as its hero.
+  const heroHomes =
+    rows.length > 0
+      ? rows
+      : withPhoto.map((home) => ({
+          name: home.name,
+          url: home.url,
+          city: home.city ?? null,
+          state: home.state ?? null,
+          bedrooms: home.bedrooms ?? null,
+          bathrooms: home.bathrooms ?? null,
+          guests: home.guests ?? null,
+          rating: home.rating ?? null,
+          heroSourceUrl: home.imageUrl ?? null,
+          featured: false,
+        }));
+  const previewHome = resolvePreviewHome({
     brandName: brand.name,
     featuredListingUrl: brand.featuredListingUrl,
     previewSourceUrl: brand.previewSourceUrl,
-    feed: homes,
-    committed,
+    homes: heroHomes,
   });
+  // The picker offers the featured homes once there are any, else them all.
+  const withHero = heroHomes.filter((home) => home.heroSourceUrl);
+  const featuredWithHero = withHero.filter((home) => home.featured);
+  const heroOptions = (
+    featuredWithHero.length > 0 ? featuredWithHero : withHero
+  ).map((home) => ({
+    name: home.name,
+    url: home.url,
+    imageUrl: home.heroSourceUrl!,
+    thumbUrl: null,
+  }));
   const slug = brand.slug ?? brand.id;
-  // The grid's tick toggle keys the set by feed id → home row id.
+  const factsOf = (home: {
+    bedrooms: number | null;
+    guests: number | null;
+    city: string | null;
+    state: string | null;
+  }) =>
+    [
+      home.bedrooms ? `${home.bedrooms} bd` : null,
+      home.guests ? `${home.guests} guests` : null,
+      [home.city, home.state].filter(Boolean).join(", ") || null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  // The legacy strip's tick keys the set by feed id → home row id.
   const picked = committed.map((home) => ({
     externalId: home.externalId,
     homeId: home.id,
   }));
-  // The in-focus band shows each picked home enriched from its live listing:
-  // the gallery and fuller facts come free off the feed already read.
-  const byId = new Map(homes.map((listing) => [listing.id, listing]));
+  // The in-focus band shows each featured home from its row: ingestion
+  // stored the full gallery on it.
   const pickedHomes: PickedHome[] = committed.map((home) => {
-    const listing = byId.get(home.externalId) ?? null;
-    // The full gallery is cached on the row at pick time; the live feed only
-    // carries a ~5-photo preview. Prefer the cache, fall back to the feed.
-    const cached = home.galleryCache ?? [];
-    const feed = listing?.gallery ?? [];
-    const galleryUrls =
-      cached.length > 0
-        ? cached.map((photo) => photo.thumbUrl || photo.url)
-        : feed.length > 0
-          ? feed.map((photo) => photo.thumbUrl || photo.url)
-          : [listing?.imageUrl ?? home.heroSourceUrl].filter(
-              (url): url is string => Boolean(url),
-            );
-    const photoCount = galleryUrls.length;
-    const images = galleryUrls.slice(0, 12);
+    const gallery = (home.galleryCache ?? []).map(
+      (photo) => photo.thumbUrl || photo.url,
+    );
+    const images = (
+      gallery.length > 0 ? gallery : [home.heroSourceUrl].filter(Boolean)
+    ) as string[];
     return {
       id: home.id,
       externalId: home.externalId,
       source: home.source,
-      name: listing?.name ?? home.name,
-      hero: home.heroSourceUrl ?? listing?.imageUrl ?? images[0] ?? null,
-      images,
-      photoCount,
-      bedrooms: listing?.bedrooms ?? home.bedrooms,
-      bathrooms: listing?.bathrooms ?? home.bathrooms,
-      guests: listing?.guests ?? home.guests,
-      rating: listing?.rating ?? home.rating,
-      nightlyFrom: listing?.nightlyFrom ?? home.nightlyFrom,
-      city: listing?.city ?? home.city,
-      state: listing?.state ?? home.state,
-      offFeed: home.source === "wanderos" && !listing,
+      name: home.name,
+      hero: home.heroSourceUrl,
+      images: images.slice(0, 12),
+      photoCount: images.length,
+      bedrooms: home.bedrooms,
+      bathrooms: home.bathrooms,
+      guests: home.guests,
+      rating: home.rating,
+      nightlyFrom: home.nightlyFrom,
+      city: home.city,
+      state: home.state,
+      offFeed: false,
     };
   });
 
@@ -134,7 +162,7 @@ export default async function PerformanceBrandHomesPage({
         <h2 className="text-lg font-semibold">Brand and home setup</h2>
         <RefreshHomes brandId={brand.id} />
       </div>
-      {inventory.enrichmentError && (
+      {inventory?.enrichmentError && (
         <p className="text-sm text-muted-foreground">
           {inventory.enrichmentError}
         </p>
@@ -145,6 +173,12 @@ export default async function PerformanceBrandHomesPage({
         identity={brand.brandIdentity ?? null}
         website={brand.website}
       />
+      <HeroCard
+        brandId={brand.id}
+        hero={previewHome}
+        options={heroOptions}
+        heroUrl={brand.featuredListingUrl}
+      />
       <BrandMarkCard
         brandId={brand.id}
         brandName={brand.name}
@@ -152,22 +186,23 @@ export default async function PerformanceBrandHomesPage({
         identity={brand.brandIdentity ?? null}
         mark={brand.brandMark ?? null}
         variants={markVariants}
-        photo={homes[0]?.imageUrl ?? null}
+        photo={previewHome?.imageUrl ?? null}
       />
       <BrandPreviewCard
         brandId={brand.id}
         brandName={brand.name}
         identity={brand.brandIdentity ?? null}
         previewHome={previewHome}
-        heroOptions={heroOptions}
-        featuredUrl={brand.featuredListingUrl}
       />
       {committed.length > 0 ? (
         <PickedHomes brandId={brand.id} brandSlug={slug} picked={pickedHomes} />
       ) : null}
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <SectionLabel>
-          Homes{homes.length ? ` · ${homes.length}` : ""}
+          Homes
+          {(feedRows.length || homes.length) > 0
+            ? ` · ${feedRows.length || homes.length}`
+            : ""}
         </SectionLabel>
         <div className="flex items-center gap-3 text-[11.5px]">
           {brand.website ? (
@@ -182,7 +217,21 @@ export default async function PerformanceBrandHomesPage({
           ) : null}
         </div>
       </div>
-      {homes.length === 0 ? (
+      {feedRows.length > 0 ? (
+        <HomeRowsGrid
+          homes={feedRows.map((home) => ({
+            id: home.id,
+            externalId: home.externalId,
+            name: home.name,
+            url: home.url,
+            heroSourceUrl: home.heroSourceUrl,
+            featured: home.featured,
+            facts: factsOf(home),
+          }))}
+          brandSlug={slug}
+          heroUrl={brand.featuredListingUrl}
+        />
+      ) : homes.length === 0 ? (
         <AddHomesByHand
           brandId={brand.id}
           brandSlug={slug}
@@ -190,13 +239,7 @@ export default async function PerformanceBrandHomesPage({
           homes={committed.map((home) => ({
             id: home.id,
             name: home.name,
-            facts: [
-              home.bedrooms ? `${home.bedrooms} bd` : null,
-              home.guests ? `${home.guests} guests` : null,
-              [home.city, home.state].filter(Boolean).join(", ") || null,
-            ]
-              .filter(Boolean)
-              .join(" · "),
+            facts: factsOf(home),
           }))}
         />
       ) : (
@@ -214,13 +257,12 @@ export default async function PerformanceBrandHomesPage({
               bathrooms: home.bathrooms ?? null,
               guests: home.guests ?? null,
               rating: home.rating ?? null,
-              facts: [
-                home.bedrooms ? `${home.bedrooms} bd` : null,
-                home.guests ? `${home.guests} guests` : null,
-                [home.city, home.state].filter(Boolean).join(", ") || null,
-              ]
-                .filter(Boolean)
-                .join(" · "),
+              facts: factsOf({
+                bedrooms: home.bedrooms ?? null,
+                guests: home.guests ?? null,
+                city: home.city ?? null,
+                state: home.state ?? null,
+              }),
             }))}
             brandId={brand.id}
             brandSlug={brand.slug}

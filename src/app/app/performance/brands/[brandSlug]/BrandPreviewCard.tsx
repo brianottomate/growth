@@ -18,8 +18,6 @@ import { toast } from "@/components/ui/toast";
 import type { BrandIdentity } from "@/server/db/brand-schema";
 import { orpc } from "@/orpc/client";
 
-import { HeroHomePicker, type HeroOption } from "./HeroHomePicker";
-
 /**
  * Try the brand's fonts on live cards of one home before saving them. A
  * picked font is a draft until saved; saved fonts outlive a re-enrich until
@@ -30,15 +28,11 @@ export function BrandPreviewCard({
   brandName,
   identity,
   previewHome,
-  heroOptions,
-  featuredUrl,
 }: {
   brandId: string;
   brandName: string;
   identity: BrandIdentity | null;
   previewHome: PreviewHome | null;
-  heroOptions: HeroOption[];
-  featuredUrl: string | null;
 }) {
   const router = useRouter();
   const saved = brandFonts(identity);
@@ -106,13 +100,6 @@ export function BrandPreviewCard({
         brandId={brandId}
         brandName={brandName}
         home={previewHome}
-        action={
-          <HeroHomePicker
-            brandId={brandId}
-            options={heroOptions}
-            featuredUrl={featuredUrl}
-          />
-        }
         fontFamily={
           dirty && fonts.heading !== saved.heading ? fonts.heading : null
         }

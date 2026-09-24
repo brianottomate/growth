@@ -27,6 +27,8 @@ Work in this order. Each step reads before it writes, and re-running any step is
 
 1. `mediaLibraryRead.listingPhotos` for the brand. An empty result means the website is not a WanderOS site: say so, and offer `mediaLibraryRead.list` for whatever the library already holds.
 2. Do not import the photos here. `adsWrite.draftAdsFromHomes` in step 5 imports the heroes it needs and only those. Import separately only when the operator asks for photos without ads.
+3. Feature the homes the operator named with `performanceWrite.updateHome` (`featured: true`), one call per home, using each `homeId` from the listing read. A `homeId` of null means the brand's homes are not ingested yet: ask the operator to press Refresh homes on the Setup page, then read again.
+4. Set the hero with `brandWrite.update` and `heroHomeId`: the home the operator named, or else the featured home with the strongest cover photo, and say in one line which and why. Nothing sets a hero on its own, so a brand without one shows empty previews until this step.
 
 ## 4. Campaign shell
 

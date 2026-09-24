@@ -68,6 +68,7 @@ import {
   setBrandMarkAction,
   addBrandAdPreviewAction,
   setPerformanceSettingsAction,
+  updateBrandAction,
 } from "./brands";
 import { listPlaybooksAction, readPlaybookAction } from "./playbooks";
 import { CONTENT_STRATEGY_TOOLS } from "./content-strategy";
@@ -181,8 +182,7 @@ import {
   updatePerformancePropertyAction,
   clientCampaignContextAction,
   featuredHomesAction,
-  featureHomesAction,
-  unfeatureHomesAction,
+  updateHomeAction,
   listIntakesAction,
   previewIntakeApplyAction,
   applyIntakeAction,
@@ -199,7 +199,7 @@ export const brandRead = growthDomainTool({
 
 export const brandWrite = growthDomainTool({
   description:
-    "Create an owned brand and update its identity or settings. Create first, enrich second. Brand offboarding is available in the brand settings UI.",
+    "Create an owned brand and update its identity or settings; update sets plain brand fields such as the hero. Create first, enrich second. Brand offboarding is available in the brand settings UI.",
   actions: {
     create: createBrandAction,
     createProspect: createProspectAction,
@@ -208,6 +208,7 @@ export const brandWrite = growthDomainTool({
     setMark: setBrandMarkAction,
     addAdPreview: addBrandAdPreviewAction,
     setPerformanceSettings: setPerformanceSettingsAction,
+    update: updateBrandAction,
   },
 });
 
@@ -263,7 +264,7 @@ export const performanceRead = growthDomainTool({
 
 export const performanceWrite = growthDomainTool({
   description:
-    "Manage Performance accounts: onboard clients, add their homes, feature homes on a brand's Setup page, open and update billing cycles, and attach existing delivery (campaigns, lifecycle campaigns, amplification targets) to a cycle. Never creates ads or sends anything.",
+    "Manage Performance accounts: onboard clients, add their homes, update one home at a time (featured on the Setup page, hero photo), open and update billing cycles, and attach existing delivery (campaigns, lifecycle campaigns, amplification targets) to a cycle. Never creates ads or sends anything.",
   actions: {
     createAccount: createPerformanceAccountAction,
     updateAccount: updatePerformanceAccountAction,
@@ -277,8 +278,7 @@ export const performanceWrite = growthDomainTool({
     promoteToClient: promoteToClientAction,
     applyIntake: applyIntakeAction,
     verifyIntakeAccess: verifyIntakeAccessAction,
-    featureHomes: featureHomesAction,
-    unfeatureHomes: unfeatureHomesAction,
+    updateHome: updateHomeAction,
   },
 });
 

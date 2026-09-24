@@ -89,7 +89,7 @@ export function HomeWorkbench({ home }: { home: HomeDetail }) {
     commit(next);
   };
 
-  const heroUrl = home.hero?.url ?? home.photos[0]?.url ?? null;
+  const heroUrl = home.heroSourceUrl;
   const busy =
     setHero.isPending || setMedia.isPending || saveCarousel.isPending;
 

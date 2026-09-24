@@ -117,15 +117,16 @@ export const homeTable = pgTable(
     catalogExcluded: t.boolean().default(false).notNull(),
 
     /**
-     * The listing's full photo set, cached from the detail endpoint the search
-     * feed does not carry. The feed's per-listing preview is around five
-     * photos; a large home's gallery is forty-odd. Filled when a home is
-     * picked, so the setup cards can show the real photo count and more than
-     * five thumbnails without a per-render detail fetch. A cache of the feed's
-     * facts, like the name/geo above, not a decision — decisions live on
-     * `home_media`. The detail page still reads the gallery live.
+     * The home's photos: the listing's full gallery, with room labels, from
+     * the detail endpoint the search feed does not carry (the feed previews
+     * about five; a large home has forty-odd). Ingestion writes it; every page
+     * reads it. Kept under its old name to avoid a migration. It is the
+     * feed's facts, like the name and geo above, not a decision: decisions
+     * live on `home_media`.
      */
-    galleryCache: t.jsonb().$type<{ url: string; thumbUrl: string }[]>(),
+    galleryCache: t
+      .jsonb()
+      .$type<{ url: string; thumbUrl: string; room?: string | null }[]>(),
 
     sortOrder: t.integer(),
     /** Last time the feed's facts above were refreshed. */

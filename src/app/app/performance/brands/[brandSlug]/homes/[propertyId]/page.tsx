@@ -67,11 +67,6 @@ export default async function PerformanceHomePage({
           <h3 className="text-base font-semibold tracking-tight">
             {home.name}
           </h3>
-          {home.offFeed ? (
-            <span className="text-[11px] text-amber-300">
-              No longer on their feed
-            </span>
-          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
           {place ? <span>{place}</span> : null}

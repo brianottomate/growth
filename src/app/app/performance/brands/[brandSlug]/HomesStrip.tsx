@@ -49,12 +49,9 @@ export type StripHome = {
 
 const panel = "bg-card overflow-hidden rounded-2xl border";
 
-/** A set runs on at most ten homes. */
-const MAX_SET = 10;
-
 /**
  * The homes on their WanderOS site. Browse them as photos, pick the three to
- * ten a set runs on (a tick on each tile), feature the one that stands for the
+ * ten a set runs on (a tick on each tile), choose the hero that stands for the
  * brand, or open a lightbox on the hero and design an ad from it. The
  * catalog-card view of the same roster lives at the foot of the Ads tab.
  */
@@ -107,14 +104,14 @@ export function HomesStrip({
     }),
   );
 
-  // Featuring is a saved choice on the brand: the ad previews draw from it.
+  // The hero is a saved choice on the brand: the ad previews draw from it.
   const feature = useMutation(
     orpc.brand.setPreviewSource.mutationOptions({
       onSuccess: (result) => {
         toast.success(
           result.featuredListingUrl
-            ? "Featured. The ad previews draw from this home now."
-            : "No longer featured",
+            ? "Hero set. The ad previews draw from this home now."
+            : "Hero cleared",
         );
         router.refresh();
       },
@@ -124,7 +121,6 @@ export function HomesStrip({
 
   // Picking commits (or drops) a `home` row for the set the ads run on.
   const byExternal = new Map(picked.map((p) => [p.externalId, p.homeId]));
-  const count = picked.length;
   const add = useMutation(
     orpc.brand.homesAddWanderOs.mutationOptions({
       onSuccess: () => router.refresh(),
@@ -144,10 +140,6 @@ export function HomesStrip({
     if (homeId) {
       setBusyId(home.id);
       drop.mutate({ brandId, homeId });
-      return;
-    }
-    if (count >= MAX_SET) {
-      toast.error("Ten is the most a set runs on.");
       return;
     }
     setBusyId(home.id);
@@ -234,7 +226,7 @@ export function HomesStrip({
                     {home.url === featuredUrl ? (
                       <Star
                         className="size-3 shrink-0 fill-amber-300 text-amber-300"
-                        aria-label="Featured"
+                        aria-label="Brand hero"
                       />
                     ) : null}
                     <span className="truncate group-hover:underline">
@@ -258,7 +250,7 @@ export function HomesStrip({
               <button
                 type="button"
                 onClick={() => togglePick(home)}
-                disabled={busy || (!isPicked && count >= MAX_SET)}
+                disabled={busy}
                 aria-pressed={isPicked}
                 aria-label={
                   isPicked
@@ -346,7 +338,7 @@ export function HomesStrip({
                         : "size-3.5"
                     }
                   />
-                  {open.url === featuredUrl ? "Featured" : "Feature this home"}
+                  {open.url === featuredUrl ? "Hero" : "Use as hero"}
                 </Button>
                 <ButtonLink
                   href={open.url}

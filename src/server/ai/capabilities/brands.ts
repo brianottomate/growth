@@ -11,7 +11,7 @@ import { z } from "zod";
 import { and, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/server/db";
-import { brandTable } from "@/server/db/schema";
+import { brandTable, homeTable } from "@/server/db/schema";
 import {
   createOwnedBrand,
   enrichBrandById,
@@ -27,6 +27,7 @@ import {
 import {
   addBrandAdPreview,
   performanceBrandPath,
+  setBrandPreviewSource,
 } from "@/server/services/brand-ad-previews.service";
 import {
   performanceSettingsPatchSchema,
@@ -124,6 +125,77 @@ export const addBrandAdPreviewAction = growthAction({
       brandId: brand.id,
       count: previews.length,
       path: performanceBrandPath(brand),
+    };
+  },
+});
+
+/**
+ * The general brand writer. It carries the hero today and is where further
+ * plain brand fields belong, rather than a tool per field.
+ */
+export const updateBrandAction = growthAction({
+  description:
+    "Update an owned brand's fields. Send only the keys to change. heroHomeId sets the brand's hero, the one home that stands for the brand in its previews; null clears it. heroImageUrl picks which photo the previews draw: one of the hero home's photos, or a library image; without it the hero home's own hero photo is used. Nothing is chosen on the brand's behalf, so a brand with no hero shows none until one is set.",
+  inputSchema: z
+    .object({
+      brandId: z.string().min(1),
+      heroHomeId: z.string().min(1).nullable().optional(),
+      heroImageUrl: z.string().url().nullable().optional(),
+    })
+    .refine(
+      (value) =>
+        value.heroHomeId !== undefined || value.heroImageUrl !== undefined,
+      { message: "Send at least one field to change." },
+    ),
+  outputSchema: z.object({
+    brandId: z.string(),
+    heroListingUrl: z.string().nullable(),
+    heroImageUrl: z.string().nullable(),
+  }),
+  examples: [{ brandId: "brand_winterpark", heroHomeId: "home_01" }],
+  execute: async (input, ctx) => {
+    const brand = await db.query.brandTable.findFirst({
+      where: and(
+        eq(brandTable.id, input.brandId),
+        eq(brandTable.organizationId, ctx.orgId),
+        isNull(brandTable.deletedAt),
+      ),
+      columns: {
+        id: true,
+        featuredListingUrl: true,
+        previewSourceUrl: true,
+      },
+    });
+    if (!brand)
+      throw new Error(
+        "That brand is not available in the active organization.",
+      );
+    let listingUrl = brand.featuredListingUrl;
+    let sourceUrl =
+      input.heroImageUrl !== undefined
+        ? input.heroImageUrl
+        : brand.previewSourceUrl;
+    if (input.heroHomeId === null) {
+      listingUrl = null;
+      sourceUrl = input.heroImageUrl ?? null;
+    } else if (input.heroHomeId !== undefined) {
+      const home = await db.query.homeTable.findFirst({
+        where: and(
+          eq(homeTable.id, input.heroHomeId),
+          eq(homeTable.brandId, brand.id),
+          isNull(homeTable.deletedAt),
+        ),
+        columns: { url: true, heroSourceUrl: true },
+      });
+      if (!home) throw new Error("That home is not on this brand's record.");
+      listingUrl = home.url;
+      sourceUrl = input.heroImageUrl ?? home.heroSourceUrl;
+    }
+    await setBrandPreviewSource({ brandId: brand.id, listingUrl, sourceUrl });
+    return {
+      brandId: brand.id,
+      heroListingUrl: listingUrl,
+      heroImageUrl: sourceUrl,
     };
   },
 });

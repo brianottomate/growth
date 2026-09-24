@@ -96,6 +96,8 @@ export const growthActionPolicies = {
     addAdPreview: write({ idempotent: true }),
     // A merge into the brand's settings JSONB; the same patch twice is a no-op.
     setPerformanceSettings: write({ idempotent: true }),
+    // Plain brand fields; writing the old values back is the undo.
+    update: write({ idempotent: true, undoWith: "brandWrite.update" }),
   },
   productAtlasRead: { list: read(), get: read() },
   productAtlasWrite: { create: write(), update: write({ idempotent: true }) },
@@ -156,16 +158,11 @@ export const growthActionPolicies = {
       consequence: "background-run",
       idempotent: true,
     }),
-    // Flips `featured` on our own home rows after reading the brand's site
-    // feed. Un-featuring keeps the row, so each is the other's undo.
-    featureHomes: write({
+    // Sets `featured` or the hero photo on one of our own home rows. Setting
+    // the old value back is the undo.
+    updateHome: write({
       idempotent: true,
-      consequence: "provider-read",
-      undoWith: "performanceWrite.unfeatureHomes",
-    }),
-    unfeatureHomes: write({
-      idempotent: true,
-      undoWith: "performanceWrite.featureHomes",
+      undoWith: "performanceWrite.updateHome",
     }),
   },
   personaWrite: {

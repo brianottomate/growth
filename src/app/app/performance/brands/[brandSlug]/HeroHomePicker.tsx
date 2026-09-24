@@ -23,15 +23,17 @@ export type HeroOption = {
   thumbUrl: string | null;
 };
 
-/** Choose the home the previews draw from; saved as the brand's featured home. */
+/** Choose the brand's hero home; the previews draw from it and its photo. */
 export function HeroHomePicker({
   brandId,
   options,
   featuredUrl,
+  label,
 }: {
   brandId: string;
   options: HeroOption[];
   featuredUrl: string | null;
+  label: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -49,7 +51,7 @@ export function HeroHomePicker({
   return (
     <>
       <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
-        Change home
+        {label}
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-3xl">

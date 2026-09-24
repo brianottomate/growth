@@ -16,7 +16,8 @@ export type PreviewHome = {
   place: string | null;
   facts: string | null;
   rating: number | null;
-  source: "featured" | "feed" | "home" | "library";
+  /** The brand's hero home, or a library photo chosen with no home behind it. */
+  source: "hero" | "library";
 };
 
 // Hidden for now: the alternative blueprints and their aspect picker.
@@ -143,8 +144,8 @@ export function BrandPreviewStrip({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-muted-foreground">
           {home
-            ? `${home.name}${home.source === "featured" ? " · featured" : home.source === "library" ? " · library photo" : ""}`
-            : "No photo yet"}
+            ? `${home.name}${home.source === "library" ? " · library photo" : ""}`
+            : "No hero yet"}
         </span>
         {action}
       </div>
@@ -168,7 +169,7 @@ export function BrandPreviewStrip({
       ) : null}
       {home === null ? (
         <p className="text-muted-foreground">
-          Add a home or a photo to preview cards.
+          Choose a hero above to preview cards.
         </p>
       ) : null}
     </div>
