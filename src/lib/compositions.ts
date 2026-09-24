@@ -58,7 +58,7 @@ export const COMPOSITION_TEMPLATES = [
     version: 2,
     label: "Catalog · place",
     description:
-      "One bold statement, the hook and the place, then the facts and a guest-rating pill over a dark foot gradient. No mark: the feed shows the brand above the card. The listing card.",
+      "One bold statement, the hook and the place, then the facts and a guest-rating pill over a dark foot gradient. The mark is optional, top left. The listing card.",
   },
   {
     id: "catalog-review",
@@ -179,6 +179,7 @@ export const COMPOSITION_FIELDS: Record<
     },
   ],
   "catalog-place": [
+    mark,
     { key: "eyebrow", label: "Lead-in", hint: "Arcade games & firepit in" },
     { key: "title", label: "Place", hint: "Winter Park, CO" },
     {

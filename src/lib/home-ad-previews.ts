@@ -150,7 +150,9 @@ export function compositionPreviewUrl(spec: PreviewSpec) {
     templateId: spec.templateId,
     formatId: spec.formatId,
     title: spec.title,
-    mark: "auto",
+    // The ad set's listing cards run in the feed, which already shows the
+    // brand above the creative, so catalog-place draws no mark there.
+    mark: spec.templateId === "catalog-place" ? "none" : "auto",
   });
   if (spec.subtitle) params.set("subtitle", spec.subtitle);
   if (spec.eyebrow) params.set("eyebrow", spec.eyebrow);

@@ -1234,9 +1234,9 @@ export function renderComposition(
   } else if (spec.templateId === "catalog-place") {
     // The listing card: one bold statement (the hook and the place as a single
     // headline, the way the reference layouts set it), the facts, and the
-    // guest rating as a pill in the accent colour over the foot gradient. No
-    // mark and no top scrim: this is a feed card, and the feed already shows
-    // the brand's name and avatar above the creative.
+    // guest rating as a pill in the accent colour over the foot gradient. The
+    // mark is drawn only when the spec asks for one: a feed card already has
+    // the brand's name and avatar above it, a catalog card may want it.
     const pad = square ? 56 : 64;
     const scale = square ? 0.9 : 1;
     const statement = placeStatement(spec);
@@ -1278,6 +1278,39 @@ export function renderComposition(
             background: `linear-gradient(180deg, ${scrim(0)} 0%, ${scrim(0.5)} 40%, ${scrim(0.85)} 100%)`,
           }}
         />
+        {/* The mark is optional here: an ad in the feed already shows the
+            brand above the card, but a catalog card can ask for it. Same
+            corner and light top scrim as catalog-copy. */}
+        {spec.mark !== "none" ? (
+          <div
+            style={{
+              display: "flex",
+              position: "absolute",
+              left: 0,
+              right: 0,
+              top: 0,
+              height: "26%",
+              background: `linear-gradient(180deg, ${scrim(0.45)} 0%, ${scrim(0)} 100%)`,
+            }}
+          />
+        ) : null}
+        {spec.mark !== "none" ? (
+          <div
+            style={{
+              display: "flex",
+              position: "absolute",
+              top: pad,
+              left: pad,
+            }}
+          >
+            <BrandMark
+              brandName={context.brand.name}
+              logo={context.logo}
+              tone={spec.mark}
+              inverse
+            />
+          </div>
+        ) : null}
         <div
           style={{
             display: "flex",
