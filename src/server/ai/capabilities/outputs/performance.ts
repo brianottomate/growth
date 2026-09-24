@@ -5,7 +5,6 @@ import { lifecycleRunStateEnum } from "@/server/db/lifecycle-schema";
 import { channelPlatformEnum } from "@/server/db/channel-schema";
 import { platformCampaignStatusEnum } from "@/server/db/ads-schema";
 import { brandRelationshipEnum } from "@/server/db/brand-schema";
-import { cardsSchema } from "./shared";
 import { z } from "zod";
 import { jsonValueSchema } from "../../kernel/output";
 
@@ -694,21 +693,6 @@ export const previewIntakeApplyActionOutputSchema = z.strictObject({
             bookings: z.number().nullable().optional(),
             carouselCreativeUrl: z.string().nullable().optional(),
             catalogCreativeUrl: z.string().nullable().optional(),
-            catalogStudio: z
-              .strictObject({
-                cards: z.array(cardsSchema),
-                formats: z.array(
-                  z.enum(["story", "landscape", "square", "portrait", "wide"]),
-                ),
-                primaryFormat: z.enum([
-                  "story",
-                  "landscape",
-                  "square",
-                  "portrait",
-                  "wide",
-                ]),
-              })
-              .optional(),
             creativeDriveUrl: z.string().nullable().optional(),
             dedicatedNewsletter: z.string().nullable().optional(),
             guestListDriveUrl: z.string().nullable().optional(),

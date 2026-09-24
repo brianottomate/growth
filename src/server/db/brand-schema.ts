@@ -168,7 +168,6 @@ export type PerformanceSettings = {
   /** Brand whose Zernio connection is explicitly shared for paid ads only. */
   adsConnectionBrandId?: string;
   homeInventory?: import("@/server/services/home-inventory.service").HomeInventory;
-  catalogStudio?: import("@/lib/catalog-studio").CatalogDraft;
   /** Who receives the monthly report; free text, commas between addresses. */
   reportEmails?: string | null;
   invoiceEmail?: string | null;

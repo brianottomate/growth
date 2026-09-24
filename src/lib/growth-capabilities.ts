@@ -139,6 +139,8 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "addAdShell",
     "createAdsFromAssets",
     "setAdHome",
+    "setHomeHero",
+    "editCatalogCard",
     "editAdCards",
     "attachAdSet",
     "replaceAdCard",

@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/server/db";
 import {
   brandTable,
@@ -7,16 +7,22 @@ import {
   creativeRunTable,
   mediaFolderTable,
   mediaAssetTable,
+  homeTable,
 } from "@/server/db/schema";
+import { fetchWanderOsListingDetail } from "@/server/clients/wanderos-site.client";
 import {
   catalogArtworkIssues,
   catalogDraft,
-  catalogDraftSchema,
   catalogExportRows,
-  type CatalogDraft,
+  type CatalogCard,
   type CatalogExport,
+  type CatalogHome,
+  type CatalogOverrides,
 } from "@/lib/catalog-studio";
+import { compositionTemplateIdSchema } from "@/lib/compositions";
 import { brandHomeInventory } from "./home-inventory.service";
+import { ingestBrandHomes } from "./homes.service";
+import { brandWebsiteId } from "./wanderos-listings.service";
 import { freezeComposition } from "./composition.service";
 import { importRemoteImage } from "./media.service";
 
@@ -43,15 +49,115 @@ export async function catalogBrand(userId: string, brandId: string) {
   if (!brand) throw new Error("Brand not found");
   return brand;
 }
+type CatalogBrand = Awaited<ReturnType<typeof catalogBrand>>;
+
+/** Every home row on the brand, by its listing id. */
+async function catalogRows(brandId: string) {
+  const rows = await db.query.homeTable.findMany({
+    where: and(eq(homeTable.brandId, brandId), isNull(homeTable.deletedAt)),
+    columns: {
+      id: true,
+      externalId: true,
+      amenities: true,
+      description: true,
+      galleryCache: true,
+      catalogTitle: true,
+      catalogSubtitle: true,
+      catalogTemplateId: true,
+      catalogImagePosition: true,
+      catalogShowLogo: true,
+      catalogImageAssetId: true,
+      catalogMode: true,
+      catalogFinishedAssetId: true,
+      catalogExcluded: true,
+    },
+  });
+  return new Map(rows.map((row) => [row.externalId, row]));
+}
+type CatalogRow = NonNullable<
+  ReturnType<Awaited<ReturnType<typeof catalogRows>>["get"]>
+>;
+
+function overridesOf(
+  row: CatalogRow,
+  assets: ReadonlyMap<string, string>,
+): CatalogOverrides {
+  const asset = (id: string | null) =>
+    id && assets.get(id) ? { assetId: id, url: assets.get(id)! } : null;
+  const template = compositionTemplateIdSchema.safeParse(row.catalogTemplateId);
+  const position = IMAGE_POSITIONS.find((p) => p === row.catalogImagePosition);
+  return {
+    title: row.catalogTitle,
+    subtitle: row.catalogSubtitle,
+    templateId: template.success ? template.data : null,
+    imagePosition: position ?? null,
+    showLogo: row.catalogShowLogo,
+    image: asset(row.catalogImageAssetId),
+    mode:
+      row.catalogMode === "finished" || row.catalogMode === "compose"
+        ? row.catalogMode
+        : null,
+    finished: asset(row.catalogFinishedAssetId),
+    excluded: row.catalogExcluded,
+  };
+}
+const IMAGE_POSITIONS = ["top", "center", "bottom"] as const;
+
+/**
+ * The brand's homes as the catalog reads them: the feed inventory for facts
+ * and addresses, each home's row for its gallery, amenities and card
+ * overrides, and the cards built from both.
+ */
+async function catalogHomes(brand: CatalogBrand, refresh = false) {
+  const inventory = await brandHomeInventory(brand, refresh);
+  let rows = await catalogRows(brand.id);
+  // A brand not yet ingested, or a listing new since the last ingest, gets
+  // its rows on first read so every card has somewhere to keep an edit.
+  if (inventory.homes.some((home) => !rows.has(home.id))) {
+    await ingestBrandHomes({ brandId: brand.id, website: brand.website });
+    rows = await catalogRows(brand.id);
+  }
+  const homes: CatalogHome[] = inventory.homes.map((home) => {
+    const row = rows.get(home.id);
+    return row
+      ? {
+          ...home,
+          amenities: row.amenities ?? home.amenities,
+          gallery: row.galleryCache ?? home.gallery,
+        }
+      : home;
+  });
+  const assetIds = [...rows.values()].flatMap((row) =>
+    [row.catalogImageAssetId, row.catalogFinishedAssetId].filter(
+      (id): id is string => Boolean(id),
+    ),
+  );
+  const assets = assetIds.length
+    ? await db.query.mediaAssetTable.findMany({
+        where: and(
+          inArray(mediaAssetTable.id, assetIds),
+          eq(mediaAssetTable.brandId, brand.id),
+          isNull(mediaAssetTable.deletedAt),
+        ),
+        columns: { id: true, url: true },
+      })
+    : [];
+  const urls = new Map(
+    assets.flatMap((a) => (a.url ? [[a.id, a.url] as const] : [])),
+  );
+  const overrides = new Map(
+    [...rows.values()].map((row) => [row.externalId, overridesOf(row, urls)]),
+  );
+  return { inventory, homes, rows, draft: catalogDraft(homes, overrides) };
+}
+
 export async function catalogState(
   userId: string,
   brandId: string,
   refresh = false,
 ) {
   const brand = await catalogBrand(userId, brandId);
-  const inventory = await brandHomeInventory(brand, refresh);
-  const homes = inventory.homes;
-  const saved = catalogDraftSchema.safeParse(brand.settings?.catalogStudio);
+  const { inventory, homes, draft } = await catalogHomes(brand, refresh);
   const runs = await db.query.creativeRunTable.findMany({
     where: and(
       eq(creativeRunTable.brandId, brandId),
@@ -63,7 +169,7 @@ export async function catalogState(
     homes,
     enrichmentError: inventory.enrichmentError,
     syncedAt: inventory.syncedAt,
-    draft: catalogDraft(homes, saved.success ? saved.data : null),
+    draft,
     exports: runs.map((run): CatalogExport => ({
       ...run.providerOutput,
       id: run.id,
@@ -73,40 +179,198 @@ export async function catalogState(
     })),
   };
 }
-export async function saveCatalog(
+
+/**
+ * One home as the catalog chat works on it: its card, and every photo on its
+ * listing in the site's own order. Photo numbers are 1-based positions in
+ * `photos`, the same numbers the contact sheets print.
+ */
+export async function catalogHomeContext(
   userId: string,
   brandId: string,
-  draft: CatalogDraft,
-) {
-  await catalogBrand(userId, brandId);
-  await db
-    .update(brandTable)
-    .set({
-      performanceSettings: sql`jsonb_set(coalesce(${brandTable.performanceSettings}, '{}'::jsonb), '{catalogStudio}', ${JSON.stringify(draft)}::jsonb)`,
-    })
-    .where(eq(brandTable.id, brandId));
-}
-export async function startCatalogExport(
-  userId: string,
-  brandId: string,
-  draft: CatalogDraft,
+  homeId: string,
 ) {
   const brand = await catalogBrand(userId, brandId);
-  const { homes } = await brandHomeInventory(brand);
+  const { homes, rows, draft } = await catalogHomes(brand);
+  const home = homes.find((h) => h.id === homeId);
+  const row = rows.get(homeId);
+  if (!home || !row)
+    throw new Error("That home is not on this brand's catalog");
+  // The live detail carries room names the cached gallery does not.
+  const websiteId = await brandWebsiteId(brand.id);
+  const detail = websiteId
+    ? await fetchWanderOsListingDetail({ websiteId, propertyId: home.id })
+    : null;
+  const photos: { url: string; thumbUrl: string; room: string | null }[] =
+    detail?.photos.length
+      ? detail.photos
+      : (row.galleryCache ?? home.gallery ?? []).map((photo) => ({
+          ...photo,
+          room: null,
+        }));
+  return {
+    brand,
+    home,
+    rowId: row.id,
+    card: draft.cards.find((c) => c.homeId === home.id) ?? null,
+    photos,
+    description: row.description ?? detail?.description ?? null,
+    amenities: row.amenities ?? detail?.amenities ?? home.amenities ?? [],
+  };
+}
+
+/**
+ * Make one of the home's photos its hero. The hero belongs to the home, so
+ * ads, previews and the catalog all move with it; a catalog card that had its
+ * own library pick gives it up, because the operator just chose a photo.
+ */
+export async function setCatalogHomeHero(input: {
+  userId: string;
+  brandId: string;
+  homeId: string;
+  /** The contact-sheet number (chat), or the photo's URL (the editor). */
+  photo: { number: number } | { url: string };
+}) {
+  const ctx = await catalogHomeContext(
+    input.userId,
+    input.brandId,
+    input.homeId,
+  );
+  const wanted = input.photo;
+  const photo =
+    "number" in wanted
+      ? ctx.photos[wanted.number - 1]
+      : [...ctx.photos, ...(ctx.home.gallery ?? [])].find(
+          (p) => p.url === wanted.url,
+        );
+  if (!photo)
+    throw new Error(
+      "number" in wanted
+        ? `Photo ${wanted.number} is not in ${ctx.home.name}'s gallery (1–${ctx.photos.length})`
+        : `That photo is not in ${ctx.home.name}'s gallery`,
+    );
+  await db
+    .update(homeTable)
+    .set({ heroSourceUrl: photo.url, catalogImageAssetId: null })
+    .where(eq(homeTable.id, ctx.rowId));
+  const photoNumber = ctx.photos.findIndex((p) => p.url === photo.url) + 1;
+  return {
+    homeId: ctx.home.id,
+    homeName: ctx.home.name,
+    photoNumber: photoNumber || null,
+    room: "room" in photo ? (photo.room ?? null) : null,
+    heroUrl: photo.url,
+  };
+}
+
+/** A change to one card. Null puts a field back on its default. */
+export type CatalogCardPatch = {
+  title?: string | null;
+  subtitle?: string | null;
+  templateId?: CatalogCard["templateId"] | null;
+  imagePosition?: CatalogCard["imagePosition"] | null;
+  showLogo?: boolean | null;
+  included?: boolean;
+  mode?: "compose" | "finished" | null;
+  /** A library image to draw the card on instead of the hero. */
+  imageAssetId?: string | null;
+  /** Supplied artwork for a finished card. */
+  finishedAssetId?: string | null;
+};
+
+/** Change one home's catalog card on its row. */
+export async function editCatalogCard(input: {
+  userId: string;
+  brandId: string;
+  homeId: string;
+  patch: CatalogCardPatch;
+}) {
+  const brand = await catalogBrand(input.userId, input.brandId);
+  const { patch } = input;
+  for (const id of [patch.imageAssetId, patch.finishedAssetId])
+    if (id) await finishedCatalogAsset(brand.id, id);
+  const title = patch.title?.trim();
+  if (title !== undefined && (!title || title.length > 120))
+    throw new Error("A headline is 1–120 characters");
+  if (patch.subtitle && patch.subtitle.length > 220)
+    throw new Error("The facts line is at most 220 characters");
+  const set = {
+    ...(patch.title !== undefined ? { catalogTitle: title ?? null } : {}),
+    ...(patch.subtitle !== undefined
+      ? { catalogSubtitle: patch.subtitle }
+      : {}),
+    ...(patch.templateId !== undefined
+      ? { catalogTemplateId: patch.templateId }
+      : {}),
+    ...(patch.imagePosition !== undefined
+      ? { catalogImagePosition: patch.imagePosition }
+      : {}),
+    ...(patch.showLogo !== undefined
+      ? { catalogShowLogo: patch.showLogo }
+      : {}),
+    ...(patch.included !== undefined
+      ? { catalogExcluded: !patch.included }
+      : {}),
+    ...(patch.mode !== undefined ? { catalogMode: patch.mode } : {}),
+    ...(patch.imageAssetId !== undefined
+      ? { catalogImageAssetId: patch.imageAssetId }
+      : {}),
+    ...(patch.finishedAssetId !== undefined
+      ? { catalogFinishedAssetId: patch.finishedAssetId }
+      : {}),
+  };
+  if (Object.keys(set).length) {
+    const [updated] = await db
+      .update(homeTable)
+      .set(set)
+      .where(
+        and(
+          eq(homeTable.brandId, brand.id),
+          eq(homeTable.externalId, input.homeId),
+          isNull(homeTable.deletedAt),
+        ),
+      )
+      .returning({ id: homeTable.id });
+    if (!updated) throw new Error("That home has no catalog card");
+  }
+  const { draft } = await catalogHomes(brand);
+  const card = draft.cards.find((c) => c.homeId === input.homeId);
+  if (!card) throw new Error("That home has no catalog card");
+  return {
+    homeId: card.homeId,
+    title: card.title,
+    subtitle: card.subtitle,
+    templateId: card.templateId,
+    imagePosition: card.imagePosition,
+    showLogo: card.showLogo,
+    included: card.included,
+  };
+}
+
+/** Include or exclude every home in the brand's catalog at once. */
+export async function setCatalogIncluded(input: {
+  userId: string;
+  brandId: string;
+  included: boolean;
+}) {
+  const brand = await catalogBrand(input.userId, input.brandId);
+  await db
+    .update(homeTable)
+    .set({ catalogExcluded: !input.included })
+    .where(and(eq(homeTable.brandId, brand.id), isNull(homeTable.deletedAt)));
+}
+
+/** Freeze the catalog as it stands on the rows into a new export run. */
+export async function startCatalogExport(userId: string, brandId: string) {
+  const brand = await catalogBrand(userId, brandId);
+  const { homes, draft } = await catalogHomes(brand);
   const included = draft.cards.filter((c) => c.included);
   if (!included.length) throw new Error("Include at least one home");
-  if (
-    new Set(included.map((c) => c.homeId)).size !== included.length ||
-    included.some((c) => !homes.some((h) => h.id === c.homeId))
-  )
-    throw new Error("Choose homes from this brand");
   const artworkIssues = catalogArtworkIssues(draft);
   if (artworkIssues.length) throw new Error(artworkIssues.join(" · "));
-  // Resolve library identity server-side; never trust an override URL from the client.
   for (const card of included.filter((c) => c.mode === "finished")) {
     await finishedCatalogAsset(brandId, card.finishedArtwork!.assetId);
   }
-  await saveCatalog(userId, brandId, draft);
   const [run] = await db
     .insert(creativeRunTable)
     .values({
@@ -124,14 +388,13 @@ export async function startCatalogExport(
       },
     })
     .returning();
-  return { run: run!, brand, homes };
+  return { run: run!, brand, homes, draft };
 }
 export async function renderCatalogExport(
   input: Awaited<ReturnType<typeof startCatalogExport>>,
   userId: string,
-  draft: CatalogDraft,
 ) {
-  const { run, brand, homes } = input;
+  const { run, brand, homes, draft } = input;
   const assets: NonNullable<CatalogExport["assets"]> = [];
   let folderId: string | undefined;
   const total =

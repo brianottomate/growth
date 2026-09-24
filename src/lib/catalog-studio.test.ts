@@ -2,7 +2,6 @@ import { expect, test } from "bun:test";
 import {
   catalogArtworkIssues,
   catalogDraft,
-  catalogDraftSchema,
   catalogExportRows,
   catalogFeedCsv,
 } from "./catalog-studio";
@@ -23,14 +22,30 @@ const homes = [
     imageUrl: "https://example.com/other.jpg",
   },
 ];
-test("catalog edits survive listing refresh and new homes start included", () => {
-  const initial = catalogDraft(homes.slice(0, 1));
-  initial.cards[0]!.title = "Edited headline";
-  initial.cards[0]!.included = false;
-  const next = catalogDraft(homes, initial);
-  expect(next.cards[0]?.title).toBe("Edited headline");
-  expect(next.cards[0]?.included).toBe(false);
-  expect(next.cards[1]?.included).toBe(true);
+test("a card is its defaults until its row overrides a field", () => {
+  const draft = catalogDraft(
+    homes,
+    new Map([
+      [
+        homes[0]!.id,
+        { title: "Edited headline", excluded: true, subtitle: null },
+      ],
+    ]),
+  );
+  expect(draft.cards[0]?.title).toBe("Edited headline");
+  expect(draft.cards[0]?.included).toBe(false);
+  // A null override is the default, not an empty line.
+  expect(draft.cards[0]?.subtitle).toBe("8 guests");
+  expect(draft.cards[1]?.included).toBe(true);
+  expect(draft.cards[1]?.templateId).toBe("catalog-copy");
+});
+test("a card draws on the home's hero unless it has its own library image", () => {
+  const own = { assetId: "media_1", url: "https://media.example.com/own.jpg" };
+  const draft = catalogDraft(homes, new Map([[homes[1]!.id, { image: own }]]));
+  expect(draft.cards[0]?.imageUrl).toBe(homes[0]!.imageUrl);
+  expect(draft.cards[0]?.assetId).toBeUndefined();
+  expect(draft.cards[1]?.imageUrl).toBe(own.url);
+  expect(draft.cards[1]?.assetId).toBe(own.assetId);
 });
 test("export has one row per included home and uses its frozen primary artwork", () => {
   const draft = catalogDraft(homes);
@@ -67,27 +82,22 @@ test("export has one row per included home and uses its frozen primary artwork",
     "frozen primary image",
   );
 });
-test("primary feed format must be included", () => {
-  const draft = catalogDraft(homes);
-  draft.primaryFormat = "story";
-  expect(catalogDraftSchema.safeParse(draft).success).toBe(false);
-});
-
-test("finished artwork survives refresh without replacing the saved composition", () => {
-  const draft = catalogDraft(homes);
-  const card = draft.cards[0]!;
-  card.mode = "finished";
-  card.finishedArtwork = {
+test("finished artwork keeps the composition underneath it", () => {
+  const finished = {
     assetId: "original",
     url: "https://example.com/finished.png",
-    format: "portrait",
   };
-  const saved = catalogDraftSchema.parse(draft);
-  const refreshed = catalogDraft(homes, saved);
-  expect(refreshed.cards[0]?.finishedArtwork).toEqual(card.finishedArtwork);
-  expect(refreshed.cards[0]?.imageUrl).toBe(homes[0]!.imageUrl);
-  expect(refreshed.cards[0]?.templateId).toBe("catalog-copy");
-  expect(catalogArtworkIssues(refreshed)).toEqual([]);
+  const draft = catalogDraft(
+    homes,
+    new Map([[homes[0]!.id, { mode: "finished" as const, finished }]]),
+  );
+  expect(draft.cards[0]?.finishedArtwork).toEqual({
+    ...finished,
+    format: "portrait",
+  });
+  expect(draft.cards[0]?.imageUrl).toBe(homes[0]!.imageUrl);
+  expect(draft.cards[0]?.templateId).toBe("catalog-copy");
+  expect(catalogArtworkIssues(draft)).toEqual([]);
 });
 test("finished artwork requires an original and cannot silently generate other export sizes", () => {
   const draft = catalogDraft(homes);

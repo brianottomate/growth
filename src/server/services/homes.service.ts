@@ -9,6 +9,7 @@ import { db } from "@/server/db";
 import { brandTable, homeMediaTable, homeTable } from "@/server/db/schema";
 import type { HomeMediaRole, HomeSource } from "@/server/db/home-schema";
 import {
+  fetchWanderOsListingDetail,
   listWanderOsListingPhotos,
   type WanderOsListing,
 } from "@/server/clients/wanderos-site.client";
@@ -22,10 +23,8 @@ import {
 // One home, as a page can work with it: the row, the feed's live facts, and
 // its photos with whatever has been decided about them.
 //
-// Rows are created lazily by `ensureHome`, so opening a home is what puts it
-// on the record. That keeps a two-hundred-listing brand from carrying two
-// hundred rows nobody has touched, and it means the page works the first
-// time it is opened rather than after a sync.
+// `ingestBrandHomes` gives every listing a row up front; `ensureHome` still
+// creates one on the spot for a home opened before its brand was ingested.
 
 export class HomeError extends Error {
   constructor(
@@ -448,10 +447,14 @@ export type BrandHome = {
   galleryCache: { url: string; thumbUrl: string }[] | null;
 };
 
-/** Every committed home for a brand, newest picks last, for the setup grid. */
+/** Every featured home for a brand, newest picks last, for the setup grid. */
 export async function listBrandHomes(brandId: string): Promise<BrandHome[]> {
   const rows = await db.query.homeTable.findMany({
-    where: and(eq(homeTable.brandId, brandId), isNull(homeTable.deletedAt)),
+    where: and(
+      eq(homeTable.brandId, brandId),
+      eq(homeTable.featured, true),
+      isNull(homeTable.deletedAt),
+    ),
     orderBy: (home, { asc: a }) => [a(home.sortOrder), a(home.createdAt)],
     columns: {
       id: true,
@@ -495,6 +498,10 @@ export async function addWanderOsHome(input: {
   const listing = listings.find((row) => row.id === input.externalId);
   if (!listing) throw new HomeError(404, "That home is not on their feed");
   const row = await ensureHome({ brandId: input.brandId, listing });
+  await db
+    .update(homeTable)
+    .set({ featured: true })
+    .where(eq(homeTable.id, row.id));
   // Picking a home is a deliberate, one-at-a-time act, so the extra detail
   // fetch here is off the render path. It caches the full gallery the search
   // feed does not carry, so the setup cards show the real photo count.
@@ -532,6 +539,68 @@ export async function refreshHomeGalleryCache(input: {
       })),
     })
     .where(eq(homeTable.id, input.homeId));
+}
+
+/**
+ * Give every listing on a brand's feed a row, with what the search feed does
+ * not carry: the full gallery, the amenity labels and the description, from
+ * one listing-detail read per home. Photos stay URLs; nothing is re-hosted.
+ * Decisions (hero, featured, catalog overrides) are never written, so it is
+ * safe to rerun. `only` limits the run to some listing ids, for a canary.
+ */
+export async function ingestBrandHomes(input: {
+  brandId: string;
+  website: string | null;
+  only?: string[];
+}) {
+  const websiteId = await brandWebsiteId(input.brandId);
+  const listings = await brandListings({
+    id: input.brandId,
+    website: input.website,
+  });
+  if (!websiteId || listings.length === 0)
+    throw new HomeError(404, "No WanderOS listings found for this brand");
+  const selected = input.only
+    ? listings.filter((listing) => input.only!.includes(listing.id))
+    : listings;
+  let withDetail = 0;
+  const failed: { id: string; error: string }[] = [];
+  // Ten detail reads at a time keeps a large brand off the listing API's back.
+  for (let offset = 0; offset < selected.length; offset += 10) {
+    await Promise.all(
+      selected.slice(offset, offset + 10).map(async (listing) => {
+        try {
+          const row = await ensureHome({ brandId: input.brandId, listing });
+          const detail = await fetchWanderOsListingDetail({
+            websiteId,
+            propertyId: listing.id,
+          });
+          // A detail read that comes back empty keeps what the row had.
+          const set = {
+            ...(detail.photos.length
+              ? {
+                  galleryCache: detail.photos.map((photo) => ({
+                    url: photo.url,
+                    thumbUrl: photo.thumbUrl,
+                  })),
+                }
+              : {}),
+            ...(detail.amenities.length ? { amenities: detail.amenities } : {}),
+            ...(detail.description ? { description: detail.description } : {}),
+          };
+          if (Object.keys(set).length === 0) return;
+          await db.update(homeTable).set(set).where(eq(homeTable.id, row.id));
+          withDetail++;
+        } catch (error) {
+          failed.push({
+            id: listing.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }),
+    );
+  }
+  return { listings: selected.length, withDetail, failed };
 }
 
 /** One typed-in home, before it is a row. Only the name is required. */
@@ -597,11 +666,12 @@ export async function createManualHomes(input: {
         brandId: input.brandId,
         source: "manual",
         externalId,
+        featured: true,
         ...facts,
       })
       .onConflictDoUpdate({
         target: [homeTable.brandId, homeTable.externalId],
-        set: facts,
+        set: { ...facts, featured: true },
       })
       .returning();
     rows.push(row!);
@@ -609,13 +679,17 @@ export async function createManualHomes(input: {
   return rows;
 }
 
-/** Drop a committed home. The feed still carries it; this only un-picks it. */
+/**
+ * Un-pick a featured home. The row stays: it is still on the feed, and its
+ * catalog card and hero live on it.
+ */
 export async function removeBrandHome(input: {
   brandId: string;
   homeId: string;
 }) {
   await db
-    .delete(homeTable)
+    .update(homeTable)
+    .set({ featured: false })
     .where(
       and(eq(homeTable.id, input.homeId), eq(homeTable.brandId, input.brandId)),
     );

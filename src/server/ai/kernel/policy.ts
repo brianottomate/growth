@@ -271,6 +271,8 @@ export const growthActionPolicies = {
     addAdShell: write(),
     createAdsFromAssets: write(),
     setAdHome: write({ idempotent: true }),
+    setHomeHero: write({ idempotent: true }),
+    editCatalogCard: write({ idempotent: true }),
     editAdCards: write(),
     // Sets one field on local rows; the push is still the provider step.
     attachAdSet: write({ idempotent: true }),

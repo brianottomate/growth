@@ -1,3 +1,4 @@
+import { compositionTemplateIdSchema } from "@/lib/compositions";
 import { campaignStatusEnum } from "@/server/db/ads-schema";
 import { audienceTypeEnum } from "@/server/db/ads-schema";
 import { platformCampaignStatusEnum } from "@/server/db/ads-schema";
@@ -692,21 +693,6 @@ export const duplicateMetaCampaignActionOutputSchema = z.strictObject({
         bookings: z.number().nullable().optional(),
         carouselCreativeUrl: z.string().nullable().optional(),
         catalogCreativeUrl: z.string().nullable().optional(),
-        catalogStudio: z
-          .strictObject({
-            cards: z.array(cardsSchema),
-            formats: z.array(
-              z.enum(["story", "landscape", "square", "portrait", "wide"]),
-            ),
-            primaryFormat: z.enum([
-              "story",
-              "landscape",
-              "square",
-              "portrait",
-              "wide",
-            ]),
-          })
-          .optional(),
         creativeDriveUrl: z.string().nullable().optional(),
         dedicatedNewsletter: z.string().nullable().optional(),
         guestListDriveUrl: z.string().nullable().optional(),
@@ -1127,6 +1113,24 @@ export const createAdsFromAssetsActionOutputSchema = z.strictObject({
     }),
   ),
   brandId: z.string(),
+});
+
+export const setHomeHeroActionOutputSchema = z.strictObject({
+  homeId: z.string(),
+  homeName: z.string(),
+  photoNumber: z.number().nullable(),
+  room: z.string().nullable(),
+  heroUrl: z.string(),
+});
+
+export const editCatalogCardActionOutputSchema = z.strictObject({
+  homeId: z.string(),
+  title: z.string(),
+  subtitle: z.string(),
+  templateId: compositionTemplateIdSchema,
+  imagePosition: z.enum(["top", "center", "bottom"]),
+  showLogo: z.boolean(),
+  included: z.boolean(),
 });
 
 export const setAdHomeActionOutputSchema = z.strictObject({

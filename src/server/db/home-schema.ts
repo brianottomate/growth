@@ -17,9 +17,9 @@ import { createId } from "./utils";
 // DECISIONS are stored, because a decision is not derivable: which photo the
 // ads draw on, which order the gallery runs in, where a crop sits.
 //
-// Rows are created lazily. Opening a home's page upserts it by its feed id,
-// so a brand with two hundred listings has rows only for the homes anyone
-// actually worked on.
+// Every listing on a brand's feed gets a row at ingestion, so the catalog can
+// hang its per-home overrides here. `featured` marks the handful the operator
+// picked on setup; the ads and the setup grid read only those.
 
 export const homeSourceEnum = pgEnum("home_source", [
   "wanderos", // read off the client's own booking site
@@ -88,6 +88,33 @@ export const homeTable = pgTable(
      * chosen the same way once its asset has a URL.
      */
     heroSourceUrl: t.text(),
+
+    /** Picked on setup. Ads and the setup grid work on featured homes only. */
+    featured: t.boolean().default(false).notNull(),
+
+    /** WanderOS amenity labels from the listing detail, cached at ingestion. */
+    amenities: t.jsonb().$type<string[]>(),
+    /** The client's own words about the home, from the listing detail. */
+    description: t.text(),
+
+    // Catalog card overrides. Null means the computed default: the amenity
+    // headline, the bed/bath/guest line, the hero photo. Only an edit writes.
+    catalogTitle: t.text(),
+    catalogSubtitle: t.text(),
+    catalogTemplateId: t.text(),
+    catalogImagePosition: t.text(),
+    catalogShowLogo: t.boolean(),
+    /** A library image this card uses instead of the hero. */
+    catalogImageAssetId: t
+      .text()
+      .references(() => mediaAssetTable.id, { onDelete: "set null" }),
+    /** "finished" uses supplied artwork as-is; null or "compose" draws the card. */
+    catalogMode: t.text(),
+    /** The supplied artwork a finished card uses. Kept when switching back. */
+    catalogFinishedAssetId: t
+      .text()
+      .references(() => mediaAssetTable.id, { onDelete: "set null" }),
+    catalogExcluded: t.boolean().default(false).notNull(),
 
     /**
      * The listing's full photo set, cached from the detail endpoint the search

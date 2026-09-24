@@ -20,6 +20,7 @@
     "db:apply:meta-leadgen": "bun --conditions=react-server scripts/apply-meta-leadgen-schema.ts",
     "meta-leadgen:backfill": "bun --conditions=react-server scripts/backfill-meta-leadgen.ts",
     "db:apply:cycle-paid-columns": "bun --conditions=react-server scripts/apply-cycle-paid-columns.ts",
+    "db:apply:home-catalog-columns": "bun --conditions=react-server scripts/apply-home-catalog-columns.ts",
     "db:apply:lifecycle-split": "bun --conditions=react-server scripts/apply-lifecycle-split.ts",
     "db:apply:pregen-verdict": "bun --conditions=react-server scripts/apply-pregen-verdict-schema.ts",
     "db:apply:persona-demand-geography": "bun --conditions=react-server scripts/apply-persona-demand-geography.ts",

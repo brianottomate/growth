@@ -97,8 +97,25 @@ export type DesignAdPreviewIntent = {
   visibleText: string;
 };
 
+/**
+ * Work one home of a Performance client's catalog: its hero photo and its
+ * card copy. Fired from the catalog's list rows; `focus` says which of the
+ * row's buttons opened it.
+ */
+export type WorkCatalogHomeIntent = {
+  type: "work_catalog_home";
+  brandId: string;
+  brandName: string;
+  homeId: string;
+  homeName: string;
+  focus?: "photo" | "copy";
+  visibleText: string;
+};
+export type CatalogHomeWorkContext = Omit<WorkCatalogHomeIntent, "visibleText">;
+
 export type AssistantIntent =
   | DesignAdPreviewIntent
+  | WorkCatalogHomeIntent
   | StartClientCampaignIntent
   | DefinePersonasIntent
   | SetUpClientIntent

@@ -103,8 +103,11 @@ export async function starterGenerationStatus(input: {
   };
 }
 
-/** Numbered contact sheet, rebuilt each run. No persistent photo analysis. */
-export async function contactSheet(home: StarterHome) {
+/**
+ * Numbered contact sheet, rebuilt each run. No persistent photo analysis.
+ * `firstLabel` numbers a later batch on from where the previous one ended.
+ */
+export async function contactSheet(home: StarterHome, firstLabel = 1) {
   const photos =
     home.photos.length <= 16
       ? home.photos
@@ -117,7 +120,7 @@ export async function contactSheet(home: StarterHome) {
     photos.map(async (photo, i) => {
       const { body } = await fetchPublicImage(photo.url);
       const label = Buffer.from(
-        `<svg width="256" height="28"><rect width="256" height="28" fill="black"/><text x="10" y="20" font-size="18" fill="white">${i + 1}</text></svg>`,
+        `<svg width="256" height="28"><rect width="256" height="28" fill="black"/><text x="10" y="20" font-size="18" fill="white">${i + firstLabel}</text></svg>`,
       );
       return {
         input: await sharp(body)

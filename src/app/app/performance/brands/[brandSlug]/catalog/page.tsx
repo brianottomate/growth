@@ -20,5 +20,5 @@ export default async function PerformanceBrandCatalogPage({
     return <div className="text-muted-foreground">No organization found.</div>;
   if (!brand) notFound();
 
-  return <CatalogCards brandId={brand.id} />;
+  return <CatalogCards brandId={brand.id} brandName={brand.name} />;
 }

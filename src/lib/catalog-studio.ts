@@ -2,8 +2,9 @@ import { z } from "zod";
 import {
   compositionFormatIdSchema,
   compositionTemplateIdSchema,
+  type CompositionFormatId,
 } from "./compositions";
-import { homeCatalogCopy, place } from "./home-ad-previews";
+import { homeCatalogCopy } from "./home-ad-previews";
 import {
   hotelFeedRows,
   type HotelFeedHome,
@@ -29,18 +30,30 @@ export const catalogCardSchema = z.object({
   imagePosition: z.enum(["top", "center", "bottom"]),
   showLogo: z.boolean(),
 });
-export const catalogDraftSchema = z
-  .object({
-    cards: z.array(catalogCardSchema),
-    formats: z.array(compositionFormatIdSchema).min(1),
-    primaryFormat: compositionFormatIdSchema,
-  })
-  .refine(
-    (v) => v.formats.includes(v.primaryFormat),
-    "Include the primary feed size",
-  );
 export type CatalogCard = z.infer<typeof catalogCardSchema>;
-export type CatalogDraft = z.infer<typeof catalogDraftSchema>;
+export type CatalogDraft = {
+  cards: CatalogCard[];
+  formats: CompositionFormatId[];
+  primaryFormat: CompositionFormatId;
+};
+/**
+ * One home's catalog decisions, as its `home` row stores them. Anything null
+ * or absent is the default the card computes: the amenity headline, the
+ * bed/bath/guest line, the hero photo, the catalog-copy template.
+ */
+export type CatalogOverrides = {
+  title?: string | null;
+  subtitle?: string | null;
+  templateId?: CatalogCard["templateId"] | null;
+  imagePosition?: CatalogCard["imagePosition"] | null;
+  showLogo?: boolean | null;
+  /** A library image the card draws on instead of the hero. */
+  image?: { assetId: string; url: string } | null;
+  mode?: "compose" | "finished" | null;
+  /** Supplied artwork a finished card uses as-is. */
+  finished?: { assetId: string; url: string } | null;
+  excluded?: boolean;
+};
 export type CatalogHome = HotelFeedHome & {
   rating?: number;
   thumbUrl?: string;
@@ -63,49 +76,49 @@ export type CatalogExport = {
   }[];
   rows?: HotelFeedRow[];
 };
+/**
+ * Every home's card: its computed defaults with its overrides on top. The
+ * defaults are recomputed on every read, so a better headline rule or a new
+ * hero reaches each card nobody changed. Portrait only for now.
+ */
 export function catalogDraft(
   homes: CatalogHome[],
-  saved?: CatalogDraft | null,
+  overrides: ReadonlyMap<string, CatalogOverrides> = new Map(),
 ): CatalogDraft {
   const leads = new Set<string>();
   return {
-    formats: saved?.formats ?? ["portrait"],
-    primaryFormat: saved?.primaryFormat ?? "portrait",
+    formats: ["portrait"],
+    primaryFormat: "portrait",
     cards: homes
       .filter((h) => h.imageUrl)
-      .map((home) => {
+      .map((home): CatalogCard => {
         const copy = homeCatalogCopy(home, leads);
         if (copy.lead) leads.add(copy.lead);
-        const existing = saved?.cards.find((c) => c.homeId === home.id);
-        if (existing) {
-          // Drafts saved before cards led on amenities still say "<name> in
-          // <place>"; nobody typed that, so it gives way. An edited headline
-          // is kept.
-          return copy.lead && isNameHeadline(existing.title, home)
-            ? {
-                ...existing,
-                title: [copy.eyebrow, copy.title].filter(Boolean).join(" "),
-              }
-            : existing;
-        }
+        const o = overrides.get(home.id) ?? {};
         return {
           homeId: home.id,
-          included: true,
-          imageUrl: home.imageUrl!,
-          templateId: "catalog-copy",
-          title: [copy.eyebrow, copy.title].filter(Boolean).join(" "),
-          subtitle: copy.subtitle,
-          imagePosition: "center",
-          showLogo: true,
+          included: !o.excluded,
+          ...(o.mode ? { mode: o.mode } : {}),
+          ...(o.finished
+            ? {
+                finishedArtwork: {
+                  assetId: o.finished.assetId,
+                  url: o.finished.url,
+                  format: "portrait",
+                },
+              }
+            : {}),
+          imageUrl: o.image?.url ?? home.imageUrl!,
+          ...(o.image ? { assetId: o.image.assetId } : {}),
+          templateId: o.templateId ?? "catalog-copy",
+          title:
+            o.title ?? [copy.eyebrow, copy.title].filter(Boolean).join(" "),
+          subtitle: o.subtitle ?? copy.subtitle,
+          imagePosition: o.imagePosition ?? "center",
+          showLogo: o.showLogo ?? true,
         };
       }),
   };
-}
-function isNameHeadline(title: string, home: CatalogHome) {
-  const where = place(home);
-  return (
-    title === home.name || (!!where && title === `${home.name} in ${where}`)
-  );
 }
 
 /** One feed row per included home, using only its frozen primary image. */

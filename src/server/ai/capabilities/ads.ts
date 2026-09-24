@@ -34,6 +34,8 @@ import {
   addAdShellActionOutputSchema,
   createAdsFromAssetsActionOutputSchema,
   setAdHomeActionOutputSchema,
+  setHomeHeroActionOutputSchema,
+  editCatalogCardActionOutputSchema,
   editAdCardsActionOutputSchema,
   attachAdSetActionOutputSchema,
   setAdStatusActionOutputSchema,
@@ -53,6 +55,7 @@ import {
   importMetaCampaignSchema,
 } from "@/server/services/meta-campaign-import.service";
 import { metaPlacementPlanSchema } from "@/lib/meta-placement-plan";
+import { compositionTemplateIdSchema } from "@/lib/compositions";
 import "server-only";
 import { ideaSaveSchema, ideaExportShapesSchema } from "@/lib/ad-idea-studio";
 import { saveAdIdea } from "@/server/services/ad-idea-studio.service";
@@ -107,6 +110,10 @@ import {
   updateAudience,
 } from "@/server/services/ads-draft.service";
 import { draftAdsFromHomes } from "@/server/services/property-ads.service";
+import {
+  editCatalogCard,
+  setCatalogHomeHero,
+} from "@/server/services/catalog-studio.service";
 import { requireOwnedCampaign } from "@/server/services/ads-draft.service";
 import { MediaService } from "@/server/services/media.service";
 import { mediaTypeForUrl } from "@/lib/media-url";
@@ -1439,6 +1446,49 @@ export const createAdsFromAssetsAction = growthAction({
     },
   ],
   execute: (input, ctx) => createAdsFromAssets({ ...input, orgId: ctx.orgId }),
+});
+
+export const setHomeHeroAction = growthAction({
+  outputSchema: setHomeHeroActionOutputSchema,
+  description:
+    "Make one of a Performance client's home photos that home's hero: the photo its ads, previews and catalog card draw on. photoNumber is the 1-based number printed on the home's contact sheet in the catalog conversation. Replaces the previous hero; run it again to change it.",
+  inputSchema: z.object({
+    brandId: z.string().min(1),
+    homeId: z.string().min(1).describe("The WanderOS listing id."),
+    photoNumber: z.number().int().min(1),
+  }),
+  examples: [{ brandId: "brd_01", homeId: "1234567890123", photoNumber: 4 }],
+  execute: ({ photoNumber, ...input }, ctx) =>
+    setCatalogHomeHero({
+      ...input,
+      userId: ctx.userId,
+      photo: { number: photoNumber },
+    }),
+});
+
+export const editCatalogCardAction = growthAction({
+  outputSchema: editCatalogCardActionOutputSchema,
+  description:
+    "Change one home's card in a Performance client's catalog draft: the headline printed on the image (title, e.g. 'Exposed-brick loft in Louisville, KY'), the facts line (subtitle), the composition template, the crop focus, the logo, or whether the home is in the export. Send only the fields to change. Saves the draft; nothing is exported or pushed.",
+  inputSchema: z.object({
+    brandId: z.string().min(1),
+    homeId: z.string().min(1).describe("The WanderOS listing id."),
+    title: z.string().trim().min(1).max(120).optional(),
+    subtitle: z.string().max(220).optional(),
+    templateId: compositionTemplateIdSchema.optional(),
+    imagePosition: z.enum(["top", "center", "bottom"]).optional(),
+    showLogo: z.boolean().optional(),
+    included: z.boolean().optional(),
+  }),
+  examples: [
+    {
+      brandId: "brd_01",
+      homeId: "1234567890123",
+      title: "Exposed-brick loft in Louisville, KY",
+    },
+  ],
+  execute: ({ brandId, homeId, ...patch }, ctx) =>
+    editCatalogCard({ userId: ctx.userId, brandId, homeId, patch }),
 });
 
 export const setAdHomeAction = growthAction({

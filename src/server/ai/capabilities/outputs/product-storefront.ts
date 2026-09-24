@@ -354,41 +354,6 @@ const finishedArtworkSchema = z.strictObject({
   url: z.string(),
 });
 
-const cardItemSchema = z.strictObject({
-  assetId: z.string().optional(),
-  finishedArtwork: finishedArtworkSchema.optional(),
-  homeId: z.string(),
-  imagePosition: z.enum(["top", "center", "bottom"]),
-  imageUrl: z.string(),
-  included: z.boolean(),
-  mode: z.enum(["compose", "finished"]).optional(),
-  showLogo: z.boolean(),
-  subtitle: z.string(),
-  templateId: z.enum([
-    "photo-only",
-    "catalog-copy",
-    "catalog-place",
-    "catalog-review",
-    "tall-statement",
-    "tall-welcome",
-    "hero-overlay",
-    "image-hero",
-    "split-frame",
-    "editorial-overlay",
-    "product-proof",
-    "brand-statement",
-  ]),
-  title: z.string(),
-});
-
-const catalogStudioSchema = z.strictObject({
-  cards: z.array(cardItemSchema),
-  formats: z.array(
-    z.enum(["story", "landscape", "square", "portrait", "wide"]),
-  ),
-  primaryFormat: z.enum(["story", "landscape", "square", "portrait", "wide"]),
-});
-
 const homeItemSchema = homesSchema;
 
 const homeInventorySchema = z.strictObject({
@@ -404,7 +369,6 @@ const performanceSettingsSchema = z.strictObject({
   bookings: z.number().nullable().optional(),
   carouselCreativeUrl: z.string().nullable().optional(),
   catalogCreativeUrl: z.string().nullable().optional(),
-  catalogStudio: catalogStudioSchema.optional(),
   creativeDriveUrl: z.string().nullable().optional(),
   dedicatedNewsletter: z.string().nullable().optional(),
   guestListDriveUrl: z.string().nullable().optional(),

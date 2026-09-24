@@ -1,4 +1,4 @@
-import { homesSchema, cardsSchema } from "./shared";
+import { homesSchema } from "./shared";
 import { z } from "zod";
 import { appliedEvidenceSchema } from "@/lib/applied-evidence";
 
@@ -39,21 +39,6 @@ export const setPerformanceSettingsActionOutputSchema = z.strictObject({
     bookings: z.number().nullable().optional(),
     carouselCreativeUrl: z.string().nullable().optional(),
     catalogCreativeUrl: z.string().nullable().optional(),
-    catalogStudio: z
-      .strictObject({
-        cards: z.array(cardsSchema),
-        formats: z.array(
-          z.enum(["story", "landscape", "square", "portrait", "wide"]),
-        ),
-        primaryFormat: z.enum([
-          "story",
-          "landscape",
-          "square",
-          "portrait",
-          "wide",
-        ]),
-      })
-      .optional(),
     creativeDriveUrl: z.string().nullable().optional(),
     dedicatedNewsletter: z.string().nullable().optional(),
     guestListDriveUrl: z.string().nullable().optional(),
