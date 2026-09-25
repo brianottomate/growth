@@ -73,6 +73,8 @@ export function CatalogCards({
   const [layout, setLayout] = useState<"grid" | "list">("grid");
   const [details, setDetails] = useState<CatalogCard | null>(null);
   const [library, setLibrary] = useState(false);
+  /** A card whose photo is being swapped straight from its row, saved on pick. */
+  const [picking, setPicking] = useState<CatalogCard | null>(null);
   const [limit, setLimit] = useState(10);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -134,6 +136,11 @@ export function CatalogCards({
           : d,
       );
   }
+  /** Finished artwork comes from the library; a composition from the home's photos first. */
+  const choosePhoto = (card: CatalogCard) => {
+    setPicking(card);
+    if (card.mode === "finished") setLibrary(true);
+  };
   /** Save what changed on one card to its home's row. */
   const update = (next: CatalogCard) => {
     const prev = draft?.cards.find((c) => c.homeId === next.homeId);
@@ -346,21 +353,7 @@ export function CatalogCards({
                             {homeOf(card)?.name}
                           </label>
                           {!editing && (
-                            <div className="flex flex-wrap gap-1">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => workInChat(card, "photo")}
-                              >
-                                New photo
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => workInChat(card, "copy")}
-                              >
-                                New copy
-                              </Button>
+                            <div className="flex flex-wrap gap-2">
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -371,7 +364,7 @@ export function CatalogCards({
                               </Button>
                               <Button
                                 size="sm"
-                                variant="outline"
+                                variant="secondary"
                                 onClick={() => setDetails({ ...card })}
                               >
                                 Edit
@@ -420,6 +413,29 @@ export function CatalogCards({
                               </div>
                             ))}
                           </dl>
+                        )}
+                        {!editing && (
+                          <div className="flex flex-wrap items-center gap-1 border-t pt-3">
+                            <span className="mr-1.5 text-xs text-muted-foreground">
+                              Quick changes
+                            </span>
+                            {(
+                              [
+                                ["Choose photo", () => choosePhoto(card)],
+                                ["New photo", () => workInChat(card, "photo")],
+                                ["New copy", () => workInChat(card, "copy")],
+                              ] as const
+                            ).map(([label, onClick]) => (
+                              <Button
+                                key={label}
+                                size="xs"
+                                variant="ghost"
+                                onClick={onClick}
+                              >
+                                {label}
+                              </Button>
+                            ))}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -555,12 +571,76 @@ export function CatalogCards({
           )}
         </DialogContent>
       </Dialog>
+      <Dialog
+        open={!!picking && !library}
+        onOpenChange={(open) => {
+          if (!open) setPicking(null);
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{picking && homeOf(picking)?.name}</DialogTitle>
+            <DialogDescription>Photos from this home</DialogDescription>
+          </DialogHeader>
+          {picking && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                {homeOf(picking)?.gallery?.map((photo) => {
+                  const current =
+                    !picking.assetId && photo.url === picking.imageUrl;
+                  return (
+                    <button
+                      key={photo.url}
+                      aria-label="Use this photo"
+                      aria-pressed={current}
+                      onClick={() => {
+                        const card = picking;
+                        setPicking(null);
+                        void setHero(card, photo.url);
+                      }}
+                    >
+                      <img
+                        src={photo.thumbUrl}
+                        alt="Home photo"
+                        className={`aspect-square w-full rounded object-cover ${current ? "ring-2 ring-foreground" : ""}`}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+              <Button variant="outline" onClick={() => setLibrary(true)}>
+                Choose from library or upload
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
       <MediaPickerDialog
         brandId={brandId}
         open={library}
-        onOpenChange={setLibrary}
+        onOpenChange={(open) => {
+          setLibrary(open);
+          if (!open) setPicking(null);
+        }}
         existingAssetIds={[]}
         onPick={(item) => {
+          if (picking && item.type === "image" && item.assetId) {
+            const card = picking;
+            setPicking(null);
+            setLibrary(false);
+            void post(
+              {
+                action: "card",
+                homeId: card.homeId,
+                patch:
+                  card.mode === "finished"
+                    ? { finishedAssetId: item.assetId }
+                    : { imageAssetId: item.assetId },
+              },
+              "Unable to save the photo",
+            );
+            return;
+          }
           if (details && item.type === "image" && item.assetId) {
             setDetails(
               details.mode === "finished"
