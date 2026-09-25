@@ -491,6 +491,8 @@ export async function POST(req: Request): Promise<Response> {
             guests: catalogHome.home.guests,
             amenities: catalogHome.amenities,
             description: catalogHome.description?.slice(0, 2000) ?? null,
+            locationDescription: catalogHome.locationDescription,
+            petsAllowed: catalogHome.petsAllowed,
           },
           focus:
             assistantIntent?.type === "work_catalog_home"

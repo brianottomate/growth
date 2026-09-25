@@ -205,6 +205,9 @@ export type WanderOsListingDetail = {
   description: string | null;
   /** Amenity labels, deduplicated: "Hot tub", "Game Room", "Fire Place". */
   amenities: string[];
+  /** The site's "Where you'll be" paragraph: what the home is near. */
+  locationDescription: string | null;
+  petsAllowed: boolean | null;
 };
 
 /** Just the photos, for callers that do not need the rest. */
@@ -227,9 +230,18 @@ export async function fetchWanderOsListingDetail(input: {
       },
       cache: "no-store",
     });
-    if (!response.ok) return { photos: [], description: null, amenities: [] };
+    if (!response.ok)
+      return {
+        photos: [],
+        description: null,
+        amenities: [],
+        locationDescription: null,
+        petsAllowed: null,
+      };
     const body = (await response.json()) as {
       description?: string | null;
+      locationDescription?: string | null;
+      petAllowed?: boolean | null;
       amenities?: { name?: string; amenities?: { label?: string }[] }[];
       medias?: {
         name?: string;
@@ -279,9 +291,17 @@ export async function fetchWanderOsListingDetail(input: {
       photos,
       description: body.description?.trim() || null,
       amenities,
+      locationDescription: body.locationDescription?.trim() || null,
+      petsAllowed: body.petAllowed ?? null,
     };
   } catch (error) {
     console.error("wanderos listing detail failed", input.propertyId, error);
-    return { photos: [], description: null, amenities: [] };
+    return {
+      photos: [],
+      description: null,
+      amenities: [],
+      locationDescription: null,
+      petsAllowed: null,
+    };
   }
 }

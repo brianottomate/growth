@@ -34,6 +34,8 @@ type Item = {
   name: string;
   headline: string;
   detail: string;
+  /** The home's amenity labels, so a note can point at a real one. */
+  amenities?: string[];
   imageUrl: string;
 };
 
@@ -56,6 +58,7 @@ async function catalogItems(userId: string, brandId: string): Promise<Item[]> {
         name: byId.get(card.homeId)?.name ?? card.homeId,
         headline: card.title,
         detail: card.subtitle,
+        amenities: byId.get(card.homeId)?.amenities ?? [],
         imageUrl: url,
       },
     ];
@@ -161,6 +164,7 @@ export async function reviewPortfolio(input: {
       name: item.name,
       headline: item.headline,
       detail: item.detail,
+      ...(item.amenities ? { amenities: item.amenities } : {}),
     })),
   });
   const { output } = await generateText({

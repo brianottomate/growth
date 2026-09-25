@@ -221,6 +221,59 @@ export async function catalogHomeContext(
     photos,
     description: row.description ?? detail?.description ?? null,
     amenities: row.amenities ?? detail?.amenities ?? home.amenities ?? [],
+    locationDescription: detail?.locationDescription ?? null,
+    petsAllowed: detail?.petsAllowed ?? null,
+  };
+}
+
+/**
+ * What each home's listing says, for writing its card: the full amenity list,
+ * the description, what it is near and whether pets are welcome. The chat
+ * reads this rather than the public page, which shows only the first few
+ * amenities before "Show all".
+ */
+export async function catalogHomeFacts(
+  userId: string,
+  brandId: string,
+  homeIds: readonly string[],
+) {
+  const brand = await catalogBrand(userId, brandId);
+  const { homes, rows, draft } = await catalogHomes(brand);
+  const websiteId = await brandWebsiteId(brand.id);
+  const wanted = homes.filter((home) => homeIds.includes(home.id));
+  const out = [];
+  // Eight at a time, as the inventory sync reads the same endpoint.
+  for (let i = 0; i < wanted.length; i += 8) {
+    const batch = await Promise.all(
+      wanted.slice(i, i + 8).map(async (home) => {
+        const row = rows.get(home.id);
+        const detail = websiteId
+          ? await fetchWanderOsListingDetail({ websiteId, propertyId: home.id })
+          : null;
+        return {
+          homeId: home.id,
+          name: home.name,
+          url: home.url,
+          headline:
+            draft.cards.find((c) => c.homeId === home.id)?.title ?? null,
+          bedrooms: home.bedrooms ?? null,
+          bathrooms: home.bathrooms ?? null,
+          guests: home.guests ?? null,
+          petsAllowed: detail?.petsAllowed ?? null,
+          amenities:
+            row?.amenities ?? detail?.amenities ?? home.amenities ?? [],
+          description:
+            (row?.description ?? detail?.description)?.slice(0, 1500) ?? null,
+          locationDescription:
+            detail?.locationDescription?.slice(0, 800) ?? null,
+        };
+      }),
+    );
+    out.push(...batch);
+  }
+  return {
+    homes: out,
+    unknown: homeIds.filter((id) => !wanted.some((h) => h.id === id)),
   };
 }
 

@@ -90,6 +90,12 @@ const RANKED: { test: RegExp; key: string; hook: string; bullet: string }[] = [
     bullet: "🌊 Water views",
   },
   {
+    test: /city view|skyline/i,
+    key: "city-view",
+    hook: "City views",
+    bullet: "🏙️ City views",
+  },
+  {
     test: /fire ?place/i,
     key: "fireplace",
     hook: "Cozy fireplace",

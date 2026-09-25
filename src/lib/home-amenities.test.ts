@@ -30,6 +30,14 @@ describe("home amenities", () => {
     ]);
   });
 
+  test("a city view outranks a workspace", () => {
+    expect(
+      rankAmenities(["Dedicated workspace", "Elevator", "City view"]).map(
+        (row) => row.hook,
+      ),
+    ).toEqual(["City views", "Dedicated workspace"]);
+  });
+
   test("the listing's own labels win over its description", () => {
     expect(amenitySource(["Sauna"], "A rooftop deck.")).toEqual(["Sauna"]);
   });

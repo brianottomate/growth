@@ -70,6 +70,8 @@ export async function adChatContext(input: {
         guests: listing?.guests,
         description: detail?.description,
         amenities: detail?.amenities,
+        locationDescription: detail?.locationDescription,
+        petsAllowed: detail?.petsAllowed,
       };
     }),
   );

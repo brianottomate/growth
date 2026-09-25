@@ -35,6 +35,7 @@ import {
   createAdsFromAssetsActionOutputSchema,
   setAdHomeActionOutputSchema,
   setHomeHeroActionOutputSchema,
+  catalogHomeFactsActionOutputSchema,
   editCatalogCardActionOutputSchema,
   editAdCardsActionOutputSchema,
   attachAdSetActionOutputSchema,
@@ -111,6 +112,7 @@ import {
 } from "@/server/services/ads-draft.service";
 import { draftAdsFromHomes } from "@/server/services/property-ads.service";
 import {
+  catalogHomeFacts,
   editCatalogCard,
   setCatalogHomeHero,
 } from "@/server/services/catalog-studio.service";
@@ -1464,6 +1466,23 @@ export const setHomeHeroAction = growthAction({
       userId: ctx.userId,
       photo: { number: photoNumber },
     }),
+});
+
+export const catalogHomeFactsAction = growthAction({
+  outputSchema: catalogHomeFactsActionOutputSchema,
+  description:
+    "Read what homes' listings say, for writing their catalog cards: the complete amenity list, the description, the location paragraph (what the home is near), pets, bedrooms, baths, guests, the listing URL and the card's current headline. Use this instead of reading the public listing page, which shows only the first few amenities. Up to 16 homes per call; for a whole catalog, call it once per batch.",
+  inputSchema: z.object({
+    brandId: z.string().min(1),
+    homeIds: z
+      .array(z.string().min(1))
+      .min(1)
+      .max(16)
+      .describe("WanderOS listing ids."),
+  }),
+  examples: [{ brandId: "brd_01", homeIds: ["1234567890123"] }],
+  execute: ({ brandId, homeIds }, ctx) =>
+    catalogHomeFacts(ctx.userId, brandId, homeIds),
 });
 
 export const editCatalogCardAction = growthAction({

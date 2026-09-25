@@ -1123,6 +1123,25 @@ export const setHomeHeroActionOutputSchema = z.strictObject({
   heroUrl: z.string(),
 });
 
+export const catalogHomeFactsActionOutputSchema = z.strictObject({
+  homes: z.array(
+    z.strictObject({
+      homeId: z.string(),
+      name: z.string(),
+      url: z.string(),
+      headline: z.string().nullable(),
+      bedrooms: z.number().nullable(),
+      bathrooms: z.number().nullable(),
+      guests: z.number().nullable(),
+      petsAllowed: z.boolean().nullable(),
+      amenities: z.array(z.string()),
+      description: z.string().nullable(),
+      locationDescription: z.string().nullable(),
+    }),
+  ),
+  unknown: z.array(z.string()),
+});
+
 export const editCatalogCardActionOutputSchema = z.strictObject({
   homeId: z.string(),
   title: z.string(),
@@ -1260,7 +1279,9 @@ export const ideaContextActionOutputSchema = z.strictObject({
       description: z.string().nullable().optional(),
       guests: z.number().optional(),
       id: z.string(),
+      locationDescription: z.string().nullable().optional(),
       name: z.string(),
+      petsAllowed: z.boolean().nullable().optional(),
       state: z.string().optional(),
       url: z.string(),
     }),
