@@ -1489,7 +1489,7 @@ export const catalogHomeFactsAction = growthAction({
 export const editCatalogCardAction = growthAction({
   outputSchema: editCatalogCardActionOutputSchema,
   description:
-    "Change one home's card in a Performance client's catalog draft: the headline printed on the image (title, e.g. 'Exposed-brick loft in Louisville, KY'), the facts line (subtitle), the composition template, the crop focus, the logo, or whether the home is in the export. Send only the fields to change. Saves the draft; nothing is exported or pushed.",
+    "Change one home's card in a Performance client's catalog draft: the headline printed on the image (title, e.g. 'Exposed-brick loft in Louisville, KY'), the facts line (subtitle), the composition template, the crop focus, the logo, or whether the home is in the export. Send only the fields to change. Saves the draft; nothing is exported or pushed. A change to what the card shows sends an approved card back for the operator's review.",
   inputSchema: z.object({
     brandId: z.string().min(1),
     homeId: z.string().min(1).describe("The WanderOS listing id."),

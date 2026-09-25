@@ -97,8 +97,9 @@ export const homeTable = pgTable(
     /** The client's own words about the home, from the listing detail. */
     description: t.text(),
 
-    // Catalog card overrides. Null means the computed default: the amenity
-    // headline, the bed/bath/guest line, the hero photo. Only an edit writes.
+    // Catalog card overrides. Null means the computed default: the plain
+    // "Sleeps N in place" headline, the bed/bath/guest line, the hero photo.
+    // Only an edit writes.
     catalogTitle: t.text(),
     catalogSubtitle: t.text(),
     catalogTemplateId: t.text(),
@@ -115,6 +116,14 @@ export const homeTable = pgTable(
       .text()
       .references(() => mediaAssetTable.id, { onDelete: "set null" }),
     catalogExcluded: t.boolean().default(false).notNull(),
+    /**
+     * Who signed the card off, and the card as it was then. Any later change
+     * to what the card shows (an edit, a new hero, a changed default) no
+     * longer matches the fingerprint, so the card is back to unreviewed.
+     */
+    catalogApproval: t
+      .jsonb()
+      .$type<{ approvedAt: string; approvedBy: string; fingerprint: string }>(),
 
     /**
      * The home's photos: the listing's full gallery, with room labels, from

@@ -1,7 +1,7 @@
 "use client";
 import { catalogAddressIssues } from "@/lib/catalog-addresses";
 import { useEffect, useState } from "react";
-import { ExternalLink, MessageSquare, RefreshCw } from "lucide-react";
+import { Check, ExternalLink, MessageSquare, RefreshCw } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,14 +16,14 @@ import { MediaPickerDialog } from "@/app/app/content/[contentId]/MediaPickerDial
 import { COMPOSITION_FORMATS, COMPOSITION_TEMPLATES } from "@/lib/compositions";
 import {
   catalogArtworkIssues,
+  catalogCardFingerprint,
   catalogCardPreviewUrl,
+  catalogUnapproved,
   type CatalogCard,
   type CatalogDraft,
   type CatalogHome,
   type CatalogExport,
 } from "@/lib/catalog-studio";
-import { amenityHeadlineOptions } from "@/lib/home-amenities";
-import { place } from "@/lib/home-ad-previews";
 import { safeHomeUrl } from "@/lib/ad-preview-links";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 import { ReviewInChatButton } from "../ReviewInChatButton";
@@ -152,6 +152,20 @@ export function CatalogCards({
         "Unable to save the card",
       );
   };
+  /** Sign cards off as shown, or take it back; the server refuses stale ones. */
+  const approve = (cards: CatalogCard[], approved: boolean) =>
+    void post(
+      {
+        action: "approve",
+        approved,
+        cards: cards.map((card) => ({
+          homeId: card.homeId,
+          fingerprint: catalogCardFingerprint(card),
+        })),
+      },
+      "Unable to update approval",
+    );
+  const unapproved = draft ? catalogUnapproved(draft) : [];
   async function run(action: "export" | "refresh") {
     setBusy(true);
     const done = await post(
@@ -199,7 +213,9 @@ export function CatalogCards({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <span>
               {draft.cards.filter((c) => c.included).length} of{" "}
-              {draft.cards.length} homes included
+              {draft.cards.length} homes included ·{" "}
+              {draft.cards.filter((c) => c.included && c.approved).length}{" "}
+              approved
             </span>
             <div className="flex flex-wrap gap-2">
               <ReviewInChatButton
@@ -217,11 +233,25 @@ export function CatalogCards({
                 <span className="hidden @xl:inline">Refresh homes</span>
               </Button>
               <Button
+                variant="outline"
+                disabled={busy || unapproved.length === 0}
+                onClick={() => approve(unapproved, true)}
+              >
+                <Check aria-hidden="true" className="size-4" />
+                Approve all
+              </Button>
+              <Button
                 disabled={
                   busy ||
                   activeExport ||
                   !draft.cards.some((c) => c.included) ||
-                  catalogArtworkIssues(draft).length > 0
+                  catalogArtworkIssues(draft).length > 0 ||
+                  unapproved.length > 0
+                }
+                title={
+                  unapproved.length
+                    ? `${unapproved.length} included cards need approval`
+                    : undefined
                 }
                 onClick={() => void run("export")}
               >
@@ -320,6 +350,12 @@ export function CatalogCards({
                       {homeOf(card)?.name}
                     </button>
                   </div>
+                  <div className="px-3 pb-3">
+                    <ApproveButton
+                      card={card}
+                      onApprove={(approved) => approve([card], approved)}
+                    />
+                  </div>
                 </div>
               ))}
             </div>
@@ -354,6 +390,12 @@ export function CatalogCards({
                           </label>
                           {!editing && (
                             <div className="flex flex-wrap gap-2">
+                              <ApproveButton
+                                card={card}
+                                onApprove={(approved) =>
+                                  approve([card], approved)
+                                }
+                              />
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -662,6 +704,28 @@ export function CatalogCards({
   );
 }
 
+/** Sign one card off as it stands, or take the sign-off back. */
+function ApproveButton({
+  card,
+  onApprove,
+}: {
+  card: CatalogCard;
+  onApprove: (approved: boolean) => void;
+}) {
+  return (
+    <Button
+      size="sm"
+      variant={card.approved ? "secondary" : "outline"}
+      aria-pressed={Boolean(card.approved)}
+      disabled={!card.included}
+      onClick={() => onApprove(!card.approved)}
+    >
+      {card.approved && <Check aria-hidden="true" className="size-3.5" />}
+      {card.approved ? "Approved" : "Approve"}
+    </Button>
+  );
+}
+
 function CardPreview({
   brandId,
   card,
@@ -780,22 +844,6 @@ function CardEditor({
               onChange={(e) => onChange({ ...card, title: e.target.value })}
             />
           </label>
-          {home && (
-            <div className="flex flex-wrap gap-1.5">
-              {amenityHeadlineOptions(home.amenities, place(home)).map(
-                (option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => onChange({ ...card, title: option })}
-                    className={`rounded-full border px-2.5 py-1 text-xs ${option === card.title ? "border-foreground bg-foreground text-background" : "text-muted-foreground hover:text-foreground"}`}
-                  >
-                    {option}
-                  </button>
-                ),
-              )}
-            </div>
-          )}
           <label className="block space-y-1 text-sm">
             Facts
             <Input

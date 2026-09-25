@@ -4,7 +4,7 @@ import {
   compositionTemplateIdSchema,
   type CompositionFormatId,
 } from "./compositions";
-import { homeCatalogCopy, ratingOutOfFive } from "./home-ad-previews";
+import { homeCatalogCopy, place, ratingOutOfFive } from "./home-ad-previews";
 import {
   hotelFeedRows,
   type HotelFeedHome,
@@ -31,6 +31,8 @@ export const catalogCardSchema = z.object({
   showLogo: z.boolean(),
   /** The home's guest rating out of 5, for the catalog-place pill. */
   rating: z.number().nullable().optional(),
+  /** Signed off as it stands now; derived on read, never saved from a client. */
+  approved: z.boolean().optional(),
 });
 export type CatalogCard = z.infer<typeof catalogCardSchema>;
 export type CatalogDraft = {
@@ -79,6 +81,40 @@ export type CatalogExport = {
   rows?: HotelFeedRow[];
 };
 /**
+ * The headline a card carries until someone writes a better one. Plain and
+ * never wrong on purpose: a real headline comes from the listing, written by
+ * the chat, and nothing exports until a person approves the card.
+ */
+export function catalogBaselineTitle(home: CatalogHome) {
+  const where = place(home);
+  const lead = home.guests ? `Sleeps ${home.guests}` : "Vacation home";
+  return where ? `${lead} in ${where}` : lead;
+}
+
+/** What a card shows, as one string: approval holds while this is unchanged. */
+export function catalogCardFingerprint(card: CatalogCard) {
+  // Supplied artwork is the whole card; the fields it does not draw can
+  // change without touching what was approved.
+  if (card.mode === "finished")
+    return JSON.stringify(["finished", card.finishedArtwork?.assetId ?? null]);
+  return JSON.stringify([
+    card.mode ?? "compose",
+    card.finishedArtwork?.assetId ?? null,
+    card.imageUrl,
+    card.assetId ?? null,
+    card.templateId,
+    card.title,
+    card.subtitle,
+    card.imagePosition,
+    card.showLogo,
+  ]);
+}
+
+/** The included cards nobody has signed off in their current state. */
+export const catalogUnapproved = (draft: CatalogDraft) =>
+  draft.cards.filter((card) => card.included && !card.approved);
+
+/**
  * Every home's card: its computed defaults with its overrides on top. The
  * defaults are recomputed on every read, so a better headline rule or a new
  * hero reaches each card nobody changed. Portrait only for now.
@@ -86,18 +122,17 @@ export type CatalogExport = {
 export function catalogDraft(
   homes: CatalogHome[],
   overrides: ReadonlyMap<string, CatalogOverrides> = new Map(),
+  approvals: ReadonlyMap<string, string> = new Map(),
 ): CatalogDraft {
-  const leads = new Set<string>();
   return {
     formats: ["portrait"],
     primaryFormat: "portrait",
     cards: homes
       .filter((h) => h.imageUrl)
       .map((home): CatalogCard => {
-        const copy = homeCatalogCopy(home, leads);
-        if (copy.lead) leads.add(copy.lead);
+        const copy = homeCatalogCopy(home);
         const o = overrides.get(home.id) ?? {};
-        return {
+        const card: CatalogCard = {
           homeId: home.id,
           included: !o.excluded,
           ...(o.mode ? { mode: o.mode } : {}),
@@ -114,12 +149,15 @@ export function catalogDraft(
           ...(o.image ? { assetId: o.image.assetId } : {}),
           // The listing card: place statement, facts and the rating pill.
           templateId: o.templateId ?? "catalog-place",
-          title:
-            o.title ?? [copy.eyebrow, copy.title].filter(Boolean).join(" "),
+          title: o.title ?? catalogBaselineTitle(home),
           subtitle: o.subtitle ?? copy.subtitle,
           imagePosition: o.imagePosition ?? "center",
           showLogo: o.showLogo ?? true,
           rating: ratingOutOfFive(home.rating),
+        };
+        return {
+          ...card,
+          approved: approvals.get(home.id) === catalogCardFingerprint(card),
         };
       }),
   };

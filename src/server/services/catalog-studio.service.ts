@@ -13,7 +13,9 @@ import { fetchWanderOsListingDetail } from "@/server/clients/wanderos-site.clien
 import {
   catalogArtworkIssues,
   catalogCardCopy,
+  catalogCardFingerprint,
   catalogDraft,
+  catalogUnapproved,
   catalogExportRows,
   type CatalogCard,
   type CatalogExport,
@@ -73,6 +75,7 @@ async function catalogRows(brandId: string) {
       catalogMode: true,
       catalogFinishedAssetId: true,
       catalogExcluded: true,
+      catalogApproval: true,
     },
   });
   return new Map(rows.map((row) => [row.externalId, row]));
@@ -154,7 +157,19 @@ async function catalogHomes(brand: CatalogBrand, refresh = false) {
   const overrides = new Map(
     [...rows.values()].map((row) => [row.externalId, overridesOf(row, urls)]),
   );
-  return { inventory, homes, rows, draft: catalogDraft(homes, overrides) };
+  const approvals = new Map(
+    [...rows.values()].flatMap((row) =>
+      row.catalogApproval
+        ? [[row.externalId, row.catalogApproval.fingerprint] as const]
+        : [],
+    ),
+  );
+  return {
+    inventory,
+    homes,
+    rows,
+    draft: catalogDraft(homes, overrides, approvals),
+  };
 }
 
 /** The homes whose cards go out: brand-wide reads count only these. */
@@ -428,6 +443,52 @@ export async function editCatalogCard(input: {
   };
 }
 
+/**
+ * Sign cards off exactly as the operator saw them, or take the sign-off back.
+ * Each approval carries the fingerprint of the card on screen; a card the
+ * chat changed since is refused rather than approved unseen. A card that
+ * changes later is unreviewed again on its own.
+ */
+export async function setCatalogApproval(input: {
+  userId: string;
+  brandId: string;
+  approved: boolean;
+  cards: readonly { homeId: string; fingerprint?: string }[];
+}) {
+  const brand = await catalogBrand(input.userId, input.brandId);
+  const { homes, draft } = await catalogHomes(brand);
+  const cards = input.cards.flatMap((seen) => {
+    const card = draft.cards.find((c) => c.homeId === seen.homeId);
+    if (!card) return [];
+    if (input.approved && seen.fingerprint !== catalogCardFingerprint(card))
+      throw new Error(
+        `${homes.find((h) => h.id === card.homeId)?.name ?? "A card"} changed since you looked at it. Review it again.`,
+      );
+    return [card];
+  });
+  const approvedAt = new Date().toISOString();
+  for (const card of cards)
+    await db
+      .update(homeTable)
+      .set({
+        catalogApproval: input.approved
+          ? {
+              approvedAt,
+              approvedBy: input.userId,
+              fingerprint: catalogCardFingerprint(card),
+            }
+          : null,
+      })
+      .where(
+        and(
+          eq(homeTable.brandId, brand.id),
+          eq(homeTable.externalId, card.homeId),
+          isNull(homeTable.deletedAt),
+        ),
+      );
+  return { updated: cards.length };
+}
+
 /** Include or exclude every home in the brand's catalog at once. */
 export async function setCatalogIncluded(input: {
   userId: string;
@@ -449,6 +510,11 @@ export async function startCatalogExport(userId: string, brandId: string) {
   if (!included.length) throw new Error("Include at least one home");
   const artworkIssues = catalogArtworkIssues(draft);
   if (artworkIssues.length) throw new Error(artworkIssues.join(" · "));
+  const unapproved = catalogUnapproved(draft);
+  if (unapproved.length)
+    throw new Error(
+      `Approve every included card before exporting: ${unapproved.length} still need review`,
+    );
   for (const card of included.filter((c) => c.mode === "finished")) {
     await finishedCatalogAsset(brandId, card.finishedArtwork!.assetId);
   }

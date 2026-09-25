@@ -2,7 +2,9 @@ import { expect, test } from "bun:test";
 import {
   catalogArtworkIssues,
   catalogCardCopy,
+  catalogCardFingerprint,
   catalogDraft,
+  catalogUnapproved,
   catalogExportRows,
   catalogFeedCsv,
 } from "./catalog-studio";
@@ -145,4 +147,53 @@ test("catalog-place splits the headline into lead-in and place", () => {
   expect(catalogCardCopy({ ...card, templateId: "catalog-copy" }).title).toBe(
     card.title,
   );
+});
+
+test("an unedited card says only what is never wrong", () => {
+  const draft = catalogDraft(homes);
+  expect(draft.cards[0]?.title).toBe("Sleeps 8 in Sonoma, CA");
+  expect(draft.cards[1]?.title).toBe("Vacation home");
+});
+test("approval holds until what the card shows changes", () => {
+  const signed = catalogDraft(homes).cards[0]!;
+  const approvals = new Map([[signed.homeId, catalogCardFingerprint(signed)]]);
+  const draft = catalogDraft(homes, new Map(), approvals);
+  expect(draft.cards[0]?.approved).toBe(true);
+  // The second home was never signed, so it alone holds the export.
+  expect(catalogUnapproved(draft).map((c) => c.homeId)).toEqual(["2"]);
+  const edited = catalogDraft(
+    homes,
+    new Map([[signed.homeId, { title: "Shower for two in Sonoma, CA" }]]),
+    approvals,
+  );
+  expect(edited.cards[0]?.approved).toBe(false);
+});
+test("an excluded card never holds the export", () => {
+  const draft = catalogDraft(homes, new Map([["2", { excluded: true }]]));
+  expect(catalogUnapproved(draft).map((c) => c.homeId)).toEqual([homes[0]!.id]);
+});
+test("finished artwork stays approved when fields it does not draw change", () => {
+  const finished = {
+    mode: "finished" as const,
+    finished: { assetId: "art_1", url: "https://media.example.com/art.png" },
+  };
+  const signed = catalogDraft(homes, new Map([["2", finished]])).cards[1]!;
+  const approvals = new Map([["2", catalogCardFingerprint(signed)]]);
+  const retitled = catalogDraft(
+    homes,
+    new Map([["2", { ...finished, title: "New headline" }]]),
+    approvals,
+  );
+  expect(retitled.cards[1]?.approved).toBe(true);
+  const newArt = catalogDraft(
+    homes,
+    new Map([
+      [
+        "2",
+        { ...finished, finished: { ...finished.finished, assetId: "art_2" } },
+      ],
+    ]),
+    approvals,
+  );
+  expect(newArt.cards[1]?.approved).toBe(false);
 });

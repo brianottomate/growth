@@ -9,6 +9,7 @@ import {
   editCatalogCard,
   startCatalogExport,
   renderCatalogExport,
+  setCatalogApproval,
   setCatalogHomeHero,
   setCatalogIncluded,
 } from "@/server/services/catalog-studio.service";
@@ -70,6 +71,18 @@ export async function POST(
           patch: patchSchema,
         }),
         z.object({ action: z.literal("includeAll"), included: z.boolean() }),
+        z.object({
+          action: z.literal("approve"),
+          approved: z.boolean(),
+          cards: z
+            .array(
+              z.object({
+                homeId: z.string().min(1),
+                fingerprint: z.string().optional(),
+              }),
+            )
+            .min(1),
+        }),
       ])
       .parse(await request.json());
     switch (body.action) {
@@ -104,6 +117,15 @@ export async function POST(
       case "includeAll":
         await setCatalogIncluded({ userId, brandId, included: body.included });
         return NextResponse.json({ saved: true });
+      case "approve":
+        return NextResponse.json(
+          await setCatalogApproval({
+            userId,
+            brandId,
+            approved: body.approved,
+            cards: body.cards,
+          }),
+        );
     }
   } catch (error) {
     return NextResponse.json(
