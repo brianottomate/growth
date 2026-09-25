@@ -15,6 +15,7 @@ import {
   catalogCardCopy,
   catalogCardFingerprint,
   catalogDraft,
+  catalogHeadlineIssue,
   catalogExportRows,
   type CatalogCard,
   type CatalogExport,
@@ -391,6 +392,26 @@ export async function editCatalogCard(input: {
     throw new Error("A headline is 1–120 characters");
   if (patch.subtitle && patch.subtitle.length > 220)
     throw new Error("The facts line is at most 220 characters");
+  if (title) {
+    const row = await db.query.homeTable.findFirst({
+      where: and(
+        eq(homeTable.brandId, brand.id),
+        eq(homeTable.externalId, input.homeId),
+        isNull(homeTable.deletedAt),
+      ),
+      columns: { catalogTemplateId: true },
+    });
+    const template = compositionTemplateIdSchema.safeParse(
+      patch.templateId !== undefined
+        ? patch.templateId
+        : row?.catalogTemplateId,
+    );
+    const issue = catalogHeadlineIssue(
+      title,
+      template.success ? template.data : "catalog-place",
+    );
+    if (issue) throw new Error(issue);
+  }
   const set = {
     ...(patch.title !== undefined ? { catalogTitle: title ?? null } : {}),
     ...(patch.subtitle !== undefined

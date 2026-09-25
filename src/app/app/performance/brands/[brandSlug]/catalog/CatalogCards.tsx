@@ -355,10 +355,8 @@ export function CatalogCards({
                     className={`rounded-lg border p-4 ${card.included || editing ? "" : "opacity-50"}`}
                   >
                     <div className="grid grid-cols-1 items-start gap-5 @xl:grid-cols-[minmax(0,240px)_minmax(0,1fr)]">
-                      <div className="flex justify-center rounded-lg bg-muted p-3">
-                        <div className="w-full max-w-xs overflow-hidden rounded-md">
-                          <CardPreview brandId={brandId} card={shown} />
-                        </div>
+                      <div className="mx-auto w-full max-w-xs overflow-hidden rounded-lg">
+                        <CardPreview brandId={brandId} card={shown} />
                       </div>
                       <div className="min-w-0 space-y-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">

@@ -191,6 +191,24 @@ export function catalogCardCopy(card: CatalogCard): {
   };
 }
 
+/** The longest "{lead} in" the catalog-place template can draw. */
+export const CATALOG_PLACE_LEAD_MAX = 40;
+
+/**
+ * Why a headline cannot be drawn on this template, or null. catalog-place
+ * prints "{lead} in" as its eyebrow, which the composition caps, so a longer
+ * lead saves fine and then renders nothing.
+ */
+export function catalogHeadlineIssue(
+  title: string,
+  templateId: CatalogCard["templateId"],
+) {
+  if (templateId !== "catalog-place") return null;
+  const at = title.lastIndexOf(" in ");
+  if (at <= 0 || at + 3 <= CATALOG_PLACE_LEAD_MAX) return null;
+  return `"${title.slice(0, at)}" is too long for this card: keep the part before " in" to ${CATALOG_PLACE_LEAD_MAX - 3} characters, ideally 28 so it stays on two lines`;
+}
+
 /**
  * The URL a card draws at: its finished artwork, or its composition on the
  * portrait canvas the catalog runs in. Shared by the Catalog tab and the

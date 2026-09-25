@@ -4,6 +4,7 @@ import {
   catalogCardCopy,
   catalogCardFingerprint,
   catalogDraft,
+  catalogHeadlineIssue,
   catalogUnapproved,
   catalogExportRows,
   catalogFeedCsv,
@@ -196,4 +197,16 @@ test("finished artwork stays approved when fields it does not draw change", () =
     approvals,
   );
   expect(newArt.cards[1]?.approved).toBe(false);
+});
+
+test("a catalog-place headline the card cannot draw is refused, others pass", () => {
+  const long = `${"Soaking tub ".repeat(4).trim()} in Louisville, KY`;
+  expect(catalogHeadlineIssue(long, "catalog-place")).toContain("too long");
+  expect(
+    catalogHeadlineIssue(
+      "50 private acres & lake view in Louisville, KY",
+      "catalog-place",
+    ),
+  ).toBeNull();
+  expect(catalogHeadlineIssue(long, "catalog-copy")).toBeNull();
 });
