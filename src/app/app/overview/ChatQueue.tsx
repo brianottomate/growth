@@ -1,4 +1,8 @@
 "use client";
+import {
+  assistantFocusLabel,
+  type AssistantFocus,
+} from "@/lib/assistant-focus";
 import { useState } from "react";
 import { ListPlus, Pencil, X, CornerUpLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -94,6 +98,42 @@ export function ChatQueue({
                           : "Queued: "}
                     </span>
                     {chatInputText(input)}
+                  </p>
+                  <p className="mt-1 text-muted-foreground">
+                    {assistantFocusLabel({
+                      ...input.payload.context,
+                      catalogHomeContext: input.payload.context.catalogContext,
+                      adWorkContext: input.payload.context.campaignContext,
+                      ...(input.payload.context.assistantIntent &&
+                      typeof input.payload.context.assistantIntent === "object"
+                        ? {
+                            catalogHomeContext:
+                              (
+                                input.payload.context.assistantIntent as {
+                                  type: string;
+                                }
+                              ).type === "work_catalog_home"
+                                ? input.payload.context.assistantIntent
+                                : undefined,
+                            adWorkContext:
+                              (
+                                input.payload.context.assistantIntent as {
+                                  type: string;
+                                }
+                              ).type === "work_ad_campaign"
+                                ? input.payload.context.assistantIntent
+                                : undefined,
+                            workContext:
+                              (
+                                input.payload.context.assistantIntent as {
+                                  type: string;
+                                }
+                              ).type === "work_content_post"
+                                ? input.payload.context.assistantIntent
+                                : undefined,
+                          }
+                        : {}),
+                    } as AssistantFocus)}
                   </p>
                   {input.error && (
                     <p className="mt-1 text-muted-foreground" role="alert">

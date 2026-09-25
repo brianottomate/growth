@@ -19,6 +19,8 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { useMediaQuery } from "@/components/ui/hooks/use-media-query";
+import Link from "next/link";
+import { latestAssistantFocus } from "@/lib/assistant-focus";
 import { cn } from "@/lib/utils";
 import { orpc } from "@/orpc/client";
 import {
@@ -27,6 +29,7 @@ import {
   type AssistantIntent,
   type AdCampaignWorkContext,
   type ContentWorkContext,
+  type CatalogHomeWorkContext,
 } from "@/lib/assistant-events";
 import { OverviewChat } from "./OverviewChat";
 import {
@@ -66,6 +69,7 @@ export function OverviewAssistantPopup({
         brandId?: string;
         campaign?: AdCampaignWorkContext;
         work?: ContentWorkContext;
+        catalog?: CatalogHomeWorkContext;
       }
     >
   >({});
@@ -112,21 +116,7 @@ export function OverviewAssistantPopup({
     enabled: !!activeThreadId,
   });
 
-  const savedFocus = threadQuery.data?.messages
-    .slice()
-    .reverse()
-    .map(
-      (message) =>
-        message.metadata as
-          | {
-              adWorkContext?: AdCampaignWorkContext;
-              workContext?: ContentWorkContext;
-              brandId?: string;
-              contextMode?: "page" | "pinned";
-            }
-          | undefined,
-    )
-    .find((metadata) => metadata?.contextMode || metadata?.adWorkContext);
+  const savedFocus = latestAssistantFocus(threadQuery.data?.messages ?? []);
   const savedCampaignContext = savedFocus?.adWorkContext;
   const savedContextMode = savedFocus?.contextMode;
   const threadFocus = activeThreadId
@@ -134,21 +124,26 @@ export function OverviewAssistantPopup({
     : undefined;
   const pinnedCampaign = threadFocus
     ? threadFocus.campaign
-    : savedCampaignContext;
+    : (savedCampaignContext ?? undefined);
   const pinnedWork = threadFocus ? threadFocus.work : savedFocus?.workContext;
+  const pinnedCatalog = threadFocus
+    ? threadFocus.catalog
+    : savedFocus?.catalogHomeContext;
   const pinnedBrand = brands.find(
     (brand) =>
       brand.id === (threadFocus ? threadFocus.brandId : savedFocus?.brandId),
   );
-  const pinnedLabel = pinnedCampaign
-    ? `${pinnedCampaign.brandName} · ${pinnedCampaign.campaignName}${pinnedCampaign.adId ? " · Selected ad" : ""}`
-    : pinnedWork
-      ? `${pinnedWork.brandName} · ${pinnedWork.contentTitle}`
-      : pinnedBrand?.name;
+  const pinnedLabel = pinnedCatalog
+    ? pinnedCatalog.homeName
+    : pinnedCampaign
+      ? `${pinnedCampaign.brandName} · ${pinnedCampaign.campaignName}${pinnedCampaign.adId ? " · Selected ad" : ""}`
+      : pinnedWork
+        ? `${pinnedWork.brandName} · ${pinnedWork.contentTitle}${pinnedWork.platform ? ` · ${pinnedWork.platform}` : ""}`
+        : pinnedBrand?.name;
   const contextMode =
     (activeThreadId && scopeByThread[activeThreadId]) ||
     savedContextMode ||
-    (savedCampaignContext ? "pinned" : "page");
+    (savedCampaignContext || pinnedCatalog || pinnedWork ? "pinned" : "page");
   const selectScope = (scope: "page" | "pinned") => {
     if (activeThreadId)
       setScopeByThread((previous) => ({
@@ -161,7 +156,10 @@ export function OverviewAssistantPopup({
       ? brands.find(
           (brand) =>
             brand.id ===
-            (pinnedCampaign?.brandId ?? pinnedWork?.brandId ?? pinnedBrand?.id),
+            (pinnedCatalog?.brandId ??
+              pinnedCampaign?.brandId ??
+              pinnedWork?.brandId ??
+              pinnedBrand?.id),
         )
       : activeBrand;
 
@@ -208,6 +206,7 @@ export function OverviewAssistantPopup({
         brandId: "brandId" in intent ? intent.brandId : undefined,
         campaign: intent.type === "work_ad_campaign" ? intent : undefined,
         work: intent.type === "work_content_post" ? intent : undefined,
+        catalog: intent.type === "work_catalog_home" ? intent : undefined,
       };
       const pin = (threadId: string) => {
         setFocusByThread((previous) => ({ ...previous, [threadId]: focus }));
@@ -390,73 +389,115 @@ export function OverviewAssistantPopup({
             <X className="size-4 lg:hidden" />
           </Button>
         </header>
-        <div className="space-y-1 border-b px-3 py-2 text-xs">
-          <p className="truncate" title={pageQuery.data?.label ?? pathname}>
-            Page: {pageQuery.data?.label ?? pathname}
-          </p>
-          {pinnedLabel && (
-            <p className="truncate" title={pinnedLabel}>
-              Conversation focus: {pinnedLabel}
-            </p>
-          )}
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="rounded border px-2 py-1 aria-pressed:bg-accent"
-              aria-pressed={contextMode === "page"}
-              onClick={() => selectScope("page")}
-            >
-              Use current page
-            </button>
-            {pageQuery.data?.brand && (
-              <button
-                type="button"
-                className="rounded border px-2 py-1"
+        <div
+          className="flex min-w-0 items-center gap-1.5 border-b px-3 py-2 text-xs"
+          aria-label="Conversation focus"
+        >
+          <span className="text-muted-foreground">
+            {contextMode === "pinned" ? "Focus" : "Page"}
+          </span>
+          {contextMode === "pinned" && pinnedLabel ? (
+            <>
+              <Button
+                asChild
+                variant="outline"
+                size="xs"
+                className="min-w-0 flex-1 overflow-hidden"
+              >
+                <Link
+                  href={
+                    pinnedCatalog && effectiveBrand?.slug
+                      ? `/app/performance/brands/${effectiveBrand.slug}/homes/${pinnedCatalog.homeId}`
+                      : pinnedWork
+                        ? pinnedWork.platform === "newsletter" &&
+                          pinnedWork.platformPostId
+                          ? `/app/newsletters/${pinnedWork.platformPostId}`
+                          : `/app/content/${pinnedWork.contentPostId}`
+                        : pinnedCampaign && effectiveBrand?.slug
+                          ? `/app/performance/brands/${effectiveBrand.slug}/campaigns/${pinnedCampaign.campaignId}`
+                          : `/app/brands/${effectiveBrand?.slug ?? ""}`
+                  }
+                  title={pinnedLabel}
+                >
+                  <span className="truncate">{pinnedLabel}</span>
+                </Link>
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                aria-label="Clear conversation target"
                 onClick={() => {
-                  const page = pageQuery.data;
-                  if (!page?.brand) return;
                   if (!activeThreadId) return;
-                  const brand = page.brand;
                   setFocusByThread((previous) => ({
                     ...previous,
-                    [activeThreadId]: {
-                      brandId: brand.id,
-                      campaign: page.campaign
-                        ? {
-                            type: "work_ad_campaign",
-                            brandId: brand.id,
-                            brandName: brand.name,
-                            campaignId: page.campaign.id,
-                            campaignName: page.campaign.name,
-                          }
-                        : undefined,
-                    },
+                    [activeThreadId]: { brandId: effectiveBrand?.id },
                   }));
                   selectScope("pinned");
                 }}
               >
-                {pageQuery.data.campaign ? "Pin campaign" : "Pin brand"}
-              </button>
-            )}
-            {pinnedLabel && (
-              <button
-                type="button"
-                className="rounded border px-2 py-1 aria-pressed:bg-accent"
-                aria-pressed={contextMode === "pinned"}
-                onClick={() => selectScope("pinned")}
+                <X className="size-3.5" />
+              </Button>
+            </>
+          ) : (
+            <span className="min-w-0 flex-1 truncate">
+              {contextMode === "page"
+                ? (pageQuery.data?.label ?? pathname)
+                : (effectiveBrand?.name ?? "Workspace")}
+            </span>
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="ml-auto"
+                aria-label="Change conversation focus"
               >
-                Keep conversation focus
-              </button>
-            )}
-          </div>
-          {contextMode === "pinned" &&
-            pinnedLabel &&
-            pageQuery.data?.label &&
-            pinnedLabel !== pageQuery.data.label && (
-              <p className="text-amber-700 dark:text-amber-300">
-                Your next message uses the conversation focus above.
-              </p>
-            )}
+                Change <ChevronDown className="size-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Next message</DropdownMenuLabel>
+              <DropdownMenuItem onSelect={() => selectScope("page")}>
+                Follow current page
+              </DropdownMenuItem>
+              {pageQuery.data?.brand && (
+                <DropdownMenuItem
+                  onSelect={() => {
+                    const page = pageQuery.data;
+                    if (!page?.brand || !activeThreadId) return;
+                    const pageBrand = page.brand;
+                    setFocusByThread((previous) => ({
+                      ...previous,
+                      [activeThreadId]: {
+                        brandId: pageBrand.id,
+                        campaign: page.campaign
+                          ? {
+                              type: "work_ad_campaign",
+                              brandId: pageBrand.id,
+                              brandName: pageBrand.name,
+                              campaignId: page.campaign.id,
+                              campaignName: page.campaign.name,
+                            }
+                          : undefined,
+                      },
+                    }));
+                    selectScope("pinned");
+                  }}
+                >
+                  Keep{" "}
+                  {pageQuery.data.campaign ? "this campaign" : "this brand"} in
+                  focus
+                </DropdownMenuItem>
+              )}
+              {pinnedLabel && (
+                <DropdownMenuItem onSelect={() => selectScope("pinned")}>
+                  Keep conversation focus
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
         <div className="min-h-0 flex-1">
           {activeThreadId && threadQuery.data ? (
@@ -492,6 +533,11 @@ export function OverviewAssistantPopup({
               seedPrompt={searchParams.get("prompt") ?? undefined}
               workContext={
                 contextMode === "pinned" ? (pinnedWork ?? undefined) : undefined
+              }
+              catalogContext={
+                contextMode === "pinned"
+                  ? (pinnedCatalog ?? undefined)
+                  : undefined
               }
               campaignContext={
                 contextMode === "pinned"

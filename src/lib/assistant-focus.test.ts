@@ -75,3 +75,64 @@ describe("campaign navigation", () => {
     );
   });
 });
+
+import {
+  catalogFocusForTurn,
+  latestAssistantFocus,
+  sameTurnFocus,
+} from "./assistant-focus";
+const home = {
+  type: "work_catalog_home" as const,
+  brandId: "brand-a",
+  brandName: "A",
+  homeId: "home-1",
+  homeName: "Suite 302",
+};
+test("a cleared catalog focus survives persistence and ordinary follow-ups", () => {
+  const messages: { role: string; metadata?: unknown }[] = JSON.parse(
+    JSON.stringify([
+      { role: "user", metadata: { catalogHomeContext: home } },
+      {
+        role: "user",
+        metadata: { contextMode: "pinned", catalogHomeContext: null },
+      },
+      { role: "assistant", metadata: {} },
+    ]),
+  ) as { role: string; metadata?: unknown }[];
+  const saved = latestAssistantFocus(messages);
+  expect(saved?.catalogHomeContext).toBeNull();
+  expect(
+    catalogFocusForTurn({ saved: saved?.catalogHomeContext }),
+  ).toBeUndefined();
+});
+test("switching intent or following the page ends catalog focus", () => {
+  expect(
+    catalogFocusForTurn({ mode: "page", saved: home, pinned: home }),
+  ).toBeUndefined();
+  expect(
+    catalogFocusForTurn({
+      intent: { ...page, visibleText: "Work on this" },
+      saved: home,
+    }),
+  ).toBeUndefined();
+  expect(catalogFocusForTurn({ mode: "pinned", saved: home })).toBeUndefined();
+});
+test("a correction may follow the selected home across navigation but cannot change homes", () => {
+  const running = {
+    assistantIntent: { ...home, focus: "photo", visibleText: "New photo" },
+    pagePath: "/catalog",
+  };
+  expect(
+    sameTurnFocus(running, {
+      contextMode: "pinned",
+      catalogContext: home,
+      pagePath: "/elsewhere",
+    }),
+  ).toBe(true);
+  expect(
+    sameTurnFocus(running, {
+      contextMode: "pinned",
+      catalogContext: { ...home, homeId: "home-2" },
+    }),
+  ).toBe(false);
+});

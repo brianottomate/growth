@@ -1,4 +1,8 @@
-import { campaignFocusForTurn } from "@/lib/assistant-focus";
+import {
+  campaignFocusForTurn,
+  catalogFocusForTurn,
+  latestAssistantFocus,
+} from "@/lib/assistant-focus";
 import { after } from "next/server";
 import {
   claimChatTurn,
@@ -227,7 +231,8 @@ export async function POST(req: Request): Promise<Response> {
       assistantIntent,
       workContext,
       campaignContext,
-      contextMode,
+      catalogContext,
+      contextMode: requestedContextMode,
       chatAttachment,
       chatAttachments,
       skippedAttachments,
@@ -243,6 +248,7 @@ export async function POST(req: Request): Promise<Response> {
       assistantIntent?: AssistantIntent;
       workContext?: ContentWorkContext;
       campaignContext?: AdCampaignWorkContext;
+      catalogContext?: CatalogHomeWorkContext;
       contextMode?: "page" | "pinned";
       chatAttachment?: { url?: string; mediaType?: string; fileName?: string };
       chatAttachments?: {
@@ -283,6 +289,7 @@ export async function POST(req: Request): Promise<Response> {
       ? rawIntent
       : undefined;
 
+    const contextMode = assistantIntent ? "pinned" : requestedContextMode;
     const pageContext = await resolvePageContext(
       pagePath ?? "",
       membership.organizationId,
@@ -290,7 +297,7 @@ export async function POST(req: Request): Promise<Response> {
     const requestedWorkContext =
       assistantIntent?.type === "work_content_post"
         ? assistantIntent
-        : contextMode === "page"
+        : assistantIntent || contextMode === "page"
           ? undefined
           : workContext;
     const workItem = requestedWorkContext?.contentPostId
@@ -327,35 +334,32 @@ export async function POST(req: Request): Promise<Response> {
         asc(assistantMessageTable.id),
       ],
     });
-    const savedAdContext = persisted
-      .map(
-        (row) =>
-          (
-            row.message.metadata as
-              | { adWorkContext?: AdCampaignWorkContext }
-              | undefined
-          )?.adWorkContext,
-      )
-      .find((context) => context?.adId);
-    const requestedCampaignContext = campaignFocusForTurn({
-      mode: contextMode,
-      intent:
-        assistantIntent?.type === "work_ad_campaign"
-          ? assistantIntent
-          : undefined,
-      page:
-        pageContext.campaign && pageContext.brand
-          ? {
-              type: "work_ad_campaign",
-              campaignId: pageContext.campaign.id,
-              brandId: pageContext.brand.id,
-              brandName: pageContext.brand.name,
-              campaignName: pageContext.campaign.name,
-            }
-          : undefined,
-      pinned: campaignContext,
-      saved: savedAdContext,
-    });
+    const savedFocus = latestAssistantFocus(
+      persisted.map((row) => row.message),
+    );
+    const savedAdContext = savedFocus?.adWorkContext ?? undefined;
+    const requestedCampaignContext =
+      assistantIntent && assistantIntent.type !== "work_ad_campaign"
+        ? undefined
+        : campaignFocusForTurn({
+            mode: contextMode,
+            intent:
+              assistantIntent?.type === "work_ad_campaign"
+                ? assistantIntent
+                : undefined,
+            page:
+              pageContext.campaign && pageContext.brand
+                ? {
+                    type: "work_ad_campaign",
+                    campaignId: pageContext.campaign.id,
+                    brandId: pageContext.brand.id,
+                    brandName: pageContext.brand.name,
+                    campaignName: pageContext.campaign.name,
+                  }
+                : undefined,
+            pinned: campaignContext,
+            saved: savedAdContext,
+          });
     const campaignWorkItem = requestedCampaignContext?.campaignId
       ? await db.query.campaignTable.findFirst({
           where: eq(campaignTable.id, requestedCampaignContext.campaignId),
@@ -383,32 +387,12 @@ export async function POST(req: Request): Promise<Response> {
         })
       : null;
 
-    // A catalog home stays in focus for the rest of the thread, so a reply
-    // like "no, use 12" steers the same home; any other intent ends it.
-    const savedCatalogContext = [...persisted]
-      .reverse()
-      .map(
-        (row) =>
-          (
-            row.message.metadata as
-              | { catalogHomeContext?: CatalogHomeWorkContext }
-              | undefined
-          )?.catalogHomeContext,
-      )
-      .find(Boolean);
-    const requestedCatalogContext: CatalogHomeWorkContext | undefined =
-      assistantIntent?.type === "work_catalog_home"
-        ? {
-            type: "work_catalog_home",
-            brandId: assistantIntent.brandId,
-            brandName: assistantIntent.brandName,
-            homeId: assistantIntent.homeId,
-            homeName: assistantIntent.homeName,
-            focus: assistantIntent.focus,
-          }
-        : assistantIntent
-          ? undefined
-          : savedCatalogContext;
+    const requestedCatalogContext = catalogFocusForTurn({
+      mode: contextMode,
+      intent: assistantIntent,
+      pinned: catalogContext,
+      saved: savedFocus?.catalogHomeContext,
+    });
     const catalogHome = requestedCatalogContext
       ? await catalogHomeContext(
           currentUser.id,
@@ -422,7 +406,13 @@ export async function POST(req: Request): Promise<Response> {
       : null;
     // The button's focus steers only the turn it opened.
     const activeCatalogContext = catalogHome
-      ? { ...requestedCatalogContext!, focus: undefined }
+      ? {
+          type: "work_catalog_home" as const,
+          brandId: catalogHome.brand.id,
+          brandName: catalogHome.brand.name,
+          homeId: catalogHome.home.id,
+          homeName: catalogHome.home.name,
+        }
       : undefined;
 
     const requestedBrandId =
@@ -604,7 +594,7 @@ export async function POST(req: Request): Promise<Response> {
       incoming.metadata = {
         ...((incoming.metadata ?? {}) as Record<string, unknown>),
         adWorkContext: activeCampaignContext,
-        catalogHomeContext: activeCatalogContext,
+        catalogHomeContext: activeCatalogContext ?? null,
         workContext: activeWorkContext,
         brandId: brand?.id,
         contextMode,

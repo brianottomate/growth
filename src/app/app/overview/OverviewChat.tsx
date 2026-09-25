@@ -1,4 +1,9 @@
 "use client";
+import {
+  assistantFocusLabel,
+  sameTurnFocus,
+  type AssistantFocus,
+} from "@/lib/assistant-focus";
 import { appliedEvidenceSchema } from "@/lib/applied-evidence";
 import { AppliedEvidenceCard } from "./AppliedEvidenceCard";
 import { OperationJobCard } from "./OperationJobCard";
@@ -219,6 +224,7 @@ export function OverviewChat({
   seedPrompt,
   workContext,
   campaignContext,
+  catalogContext,
   contextMode,
 }: {
   threadId: string;
@@ -241,6 +247,7 @@ export function OverviewChat({
   seedPrompt?: string;
   workContext?: ContentWorkContext;
   campaignContext?: AdCampaignWorkContext;
+  catalogContext?: import("@/lib/assistant-events").CatalogHomeWorkContext;
   contextMode?: "page" | "pinned";
 }) {
   const router = useRouter();
@@ -272,6 +279,7 @@ export function OverviewChat({
     intent,
     workContext,
     campaignContext,
+    catalogContext,
     pagePath: pathname,
     contextMode,
   };
@@ -967,7 +975,18 @@ export function OverviewChat({
                   )}
                 >
                   {message.role === "user" ? (
-                    <UserMessage message={message} />
+                    <div className="flex max-w-[85%] min-w-0 flex-col items-end gap-1">
+                      {assistantFocusLabel(
+                        message.metadata as AssistantFocus | undefined,
+                      ) && (
+                        <p className="text-right text-xs text-muted-foreground">
+                          {assistantFocusLabel(
+                            message.metadata as AssistantFocus,
+                          )}
+                        </p>
+                      )}
+                      <UserMessage message={message} />
+                    </div>
                   ) : (
                     <div className="max-w-[95%] min-w-0 space-y-2">
                       {message.parts.map((part, i) => {
@@ -1197,7 +1216,11 @@ export function OverviewChat({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
+                if (
+                  e.key === "Enter" &&
+                  !e.shiftKey &&
+                  !e.nativeEvent.isComposing
+                ) {
                   e.preventDefault();
                   void submitComposer();
                 }
@@ -1237,6 +1260,14 @@ export function OverviewChat({
                 {busy &&
                   queue.state?.activeTurnId &&
                   canSend &&
+                  queue.state.inputs.some(
+                    (item) =>
+                      item.status === "running" &&
+                      sameTurnFocus(
+                        item.payload.context,
+                        requestBodyRef.current,
+                      ),
+                  ) &&
                   readyAttachments.length === 0 && (
                     <Button
                       type="button"
@@ -1293,7 +1324,7 @@ function UserMessage({ message }: { message: UIMessage }) {
   );
   const longText = text.length >= LONG_TEXT_ATTACHMENT_THRESHOLD;
   return (
-    <div className="flex max-w-[85%] min-w-0 flex-col items-end gap-1.5">
+    <div className="flex max-w-full min-w-0 flex-col items-end gap-1.5">
       {images.length > 0 && (
         <div
           className={cn(

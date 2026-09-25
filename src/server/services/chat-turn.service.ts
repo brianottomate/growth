@@ -1,3 +1,4 @@
+import { sameTurnFocus } from "@/lib/assistant-focus";
 import { isDeepStrictEqual } from "node:util";
 import "server-only";
 import { and, asc, eq, gt, inArray } from "drizzle-orm";
@@ -170,6 +171,18 @@ export async function enqueueChatInput(
       targetTurnId &&
       targetTurnId === thread.activeTurnId &&
       !thread.stopRequested;
+    if (steering) {
+      const [running] = await tx
+        .select({ payload: inputs.payload })
+        .from(inputs)
+        .where(and(eq(inputs.threadId, threadId), eq(inputs.status, "running")))
+        .limit(1);
+      if (!running || !sameTurnFocus(running.payload.context, payload.context))
+        throw new ChatTurnError(
+          "The focus changed. Queue this message as a new turn.",
+          409,
+        );
+    }
     const [item] = await tx
       .insert(inputs)
       .values({
