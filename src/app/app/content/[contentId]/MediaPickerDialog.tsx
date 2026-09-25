@@ -220,12 +220,12 @@ export function MediaPickerDialog({
                         event.stopPropagation();
                         setPreview(a);
                       }}
-                      className="absolute top-1 right-1 grid size-6 place-items-center rounded bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/80"
+                      className="absolute top-1 right-1 grid size-6 grid-cols-1 place-items-center rounded bg-black/60 text-white opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:bg-black/80 pointer-coarse:opacity-100"
                     >
                       <Expand className="size-3" />
                     </span>
                     {already && (
-                      <span className="absolute inset-0 grid place-items-center bg-black/40 text-[10px] font-semibold text-white">
+                      <span className="absolute inset-0 grid grid-cols-1 place-items-center bg-black/40 text-[10px] font-semibold text-white">
                         Added
                       </span>
                     )}

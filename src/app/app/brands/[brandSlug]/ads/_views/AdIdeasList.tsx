@@ -119,15 +119,9 @@ export function AdIdeasList({
     );
   return (
     <section aria-labelledby="ad-ideas-heading" className="space-y-4">
-      <div>
-        <h2 id="ad-ideas-heading" className="text-sm font-semibold">
-          Ads <span className="text-muted-foreground">· {ideas.length}</span>
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          Shape each idea, review its previews, then approve to save the
-          finished creative.
-        </p>
-      </div>
+      <h2 id="ad-ideas-heading" className="text-sm font-semibold">
+        Ads <span className="text-muted-foreground">· {ideas.length}</span>
+      </h2>
       {preparingHero && (
         <div
           className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground"

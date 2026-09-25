@@ -97,8 +97,8 @@ export function CoverWall({
     <div
       className={
         variant === "og"
-          ? "grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
-          : "grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4"
+          ? "grid gap-4 @xl:grid-cols-2 @5xl:grid-cols-3"
+          : "grid grid-cols-2 gap-4 @xl:grid-cols-3 @4xl:grid-cols-4"
       }
     >
       {items.map((it) => (

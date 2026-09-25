@@ -226,9 +226,9 @@ export function Reddit() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-[220px_1fr]">
+      <div className="grid grid-cols-1 gap-5 @2xl:grid-cols-[220px_1fr]">
         {/* rail */}
-        <aside className="space-y-5 md:sticky md:top-4 md:self-start">
+        <aside className="space-y-5 @2xl:sticky @2xl:top-4 @2xl:self-start">
           <RailGroup
             title="Subreddits"
             items={subCounts}

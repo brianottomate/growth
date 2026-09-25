@@ -19,7 +19,7 @@ export default async function ProspectPage({
   const decoded = decodeURIComponent(domain).toLowerCase();
 
   return (
-    <div className="mx-auto max-w-5xl p-4 sm:p-6">
+    <div className="mx-auto max-w-5xl p-4 @xl:p-6">
       <Link
         href="/app/leads"
         className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"

@@ -107,7 +107,7 @@ export function HeroHomePicker({
                         className="size-full object-cover"
                       />
                       {selected ? (
-                        <span className="absolute top-1.5 right-1.5 grid size-5 place-items-center rounded-full bg-foreground text-background">
+                        <span className="absolute top-1.5 right-1.5 grid size-5 grid-cols-1 place-items-center rounded-full bg-foreground text-background">
                           <Check className="size-3" />
                         </span>
                       ) : null}

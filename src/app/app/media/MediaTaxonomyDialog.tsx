@@ -141,8 +141,8 @@ export function MediaTaxonomyDialog({
           </TabsContent>
 
           <TabsContent value="tags" className="space-y-4 pt-2">
-            <div className="grid gap-2">
-              <div className="grid gap-1.5">
+            <div className="grid grid-cols-1 gap-2">
+              <div className="grid grid-cols-1 gap-1.5">
                 <Label>Tag name</Label>
                 <Input
                   value={tagName}
@@ -150,7 +150,7 @@ export function MediaTaxonomyDialog({
                   placeholder="Logo, founder, product screenshot…"
                 />
               </div>
-              <div className="grid gap-1.5">
+              <div className="grid grid-cols-1 gap-1.5">
                 <Label>Description for AI</Label>
                 <Input
                   value={tagDescription}

@@ -168,7 +168,7 @@ export function LaunchDetail({
             Atlas yet.
           </p>
         ) : (
-          <ul className="grid gap-1 sm:grid-cols-2">
+          <ul className="grid grid-cols-1 gap-1 @xl:grid-cols-2">
             {features.map((feature) => (
               <li key={feature.id}>
                 <label className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent/50">

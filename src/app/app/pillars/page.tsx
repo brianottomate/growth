@@ -130,7 +130,7 @@ export default async function PillarsPage() {
                 ))}
             </div>
           ) : null}
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 @2xl:grid-cols-2">
             {pillars.map((p) => {
               const count = countByPillar.get(p.slug) ?? 0;
               const seriesCount = seriesByPillar.get(p.slug) ?? 0;

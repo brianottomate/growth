@@ -92,10 +92,10 @@ export function ByHomeView({
       <header className="space-y-2">
         <Link
           href={back}
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          className="inline-flex max-w-full items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
-          <ChevronLeft className="size-4" />
-          {campaignName}
+          <ChevronLeft className="size-4 shrink-0" />
+          <span className="truncate">{campaignName}</span>
         </Link>
         <h1 className="text-xl font-semibold tracking-tight">By home</h1>
         <div className="flex flex-wrap items-center gap-1.5">
@@ -208,10 +208,10 @@ function AdAcross({
 
   return (
     <li className={cn(panel, "p-4")}>
-      <div className="grid gap-4 @4xl:grid-cols-[minmax(0,1fr)_18rem]">
+      <div className="grid grid-cols-1 gap-4 @4xl:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="flex flex-wrap items-start gap-4">
           {shell ? (
-            <div className="grid h-40 w-full max-w-md place-items-center rounded-xl border border-dashed bg-muted/40 text-xs text-muted-foreground">
+            <div className="grid h-40 w-full max-w-md grid-cols-1 place-items-center rounded-xl border border-dashed bg-muted/40 text-xs text-muted-foreground">
               No creative yet. Fill it on the campaign page.
             </div>
           ) : (

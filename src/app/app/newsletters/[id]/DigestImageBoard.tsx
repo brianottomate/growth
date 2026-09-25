@@ -74,7 +74,7 @@ export function DigestImageBoard({
             <p className="mb-2 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
               {section.heading}
             </p>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-2 @xl:grid-cols-3">
               {section.properties.map((property, propertyIndex) => (
                 <div
                   key={`${property.name}-${propertyIndex}`}

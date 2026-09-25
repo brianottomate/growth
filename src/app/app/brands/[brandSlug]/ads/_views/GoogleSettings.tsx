@@ -128,7 +128,7 @@ export function GoogleSettings({
               onChange={(event) =>
                 setCampaignType(event.target.value as "search" | "display")
               }
-              className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs sm:w-56"
+              className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs @xl:w-56"
             >
               <option value="search">Search · buys keywords</option>
               <option value="display">Display · buys placements</option>
@@ -136,7 +136,7 @@ export function GoogleSettings({
           </div>
 
           {campaignType === "search" ? (
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 @xl:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="g-keywords">Keywords (one per line)</Label>
                 <Textarea

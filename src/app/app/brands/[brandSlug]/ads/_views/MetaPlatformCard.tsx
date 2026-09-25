@@ -277,7 +277,7 @@ export function MetaPlatformCard({
                 }}
               />
             </div>
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 @2xl:grid-cols-2">
               <div className="space-y-4 rounded-lg border p-4">
                 <h5 className="text-sm font-semibold">Identity & objective</h5>
                 <dl className="grid grid-cols-2 gap-3 text-sm">

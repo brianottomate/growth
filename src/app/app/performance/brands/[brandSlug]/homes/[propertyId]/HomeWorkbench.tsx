@@ -217,7 +217,7 @@ export function HomeWorkbench({ home }: { home: HomeDetail }) {
                     />
                     {inCarousel ? (
                       <span
-                        className="absolute top-1.5 left-1.5 grid size-5 place-items-center rounded-full bg-sky-500 text-[10px] font-semibold text-white tabular-nums"
+                        className="absolute top-1.5 left-1.5 grid size-5 grid-cols-1 place-items-center rounded-full bg-sky-500 text-[10px] font-semibold text-white tabular-nums"
                         title={`Ad photo ${position}`}
                       >
                         {position}
@@ -234,7 +234,7 @@ export function HomeWorkbench({ home }: { home: HomeDetail }) {
                         })
                       }
                       title="Hide this photo"
-                      className="absolute top-1.5 right-1.5 grid size-6 place-items-center rounded-full border border-white/50 bg-black/50 text-white opacity-0 transition group-hover:opacity-100 focus:opacity-100 disabled:opacity-30"
+                      className="absolute top-1.5 right-1.5 grid size-6 grid-cols-1 place-items-center rounded-full border border-white/50 bg-black/50 text-white opacity-0 transition group-hover:opacity-100 focus:opacity-100 disabled:opacity-30 pointer-coarse:opacity-100"
                     >
                       <EyeOff className="size-3" />
                     </button>

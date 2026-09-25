@@ -89,7 +89,7 @@ function PeerBrandCard({
       id={`tracked-brand-${brand.id}`}
       className="scroll-mt-24 rounded-2xl border bg-card p-4 shadow-sm"
     >
-      <div className="flex items-start gap-3.5">
+      <div className="flex flex-wrap items-start gap-3.5">
         {brand.logo ? (
           // oxlint-disable-next-line nextjs/no-img-element
           <img
@@ -102,7 +102,7 @@ function PeerBrandCard({
             {brand.name.slice(0, 2)}
           </div>
         )}
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="text-sm font-semibold">{brand.name}</span>
             {brand.website && (
@@ -130,7 +130,7 @@ function PeerBrandCard({
             </p>
           )}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1">
           <SuggestedChannels
             brandId={brand.id}
             suggestions={suggestions}
@@ -646,7 +646,7 @@ export default async function BrandsPage() {
 
   return (
     <div>
-      <div className="flex items-start justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Brands</h1>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -655,7 +655,7 @@ export default async function BrandsPage() {
             {ours.length} ours · {distinctTracked} tracked
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <ImportZernioBrands />
           <NewBrandButton />
         </div>

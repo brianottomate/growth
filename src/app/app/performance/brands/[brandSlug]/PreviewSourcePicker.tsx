@@ -76,7 +76,7 @@ export function PreviewSourcePicker({
             className="size-6 rounded-full object-cover"
           />
         ) : (
-          <span className="grid size-6 place-items-center rounded-full bg-muted">
+          <span className="grid size-6 grid-cols-1 place-items-center rounded-full bg-muted">
             <ImageIcon className="size-3" />
           </span>
         )}
@@ -217,7 +217,7 @@ function Tile({
           className="aspect-square w-full object-cover"
         />
         {selected ? (
-          <span className="absolute top-1 right-1 grid size-5 place-items-center rounded-full bg-sky-400 text-white">
+          <span className="absolute top-1 right-1 grid size-5 grid-cols-1 place-items-center rounded-full bg-sky-400 text-white">
             <Check className="size-3" />
           </span>
         ) : null}

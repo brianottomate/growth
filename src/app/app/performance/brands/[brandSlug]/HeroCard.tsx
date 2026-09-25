@@ -90,7 +90,7 @@ export function HeroCard({
                   />
                 ))}
                 {more > 0 ? (
-                  <span className="grid size-14 place-items-center rounded-md bg-muted text-[11px] text-muted-foreground">
+                  <span className="grid size-14 grid-cols-1 place-items-center rounded-md bg-muted text-[11px] text-muted-foreground">
                     +{more}
                   </span>
                 ) : null}

@@ -117,7 +117,7 @@ export function HomeRowsGrid({
                     className="aspect-[4/3] w-full bg-muted object-cover transition-opacity group-hover:opacity-90"
                   />
                 ) : (
-                  <span className="grid aspect-[4/3] w-full place-items-center bg-muted text-muted-foreground">
+                  <span className="grid aspect-[4/3] w-full grid-cols-1 place-items-center bg-muted text-muted-foreground">
                     <ImageOff className="size-4" aria-label="No hero photo" />
                   </span>
                 )}
@@ -156,7 +156,7 @@ export function HomeRowsGrid({
                   "absolute top-1.5 left-1.5 grid size-7 place-items-center rounded-full border text-white transition disabled:opacity-40",
                   home.featured
                     ? "border-white/70 bg-black/70 opacity-100"
-                    : "border-white/50 bg-black/50 opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
+                    : "border-white/50 bg-black/50 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100",
                 )}
               >
                 {busy ? (

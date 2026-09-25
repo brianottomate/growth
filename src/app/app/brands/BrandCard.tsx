@@ -189,7 +189,7 @@ export function BrandCard({
       </div>
 
       {/* strategy */}
-      <div className="grid gap-x-8 gap-y-4 border-t px-5 py-4 md:grid-cols-[1fr_1.15fr]">
+      <div className="grid grid-cols-1 gap-x-8 gap-y-4 border-t px-5 py-4 @2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
         <div className="min-w-0">
           <div className="mb-2 flex items-center justify-between">
             <span className={LABEL}>

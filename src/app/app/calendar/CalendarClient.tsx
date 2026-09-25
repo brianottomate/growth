@@ -612,7 +612,7 @@ export function CalendarClient({
       </div>
 
       {/* Body */}
-      <div ref={ref} style={style} className="mt-5 px-8 sm:px-0">
+      <div ref={ref} style={style} className="mt-5 px-8 @xl:px-0">
         {zoom === "month" ? (
           <MonthGrid
             year={year}
@@ -871,11 +871,11 @@ function ContentChip({ g }: { g: DayGroup }) {
     <span
       // Below lg (side-by-side windows, tablets) the thumbnail stacks on top so
       // the title still gets usable width; desktop keeps it inline on the left.
-      className="flex flex-col gap-1.5 overflow-hidden rounded-md border bg-card p-1 text-xs lg:flex-row lg:items-center"
+      className="flex flex-col gap-1.5 overflow-hidden rounded-md border bg-card p-1 text-xs @4xl:flex-row @4xl:items-center"
       style={pillar ? { borderLeft: `2px solid ${pillar.color}` } : undefined}
       title={label}
     >
-      <span className="relative h-12 w-full shrink-0 overflow-hidden rounded bg-muted lg:h-8 lg:w-8">
+      <span className="relative h-12 w-full shrink-0 overflow-hidden rounded bg-muted @4xl:h-8 @4xl:w-8">
         {media ? (
           // oxlint-disable-next-line nextjs/no-img-element
           <img src={media} alt="" className="size-full object-cover" />
@@ -958,7 +958,7 @@ function YearMonths({
 }) {
   const firstYear = months[0]?.year;
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 @xl:grid-cols-2 @4xl:grid-cols-3 @5xl:grid-cols-4">
       {months.map(({ year, month }) => (
         <MiniMonth
           key={`${year}-${month}`}
@@ -1155,7 +1155,7 @@ function YearMonthsDetailed({
 }) {
   const firstYear = months[0]?.year;
   return (
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 @5xl:grid-cols-2">
       {months.map(({ year, month }) => (
         <DetailedMonth
           key={`${year}-${month}`}

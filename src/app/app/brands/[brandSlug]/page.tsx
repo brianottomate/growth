@@ -145,14 +145,14 @@ export default async function BrandPage({
           <span className="text-muted-foreground">/</span>
           <span className="font-medium">{brand.name}</span>
         </div>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-semibold tracking-tight">
             {brand.name}{" "}
             <span className="text-base font-normal text-muted-foreground">
               brand map
             </span>
           </h1>
-          <div className="flex items-center gap-3 text-sm">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
             <ContentStructureAssistantButton
               brandId={brand.id}
               brandName={brand.name}

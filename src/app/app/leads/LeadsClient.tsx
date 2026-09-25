@@ -382,7 +382,7 @@ export function LeadsClient() {
       </div>
 
       {showCohortDetail && (
-        <div className="mt-2 grid gap-2 rounded-lg border border-border p-3 text-xs lg:grid-cols-2">
+        <div className="mt-2 grid grid-cols-1 gap-2 rounded-lg border border-border p-3 text-xs @4xl:grid-cols-2">
           {(
             Object.entries(HUBSPOT_PREGEN_LISTS) as Array<
               [

@@ -201,7 +201,7 @@ export async function PlatformCampaignView({
         </div>
       </header>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 @xl:grid-cols-4">
         {statCards.map((card) => (
           <div key={card.label} className="rounded-xl border bg-card p-3">
             <p className="text-xs text-muted-foreground">{card.label}</p>
@@ -234,7 +234,7 @@ export async function PlatformCampaignView({
             </p>
           </div>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 @xl:grid-cols-2 @4xl:grid-cols-3">
             {sortedSpots.map((spot) => (
               <div
                 key={spot.id}

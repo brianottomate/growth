@@ -202,20 +202,23 @@ export function TransactionalRegistry({
                   {showBrand && (
                     <Badge
                       variant="secondary"
-                      className="hidden md:inline-flex"
+                      className="hidden @2xl:inline-flex"
                     >
                       {m.brand.name}
                     </Badge>
                   )}
                   {m.templateKey ? (
-                    <Badge variant="outline" className="hidden md:inline-flex">
+                    <Badge
+                      variant="outline"
+                      className="hidden @2xl:inline-flex"
+                    >
                       react-email ready
                     </Badge>
                   ) : m.status !== "dead" ? (
                     <Badge
                       variant="outline"
                       tone="muted"
-                      className="hidden md:inline-flex"
+                      className="hidden @2xl:inline-flex"
                     >
                       template gap
                     </Badge>

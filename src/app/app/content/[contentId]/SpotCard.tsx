@@ -478,7 +478,7 @@ export function SpotCard({
           </Link>
         </div>
       ) : (
-        <div className="mt-4 grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="mt-4 grid grid-cols-1 items-start gap-4 @4xl:grid-cols-[minmax(0,1fr)_18rem]">
           <div className="min-w-0 space-y-3">
             <section className="rounded-xl border bg-background p-4">
               <h3 className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
@@ -540,7 +540,7 @@ export function SpotCard({
                             Post {threadIndex + 1}
                           </div>
                         )}
-                        <ol className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+                        <ol className="grid grid-cols-2 gap-2 @xl:grid-cols-3 @5xl:grid-cols-4">
                           {itemMedia.map((item, mediaIndex) => (
                             <li
                               key={`${item.assetId ?? item.url}-${mediaIndex}`}

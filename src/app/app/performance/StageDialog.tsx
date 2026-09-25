@@ -128,7 +128,7 @@ function Group({
     <div
       role="radiogroup"
       aria-label={label}
-      className="grid content-start gap-1"
+      className="grid grid-cols-1 content-start gap-1"
     >
       <p className="mb-1 text-[10.5px] font-semibold tracking-[0.07em] text-muted-foreground uppercase">
         {label}

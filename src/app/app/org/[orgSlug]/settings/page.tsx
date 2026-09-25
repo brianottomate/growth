@@ -36,12 +36,12 @@ export default async function OrganizationSettingsPage({
 
   return (
     <HydrateClient>
-      <div className="mx-auto max-w-2xl space-y-8 sm:space-y-10">
+      <div className="mx-auto max-w-2xl space-y-8 @xl:space-y-10">
         <div>
-          <h1 className="text-2xl font-bold sm:text-3xl">
+          <h1 className="text-2xl font-bold @xl:text-3xl">
             Organization Settings
           </h1>
-          <p className="mt-2 text-sm text-muted-foreground sm:text-base">
+          <p className="mt-2 text-sm text-muted-foreground @xl:text-base">
             Manage your organization information and settings.
           </p>
         </div>

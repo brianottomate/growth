@@ -116,7 +116,7 @@ export function TrackedBrands({
             onClick={() => untrackM.mutate({ inspirationId: t.inspirationId })}
             disabled={untrackM.isPending}
             title="Stop tracking"
-            className="text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
+            className="text-muted-foreground opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:text-foreground pointer-coarse:opacity-100"
           >
             <X className="size-3" />
           </button>

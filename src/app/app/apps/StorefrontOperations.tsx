@@ -84,7 +84,7 @@ export function StorefrontOperations({
         </p>
       </header>
 
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 @xl:grid-cols-4">
         <Summary value={storefronts.length} label="storefronts" icon={Store} />
         <Summary value={stale.length} label="stale" icon={TriangleAlert} />
         <Summary value={current.length} label="confirmed" icon={CheckCircle2} />
@@ -168,7 +168,7 @@ export function StorefrontOperations({
             No storefronts match this filter.
           </div>
         ) : (
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 @2xl:grid-cols-2">
             {visible.map((item) => {
               const meta = freshnessMeta[item.freshnessStatus];
               const Icon = meta.icon;

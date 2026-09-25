@@ -725,7 +725,7 @@ export function FeedClient({
           </div>
 
           {/* timeline */}
-          <div ref={ref} style={style} className="px-8 sm:px-0">
+          <div ref={ref} style={style} className="px-8 @xl:px-0">
             {typeFilter === "paid" ? (
               <div className="py-16 text-center text-sm text-muted-foreground">
                 Paid spots arrive with the ads schema — coming soon.

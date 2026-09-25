@@ -45,7 +45,7 @@ export function CreativePanel({
   });
 
   return (
-    <div className="grid min-w-0 gap-4 lg:grid-cols-[210px_minmax(0,1fr)_300px]">
+    <div className="grid min-w-0 grid-cols-1 gap-4 @4xl:grid-cols-[210px_minmax(0,1fr)_300px]">
       <aside className="rounded-xl border bg-card p-3">
         <h3 className="px-2 text-xs font-semibold">
           Homes on the feed · {homes.length}
@@ -90,7 +90,7 @@ export function CreativePanel({
         </div>
       </aside>
 
-      <section className="min-w-0 rounded-xl border bg-card p-4 sm:p-5">
+      <section className="min-w-0 rounded-xl border bg-card p-4 @xl:p-5">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <h3 className="font-semibold">{home.name} · Catalog card</h3>

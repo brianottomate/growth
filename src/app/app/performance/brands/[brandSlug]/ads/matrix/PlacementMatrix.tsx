@@ -523,7 +523,7 @@ function AdRow({
       {editingBase ? (
         <BaseCopyEditor ad={ad} onClose={() => setEditingBase(false)} />
       ) : null}
-      <div className="grid [grid-template-columns:repeat(auto-fit,minmax(min(100%,20rem),1fr))] gap-3">
+      <div className="grid [grid-template-columns:repeat(auto-fit,minmax(min(100%,20rem),1fr))] grid-cols-1 gap-3">
         {ad.cells.map((cell) => (
           <CellCard
             key={cell.key}

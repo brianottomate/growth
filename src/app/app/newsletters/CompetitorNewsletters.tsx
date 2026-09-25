@@ -175,7 +175,7 @@ export function CompetitorNewsletters({
                           {issue.themes.slice(0, 2).map((t) => (
                             <span
                               key={t}
-                              className="hidden shrink-0 rounded-full bg-muted px-2 py-0.5 text-muted-foreground sm:inline"
+                              className="hidden shrink-0 rounded-full bg-muted px-2 py-0.5 text-muted-foreground @xl:inline"
                             >
                               {t}
                             </span>

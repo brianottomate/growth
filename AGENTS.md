@@ -363,6 +363,19 @@ streaming endpoint).
   leaked lead PII (removed 2026-07-10), which is why the gate still requires a
   session even though it no longer restricts to one person.
 - UI components in `src/components/ui/` are shadcn/Radix-based.
+- **Responsive layout uses container queries.** The app's scroll area
+  (`src/app/app/layout.tsx`) is an `@container`, and the assistant panel sits
+  beside it, so `@3xl:grid-cols-3` reacts to the chat opening and the sidebar
+  collapsing; `lg:` only sees the window. Inside `/app` pages use `@`-variants;
+  viewport variants are for the shell (sidebar, assistant, header). The scales
+  differ (`@4xl` is 56rem, `lg` is 64rem of window), so convert a component by
+  checking it at phone, laptop-with-chat and desktop widths, never by find and
+  replace. Dialogs and sheets are containers too, but their bodies keep
+  viewport variants. Give every grid a base template (`grid grid-cols-1
+  @xl:grid-cols-2`): a template-less grid sizes its column to its widest
+  content and overflows the phone. Hover-revealed controls also need
+  `pointer-coarse:opacity-100` (and `group-focus-within:`), or touch users
+  never see them.
 - **Styling bridge:** `src/styles/globals.css` maps wandercom design-system tokens
   (`@wandercom/design-system-*`) into shadcn variables. Theming is via a `data-theme`
   attribute, **not** a `.dark` class.

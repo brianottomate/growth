@@ -43,8 +43,8 @@ function Row({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-0.5 py-1 text-sm sm:flex-row sm:gap-3">
-      <span className="shrink-0 text-xs text-muted-foreground sm:w-36 sm:text-sm">
+    <div className="flex flex-col gap-0.5 py-1 text-sm @xl:flex-row @xl:gap-3">
+      <span className="shrink-0 text-xs text-muted-foreground @xl:w-36 @xl:text-sm">
         {label}
       </span>
       <span className="min-w-0 flex-1 break-words">{children}</span>
@@ -414,7 +414,7 @@ export function ProspectDetail({ domain }: { domain: string }) {
             .filter(Boolean)
             .join(" · ")}
         </p>
-        <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 @xl:grid-cols-3 @4xl:grid-cols-6">
           <Stat label="PMS">{row.pms ?? "—"}</Stat>
           <Stat label="Units">{fmt(row.unitCount ?? row.unitEstimate)}</Stat>
           <Stat label="Owner">{row.hubspotOwner ?? "unassigned"}</Stat>
@@ -594,7 +594,7 @@ export function ProspectDetail({ domain }: { domain: string }) {
       </header>
 
       {/* Their site, then our preview — the comparison the pitch rests on */}
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 @4xl:grid-cols-2">
         <Section title="Their site" note={`https://${row.domain}`}>
           {screenshot ? (
             <div className="relative aspect-[4/3] w-full overflow-hidden rounded border border-border bg-muted">
@@ -884,7 +884,7 @@ export function ProspectDetail({ domain }: { domain: string }) {
             return (
               <div key={index}>
                 <DayRail day={rail} label={drift} />
-                <div className="grid gap-3 lg:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 @4xl:grid-cols-2">
                   {blast ? (
                     <TouchCard
                       arm="Template"
@@ -894,7 +894,7 @@ export function ProspectDetail({ domain }: { domain: string }) {
                       filled={filled}
                     />
                   ) : (
-                    <div className="hidden items-center rounded-lg border border-dashed p-4 text-xs text-muted-foreground lg:flex">
+                    <div className="hidden items-center rounded-lg border border-dashed p-4 text-xs text-muted-foreground @4xl:flex">
                       The template has no touch {index + 1}.
                     </div>
                   )}
@@ -911,7 +911,7 @@ export function ProspectDetail({ domain }: { domain: string }) {
                       filled={filled}
                     />
                   ) : bespokeSteps.length ? (
-                    <div className="hidden items-center rounded-lg border border-dashed p-4 text-xs text-muted-foreground lg:flex">
+                    <div className="hidden items-center rounded-lg border border-dashed p-4 text-xs text-muted-foreground @4xl:flex">
                       The bespoke draft has no touch {index + 1}.
                     </div>
                   ) : null}

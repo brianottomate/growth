@@ -206,7 +206,7 @@ export default async function PregenPage() {
                 </span>
               ) : null}
 
-              <span className="shrink-0 text-xs text-muted-foreground">
+              <span className="min-w-0 text-xs text-muted-foreground">
                 {[
                   build.batch,
                   build.pms,

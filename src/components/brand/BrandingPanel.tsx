@@ -85,7 +85,7 @@ export function BrandingPanel({
         {colors.length === 0 ? (
           <span className="text-muted-foreground">None found on the site.</span>
         ) : (
-          <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+          <div className="grid grid-cols-1 gap-x-3 gap-y-1 @md:grid-cols-2">
             {colors.map(([name, value]) => (
               <span key={name} className="flex items-center gap-1.5">
                 <span

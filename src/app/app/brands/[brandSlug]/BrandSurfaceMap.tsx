@@ -173,7 +173,7 @@ export function BrandSurfaceMap({
         </div>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2 @xl:grid-cols-2 @4xl:grid-cols-3">
         {surfaces.map((surface) => {
           const Icon = surface.icon;
           return (
@@ -183,7 +183,7 @@ export function BrandSurfaceMap({
               className="group rounded-xl border bg-card p-3.5 transition-colors hover:border-foreground/25"
             >
               <div className="flex items-start gap-3">
-                <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
+                <span className="grid size-8 shrink-0 grid-cols-1 place-items-center rounded-lg bg-muted text-muted-foreground">
                   <Icon className="size-4" />
                 </span>
                 <span className="min-w-0 flex-1">

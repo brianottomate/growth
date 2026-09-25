@@ -332,7 +332,7 @@ function IntakeFacts({
             </SectionLabel>
             <p
               className={cn(
-                "mt-1 truncate text-[12.5px]",
+                "mt-1 line-clamp-2 text-[12.5px] break-words",
                 row.tone === "ok"
                   ? "font-semibold"
                   : row.tone === "warn"
@@ -341,7 +341,12 @@ function IntakeFacts({
               )}
               title={row.value}
             >
-              {row.value}
+              {/* An email wraps after its @, not mid-word. */}
+              {row.value
+                .split("@")
+                .flatMap((part, i) =>
+                  i === 0 ? [part] : ["@", <wbr key={i} />, part],
+                )}
             </p>
           </div>
         ))}

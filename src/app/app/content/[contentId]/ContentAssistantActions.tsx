@@ -45,7 +45,7 @@ export function ContentAssistantActions({
           <MessageSquare className="size-3.5" /> Work in chat
         </Button>
       </div>
-      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+      <div className="mt-3 grid grid-cols-1 gap-2 @xl:grid-cols-3">
         {readiness.checks.map((check) => (
           <div
             key={check.id}

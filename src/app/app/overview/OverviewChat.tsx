@@ -930,7 +930,7 @@ export function OverviewChat({
                       onClick={() => send(text)}
                       className="group flex items-start gap-2.5 rounded-lg border bg-card px-3.5 py-3 text-left transition-all duration-200 hover:-translate-y-px hover:border-foreground/20 hover:shadow-md"
                     >
-                      <span className="grid size-6 shrink-0 place-items-center rounded-md bg-primary/10 text-primary">
+                      <span className="grid size-6 shrink-0 grid-cols-1 place-items-center rounded-md bg-primary/10 text-primary">
                         <Icon className="h-3.5 w-3.5" />
                       </span>
                       <span className="text-xs leading-snug">{text}</span>
@@ -1060,7 +1060,7 @@ export function OverviewChat({
                       })}
 
                       {!busy && (
-                        <div className="flex gap-0.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 max-lg:opacity-100">
+                        <div className="flex gap-0.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 @max-4xl:opacity-100 pointer-coarse:opacity-100">
                           <Button
                             variant="ghost"
                             size="icon"
@@ -1350,7 +1350,7 @@ function UserMessage({ message }: { message: UIMessage }) {
         </div>
       )}
       {videos.length > 0 && (
-        <div className="grid w-full max-w-md gap-1.5">
+        <div className="grid w-full max-w-md grid-cols-1 gap-1.5">
           {videos.map((part, index) => {
             const file = part as { url?: string; filename?: string };
             return file.url ? (

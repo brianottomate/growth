@@ -206,7 +206,7 @@ export function AdPreviewsSection({
       </div>
 
       {cards.length > 0 ? (
-        <ul className="grid gap-4 @xl:grid-cols-2 @4xl:grid-cols-3">
+        <ul className="grid grid-cols-1 gap-4 @xl:grid-cols-2 @4xl:grid-cols-3">
           {cards.map((card) => (
             <li key={card.assetId} className="flex flex-col items-center gap-2">
               <AdMock
@@ -269,7 +269,7 @@ export function AdPreviewsSection({
           {/* The two families in the placement the toggle is on, rather than
               every family in every placement: six mocks of one home was a wall,
               and comparing placements is what the toggle is for. */}
-          <div className="grid gap-4 @xl:grid-cols-2 @4xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 @xl:grid-cols-2 @4xl:grid-cols-3">
             {(
               [
                 { row: "awareness", label: "Awareness · Hero overlay" },

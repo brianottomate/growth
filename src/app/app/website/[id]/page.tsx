@@ -146,7 +146,7 @@ export default async function WebsiteDetailPage({
           ))}
         </div>
 
-        <div className="mt-5 grid gap-2 md:grid-cols-2">
+        <div className="mt-5 grid grid-cols-1 gap-2 @2xl:grid-cols-2">
           <MetadataLine
             label="Title"
             value={page.title}
@@ -178,7 +178,7 @@ export default async function WebsiteDetailPage({
         </div>
 
         {page.ogImage ? (
-          <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_240px]">
+          <div className="mt-5 grid grid-cols-1 gap-5 @4xl:grid-cols-[minmax(0,1fr)_240px]">
             <div>
               <p className="mb-2 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
                 Large card · 1.91:1

@@ -172,7 +172,7 @@ export function CompactPlatformPreview({
   return (
     <aside
       className={cn(
-        "mx-auto w-full max-w-64 self-start rounded-xl border bg-background/50 p-2.5 lg:mx-0",
+        "mx-auto w-full max-w-64 self-start rounded-xl border bg-background/50 p-2.5 @4xl:mx-0",
         className,
       )}
     >

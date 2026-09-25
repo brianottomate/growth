@@ -95,7 +95,7 @@ export function ContentAnalysisPanel({
             </span>
           </div>
 
-          <div className="grid gap-5 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-5 @2xl:grid-cols-2">
             <AnalysisList title="What works" items={analysis.strengths} />
             <AnalysisList
               title="Watchouts"
@@ -215,7 +215,7 @@ function AnalysisList({
 function SpecializedAnalysis({ analysis }: { analysis: ContentAnalysis }) {
   if (analysis.website) {
     return (
-      <div className="grid gap-5 border-t pt-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 border-t pt-4 @2xl:grid-cols-2">
         <div>
           <h3 className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
             Search intent
@@ -237,7 +237,7 @@ function SpecializedAnalysis({ analysis }: { analysis: ContentAnalysis }) {
   }
   if (analysis.blog) {
     return (
-      <div className="grid gap-5 border-t pt-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 border-t pt-4 @2xl:grid-cols-2">
         <div>
           <h3 className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
             Thesis
@@ -253,7 +253,7 @@ function SpecializedAnalysis({ analysis }: { analysis: ContentAnalysis }) {
   }
   if (analysis.newsletter) {
     return (
-      <div className="grid gap-5 border-t pt-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 border-t pt-4 @2xl:grid-cols-2">
         <div>
           <h3 className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
             Lifecycle role

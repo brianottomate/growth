@@ -200,7 +200,7 @@ export default async function SeriesPage() {
         </Link>
       </div>
 
-      <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="mt-6 grid grid-cols-2 gap-3 @2xl:grid-cols-4">
         <Metric label="Active" value={metrics.active} />
         <Metric label="Planned" value={metrics.planned} />
         <Metric label="Installments" value={metrics.installments} />
@@ -227,7 +227,7 @@ export default async function SeriesPage() {
 
           return (
             <section key={brand.id} className="mt-8">
-              <div className="mb-3 flex items-center gap-2">
+              <div className="mb-3 flex flex-wrap items-center gap-2">
                 <div className="flex size-7 items-center justify-center rounded-md bg-muted text-[10px] font-semibold text-foreground">
                   {brand.name.slice(0, 2).toUpperCase()}
                 </div>
@@ -248,7 +248,7 @@ export default async function SeriesPage() {
                 />
               </div>
 
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 @2xl:grid-cols-2">
                 {brandSeries.map((item) => {
                   const posts = postsBySeries.get(item.id) ?? [];
                   const targets = cadenceBySeries.get(item.id) ?? [];

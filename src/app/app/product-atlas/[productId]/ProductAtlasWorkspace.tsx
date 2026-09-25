@@ -112,7 +112,7 @@ export function ProductAtlasWorkspace({
       >
         <ArrowLeft className="size-3.5" /> Product Atlas
       </Link>
-      <header className="flex flex-col gap-4 border-b pb-5 sm:flex-row sm:items-end sm:justify-between">
+      <header className="flex flex-col gap-4 border-b pb-5 @xl:flex-row @xl:items-end @xl:justify-between">
         <div>
           <p className="text-xs text-muted-foreground">{product.brand.name}</p>
           <h1 className="mt-1 text-3xl font-semibold">{product.name}</h1>
@@ -226,7 +226,7 @@ export function ProductAtlasWorkspace({
             Open operations queue
           </Link>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 @xl:grid-cols-2">
           {product.storefronts.map((storefront) => (
             <Link
               key={storefront.id}
@@ -295,7 +295,7 @@ function Overview({
     ["Storefronts", product.storefronts.length, Store],
   ] as const;
   return (
-    <section className="grid gap-3 sm:grid-cols-5">
+    <section className="grid grid-cols-1 gap-3 @xl:grid-cols-5">
       {facts.map(([label, value, Icon]) => (
         <div key={label} className="rounded-xl border bg-card p-4">
           <Icon className="size-4 text-muted-foreground" />
@@ -317,7 +317,7 @@ function JourneyMap({ atlas }: { atlas: ProductAtlas }) {
         atlas.journeys.map((journey) => (
           <div key={journey.id} className="rounded-2xl border bg-card p-5">
             <h2 className="font-semibold">{journey.name}</h2>
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <div className="mt-4 grid grid-cols-1 gap-3 @2xl:grid-cols-2">
               {[...journey.steps]
                 .sort((a, b) => a.order - b.order)
                 .map((step) => {
@@ -368,7 +368,7 @@ function Views({ atlas }: { atlas: ProductAtlas }) {
     atlas.surfaces.map((surface) => [surface.id, surface]),
   );
   return (
-    <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <section className="grid grid-cols-1 gap-3 @xl:grid-cols-2 @4xl:grid-cols-3">
       {atlas.views.length === 0 ? (
         <Empty label="No product views mapped yet." />
       ) : (
@@ -560,7 +560,7 @@ function EditorCollection({
               onChange={(event) => onName(item.id, event.target.value)}
               className="min-w-0 flex-1 rounded-lg border bg-background px-3 py-2 text-sm"
             />
-            <code className="hidden text-[10px] text-muted-foreground sm:block">
+            <code className="hidden text-[10px] text-muted-foreground @xl:block">
               {item.id}
             </code>
             <button

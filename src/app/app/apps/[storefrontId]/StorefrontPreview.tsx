@@ -80,7 +80,7 @@ function AssistantPreview({
       <div className="border-b border-white/10 px-6 py-3 text-xs text-white/55">
         Internal {host} directory preview · {listingStatus.replaceAll("_", " ")}
       </div>
-      <div className="mx-auto max-w-3xl space-y-6 px-6 py-10 sm:px-10">
+      <div className="mx-auto max-w-3xl space-y-6 px-6 py-10 @xl:px-10">
         <header className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-4">
             <PreviewIcon asset={icon} name={content.copy.displayName} />
@@ -169,7 +169,7 @@ function StorePreview({
   listingStatus: StorefrontListingStatus;
 }) {
   return (
-    <section className="rounded-2xl border bg-card p-6 shadow-sm sm:p-8">
+    <section className="rounded-2xl border bg-card p-6 shadow-sm @xl:p-8">
       <p className="text-xs text-muted-foreground">
         Internal {surface.replaceAll("_", " ")} preview ·{" "}
         {listingStatus.replaceAll("_", " ")}

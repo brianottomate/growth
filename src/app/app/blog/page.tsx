@@ -161,7 +161,7 @@ export default async function BlogPage({
 
   return (
     <div>
-      <div className="flex items-start justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Blog</h1>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -277,7 +277,7 @@ export default async function BlogPage({
                     </span>
                   )}
                   <span className="min-w-0 flex-1 truncate">{t.post.text}</span>
-                  <span className="hidden shrink-0 gap-1 text-[11px] text-muted-foreground sm:flex">
+                  <span className="hidden shrink-0 gap-1 text-[11px] text-muted-foreground @xl:flex">
                     {t.tags.slice(0, 2).map((tag) => (
                       <span
                         key={tag}

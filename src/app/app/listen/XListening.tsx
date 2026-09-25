@@ -306,8 +306,8 @@ export function XListening() {
         </p>
       )}
 
-      <div className="grid items-start gap-6 lg:grid-cols-[248px_1fr]">
-        <div className="flex flex-col gap-2.5 lg:sticky lg:top-6">
+      <div className="grid grid-cols-1 items-start gap-6 @4xl:grid-cols-[248px_1fr]">
+        <div className="flex flex-col gap-2.5 @4xl:sticky @4xl:top-6">
           <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
             Watchlist
           </span>

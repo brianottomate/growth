@@ -1,7 +1,7 @@
 "use client";
 import { catalogAddressIssues } from "@/lib/catalog-addresses";
 import { useEffect, useState } from "react";
-import { ExternalLink, MessageSquare } from "lucide-react";
+import { ExternalLink, MessageSquare, RefreshCw } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -160,13 +160,7 @@ export function CatalogCards({
   return (
     <section className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold">Catalog</h2>
-          <p className="text-sm text-muted-foreground">
-            One card per home. Review, then save a frozen export to your media
-            library.
-          </p>
-        </div>
+        <h2 className="text-lg font-semibold">Catalog</h2>
         <div className="flex gap-2">
           <Button
             variant={view === "studio" ? "secondary" : "ghost"}
@@ -200,7 +194,7 @@ export function CatalogCards({
               {draft.cards.filter((c) => c.included).length} of{" "}
               {draft.cards.length} homes included
             </span>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <ReviewInChatButton
                 brandId={brandId}
                 brandName={brandName}
@@ -209,9 +203,11 @@ export function CatalogCards({
               <Button
                 variant="outline"
                 disabled={busy}
+                aria-label="Refresh homes"
                 onClick={() => void run("refresh")}
               >
-                Refresh homes
+                <RefreshCw aria-hidden="true" className="size-4 @xl:hidden" />
+                <span className="hidden @xl:inline">Refresh homes</span>
               </Button>
               <Button
                 disabled={
@@ -243,30 +239,32 @@ export function CatalogCards({
                 </Button>
               ))}
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() =>
-                void post(
-                  { action: "includeAll", included: true },
-                  "Unable to update the catalog",
-                )
-              }
-            >
-              Include all
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() =>
-                void post(
-                  { action: "includeAll", included: false },
-                  "Unable to update the catalog",
-                )
-              }
-            >
-              Exclude all
-            </Button>
+            <div className="flex">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() =>
+                  void post(
+                    { action: "includeAll", included: true },
+                    "Unable to update the catalog",
+                  )
+                }
+              >
+                Include all
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() =>
+                  void post(
+                    { action: "includeAll", included: false },
+                    "Unable to update the catalog",
+                  )
+                }
+              >
+                Exclude all
+              </Button>
+            </div>
           </div>
           {catalogArtworkIssues(draft).length > 0 && (
             <p role="alert" className="text-sm text-destructive">
@@ -279,7 +277,7 @@ export function CatalogCards({
             </p>
           )}
           {layout === "grid" ? (
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 xl:grid-cols-5">
+            <div className="grid grid-cols-2 gap-3 @xl:grid-cols-3 @2xl:gap-4 @4xl:grid-cols-4 @6xl:grid-cols-5">
               {draft.cards.slice(0, limit).map((card) => (
                 <div
                   key={card.homeId}
@@ -308,7 +306,8 @@ export function CatalogCards({
                       }
                     />
                     <button
-                      className="text-left text-sm"
+                      className="line-clamp-2 text-left text-sm"
+                      title={homeOf(card)?.name}
                       onClick={() => setDetails({ ...card })}
                     >
                       {homeOf(card)?.name}
@@ -328,7 +327,7 @@ export function CatalogCards({
                     aria-label={homeOf(card)?.name}
                     className={`rounded-lg border p-4 ${card.included || editing ? "" : "opacity-50"}`}
                   >
-                    <div className="grid items-start gap-5 md:grid-cols-[minmax(0,240px)_minmax(0,1fr)]">
+                    <div className="grid grid-cols-1 items-start gap-5 @xl:grid-cols-[minmax(0,240px)_minmax(0,1fr)]">
                       <div className="flex justify-center rounded-lg bg-muted p-3">
                         <div className="w-full max-w-xs overflow-hidden rounded-md">
                           <CardPreview brandId={brandId} card={shown} />

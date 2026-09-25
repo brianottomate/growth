@@ -182,7 +182,7 @@ export default async function SpendPage({
       </div>
 
       {/* KPI grid — growth-tracker card order */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 @2xl:grid-cols-3 @4xl:grid-cols-4">
         <Kpi
           label="Marketing Spend"
           explainer="Everything spent on marketing in this window: ad platforms (Meta, Google) plus fixed monthly costs (BDRs, TV, content, affiliate) pro-rated per day. Loyalty points and coupons are not included."

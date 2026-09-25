@@ -331,7 +331,7 @@ export default async function NewslettersPage({
               recurring broadcasts count toward newsletter cadence.
             </p>
           </div>
-          <div className="mt-4 grid gap-4 lg:grid-cols-3">
+          <div className="mt-4 grid grid-cols-1 gap-4 @4xl:grid-cols-3">
             {emailBuckets.map((bucket) => (
               <div key={bucket.label}>
                 <div className="mb-2 flex items-baseline justify-between gap-2">
@@ -491,7 +491,7 @@ export default async function NewslettersPage({
                     <span className="min-w-0 flex-1 truncate">
                       {issue.text}
                     </span>
-                    <span className="hidden w-28 shrink-0 text-right text-xs text-muted-foreground tabular-nums sm:block">
+                    <span className="hidden w-28 shrink-0 text-right text-xs text-muted-foreground tabular-nums @xl:block">
                       {s?.sent ? `${fmt(s.sent)} sent` : "—"}
                     </span>
                     <span className="w-16 shrink-0 text-right text-xs text-muted-foreground tabular-nums">

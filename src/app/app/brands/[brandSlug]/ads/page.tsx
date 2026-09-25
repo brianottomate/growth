@@ -187,7 +187,7 @@ function CampaignRow({
               key={s.id}
               className="w-28 shrink-0 overflow-hidden rounded-lg border bg-background"
             >
-              <div className="relative grid h-16 place-items-center bg-muted">
+              <div className="relative grid h-16 grid-cols-1 place-items-center bg-muted">
                 {spotImage(s) && <ImportCreativeButton platformAdId={s.id} />}
                 {/* Ads we authored carry their creative in `media`; ads mirrored
                     from the platform carry it on `thumbnailUrl` instead. */}
@@ -422,8 +422,8 @@ export default async function BrandAdsPage({
   return (
     <div>
       {/* header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Link href="/app/brands" className="hover:text-foreground">
               Brands
@@ -452,7 +452,7 @@ export default async function BrandAdsPage({
             {plural(personas.length, "persona")} · {money(totalSpend)} / 30d
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <CopyButton text={md} label="Copy for ChatGPT / Claude" />
           {brand.slug && <ImportMetaCampaignButton brandSlug={brand.slug} />}
           <NewCampaignButton
@@ -538,7 +538,8 @@ export default async function BrandAdsPage({
                   <div className="flex flex-wrap items-center gap-2">
                     <Link
                       href={`/app/brands/${brandSlug}/ads/${init.id}`}
-                      className="text-base font-semibold hover:underline"
+                      className="max-w-full min-w-0 truncate text-base font-semibold hover:underline"
+                      title={init.name}
                     >
                       {init.name}
                     </Link>
@@ -689,7 +690,7 @@ export default async function BrandAdsPage({
           </div>
         </div>
       ) : (
-        <div className="grid gap-2.5 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2.5 @2xl:grid-cols-2">
           {personas.map((persona) => {
             const derived = planAudiences.filter(
               (aud) => aud.personaId === persona.id,
@@ -725,7 +726,7 @@ export default async function BrandAdsPage({
             Mirrored from the platform. They target fine as they are; mapping
             one to an audience is what makes it count as coverage above.
           </p>
-          <div className="grid gap-2.5 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-2.5 @2xl:grid-cols-2">
             {unmappedAudiences.map((a) => (
               <div
                 key={a.name}

@@ -453,7 +453,7 @@ export function PlatformPostEditDialog({
                               ),
                             )
                           }
-                          className="absolute top-1 right-1 rounded bg-black/70 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
+                          className="absolute top-1 right-1 rounded bg-black/70 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100 pointer-coarse:opacity-100"
                           aria-label="Remove asset"
                         >
                           <X className="size-3" />

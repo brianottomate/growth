@@ -95,7 +95,7 @@ export function WebsitePortfolioAnalysisPanel({
       {analysis && (
         <div className="mt-5 space-y-5 border-t pt-5">
           <p className="text-sm leading-relaxed">{analysis.summary}</p>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid grid-cols-1 gap-4 @xl:grid-cols-2 @4xl:grid-cols-5">
             {Object.entries(analysis.health).map(([key, value]) => (
               <div key={key} className="rounded-lg bg-muted/50 p-3">
                 <h3 className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
@@ -106,7 +106,7 @@ export function WebsitePortfolioAnalysisPanel({
             ))}
           </div>
 
-          <div className="grid gap-5 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-5 @2xl:grid-cols-2">
             <AnalysisList title="What works" items={analysis.strengths} />
             <AnalysisList
               title="Systemic issues"
@@ -146,7 +146,7 @@ export function WebsitePortfolioAnalysisPanel({
             </div>
           </div>
 
-          <div className="grid gap-5 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-5 @2xl:grid-cols-2">
             <AnalysisList
               title="Opportunities"
               items={analysis.opportunities}

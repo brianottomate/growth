@@ -266,7 +266,7 @@ export function PreviewsClient({
               </div>
               {/* One row per idea: every platform rendering side by side, stacking only on phones. */}
               <div
-                className="grid items-start gap-6 max-sm:!grid-cols-1"
+                className="grid grid-cols-1 items-start gap-6 @max-xl:!grid-cols-1"
                 style={{
                   gridTemplateColumns: `repeat(${Math.min(Math.max(idea.spots.length, 1), 3)}, minmax(0, 1fr))`,
                 }}

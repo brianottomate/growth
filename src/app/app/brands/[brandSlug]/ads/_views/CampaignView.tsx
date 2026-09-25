@@ -194,27 +194,29 @@ export async function CampaignView({
     <div className="space-y-8">
       <header className="space-y-3">
         <WorkspaceBreadcrumbs
-          items={[
-            {
-              label: workspace === "performance" ? "Clients" : "Brands",
-              href:
-                workspace === "performance"
-                  ? "/app/performance/clients"
-                  : "/app/brands",
-            },
-            {
-              label: brandName,
-              href:
-                workspace === "performance"
-                  ? `/app/performance/brands/${brandSlug}`
-                  : `/app/brands/${brandSlug}`,
-            },
-            {
-              label: "Paid campaigns",
-              href: campaignListPath(brandSlug, workspace),
-            },
-            { label: campaign.name },
-          ]}
+          items={
+            // The Performance brand layout already crumbs Clients / brand,
+            // and the name is the title right below.
+            workspace === "performance"
+              ? [
+                  {
+                    label: "Paid campaigns",
+                    href: campaignListPath(brandSlug, workspace),
+                  },
+                ]
+              : [
+                  {
+                    label: "Brands",
+                    href: "/app/brands",
+                  },
+                  { label: brandName, href: `/app/brands/${brandSlug}` },
+                  {
+                    label: "Paid campaigns",
+                    href: campaignListPath(brandSlug, workspace),
+                  },
+                  { label: campaign.name },
+                ]
+          }
         />
         <Link
           className="text-sm underline"

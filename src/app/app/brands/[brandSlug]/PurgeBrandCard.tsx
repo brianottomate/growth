@@ -96,7 +96,7 @@ export function PurgeBrandCard({
         <p className="text-sm text-red-300">{preview.error.message}</p>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-1 @xl:grid-cols-4">
             {ROWS.map((row) => (
               <div key={row.key} className="text-sm">
                 <span className="tabular-nums">

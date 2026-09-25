@@ -129,7 +129,7 @@ export function StorefrontReferences({
           </div>
         ) : (
           <>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 @xl:grid-cols-2">
               <label className="text-xs">
                 <span className="mb-1 block text-muted-foreground">Brand</span>
                 <select
@@ -177,7 +177,7 @@ export function StorefrontReferences({
                 className="w-full rounded-lg border bg-background px-3 py-2"
               />
             </label>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 @xl:grid-cols-2">
               <label className="text-xs">
                 <span className="mb-1 block text-muted-foreground">
                   Internal note (optional)
@@ -286,7 +286,7 @@ function ReferenceCard({
   const snapshot = reference.snapshot;
   return (
     <article className="space-y-5 rounded-xl border bg-card p-5">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <header className="flex flex-col gap-3 @xl:flex-row @xl:items-start @xl:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h4 className="font-semibold">{reference.referenceBrand.name}</h4>
@@ -340,7 +340,7 @@ function ReferenceCard({
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 @4xl:grid-cols-3">
         <ReferenceList title="Strengths" items={snapshot.strengths} />
         <ReferenceList title="Gaps" items={snapshot.gaps} />
         <ReferenceList
@@ -352,7 +352,7 @@ function ReferenceCard({
       {snapshot.imageSequence.length > 0 && (
         <div>
           <h5 className="text-xs font-semibold">Image sequence</h5>
-          <div className="mt-2 grid gap-2 md:grid-cols-2">
+          <div className="mt-2 grid grid-cols-1 gap-2 @2xl:grid-cols-2">
             {snapshot.imageSequence.map((image) => (
               <div
                 key={`${image.position}-${image.caption}`}

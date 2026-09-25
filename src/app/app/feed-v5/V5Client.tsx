@@ -678,7 +678,7 @@ export function V5Client({
 
         {/* Swimlane grid — time flows down, lanes are columns. */}
         <MetricsCtx.Provider value={metricsMode === "performance"}>
-          <div ref={ref} style={style} className="mt-5 px-8 sm:px-0">
+          <div ref={ref} style={style} className="mt-5 px-8 @xl:px-0">
             {lanes.length === 0 ? (
               <p className="py-12 text-center text-sm text-muted-foreground">
                 No lanes — turn on a brand above.
@@ -686,7 +686,7 @@ export function V5Client({
             ) : (
               <div className="max-h-[calc(100vh-9rem)] overflow-auto rounded-xl border">
                 <div
-                  className="grid min-w-max"
+                  className="grid min-w-max grid-cols-1"
                   style={{
                     gridTemplateColumns: `7rem repeat(${lanes.length}, 26rem)`,
                   }}
@@ -1290,7 +1290,7 @@ function SpotThumb({
           "absolute top-0.5 left-0.5 flex size-4 items-center justify-center rounded border backdrop-blur-sm",
           selected
             ? "border-emerald-400 bg-emerald-600 text-white"
-            : "border-white/30 bg-black/45 text-white opacity-0 group-hover:opacity-100",
+            : "border-white/30 bg-black/45 text-white opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100",
         )}
       >
         {selected && <Check className="size-2.5" />}
@@ -1310,7 +1310,7 @@ function SpotThumb({
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
           title="Open original"
-          className="absolute right-0.5 bottom-0.5 flex size-4 items-center justify-center rounded bg-card/80 text-muted-foreground opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 hover:text-foreground"
+          className="absolute right-0.5 bottom-0.5 flex size-4 items-center justify-center rounded bg-card/80 text-muted-foreground opacity-0 backdrop-blur-sm transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:text-foreground pointer-coarse:opacity-100"
         >
           <ExternalLink className="size-2.5" />
         </a>
@@ -1373,7 +1373,7 @@ function SpotCard({
           "absolute top-1 right-1 z-10 flex size-5 items-center justify-center rounded border backdrop-blur-sm",
           selected
             ? "border-emerald-400 bg-emerald-600 text-white"
-            : "border-white/30 bg-black/45 text-white opacity-0 group-hover:opacity-100",
+            : "border-white/30 bg-black/45 text-white opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100",
         )}
       >
         {selected && <Check className="size-3" />}
@@ -1395,7 +1395,7 @@ function SpotCard({
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
           title="Open original"
-          className="absolute right-1 bottom-[3.25rem] flex size-5 items-center justify-center rounded border bg-card/80 text-muted-foreground opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 hover:text-foreground"
+          className="absolute right-1 bottom-[3.25rem] flex size-5 items-center justify-center rounded border bg-card/80 text-muted-foreground opacity-0 backdrop-blur-sm transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:text-foreground pointer-coarse:opacity-100"
         >
           <ExternalLink className="size-3" />
         </a>

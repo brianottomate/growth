@@ -409,7 +409,7 @@ export default async function SeriesDetailPage({
             seriesName={series.name}
           />
         </div>
-        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-4 grid grid-cols-1 gap-2 @xl:grid-cols-2 @4xl:grid-cols-3">
           {planningChecks.map((check) => (
             <div
               key={check.label}
@@ -436,7 +436,7 @@ export default async function SeriesDetailPage({
           <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
             Unscheduled installments
           </h2>
-          <div className="mt-2 grid gap-2 md:grid-cols-2">
+          <div className="mt-2 grid grid-cols-1 gap-2 @2xl:grid-cols-2">
             {unscheduled.map((post) => (
               <InstallmentCard
                 key={post.id}

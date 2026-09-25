@@ -133,22 +133,22 @@ export function OrganizeMediaDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-4 py-2">
-          <div className="grid gap-1.5">
+        <div className="grid grid-cols-1 gap-4 py-2">
+          <div className="grid grid-cols-1 gap-1.5">
             <Label>Title</Label>
             <Input
               value={title}
               onChange={(event) => setTitle(event.target.value)}
             />
           </div>
-          <div className="grid gap-1.5">
+          <div className="grid grid-cols-1 gap-1.5">
             <Label>Alt text</Label>
             <Input
               value={alt}
               onChange={(event) => setAlt(event.target.value)}
             />
           </div>
-          <div className="grid gap-1.5">
+          <div className="grid grid-cols-1 gap-1.5">
             <Label>Folder</Label>
             <SimpleSelect
               value={folderId}
@@ -164,7 +164,7 @@ export function OrganizeMediaDialog({
             />
           </div>
           {brands.length > 1 && (
-            <div className="grid gap-1.5">
+            <div className="grid grid-cols-1 gap-1.5">
               <Label>Brand</Label>
               <SimpleSelect
                 value={asset.brandId}
@@ -199,7 +199,7 @@ export function OrganizeMediaDialog({
               </p>
             </div>
           )}
-          <div className="grid gap-2">
+          <div className="grid grid-cols-1 gap-2">
             <Label>Tags</Label>
             {taxonomy.tags.length ? (
               <div className="grid grid-cols-2 gap-2 rounded-lg border p-3">
@@ -238,7 +238,7 @@ export function OrganizeMediaDialog({
           </div>
 
           {(asset.kind === "image" || asset.kind === "video") && (
-            <div className="grid gap-2 rounded-lg border bg-muted/30 p-3">
+            <div className="grid grid-cols-1 gap-2 rounded-lg border bg-muted/30 p-3">
               <div className="flex items-center gap-2">
                 <Sparkles className="size-4" />
                 <span className="text-sm font-medium">AI analysis</span>

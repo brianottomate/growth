@@ -100,7 +100,7 @@ export function EngineeringView({ health }: { health: DataHealth }) {
       </header>
 
       {/* Summary */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 @xl:grid-cols-4">
         {[
           { label: "Tables", value: fmt(totalTables) },
           { label: "Total rows", value: fmt(totalRows) },

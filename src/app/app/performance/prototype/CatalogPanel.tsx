@@ -23,7 +23,7 @@ export function CatalogPanel({
     );
   }
   return (
-    <div className="rounded-xl border bg-card p-4 sm:p-5">
+    <div className="rounded-xl border bg-card p-4 @xl:p-5">
       <CatalogCards brandId={brandId} />
     </div>
   );

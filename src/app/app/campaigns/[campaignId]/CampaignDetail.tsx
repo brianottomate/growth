@@ -228,7 +228,7 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
                     onClick={() =>
                       unlink.mutate({ campaignId, contentPostId: p.id })
                     }
-                    className="text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
+                    className="text-muted-foreground opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:text-foreground pointer-coarse:opacity-100"
                   >
                     <X className="size-3.5" />
                   </button>

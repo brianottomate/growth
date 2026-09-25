@@ -203,7 +203,7 @@ export function MomentAmplifiers({ momentId }: { momentId: string }) {
                   type="button"
                   aria-label="Remove amplifier"
                   onClick={() => removeTarget.mutate({ targetId: t.id })}
-                  className="shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
+                  className="shrink-0 text-muted-foreground opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:text-foreground pointer-coarse:opacity-100"
                 >
                   <X className="size-3.5" />
                 </button>

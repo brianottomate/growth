@@ -202,8 +202,8 @@ export default async function PregenReviewPage({
     // negative margin escapes that column (the layout's scroll div is the
     // @container) exactly as the content Board does, then the inner cap keeps
     // an ultrawide monitor from stretching a preview past readable.
-    <div className="mx-[calc(((100cqw-min(100cqw,64rem))/2+2rem)*-1)]">
-      <div className="mx-auto w-full max-w-[100rem] p-4 sm:p-6">
+    <div className="mx-[calc(((100cqw-min(100cqw,64rem))/2+1rem)*-1)] @xl:mx-[calc(((100cqw-min(100cqw,64rem))/2+2rem)*-1)]">
+      <div className="mx-auto w-full max-w-[100rem] p-4 @xl:p-6">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h1 className="text-lg font-semibold">Pregen review</h1>

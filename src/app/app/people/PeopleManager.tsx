@@ -83,7 +83,7 @@ export function PeopleManager({
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2 @xl:grid-cols-2 @4xl:grid-cols-3">
         {members.map((m) => {
           const isSelf = m.userId === currentUserId;
           return (
@@ -125,7 +125,7 @@ export function PeopleManager({
                 {m.role}
               </span>
 
-              <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100">
+              <div className="flex shrink-0 items-center opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
                 {(isSelf || canManage) && (
                   <Button
                     size="icon"

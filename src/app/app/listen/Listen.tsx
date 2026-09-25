@@ -111,7 +111,7 @@ export function Listen({
         </Select>
       </div>
 
-      <TabsList>
+      <TabsList className="max-w-full justify-start overflow-x-auto">
         <TabsTrigger value="monitor">What we monitor</TabsTrigger>
         <TabsTrigger value="reddit">Reddit</TabsTrigger>
         <TabsTrigger value="instagram">Instagram</TabsTrigger>

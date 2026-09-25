@@ -153,7 +153,7 @@ export function StorefrontEditor({
       </Link>
 
       <header className="space-y-4 border-b pb-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-4 @xl:flex-row @xl:items-start @xl:justify-between">
           <div>
             <p className="text-xs text-muted-foreground">
               {storefront.product.brand.name} ·{" "}
@@ -201,7 +201,7 @@ export function StorefrontEditor({
         </div>
       </header>
 
-      <section className="grid gap-3 sm:grid-cols-2">
+      <section className="grid grid-cols-1 gap-3 @xl:grid-cols-2">
         <label className="text-xs">
           <span className="mb-1 block text-muted-foreground">Manager</span>
           <select
@@ -245,7 +245,7 @@ export function StorefrontEditor({
         </label>
       </section>
 
-      <nav className="flex gap-1 border-b">
+      <nav className="flex gap-1 overflow-x-auto border-b">
         {(
           [
             "content",
@@ -726,7 +726,7 @@ function AssetFields({
               onUp={() => reorder("screenshots", index, -1)}
               onDown={() => reorder("screenshots", index, 1)}
               extra={
-                <div className="mt-2 grid gap-1 sm:grid-cols-2">
+                <div className="mt-2 grid grid-cols-1 gap-1 @xl:grid-cols-2">
                   <select
                     value={item.presentation}
                     onChange={(event) =>
@@ -901,7 +901,7 @@ function AssetPicker({
             No compatible ready assets found.
           </p>
         ) : (
-          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="mt-5 grid grid-cols-2 gap-3 @xl:grid-cols-4">
             {visible.map((asset) => (
               <button
                 key={asset.id}
@@ -1031,7 +1031,7 @@ function FieldGrid({
   return (
     <fieldset>
       <legend className="mb-3 text-sm font-semibold">{title}</legend>
-      <div className="grid gap-4 sm:grid-cols-2">{children}</div>
+      <div className="grid grid-cols-1 gap-4 @xl:grid-cols-2">{children}</div>
     </fieldset>
   );
 }
@@ -1076,7 +1076,7 @@ function TextArea({
   tall?: boolean;
 }) {
   return (
-    <label className={cn("text-xs", tall && "sm:col-span-2")}>
+    <label className={cn("text-xs", tall && "@xl:col-span-2")}>
       <span className="mb-1 block font-medium">{label}</span>
       <textarea
         value={value}

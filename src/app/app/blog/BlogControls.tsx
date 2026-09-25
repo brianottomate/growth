@@ -35,7 +35,7 @@ export function BlogControls({
   );
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       <SocialPreviewSelect />
       <BrandFilterSelect
         brands={brands.map((brand) => ({

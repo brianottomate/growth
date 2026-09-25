@@ -144,7 +144,7 @@ export function HomePicker({
                           "absolute top-1.5 right-1.5 grid size-5 place-items-center rounded-full border text-white",
                           on
                             ? "border-sky-400 bg-sky-500"
-                            : "border-white/60 bg-black/40 opacity-0 group-hover:opacity-100",
+                            : "border-white/60 bg-black/40 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100",
                         )}
                       >
                         {on ? <Check className="size-3" /> : null}

@@ -104,7 +104,7 @@ function PathList({ pages, cap }: { pages: WebPage[]; cap?: number }) {
             title={PAGE_TYPE_META[p.pageType].label}
           />
           <span className="min-w-0 flex-1 truncate">{p.title}</span>
-          <span className="hidden min-w-0 shrink truncate text-xs text-muted-foreground sm:block">
+          <span className="hidden min-w-0 shrink truncate text-xs text-muted-foreground @xl:block">
             {p.path}
           </span>
           <span className="w-4 shrink-0 text-right text-xs text-muted-foreground">
@@ -241,7 +241,7 @@ function HubList({ pages, baseUrl }: { pages: WebPage[]; baseUrl: string }) {
   const sorted = [...totals.entries()].sort((a, b) => b[1] - a[1]);
   if (!sorted.length) return null;
   return (
-    <div className="grid gap-x-6 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-x-6 gap-y-1 @xl:grid-cols-2 @4xl:grid-cols-3">
       {sorted.map(([hub, n]) => (
         <a
           key={hub}
@@ -452,7 +452,7 @@ export default async function WebsitePage({
 
   return (
     <div>
-      <div className="flex items-start justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Website</h1>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -584,7 +584,7 @@ export default async function WebsitePage({
               />
             )}
           </section>
-          <section className="mt-10 grid gap-4 sm:grid-cols-2">
+          <section className="mt-10 grid grid-cols-1 gap-4 @xl:grid-cols-2">
             <Link
               href={websiteHref("property")}
               className="rounded-xl border p-5 transition-colors hover:border-foreground/30"

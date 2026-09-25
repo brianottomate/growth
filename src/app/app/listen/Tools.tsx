@@ -22,7 +22,7 @@ export function Tools() {
             responses.
           </p>
         </div>
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 @xl:grid-cols-2">
           <ToolCard
             name="Peec.ai"
             href="https://peec.ai/pricing"
@@ -59,7 +59,7 @@ export function Tools() {
             External SoMe listening services to evaluate or integrate.
           </p>
         </div>
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 @xl:grid-cols-2">
           <ToolCard
             name="Mentionkit"
             href="https://mentionkit.com/pricing"

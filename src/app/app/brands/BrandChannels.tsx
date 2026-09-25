@@ -322,7 +322,7 @@ export function BrandChannels({
           or add one by hand.
         </p>
       ) : (
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-2 @xl:grid-cols-2 @5xl:grid-cols-4">
           {sorted.map((c) => {
             const posts = postCountByPlatform[c.platform] ?? 0;
             const discovered = isDiscovered(c);
@@ -633,7 +633,7 @@ export function BrandChannels({
                                 type="button"
                                 title="Remove capture"
                                 onClick={() => removeCapture(snap.capturedAt)}
-                                className="text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-destructive"
+                                className="text-muted-foreground opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:text-destructive pointer-coarse:opacity-100"
                               >
                                 <X className="size-3.5" />
                               </button>

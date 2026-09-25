@@ -111,7 +111,7 @@ export function SharedAdsConnections({ brandId }: { brandId: string }) {
           )}
           {!!data?.destinations.length && (
             <div className="space-y-3">
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 @xl:grid-cols-3">
                 <label className="space-y-1 text-sm">
                   Client brand
                   <select

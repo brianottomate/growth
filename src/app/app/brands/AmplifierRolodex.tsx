@@ -140,7 +140,7 @@ export function AmplifierRolodex() {
             return (
               <div
                 key={a.id}
-                className="group flex items-center gap-3 px-5 py-3.5"
+                className="group flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3.5"
               >
                 <span className="shrink-0 text-sm font-semibold">{a.name}</span>
                 {a.type && (
@@ -174,7 +174,7 @@ export function AmplifierRolodex() {
                     ))
                   )}
                 </div>
-                <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
                   <Button
                     size="sm"
                     variant="ghost"

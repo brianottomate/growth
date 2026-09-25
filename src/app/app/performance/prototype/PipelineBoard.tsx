@@ -96,7 +96,7 @@ export function PipelineBoard({ brands }: { brands: PipelineBrand[] }) {
           placeholder="Search brands or sites"
         />
       </label>
-      <div className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid min-w-0 grid-cols-1 gap-4 @2xl:grid-cols-2 @5xl:grid-cols-4">
         {COLUMNS.map((column) => {
           const clients = visible.filter(
             (brand) => COLUMN_OF[brand.delivery] === column,
@@ -195,7 +195,7 @@ export function PipelineBoard({ brands }: { brands: PipelineBrand[] }) {
                         onClick={() => setStaging(brand)}
                         aria-label={`Set ${brand.name}'s stage`}
                         title="Set stage"
-                        className="absolute top-2.5 right-2.5 flex size-7 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-accent hover:text-foreground"
+                        className="absolute top-2.5 right-2.5 flex size-7 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:bg-accent hover:text-foreground pointer-coarse:opacity-100"
                       >
                         <MoreHorizontal className="size-4" aria-hidden="true" />
                       </button>

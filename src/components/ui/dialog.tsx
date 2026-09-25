@@ -202,7 +202,12 @@ function DialogContent({
   scrollable?: boolean;
   size?: "default" | "sm" | "lg" | "xl" | "2xl" | "full";
 } & VariantProps<typeof dialogContentStyleVariants>) {
-  const className = cn(dialogContentStyleVariants({ tone }), customClassName);
+  // A container, so page components opened in a dialog lay out by its width.
+  const className = cn(
+    "@container",
+    dialogContentStyleVariants({ tone }),
+    customClassName,
+  );
 
   const isDesktop = useMediaQuery("(min-width: 768px)");
 

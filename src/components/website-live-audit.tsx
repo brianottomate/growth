@@ -174,7 +174,7 @@ function AuditSummary({ result }: { result: WebsiteAuditResult }) {
     ["Metadata mismatches", result.summary.metadataMismatches],
   ] as const;
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+    <div className="grid grid-cols-2 gap-2 @xl:grid-cols-3 @4xl:grid-cols-6">
       {stats.map(([label, value]) => (
         <div key={label} className="rounded-lg bg-muted/40 p-3">
           <div className="text-xl font-semibold tabular-nums">{value}</div>
@@ -222,7 +222,7 @@ function AuditEntryRow({ entry }: { entry: WebsiteAuditEntry }) {
       {entry.fetchError ? (
         <p className="mt-3 text-xs text-muted-foreground">{entry.fetchError}</p>
       ) : (
-        <div className="mt-3 grid gap-2 text-xs lg:grid-cols-2">
+        <div className="mt-3 grid grid-cols-1 gap-2 text-xs @4xl:grid-cols-2">
           <MetadataLine
             label="Title"
             value={entry.title}

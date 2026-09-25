@@ -331,7 +331,7 @@ export function AdPreviewsWorkspace({
       {drafted ? (
         // Break out of the centered column so all placements have room; the
         // app layout's scroll div is the @container this measures against.
-        <div className="mx-[calc(((100cqw-min(100cqw,64rem))/2+2rem)*-1)] px-8">
+        <div className="mx-[calc(((100cqw-min(100cqw,64rem))/2+1rem)*-1)] px-4 @xl:mx-[calc(((100cqw-min(100cqw,64rem))/2+2rem)*-1)] @xl:px-8">
           <PlacementMatrix
             homes={matrixHomes}
             brandId={brandId}

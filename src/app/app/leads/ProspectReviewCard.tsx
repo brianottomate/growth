@@ -329,7 +329,7 @@ function SequencePreview({ data }: { data: ProspectCardData }) {
           {fullCopy ? "Collapse copy" : "Show full copy"}
         </button>
       </div>
-      <div className="grid gap-2.5 @lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2.5 @lg:grid-cols-2">
         {outreach.steps.slice(0, 4).map((step, index) => (
           <div key={index} className="rounded-md border p-3">
             <div className="flex items-center justify-between gap-2 text-[10px] font-medium text-muted-foreground">
@@ -537,8 +537,8 @@ export function ProspectReviewCard({
               </div>
             </div>
           </div>
-          <div className="flex shrink-0 flex-col items-end gap-2">
-            <div className="flex items-center gap-2">
+          <div className="flex max-w-full shrink-0 flex-col items-start gap-2 @2xl:items-end">
+            <div className="flex flex-wrap items-center gap-2 @2xl:justify-end">
               {/* One artifact seen two ways: the bare preview the prospect
                   lands on, and the wander.com page that wraps it in the pitch.
                   Icon-only because they are lookups, not the action the card is
@@ -700,7 +700,7 @@ export function ProspectReviewCard({
             sequence full-width underneath — one reading order at every size,
             instead of the old info/sequence split that made narrow containers
             interleave the two. */}
-        <div className="grid gap-x-6 gap-y-1 @lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-x-6 gap-y-1 @lg:grid-cols-2">
           <div>
             <MicroLabel>Selected channel</MicroLabel>
             <div className="mt-1 text-sm">

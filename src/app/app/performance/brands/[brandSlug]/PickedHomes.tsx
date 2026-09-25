@@ -152,7 +152,7 @@ export function PickedHomes({
           </Button>
         </div>
       ) : (
-        <div className="grid gap-2.5 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2.5 @xl:grid-cols-2">
           {picked.map((home) => {
             const rest = home.images.filter((url) => url !== home.hero);
             const thumbs = rest.slice(0, 5);

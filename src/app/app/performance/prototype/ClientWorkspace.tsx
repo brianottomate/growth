@@ -84,7 +84,7 @@ export function ClientWorkspace({ data }: { data: WorkspaceData }) {
         <ArrowLeft className="size-4" aria-hidden="true" /> All brands
       </Link>
 
-      <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+      <header className="flex flex-col justify-between gap-4 @xl:flex-row @xl:items-center">
         <div className="flex items-center gap-4">
           <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white">
             {brand.avatarUrl ? (

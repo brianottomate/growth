@@ -21,7 +21,7 @@ export default function Loading() {
       </div>
 
       {/* KPI grid — matches grid-cols-2 md:grid-cols-3 lg:grid-cols-4 */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 @2xl:grid-cols-3 @4xl:grid-cols-4">
         {Array.from({ length: 11 }).map((_, i) => (
           <div key={i} className="space-y-3 rounded-xl border p-4">
             <Skeleton className="h-3 w-24" />
@@ -43,9 +43,9 @@ export default function Loading() {
           >
             <Skeleton shape="round" className="size-2.5 shrink-0" />
             <Skeleton className="h-4 w-32" />
-            <div className="ml-auto flex gap-6 sm:gap-8">
+            <div className="ml-auto flex gap-6 @xl:gap-8">
               {Array.from({ length: 6 }).map((_, j) => (
-                <Skeleton key={j} className="hidden h-4 w-12 sm:block" />
+                <Skeleton key={j} className="hidden h-4 w-12 @xl:block" />
               ))}
             </div>
           </div>

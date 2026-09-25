@@ -61,7 +61,7 @@ function ReviewCard({ item }: { item: ReviewItem }) {
       className="group rounded-xl border bg-card p-4 transition-colors hover:border-foreground/25"
     >
       <div className="flex items-start gap-3">
-        <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
+        <span className="grid size-9 shrink-0 grid-cols-1 place-items-center rounded-lg bg-muted text-muted-foreground">
           <Icon className="size-4" />
         </span>
         <span className="min-w-0 flex-1">
@@ -323,7 +323,7 @@ export default async function ReviewPage() {
             human reviews them.
           </p>
         </div>
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 @2xl:grid-cols-2">
           {decisions.map((item) => (
             <ReviewCard key={item.title} item={item} />
           ))}
@@ -340,7 +340,7 @@ export default async function ReviewPage() {
             confirmed planning context.
           </p>
         </div>
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 @2xl:grid-cols-2">
           {gaps.map((item) => (
             <ReviewCard key={item.title} item={item} />
           ))}

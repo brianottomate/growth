@@ -277,7 +277,7 @@ export function OverviewAssistantPopup({
         )}
       >
         <header className="flex h-12 shrink-0 items-center gap-3 border-b px-3">
-          <span className="grid size-7 place-items-center rounded-lg bg-primary/10 text-primary">
+          <span className="grid size-7 grid-cols-1 place-items-center rounded-lg bg-primary/10 text-primary">
             <Sparkles className="size-3.5" />
           </span>
           <div className="min-w-0 flex-1">
@@ -546,7 +546,7 @@ export function OverviewAssistantPopup({
               }
             />
           ) : (
-            <div className="grid h-full place-items-center text-muted-foreground">
+            <div className="grid h-full grid-cols-1 place-items-center text-muted-foreground">
               <Loader2 className="size-5 animate-spin" />
             </div>
           )}

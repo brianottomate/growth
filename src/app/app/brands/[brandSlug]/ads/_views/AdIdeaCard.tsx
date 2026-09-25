@@ -633,7 +633,7 @@ export function AdIdeaCard({
                 Edit copy
               </Button>
             </div>
-            <dl className="grid gap-4 text-sm sm:grid-cols-2">
+            <dl className="grid grid-cols-1 gap-4 text-sm @xl:grid-cols-2">
               {(
                 [
                   ["Headline", savedState.document.copy.headline],

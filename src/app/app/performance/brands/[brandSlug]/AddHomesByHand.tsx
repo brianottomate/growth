@@ -62,7 +62,7 @@ export function AddHomesByHand({
   return (
     <div className="space-y-4">
       {homes.length > 0 ? (
-        <ul className="grid gap-2.5 sm:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-2.5 @xl:grid-cols-2">
           {homes.map((home) => (
             <li
               key={home.id}

@@ -420,7 +420,7 @@ export function LifecycleStrategy({
                               depth > 0 ? { marginLeft: depth * 24 } : undefined
                             }
                           >
-                            <div className="group flex items-center gap-2.5 rounded-lg border bg-background/50 px-2.5 py-1.5">
+                            <div className="group flex flex-wrap items-center gap-2.5 rounded-lg border bg-background/50 px-2.5 py-1.5">
                               {depth === 0 ? (
                                 <span className="w-4 text-center text-[11px] text-muted-foreground tabular-nums">
                                   {++mainIdx}
@@ -495,7 +495,7 @@ export function LifecycleStrategy({
                                   via CIO
                                 </span>
                               )}
-                              <div className="ml-auto flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                              <div className="ml-auto flex items-center gap-0.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
                                 <Button
                                   size="icon"
                                   variant="ghost"

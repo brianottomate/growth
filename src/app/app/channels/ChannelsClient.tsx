@@ -210,9 +210,9 @@ export function ChannelsClient({
             </div>
 
             {/* Channels */}
-            <div className="grid gap-3 p-3 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 p-3 @2xl:grid-cols-2">
               {b.channels.length === 0 && (
-                <p className="text-xs text-muted-foreground md:col-span-2">
+                <p className="text-xs text-muted-foreground @2xl:col-span-2">
                   No connected channels.
                 </p>
               )}
@@ -456,9 +456,9 @@ function EditChannelDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-4 py-2">
+        <div className="grid grid-cols-1 gap-4 py-2">
           <PhotoPickerField picker={photoPicker} idPrefix="channel-profile" />
-          <div className="grid gap-2 border-t pt-4">
+          <div className="grid grid-cols-1 gap-2 border-t pt-4">
             <PhotoPickerField
               picker={bannerPicker}
               variant="banner"
@@ -478,7 +478,7 @@ function EditChannelDialog({
               </Button>
             )}
           </div>
-          <div className="grid gap-1.5">
+          <div className="grid grid-cols-1 gap-1.5">
             <Label>Handle</Label>
             <Input
               value={form.handle}
@@ -491,7 +491,7 @@ function EditChannelDialog({
               placeholder="@handle"
             />
           </div>
-          <div className="grid gap-1.5">
+          <div className="grid grid-cols-1 gap-1.5">
             <Label>Public profile</Label>
             <Input
               value={form.profileUrl}
@@ -504,7 +504,7 @@ function EditChannelDialog({
               placeholder="https://x.com/handle"
             />
           </div>
-          <div className="grid gap-1.5">
+          <div className="grid grid-cols-1 gap-1.5">
             <Label>Manage link</Label>
             <Input
               value={form.manageUrl}
@@ -517,7 +517,7 @@ function EditChannelDialog({
               placeholder="Provider dashboard URL"
             />
           </div>
-          <div className="grid gap-1.5">
+          <div className="grid grid-cols-1 gap-1.5">
             <Label>Connection status</Label>
             <Select
               value={form.connectionStatus}

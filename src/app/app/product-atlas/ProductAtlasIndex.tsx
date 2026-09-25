@@ -37,7 +37,7 @@ export function ProductAtlasIndex({ products }: { products: ProductList }) {
           </p>
         </div>
       ) : (
-        <section className="grid gap-4 md:grid-cols-2">
+        <section className="grid grid-cols-1 gap-4 @2xl:grid-cols-2">
           {products.map((product) => (
             <Link
               key={product.id}

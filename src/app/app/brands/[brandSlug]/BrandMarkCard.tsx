@@ -153,8 +153,8 @@ export function BrandMarkCard({
       id="brand-mark"
       className="scroll-mt-6 space-y-4 rounded-xl border p-4"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
           <h2 className="text-base font-semibold">Brand mark</h2>
           <p className="mt-0.5 text-sm text-muted-foreground">
             {mark
@@ -162,7 +162,7 @@ export function BrandMarkCard({
               : "No mark chosen. Cards fall back to the scraped logo, cut white over photos."}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             size="sm"
             variant="outline"

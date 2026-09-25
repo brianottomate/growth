@@ -243,7 +243,7 @@ export function HomesStrip({
                 onClick={() => setOpenIndex(index)}
                 aria-label={`See ${home.name} at full size`}
                 title="See the photo at full size"
-                className="absolute top-1.5 right-1.5 grid size-7 place-items-center rounded-full border border-white/50 bg-black/50 text-white opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100"
+                className="absolute top-1.5 right-1.5 grid size-7 grid-cols-1 place-items-center rounded-full border border-white/50 bg-black/50 text-white opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
               >
                 <ZoomIn className="size-3.5" />
               </button>
@@ -262,7 +262,7 @@ export function HomesStrip({
                   "absolute top-1.5 left-1.5 grid size-7 place-items-center rounded-full border text-white transition disabled:opacity-40",
                   isPicked
                     ? "border-sky-300 bg-sky-500 opacity-100"
-                    : "border-white/50 bg-black/50 opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
+                    : "border-white/50 bg-black/50 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100",
                 )}
               >
                 {busy ? (
@@ -376,7 +376,7 @@ export function HomesStrip({
                     type="button"
                     onClick={() => step(-1)}
                     aria-label="Previous home"
-                    className="absolute top-1/2 left-3 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+                    className="absolute top-1/2 left-3 grid size-10 -translate-y-1/2 grid-cols-1 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
                   >
                     <ChevronLeft className="size-5" />
                   </button>
@@ -384,7 +384,7 @@ export function HomesStrip({
                     type="button"
                     onClick={() => step(1)}
                     aria-label="Next home"
-                    className="absolute top-1/2 right-3 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+                    className="absolute top-1/2 right-3 grid size-10 -translate-y-1/2 grid-cols-1 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
                   >
                     <ChevronRight className="size-5" />
                   </button>

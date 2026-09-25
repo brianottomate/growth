@@ -124,8 +124,8 @@ export function MarketplaceWorkspace({
       : marketplaceSurfaces.filter((surface) => surface.id === surfaceId);
 
   return (
-    <main className="mx-auto max-w-[1480px] space-y-8 p-5 sm:p-7">
-      <header className="flex flex-col gap-5 border-b pb-6 xl:flex-row xl:items-end xl:justify-between">
+    <main className="mx-auto max-w-[1480px] space-y-8 p-5 @xl:p-7">
+      <header className="flex flex-col gap-5 border-b pb-6 @5xl:flex-row @5xl:items-end @5xl:justify-between">
         <div className="max-w-3xl">
           <p className="text-xs font-medium tracking-[0.18em] text-muted-foreground uppercase">
             Wander brand map · persistent acquisition surfaces
@@ -140,7 +140,7 @@ export function MarketplaceWorkspace({
             public listing.
           </p>
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 @xl:grid-cols-4">
           {[
             [audit.listings, "mapped listings"],
             [audit.verified, "verified fields"],
@@ -189,7 +189,7 @@ export function MarketplaceWorkspace({
             Show deferred
           </button>
         </div>
-        <div className="grid gap-2 md:grid-cols-5">
+        <div className="grid grid-cols-1 gap-2 @2xl:grid-cols-5">
           <button
             type="button"
             onClick={() => setSurfaceId("all")}
@@ -253,7 +253,7 @@ export function MarketplaceWorkspace({
             follow.
           </p>
         </div>
-        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-2 @2xl:grid-cols-2 @5xl:grid-cols-3">
           {queue.map(({ listing, item, definition }, index) => {
             if (!definition) return null;
             const Icon = kindIcons[definition.kind];
@@ -263,7 +263,7 @@ export function MarketplaceWorkspace({
                 className="rounded-xl border bg-card p-3.5"
               >
                 <div className="flex items-start gap-3">
-                  <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
+                  <span className="grid size-8 shrink-0 grid-cols-1 place-items-center rounded-lg bg-muted text-muted-foreground">
                     <Icon className="size-4" />
                   </span>
                   <div className="min-w-0 flex-1">
@@ -323,7 +323,7 @@ export function MarketplaceWorkspace({
                   className="overflow-hidden rounded-2xl border bg-card"
                 >
                   <div className="flex items-start gap-3 border-b p-4">
-                    <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-foreground text-background">
+                    <span className="grid size-10 shrink-0 grid-cols-1 place-items-center rounded-xl bg-foreground text-background">
                       <Icon className="size-5" />
                     </span>
                     <div className="min-w-0">
@@ -347,7 +347,7 @@ export function MarketplaceWorkspace({
                       </p>
                     </div>
                   </div>
-                  <div className="grid xl:grid-cols-2">
+                  <div className="grid grid-cols-1 @5xl:grid-cols-2">
                     {fields.map((item) => {
                       const definition = surface.fields.find(
                         (candidate) => candidate.id === item.fieldId,
@@ -357,10 +357,10 @@ export function MarketplaceWorkspace({
                       return (
                         <div
                           key={item.fieldId}
-                          className="border-b p-4 xl:odd:border-r"
+                          className="border-b p-4 @5xl:odd:border-r"
                         >
                           <div className="flex items-start gap-3">
-                            <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
+                            <span className="grid size-7 shrink-0 grid-cols-1 place-items-center rounded-lg bg-muted text-muted-foreground">
                               <FieldIcon className="size-3.5" />
                             </span>
                             <div className="min-w-0 flex-1">
@@ -429,7 +429,7 @@ export function MarketplaceWorkspace({
             dashboards remain the source of current truth.
           </p>
         </div>
-        <div className="grid gap-3 xl:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 @5xl:grid-cols-2">
           {visibleSurfaces.map((surface) => {
             const Icon = surfaceIcons[surface.id];
             return (
@@ -438,7 +438,7 @@ export function MarketplaceWorkspace({
                 className="rounded-2xl border bg-card p-4"
               >
                 <div className="flex items-start gap-3">
-                  <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground">
+                  <span className="grid size-9 shrink-0 grid-cols-1 place-items-center rounded-xl bg-muted text-muted-foreground">
                     <Icon className="size-4" />
                   </span>
                   <div>
@@ -470,7 +470,7 @@ export function MarketplaceWorkspace({
                     </a>
                   </div>
                 </div>
-                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                <div className="mt-4 grid grid-cols-1 gap-2 @xl:grid-cols-2">
                   {surface.fields.map((definition) => {
                     const FieldIcon = kindIcons[definition.kind];
                     return (

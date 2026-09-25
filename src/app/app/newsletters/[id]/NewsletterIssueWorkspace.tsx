@@ -234,7 +234,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
         </div>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.9fr)]">
+      <div className="grid grid-cols-1 gap-5 @5xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.9fr)]">
         <div className="space-y-4">
           {/* Chat-first: the conversation is the write path for words (subject,
               intro, CTA); the one clicky exception is photos, because picking
@@ -461,7 +461,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
                 {copied ? "Copied" : "Copy implementation context"}
               </button>
             </div>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className="mt-3 grid grid-cols-1 gap-3 @xl:grid-cols-2">
               <label>
                 <span className="mb-1 block text-xs font-medium">
                   Target product repo
@@ -515,7 +515,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
                 </div>
               )}
 
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className="mt-3 grid grid-cols-1 gap-3 @xl:grid-cols-2">
               <label>
                 <span className="mb-1 block text-xs font-medium">
                   API-triggered broadcast ID
@@ -720,7 +720,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
           )}
         </div>
 
-        <div className="xl:sticky xl:top-4 xl:self-start">
+        <div className="@5xl:sticky @5xl:top-4 @5xl:self-start">
           <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-slate-50 px-4 py-2.5 text-xs font-medium text-slate-600">
               <span>Wander email preview</span>
@@ -854,8 +854,8 @@ function ManualFieldsDialog({
         </div>
       }
     >
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="sm:col-span-2">
+      <div className="grid grid-cols-1 gap-3 @xl:grid-cols-2">
+        <label className="@xl:col-span-2">
           <span className="mb-1 block text-xs font-medium">Subject</span>
           <input
             value={fields.subject}
@@ -865,7 +865,7 @@ function ManualFieldsDialog({
             className={controlClass}
           />
         </label>
-        <label className="sm:col-span-2">
+        <label className="@xl:col-span-2">
           <span className="mb-1 block text-xs font-medium">Preheader</span>
           <input
             value={fields.preheader ?? ""}
@@ -876,7 +876,7 @@ function ManualFieldsDialog({
             placeholder="Optional inbox preview text"
           />
         </label>
-        <label className="sm:col-span-2">
+        <label className="@xl:col-span-2">
           <span className="mb-1 block text-xs font-medium">
             {isDigest
               ? "Intro copy · shown above the homes"

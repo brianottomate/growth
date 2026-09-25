@@ -113,7 +113,7 @@ export function Sources({
                 Nothing here yet.
               </p>
             ) : (
-              <div className="grid gap-2.5">
+              <div className="grid grid-cols-1 gap-2.5">
                 {groupSources.map((s) => (
                   <SourceCard
                     key={s.id}

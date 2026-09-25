@@ -45,7 +45,7 @@ export function BriefOverview({
           and CTA.
         </p>
       ) : (
-        <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+        <dl className="mt-3 grid grid-cols-1 gap-3 @xl:grid-cols-2">
           {fields.map((field) => (
             <div
               key={field.label}

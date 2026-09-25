@@ -54,7 +54,7 @@ export function SocialSharePreviews({
   const xTitle = twitterTitle ?? title;
   const xDescription = twitterDescription ?? description;
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 @2xl:grid-cols-2 @5xl:grid-cols-4">
       <Provider label="Facebook / WhatsApp">
         <div className="overflow-hidden rounded-md border border-gray-200 bg-white shadow-sm">
           <PreviewImage
@@ -109,7 +109,7 @@ export function SocialSharePreviews({
       </Provider>
 
       <Provider label="Instagram DM">
-        <div className="mx-auto max-w-[240px] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm md:mx-0">
+        <div className="mx-auto max-w-[240px] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm @2xl:mx-0">
           <PreviewImage
             src={image}
             alt="Instagram direct-message preview"

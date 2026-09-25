@@ -505,7 +505,7 @@ export function MediaLibrary({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-56 flex-1 sm:max-w-sm">
+        <div className="relative min-w-56 flex-1 @xl:max-w-sm">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
@@ -640,7 +640,7 @@ export function MediaLibrary({
           No media yet. Upload your first asset above.
         </p>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 @xl:grid-cols-3 @2xl:grid-cols-4 @4xl:grid-cols-5">
           {groupMediaExports(assets ?? []).map((entry) =>
             entry.approval ? (
               <ExportBundle
@@ -826,7 +826,7 @@ function MediaCard({
           </ButtonLink>
         )}
 
-        <div className="pointer-events-none absolute inset-0 flex items-end justify-end gap-1.5 bg-gradient-to-t from-black/60 to-transparent p-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+        <div className="pointer-events-none absolute inset-0 flex items-end justify-end gap-1.5 bg-gradient-to-t from-black/60 to-transparent p-1.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
           <ButtonLink
             size="icon"
             variant="secondary"

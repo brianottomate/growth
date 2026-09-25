@@ -138,7 +138,7 @@ export function PersonasClient({
   return (
     <div
       className={
-        embedded ? "space-y-6" : "mx-auto w-full max-w-4xl space-y-6 p-6"
+        embedded ? "space-y-6" : "mx-auto w-full max-w-4xl space-y-6 @xl:p-6"
       }
     >
       <header
@@ -158,12 +158,12 @@ export function PersonasClient({
             </p>
           </div>
         )}
-        <div className="flex items-center gap-2">
+        <div className="flex max-w-full min-w-0 flex-wrap items-center gap-2">
           {brands.length > 1 && (
             <select
               value={brandId}
               onChange={(event) => setBrandId(event.target.value)}
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              className="h-9 max-w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm"
             >
               {brands.map((brand) => (
                 <option key={brand.id} value={brand.id}>
@@ -192,7 +192,7 @@ export function PersonasClient({
           </p>
         </div>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 @2xl:grid-cols-2">
           {(personas.data ?? []).map((persona) => (
             <div key={persona.id} className="rounded-xl border bg-card p-4">
               <div className="flex items-start justify-between gap-2">

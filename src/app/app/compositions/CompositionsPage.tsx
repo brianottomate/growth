@@ -89,12 +89,7 @@ export function CompositionsPage({ brands }: { brands: Brand[] }) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">Compositions</h1>
-        <p className="text-sm text-muted-foreground">
-          Turn library images and brand copy into finished publishing assets.
-        </p>
-      </div>
+      <h1 className="text-xl font-semibold">Compositions</h1>
       <CompositionWorkbench
         brands={brands}
         brandId={brandId}

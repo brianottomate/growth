@@ -9,7 +9,7 @@ export function WorkspaceBreadcrumbs({
     <nav aria-label="Breadcrumb">
       <ol className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
         {items.map((item, index) => (
-          <li key={index} className="flex items-center gap-2">
+          <li key={index} className="flex min-w-0 items-center gap-2">
             {index > 0 && <span aria-hidden="true">/</span>}
             {item.href ? (
               <Link
@@ -19,7 +19,9 @@ export function WorkspaceBreadcrumbs({
                 {item.label}
               </Link>
             ) : (
-              <span aria-current="page">{item.label}</span>
+              <span aria-current="page" className="truncate">
+                {item.label}
+              </span>
             )}
           </li>
         ))}

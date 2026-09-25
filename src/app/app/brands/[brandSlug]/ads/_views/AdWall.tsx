@@ -140,7 +140,7 @@ export function AdWall({
               <p className="text-[13px] font-semibold">
                 {formatLabel(group.key)} · {group.ads.length}
               </p>
-              <ul className="grid gap-3 @3xl:grid-cols-2">
+              <ul className="grid grid-cols-1 gap-3 @3xl:grid-cols-2">
                 {group.ads.map((ad) => (
                   <AdTile key={ad.id} ad={ad} {...tile} />
                 ))}
@@ -176,7 +176,7 @@ export function AdWall({
                 </a>
               ) : null}
             </div>
-            <ul className="grid gap-3 @3xl:grid-cols-2">
+            <ul className="grid grid-cols-1 gap-3 @3xl:grid-cols-2">
               {group.ads.map((ad) => (
                 <AdTile key={ad.id} ad={ad} {...tile} />
               ))}
@@ -194,7 +194,7 @@ export function AdWall({
               About no home in particular
             </p>
           ) : null}
-          <ul className="grid gap-3 @3xl:grid-cols-2">
+          <ul className="grid grid-cols-1 gap-3 @3xl:grid-cols-2">
             {grouped.other.map((ad) => (
               <AdTile key={ad.id} ad={ad} {...tile} />
             ))}
@@ -444,7 +444,7 @@ export function AdTile({
               {index + 1}
             </span>
             {locked ? null : (
-              <span className="absolute inset-x-0 bottom-0 flex justify-center gap-1 bg-black/60 py-0.5 opacity-0 transition group-hover:opacity-100">
+              <span className="absolute inset-x-0 bottom-0 flex justify-center gap-1 bg-black/60 py-0.5 opacity-0 transition group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
                 <button
                   type="button"
                   disabled={busy}
@@ -533,7 +533,7 @@ export function AdTile({
             disabled={busy}
             onClick={() => setPicking("append")}
             title="Add a card from the library"
-            className="grid size-16 place-items-center rounded-lg border text-[9px] text-muted-foreground hover:border-white/30 hover:text-foreground"
+            className="grid size-16 grid-cols-1 place-items-center rounded-lg border text-[9px] text-muted-foreground hover:border-white/30 hover:text-foreground"
           >
             <ImagePlus className="size-3.5" />
             Library

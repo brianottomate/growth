@@ -213,8 +213,8 @@ export function Instagram() {
           land here with a drafted comment.
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-[220px_1fr]">
-          <aside className="space-y-5 md:sticky md:top-4 md:self-start">
+        <div className="grid grid-cols-1 gap-5 @2xl:grid-cols-[220px_1fr]">
+          <aside className="space-y-5 @2xl:sticky @2xl:top-4 @2xl:self-start">
             <RailGroup
               title="Accounts"
               items={accountCounts}

@@ -489,7 +489,7 @@ export function MediaSuggestionsCard({
                       className="size-full object-cover"
                     />
                   ) : (
-                    <div className="grid size-full place-items-center text-muted-foreground">
+                    <div className="grid size-full grid-cols-1 place-items-center text-muted-foreground">
                       <ImageIcon className="size-5" />
                     </div>
                   )}
@@ -528,7 +528,7 @@ export function MediaSuggestionsCard({
                 key={`${candidate.platformPostId}-${candidate.media.mediaIndex}`}
                 className="flex items-start gap-2 rounded-lg border bg-background p-2"
               >
-                <div className="grid size-9 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground">
+                <div className="grid size-9 shrink-0 grid-cols-1 place-items-center rounded-md bg-muted text-muted-foreground">
                   <ArchiveRestore className="size-4" />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -757,7 +757,7 @@ function ToolCard({
     <div className="overflow-hidden rounded-lg border bg-card text-card-foreground">
       <div className="flex items-center justify-between gap-2 border-b px-3.5 py-2.5">
         <div className="flex items-center gap-2">
-          <span className="grid size-6 shrink-0 place-items-center rounded-md bg-primary/10 text-primary">
+          <span className="grid size-6 shrink-0 grid-cols-1 place-items-center rounded-md bg-primary/10 text-primary">
             <Icon className="h-3.5 w-3.5" />
           </span>
           <span className="text-sm font-medium">{title}</span>
@@ -930,7 +930,7 @@ export function WorkspaceOverviewCard({
   const { brands, content, leads, engageWorthyMentions } = output;
   return (
     <ToolCard icon={Sparkles} title="Workspace snapshot">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 @xl:grid-cols-4">
         <Stat label="Brands" value={brands} href="/app/brands" />
         <Stat
           label="Content"
@@ -1599,7 +1599,7 @@ export function LeadsSummaryCard({ output }: { output: LeadsSummaryOutput }) {
   const pmsMax = Math.max(1, ...topPms.map((p) => p.count));
   return (
     <ToolCard icon={Users} title="Leads pool" href="/app/leads">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-2 @xl:grid-cols-3">
         <Stat label="Domains" value={fmtNum(domains)} />
         <Stat label="Contacts" value={fmtNum(contacts)} />
         <Stat
@@ -1818,7 +1818,7 @@ export function AdsScopeCard({ output }: { output: AdsScopeOutput }) {
   const monthMax = Math.max(1, ...byMonth.map((m) => m.impressions));
   return (
     <ToolCard icon={Megaphone} title="Ad performance" hint={fmtWindow(window)}>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 @xl:grid-cols-4">
         <Stat label="Impressions" value={fmtNum(totals.impressions)} />
         <Stat
           label="Clicks"
@@ -1914,7 +1914,7 @@ function RankedAdRow({ ad }: { ad: RankedAd }) {
           className="size-12 shrink-0 rounded-md bg-muted object-cover"
         />
       ) : (
-        <div className="grid size-12 shrink-0 place-items-center rounded-md bg-muted">
+        <div className="grid size-12 shrink-0 grid-cols-1 place-items-center rounded-md bg-muted">
           <Megaphone className="h-4 w-4 text-muted-foreground" />
         </div>
       )}

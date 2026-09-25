@@ -271,7 +271,7 @@ export function ImageBatchImporter({
 
       {slides.length > 0 && (
         <>
-          <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5">
+          <div className="mt-3 grid grid-cols-3 gap-2 @xl:grid-cols-5">
             {slides.map((slide, index) => (
               <div
                 key={slide.id}

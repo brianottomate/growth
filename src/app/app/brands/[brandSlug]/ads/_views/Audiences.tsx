@@ -352,7 +352,7 @@ export function Audiences({
           }
         />
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 @4xl:grid-cols-2">
           <section className="space-y-4 rounded-xl border bg-card p-5">
             <div>
               <h3 className="font-semibold">Guest-origin coverage</h3>

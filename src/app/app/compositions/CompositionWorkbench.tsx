@@ -513,7 +513,7 @@ export function CompositionWorkbench({
   const bodyFont = fonts.find((font) => font.role === "body")?.family;
 
   return (
-    <div className="grid gap-6 2xl:grid-cols-[440px_minmax(0,1fr)]">
+    <div className="grid grid-cols-1 gap-6 @3xl:grid-cols-[minmax(0,360px)_minmax(0,1fr)] @5xl:grid-cols-[440px_minmax(0,1fr)]">
       <div className="space-y-5">
         {openAssetId || adPreviewTarget ? (
           <div className="flex items-center justify-between gap-3 rounded-xl border bg-muted/40 px-3 py-2 text-xs">
@@ -958,7 +958,7 @@ export function CompositionWorkbench({
               in Media.
             </div>
           ) : (
-            <div className="grid max-h-72 grid-cols-4 gap-2 overflow-y-auto pr-1 sm:grid-cols-6">
+            <div className="grid max-h-72 grid-cols-4 gap-2 overflow-y-auto pr-1 @xl:grid-cols-6">
               {hostedAssets.slice(0, 30).map((asset) => {
                 const selected = renderSourceId === asset.id;
                 return (
@@ -1019,7 +1019,7 @@ export function CompositionWorkbench({
               </div>
             )}
           </div>
-          <div className="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center">
+          <div className="flex flex-col gap-3 border-t px-4 py-3 @xl:flex-row @xl:items-center">
             <Label className="whitespace-nowrap">Library asset name</Label>
             <Input
               value={assetTitle}

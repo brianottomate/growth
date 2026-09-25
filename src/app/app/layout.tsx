@@ -68,9 +68,13 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             <SidebarTrigger className="-ml-1" />
           </header>
           {/* @container lets wide surfaces (e.g. the content Board) break out of
-              the centered column with a cqw-based negative margin. */}
+              the centered column with a cqw-based negative margin. Those
+              margins repeat the column's padding (1rem, 2rem from @xl), so
+              change them together. */}
           <div className="@container min-h-0 flex-1 scrollbar-thin overflow-x-hidden overflow-y-auto">
-            <div className="mx-auto w-full max-w-5xl p-8">{children}</div>
+            <div className="mx-auto w-full max-w-5xl p-4 pb-20 @xl:p-8 @xl:pb-20">
+              {children}
+            </div>
           </div>
         </SidebarInset>
         <OverviewAssistantPopup

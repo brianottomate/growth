@@ -31,7 +31,7 @@ export default function NextPage() {
       </div>
 
       {threadsQuery.isPending ? (
-        <div className="grid h-40 place-items-center text-muted-foreground">
+        <div className="grid h-40 grid-cols-1 place-items-center text-muted-foreground">
           <Loader2 className="size-5 animate-spin" />
         </div>
       ) : threadsQuery.data?.length ? (
@@ -45,7 +45,7 @@ export default function NextPage() {
                   thread.id === activeThreadId && "border-primary/50",
                 )}
               >
-                <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-md bg-primary/10 text-primary">
+                <span className="mt-0.5 grid size-7 shrink-0 grid-cols-1 place-items-center rounded-md bg-primary/10 text-primary">
                   <MessageSquare className="size-3.5" />
                 </span>
                 <div className="min-w-0 flex-1">

@@ -140,7 +140,7 @@ export function AdIdeaSlideRow({
           )}
         </div>
       </div>
-      <div className="grid items-start gap-5 md:grid-cols-[minmax(0,240px)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 items-start gap-5 @xl:grid-cols-[minmax(0,240px)_minmax(0,1fr)]">
         <div className="space-y-2">
           <div className="flex justify-center rounded-lg bg-muted p-3">
             <div

@@ -19,9 +19,9 @@ const STATE_LABEL: Record<WorkspaceCampaign["state"], string> = {
 
 export function LaunchBrief({ data }: { data: WorkspaceData }) {
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+    <div className="grid grid-cols-1 gap-4 @4xl:grid-cols-[minmax(0,1fr)_320px]">
       <div className="space-y-4">
-        <div className="grid overflow-hidden rounded-xl border bg-card sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 overflow-hidden rounded-xl border bg-card @xl:grid-cols-2 @5xl:grid-cols-4">
           {[
             [
               "Media budget",
@@ -36,7 +36,7 @@ export function LaunchBrief({ data }: { data: WorkspaceData }) {
           ].map(([label, value]) => (
             <div
               key={label}
-              className="border-b p-4 last:border-b-0 sm:border-r sm:last:border-r-0"
+              className="border-b p-4 last:border-b-0 @xl:border-r @xl:last:border-r-0"
             >
               <p className="text-[11px] text-muted-foreground">{label}</p>
               <p className="mt-1 font-semibold">{value}</p>
@@ -50,7 +50,7 @@ export function LaunchBrief({ data }: { data: WorkspaceData }) {
           <p className="text-xs text-muted-foreground">
             The homes the ad set is keyed on, from this brand&apos;s feed.
           </p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="mt-4 grid grid-cols-1 gap-3 @xl:grid-cols-3">
             {data.starting.map((home) => (
               <HomeThumb key={home.id} home={home} />
             ))}
@@ -151,7 +151,7 @@ export function AudiencePanel({
 }) {
   const withDemand = personas.filter(hasDemand);
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+    <div className="grid grid-cols-1 gap-4 @4xl:grid-cols-[minmax(0,1fr)_360px]">
       <section className={panel}>
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>

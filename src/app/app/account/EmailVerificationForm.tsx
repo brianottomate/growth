@@ -50,7 +50,7 @@ export function EmailVerificationForm() {
       {/* Current Email Status */}
       <div className="space-y-2">
         <Label>Current Email</Label>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-2 @xl:flex-row @xl:items-center">
           <code className="rounded bg-muted px-2 py-1 text-sm break-all">
             {user?.email}
           </code>
