@@ -1,7 +1,7 @@
 "use client";
 import { catalogAddressIssues } from "@/lib/catalog-addresses";
 import { useEffect, useState } from "react";
-import { MessageSquare } from "lucide-react";
+import { ExternalLink, MessageSquare } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,7 @@ import {
 } from "@/lib/catalog-studio";
 import { amenityHeadlineOptions } from "@/lib/home-amenities";
 import { place } from "@/lib/home-ad-previews";
+import { safeHomeUrl } from "@/lib/ad-preview-links";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 import { ReviewInChatButton } from "../ReviewInChatButton";
 
@@ -650,8 +651,20 @@ function CardEditor({
   onApply: () => void;
   onCancel?: () => void;
 }) {
+  const homeUrl = safeHomeUrl(home?.url);
   return (
     <div className="space-y-4">
+      {homeUrl ? (
+        <a
+          href={homeUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+        >
+          View home
+          <ExternalLink className="size-3" aria-hidden="true" />
+        </a>
+      ) : null}
       <label className="block space-y-1 text-sm">
         Artwork
         <select

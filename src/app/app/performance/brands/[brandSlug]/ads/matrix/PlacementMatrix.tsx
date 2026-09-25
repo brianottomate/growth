@@ -10,6 +10,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ExternalLink,
   ImageOff,
   Loader2,
   Lock,
@@ -31,6 +32,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/components/ui/lib/utils";
 import { toast } from "@/components/ui/toast";
 import { orpc } from "@/orpc/client";
+import { safeHomeUrl } from "@/lib/ad-preview-links";
 
 type CellState = "rendered" | "overridden" | "frozen";
 
@@ -76,7 +78,12 @@ export type MatrixAd = {
   cells: MatrixCell[];
 };
 
-export type MatrixHome = { key: string; name: string; ads: MatrixAd[] };
+export type MatrixHome = {
+  key: string;
+  name: string;
+  url?: string | null;
+  ads: MatrixAd[];
+};
 
 const STATE_CHIP: Record<CellState, string> = {
   rendered: "text-muted-foreground",
@@ -128,6 +135,7 @@ export function PlacementMatrix({
     <div className="space-y-3">
       {homes.map((home) => {
         const isOpen = open.has(home.key);
+        const homeUrl = safeHomeUrl(home.url);
         const frozen = home.ads.reduce(
           (sum, ad) => sum + ad.coverage.frozen,
           0,
@@ -175,6 +183,17 @@ export function PlacementMatrix({
             </button>
             {isOpen ? (
               <div className="space-y-5 border-t px-4 py-4">
+                {homeUrl ? (
+                  <a
+                    href={homeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                  >
+                    View home
+                    <ExternalLink className="size-3" aria-hidden="true" />
+                  </a>
+                ) : null}
                 {home.ads.map((ad) => (
                   <AdRow
                     key={ad.id}

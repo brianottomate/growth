@@ -63,3 +63,21 @@ export function reopenCardHref(input: {
   });
   return `/app/compositions?${params.toString()}`;
 }
+
+/** A listing-page link, never a creative's image URL or a guessed home path. */
+export function safeHomeUrl(value: unknown): string | null {
+  if (typeof value !== "string" || !/^https?:\/\//i.test(value.trim()))
+    return null;
+  try {
+    const url = new URL(value.trim());
+    if (
+      (url.protocol !== "https:" && url.protocol !== "http:") ||
+      url.username ||
+      url.password
+    )
+      return null;
+    return url.href;
+  } catch {
+    return null;
+  }
+}

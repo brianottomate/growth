@@ -35,6 +35,7 @@ import { toast } from "@/components/ui/toast";
 import { cn } from "@/components/ui/lib/utils";
 import type { BrandIdentity } from "@/server/db/brand-schema";
 import { orpc } from "@/orpc/client";
+import { safeHomeUrl } from "@/lib/ad-preview-links";
 import { ListingSamplesDialog } from "./ListingSamplesDialog";
 import { SiteImagesDialog } from "./SiteImagesDialog";
 
@@ -153,7 +154,11 @@ export function CompositionWorkbench({
     adPreviewTarget ? "Ad preview" : "Wander social composition",
   );
   // The home the copywriter matched the photo to, kept for the brand row.
-  const [homeUrl, setHomeUrl] = useState<string | null>(null);
+  const [copyHome, setCopyHome] = useState<{
+    brandId: string;
+    sourceId: string | undefined;
+    url: string | null;
+  } | null>(null);
   const [sourceSearch, setSourceSearch] = useState("");
   const [mark, setMark] = useState<
     "auto" | "color" | "white" | "dark" | "none"
@@ -270,6 +275,20 @@ export function CompositionWorkbench({
     : (hostedAssets[0]?.id ?? "");
   const requiresImage = templateId !== "brand-statement";
   const renderSourceId = requiresImage ? effectiveSourceId : "";
+  const source = hostedAssets.find((asset) => asset.id === renderSourceId);
+  const sourceMetadata = source?.metadata as {
+    listingUrl?: unknown;
+  } | null;
+  const metadataHomeUrl = safeHomeUrl(sourceMetadata?.listingUrl);
+  const homeUrl =
+    renderSourceId && (!openAssetId || hydratedFrom === openAssetId)
+      ? (metadataHomeUrl ??
+        safeHomeUrl(
+          copyHome?.brandId === brandId && copyHome.sourceId === renderSourceId
+            ? copyHome.url
+            : null,
+        ))
+      : null;
   const needsTitle = has("title");
   const canRender = Boolean(
     (!needsTitle || title.trim()) && (!requiresImage || renderSourceId),
@@ -418,13 +437,17 @@ export function CompositionWorkbench({
   // voice and the home behind the photo. The art director then judges them.
   const writeCopy = useMutation(
     orpc.composition.writeCopy.mutationOptions({
-      onSuccess: (copy) => {
+      onSuccess: (copy, input) => {
         setTitle(copy.title);
         setEyebrow(copy.eyebrow ?? "");
         setSubtitle(copy.subtitle ?? "");
         setCta(copy.cta ?? "");
         if (copy.rating != null) setRating(copy.rating);
-        setHomeUrl(copy.homeUrl);
+        setCopyHome({
+          brandId: input.brandId,
+          sourceId: input.sourceMediaAssetId,
+          url: copy.homeUrl,
+        });
         resetDirection();
         if (adPreviewTarget && selectedBrand) {
           setAssetTitle(`${copy.title} — ${selectedBrand.name} ad preview`);
@@ -667,6 +690,17 @@ export function CompositionWorkbench({
         <section className="space-y-4 rounded-xl border p-4">
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <span className="font-semibold">{selectedTemplate.label}</span>
+            {homeUrl ? (
+              <a
+                href={homeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+              >
+                View home
+                <ExternalLink className="size-3" aria-hidden="true" />
+              </a>
+            ) : null}
             <Badge variant="outline">
               {fields.length} field{fields.length === 1 ? "" : "s"}
             </Badge>

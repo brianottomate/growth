@@ -12,7 +12,7 @@ export type MatrixAdRow = {
   content: unknown;
   placements?: AdPlacements | null;
   homeId: string | null;
-  home?: { externalId: string; name: string } | null;
+  home?: { externalId: string; name: string; url?: string | null } | null;
 };
 
 /**
@@ -77,6 +77,7 @@ export function toMatrixHomes(ads: MatrixAdRow[]): MatrixHome[] {
       groups.set(homeKey, {
         key: homeKey,
         name: ad.home?.name ?? "Not bound to a home",
+        url: ad.home?.url ?? null,
         ads: [matrixAd],
       });
     }

@@ -305,9 +305,9 @@ export const clientCampaignContextAction = growthAction({
 export const listIntakesAction = growthAction({
   outputSchema: listIntakesActionOutputSchema,
   description:
-    "List the onboarding forms a Performance client has filed for one account, newest first: what they answered, the budget they agreed to, whether it has been applied, and whether their ad access has been verified.",
-  inputSchema: z.object({ accountId: z.string().min(1) }),
-  examples: [{ accountId: "perf_01" }],
+    "List Performance onboarding submissions in the authenticated workspace, newest first: what they answered, the budget they agreed to, whether it has been applied, and whether their ad access has been verified. Supply accountId to list one account, or omit it to list all accounts in the workspace.",
+  inputSchema: z.object({ accountId: z.string().min(1).optional() }),
+  examples: [{}, { accountId: "perf_01" }],
   execute: (input, ctx) =>
     listPerformanceIntakes(actorFrom(ctx), input.accountId),
 });

@@ -3,12 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { Sparkles } from "lucide-react";
+import { ExternalLink, Sparkles } from "lucide-react";
 
 import { AdMock, type AdMockSurface } from "@/components/ad-mock";
 import { cn } from "@/components/ui/lib/utils";
 import { toast } from "@/components/ui/toast";
-import { adPreviewStudioHref } from "@/lib/ad-preview-links";
+import { adPreviewStudioHref, safeHomeUrl } from "@/lib/ad-preview-links";
 import {
   getCompositionFormat,
   getCompositionTemplate,
@@ -194,6 +194,7 @@ export function OnDemandTile({
     }
   };
 
+  const homeUrl = safeHomeUrl(home.url);
   const busy = phase !== "idle";
   const busyLabel =
     phase === "importing"
@@ -246,6 +247,17 @@ export function OnDemandTile({
           }
         />
       )}
+      {homeUrl ? (
+        <a
+          href={homeUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+        >
+          View home
+          <ExternalLink className="size-3" aria-hidden="true" />
+        </a>
+      ) : null}
       <div
         className={cn(
           "flex w-full flex-col gap-1 text-[11px] text-muted-foreground",

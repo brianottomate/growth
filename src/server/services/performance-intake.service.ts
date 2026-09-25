@@ -6,7 +6,7 @@ import {
 
 import { advanceDeliveryStage } from "./brand-relationship.service";
 
-import { and, desc, eq, isNotNull, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/server/db";
@@ -444,18 +444,22 @@ async function requireIntake(actor: PerformanceActor, intakeId: string) {
 
 export async function listPerformanceIntakes(
   actor: PerformanceActor,
-  accountId: string,
+  accountId?: string,
 ): Promise<PerformanceIntake[]> {
-  const account = await db.query.performanceAccountTable.findFirst({
-    where: and(
-      eq(performanceAccountTable.id, accountId),
-      eq(performanceAccountTable.organizationId, actor.orgId),
-    ),
-    columns: { id: true },
-  });
-  if (!account) return [];
+  const accounts = db
+    .select({ id: performanceAccountTable.id })
+    .from(performanceAccountTable)
+    .where(
+      and(
+        eq(performanceAccountTable.organizationId, actor.orgId),
+        isNull(performanceAccountTable.deletedAt),
+        accountId !== undefined
+          ? eq(performanceAccountTable.id, accountId)
+          : undefined,
+      ),
+    );
   return db.query.performanceIntakeTable.findMany({
-    where: eq(performanceIntakeTable.accountId, accountId),
+    where: inArray(performanceIntakeTable.accountId, accounts),
     orderBy: desc(performanceIntakeTable.submittedAt),
   });
 }

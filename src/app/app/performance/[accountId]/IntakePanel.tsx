@@ -1,42 +1,93 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, CircleDashed, FileText } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { intakeBrandRef } from "@/lib/intake-ref";
 import { orpc } from "@/orpc/client";
 
 /**
- * Submitted intakes for one account, and the apply step that promotes one
- * into the account, its cycle and its homes.
+ * Submitted intakes for one account or the workspace, and the apply step
+ * that promotes one into the account, its cycle and its homes.
  *
  * The blob is shown as-is rather than mapped into fields. Most of what a
  * client tells us is prose that the campaign agent reads whole, so rendering
  * it back as a form would only invite someone to edit a receipt.
  */
-export function IntakePanel({ accountId }: { accountId: string }) {
+export function IntakePanel({ accountId }: { accountId?: string }) {
   const queryClient = useQueryClient();
   const [openId, setOpenId] = useState<string | null>(null);
 
-  const intakes = useQuery(
-    orpc.performance.intakes.queryOptions({ input: { accountId } }),
-  );
+  const intakesOptions = orpc.performance.intakes.queryOptions({
+    input: accountId ? { accountId } : {},
+  });
+  const intakes = useQuery(intakesOptions);
   const rows = intakes.data ?? [];
 
-  if (intakes.isPending) return null;
-  if (rows.length === 0) return null;
+  function refreshIntake(intakeId: string) {
+    // Keep the other list scopes fresh when the operator navigates back to them.
+    void queryClient.invalidateQueries({
+      queryKey: orpc.performance.intakes.key(),
+    });
+    void queryClient.invalidateQueries({
+      queryKey: orpc.performance.previewIntake.queryKey({
+        input: { intakeId },
+      }),
+    });
+  }
+
+  if (intakes.isPending) {
+    return (
+      <p role="status" className="text-sm text-muted-foreground">
+        Loading submissions…
+      </p>
+    );
+  }
+  if (intakes.isError) {
+    return (
+      <div className="space-y-2">
+        <p role="alert" className="text-sm text-destructive">
+          Could not load submissions. Please try again.
+        </p>
+        <Button
+          size="sm"
+          variant="outline"
+          loading={intakes.isFetching}
+          onClick={() => void intakes.refetch()}
+        >
+          Retry
+        </Button>
+      </div>
+    );
+  }
+  if (rows.length === 0) {
+    if (accountId) return null;
+    return (
+      <div
+        role="status"
+        className="rounded-lg border border-dashed p-8 text-center"
+      >
+        <p className="text-sm text-muted-foreground">No submissions yet</p>
+      </div>
+    );
+  }
 
   return (
-    <section className="space-y-3">
-      <h2 className="text-sm font-semibold">Intake</h2>
+    <section aria-label="Intake submissions" className="space-y-3">
+      {accountId && <h2 className="text-sm font-semibold">Intake</h2>}
       <div className="divide-y rounded-xl border bg-card">
         {rows.map((intake) => (
           <div key={intake.id} className="px-3 py-2.5">
             <div className="flex flex-wrap items-center gap-2 text-sm">
-              <FileText className="size-4 text-muted-foreground" />
+              <FileText
+                aria-hidden="true"
+                className="size-4 text-muted-foreground"
+              />
               <span className="font-medium">
                 {new Date(intake.submittedAt).toLocaleDateString(undefined, {
                   day: "numeric",
@@ -44,9 +95,29 @@ export function IntakePanel({ accountId }: { accountId: string }) {
                   year: "numeric",
                 })}
               </span>
-              <span className="text-xs text-muted-foreground">
-                {intakeBrandRef(intake)}
-              </span>
+              {accountId ? (
+                <span className="text-xs text-muted-foreground">
+                  {intakeBrandRef(intake)}
+                </span>
+              ) : (
+                <>
+                  <Link
+                    href={`/app/performance/${intake.accountId}`}
+                    className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+                  >
+                    {intakeBrandRef(intake)}
+                  </Link>
+                  {(intake.submittedByName || intake.submittedByEmail) && (
+                    <span className="text-xs text-muted-foreground">
+                      Issued by{" "}
+                      {intake.submittedByName || intake.submittedByEmail}
+                      {intake.submittedByName && intake.submittedByEmail
+                        ? ` (${intake.submittedByEmail})`
+                        : null}
+                    </span>
+                  )}
+                </>
+              )}
               <StatusPill status={intake.status} />
               <span className="text-xs text-muted-foreground">
                 {intake.mediaBudgetDollars != null
@@ -59,6 +130,9 @@ export function IntakePanel({ accountId }: { accountId: string }) {
                 size="sm"
                 variant="ghost"
                 className="ml-auto h-7"
+                aria-expanded={openId === intake.id}
+                aria-controls={`intake-${intake.id}`}
+                aria-label={`${openId === intake.id ? "Hide" : "Review"} submission for ${intakeBrandRef(intake)}`}
                 onClick={() =>
                   setOpenId(openId === intake.id ? null : intake.id)
                 }
@@ -85,30 +159,17 @@ export function IntakePanel({ accountId }: { accountId: string }) {
             </div>
 
             {openId === intake.id && (
-              <VerifyAccess
-                intakeId={intake.id}
-                verifiedPageId={intake.verifiedPageId}
-                onVerified={() =>
-                  void queryClient.invalidateQueries({
-                    queryKey: orpc.performance.intakes.queryKey({
-                      input: { accountId },
-                    }),
-                  })
-                }
-              />
-            )}
-
-            {openId === intake.id && (
-              <IntakeDetail
-                intakeId={intake.id}
-                onApplied={() =>
-                  void queryClient.invalidateQueries({
-                    queryKey: orpc.performance.intakes.queryKey({
-                      input: { accountId },
-                    }),
-                  })
-                }
-              />
+              <div id={`intake-${intake.id}`}>
+                <VerifyAccess
+                  intakeId={intake.id}
+                  verifiedPageId={intake.verifiedPageId}
+                  onVerified={() => refreshIntake(intake.id)}
+                />
+                <IntakeDetail
+                  intakeId={intake.id}
+                  onApplied={() => refreshIntake(intake.id)}
+                />
+              </div>
             )}
           </div>
         ))}
@@ -118,16 +179,18 @@ export function IntakePanel({ accountId }: { accountId: string }) {
 }
 
 function StatusPill({ status }: { status: string }) {
-  const tone =
-    status === "applied"
-      ? "bg-emerald-500/15 text-emerald-300"
-      : status === "verified"
-        ? "bg-sky-500/15 text-sky-300"
-        : "bg-muted text-muted-foreground";
   return (
-    <span className={`rounded-full px-2 py-0.5 text-[11px] capitalize ${tone}`}>
+    <Badge
+      variant={
+        status === "applied"
+          ? "default"
+          : status === "verified"
+            ? "secondary"
+            : "outline"
+      }
+    >
       {status}
-    </span>
+    </Badge>
   );
 }
 
@@ -135,10 +198,11 @@ function Signal({ ok, children }: { ok: boolean; children: React.ReactNode }) {
   return (
     <span className="flex items-center gap-1">
       {ok ? (
-        <CheckCircle2 className="size-3 text-emerald-400" />
+        <CheckCircle2 aria-hidden="true" className="size-3 text-primary" />
       ) : (
-        <CircleDashed className="size-3" />
+        <CircleDashed aria-hidden="true" className="size-3" />
       )}
+      <span className="sr-only">{ok ? "Confirmed: " : "Not confirmed: "}</span>
       {children}
     </span>
   );
@@ -201,6 +265,7 @@ function IntakeDetail({
             <Input
               value={budget}
               inputMode="numeric"
+              aria-label="Media budget, whole dollars per month"
               placeholder="Media budget, whole dollars per month"
               onChange={(event) => setBudget(event.target.value)}
               textSize="xs"
@@ -211,7 +276,7 @@ function IntakeDetail({
       )}
 
       {data.blockers.length > 0 && (
-        <ul className="space-y-1 text-xs text-amber-300">
+        <ul className="space-y-1 text-xs text-destructive">
           {data.blockers.map((blocker) => (
             <li key={blocker}>{blocker}</li>
           ))}
@@ -246,7 +311,7 @@ function IntakeDetail({
         </Button>
       )}
       {apply.error && (
-        <p className="text-xs text-red-300">{apply.error.message}</p>
+        <p className="text-xs text-destructive">{apply.error.message}</p>
       )}
     </div>
   );
@@ -300,7 +365,7 @@ function VerifyAccess({
       </div>
 
       {result?.matched && (
-        <p className="text-xs text-emerald-300">
+        <p className="text-xs text-primary">
           Found {result.matched.name ?? result.matched.id}. Their Page is
           reachable from Wander&apos;s Meta connection.
         </p>
@@ -331,12 +396,12 @@ function VerifyAccess({
       )}
 
       {result?.errors.map((message) => (
-        <p key={message} className="text-xs text-amber-300">
+        <p key={message} className="text-xs text-destructive">
           {message}
         </p>
       ))}
       {verify.error && (
-        <p className="text-xs text-red-300">{verify.error.message}</p>
+        <p className="text-xs text-destructive">{verify.error.message}</p>
       )}
     </div>
   );
