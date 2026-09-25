@@ -247,7 +247,7 @@ export const draftBrandStoryAction = growthAction({
 export const setPerformanceSettingsAction = growthAction({
   outputSchema: setPerformanceSettingsActionOutputSchema,
   description:
-    "Set a Performance client's live settings on the brand: report emails, invoice email, UGC permission, the client's creative and guest-list folders, the catalog / carousel / hero creative folders, the ad copies doc, dedicated newsletter, influencer, social posts, and hand-counted bookings. Send only the keys to change; an empty string clears one. This is the only writer besides an applied intake, which fills empty cells and never overwrites, so replacing a value the client gave is your decision to make and to say.",
+    "Set a Performance client's live settings on the brand, which the Performance tracker reads: the contract (monthly fee, effective and end dates as YYYY-MM-DD, terms, WanderOS site live, agreed ad spend a month), report emails, invoice email, UGC permission, the client's creative and guest-list folders, the catalog / carousel / hero creative folders, the ad copies doc, dedicated newsletter, influencer, social posts, and hand-counted bookings. Send only the keys to change; an empty string clears one. This is the only writer besides an applied intake, which fills empty cells and never overwrites, so replacing a value the client gave is your decision to make and to say.",
   inputSchema: z.object({
     brandId: z.string().min(1),
     patch: performanceSettingsPatchSchema,

@@ -5,6 +5,8 @@ import { cn } from "@/components/ui/lib/utils";
 import { trackerDate } from "@/lib/performance-settings";
 import type { TrackerRow } from "@/server/services/performance-tracker.service";
 
+import { TrackerChatButton } from "./TrackerChatButton";
+
 const COLUMNS = [
   "Client",
   "Paid fee per month",
@@ -61,16 +63,23 @@ export function TrackerTable({ rows }: { rows: TrackerRow[] }) {
                 scope="row"
                 className="sticky left-0 z-10 bg-card px-3 py-2 text-left font-medium whitespace-nowrap"
               >
-                {row.slug ? (
-                  <Link
-                    href={`/app/performance/brands/${row.slug}/settings`}
-                    className="hover:underline"
-                  >
-                    {row.name}
-                  </Link>
-                ) : (
-                  row.name
-                )}
+                <span className="flex items-center justify-between gap-3">
+                  {row.slug ? (
+                    <Link
+                      href={`/app/performance/brands/${row.slug}/settings`}
+                      className="hover:underline"
+                    >
+                      {row.name}
+                    </Link>
+                  ) : (
+                    row.name
+                  )}
+                  <TrackerChatButton
+                    brandId={row.brandId}
+                    brandName={row.name}
+                    row={chatSnapshot(row)}
+                  />
+                </span>
               </th>
               <Cell>{row.fee != null ? usd(row.fee) : null}</Cell>
               <Cell>{trackerDate(row.effectiveDate)}</Cell>
@@ -149,4 +158,28 @@ function Out({ href, children }: { href: string; children: ReactNode }) {
       {children}
     </a>
   );
+}
+
+/** What the chat is told the row says: the same cells, as plain values. */
+function chatSnapshot(row: TrackerRow): Record<string, string | number | null> {
+  return {
+    monthlyFee: row.fee,
+    effectiveDate: row.effectiveDate,
+    terms: row.terms,
+    endDate: row.endDate,
+    siteLive: row.siteLive,
+    agreedAdSpend: row.agreedAdSpend,
+    billedAdSpend: row.spent,
+    fbConnection: row.fb,
+    adCreative:
+      row.creative.map((item) => `${item.label}: ${item.url}`).join(", ") ||
+      null,
+    adCopiesUrl: row.adCopiesUrl,
+    adsLive: row.adsLive,
+    cpb: row.cpb,
+    newsletter: row.newsletter,
+    influencer: row.influencer,
+    socialMediaPosts: row.socialMediaPosts,
+    bookings: row.bookings,
+  };
 }

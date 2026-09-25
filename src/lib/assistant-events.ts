@@ -89,6 +89,17 @@ export type ReviewIntakeIntent = {
   visibleText: string;
 };
 
+/** "Work in chat" on a tracker row: a fresh chat edits that client's row. */
+export type WorkTrackerRowIntent = {
+  type: "work_tracker_row";
+  newThread: true;
+  brandId: string;
+  brandName: string;
+  /** The row as the operator sees it, so the chat starts from the same values. */
+  row: Record<string, string | number | null>;
+  visibleText: string;
+};
+
 /** "Suggest featured homes": the chat ranks the brand's homes and proposes a set. */
 export type SuggestFeaturedHomesIntent = {
   type: "suggest_featured_homes";
@@ -150,6 +161,7 @@ export type AssistantIntent =
   | SuggestFeaturedHomesIntent
   | ReviewPortfolioIntent
   | ReviewIntakeIntent
+  | WorkTrackerRowIntent
   | SetUpClientIntent
   | PlanTwoWeeksIntent
   | WorkContentIntent
