@@ -186,6 +186,15 @@ export type PerformanceSettings = {
   socialMediaPosts?: string | null;
   /** Bookings reported by hand, until the platform counts them. */
   bookings?: number | null;
+  /** The contract, as the tracker sheet kept it. Dates are YYYY-MM-DD. */
+  monthlyFee?: number | null;
+  effectiveDate?: string | null;
+  terms?: string | null;
+  endDate?: string | null;
+  /** Whether their WanderOS site is live, in words ("Yes", "Dec 1st"). */
+  siteLive?: string | null;
+  /** Media a month the client agreed to, over the intake's figure. */
+  agreedAdSpend?: number | null;
   updatedAt?: string;
   updatedBy?: string | null;
   /** What last wrote here: the intake being applied, a person, or the agent. */

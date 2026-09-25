@@ -16,6 +16,7 @@ import {
   type DeskBrand,
   type DeskCampaign,
 } from "@/server/services/performance-desk.service";
+import { loadPerformanceTracker } from "@/server/services/performance-tracker.service";
 
 import {
   brandAdsHref,
@@ -26,6 +27,7 @@ import {
   pill,
   SectionLabel,
 } from "./_components";
+import { TrackerTable } from "./TrackerTable";
 
 export const metadata: Metadata = { title: "Wander Performance" };
 export const dynamic = "force-dynamic";
@@ -50,7 +52,10 @@ export default async function PerformanceDashboardPage() {
   if (!org)
     return <div className="text-muted-foreground">No organization found.</div>;
 
-  const desk = narrowDesk(await loadPerformanceDesk(org.id), "client");
+  const [desk, tracker] = await Promise.all([
+    loadPerformanceDesk(org.id).then((all) => narrowDesk(all, "client")),
+    loadPerformanceTracker(org.id),
+  ]);
   const brandById = new Map(desk.brands.map((brand) => [brand.id, brand]));
 
   // What needs a person, each with the one move that clears it.
@@ -152,6 +157,21 @@ export default async function PerformanceDashboardPage() {
           />
         </div>
       </div>
+
+      {tracker.length > 0 && (
+        <section className="space-y-2.5">
+          <div className="flex items-baseline justify-between">
+            <SectionLabel>Tracker</SectionLabel>
+            <Link
+              href="/app/performance/tracker"
+              className="inline-flex items-center gap-1 text-[11.5px] text-sky-300 hover:underline"
+            >
+              Open <ArrowRight className="size-3" />
+            </Link>
+          </div>
+          <TrackerTable rows={tracker} />
+        </section>
+      )}
 
       {desk.brands.length === 0 ? (
         <EmptyState

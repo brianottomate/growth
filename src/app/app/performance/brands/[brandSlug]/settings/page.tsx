@@ -61,7 +61,8 @@ export default async function PerformanceBrandSettingsPage({
     : null;
 
   const derived: SettingsDerived = {
-    paidFee: cycle?.billedAmount ?? null,
+    paidFee:
+      cycle?.billedAmount ?? brand.performanceSettings?.monthlyFee ?? null,
     feePaidAt: cycle?.feePaidAt ?? null,
     mediaPaidAt: cycle?.mediaPaidAt ?? null,
     // The intake's figure stands in until a cycle is opened, as on the checklist.

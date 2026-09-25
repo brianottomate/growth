@@ -31,6 +31,12 @@ export const performanceSettingsPatchSchema = z.object({
   influencer: text.nullish(),
   socialMediaPosts: text.nullish(),
   bookings: z.number().int().min(0).nullish(),
+  monthlyFee: z.number().int().min(0).nullish(),
+  effectiveDate: z.iso.date().or(z.literal("")).nullish(),
+  terms: text.nullish(),
+  endDate: z.iso.date().or(z.literal("")).nullish(),
+  siteLive: text.nullish(),
+  agreedAdSpend: z.number().int().min(0).nullish(),
 });
 
 export type PerformanceSettingsPatch = z.infer<

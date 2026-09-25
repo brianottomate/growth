@@ -23,12 +23,32 @@ export type SettingsField =
       key: SettingsKey;
       label: string;
       source: "setting";
-      kind: "url" | "text" | "number";
+      kind: "url" | "text" | "number" | "money" | "date";
     };
 
 /** The tracker sheet's columns first, in its order, then the intake's settings. */
 export const SETTINGS_FIELDS: SettingsField[] = [
   { key: "paidFee", label: "Paid fee", source: "derived", from: "cycle" },
+  {
+    key: "effectiveDate",
+    label: "Effective date",
+    source: "setting",
+    kind: "date",
+  },
+  { key: "terms", label: "Terms", source: "setting", kind: "text" },
+  { key: "endDate", label: "End date", source: "setting", kind: "date" },
+  {
+    key: "siteLive",
+    label: "WanderOS site live",
+    source: "setting",
+    kind: "text",
+  },
+  {
+    key: "agreedAdSpend",
+    label: "Agreed ad spend",
+    source: "setting",
+    kind: "money",
+  },
   {
     key: "paidAdSpend",
     label: "Paid ad spend",
@@ -114,8 +134,11 @@ export const SETTINGS_FIELDS: SettingsField[] = [
   },
 ];
 
+/** Where the sheet's columns end and the intake's settings begin. */
+export const FIRST_INTAKE_SETTING: SettingsKey = "reportEmails";
+
 export type SettingsDerived = {
-  /** Whole dollars the client pays a month, from the newest cycle. */
+  /** Whole dollars the client pays a month: the newest cycle, else the contract. */
   paidFee: number | null;
   /** When this month's fee and media invoices cleared; null while open. */
   feePaidAt: Date | null;
@@ -144,4 +167,19 @@ export function settingsBookings(
 export function costPerBooking(spend: number, bookings: number | null) {
   if (!bookings || bookings <= 0 || spend <= 0) return null;
   return Math.round(spend / bookings);
+}
+
+/** "2026-09-02" as "Sep 2, 2026"; anything else as written. */
+export function trackerDate(value: string | null | undefined) {
+  if (!value) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return value;
+  return new Date(
+    Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])),
+  ).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
 }

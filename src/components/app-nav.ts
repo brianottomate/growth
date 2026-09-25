@@ -3,6 +3,7 @@ import {
   Building2,
   Calendar,
   CircleDollarSign,
+  Table2,
   ClipboardCheck,
   Database,
   FileText,
@@ -63,9 +64,9 @@ export const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
       },
       { label: "Clients", href: "/app/performance/clients", icon: Building2 },
       {
-        label: "Billing",
-        href: "/app/performance/accounts",
-        icon: CircleDollarSign,
+        label: "Tracker",
+        href: "/app/performance/tracker",
+        icon: Table2,
       },
       {
         label: "Campaigns",

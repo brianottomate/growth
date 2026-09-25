@@ -2,7 +2,9 @@ import { ExternalLink } from "lucide-react";
 
 import { cn } from "@/components/ui/lib/utils";
 import {
+  FIRST_INTAKE_SETTING,
   SETTINGS_FIELDS,
+  trackerDate,
   costPerBooking,
   settingsBookings,
   type SettingsDerived,
@@ -106,7 +108,7 @@ export function SettingsCard({
 
   const settingCell = (
     key: keyof PerformanceSettings,
-    kind: "url" | "text" | "number",
+    kind: "url" | "text" | "number" | "money" | "date",
   ): Cell => {
     if (key === "bookings") {
       if (derived.platformBookings > 0)
@@ -116,6 +118,10 @@ export function SettingsCard({
         : { text: "Not set", tone: "muted" };
     }
     const value = settings?.[key];
+    if (kind === "money" && typeof value === "number")
+      return { text: `${money(value)}/mo`, tone: "ok" };
+    if (kind === "date" && typeof value === "string" && value)
+      return { text: trackerDate(value) ?? value, tone: "ok" };
     if (typeof value !== "string" || !value)
       return { text: "Not set", tone: "muted" };
     if (kind === "url" && /^https?:\/\//.test(value))
@@ -123,8 +129,11 @@ export function SettingsCard({
     return { text: value, tone: "ok" };
   };
 
-  const sheet = SETTINGS_FIELDS.slice(0, 14);
-  const intake = SETTINGS_FIELDS.slice(14);
+  const split = SETTINGS_FIELDS.findIndex(
+    (field) => field.key === FIRST_INTAKE_SETTING,
+  );
+  const sheet = SETTINGS_FIELDS.slice(0, split);
+  const intake = SETTINGS_FIELDS.slice(split);
 
   return (
     <div className="space-y-5">
