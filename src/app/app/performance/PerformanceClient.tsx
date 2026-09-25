@@ -48,6 +48,11 @@ export function PerformanceClient() {
     orpc.performance.list.queryOptions({ input: {} }),
   );
   const accounts = data?.accounts ?? [];
+  // Each client's page is addressed by its brand's slug.
+  const brands = useQuery(orpc.brand.listLite.queryOptions({ input: {} }));
+  const slugOf = new Map(
+    (brands.data?.brands ?? []).map((brand) => [brand.id, brand.slug]),
+  );
 
   return (
     <div className="space-y-6">
@@ -101,12 +106,16 @@ export function PerformanceClient() {
                     className="border-t border-border hover:bg-surface-secondary/30 [&>td]:px-3 [&>td]:py-2.5"
                   >
                     <td>
-                      <Link
-                        href={`/app/performance/${account.id}`}
-                        className="font-medium hover:underline"
-                      >
-                        {account.name}
-                      </Link>
+                      {account.brandId && slugOf.get(account.brandId) ? (
+                        <Link
+                          href={`/app/performance/brands/${slugOf.get(account.brandId)}/settings`}
+                          className="font-medium hover:underline"
+                        >
+                          {account.name}
+                        </Link>
+                      ) : (
+                        <span className="font-medium">{account.name}</span>
+                      )}
                       {account.contactName && (
                         <div className="text-xs text-muted-foreground">
                           {account.contactName}

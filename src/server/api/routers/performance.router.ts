@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { setIntakeVerifiedPage } from "@/server/services/performance-intake.service";
 import { setBrandStages } from "@/server/services/brand-relationship.service";
 import { BUSINESS_STAGES, DELIVERY_STAGES } from "@/lib/performance-stage";
 import { markCycleLinePaid } from "@/server/services/performance-billing.service";
@@ -18,11 +17,7 @@ import {
   attachToPerformanceCycleAction,
   listSponsoredAbandonmentAction,
   refreshPerformanceCycleSpendAction,
-  listIntakesAction,
-  applyIntakeAction,
-  verifyIntakeAccessAction,
   promoteToClientAction,
-  previewIntakeApplyAction,
   clientCampaignContextAction,
 } from "@/server/ai/capabilities/performance";
 
@@ -55,24 +50,6 @@ export const performanceRouter = {
   sponsoredAbandonment: actionProcedure(listSponsoredAbandonmentAction),
 
   refreshSpend: actionProcedure(refreshPerformanceCycleSpendAction),
-
-  // ---- intake -------------------------------------------------------------
-
-  intakes: actionProcedure(listIntakesAction),
-
-  previewIntake: actionProcedure(previewIntakeApplyAction),
-
-  applyIntake: actionProcedure(applyIntakeAction),
-
-  // Read-only against Zernio: asks whether the Leadsie grant landed and
-  // records the Page when exactly one name matches.
-  verifyIntakeAccess: actionProcedure(verifyIntakeAccessAction),
-
-  setIntakeVerifiedPage: workspaceProcedure
-    .input(z.object({ intakeId: z.string().min(1), pageId: z.string().min(1) }))
-    .handler(async ({ context: ctx, input }) =>
-      setIntakeVerifiedPage({ orgId: ctx.workspace.orgId }, input),
-    ),
 
   // ---- relationship -------------------------------------------------------
 

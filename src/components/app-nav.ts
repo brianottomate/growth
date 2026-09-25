@@ -63,11 +63,6 @@ export const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
       },
       { label: "Clients", href: "/app/performance/clients", icon: Building2 },
       {
-        label: "Submissions",
-        href: "/app/performance/submissions",
-        icon: FileText,
-      },
-      {
         label: "Billing",
         href: "/app/performance/accounts",
         icon: CircleDollarSign,

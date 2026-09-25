@@ -46,7 +46,10 @@ export function NewAccountDialog() {
       onSuccess: async (result) => {
         await queryClient.invalidateQueries({ queryKey: [["performance"]] });
         setOpen(false);
-        router.push(`/app/performance/${result.account.id}`);
+        const slug = brands.data?.brands.find(
+          (row) => row.id === result.account.brandId,
+        )?.slug;
+        if (slug) router.push(`/app/performance/brands/${slug}`);
       },
     }),
   );

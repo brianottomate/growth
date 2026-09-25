@@ -71,6 +71,7 @@ import {
 } from "@/lib/growth-capabilities";
 import {
   ASSISTANT_INTENT_EVENT,
+  wantsNewThread,
   type AssistantIntent,
   type AdCampaignWorkContext,
   type ContentWorkContext,
@@ -420,7 +421,7 @@ export function OverviewChat({
     const receiveIntent = (event: Event) => {
       const incoming = (event as CustomEvent<AssistantIntent>).detail;
       // The dock creates and mounts the new session before delivering this intent.
-      if (incoming.type === "work_ad_campaign" && incoming.newThread) return;
+      if (wantsNewThread(incoming)) return;
       submitAssistantIntent(incoming);
     };
     window.addEventListener(ASSISTANT_INTENT_EVENT, receiveIntent);

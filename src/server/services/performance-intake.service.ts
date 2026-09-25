@@ -823,24 +823,6 @@ export async function verifyIntakeAccess(
   };
 }
 
-/** Bind a Page an operator picked when the name did not match automatically. */
-export async function setIntakeVerifiedPage(
-  actor: PerformanceActor,
-  input: { intakeId: string; pageId: string },
-) {
-  const intake = await requireIntake(actor, input.intakeId);
-  await db
-    .update(performanceIntakeTable)
-    .set({
-      status: intake.status === "applied" ? "applied" : "verified",
-      zernioVerifiedAt: new Date(),
-      verifiedPageId: input.pageId,
-    })
-    .where(eq(performanceIntakeTable.id, intake.id));
-  if (intake.brandId) await bindBrandPage(intake.brandId, input.pageId);
-  return { intakeId: intake.id, pageId: input.pageId };
-}
-
 /**
  * The verified Page becomes the brand's delivery identity. The intake keeps
  * its own copy as the record of the check; the brand column is what the push

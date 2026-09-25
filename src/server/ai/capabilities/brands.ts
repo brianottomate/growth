@@ -54,7 +54,7 @@ export async function orgBrandIds(orgId: string): Promise<string[]> {
 export const listBrands = growthAction({
   outputSchema: listBrandsOutputSchema,
   description:
-    "List the brands in the current organization (id, name, tagline, and Wander's relationship to each: internal, client, prospect or reference). Use when the operator asks about brands or you need a brand's name/id.",
+    "List the brands in the current organization (id, name, slug, tagline, and Wander's relationship to each: internal, client, prospect or reference). Use when the operator asks about brands or you need a brand's name/id.",
   inputSchema: z.object({}),
   execute: async (_input, ctx) => {
     const brands = await db.query.brandTable.findMany({
@@ -62,7 +62,13 @@ export const listBrands = growthAction({
         eq(brandTable.organizationId, ctx.orgId),
         isNull(brandTable.deletedAt),
       ),
-      columns: { id: true, name: true, tagline: true, relationship: true },
+      columns: {
+        id: true,
+        name: true,
+        slug: true,
+        tagline: true,
+        relationship: true,
+      },
       orderBy: (t, { asc }) => asc(t.name),
     });
     return { brands };

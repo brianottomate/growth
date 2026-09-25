@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { orpc } from "@/orpc/client";
 import {
   ASSISTANT_INTENT_EVENT,
+  wantsNewThread,
   type AssistantIntent,
   type AdCampaignWorkContext,
   type ContentWorkContext,
@@ -212,7 +213,7 @@ export function OverviewAssistantPopup({
         setFocusByThread((previous) => ({ ...previous, [threadId]: focus }));
         setScopeByThread((previous) => ({ ...previous, [threadId]: "pinned" }));
       };
-      if (intent.type === "work_ad_campaign" && intent.newThread) {
+      if (wantsNewThread(intent)) {
         if (creatingCampaignThread.current) return;
         creatingCampaignThread.current = true;
         createThread.mutate(
@@ -223,9 +224,7 @@ export function OverviewAssistantPopup({
               pin(thread.id);
             },
             onError: () =>
-              toast.error(
-                "Could not start a new campaign chat. Please try again.",
-              ),
+              toast.error("Could not start a new chat. Please try again."),
             onSettled: () => {
               creatingCampaignThread.current = false;
             },

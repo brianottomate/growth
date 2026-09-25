@@ -167,12 +167,12 @@ export function BrandCard({
               </Link>
             </>
           )}
-          {readiness && (
+          {readiness && brand.slug && (
             <Link
-              href={`/app/performance/${readiness.accountId}`}
+              href={`/app/performance/brands/${brand.slug}`}
               className={TAB}
             >
-              Account
+              Performance
             </Link>
           )}
         </nav>
@@ -327,7 +327,11 @@ export function BrandCard({
 
       {/* readiness + tracking */}
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t px-5 py-3">
-        {readiness ? <ReadinessChecklist readiness={readiness} /> : <span />}
+        {readiness ? (
+          <ReadinessChecklist readiness={readiness} slug={brand.slug} />
+        ) : (
+          <span />
+        )}
         <TrackedBrands ownerBrandId={brand.id} tracked={tracked} />
       </div>
     </div>
@@ -336,9 +340,15 @@ export function BrandCard({
 
 /**
  * The commercial to-do list as a checklist: done items read as facts, missing
- * items are links to the account page where they get fixed.
+ * items link to the client's Performance workspace, where they get fixed.
  */
-function ReadinessChecklist({ readiness }: { readiness: BrandReadiness }) {
+function ReadinessChecklist({
+  readiness,
+  slug,
+}: {
+  readiness: BrandReadiness;
+  slug: string | null;
+}) {
   const items: { label: string; done: boolean }[] = [
     { label: "Intake", done: readiness.intake },
     {
@@ -359,7 +369,9 @@ function ReadinessChecklist({ readiness }: { readiness: BrandReadiness }) {
   ];
   const done = items.filter((i) => i.done);
   const missing = items.filter((i) => !i.done);
-  const fixHref = `/app/performance/${readiness.accountId}`;
+  const fixHref = slug
+    ? `/app/performance/brands/${slug}`
+    : "/app/performance/clients";
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
       {done.length > 0 && (

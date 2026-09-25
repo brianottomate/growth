@@ -79,6 +79,16 @@ export type ReviewPortfolioIntent = {
   visibleText: string;
 };
 
+/** "Review and apply": a fresh chat walks one intake submission to applied. */
+export type ReviewIntakeIntent = {
+  type: "review_intake";
+  newThread: true;
+  brandId: string;
+  brandName: string;
+  intakeId: string;
+  visibleText: string;
+};
+
 /** "Suggest featured homes": the chat ranks the brand's homes and proposes a set. */
 export type SuggestFeaturedHomesIntent = {
   type: "suggest_featured_homes";
@@ -139,6 +149,7 @@ export type AssistantIntent =
   | DefinePersonasIntent
   | SuggestFeaturedHomesIntent
   | ReviewPortfolioIntent
+  | ReviewIntakeIntent
   | SetUpClientIntent
   | PlanTwoWeeksIntent
   | WorkContentIntent
@@ -178,6 +189,16 @@ export type WorkAdCampaignIntent = {
 
 export type ContentWorkContext = Omit<WorkContentIntent, "visibleText">;
 export type AdCampaignWorkContext = Omit<WorkAdCampaignIntent, "visibleText">;
+
+/** Intents that open their own chat session instead of joining the current one. */
+export function wantsNewThread(intent: AssistantIntent): intent is Extract<
+  AssistantIntent,
+  { newThread?: boolean }
+> & {
+  brandId: string;
+} {
+  return "newThread" in intent && intent.newThread === true;
+}
 
 export function sendAssistantIntent(intent: AssistantIntent) {
   window.dispatchEvent(
