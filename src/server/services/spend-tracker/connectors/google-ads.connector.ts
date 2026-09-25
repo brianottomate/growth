@@ -1,6 +1,7 @@
 import "server-only";
 
 import { env } from "@/env";
+import { googleAdsClient } from "@/server/clients/google-ads.client";
 import { isMarketplaceCampaign } from "../spend-tracker.config";
 import type { SpendConnector, ZernioShapedDailyRow } from "./types";
 
@@ -8,7 +9,7 @@ import type { SpendConnector, ZernioShapedDailyRow } from "./types";
  * INTERIM Google Ads connector — delete when Zernio has Google connected
  * (see README.md). GAQL + methodology ported verbatim from Brian's tracker
  * `src/lib/google-ads/queries.ts`; transport reimplemented on the Google Ads
- * REST API (OAuth refresh + `googleAds:searchStream`) to avoid pulling in the
+ * shared Google Ads client (`googleAds:searchStream`) to avoid pulling in the
  * `google-ads-api` package for a temporary integration.
  *
  * Methodology (locked):
@@ -19,8 +20,6 @@ import type { SpendConnector, ZernioShapedDailyRow } from "./types";
  *     actions (`metrics.conversions` would return 0 — Purchase is a secondary
  *     goal). Data-driven attribution (Google's default).
  */
-
-const GOOGLE_ADS_API_VERSION = "v20";
 
 // Purchase conversion actions — BOTH must be included to match the Google Ads
 // UI totals (GTM client-side web + ECL-from-BigQuery for the Demand account).
@@ -42,92 +41,24 @@ interface GoogleAdsSearchRow {
 }
 
 function isConfigured(): boolean {
-  return Boolean(
-    env.GOOGLE_ADS_CLIENT_ID &&
-    env.GOOGLE_ADS_CLIENT_SECRET &&
-    env.GOOGLE_ADS_DEVELOPER_TOKEN &&
-    env.GOOGLE_ADS_REFRESH_TOKEN &&
-    env.GOOGLE_ADS_CUSTOMER_ID,
-  );
-}
-
-async function getAccessToken(): Promise<string> {
-  const res = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: env.GOOGLE_ADS_CLIENT_ID!,
-      client_secret: env.GOOGLE_ADS_CLIENT_SECRET!,
-      refresh_token: env.GOOGLE_ADS_REFRESH_TOKEN!,
-      grant_type: "refresh_token",
-    }),
-    cache: "no-store",
-  });
-  if (!res.ok) {
-    throw new Error(
-      `Google OAuth token refresh failed: ${res.status} ${await res.text()}`,
-    );
-  }
-  const json = (await res.json()) as { access_token?: string };
-  if (!json.access_token)
-    throw new Error("Google OAuth: no access_token in response");
-  return json.access_token;
-}
-
-/** Run a GAQL query via searchStream and flatten the result batches. */
-async function gaqlSearch(
-  accessToken: string,
-  query: string,
-): Promise<GoogleAdsSearchRow[]> {
-  const customerId = env.GOOGLE_ADS_CUSTOMER_ID!.replace(/-/g, "");
-  const url = `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers/${customerId}/googleAds:searchStream`;
-
-  const headers: Record<string, string> = {
-    Authorization: `Bearer ${accessToken}`,
-    "developer-token": env.GOOGLE_ADS_DEVELOPER_TOKEN!,
-    "Content-Type": "application/json",
-  };
-  if (env.GOOGLE_ADS_LOGIN_CUSTOMER_ID) {
-    headers["login-customer-id"] = env.GOOGLE_ADS_LOGIN_CUSTOMER_ID.replace(
-      /-/g,
-      "",
-    );
-  }
-
-  const res = await fetch(url, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ query }),
-    cache: "no-store",
-  });
-  if (!res.ok) {
-    throw new Error(`Google Ads API ${res.status}: ${await res.text()}`);
-  }
-
-  // searchStream returns an ARRAY of batches: [{ results: [...] }, ...]
-  const batches = (await res.json()) as Array<{
-    results?: GoogleAdsSearchRow[];
-  }>;
-  return batches.flatMap((b) => b.results ?? []);
+  return Boolean(googleAdsClient.authMode && env.GOOGLE_ADS_CUSTOMER_ID);
 }
 
 async function fetchTimeline(
   fromDate: string,
   toDate: string,
 ): Promise<ZernioShapedDailyRow[]> {
-  const accessToken = await getAccessToken();
-
   // Query 1: spend/clicks/impressions — campaign-level for the denylist.
-  const spendRows = await gaqlSearch(
-    accessToken,
+  const spendRows = await googleAdsClient.search<GoogleAdsSearchRow>(
+    env.GOOGLE_ADS_CUSTOMER_ID!,
     `SELECT segments.date, campaign.name, metrics.cost_micros, metrics.clicks, metrics.impressions
      FROM campaign
      WHERE segments.date BETWEEN '${fromDate}' AND '${toDate}'`,
   );
 
   // Query 2: purchase conversions (both actions, all_conversions).
-  const purchaseRows = await gaqlSearch(
-    accessToken,
+  const purchaseRows = await googleAdsClient.search<GoogleAdsSearchRow>(
+    env.GOOGLE_ADS_CUSTOMER_ID!,
     `SELECT segments.date, segments.conversion_action_name, metrics.all_conversions, metrics.all_conversions_value
      FROM customer
      WHERE segments.date BETWEEN '${fromDate}' AND '${toDate}'

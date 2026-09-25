@@ -77,8 +77,8 @@ export const env = createEnv({
     META_LEADS_APP_SECRET: z.string().optional(), // verifies X-Hub-Signature-256 on the leadgen webhook
     META_LEADGEN_VERIFY_TOKEN: z.string().optional(), // hub.verify_token for the webhook subscription handshake
     META_LEADGEN_ROUTE_FROM: z.iso.datetime({ offset: true }).optional(), // hand leads created at/after this instant to the inbound router; unset while Make still does it
-    // Google Ads — interim spend-tracker connector until Zernio adds Google
-    // (creds to be handed off from Brian's Railway env; connector is a no-op until set)
+    // Google Ads direct API. Service account takes precedence over user OAuth.
+    GOOGLE_ADS_SERVICE_ACCOUNT_JSON: z.string().optional(),
     GOOGLE_ADS_CLIENT_ID: z.string().optional(),
     GOOGLE_ADS_CLIENT_SECRET: z.string().optional(),
     GOOGLE_ADS_DEVELOPER_TOKEN: z.string().optional(),
@@ -227,6 +227,8 @@ export const env = createEnv({
     META_LEADGEN_VERIFY_TOKEN: process.env.META_LEADGEN_VERIFY_TOKEN,
     META_LEADGEN_ROUTE_FROM: process.env.META_LEADGEN_ROUTE_FROM,
     // Google Ads (spend-tracker connector)
+    GOOGLE_ADS_SERVICE_ACCOUNT_JSON:
+      process.env.GOOGLE_ADS_SERVICE_ACCOUNT_JSON,
     GOOGLE_ADS_CLIENT_ID: process.env.GOOGLE_ADS_CLIENT_ID,
     GOOGLE_ADS_CLIENT_SECRET: process.env.GOOGLE_ADS_CLIENT_SECRET,
     GOOGLE_ADS_DEVELOPER_TOKEN: process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
