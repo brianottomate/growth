@@ -472,6 +472,7 @@ export async function POST(req: Request): Promise<Response> {
                 facts: catalogHome.card.subtitle,
                 templateId: catalogHome.card.templateId,
                 included: catalogHome.card.included,
+                mode: catalogHome.card.mode ?? "compose",
               }
             : null,
           place: place(catalogHome.home),
@@ -484,6 +485,8 @@ export async function POST(req: Request): Promise<Response> {
             locationDescription: catalogHome.locationDescription,
             petsAllowed: catalogHome.petsAllowed,
           },
+          siblings: catalogHome.siblings,
+          brandWide: catalogHome.brandWide,
           focus:
             assistantIntent?.type === "work_catalog_home"
               ? assistantIntent.focus

@@ -57,6 +57,7 @@ import {
 } from "@/server/services/meta-campaign-import.service";
 import { metaPlacementPlanSchema } from "@/lib/meta-placement-plan";
 import { compositionTemplateIdSchema } from "@/lib/compositions";
+import { EM_DASH_MESSAGE, hasEmDash } from "@/lib/catalog-copy";
 import "server-only";
 import { ideaSaveSchema, ideaExportShapesSchema } from "@/lib/ad-idea-studio";
 import { saveAdIdea } from "@/server/services/ad-idea-studio.service";
@@ -1492,8 +1493,18 @@ export const editCatalogCardAction = growthAction({
   inputSchema: z.object({
     brandId: z.string().min(1),
     homeId: z.string().min(1).describe("The WanderOS listing id."),
-    title: z.string().trim().min(1).max(120).optional(),
-    subtitle: z.string().max(220).optional(),
+    title: z
+      .string()
+      .trim()
+      .min(1)
+      .max(120)
+      .refine((text) => !hasEmDash(text), EM_DASH_MESSAGE)
+      .optional(),
+    subtitle: z
+      .string()
+      .max(220)
+      .refine((text) => !hasEmDash(text), EM_DASH_MESSAGE)
+      .optional(),
     templateId: compositionTemplateIdSchema.optional(),
     imagePosition: z.enum(["top", "center", "bottom"]).optional(),
     showLogo: z.boolean().optional(),

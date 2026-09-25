@@ -183,7 +183,7 @@ export const suggestFeaturedHomesAction = growthAction({
 
 export const reviewPortfolioAction = growthAction({
   description:
-    "Review a brand's creative as a set: every included catalog card (surface catalog), or every ad of a campaign or of the brand's draft set with no campaign (surface ads). Renders the cards onto numbered sheets and returns an overall read plus up to twelve surgical notes, each naming one card by homeId or adId. Changes nothing itself. Present the overall read, then apply the notes you agree with directly, one card at a time, with the per-card tools (adsWrite.editCatalogCard and adsWrite.setHomeHero for catalog cards; adsWrite.setAdCopy, adsWrite.replaceAdCard or adsWrite.editAdCards for ads), and report what changed in a short list. If a note reveals something about the brand as a whole, add it to the brand story with brandWrite.update.",
+    "Review a brand's creative as a set: every included catalog card (surface catalog), or every ad of a campaign or of the brand's draft set with no campaign (surface ads). Renders the cards onto numbered sheets and returns an overall read plus up to twelve surgical notes, each naming one card by homeId or adId. Changes nothing itself. Present the overall read, then apply the notes you agree with directly, one card at a time (a catalog note's headline is the exact replacement title; on a finished card the text is part of the supplied artwork, so list those headlines for whoever remakes it instead of saving them), with the per-card tools (adsWrite.editCatalogCard and adsWrite.setHomeHero for catalog cards; adsWrite.setAdCopy, adsWrite.replaceAdCard or adsWrite.editAdCards for ads), and report what changed in a short list. If a note reveals something about the brand as a whole, add it to the brand story with brandWrite.update.",
   inputSchema: z.object({
     brandId: brandIdInput,
     surface: z.enum(["catalog", "ads"]),
@@ -206,6 +206,8 @@ export const reviewPortfolioAction = growthAction({
         homeId: z.string().optional(),
         adId: z.string().optional(),
         note: z.string(),
+        /** Catalog: the exact replacement headline, when the headline is the fix. */
+        headline: z.string().optional(),
       }),
     ),
   }),

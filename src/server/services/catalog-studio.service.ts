@@ -20,6 +20,7 @@ import {
   type CatalogHome,
   type CatalogOverrides,
 } from "@/lib/catalog-studio";
+import { brandWideAmenities } from "@/lib/catalog-copy";
 import { compositionTemplateIdSchema } from "@/lib/compositions";
 import { brandHomeInventory } from "./home-inventory.service";
 import { ingestBrandHomes } from "./homes.service";
@@ -156,6 +157,17 @@ async function catalogHomes(brand: CatalogBrand, refresh = false) {
   return { inventory, homes, rows, draft: catalogDraft(homes, overrides) };
 }
 
+/** The homes whose cards go out: brand-wide reads count only these. */
+export function includedHomes(
+  homes: readonly CatalogHome[],
+  draft: { cards: readonly CatalogCard[] },
+) {
+  const ids = new Set(
+    draft.cards.filter((card) => card.included).map((card) => card.homeId),
+  );
+  return homes.filter((home) => ids.has(home.id));
+}
+
 export async function catalogState(
   userId: string,
   brandId: string,
@@ -223,6 +235,17 @@ export async function catalogHomeContext(
     amenities: row.amenities ?? detail?.amenities ?? home.amenities ?? [],
     locationDescription: detail?.locationDescription ?? null,
     petsAllowed: detail?.petsAllowed ?? null,
+    siblings: draft.cards.flatMap((card) =>
+      card.included && card.homeId !== home.id
+        ? [
+            {
+              name: homes.find((h) => h.id === card.homeId)?.name ?? "",
+              headline: card.title,
+            },
+          ]
+        : [],
+    ),
+    brandWide: brandWideAmenities(includedHomes(homes, draft)),
   };
 }
 
