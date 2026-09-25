@@ -163,7 +163,16 @@ function ClientRow({
             <SendLink label="Pitch page" url={brand.pitchUrl} />
           ) : null}
           {brand.intakeUrl ? (
-            <SendLink label="Intake form" url={brand.intakeUrl} />
+            <SendLink
+              label="Intake form"
+              url={brand.intakeUrl}
+              viewHref={
+                intake
+                  ? `/app/performance/brands/${brand.slug ?? brand.id}/submission`
+                  : undefined
+              }
+              viewLabel="View submission"
+            />
           ) : null}
           <BrandRowMenu
             brandId={brand.id}

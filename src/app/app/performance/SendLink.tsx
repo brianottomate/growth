@@ -1,21 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy } from "lucide-react";
+import Link from "next/link";
+import { Check, Copy, FileText } from "lucide-react";
 
 import { cn } from "@/components/ui/lib/utils";
 
 /**
  * One quiet chip for a link a rep sends: the name opens it, the icon on the
  * end copies it. Two links a row used to take four controls; this is two.
+ * `viewHref` adds a third segment that opens what came back, inside the app.
  */
 export function SendLink({
   label,
   url,
+  viewHref,
+  viewLabel,
   className,
 }: {
   label: string;
   url: string;
+  viewHref?: string;
+  viewLabel?: string;
   className?: string;
 }) {
   const [copied, setCopied] = useState(false);
@@ -51,6 +57,16 @@ export function SendLink({
       >
         {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
       </button>
+      {viewHref ? (
+        <Link
+          href={viewHref}
+          aria-label={viewLabel}
+          title={viewLabel}
+          className="flex items-center border-l px-2 hover:bg-muted/60 hover:text-foreground"
+        >
+          <FileText className="size-3" />
+        </Link>
+      ) : null}
     </span>
   );
 }
