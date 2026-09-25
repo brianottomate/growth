@@ -268,7 +268,7 @@ export const GROWTH_CAPABILITY_LABELS = {
   contentStrategyRead: "Reading content strategy",
   contentStrategyWrite: "Updating content strategy",
   adsRead: "Reading ads",
-  adsWrite: "Creating ads",
+  adsWrite: "Updating ads",
   publishingRead: "Reading publishing state",
   publishingWrite: "Publishing social content",
   sourceSyncWrite: "Synchronizing sources",

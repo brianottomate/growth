@@ -245,13 +245,7 @@ export function CatalogCards({
                   busy ||
                   activeExport ||
                   !draft.cards.some((c) => c.included) ||
-                  catalogArtworkIssues(draft).length > 0 ||
-                  unapproved.length > 0
-                }
-                title={
-                  unapproved.length
-                    ? `${unapproved.length} included cards need approval`
-                    : undefined
+                  catalogArtworkIssues(draft).length > 0
                 }
                 onClick={() => void run("export")}
               >
@@ -314,7 +308,7 @@ export function CatalogCards({
             </p>
           )}
           {layout === "grid" ? (
-            <div className="grid grid-cols-2 gap-3 @xl:grid-cols-3 @2xl:gap-4 @4xl:grid-cols-4 @6xl:grid-cols-5">
+            <div className="grid grid-cols-1 gap-3 @xl:grid-cols-2 @2xl:gap-4 @4xl:grid-cols-3 @6xl:grid-cols-4">
               {draft.cards.slice(0, limit).map((card) => (
                 <div
                   key={card.homeId}
@@ -333,15 +327,7 @@ export function CatalogCards({
                       {card.finishedArtwork ? "" : " · Choose image"}
                     </p>
                   )}
-                  <div className="flex items-start gap-2 p-3">
-                    <input
-                      type="checkbox"
-                      aria-label={`Include ${homeOf(card)?.name}`}
-                      checked={card.included}
-                      onChange={(e) =>
-                        update({ ...card, included: e.target.checked })
-                      }
-                    />
+                  <div className="flex items-end justify-between gap-2 p-3">
                     <button
                       className="line-clamp-2 text-left text-sm"
                       title={homeOf(card)?.name}
@@ -349,11 +335,9 @@ export function CatalogCards({
                     >
                       {homeOf(card)?.name}
                     </button>
-                  </div>
-                  <div className="px-3 pb-3">
-                    <ApproveButton
+                    <IncludeButton
                       card={card}
-                      onApprove={(approved) => approve([card], approved)}
+                      onInclude={(included) => update({ ...card, included })}
                     />
                   </div>
                 </div>
@@ -378,24 +362,11 @@ export function CatalogCards({
                       </div>
                       <div className="min-w-0 space-y-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <label className="flex items-center gap-2 text-sm font-medium">
-                            <input
-                              type="checkbox"
-                              checked={card.included}
-                              onChange={(e) =>
-                                update({ ...card, included: e.target.checked })
-                              }
-                            />
+                          <p className="text-sm font-medium">
                             {homeOf(card)?.name}
-                          </label>
+                          </p>
                           {!editing && (
                             <div className="flex flex-wrap gap-2">
-                              <ApproveButton
-                                card={card}
-                                onApprove={(approved) =>
-                                  approve([card], approved)
-                                }
-                              />
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -477,6 +448,20 @@ export function CatalogCards({
                                 {label}
                               </Button>
                             ))}
+                            <div className="ml-auto flex gap-2">
+                              <IncludeButton
+                                card={card}
+                                onInclude={(included) =>
+                                  update({ ...card, included })
+                                }
+                              />
+                              <ApproveButton
+                                card={card}
+                                onApprove={(approved) =>
+                                  approve([card], approved)
+                                }
+                              />
+                            </div>
                           </div>
                         )}
                       </div>
@@ -704,6 +689,21 @@ export function CatalogCards({
   );
 }
 
+/** Put a home in the export or take it out. */
+function IncludeButton({
+  card,
+  onInclude,
+}: {
+  card: CatalogCard;
+  onInclude: (included: boolean) => void;
+}) {
+  return (
+    <Button size="sm" variant="ghost" onClick={() => onInclude(!card.included)}>
+      {card.included ? "Exclude" : "Include"}
+    </Button>
+  );
+}
+
 /** Sign one card off as it stands, or take the sign-off back. */
 function ApproveButton({
   card,
@@ -903,7 +903,7 @@ function CardEditor({
           </Button>
           <div>
             <p className="mb-2 text-sm">Hero photo for this home</p>
-            <div className="grid max-h-56 grid-cols-3 gap-2 overflow-y-auto">
+            <div className="grid max-h-96 grid-cols-3 gap-2 overflow-y-auto">
               {home?.gallery?.map((photo) => (
                 <button
                   key={photo.url}

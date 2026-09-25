@@ -1489,7 +1489,7 @@ export const catalogHomeFactsAction = growthAction({
 export const editCatalogCardAction = growthAction({
   outputSchema: editCatalogCardActionOutputSchema,
   description:
-    "Change one home's card in a Performance client's catalog draft: the headline printed on the image (title, e.g. 'Exposed-brick loft in Louisville, KY'), the facts line (subtitle), the composition template, the crop focus, the logo, or whether the home is in the export. Send only the fields to change. Saves the draft; nothing is exported or pushed. A change to what the card shows sends an approved card back for the operator's review.",
+    "Change one home's card in a Performance client's catalog draft: the headline printed on the image (title, e.g. 'Exposed-brick loft in Louisville, KY'), the facts line (subtitle), the composition template, the crop focus, the logo, or whether the home is in the export, and mark it approved. Send only the fields to change. Saves the draft; nothing is exported or pushed. Approval is a review bookmark, not an export gate; a later change to what the card shows clears it.",
   inputSchema: z.object({
     brandId: z.string().min(1),
     homeId: z.string().min(1).describe("The WanderOS listing id."),
@@ -1509,6 +1509,12 @@ export const editCatalogCardAction = growthAction({
     imagePosition: z.enum(["top", "center", "bottom"]).optional(),
     showLogo: z.boolean().optional(),
     included: z.boolean().optional(),
+    approved: z
+      .boolean()
+      .optional()
+      .describe(
+        "Mark the card reviewed (true) or unreviewed (false) as it stands after this edit. Set it when the operator asks to approve.",
+      ),
   }),
   examples: [
     {
@@ -1517,8 +1523,8 @@ export const editCatalogCardAction = growthAction({
       title: "Exposed-brick loft in Louisville, KY",
     },
   ],
-  execute: ({ brandId, homeId, ...patch }, ctx) =>
-    editCatalogCard({ userId: ctx.userId, brandId, homeId, patch }),
+  execute: ({ brandId, homeId, approved, ...patch }, ctx) =>
+    editCatalogCard({ userId: ctx.userId, brandId, homeId, patch, approved }),
 });
 
 export const setAdHomeAction = growthAction({

@@ -1143,6 +1143,7 @@ export const catalogHomeFactsActionOutputSchema = z.strictObject({
 });
 
 export const editCatalogCardActionOutputSchema = z.strictObject({
+  approved: z.boolean(),
   homeId: z.string(),
   title: z.string(),
   subtitle: z.string(),

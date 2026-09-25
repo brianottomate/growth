@@ -15,7 +15,6 @@ import {
   catalogCardCopy,
   catalogCardFingerprint,
   catalogDraft,
-  catalogUnapproved,
   catalogExportRows,
   type CatalogCard,
   type CatalogExport,
@@ -380,6 +379,8 @@ export async function editCatalogCard(input: {
   brandId: string;
   homeId: string;
   patch: CatalogCardPatch;
+  /** Mark the card as reviewed in the state this edit leaves it in. */
+  approved?: boolean;
 }) {
   const brand = await catalogBrand(input.userId, input.brandId);
   const { patch } = input;
@@ -432,7 +433,27 @@ export async function editCatalogCard(input: {
   const { draft } = await catalogHomes(brand);
   const card = draft.cards.find((c) => c.homeId === input.homeId);
   if (!card) throw new Error("That home has no catalog card");
+  if (input.approved !== undefined)
+    await db
+      .update(homeTable)
+      .set({
+        catalogApproval: input.approved
+          ? {
+              approvedAt: new Date().toISOString(),
+              approvedBy: input.userId,
+              fingerprint: catalogCardFingerprint(card),
+            }
+          : null,
+      })
+      .where(
+        and(
+          eq(homeTable.brandId, brand.id),
+          eq(homeTable.externalId, input.homeId),
+          isNull(homeTable.deletedAt),
+        ),
+      );
   return {
+    approved: input.approved ?? card.approved,
     homeId: card.homeId,
     title: card.title,
     subtitle: card.subtitle,
@@ -510,11 +531,6 @@ export async function startCatalogExport(userId: string, brandId: string) {
   if (!included.length) throw new Error("Include at least one home");
   const artworkIssues = catalogArtworkIssues(draft);
   if (artworkIssues.length) throw new Error(artworkIssues.join(" · "));
-  const unapproved = catalogUnapproved(draft);
-  if (unapproved.length)
-    throw new Error(
-      `Approve every included card before exporting: ${unapproved.length} still need review`,
-    );
   for (const card of included.filter((c) => c.mode === "finished")) {
     await finishedCatalogAsset(brandId, card.finishedArtwork!.assetId);
   }

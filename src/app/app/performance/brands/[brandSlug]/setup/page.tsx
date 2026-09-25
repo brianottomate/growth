@@ -185,6 +185,15 @@ export default async function PerformanceBrandHomesPage({
         identity={brand.brandIdentity ?? null}
         website={brand.website}
       />
+      <BrandMarkCard
+        brandId={brand.id}
+        brandName={brand.name}
+        logo={brand.logo}
+        identity={brand.brandIdentity ?? null}
+        mark={brand.brandMark ?? null}
+        variants={markVariants}
+        photo={previewHome?.imageUrl ?? null}
+      />
       <BrandStoryCard brandId={brand.id} story={brand.story} />
       <HeroCard
         brandId={brand.id}
@@ -199,15 +208,6 @@ export default async function PerformanceBrandHomesPage({
         }
         options={heroOptions}
         heroUrl={brand.featuredListingUrl}
-      />
-      <BrandMarkCard
-        brandId={brand.id}
-        brandName={brand.name}
-        logo={brand.logo}
-        identity={brand.brandIdentity ?? null}
-        mark={brand.brandMark ?? null}
-        variants={markVariants}
-        photo={previewHome?.imageUrl ?? null}
       />
       <BrandPreviewCard
         brandId={brand.id}
