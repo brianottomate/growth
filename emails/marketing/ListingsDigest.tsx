@@ -104,6 +104,27 @@ const kickerStyle: React.CSSProperties = {
   margin: "0 0 4px",
 };
 
+/**
+ * The phone layout. Most of this list is read on a phone, so the narrow
+ * screen is the one the layout is tuned for: the card loses most of its
+ * padding and every listed home stacks, photo over text, instead of
+ * squeezing its text into a 200px column beside a 180px photo.
+ *
+ * It is a max-width query over the side-by-side base, the email convention,
+ * because clients that ignore embedded styles (desktop Outlook, mostly) are
+ * the wide ones: they keep the row, and the phone apps that read the query
+ * (iOS Mail, Gmail) stack.
+ */
+const PHONE_CSS = `
+@media only screen and (max-width: 520px) {
+  .wd-body { padding: 12px 8px !important; }
+  .wd-card { padding: 16px !important; }
+  .wd-stack { display: block !important; width: 100% !important; padding-left: 0 !important; }
+  .wd-stack-text { padding-top: 12px !important; }
+  .wd-stack-img { width: 100% !important; height: auto !important; }
+}
+`;
+
 const pillButton = (variant: "dark" | "light"): React.CSSProperties => ({
   display: "inline-block",
   backgroundColor: variant === "dark" ? colors.ink : colors.buttonSecondaryBg,
@@ -113,6 +134,8 @@ const pillButton = (variant: "dark" | "light"): React.CSSProperties => ({
   textDecoration: "none",
   borderRadius: "9999px",
   padding: "12px 24px",
+  // The gap to the next button, beside it or, wrapped on a phone, below it.
+  margin: "0 8px 8px 0",
 });
 
 /** Renders the **bold** / [label](url) subset used by paragraph strings. */
@@ -224,9 +247,13 @@ function CompactCard({ property }: { property: DigestProperty }) {
   return (
     <Section style={{ paddingTop: "16px" }}>
       <Row>
-        <Column style={{ width: "180px", verticalAlign: "top" }}>
+        <Column
+          className="wd-stack"
+          style={{ width: "180px", verticalAlign: "top" }}
+        >
           <Link href={property.href}>
             <Img
+              className="wd-stack-img"
               src={property.image.src}
               alt={property.image.alt ?? property.title}
               width={180}
@@ -238,7 +265,10 @@ function CompactCard({ property }: { property: DigestProperty }) {
             />
           </Link>
         </Column>
-        <Column style={{ paddingLeft: "16px", verticalAlign: "top" }}>
+        <Column
+          className="wd-stack wd-stack-text"
+          style={{ paddingLeft: "16px", verticalAlign: "top" }}
+        >
           <Kicker property={property} />
           <Link href={property.href} style={{ textDecoration: "none" }}>
             <Text
@@ -280,9 +310,11 @@ export default function ListingsDigest(props: ListingsDigestProps) {
           href="https://fonts.googleapis.com/css?family=Instrument+Sans:400,500,600,700"
           rel="stylesheet"
         />
+        <style>{PHONE_CSS}</style>
       </Head>
       <Preview>{props.previewText}</Preview>
       <Body
+        className="wd-body"
         style={{
           backgroundColor: colors.page,
           fontFamily: fontStack,
@@ -291,6 +323,7 @@ export default function ListingsDigest(props: ListingsDigestProps) {
         }}
       >
         <Container
+          className="wd-card"
           style={{
             maxWidth: "600px",
             backgroundColor: colors.card,
@@ -489,7 +522,6 @@ export default function ListingsDigest(props: ListingsDigestProps) {
               <Link href={props.help.textCta.href} style={pillButton("dark")}>
                 {props.help.textCta.label}
               </Link>
-              <span style={{ display: "inline-block", width: "12px" }} />
               <Link href={props.help.callCta.href} style={pillButton("light")}>
                 {props.help.callCta.label}
               </Link>

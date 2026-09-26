@@ -76,6 +76,24 @@ export type DigestExtractionResult = {
   notes: string[];
 };
 
+/**
+ * "Wander Breckenridge Loft (Breckenridge)" is a name and a city, the way
+ * list replies write them (Growth's own Adapt prompt asks for that shape).
+ * The city goes where cities go; a bracket that is part of the name, or that
+ * names somewhere else, stays.
+ */
+export function splitCityFromName<
+  T extends { name: string; city?: string | null },
+>(property: T): T {
+  const match = /^(.+?)\s*\(([^()]+)\)$/.exec(property.name.trim());
+  if (!match) return property;
+  const [, name, bracket] = match;
+  const city = property.city?.trim();
+  if (city && city.toLowerCase() !== bracket!.trim().toLowerCase())
+    return property;
+  return { ...property, name: name!.trim(), city: city || bracket!.trim() };
+}
+
 export async function extractDigest(
   pasted: string,
 ): Promise<DigestExtractionResult> {
@@ -109,7 +127,10 @@ export async function extractDigest(
       schema: "wander-growth.listings-digest.v1",
       theme: output.digest.theme,
       rationale: output.digest.rationale,
-      sections: output.digest.sections,
+      sections: output.digest.sections.map((section) => ({
+        ...section,
+        properties: section.properties.map(splitCityFromName),
+      })),
       // Only a real date range becomes the issue's stay; anything else the
       // model read is dropped rather than quoting homes for a guessed week.
       stayWindow:

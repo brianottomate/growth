@@ -23,6 +23,7 @@ import { SimpleDialog } from "@/components/ui/dialog";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 import { orpc, type RouterOutputs } from "@/orpc/client";
 import { DigestImageBoard } from "./DigestImageBoard";
+import { EmailPreviewFrame } from "./EmailPreviewFrame";
 import { FindHomesCard } from "./FindHomesCard";
 
 type Workspace = RouterOutputs["newsletter"]["workspace"];
@@ -777,12 +778,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
               </div>
             )}
             {previewHtml ? (
-              <iframe
-                srcDoc={previewHtml}
-                sandbox=""
-                title="Newsletter preview"
-                className="h-[760px] w-full bg-white"
-              />
+              <EmailPreviewFrame html={previewHtml} />
             ) : (
               <div className="flex h-[560px] items-center justify-center text-sm text-slate-500">
                 {preview.isPending

@@ -25,6 +25,7 @@ import {
   upsertMarketplaceHome,
   wanderBrandFor,
 } from "@/server/services/marketplace-homes.service";
+import { splitCityFromName } from "@/server/services/digest-extract.service";
 import {
   findImportedImage,
   importRemoteImage,
@@ -96,7 +97,8 @@ async function propertyFromHome(input: {
   brandId: string;
   userId: string;
 }): Promise<DigestProperty> {
-  const { property, row } = input;
+  const { row } = input;
+  const property = splitCityFromName(input.property);
   const tier = badgedTier(row.tier);
   const stay = row.cheapestStay
     ? {
