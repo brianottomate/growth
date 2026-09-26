@@ -136,8 +136,16 @@ export function DigestImageBoard({
     const next = { ...stayDraft, [edge]: value };
     setStayDraft(next);
     const whole = next.checkIn && next.checkOut && next.checkOut > next.checkIn;
-    if (whole || (!next.checkIn && !next.checkOut))
-      onChange({ ...digest, stayWindow: whole ? next : null });
+    if (!whole && (next.checkIn || next.checkOut)) return;
+    // New dates are new prices: re-quote every home for them straight away.
+    const repriced = { ...digest, stayWindow: whole ? next : null };
+    onChange(repriced);
+    if (
+      digest.sections.some((section) =>
+        section.properties.some((p) => p.homeId),
+      )
+    )
+      runMatch(undefined, repriced);
   };
 
   const homes = digest.sections.flatMap((section) => section.properties);
@@ -168,7 +176,7 @@ export function DigestImageBoard({
             ) : (
               <RefreshCw className="size-3.5" />
             )}
-            {matched > 0 ? "Refresh from wander.com" : "Match wander.com homes"}
+            Refresh from wander.com
           </button>
           <button
             type="button"

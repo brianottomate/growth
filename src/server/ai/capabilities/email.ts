@@ -21,8 +21,9 @@ import {
 } from "@/lib/email-document";
 import { DIGEST_TEMPLATE_KEY } from "@/lib/listings-digest";
 import { db } from "@/server/db";
-import { memberTable } from "@/server/db/schema";
+import { brandTable, memberTable } from "@/server/db/schema";
 import { extractDigest } from "@/server/services/digest-extract.service";
+import { matchDigestHomes } from "@/server/services/newsletter-homes.service";
 import {
   createEmailSlot as createEmailSlotService,
   createProductUpdateDraft as createProductUpdateDraftService,
@@ -171,6 +172,30 @@ export const createDigestFromRow = growthAction({
       throw new Error("Could not create the email slot for this digest.");
     }
 
+    // A Wander issue's homes are wander.com listings: match them now, so the
+    // issue lands with tiers, prices for its stay and email photos rather
+    // than nine "image needed" tiles and a button to press.
+    const brandSlug =
+      existing?.brand.slug ??
+      (
+        await db.query.brandTable.findFirst({
+          where: eq(brandTable.id, input.brandId),
+          columns: { slug: true },
+        })
+      )?.slug;
+    const matched =
+      brandSlug === "wander"
+        ? await matchDigestHomes({
+            digest,
+            orgId: ctx.orgId,
+            userId: ctx.userId,
+          }).catch((error: unknown) => {
+            console.error("[digest] wander.com matching failed", error);
+            return null;
+          })
+        : null;
+    const saved = matched?.digest ?? digest;
+
     await saveEmailDocument({
       platformPostId: slot.platformPostId,
       organizationId: ctx.orgId,
@@ -194,16 +219,19 @@ export const createDigestFromRow = growthAction({
         // sheet supplies homes and a rationale, not a voice.
         bodyMarkdown: existing?.document.bodyMarkdown ?? "",
         templateKey: DIGEST_TEMPLATE_KEY,
-        digest,
+        digest: saved,
       }),
-      note: "Imported from a planning-sheet row",
+      note: matched
+        ? "Imported from a pasted home list and matched to wander.com"
+        : "Imported from a planning-sheet row",
     });
 
-    const homes = digest.sections.reduce(
+    const outcomes = matched?.outcomes ?? [];
+    const homes = saved.sections.reduce(
       (count, section) => count + section.properties.length,
       0,
     );
-    const missingLinks = digest.sections.flatMap((section) =>
+    const missingLinks = saved.sections.flatMap((section) =>
       section.properties
         .filter((property) => !property.href)
         .map((p) => p.name),
@@ -213,7 +241,7 @@ export const createDigestFromRow = growthAction({
       platformPostId: slot.platformPostId,
       contentPostId: slot.contentPostId,
       title: input.title ?? theme,
-      regions: digest.sections.map((section) => ({
+      regions: saved.sections.map((section) => ({
         heading: section.heading,
         homes: section.properties.length,
       })),
@@ -223,7 +251,7 @@ export const createDigestFromRow = growthAction({
       // Not a count: a worklist. Which home, in which region, and the page to
       // grab the photo from. Naming the source page is the whole point — it
       // turns "nine images missing" into nine copy-pastes.
-      imagesNeeded: digest.sections.flatMap((section) =>
+      imagesNeeded: saved.sections.flatMap((section) =>
         section.properties
           .filter((property) => !property.imageUrl)
           .map((property) => ({
@@ -235,8 +263,23 @@ export const createDigestFromRow = growthAction({
       ),
       notes,
       url: `/app/newsletters/${slot.platformPostId}`,
-      nextStep:
-        "Every home needs a photo. List them for the operator with their source URLs so each one can be sourced, then call emailWrite.setDigestImage as each image URL comes back.",
+      wanderMatch: matched
+        ? {
+            matched: outcomes.filter((row) => row.status === "matched").length,
+            needPick: outcomes
+              .filter(
+                (row) => row.status === "ambiguous" || row.status === "missing",
+              )
+              .map((row) => row.name),
+            failed: outcomes
+              .filter((row) => row.status === "failed")
+              .map((row) => row.name),
+            stayWindow: saved.stayWindow ?? null,
+          }
+        : null,
+      nextStep: matched
+        ? "The homes are matched to wander.com: each has its tier, its price for the stay dates and an email photo with the tier pill. Tell the operator how many matched, name any that need a pick (the board shows the candidates) or that failed, and mention the stay dates if none were given (prices are then each home's cheapest cached stay; setting dates on the board re-prices them). Then offer to draft the subject, preheader and intro."
+        : "Every home needs a photo. List them for the operator with their source URLs so each one can be sourced, then call emailWrite.setDigestImage as each image URL comes back.",
     };
   },
 });

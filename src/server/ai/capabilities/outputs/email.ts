@@ -184,6 +184,16 @@ export const createDigestFromRowOutputSchema = z.strictObject({
   regions: z.array(z.strictObject({ heading: z.string(), homes: z.number() })),
   title: z.string(),
   url: z.string(),
+  wanderMatch: z
+    .strictObject({
+      matched: z.number(),
+      needPick: z.array(z.string()),
+      failed: z.array(z.string()),
+      stayWindow: z
+        .strictObject({ checkIn: z.string(), checkOut: z.string() })
+        .nullable(),
+    })
+    .nullable(),
 });
 
 export const setDigestImageOutputSchema = z.strictObject({
