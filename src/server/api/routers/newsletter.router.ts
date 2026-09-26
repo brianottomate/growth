@@ -16,6 +16,7 @@ import {
 } from "@/server/clients/resend.client";
 import { topicKeySchema, emailSchema } from "@/lib/validators";
 import { emailDocumentDraftSchema } from "@/lib/email-document";
+import { listingsDigestSchema } from "@/lib/listings-digest";
 import { MESSAGE_AUDIENCE_KINDS } from "@/lib/email-delivery";
 import {
   exportEmailHandoff,
@@ -27,6 +28,11 @@ import {
   createMessageSendDraft,
   sendApprovedMessage,
 } from "@/server/services/email-delivery.service";
+import {
+  digestHomePhotos,
+  matchDigestHomes,
+  setDigestHomeHero,
+} from "@/server/services/newsletter-homes.service";
 import {
   generateEmailDraft as generateEmailDraftAction,
   getEmailDraft as getEmailDraftAction,
@@ -123,6 +129,52 @@ export const newsletterRouter = {
           userId: ctx.session.user.id,
         }),
       };
+    }),
+
+  /**
+   * Match a digest's homes to wander.com: tier, cheapest stay, savings and the
+   * email photo with its pill. Returns the digest for the draft; the issue is
+   * saved the way every other edit is.
+   */
+  matchDigestHomes: protectedProcedure
+    .input(
+      z.object({
+        digest: listingsDigestSchema,
+        only: z
+          .object({
+            section: z.number().int().nonnegative(),
+            property: z.number().int().nonnegative(),
+          })
+          .optional(),
+      }),
+    )
+    .handler(async ({ context: ctx, input }) => {
+      const orgId = await organizationIdForUser(ctx.db, ctx.session.user.id);
+      return matchDigestHomes({
+        ...input,
+        orgId,
+        userId: ctx.session.user.id,
+      });
+    }),
+
+  /** A matched home's photos, exteriors first, to choose its hero from. */
+  digestHomePhotos: protectedProcedure
+    .input(z.object({ homeId: z.string().min(1) }))
+    .handler(async ({ context: ctx, input }) => {
+      const orgId = await organizationIdForUser(ctx.db, ctx.session.user.id);
+      return digestHomePhotos({ ...input, orgId });
+    }),
+
+  /** Make one of a home's photos its hero and render it for the email. */
+  setDigestHomeHero: protectedProcedure
+    .input(z.object({ homeId: z.string().min(1), heroUrl: z.string().url() }))
+    .handler(async ({ context: ctx, input }) => {
+      const orgId = await organizationIdForUser(ctx.db, ctx.session.user.id);
+      return setDigestHomeHero({
+        ...input,
+        orgId,
+        userId: ctx.session.user.id,
+      });
     }),
 
   prepareSend: protectedProcedure

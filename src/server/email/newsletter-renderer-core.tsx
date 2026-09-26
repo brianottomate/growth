@@ -2,6 +2,7 @@ import { marked } from "marked";
 import sanitizeHtml from "sanitize-html";
 
 import type { EmailDocumentDraft } from "@/lib/email-document";
+import { savingsLabel, stayLabel } from "@/lib/listings-digest";
 
 type GenericHtmlProps = {
   preview: string;
@@ -91,22 +92,32 @@ async function renderListingsDigest(input: {
       .filter(Boolean),
     sections: digest.sections.map((section) => {
       const [featured, ...more] = section.properties;
-      const toCard = (property: (typeof section.properties)[number]) => ({
+      const toCard = (
+        property: (typeof section.properties)[number],
+        featured: boolean,
+      ) => ({
         location: [property.city, section.heading.split(",").pop()?.trim()]
           .filter(Boolean)
           .join(", "),
         guests: property.sleeps ?? undefined,
         title: property.name,
-        priceLabel: [
-          money(property.nightlyUsd)
-            ? `${money(property.nightlyUsd)}/night`
-            : null,
-          money(property.perPersonUsd)
-            ? `~${money(property.perPersonUsd)}/person`
-            : null,
-        ]
-          .filter(Boolean)
-          .join(" · "),
+        // A home matched to wander.com quotes the stay its card advertises;
+        // one typed in quotes whatever rate the paste stated.
+        priceLabel: property.stay
+          ? stayLabel(property.stay)
+          : [
+              money(property.nightlyUsd)
+                ? `${money(property.nightlyUsd)}/night`
+                : null,
+              money(property.perPersonUsd)
+                ? `~${money(property.perPersonUsd)}/person`
+                : null,
+            ]
+              .filter(Boolean)
+              .join(" · "),
+        savingsLabel: property.savingsUsd
+          ? savingsLabel(property.savingsUsd, featured)
+          : undefined,
         // An empty src makes the browser refetch the whole page, and renders
         // as a broken card in the preview. A visible placeholder says "an
         // image goes here and nobody has chosen one yet", which is the true
@@ -121,8 +132,8 @@ async function renderListingsDigest(input: {
       });
       return {
         heading: section.heading,
-        featured: toCard(featured!),
-        more: more.map(toCard),
+        featured: toCard(featured!, true),
+        more: more.map((property) => toCard(property, false)),
         cta: { label: "See all homes", href: "https://www.wander.com" },
       };
     }),

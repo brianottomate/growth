@@ -6,6 +6,26 @@ import { Film, ImageOff, Loader2 } from "lucide-react";
 
 import { cn } from "@/components/ui/lib/utils";
 
+/**
+ * Whether next/image may resize this URL. Only hosts in next.config's
+ * `images.remotePatterns` can go through the optimizer; anything else throws
+ * at render. Our library lives on R2 and Vercel Blob; a synced social post's
+ * thumbnail lives on the platform's CDN (pbs.twimg.com, fbcdn, ...), is
+ * already small, and is shown as is.
+ */
+function optimizable(src: string) {
+  try {
+    const { hostname } = new URL(src);
+    return (
+      hostname.endsWith(".r2.dev") ||
+      hostname.endsWith(".public.blob.vercel-storage.com")
+    );
+  } catch {
+    // A relative path is a local image, which next/image always handles.
+    return src.startsWith("/");
+  }
+}
+
 function cacheBusted(src: string) {
   try {
     const url = new URL(src);
@@ -109,6 +129,7 @@ export function MediaThumbnail({
         alt={alt}
         fill
         sizes={sizes}
+        unoptimized={!optimizable(current)}
         className={cn(
           "transition-opacity",
           state === "loaded" ? "opacity-100" : "opacity-0",

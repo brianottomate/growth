@@ -30,6 +30,7 @@ describe("composition blueprints", () => {
       { id: "portrait", width: 1080, height: 1350 },
       { id: "story", width: 1080, height: 1920 },
       { id: "wide", width: 1920, height: 1080 },
+      { id: "email", width: 1200, height: 800 },
     ]);
   });
 
@@ -188,14 +189,15 @@ describe("the fields a blueprint declares", () => {
     // The form is built from the declaration and the schema enforces the
     // headline; the two must agree or the form asks for what it cannot show.
     for (const template of COMPOSITION_TEMPLATES) {
-      const requires =
+      const requires = (
         compositionSpecSchema.safeParse({
           brandId: "b",
           templateId: template.id,
           formatId: "square",
           sourceMediaAssetId: "m",
           title: "",
-        }).success === false;
+        }).error?.issues ?? []
+      ).some((issue) => issue.path[0] === "title");
       expect(compositionHasField(template.id, "title")).toBe(requires);
     }
   });
@@ -284,6 +286,34 @@ describe("home preview copy", () => {
     // No amenities read yet: say how many it sleeps, still not the name.
     expect(homeCatalogCopy({ ...home, amenities: [] }).eyebrow).toBe(
       "Sleeps 8 in",
+    );
+  });
+});
+
+describe("tier badge", () => {
+  const base = {
+    brandId: "brand_01",
+    templateId: "tier-badge",
+    formatId: "email",
+    sourceMediaAssetId: "media_01",
+    title: "",
+  } as const;
+
+  test("draws no headline but needs a tier", () => {
+    expect(
+      compositionSpecSchema.safeParse({ ...base, tier: "luxury" }).success,
+    ).toBe(true);
+    const missing = compositionSpecSchema.safeParse(base);
+    expect(missing.error?.issues.map((issue) => issue.path[0])).toEqual([
+      "tier",
+    ]);
+  });
+
+  test("a Luxury and an Iconic card of one photo are two renders", () => {
+    const luxury = compositionSpecSchema.parse({ ...base, tier: "luxury" });
+    const iconic = compositionSpecSchema.parse({ ...base, tier: "iconic" });
+    expect(getCompositionIdentity({ ...luxury, assetTitle: "a" })).not.toEqual(
+      getCompositionIdentity({ ...iconic, assetTitle: "a" }),
     );
   });
 });

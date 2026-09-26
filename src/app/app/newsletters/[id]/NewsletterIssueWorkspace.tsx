@@ -23,6 +23,7 @@ import { SimpleDialog } from "@/components/ui/dialog";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 import { orpc, type RouterOutputs } from "@/orpc/client";
 import { DigestImageBoard } from "./DigestImageBoard";
+import { FindHomesCard } from "./FindHomesCard";
 
 type Workspace = RouterOutputs["newsletter"]["workspace"];
 type Draft = Pick<
@@ -240,9 +241,22 @@ function Editor({ workspace }: { workspace: Workspace }) {
               intro, CTA); the one clicky exception is photos, because picking
               an image is a recognition task a grid does better than prose. The
               form fields survive below as a collapsed escape hatch. */}
+          {/* The empty state of a Wander issue: no homes and no words yet.
+              wander.com homes only exist for the Wander brand. */}
+          {!draft.digest &&
+            !draft.bodyMarkdown.trim() &&
+            workspace.brand.slug === "wander" && (
+              <FindHomesCard
+                title={workspace.content?.title || draft.subject || "Untitled"}
+                hook={workspace.content?.hook}
+                purpose={workspace.content?.purpose}
+                sendDate={workspace.content?.plannedAt}
+              />
+            )}
           {draft.digest && (
             <DigestImageBoard
               digest={draft.digest}
+              intro={draft.bodyMarkdown}
               brandId={workspace.brand.id}
               onChange={(digest) => setDraft({ ...draft, digest })}
             />

@@ -76,8 +76,11 @@ export default async function NewsletterIssuePage({
     return (
       <div>
         <div className="mb-4 flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Link href="/app/newsletters" className="hover:text-foreground">
-            Newsletters
+          <Link
+            href={`/app/brands/${issue.brand.slug ?? issue.brand.id}/newsletters`}
+            className="hover:text-foreground"
+          >
+            {issue.brand.name}
           </Link>
           <span>/</span>
           <span className="font-medium text-foreground">

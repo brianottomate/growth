@@ -2,6 +2,7 @@ import "server-only";
 
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { ImageResponse } from "next/og";
+import sharp from "sharp";
 
 import {
   type CompositionSpec,
@@ -39,6 +40,8 @@ export type CompositionContext = {
       colors?: { primary?: string; secondary?: string; accent?: string };
     } | null;
   };
+  /** The blueprint, so loading can fetch what only that one draws. */
+  templateId: CompositionSpec["templateId"];
   /** Where the source lives. A lookup needs only this; a render loads it. */
   sourceUrl: string | null;
   /** Ready, brand-owned R2 source, resolved after access checks. */
@@ -56,6 +59,11 @@ export type RenderContext = CompositionContext & {
   sourceImage: string | null;
   logo: LogoImage | null;
   fonts: LoadedFont[] | null;
+  /**
+   * The tier badge only: the source blurred, which is what the pill's frosted
+   * glass shows through (satori has no backdrop-filter), and the pill's face.
+   */
+  badge?: { backdrop: string; fonts: LoadedFont[] | null };
 };
 
 export class CompositionAccessError extends Error {
@@ -220,6 +228,7 @@ export async function resolveCompositionContext(
       brandIdentity: brand.brandIdentity ?? null,
       brandMark: brand.brandMark ?? null,
     },
+    templateId: spec.templateId,
     sourceUrl,
     sourceAsset,
   };
@@ -293,7 +302,149 @@ export async function loadCompositionSource(
     }),
     family ? loadGoogleFont(family) : null,
   ]);
+  if (context.templateId === "tier-badge" && sourceImage) {
+    const [backdrop, badgeFonts] = await Promise.all([
+      blurredSatoriSource(sourceImage, BADGE_BACKDROP_SIGMA),
+      loadGoogleFont(BADGE_FONT_FAMILY, [BADGE_FONT_WEIGHT]),
+    ]);
+    return {
+      ...context,
+      sourceImage,
+      logo,
+      fonts,
+      badge: { backdrop, fonts: badgeFonts },
+    };
+  }
   return { ...context, sourceImage, logo, fonts };
+}
+
+// ---- The wander.com tier pill ---------------------------------------------
+//
+// `PropertyCard_TierBadge` on wander.com, measured on a live card: a 28px
+// pill 12px in from the photo's corner, 10px/12px padding, a 16px icon 6px
+// from 14px Instrument Sans at 550, white on a 12px backdrop blur with an 18%
+// black wash and a 5% black hairline. Drawn against a 400px-wide card rather
+// than the site's 234px so the pill sits at the size the newsletter's Figma
+// exports carried it: legible at the 116px list thumbnail, quiet at 536px.
+
+const BADGE_FONT_FAMILY = "Instrument Sans";
+// 550 is a variable-font weight Google serves only as 500 or 600; 600 holds
+// up better when the email shrinks the photo to a thumbnail.
+const BADGE_FONT_WEIGHT = 600;
+const BADGE_REFERENCE_WIDTH = 400;
+// Sigma on the 600px backdrop copy that satori then scales across the canvas.
+const BADGE_BACKDROP_SIGMA = 18;
+
+const TIER_BADGES = {
+  luxury: {
+    label: "Luxury",
+    // wander.com `src/ui/Icon/icon/sparkle.svg`
+    path: "M12 2.75C13 8 16 11 21.25 12C16 13 13 16 12 21.25C11 16 8 13 2.75 12C8 11 11 8 12 2.75Z",
+  },
+  iconic: {
+    label: "Iconic",
+    // wander.com `src/ui/Icon/icon/crown.svg`
+    path: "M4.7075 17.2631L2.7498 7.7134L8.1648 10.8719L12.0001 5.006L15.8352 10.8719L21.2502 7.7134L19.2926 17.2631C19.0859 18.2707 18.1992 18.994 17.1707 18.994H6.8293C5.8009 18.994 4.9141 18.2707 4.7075 17.2631Z",
+  },
+} as const;
+
+function tierIcon(tier: keyof typeof TIER_BADGES) {
+  const svg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="${TIER_BADGES[tier].path}" stroke="#ffffff" stroke-width="2" stroke-linecap="square" stroke-linejoin="round"/></svg>`;
+  return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+}
+
+async function blurredSatoriSource(dataUri: string, sigma: number) {
+  const body = Buffer.from(dataUri.slice(dataUri.indexOf(",") + 1), "base64");
+  const jpeg = await sharp(body)
+    .resize({ width: 600, withoutEnlargement: true })
+    .blur(sigma)
+    .jpeg({ quality: 80 })
+    .toBuffer();
+  return `data:image/jpeg;base64,${jpeg.toString("base64")}`;
+}
+
+function TierPill({
+  tier,
+  canvas,
+  imagePosition,
+  backdrop,
+}: {
+  tier: keyof typeof TIER_BADGES;
+  canvas: { width: number; height: number };
+  imagePosition: string;
+  backdrop: string;
+}) {
+  const scale = canvas.width / BADGE_REFERENCE_WIDTH;
+  const px = (value: number) => Math.round(value * scale);
+  const inset = px(12);
+  const border = Math.max(1, px(1));
+  return (
+    <div
+      style={{
+        display: "flex",
+        position: "absolute",
+        left: inset,
+        top: inset,
+        height: px(28),
+        alignItems: "center",
+        paddingLeft: px(10),
+        paddingRight: px(12),
+        borderRadius: 999,
+        border: `${border}px solid rgba(0, 0, 0, 0.05)`,
+        overflow: "hidden",
+      }}
+    >
+      {/* The frosted glass: the same crop of a blurred copy, offset so it
+          lines up with the photo underneath. */}
+      {/* oxlint-disable-next-line nextjs/no-img-element */}
+      <img
+        src={backdrop}
+        alt=""
+        width={canvas.width}
+        height={canvas.height}
+        style={{
+          position: "absolute",
+          left: -(inset + border),
+          top: -(inset + border),
+          width: canvas.width,
+          height: canvas.height,
+          objectFit: "cover",
+          objectPosition: imagePosition,
+        }}
+      />
+      <div
+        style={{
+          display: "flex",
+          position: "absolute",
+          left: 0,
+          top: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(0, 0, 0, 0.18)",
+        }}
+      />
+      {/* oxlint-disable-next-line nextjs/no-img-element */}
+      <img
+        src={tierIcon(tier)}
+        alt=""
+        width={px(16)}
+        height={px(16)}
+        style={{ width: px(16), height: px(16), marginRight: px(6) }}
+      />
+      <div
+        style={{
+          display: "flex",
+          fontFamily: BADGE_FONT_FAMILY,
+          fontSize: px(14),
+          fontWeight: BADGE_FONT_WEIGHT,
+          lineHeight: 1.2,
+          color: "#ffffff",
+        }}
+      >
+        {TIER_BADGES[tier].label}
+      </div>
+    </div>
+  );
 }
 
 // Drawn, not typed: the house font has no ★ and satori's fallback fetch for
@@ -1602,6 +1753,41 @@ export function renderComposition(
         ) : null}
       </div>
     );
+  } else if (spec.templateId === "tier-badge") {
+    content = (
+      <div
+        style={{
+          display: "flex",
+          position: "relative",
+          width: "100%",
+          height: "100%",
+          overflow: "hidden",
+          background: "#000000",
+        }}
+      >
+        {/* oxlint-disable-next-line nextjs/no-img-element */}
+        <img
+          src={context.sourceImage!}
+          alt=""
+          width={format.width}
+          height={format.height}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            objectPosition: imagePosition,
+          }}
+        />
+        {spec.tier && context.badge ? (
+          <TierPill
+            tier={spec.tier}
+            canvas={format}
+            imagePosition={imagePosition}
+            backdrop={context.badge.backdrop}
+          />
+        ) : null}
+      </div>
+    );
   } else if (spec.templateId === "photo-only") {
     content = (
       <div
@@ -1712,7 +1898,9 @@ export function renderComposition(
     {
       width: format.width,
       height: format.height,
-      ...(context.fonts?.length ? { fonts: context.fonts } : {}),
+      ...(context.fonts?.length || context.badge?.fonts?.length
+        ? { fonts: [...(context.fonts ?? []), ...(context.badge?.fonts ?? [])] }
+        : {}),
     },
   );
 }
@@ -1766,14 +1954,20 @@ export async function freezeComposition(input: {
   );
   const format = getCompositionFormat(input.spec.formatId);
   const image = renderComposition(input.spec, context);
-  const bytes = Buffer.from(await image.arrayBuffer());
-  const filename = `${safeFilename(input.spec.assetTitle)}-${input.spec.formatId}.png`;
+  const png = Buffer.from(new Uint8Array(await image.arrayBuffer()));
+  // An email photo goes to an inbox: a 1200×800 PNG of a photograph weighs
+  // megabytes, the same frame as a JPEG a couple of hundred kilobytes.
+  const jpeg = format.id === "email";
+  const bytes = jpeg
+    ? await sharp(png).jpeg({ quality: 86, mozjpeg: true }).toBuffer()
+    : png;
+  const filename = `${safeFilename(input.spec.assetTitle)}-${input.spec.formatId}.${jpeg ? "jpg" : "png"}`;
 
   return importImageBuffer({
     brandId: input.spec.brandId,
     uploadedBy: input.userId,
     body: bytes,
-    contentType: "image/png",
+    contentType: jpeg ? "image/jpeg" : "image/png",
     filename,
     title: input.spec.assetTitle,
     alt: input.spec.title,
@@ -1906,6 +2100,7 @@ export async function openComposition(input: {
     scrim: stored.scrim ?? undefined,
     rating: stored.rating ?? undefined,
     mark: stored.mark ?? "auto",
+    tier: stored.tier ?? undefined,
   });
   if (!parsed.success) {
     throw new CompositionAccessError(

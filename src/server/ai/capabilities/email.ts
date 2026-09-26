@@ -124,6 +124,12 @@ export const createDigestFromRow = growthAction({
       .optional()
       .describe("Growth content-calendar time for the send."),
     format: z.enum(EMAIL_DOCUMENT_FORMATS).default("newsletter.broadcast"),
+    platformPostId: z
+      .string()
+      .optional()
+      .describe(
+        "The issue to put the homes in, when one already exists: the issue the operator has open, or the slot you just created for this send. Its subject, preheader and intro are kept. Omit only when no slot exists yet; then one is created.",
+      ),
   }),
   execute: async (input, ctx) => {
     const { digest, notes } = await extractDigest(input.row);
@@ -138,15 +144,29 @@ export const createDigestFromRow = growthAction({
     }
 
     const theme = digest.theme ?? "Property digest";
-    const slot = await createEmailSlotService({
-      brandId: input.brandId,
-      title: input.title ?? theme,
-      format: input.format,
-      purpose: digest.rationale ?? undefined,
-      plannedAt: input.plannedAt,
-      organizationId: ctx.orgId,
-      userId: ctx.userId,
-    });
+    // An existing issue takes the homes and keeps its own words; a planned
+    // slot's brief (subject, preheader, intro) is what the operator set.
+    const existing = input.platformPostId
+      ? await getEmailWorkspace({
+          platformPostId: input.platformPostId,
+          organizationId: ctx.orgId,
+          userId: ctx.userId,
+        })
+      : null;
+    const slot = existing
+      ? {
+          platformPostId: existing.spot.id,
+          contentPostId: existing.content?.id ?? "",
+        }
+      : await createEmailSlotService({
+          brandId: input.brandId,
+          title: input.title ?? theme,
+          format: input.format,
+          purpose: digest.rationale ?? undefined,
+          plannedAt: input.plannedAt,
+          organizationId: ctx.orgId,
+          userId: ctx.userId,
+        });
     if (!slot?.platformPostId) {
       throw new Error("Could not create the email slot for this digest.");
     }
@@ -156,14 +176,23 @@ export const createDigestFromRow = growthAction({
       organizationId: ctx.orgId,
       userId: ctx.userId,
       draft: emailDocumentDraftSchema.parse({
-        subject: input.subject ?? theme,
+        ...(existing
+          ? {
+              ctaLabel: existing.document.ctaLabel,
+              ctaUrl: existing.document.ctaUrl,
+            }
+          : {}),
+        subject: input.subject ?? (existing?.document.subject || theme),
         // The extracted rationale is advisory preview text — clamp it to the
         // document's 300-char preheader cap instead of failing the whole save
         // after the extraction already ran (Silvina hit this 4× on 08-07).
-        preheader: digest.rationale?.trim().slice(0, 300) || null,
+        preheader:
+          existing?.document.preheader ||
+          digest.rationale?.trim().slice(0, 300) ||
+          null,
         // Intro copy is left to the operator rather than invented here: the
         // sheet supplies homes and a rationale, not a voice.
-        bodyMarkdown: "",
+        bodyMarkdown: existing?.document.bodyMarkdown ?? "",
         templateKey: DIGEST_TEMPLATE_KEY,
         digest,
       }),

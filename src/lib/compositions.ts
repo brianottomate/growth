@@ -36,6 +36,15 @@ export const COMPOSITION_FORMATS = [
     width: 1920,
     height: 1080,
   },
+  {
+    // The newsletter's home photo: Customer.io issues run 1200×800 images,
+    // shown at 536px for a featured home and ~116px in a list.
+    id: "email",
+    label: "Email",
+    detail: "Newsletter · 3:2",
+    width: 1200,
+    height: 800,
+  },
 ] as const;
 
 export const COMPOSITION_TEMPLATES = [
@@ -45,6 +54,13 @@ export const COMPOSITION_TEMPLATES = [
     label: "Photo only",
     description:
       "The source image alone, full-bleed. The baseline every other blueprint adds to.",
+  },
+  {
+    id: "tier-badge",
+    version: 1,
+    label: "Photo · tier badge",
+    description:
+      "The photo full-bleed with wander.com's Luxury or Iconic pill top left, as the property card draws it. The newsletter home photo.",
   },
   {
     id: "catalog-copy",
@@ -152,7 +168,8 @@ export type CompositionFieldKey =
   | "accent"
   | "rating"
   | "pills"
-  | "location";
+  | "location"
+  | "tier";
 
 export type CompositionField = {
   key: CompositionFieldKey;
@@ -233,6 +250,7 @@ export const COMPOSITION_FIELDS: Record<
 > = {
   // The photo alone: nothing from the form reaches the canvas.
   "photo-only": [],
+  "tier-badge": [{ key: "tier", label: "Tier" }],
   "catalog-copy": [
     mark,
     { key: "title", label: "Home name" },
@@ -384,7 +402,22 @@ const compositionShape = {
    * photo and colour on a light ground; the rest force it or drop it.
    */
   mark: z.enum(["auto", "color", "white", "dark", "none"]).default("auto"),
+  /** The wander.com tier pill: "Luxury" with a sparkle, "Iconic" with a crown. */
+  tier: z.enum(["luxury", "iconic"]).optional(),
 };
+
+function requireTier(
+  value: { templateId: CompositionTemplateId; tier?: string },
+  context: z.RefinementCtx,
+) {
+  if (value.templateId === "tier-badge" && !value.tier) {
+    context.addIssue({
+      code: "custom",
+      path: ["tier"],
+      message: "This blueprint needs a tier",
+    });
+  }
+}
 
 function requireSourceImage(
   value: { templateId: CompositionTemplateId; sourceMediaAssetId?: string },
@@ -399,13 +432,21 @@ function requireSourceImage(
   }
 }
 
-// Photo only draws no copy, so it is the one blueprint a headline is not
-// required for. Every other template puts the title on the canvas.
+/** Blueprints that draw no copy, so a headline is not required for them. */
+export const COPYLESS_TEMPLATES: readonly CompositionTemplateId[] = [
+  "photo-only",
+  "tier-badge",
+];
+
+// Every other template puts the title on the canvas.
 function requireTitle(
   value: { templateId: CompositionTemplateId; title: string },
   context: z.RefinementCtx,
 ) {
-  if (value.templateId !== "photo-only" && value.title.length === 0) {
+  if (
+    !COPYLESS_TEMPLATES.includes(value.templateId) &&
+    value.title.length === 0
+  ) {
     context.addIssue({
       code: "custom",
       path: ["title"],
@@ -417,7 +458,8 @@ function requireTitle(
 export const compositionSpecSchema = z
   .object(compositionShape)
   .superRefine(requireSourceImage)
-  .superRefine(requireTitle);
+  .superRefine(requireTitle)
+  .superRefine(requireTier);
 
 /**
  * A spec for an on-demand preview, where the photo may come from a URL the
@@ -427,7 +469,8 @@ export const compositionSpecSchema = z
  */
 export const compositionPreviewSchema = z
   .object(compositionShape)
-  .superRefine(requireTitle);
+  .superRefine(requireTitle)
+  .superRefine(requireTier);
 
 export const freezeCompositionSchema = z
   .object({
@@ -435,7 +478,8 @@ export const freezeCompositionSchema = z
     assetTitle: z.string().trim().min(1).max(180),
   })
   .superRefine(requireSourceImage)
-  .superRefine(requireTitle);
+  .superRefine(requireTitle)
+  .superRefine(requireTier);
 
 export type CompositionSpec = z.infer<typeof compositionSpecSchema>;
 export type FreezeCompositionInput = z.infer<typeof freezeCompositionSchema>;
@@ -471,6 +515,9 @@ export function getCompositionIdentity(spec: FreezeCompositionInput) {
     scrim: spec.scrim ?? null,
     rating: spec.rating ?? null,
     mark: spec.mark,
+    // Only blueprints that draw it carry it, so every other card's identity
+    // (and every render cached under it) is unchanged.
+    ...(spec.tier ? { tier: spec.tier } : {}),
   };
 }
 
@@ -509,6 +556,7 @@ export function compositionPreviewFromParams(params: URLSearchParams) {
       pills: params.getAll("pill").length ? params.getAll("pill") : undefined,
       location: params.get("location") || undefined,
       mark: params.get("mark") || "auto",
+      tier: params.get("tier") || undefined,
     }),
   };
 }

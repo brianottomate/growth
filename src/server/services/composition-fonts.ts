@@ -2,10 +2,12 @@ import "server-only";
 
 import type { BrandIdentity } from "@/server/db/brand-schema";
 
+export type FontWeight = 400 | 500 | 600 | 700;
+
 export type LoadedFont = {
   name: string;
   data: ArrayBuffer;
-  weight: 400 | 700;
+  weight: FontWeight;
   style: "normal";
 };
 
@@ -48,21 +50,23 @@ const TTF_USER_AGENT =
 type CachedFace = {
   name: string;
   bytes: Uint8Array;
-  weight: 400 | 700;
+  weight: FontWeight;
   style: "normal";
 };
 
 const cache = new Map<string, Promise<CachedFace[] | null>>();
 
 /**
- * Regular and bold of a Google Fonts family, or null when Google does not
- * carry it (a licensed or self-hosted face), in which case the card renders
- * in the house font and nothing fails. Cached per process.
+ * Regular and bold of a Google Fonts family (or the weights asked for), or
+ * null when Google does not carry it (a licensed or self-hosted face), in
+ * which case the card renders in the house font and nothing fails. Cached per
+ * process.
  */
 export async function loadGoogleFont(
   family: string,
+  weights: FontWeight[] = [400, 700],
 ): Promise<LoadedFont[] | null> {
-  const faces = await cachedFaces(family);
+  const faces = await cachedFaces(family, weights);
   if (!faces) return null;
   // satori consumes the buffer it is handed, so a cached face can only be
   // used once. Every caller gets its own copy; without this the second
@@ -75,22 +79,27 @@ export async function loadGoogleFont(
   }));
 }
 
-function cachedFaces(family: string): Promise<CachedFace[] | null> {
+function cachedFaces(
+  family: string,
+  weights: FontWeight[],
+): Promise<CachedFace[] | null> {
   const key = family.trim();
-  const hit = cache.get(key);
+  const wanted = [...new Set(weights)].sort((a, b) => a - b);
+  const cacheKey = `${key}:${wanted.join(";")}`;
+  const hit = cache.get(cacheKey);
   if (hit) return hit;
   const pending = (async () => {
     try {
       const css = await fetch(
-        `https://fonts.googleapis.com/css2?family=${encodeURIComponent(key).replace(/%20/g, "+")}:wght@400;700&display=swap`,
+        `https://fonts.googleapis.com/css2?family=${encodeURIComponent(key).replace(/%20/g, "+")}:wght@${wanted.join(";")}&display=swap`,
         {
           headers: { "User-Agent": TTF_USER_AGENT },
           signal: AbortSignal.timeout(8_000),
         },
       );
       if (!css.ok) return null;
-      const faces = parseGoogleFontCss(await css.text()).filter(
-        (face) => face.weight === 400 || face.weight === 700,
+      const faces = parseGoogleFontCss(await css.text()).filter((face) =>
+        wanted.includes(face.weight as FontWeight),
       );
       if (faces.length === 0) return null;
       return Promise.all(
@@ -101,7 +110,7 @@ function cachedFaces(family: string): Promise<CachedFace[] | null> {
               await fetch(face.url, { signal: AbortSignal.timeout(8_000) })
             ).arrayBuffer(),
           ),
-          weight: face.weight as 400 | 700,
+          weight: face.weight as FontWeight,
           style: "normal" as const,
         })),
       );
@@ -110,6 +119,6 @@ function cachedFaces(family: string): Promise<CachedFace[] | null> {
       return null;
     }
   })();
-  cache.set(key, pending);
+  cache.set(cacheKey, pending);
   return pending;
 }

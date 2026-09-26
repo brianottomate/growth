@@ -7,6 +7,7 @@ const tabs = [
   ["", "Overview"],
   ["strategy", "Strategy"],
   ["content", "Content"],
+  ["newsletters", "Newsletters"],
   ["previews", "Organic previews"],
   ["ads", "Paid campaigns"],
   ["setup", "Connections"],

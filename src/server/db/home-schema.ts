@@ -81,6 +81,26 @@ export const homeTable = pgTable(
     rating: t.real(),
     /** Cheapest nightly rate in whole dollars. */
     nightlyFrom: t.integer(),
+    /** Guest reviews behind `rating`, when the source counts them. */
+    reviewCount: t.integer(),
+
+    // wander.com facts. A WanderOS feed carries none of these.
+    /** The marketplace tier: ICONIC and LUXURY are badged, STANDARD is not. */
+    tier: t.text(),
+    /** OPERATED, OWNED, BRANDED, MANAGED or CURATED. */
+    management: t.text(),
+    /**
+     * The cheapest stay the site advertises without dates, as it was at the
+     * last sync. Cents, like the API: `priceCents` pre-tax (the savings
+     * basis), `totalCents` with taxes and fees (what the card prints).
+     */
+    cheapestStay: t.jsonb().$type<{
+      priceCents: number;
+      totalCents: number | null;
+      nights: number;
+      checkIn: string;
+      checkOut: string;
+    }>(),
 
     /**
      * The photo the ads draw on, by URL. A feed photo needs no import to be

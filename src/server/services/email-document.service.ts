@@ -540,6 +540,9 @@ export async function runEmailGenerationJob(jobId: string) {
         brandVoice ? `Brand voice:\n${brandVoice}` : null,
         channelVoice ? `Newsletter voice:\n${channelVoice}` : null,
         "Return an honest, useful draft in Markdown. Do not invent product facts, customer quotes, metrics, dates, or links. Preserve provided URLs exactly. Do not add unsubscribe language; the product sending runtime owns the compliance footer. Use one clear CTA at most.",
+        document.digest
+          ? "This issue is a property digest: the homes render below your text from structured data, each with its photo, location, price and link. Write the subject, preheader and a short intro (a greeting and one or two paragraphs) that sets up the theme and the places. Do not list the homes, their prices or their links in the body, and leave the CTA empty; the digest carries both."
+          : null,
         productEvidence
           ? "This is an evidence-backed WanderOS product update. Every customer-facing product claim must be supported by verified shipped evidence in the prompt. Omit merged-only, ambiguous, operational, documentation-only, CI, dependency, refactor, or internal changes."
           : null,
@@ -562,6 +565,22 @@ export async function runEmailGenerationJob(jobId: string) {
         job.brief?.trim()
           ? `Latest refinement brief:\n${job.brief.trim()}`
           : null,
+        document.digest
+          ? `The homes in this issue, by place:\n${document.digest.sections
+              .map(
+                (section) =>
+                  `${section.heading}: ${section.properties
+                    .map((property) =>
+                      [property.name, property.city].filter(Boolean).join(", "),
+                    )
+                    .join("; ")}`,
+              )
+              .join("\n")}${
+              document.digest.stayWindow
+                ? `\nEvery home is quoted for ${document.digest.stayWindow.checkIn} to ${document.digest.stayWindow.checkOut}.`
+                : ""
+            }`
+          : null,
         productEvidence
           ? `Verified product change evidence (the only allowed source for product claims):\n${productEvidence}`
           : null,
@@ -583,6 +602,9 @@ export async function runEmailGenerationJob(jobId: string) {
         templateKey: document.templateKey,
         handoffTargetRepo: document.handoffTargetRepo,
         productUpdate: document.productUpdate,
+        // The model writes words; the homes are data it never returns. Left
+        // out, a generation on a property digest wiped every home.
+        digest: document.digest,
       },
       source: "generation",
       note: job.brief?.trim() || "Generated from the selected content slot",
