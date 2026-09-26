@@ -14,7 +14,8 @@ import {
 import { adChatContext } from "@/server/services/ad-chat-context.service";
 import { contactSheet } from "@/server/services/starter-ad-generation.service";
 import { catalogHomeContext } from "@/server/services/catalog-studio.service";
-import { place } from "@/lib/home-ad-previews";
+import { catalogLocation } from "@/lib/catalog-studio";
+import { marketOf } from "@/lib/markets";
 import { streamErrorMessage } from "@/server/ai/kernel/stream-error";
 
 import { anthropic } from "@ai-sdk/anthropic";
@@ -475,7 +476,7 @@ export async function POST(req: Request): Promise<Response> {
                 mode: catalogHome.card.mode ?? "compose",
               }
             : null,
-          place: place(catalogHome.home),
+          place: catalogLocation(catalogHome.home, catalogHome.brand.markets),
           listing: {
             bedrooms: catalogHome.home.bedrooms,
             bathrooms: catalogHome.home.bathrooms,
@@ -484,6 +485,7 @@ export async function POST(req: Request): Promise<Response> {
             description: catalogHome.description?.slice(0, 2000) ?? null,
             locationDescription: catalogHome.locationDescription,
             petsAllowed: catalogHome.petsAllowed,
+            market: marketOf(catalogHome.brand.markets, catalogHome.home.city),
           },
           siblings: catalogHome.siblings,
           brandWide: catalogHome.brandWide,

@@ -47,6 +47,7 @@ export const loadPerformanceBrand = cache(async (brandSlug: string) => {
         featuredListingUrl: true,
         previewSourceUrl: true,
         story: true,
+        markets: true,
         relationship: true,
         brandIdentity: true,
         brandMark: true,

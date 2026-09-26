@@ -377,6 +377,12 @@ export const brandTable = pgTable(
      */
     story: t.text(),
     /**
+     * Where the brand's homes are, as guests think of it: a label per market,
+     * its towns, and what draws people there. See src/lib/markets.ts. Applied
+     * with scripts/apply-brand-markets-column.ts.
+     */
+    markets: t.jsonb().$type<import("@/lib/markets").BrandMarkets>(),
+    /**
      * The photo the on-demand ad previews are drawn on: a home's hero on
      * their WanderOS site or a library image, by URL. Picking a home sets
      * this and `featuredListingUrl` together; a library image sets this

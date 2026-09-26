@@ -40,6 +40,7 @@ export async function catalogBrand(userId: string, brandId: string) {
       website: brandTable.website,
       organizationId: memberTable.organizationId,
       settings: brandTable.performanceSettings,
+      markets: brandTable.markets,
     })
     .from(brandTable)
     .innerJoin(
@@ -176,6 +177,7 @@ async function catalogHomes(brand: CatalogBrand, refresh = false) {
       overrides,
       approvals,
       brand.settings?.catalogTemplateId ?? "catalog-place",
+      brand.markets,
     ),
   };
 }

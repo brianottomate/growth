@@ -1,5 +1,10 @@
 import type { BrandingProfile } from "@mendable/firecrawl-js";
 import { z } from "zod";
+import { brandMarketsSchema } from "@/lib/markets";
+import {
+  draftBrandMarkets,
+  setBrandMarkets,
+} from "@/server/services/brand-markets.service";
 import { waitUntil } from "@vercel/functions";
 import { and, eq, isNull } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
@@ -629,6 +634,31 @@ export const brandRouter = {
     .handler(async ({ context: ctx, input }) => {
       const brand = await assertBrandManageable(ctx, input.brandId);
       return draftBrandStory({ brandId: brand.id });
+    }),
+
+  /** Setup: draft the brand's markets from its homes' towns and listings. */
+  draftMarkets: protectedProcedure
+    .input(z.object({ brandId: z.string().min(1) }))
+    .handler(async ({ context: ctx, input }) => {
+      const brand = await assertBrandManageable(ctx, input.brandId);
+      return draftBrandMarkets({ brandId: brand.id });
+    }),
+
+  /** Setup: save the markets as the operator edited or confirmed them. */
+  setMarkets: protectedProcedure
+    .input(
+      z.object({
+        brandId: z.string().min(1),
+        markets: brandMarketsSchema.shape.markets,
+      }),
+    )
+    .handler(async ({ context: ctx, input }) => {
+      const brand = await assertBrandManageable(ctx, input.brandId);
+      return setBrandMarkets({
+        brandId: brand.id,
+        userId: ctx.session.user.id,
+        markets: input.markets,
+      });
     }),
 
   /** Setup: tick a home into the featured set, or out of it. */

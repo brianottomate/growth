@@ -33,6 +33,8 @@ export function catalogHomeSection(input: {
     description: string | null;
     locationDescription?: string | null;
     petsAllowed?: boolean | null;
+    /** The market the home is in: its label, draws, seasons and notes. */
+    market?: unknown;
   };
   /** The other included cards' headlines, so this one leads differently. */
   siblings: { name: string; headline: string }[];

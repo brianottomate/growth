@@ -16,6 +16,7 @@
     "db:apply:pregen-evaluation-receipts": "bun --conditions=react-server scripts/apply-pregen-evaluation-receipt-schema.ts",
     "db:apply:content-parity": "bun --conditions=react-server scripts/apply-content-parity-schema.ts",
     "db:apply:catalog-approval": "bun --conditions=react-server scripts/apply-catalog-approval-schema.ts",
+    "db:apply:brand-markets": "bun --conditions=react-server scripts/apply-brand-markets-column.ts",
     "db:apply:catalog-pills": "bun --conditions=react-server scripts/apply-catalog-pills-column.ts",
     "db:apply:brand-ad-previews": "bun --conditions=react-server scripts/apply-brand-ad-previews-schema.ts",
     "db:apply:launch": "bun --conditions=react-server scripts/apply-launch-schema.ts",

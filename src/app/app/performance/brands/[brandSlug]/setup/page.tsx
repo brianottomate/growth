@@ -16,6 +16,7 @@ import {
 
 import { SectionLabel } from "../../../_components";
 import { BrandStoryCard } from "../BrandStoryCard";
+import { MarketsCard } from "../MarketsCard";
 import { HeroCard } from "../HeroCard";
 import { CatalogTemplateCard } from "../CatalogTemplateCard";
 import { HomeRowsGrid } from "../HomeRowsGrid";
@@ -108,6 +109,14 @@ export default async function PerformanceBrandHomesPage({
   const withHero = heroHomes.filter((home) => home.heroSourceUrl);
   const featuredWithHero = withHero.filter((home) => home.featured);
   const slug = brand.slug ?? brand.id;
+  const townCounts = [
+    ...heroHomes
+      .reduce((counts, home) => {
+        if (home.city) counts.set(home.city, (counts.get(home.city) ?? 0) + 1);
+        return counts;
+      }, new Map<string, number>())
+      .entries(),
+  ].map(([town, homes]) => ({ town, homes }));
   // Tiles draw the hero's gallery thumbnail, a fifth the weight of the file.
   const heroThumb = (home: {
     heroSourceUrl: string | null;
@@ -196,6 +205,11 @@ export default async function PerformanceBrandHomesPage({
         photo={previewHome?.imageUrl ?? null}
       />
       <BrandStoryCard brandId={brand.id} story={brand.story} />
+      <MarketsCard
+        brandId={brand.id}
+        markets={brand.markets ?? null}
+        towns={townCounts}
+      />
       <HeroCard
         brandId={brand.id}
         hero={

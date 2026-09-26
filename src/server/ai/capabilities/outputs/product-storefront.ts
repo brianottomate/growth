@@ -7,6 +7,8 @@ import { brandRelationshipEnum } from "@/server/db/brand-schema";
 import { currencyEnum } from "@/server/db/auth-schema";
 import { homesSchema } from "./shared";
 import { z } from "zod";
+
+import { brandMarketsSchema } from "@/lib/markets";
 import { jsonValueSchema } from "../../kernel/output";
 
 /** Wire results for this capability. Dates are ISO strings after JSON normalization. */
@@ -434,6 +436,7 @@ const brandSchema = z.strictObject({
   description: z.string().nullable(),
   featuredListingUrl: z.string().nullable(),
   story: z.string().nullable(),
+  markets: brandMarketsSchema.nullable(),
   followerCount: z.number().nullable(),
   id: z.string(),
   industryResearch: industryResearchSchema.nullable(),

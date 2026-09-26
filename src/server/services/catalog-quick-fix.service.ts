@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { hasEmDash } from "@/lib/catalog-copy";
 import { catalogHeadlineIssue } from "@/lib/catalog-studio";
+import { marketOf } from "@/lib/markets";
 import {
   CATALOG_COPY_INTENTS,
   type CatalogCopyTemplateId,
@@ -55,6 +56,8 @@ async function storyOf(ctx: Context) {
 
 /** "Louisville, KY" from "… in Louisville, KY": the catalog's own suffix. */
 function placeOf(ctx: Context) {
+  const market = marketOf(ctx.brand.markets, ctx.home.city);
+  if (market) return market.label;
   const titles = [ctx.card?.title, ...ctx.siblings.map((s) => s.headline)];
   for (const title of titles) {
     const at = title?.lastIndexOf(" in ") ?? -1;
@@ -184,6 +187,7 @@ export async function newCatalogCopy(input: {
     name: ctx.home.name,
     currentHeadline: ctx.card?.title ?? null,
     currentPills: ctx.card?.pills ?? [],
+    market: marketOf(ctx.brand.markets, ctx.home.city),
     bedrooms: ctx.home.bedrooms ?? null,
     bathrooms: ctx.home.bathrooms ?? null,
     guests: ctx.home.guests ?? null,

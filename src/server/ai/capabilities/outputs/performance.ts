@@ -6,6 +6,8 @@ import { channelPlatformEnum } from "@/server/db/channel-schema";
 import { platformCampaignStatusEnum } from "@/server/db/ads-schema";
 import { brandRelationshipEnum } from "@/server/db/brand-schema";
 import { z } from "zod";
+
+import { brandMarketsSchema } from "@/lib/markets";
 import { jsonValueSchema } from "../../kernel/output";
 
 /** Wire results for this capability. Dates are ISO strings after JSON normalization. */
@@ -641,6 +643,7 @@ export const previewIntakeApplyActionOutputSchema = z.strictObject({
         description: z.string().nullable(),
         featuredListingUrl: z.string().nullable(),
         story: z.string().nullable(),
+        markets: brandMarketsSchema.nullable(),
         followerCount: z.number().nullable(),
         id: z.string(),
         industryResearch: z

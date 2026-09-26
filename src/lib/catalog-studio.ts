@@ -5,6 +5,7 @@ import {
   type CompositionFormatId,
 } from "./compositions";
 import { homeCatalogCopy, place, ratingOutOfFive } from "./home-ad-previews";
+import { marketOf, type BrandMarkets } from "./markets";
 import {
   hotelFeedRows,
   type HotelFeedHome,
@@ -100,11 +101,21 @@ export const CATALOG_TEMPLATES = [
 ] as const;
 export type CatalogTemplateId = (typeof CATALOG_TEMPLATES)[number];
 
+/** Where a card says the home is: its market's label, else its own town. */
+export function catalogLocation(
+  home: CatalogHome,
+  markets?: BrandMarkets | null,
+) {
+  return marketOf(markets, home.city)?.label ?? place(home);
+}
+
 export function catalogBaselineTitle(
   home: CatalogHome,
   templateId: CatalogCard["templateId"] = "catalog-place",
+  markets?: BrandMarkets | null,
 ) {
-  const where = templateId === "catalog-place" ? place(home) : null;
+  const where =
+    templateId === "catalog-place" ? catalogLocation(home, markets) : null;
   const lead = home.guests ? `Sleeps ${home.guests}` : "Vacation home";
   return where ? `${lead} in ${where}` : lead;
 }
@@ -175,6 +186,8 @@ export function catalogDraft(
   approvals: ReadonlyMap<string, string> = new Map(),
   /** The brand's default card, for every home without its own. */
   defaultTemplate: CatalogTemplateId = "catalog-place",
+  /** The brand's markets: a card's location is its market's label. */
+  markets?: BrandMarkets | null,
 ): CatalogDraft {
   return {
     formats: ["portrait"],
@@ -201,13 +214,13 @@ export function catalogDraft(
           imageUrl: o.image?.url ?? home.imageUrl!,
           ...(o.image ? { assetId: o.image.assetId } : {}),
           templateId,
-          title: o.title ?? catalogBaselineTitle(home, templateId),
+          title: o.title ?? catalogBaselineTitle(home, templateId, markets),
           subtitle: o.subtitle ?? copy.subtitle,
           imagePosition: o.imagePosition ?? "center",
           showLogo: o.showLogo ?? true,
           rating: ratingOutOfFive(home.rating),
           pills: o.pills ?? defaultCatalogPills(home),
-          location: place(home) || undefined,
+          location: catalogLocation(home, markets) || undefined,
         };
         return {
           ...card,

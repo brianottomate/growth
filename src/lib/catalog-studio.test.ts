@@ -5,6 +5,7 @@ import {
   catalogCardFingerprint,
   catalogDraft,
   catalogHeadlineIssue,
+  catalogLocation,
   catalogUnapproved,
   catalogExportRows,
   catalogFeedCsv,
@@ -209,4 +210,15 @@ test("a catalog-place headline the card cannot draw is refused, others pass", ()
     ),
   ).toBeNull();
   expect(catalogHeadlineIssue(long, "catalog-copy")).toBeNull();
+});
+
+test("a card names its confirmed market, never a draft", () => {
+  const home = { ...homes[0]!, city: "Logan", state: "OH" };
+  const markets = {
+    markets: [{ id: "hh", label: "Hocking Hills, Ohio", towns: ["Logan"] }],
+  };
+  expect(catalogLocation(home, markets)).toBe("Logan, OH");
+  expect(catalogLocation(home, { ...markets, confirmedAt: "2026-09-26" })).toBe(
+    "Hocking Hills, Ohio",
+  );
 });
