@@ -85,8 +85,15 @@ export type CatalogExport = {
  * never wrong on purpose: a real headline comes from the listing, written by
  * the chat, and nothing exports until a person approves the card.
  */
-export function catalogBaselineTitle(home: CatalogHome) {
-  const where = place(home);
+/** The catalog templates a brand can default to. */
+export const CATALOG_TEMPLATES = ["catalog-place", "catalog-copy"] as const;
+export type CatalogTemplateId = (typeof CATALOG_TEMPLATES)[number];
+
+export function catalogBaselineTitle(
+  home: CatalogHome,
+  templateId: CatalogCard["templateId"] = "catalog-place",
+) {
+  const where = templateId === "catalog-place" ? place(home) : null;
   const lead = home.guests ? `Sleeps ${home.guests}` : "Vacation home";
   return where ? `${lead} in ${where}` : lead;
 }
@@ -123,6 +130,8 @@ export function catalogDraft(
   homes: CatalogHome[],
   overrides: ReadonlyMap<string, CatalogOverrides> = new Map(),
   approvals: ReadonlyMap<string, string> = new Map(),
+  /** The brand's default card, for every home without its own. */
+  defaultTemplate: CatalogTemplateId = "catalog-place",
 ): CatalogDraft {
   return {
     formats: ["portrait"],
@@ -132,6 +141,7 @@ export function catalogDraft(
       .map((home): CatalogCard => {
         const copy = homeCatalogCopy(home);
         const o = overrides.get(home.id) ?? {};
+        const templateId = o.templateId ?? defaultTemplate;
         const card: CatalogCard = {
           homeId: home.id,
           included: !o.excluded,
@@ -147,9 +157,8 @@ export function catalogDraft(
             : {}),
           imageUrl: o.image?.url ?? home.imageUrl!,
           ...(o.image ? { assetId: o.image.assetId } : {}),
-          // The listing card: place statement, facts and the rating pill.
-          templateId: o.templateId ?? "catalog-place",
-          title: o.title ?? catalogBaselineTitle(home),
+          templateId,
+          title: o.title ?? catalogBaselineTitle(home, templateId),
           subtitle: o.subtitle ?? copy.subtitle,
           imagePosition: o.imagePosition ?? "center",
           showLogo: o.showLogo ?? true,

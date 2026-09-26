@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/server/db";
 import {
   brandTable,
@@ -21,6 +21,7 @@ import {
   type CatalogExport,
   type CatalogHome,
   type CatalogOverrides,
+  type CatalogTemplateId,
 } from "@/lib/catalog-studio";
 import { brandWideAmenities } from "@/lib/catalog-copy";
 import { compositionTemplateIdSchema } from "@/lib/compositions";
@@ -168,7 +169,12 @@ async function catalogHomes(brand: CatalogBrand, refresh = false) {
     inventory,
     homes,
     rows,
-    draft: catalogDraft(homes, overrides, approvals),
+    draft: catalogDraft(
+      homes,
+      overrides,
+      approvals,
+      brand.settings?.catalogTemplateId ?? "catalog-place",
+    ),
   };
 }
 
@@ -201,6 +207,7 @@ export async function catalogState(
     homes,
     enrichmentError: inventory.enrichmentError,
     syncedAt: inventory.syncedAt,
+    defaultTemplate: brand.settings?.catalogTemplateId ?? "catalog-place",
     draft,
     exports: runs.map((run): CatalogExport => ({
       ...run.providerOutput,
@@ -529,6 +536,21 @@ export async function setCatalogApproval(input: {
         ),
       );
   return { updated: cards.length };
+}
+
+/** The catalog card every home uses unless it has its own. */
+export async function setCatalogDefaultTemplate(input: {
+  userId: string;
+  brandId: string;
+  templateId: CatalogTemplateId;
+}) {
+  const brand = await catalogBrand(input.userId, input.brandId);
+  await db
+    .update(brandTable)
+    .set({
+      performanceSettings: sql`coalesce(${brandTable.performanceSettings}, '{}'::jsonb) || ${JSON.stringify({ catalogTemplateId: input.templateId, updatedAt: new Date().toISOString(), updatedBy: input.userId })}::jsonb`,
+    })
+    .where(eq(brandTable.id, brand.id));
 }
 
 /** Include or exclude every home in the brand's catalog at once. */

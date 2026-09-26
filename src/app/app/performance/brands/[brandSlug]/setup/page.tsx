@@ -17,6 +17,7 @@ import {
 import { SectionLabel } from "../../../_components";
 import { BrandStoryCard } from "../BrandStoryCard";
 import { HeroCard } from "../HeroCard";
+import { CatalogTemplateCard } from "../CatalogTemplateCard";
 import { HomeRowsGrid } from "../HomeRowsGrid";
 import { HomesStrip } from "../HomesStrip";
 import { AddHomesByHand } from "../AddHomesByHand";
@@ -208,6 +209,10 @@ export default async function PerformanceBrandHomesPage({
         }
         options={heroOptions}
         heroUrl={brand.featuredListingUrl}
+      />
+      <CatalogTemplateCard
+        brandId={brand.id}
+        heroImageUrl={previewHome?.imageUrl ?? null}
       />
       <BrandPreviewCard
         brandId={brand.id}

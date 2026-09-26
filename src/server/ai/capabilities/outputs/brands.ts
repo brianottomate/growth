@@ -62,6 +62,10 @@ const performanceSettingsShape = {
     )
     .optional(),
   agreedAdSpend: z.number().nullable().optional(),
+  catalogTemplateId: z
+    .enum(["catalog-place", "catalog-copy"])
+    .nullable()
+    .optional(),
   effectiveDate: z.string().nullable().optional(),
   endDate: z.string().nullable().optional(),
   monthlyFee: z.number().nullable().optional(),

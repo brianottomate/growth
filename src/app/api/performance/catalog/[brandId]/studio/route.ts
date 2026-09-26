@@ -2,6 +2,7 @@ import { z } from "zod";
 import { after, NextResponse } from "next/server";
 import { getSession } from "@/server/better-auth/server";
 import { compositionTemplateIdSchema } from "@/lib/compositions";
+import { CATALOG_TEMPLATES } from "@/lib/catalog-studio";
 import { ingestBrandHomes } from "@/server/services/homes.service";
 import {
   newCatalogCopy,
@@ -14,6 +15,7 @@ import {
   startCatalogExport,
   renderCatalogExport,
   setCatalogApproval,
+  setCatalogDefaultTemplate,
   setCatalogHomeHero,
   setCatalogIncluded,
 } from "@/server/services/catalog-studio.service";
@@ -76,6 +78,10 @@ export async function POST(
         }),
         z.object({ action: z.literal("includeAll"), included: z.boolean() }),
         z.object({
+          action: z.literal("defaultTemplate"),
+          templateId: z.enum(CATALOG_TEMPLATES),
+        }),
+        z.object({
           action: z.enum(["newCopy", "newPhoto"]),
           homeId: z.string().min(1),
         }),
@@ -130,6 +136,13 @@ export async function POST(
         return NextResponse.json(
           await newCatalogPhoto({ userId, brandId, homeId: body.homeId }),
         );
+      case "defaultTemplate":
+        await setCatalogDefaultTemplate({
+          userId,
+          brandId,
+          templateId: body.templateId,
+        });
+        return NextResponse.json({ saved: true });
       case "includeAll":
         await setCatalogIncluded({ userId, brandId, included: body.included });
         return NextResponse.json({ saved: true });

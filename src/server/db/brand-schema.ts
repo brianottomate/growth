@@ -195,6 +195,8 @@ export type PerformanceSettings = {
   siteLive?: string | null;
   /** Media a month the client agreed to, over the intake's figure. */
   agreedAdSpend?: number | null;
+  /** The catalog card every home uses unless it has its own. */
+  catalogTemplateId?: import("@/lib/catalog-studio").CatalogTemplateId | null;
   updatedAt?: string;
   updatedBy?: string | null;
   /** What last wrote here: the intake being applied, a person, or the agent. */

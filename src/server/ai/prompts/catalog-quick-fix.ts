@@ -9,16 +9,21 @@ export function catalogNewCopyPrompt(input: {
   brandName: string;
   /** The brand story section, already rendered. */
   story: string;
-  /** "Louisville, KY": the suffix every headline in this catalog keeps. */
+  /** "Louisville, KY": the catalog's place suffix, for a place card. */
   place: string | null;
   brandWide: readonly string[];
+  /** The card's template: the place card keeps the suffix, the copy card has none. */
+  templateId: string;
 }): string {
-  return `You write the headline printed on one home's card in ${input.brandName}'s Meta catalog. The operator clicked New copy because the current headline is weak: find a better one, not a synonym of it.
+  const suffix =
+    input.templateId === "catalog-place" && input.place
+      ? ` The headline ends " in ${input.place}".`
+      : "";
+  return `You write the headline printed on one home's card in ${input.brandName}'s Meta catalog. The operator clicked New copy because the current headline is not doing the space justice: find a better one, not a synonym of it.
 
-General rules for catalog headlines:
-${catalogCopyRules({ place: input.place, brandWide: input.brandWide })}
+${catalogCopyRules({ place: input.place, brandWide: input.brandWide, templateId: input.templateId })}
 
-Work in order. First, who books this home and for what. Then the single reason this home wins over the other cards in the catalog, from its description, location paragraph and amenities. Then the listing facts that prove it, quoted from this home only. Only then the headline, which states that reason.${input.place ? ` The headline ends " in ${input.place}".` : ""} Approved headlines are shown as the operator's taste: match their quality and voice, never their content.${input.story ? `${input.story}\n\nThe brand story overrides the general rules. Every "never" and "avoid" in it is a hard rule for the headline, with no exceptions for pairing it with something else: if it bans guest-count phrasing, no "sleeps N" and no "for N" at all.` : ""}`;
+Work in order. First, who stays here and what the space gives them. Then the one thing this home offers that the other cards in the catalog cannot, from its description, location paragraph and amenities. Then the listing facts that prove it, from this home only. Only then the headline, which describes that.${suffix} Approved headlines are shown as the operator's taste: match their quality and voice, never their content.${input.story ? `${input.story}\n\nWhere the brand story and the general guidance differ, follow the brand story.` : ""}`;
 }
 
 /** New photo on one catalog card: pick a better hero from the numbered sheets. */
