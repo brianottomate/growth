@@ -4,6 +4,10 @@ import { getSession } from "@/server/better-auth/server";
 import { compositionTemplateIdSchema } from "@/lib/compositions";
 import { ingestBrandHomes } from "@/server/services/homes.service";
 import {
+  newCatalogCopy,
+  newCatalogPhoto,
+} from "@/server/services/catalog-quick-fix.service";
+import {
   catalogBrand,
   catalogState,
   editCatalogCard,
@@ -72,6 +76,10 @@ export async function POST(
         }),
         z.object({ action: z.literal("includeAll"), included: z.boolean() }),
         z.object({
+          action: z.enum(["newCopy", "newPhoto"]),
+          homeId: z.string().min(1),
+        }),
+        z.object({
           action: z.literal("approve"),
           approved: z.boolean(),
           cards: z
@@ -113,6 +121,14 @@ export async function POST(
             homeId: body.homeId,
             patch: body.patch,
           }),
+        );
+      case "newCopy":
+        return NextResponse.json(
+          await newCatalogCopy({ userId, brandId, homeId: body.homeId }),
+        );
+      case "newPhoto":
+        return NextResponse.json(
+          await newCatalogPhoto({ userId, brandId, homeId: body.homeId }),
         );
       case "includeAll":
         await setCatalogIncluded({ userId, brandId, included: body.included });

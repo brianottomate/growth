@@ -15,6 +15,7 @@
 export * from "./brand-story";
 export * from "./catalog-copy";
 export * from "./catalog-home";
+export * from "./catalog-quick-fix";
 export * from "./featured-homes";
 export * from "./portfolio-review";
 export * from "./triggered-intents";

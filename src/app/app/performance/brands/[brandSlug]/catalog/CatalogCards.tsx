@@ -76,6 +76,9 @@ export function CatalogCards({
   /** A card whose photo is being swapped straight from its row, saved on pick. */
   const [picking, setPicking] = useState<CatalogCard | null>(null);
   const [limit, setLimit] = useState(10);
+  const [reviewOnly, setReviewOnly] = useState(false);
+  /** Cards with a New copy or New photo call in flight. */
+  const [fixing, setFixing] = useState<Record<string, "copy" | "photo">>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const draft = query.data?.draft;
@@ -106,6 +109,17 @@ export function CatalogCards({
       setError(e instanceof Error ? e.message : fallback);
       return null;
     }
+  }
+  async function quickFix(card: CatalogCard, kind: "copy" | "photo") {
+    setFixing((f) => ({ ...f, [card.homeId]: kind }));
+    await post(
+      {
+        action: kind === "copy" ? "newCopy" : "newPhoto",
+        homeId: card.homeId,
+      },
+      kind === "copy" ? "Unable to write new copy" : "Unable to find a photo",
+    );
+    setFixing(({ [card.homeId]: _, ...rest }) => rest);
   }
   const workInChat = (card: CatalogCard, focus?: "photo" | "copy") => {
     const homeName = homeOf(card)?.name ?? "this home";
@@ -166,6 +180,7 @@ export function CatalogCards({
       "Unable to update approval",
     );
   const unapproved = draft ? catalogUnapproved(draft) : [];
+  const visible = reviewOnly ? unapproved : (draft?.cards ?? []);
   async function run(action: "export" | "refresh") {
     setBusy(true);
     const done = await post(
@@ -270,6 +285,19 @@ export function CatalogCards({
                 </Button>
               ))}
             </div>
+            <div className="flex rounded-lg border p-0.5">
+              {([false, true] as const).map((only) => (
+                <Button
+                  key={String(only)}
+                  variant={reviewOnly === only ? "secondary" : "ghost"}
+                  size="sm"
+                  aria-pressed={reviewOnly === only}
+                  onClick={() => setReviewOnly(only)}
+                >
+                  {only ? `Needs review ${unapproved.length}` : "All"}
+                </Button>
+              ))}
+            </div>
             <div className="flex">
               <Button
                 variant="ghost"
@@ -309,7 +337,7 @@ export function CatalogCards({
           )}
           {layout === "grid" ? (
             <div className="grid grid-cols-1 gap-3 @xl:grid-cols-2 @2xl:gap-4 @4xl:grid-cols-3 @6xl:grid-cols-4">
-              {draft.cards.slice(0, limit).map((card) => (
+              {visible.slice(0, limit).map((card) => (
                 <div
                   key={card.homeId}
                   className={`overflow-hidden rounded-xl border bg-card ${card.included ? "" : "opacity-50"}`}
@@ -345,7 +373,7 @@ export function CatalogCards({
             </div>
           ) : (
             <div className="space-y-3">
-              {draft.cards.slice(0, limit).map((card) => {
+              {visible.slice(0, limit).map((card) => {
                 const editing = details?.homeId === card.homeId;
                 const shown = editing ? details : card;
                 return (
@@ -433,14 +461,25 @@ export function CatalogCards({
                             {(
                               [
                                 ["Choose photo", () => choosePhoto(card)],
-                                ["New photo", () => workInChat(card, "photo")],
-                                ["New copy", () => workInChat(card, "copy")],
+                                [
+                                  fixing[card.homeId] === "photo"
+                                    ? "Finding a photo…"
+                                    : "New photo",
+                                  () => void quickFix(card, "photo"),
+                                ],
+                                [
+                                  fixing[card.homeId] === "copy"
+                                    ? "Writing copy…"
+                                    : "New copy",
+                                  () => void quickFix(card, "copy"),
+                                ],
                               ] as const
                             ).map(([label, onClick]) => (
                               <Button
                                 key={label}
                                 size="xs"
                                 variant="ghost"
+                                disabled={Boolean(fixing[card.homeId])}
                                 onClick={onClick}
                               >
                                 {label}
@@ -469,14 +508,14 @@ export function CatalogCards({
               })}
             </div>
           )}
-          {limit < draft.cards.length && (
+          {limit < visible.length && (
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={() => setLimit(limit + 10)}>
                 Load more homes
               </Button>
               <Button
                 variant="outline"
-                onClick={() => setLimit(draft.cards.length)}
+                onClick={() => setLimit(visible.length)}
               >
                 Load all homes
               </Button>
