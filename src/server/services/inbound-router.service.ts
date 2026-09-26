@@ -144,9 +144,12 @@ function isWithinDays(dateStr: string | null, days: number): boolean {
   return ms !== null && Date.now() - ms < days * 24 * 60 * 60 * 1000;
 }
 
-/** Returns a Slack @mention if the owner has a known Slack ID, otherwise falls back to their display name. */
-function slackMention(ownerId: string | null | undefined): string {
+/** Returns the owner's Slack label, suppressing mentions for owners who opted out. */
+export function slackOwnerLabel(ownerId: string | null | undefined): string {
   if (!ownerId) return "N/A";
+  if (ownerId === HS_USER_IDS.KYLE) {
+    return esc(resolveHsLabel(HS_OWNER_NAMES, ownerId));
+  }
   const slackId = HS_SLACK_IDS[ownerId];
   return slackId
     ? `<@${slackId}>`
@@ -750,7 +753,9 @@ export async function osInboundLeadRouter({
     ...(salesRepEmail
       ? [
           `*Meeting Booked For:* ${
-            overrideOwnerId ? slackMention(overrideOwnerId) : esc(salesRepEmail)
+            overrideOwnerId
+              ? slackOwnerLabel(overrideOwnerId)
+              : esc(salesRepEmail)
           }`,
         ]
       : []),
@@ -771,8 +776,8 @@ export async function osInboundLeadRouter({
       `*Type:* Closed Won wOS Deal`,
       `\n`,
       `*Deal Name:* ${esc(dealName ?? "N/A")}`,
-      `*Deal Owner:* ${slackMention(currentDealOwner)}`,
-      `*BDR:* ${slackMention(bdr)}`,
+      `*Deal Owner:* ${slackOwnerLabel(currentDealOwner)}`,
+      `*BDR:* ${slackOwnerLabel(bdr)}`,
       `*Deal Stage:* ${esc(resolveHsLabel(HS_DEAL_STAGE_LABELS, dealStage))}`,
       `*Date Entered Closed Won:* ${esc(formatHSDate(dealDateEnteredCw))}`,
       `*Last Contacted:* ${esc(formatHSDate(dealLastContacted))}`,
@@ -785,8 +790,8 @@ export async function osInboundLeadRouter({
       `*Type:* Active wOS Deal`,
       `\n`,
       `*Deal Name:* ${esc(dealName ?? "N/A")}`,
-      `*Deal Owner:* ${slackMention(currentDealOwner)}`,
-      `*BDR:* ${slackMention(bdr)}`,
+      `*Deal Owner:* ${slackOwnerLabel(currentDealOwner)}`,
+      `*BDR:* ${slackOwnerLabel(bdr)}`,
       `*Deal Stage:* ${esc(resolveHsLabel(HS_DEAL_STAGE_LABELS, dealStage))}`,
       `*Last Contacted:* ${esc(formatHSDate(dealLastContacted))}`,
       `\n`,
@@ -798,9 +803,9 @@ export async function osInboundLeadRouter({
       `*Type:* Inactive wOS Deal`,
       `\n`,
       `*Deal Name:* ${esc(dealName ?? "N/A")}`,
-      `*Reassigned to:* ${slackMention(aeForRR)}`,
+      `*Reassigned to:* ${slackOwnerLabel(aeForRR)}`,
       `*Previous Owner:* ${esc(resolveHsLabel(HS_OWNER_NAMES, currentDealOwner))}`,
-      `*BDR:* ${slackMention(bdr)}`,
+      `*BDR:* ${slackOwnerLabel(bdr)}`,
       `*Deal Stage:* ${esc(resolveHsLabel(HS_DEAL_STAGE_LABELS, dealStage))}`,
       `*Last Contacted:* ${esc(formatHSDate(dealLastContacted))}`,
       `\n`,
@@ -811,7 +816,7 @@ export async function osInboundLeadRouter({
       ...headerLines,
       `*Type:* Existing Lead (Active)`,
       `\n`,
-      `*Lead Owner:* ${slackMention(currentLeadOwner)}`,
+      `*Lead Owner:* ${slackOwnerLabel(currentLeadOwner)}`,
       `*Lead Status:* ${esc(resolveHsLabel(leadStatusSource === "contact" ? HS_CONTACT_LEAD_STATUS_LABELS : HS_COMPANY_LEAD_STATUS_LABELS, leadStatus))}`,
       `*Last Contacted:* ${esc(formatHSDate(lastContacted))}`,
       `\n`,
@@ -824,8 +829,8 @@ export async function osInboundLeadRouter({
       `*Inbound Date:* ${esc(formatHSDate(dealCreatedAt))}`,
       `\n`,
       `*Deal Name:* ${esc(dealName)}`,
-      `*Deal Owner:* ${slackMention(currentDealOwner)}`,
-      `*BDR:* ${slackMention(bdr)}`,
+      `*Deal Owner:* ${slackOwnerLabel(currentDealOwner)}`,
+      `*BDR:* ${slackOwnerLabel(bdr)}`,
       `*Deal Stage:* ${esc(resolveHsLabel(HS_DEAL_STAGE_LABELS, dealStage))}`,
       `*Last Contacted:* ${esc(formatHSDate(dealLastContacted))}`,
       `\n`,
@@ -837,7 +842,7 @@ export async function osInboundLeadRouter({
       `*Type:* Resubmission`,
       `*Inbound Date:* ${esc(formatHSDate(inboundDate))}`,
       `\n`,
-      `*Lead Owner:* ${slackMention(currentLeadOwner)}`,
+      `*Lead Owner:* ${slackOwnerLabel(currentLeadOwner)}`,
       `*Lead Status:* ${esc(resolveHsLabel(leadStatusSource === "contact" ? HS_CONTACT_LEAD_STATUS_LABELS : HS_COMPANY_LEAD_STATUS_LABELS, leadStatus))}`,
       `*Last Contacted:* ${esc(formatHSDate(lastContacted))}`,
       `\n`,
@@ -848,7 +853,7 @@ export async function osInboundLeadRouter({
       ...headerLines,
       `*Type:* Existing Lead (Inactive)`,
       `\n`,
-      `*Reassigned to:* ${slackMention(aeForRR)}`,
+      `*Reassigned to:* ${slackOwnerLabel(aeForRR)}`,
       `*Previous Owner:* ${esc(resolveHsLabel(HS_OWNER_NAMES, currentLeadOwner))}`,
       `*Lead Status:* ${esc(resolveHsLabel(leadStatusSource === "contact" ? HS_CONTACT_LEAD_STATUS_LABELS : HS_COMPANY_LEAD_STATUS_LABELS, leadStatus))}`,
       `*Last Contacted:* ${esc(formatHSDate(lastContacted))}`,
@@ -861,7 +866,7 @@ export async function osInboundLeadRouter({
       ...headerLines,
       `*Type:* New Inbound Lead`,
       `\n`,
-      `*Assigned to:* ${slackMention(aeForRR)}`,
+      `*Assigned to:* ${slackOwnerLabel(aeForRR)}`,
       `\n`,
       ...footerLines,
     ];

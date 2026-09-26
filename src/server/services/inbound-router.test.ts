@@ -1,6 +1,10 @@
 import { describe, expect, it } from "bun:test";
 
-import { inboundLeadStatus } from "@/server/services/inbound-router.service";
+import {
+  inboundLeadStatus,
+  slackOwnerLabel,
+} from "@/server/services/inbound-router.service";
+import { HS_SLACK_IDS, HS_USER_IDS } from "@/server/clients/hubspot.client";
 
 describe("inboundLeadStatus", () => {
   it("qualifies a WanderOS inbound only at 10+ units", () => {
@@ -57,5 +61,17 @@ describe("inboundLeadStatus", () => {
         numberOfProperties: "50",
       }),
     ).toBe("Listed Inbound");
+  });
+});
+
+describe("slackOwnerLabel", () => {
+  it("shows Kyle's name without notifying him", () => {
+    expect(slackOwnerLabel(HS_USER_IDS.KYLE)).toBe("Kyle Tibbitts");
+  });
+
+  it("continues mentioning other assigned owners", () => {
+    expect(slackOwnerLabel(HS_USER_IDS.KRIS)).toBe(
+      `<@${HS_SLACK_IDS[HS_USER_IDS.KRIS]}>`,
+    );
   });
 });
