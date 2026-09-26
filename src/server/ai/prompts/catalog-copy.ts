@@ -43,11 +43,11 @@ export function catalogCopyRules(input: {
 
 ${layouts}
 
-The best line is usually in the description and the location paragraph, so read those before the amenity list. The amenity list is evidence, not the message: everyday items describe every home.${brandWide} A number can sell when it is the point (sleeps 22 in a lodge, 12 acres).
+The best line is usually in the description and the location paragraph, so read those before the amenity list. The amenity list is evidence, not the message: everyday items describe every home.${brandWide} A number can sell when it is the point and the facts line does not already show it (12 acres, 2 miles from the falls).
 
-Sentence case, "&" to join two ideas, never an em dash.
+Sentence case, "&" to join two ideas, never an em dash. Frame every fact as what a guest gains, never as what is missing: an interior suite is "tucked away from street noise", not "no windows".
 
-When homes are near-identical (units in one building), a strong real lead shared with a few other cards beats a weak unique one: vary the pairing and the wording. Look-alike homes (numbered A-frames, units on one lane) get different angles from their own descriptions and photos. Keep the listing's qualifiers exactly: "seasonal" stays seasonal, and "private" appears only when the listing says private (a community pool is not a private pool). Use only this home's own listing; never invent a fact or borrow one from a sibling. The facts line is bedrooms · baths · guests unless the operator asks otherwise.
+When homes are near-identical (units in one building), a strong real lead shared with a few other cards beats a weak unique one: vary the pairing and the wording. Look-alike homes (numbered A-frames, units on one lane) get different angles from their own descriptions and photos. Keep the listing's qualifiers exactly: "seasonal" stays seasonal, and "private" appears only when the listing says private (a community pool is not a private pool). Use only this home's own listing; never invent a fact or borrow one from a sibling. The facts line is bedrooms · baths · guests unless the operator asks otherwise, and it sits right under the headline, so the headline never repeats its numbers: "Two suites merged into one", not "Two suites merged into one for 16".
 
 Hero: a catalog card sells the stay at a glance, so default to the home's exterior in good light, or an aerial when the home sits on grounds, a pool or a view that sells it. People enjoying the home are a plus. Use an interior when it is the home's signature (a wall of windows, a great room, a downtown loft) and the exterior is weak. Avoid bathrooms, close-ups, and dark, cluttered or tilted frames.`;
 }

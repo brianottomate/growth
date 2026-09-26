@@ -228,15 +228,15 @@ export const CATALOG_COPY_INTENTS = {
   },
   "catalog-amenities": {
     intent:
-      'A space-led card. The pills below carry the amenities, so the headline never lists them: it describes the space itself, the way a friend who has stayed there would ("Two suites joined for groups", "Log cabin on 12 wooded acres", "Glass house above the vineyards"). A headline that names two amenities is doing what the pills are for. Then choose the pills: the two or three amenities a guest would filter a search by and pick this home for (a hot tub, a pool, a soaking tub, a river or city view, a rooftop deck, pets welcome, free parking, a fireplace, a game room), most pulling first, each a short label (1–3 words) of something this listing actually has.',
-    headlineChars: 40,
+      'A space-led card. The pills below carry the amenities, so the headline never lists them: it describes the space itself, the way a friend who has stayed there would ("Two suites joined for groups", "Log cabin on 12 wooded acres", "Glass house above the vineyards"). A headline that names two amenities is doing what the pills are for. Then choose the pills: the two or three amenities a guest would filter a search by and pick this home for (a hot tub, a pool, a soaking tub, a river or city view, a rooftop deck, pets welcome, free parking, a fireplace, a game room), most pulling first, each a short label (1–3 words) of something this listing actually has. Prefer what sets this home apart; an amenity nearly every home in the catalog has (the brand-wide list) only when nothing else sells it.',
+    headlineChars: 42,
     placeSuffix: false,
     pills: 3,
   },
   "catalog-amenities-place": {
     intent:
-      'A space-led card with the location already shown as its first pill, so the headline never names the city. The pills below carry the amenities, so the headline never lists them: it describes the space itself, the way a friend who has stayed there would ("Two suites joined for groups", "Log cabin on 12 wooded acres"). A headline that names two amenities is doing what the pills are for. Then choose the pills: the two or three amenities a guest would filter a search by and pick this home for (a hot tub, a pool, a soaking tub, a river or city view, a rooftop deck, pets welcome, free parking, a fireplace, a game room), most pulling first, each a short label (1–3 words) of something this listing actually has.',
-    headlineChars: 40,
+      'A space-led card with the location already shown as its first pill, so the headline never names the city or the place. The pills below carry the amenities, so the headline never lists them: it describes the space itself, the way a friend who has stayed there would ("Two suites joined for groups", "Log cabin on 12 wooded acres"). A headline that names two amenities is doing what the pills are for. Then choose the pills: the two or three amenities a guest would filter a search by and pick this home for (a hot tub, a pool, a soaking tub, a river or city view, a rooftop deck, pets welcome, free parking, a fireplace, a game room), most pulling first, each a short label (1–3 words) of something this listing actually has. Prefer what sets this home apart; an amenity nearly every home in the catalog has (the brand-wide list) only when nothing else sells it.',
+    headlineChars: 42,
     placeSuffix: false,
     pills: 3,
   },
