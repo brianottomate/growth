@@ -822,9 +822,24 @@ export function renderComposition(
             left: 0,
             width: "100%",
             height: "100%",
-            background: `linear-gradient(180deg, ${scrim(0.42)} 0%, ${scrim(0.3)} 20%, ${scrim(0)} 44%, ${scrim(0)} 82%, ${scrim(0.16)} 100%)`,
+            background: `linear-gradient(180deg, ${scrim(0.62)} 0%, ${scrim(0.46)} 22%, ${scrim(0.16)} 42%, ${scrim(0)} 56%, ${scrim(0)} 80%, ${scrim(0.2)} 100%)`,
           }}
         />
+        {/* Wide canvases set the headline in the left half, below the top
+            band's reach on a bright window: darken the text side too. */}
+        {wide ? (
+          <div
+            style={{
+              display: "flex",
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              background: `linear-gradient(90deg, ${scrim(0.5)} 0%, ${scrim(0.3)} 38%, ${scrim(0)} 66%)`,
+            }}
+          />
+        ) : null}
         <div
           style={{
             display: "flex",
@@ -949,7 +964,7 @@ export function renderComposition(
             left: 0,
             width: "100%",
             height: "100%",
-            background: `linear-gradient(180deg, ${scrim(0.2)} 0%, ${scrim(0)} 18%, ${scrim(0)} 52%, ${scrim(0.38)} 78%, ${scrim(0.64)} 100%)`,
+            background: `linear-gradient(180deg, ${scrim(0.2)} 0%, ${scrim(0)} 18%, ${scrim(0)} 48%, ${scrim(0.46)} 74%, ${scrim(0.78)} 100%)`,
           }}
         />
         <div
@@ -1307,7 +1322,7 @@ export function renderComposition(
             right: 0,
             bottom: 0,
             height: "62%",
-            background: `linear-gradient(180deg, ${scrim(0)} 0%, ${scrim(0.55)} 45%, ${scrim(0.82)} 100%)`,
+            background: `linear-gradient(180deg, ${scrim(0)} 0%, ${scrim(0.6)} 45%, ${scrim(0.88)} 100%)`,
           }}
         />
         {/* Brand logos arrive in brand colours, not white; a light scrim keeps
@@ -1444,7 +1459,7 @@ export function renderComposition(
             right: 0,
             bottom: 0,
             height: "58%",
-            background: `linear-gradient(180deg, ${scrim(0)} 0%, ${scrim(0.5)} 40%, ${scrim(0.85)} 100%)`,
+            background: `linear-gradient(180deg, ${scrim(0)} 0%, ${scrim(0.56)} 40%, ${scrim(0.9)} 100%)`,
           }}
         />
         {/* The mark is optional here: an ad in the feed already shows the
@@ -1633,7 +1648,7 @@ export function renderComposition(
             top: 0,
             height: "58%",
             background: centred
-              ? `linear-gradient(180deg, ${scrim(0.34)} 0%, ${scrim(0.24)} 55%, ${scrim(0)} 100%)`
+              ? `linear-gradient(180deg, ${scrim(0.58)} 0%, ${scrim(0.42)} 50%, ${scrim(0)} 100%)`
               : "linear-gradient(180deg, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.35) 55%, rgba(0,0,0,0) 100%)",
           }}
         />
@@ -1646,7 +1661,7 @@ export function renderComposition(
             bottom: 0,
             height: "28%",
             background: centred
-              ? `linear-gradient(0deg, ${scrim(0.24)} 0%, ${scrim(0)} 100%)`
+              ? `linear-gradient(0deg, ${scrim(0.46)} 0%, ${scrim(0)} 100%)`
               : "linear-gradient(0deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 100%)",
           }}
         />
