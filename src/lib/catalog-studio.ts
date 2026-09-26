@@ -242,10 +242,18 @@ export function catalogCardCopy(card: CatalogCard): {
   eyebrow?: string;
   subtitle: string;
   rating?: number;
+  pills?: string[];
+  location?: string;
 } {
+  // The amenities cards draw pills (and a location) instead of the rating.
+  const amenities = card.templateId.startsWith("catalog-amenities");
   const base = {
     subtitle: card.subtitle,
-    ...(card.rating ? { rating: card.rating } : {}),
+    ...(card.rating && !amenities ? { rating: card.rating } : {}),
+    ...(amenities && card.pills?.length ? { pills: card.pills } : {}),
+    ...(card.templateId === "catalog-amenities-place" && card.location
+      ? { location: card.location }
+      : {}),
   };
   if (card.templateId !== "catalog-place")
     return { ...base, title: card.title };

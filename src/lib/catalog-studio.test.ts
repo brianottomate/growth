@@ -222,3 +222,18 @@ test("a card names its confirmed market, never a draft", () => {
     "Hocking Hills, Ohio",
   );
 });
+
+test("a frozen amenities card keeps its pills and location", () => {
+  const card = {
+    ...catalogDraft(homes).cards[0]!,
+    templateId: "catalog-amenities-place" as const,
+    pills: ["Hot tub", "Fire pit"],
+    location: "Hocking Hills, Ohio",
+    rating: 4.9,
+  };
+  expect(catalogCardCopy(card)).toMatchObject({
+    pills: ["Hot tub", "Fire pit"],
+    location: "Hocking Hills, Ohio",
+  });
+  expect(catalogCardCopy(card).rating).toBeUndefined();
+});

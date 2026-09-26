@@ -121,6 +121,56 @@ function wrapText(value: string, maxCharacters: number) {
 }
 
 /**
+ * Two lines of about equal length instead of a full first line and a stray
+ * word or two below it. Falls back to plain wrapping past two lines.
+ */
+function balancedLines(value: string, maxCharacters: number) {
+  const greedy = wrapText(value, maxCharacters);
+  if (greedy.length !== 2) return greedy;
+  const words = value.split(/\s+/);
+  let best = greedy;
+  let bestGap = Math.abs(greedy[0]!.length - greedy[1]!.length);
+  for (let at = 1; at < words.length; at++) {
+    const first = words.slice(0, at).join(" ");
+    const second = words.slice(at).join(" ");
+    if (first.length > maxCharacters || second.length > maxCharacters) continue;
+    // A slightly longer first line reads better than a longer second one.
+    const gap =
+      Math.abs(first.length - second.length) +
+      (second.length > first.length ? 1 : 0);
+    if (gap < bestGap) {
+      best = [first, second];
+      bestGap = gap;
+    }
+  }
+  return best;
+}
+
+/**
+ * The pills that fit one row, in order: a pill that would wrap is left off.
+ * Widths are estimated from the character count at the pill's font size.
+ */
+function pillsOnOneRow(
+  labels: readonly string[],
+  rowWidth: number,
+  fontSize: number,
+  paddingX: number,
+  gap: number,
+) {
+  const width = (label: string) =>
+    Math.ceil(label.length * fontSize * 0.56) + paddingX * 2 + 4;
+  const kept: string[] = [];
+  let used = 0;
+  for (const label of labels) {
+    const next = used + (kept.length ? gap : 0) + width(label);
+    if (next > rowWidth) break;
+    kept.push(label);
+    used = next;
+  }
+  return kept;
+}
+
+/**
  * Hosts an on-demand preview may draw a photo from without importing it: a
  * brand's own listing photos on WanderOS and our own library. Anything else
  * is refused, so the preview route cannot be pointed at an arbitrary server.
@@ -691,7 +741,10 @@ export function catalogHeadline(
     Partial<Pick<CompositionSpec, "templateId" | "eyebrow">>,
 ) {
   if (spec.templateId === "catalog-place") return placeStatement(spec);
-  return wrapText(clamp(spec.title, 90), spec.formatId === "square" ? 24 : 22);
+  return balancedLines(
+    clamp(spec.title, 90),
+    spec.formatId === "square" ? 24 : 22,
+  );
 }
 
 /** Where a hook hands over to the place: the word that goes down with the place. */
@@ -1414,7 +1467,7 @@ export function renderComposition(
     // amenities; the place card folds the place into the statement.
     const amenities = spec.templateId !== "catalog-place";
     const statement = amenities
-      ? wrapText(clamp(spec.title, 90), square ? 26 : 24)
+      ? balancedLines(clamp(spec.title, 90), square ? 26 : 24)
       : placeStatement(spec);
     const facts = clamp(spec.subtitle, 80);
     // The amenities cards leave the rating out; the place variant leads its
@@ -1425,7 +1478,17 @@ export function renderComposition(
       spec.templateId === "catalog-amenities-place"
         ? clamp(spec.location, 32)
         : "";
-    const pills = amenities ? (spec.pills ?? []).slice(0, 3) : [];
+    // One row: the location pill first, then the amenities that still fit.
+    const pillRow = pillsOnOneRow(
+      [location, ...(amenities ? (spec.pills ?? []).slice(0, 3) : [])].filter(
+        Boolean,
+      ),
+      format.width - pad * 2,
+      Math.round(26 * scale),
+      Math.round(24 * scale),
+      12,
+    );
+    const pills = location ? pillRow.slice(1) : pillRow;
     content = (
       <div
         style={{
