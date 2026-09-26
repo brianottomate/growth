@@ -11,19 +11,12 @@ import { toast } from "@/components/ui/toast";
 import { digestDesignStudioCode } from "@/lib/design-studio-export";
 import {
   savingsLabel,
-  stayLabel,
   type DigestProperty,
   type ListingsDigest,
 } from "@/lib/listings-digest";
 import { orpc } from "@/orpc/client";
 
 type Slot = { section: number; property: number };
-
-/**
- * wander.com caches one cheapest range per home, and for a few it is a month
- * ("$76,367 for 31 nights"). The card prints it; an email should not.
- */
-const LONGEST_QUOTABLE_STAY = 7;
 
 /**
  * Choose a photo for every home in a property digest.
@@ -40,12 +33,15 @@ const LONGEST_QUOTABLE_STAY = 7;
 export function DigestImageBoard({
   digest,
   intro,
+  campaign,
   brandId,
   onChange,
 }: {
   digest: ListingsDigest;
   /** The issue's intro copy, which the Design Studio export sets above the homes. */
   intro?: string | null;
+  /** The issue's title, which tags the homes' links (utm_campaign). */
+  campaign?: string | null;
   brandId: string;
   onChange: (next: ListingsDigest) => void;
 }) {
@@ -103,7 +99,7 @@ export function DigestImageBoard({
   );
   const runMatch = (only?: Slot, from = digest) => {
     setMatching(only ?? "all");
-    match.mutate({ digest: from, only });
+    match.mutate({ digest: from, only, campaign: campaign ?? undefined });
   };
 
   /** Point an entry at one listing and match just that one. */
@@ -125,27 +121,6 @@ export function DigestImageBoard({
     };
     onChange(next);
     runMatch(slot, next);
-  };
-
-  // The inputs hold what is typed; the digest only takes a whole window.
-  const [stayDraft, setStayDraft] = useState({
-    checkIn: digest.stayWindow?.checkIn ?? "",
-    checkOut: digest.stayWindow?.checkOut ?? "",
-  });
-  const setWindow = (edge: "checkIn" | "checkOut", value: string) => {
-    const next = { ...stayDraft, [edge]: value };
-    setStayDraft(next);
-    const whole = next.checkIn && next.checkOut && next.checkOut > next.checkIn;
-    if (!whole && (next.checkIn || next.checkOut)) return;
-    // New dates are new prices: re-quote every home for them straight away.
-    const repriced = { ...digest, stayWindow: whole ? next : null };
-    onChange(repriced);
-    if (
-      digest.sections.some((section) =>
-        section.properties.some((p) => p.homeId),
-      )
-    )
-      runMatch(undefined, repriced);
   };
 
   const homes = digest.sections.flatMap((section) => section.properties);
@@ -196,31 +171,6 @@ export function DigestImageBoard({
             Copy Design Studio code
           </button>
         </div>
-      </div>
-
-      <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
-        <span className="text-muted-foreground">Stay</span>
-        <input
-          type="date"
-          aria-label="Check-in"
-          value={stayDraft.checkIn}
-          onChange={(event) => setWindow("checkIn", event.target.value)}
-          className="rounded-md border bg-background px-2 py-1"
-        />
-        <span className="text-muted-foreground">to</span>
-        <input
-          type="date"
-          aria-label="Check-out"
-          value={stayDraft.checkOut}
-          min={stayDraft.checkIn || undefined}
-          onChange={(event) => setWindow("checkOut", event.target.value)}
-          className="rounded-md border bg-background px-2 py-1"
-        />
-        {!digest.stayWindow ? (
-          <span className="text-muted-foreground">
-            each home&apos;s cheapest stay
-          </span>
-        ) : null}
       </div>
 
       <div className="space-y-4">
@@ -353,26 +303,9 @@ function HomeTile({
           <p className="truncate text-[11px]" title={property.name}>
             {property.name}
           </p>
-          {property.stay ? (
-            <p
-              className={cn(
-                "text-[10px]",
-                property.stay.nights > LONGEST_QUOTABLE_STAY
-                  ? "text-amber-500"
-                  : "text-muted-foreground",
-              )}
-              title={
-                property.stay.nights > LONGEST_QUOTABLE_STAY
-                  ? "wander.com's cheapest cached stay for this home is longer than a week"
-                  : undefined
-              }
-            >
-              {stayLabel(property.stay)}
-            </p>
-          ) : null}
-          {property.stayUnavailable ? (
-            <p className="text-[10px] text-amber-500">
-              Not bookable for the stay dates
+          {property.priceLabel ? (
+            <p className="text-[10px] text-muted-foreground">
+              {property.priceLabel}
             </p>
           ) : null}
           {property.savingsUsd ? (

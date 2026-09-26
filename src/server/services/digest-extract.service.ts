@@ -37,15 +37,6 @@ const DigestExtraction = z.object({
     .nullable()
     .describe("Why this send, if the source says so. Never invented."),
   sections: z.array(digestTranscribedSectionSchema).min(1).max(10),
-  stayWindow: z
-    .object({
-      checkIn: z.string().describe("YYYY-MM-DD"),
-      checkOut: z.string().describe("YYYY-MM-DD"),
-    })
-    .nullable()
-    .describe(
-      "The one stay every home is quoted for, when the paste states it (a 'Stays:' line or equivalent). Null when it does not, or when homes are quoted for different dates. Never invented.",
-    ),
 });
 
 const SYSTEM = [
@@ -131,15 +122,6 @@ export async function extractDigest(
         ...section,
         properties: section.properties.map(splitCityFromName),
       })),
-      // Only a real date range becomes the issue's stay; anything else the
-      // model read is dropped rather than quoting homes for a guessed week.
-      stayWindow:
-        output.digest.stayWindow &&
-        /^\d{4}-\d{2}-\d{2}$/.test(output.digest.stayWindow.checkIn) &&
-        /^\d{4}-\d{2}-\d{2}$/.test(output.digest.stayWindow.checkOut) &&
-        output.digest.stayWindow.checkOut > output.digest.stayWindow.checkIn
-          ? output.digest.stayWindow
-          : null,
     },
     notes: output.notes ?? [],
   };

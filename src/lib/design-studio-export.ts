@@ -1,8 +1,4 @@
-import {
-  stayLabel,
-  type DigestProperty,
-  type ListingsDigest,
-} from "./listings-digest";
+import { type DigestProperty, type ListingsDigest } from "./listings-digest";
 
 /**
  * A property digest as Customer.io Design Studio code, one block per market,
@@ -58,7 +54,7 @@ function homeTitle(property: DigestProperty, featured: boolean) {
 }
 
 function priceLine(property: DigestProperty) {
-  if (property.stay) return stayLabel(property.stay);
+  if (property.priceLabel?.trim()) return property.priceLabel.trim();
   if (property.nightlyUsd)
     return `$${property.nightlyUsd.toLocaleString("en-US")}/night`;
   return null;

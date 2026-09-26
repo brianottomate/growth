@@ -47,22 +47,18 @@ export const digestPropertySchema = z.object({
   /** Badged tiers only; a STANDARD home carries no pill. */
   tier: z.enum(["LUXURY", "ICONIC"]).nullable().optional(),
   /**
-   * The cheapest stay wander.com advertises, as the card prints it: the
-   * all-in total in whole dollars ("$1,037 for 3 nights").
+   * The price line as the issue prints it: "$2,984 for 3 nights (October
+   * 16-19)". Written from the paste when it states a price; otherwise, once
+   * matched, from the home's cheapest stay on wander.com. Text, not data: the
+   * email quotes it and nothing re-prices it.
    */
-  stay: z
-    .object({
-      totalUsd: z.number().int().nonnegative(),
-      nights: z.number().int().positive(),
-      checkIn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-      checkOut: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    })
-    .nullable()
-    .optional(),
-  /** wander.com's "~$X less than other sites" for that stay. 0 = no line. */
+  priceLabel: z.string().trim().max(160).nullable().optional(),
+  /**
+   * "Save ~$X": wander.com's "less than other sites" line for that price.
+   * From the paste when it states one, else for the cheapest stay. 0 or null
+   * prints nothing.
+   */
   savingsUsd: z.number().int().nonnegative().nullable().optional(),
-  /** The issue has stay dates and this home cannot be booked for them. */
-  stayUnavailable: z.boolean().nullable().optional(),
   /** The listing photo `imageUrl` was rendered from. */
   heroUrl: z.string().trim().url().max(2_000).nullable().optional(),
   /**
@@ -119,16 +115,37 @@ export const digestTranscribedSectionSchema = digestSectionSchema
   .extend({
     properties: z
       .array(
-        digestPropertySchema.pick({
-          name: true,
-          city: true,
-          sleeps: true,
-          nightlyUsd: true,
-          perPersonUsd: true,
-          operated: true,
-          href: true,
-          imageUrl: true,
-        }),
+        digestPropertySchema
+          .pick({
+            name: true,
+            city: true,
+            sleeps: true,
+            nightlyUsd: true,
+            perPersonUsd: true,
+            operated: true,
+            href: true,
+            imageUrl: true,
+          })
+          .extend({
+            priceLabel: z
+              .string()
+              .trim()
+              .max(160)
+              .nullable()
+              .optional()
+              .describe(
+                "The stay price as the paste states it. When it gives a total, a number of nights and dates, write it as '$2,984 for 3 nights (October 16-19)'; otherwise copy it as written. Null when the paste gives no price for the stay. Never compute or invent one.",
+              ),
+            savingsUsd: z
+              .number()
+              .int()
+              .nonnegative()
+              .nullable()
+              .optional()
+              .describe(
+                "A savings figure the paste states for the home ('Save ~$240' is 240). Null when it states none.",
+              ),
+          }),
       )
       .min(1)
       .max(12),
@@ -141,18 +158,6 @@ export const listingsDigestSchema = z.object({
   /** Why this send, when the source states it. */
   rationale: z.string().trim().max(1_000).nullable().optional(),
   sections: z.array(digestSectionSchema).min(1).max(10),
-  /**
-   * The stay every home is quoted for ("October 16-19"), when the issue has
-   * one. Without it each home shows the cheapest stay wander.com caches for
-   * it, which can be any dates and any length.
-   */
-  stayWindow: z
-    .object({
-      checkIn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-      checkOut: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    })
-    .nullable()
-    .optional(),
 });
 
 export type ListingsDigest = z.infer<typeof listingsDigestSchema>;
@@ -172,7 +177,12 @@ function stayDates(checkIn: string, checkOut: string) {
 }
 
 /** "$1,037 for 3 nights (November 13-16)", as the issue prints it. */
-export function stayLabel(stay: NonNullable<DigestProperty["stay"]>) {
+export function stayLabel(stay: {
+  totalUsd: number;
+  nights: number;
+  checkIn: string;
+  checkOut: string;
+}) {
   return `$${stay.totalUsd.toLocaleString("en-US")} for ${stay.nights} night${stay.nights === 1 ? "" : "s"} (${stayDates(stay.checkIn, stay.checkOut)})`;
 }
 

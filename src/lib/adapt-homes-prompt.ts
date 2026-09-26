@@ -7,7 +7,7 @@
  * and the shape of the answer. The rules are the newsletter's own (3 markets
  * × 3 homes, exact three-night all-in prices, a $5,000 cap, no recent
  * markets), and the reply format is the one Growth's paste reader turns
- * straight into the issue's homes and stay dates.
+ * straight into the issue's homes, each with its price line and savings.
  */
 
 export type AdaptHomesPromptInput = {
@@ -16,8 +16,6 @@ export type AdaptHomesPromptInput = {
   purpose?: string | null;
   /** When the issue goes out. */
   sendDate?: Date | string | null;
-  /** The stay every home is quoted for; Adapt proposes one when absent. */
-  stayWindow?: { checkIn: string; checkOut: string } | null;
 };
 
 function day(value: Date | string) {
@@ -32,9 +30,6 @@ function day(value: Date | string) {
 }
 
 export function adaptHomesPrompt(input: AdaptHomesPromptInput) {
-  const stay = input.stayWindow
-    ? `${day(input.stayWindow.checkIn)} to ${day(input.stayWindow.checkOut)}. Quote every home for exactly these dates.`
-    : "Propose one three-night stay, one to three weeks after the send date, that fits the premise. Quote every home for those same dates.";
   return [
     "Find the homes for a Wander newsletter issue.",
     "",
@@ -42,21 +37,20 @@ export function adaptHomesPrompt(input: AdaptHomesPromptInput) {
     input.sendDate ? `Send date: ${day(input.sendDate)}` : null,
     input.hook ? `Premise: ${input.hook}` : null,
     input.purpose ? `Purpose: ${input.purpose}` : null,
-    `Stay: ${stay}`,
+    "Stay: choose one three-night stay, one to three weeks after the send date, that fits the premise, and quote every home for those same dates.",
     "",
     "Rules:",
     "- 3 markets × 3 homes. Each market fits the premise and has not been featured in a Wander newsletter in the last eight weeks.",
     "- LUXURY or ICONIC tier only, live on wander.com and bookable for the stay dates.",
     "- Price each home for the stay, all-in (taxes and fees), at its max occupancy. No home over $5,000; where one exists, include an option around $1,000–$1,500 in each market.",
+    '- Savings is wander.com\'s "~$X less than other sites" figure for that stay.',
     "- Mix price levels within a market and mark any Wander-operated home.",
     "- Prefer homes with a strong exterior photo; the newsletter leads with it.",
     "",
     "Reply in exactly this format, nothing before or after it:",
     "",
-    "Stays: YYYY-MM-DD to YYYY-MM-DD",
-    "",
     "MARKET, STATE",
-    "- Home name (City) | sleeps N | $TOTAL all-in | TIER",
+    "- Home name (City) | sleeps N | $TOTAL for 3 nights (Month D-D) | Save ~$X | TIER",
     "- …",
     "",
     "(the other two markets the same way)",

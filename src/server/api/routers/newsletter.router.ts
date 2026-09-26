@@ -140,6 +140,8 @@ export const newsletterRouter = {
     .input(
       z.object({
         digest: listingsDigestSchema,
+        /** The issue's title, for the links' utm_campaign. */
+        campaign: z.string().trim().max(200).optional(),
         only: z
           .object({
             section: z.number().int().nonnegative(),

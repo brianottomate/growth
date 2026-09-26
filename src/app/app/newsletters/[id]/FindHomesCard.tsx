@@ -23,8 +23,6 @@ export function FindHomesCard({
   purpose?: string | null;
   sendDate?: Date | string | null;
 }) {
-  const [checkIn, setCheckIn] = useState("");
-  const [checkOut, setCheckOut] = useState("");
   const [copied, setCopied] = useState(false);
 
   const prompt = useMemo(
@@ -34,12 +32,8 @@ export function FindHomesCard({
         hook,
         purpose,
         sendDate,
-        stayWindow:
-          checkIn && checkOut && checkOut > checkIn
-            ? { checkIn, checkOut }
-            : null,
       }),
-    [title, hook, purpose, sendDate, checkIn, checkOut],
+    [title, hook, purpose, sendDate],
   );
 
   const copy = async () => {
@@ -75,29 +69,6 @@ export function FindHomesCard({
             <ExternalLink className="size-3.5" />
           </a>
         </div>
-      </div>
-
-      <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
-        <span className="text-muted-foreground">Stay</span>
-        <input
-          type="date"
-          aria-label="Check-in"
-          value={checkIn}
-          onChange={(event) => setCheckIn(event.target.value)}
-          className="rounded-md border bg-background px-2 py-1"
-        />
-        <span className="text-muted-foreground">to</span>
-        <input
-          type="date"
-          aria-label="Check-out"
-          value={checkOut}
-          min={checkIn || undefined}
-          onChange={(event) => setCheckOut(event.target.value)}
-          className="rounded-md border bg-background px-2 py-1"
-        />
-        {!(checkIn && checkOut) ? (
-          <span className="text-muted-foreground">Adapt proposes one</span>
-        ) : null}
       </div>
 
       <pre className="max-h-64 overflow-auto rounded-lg bg-muted p-3 text-[11px] leading-5 whitespace-pre-wrap text-muted-foreground">

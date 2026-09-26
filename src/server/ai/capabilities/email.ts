@@ -189,6 +189,11 @@ export const createDigestFromRow = growthAction({
             digest,
             orgId: ctx.orgId,
             userId: ctx.userId,
+            campaign:
+              existing?.content?.title ??
+              existing?.document.subject ??
+              input.title ??
+              theme,
           }).catch((error: unknown) => {
             console.error("[digest] wander.com matching failed", error);
             return null;
@@ -274,11 +279,10 @@ export const createDigestFromRow = growthAction({
             failed: outcomes
               .filter((row) => row.status === "failed")
               .map((row) => row.name),
-            stayWindow: saved.stayWindow ?? null,
           }
         : null,
       nextStep: matched
-        ? "The homes are matched to wander.com: each has its tier, its price for the stay dates and an email photo with the tier pill. Tell the operator how many matched, name any that need a pick (the board shows the candidates) or that failed, and mention the stay dates if none were given (prices are then each home's cheapest cached stay; setting dates on the board re-prices them). Then offer to draft the subject, preheader and intro."
+        ? "The homes are matched to wander.com: each has its tier and an email photo with the tier pill, and its price line is the paste's (or, where the paste gave none, the home's cheapest stay on wander.com). Tell the operator how many matched and name any that need a pick (the board shows the candidates) or that failed. Then offer to draft the subject, preheader and intro."
         : "Every home needs a photo. List them for the operator with their source URLs so each one can be sourced, then call emailWrite.setDigestImage as each image URL comes back.",
     };
   },

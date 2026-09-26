@@ -258,6 +258,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
             <DigestImageBoard
               digest={draft.digest}
               intro={draft.bodyMarkdown}
+              campaign={workspace.content?.title || draft.subject}
               brandId={workspace.brand.id}
               onChange={(digest) => setDraft({ ...draft, digest })}
             />

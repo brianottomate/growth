@@ -1,14 +1,17 @@
 import "server-only";
 
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
-import type { DigestProperty, ListingsDigest } from "@/lib/listings-digest";
+import {
+  stayLabel,
+  type DigestProperty,
+  type ListingsDigest,
+} from "@/lib/listings-digest";
 import { otaSavingsUsd, stayTotalUsd } from "@/lib/ota-savings";
 import {
   badgedTier,
   fetchMarketplaceListing,
   marketplaceSearchUrl,
-  quoteMarketplaceStays,
   suggestMarketplacePlaces,
   type MarketplaceListing,
 } from "@/server/clients/wander-marketplace.client";
@@ -75,41 +78,55 @@ export async function renderHomeEmailImage(input: {
   return frozen.url;
 }
 
+/** "Follow the fall colors" → "follow-the-fall-colors", for a UTM value. */
+function utmSlug(value: string) {
+  return (
+    value
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || "newsletter"
+  );
+}
+
 /**
- * The link a home's card opens: its page with the advertised stay's dates,
- * so the price the reader lands on is the price the email quoted.
+ * The link a home's card opens: its plain listing page, tagged so a booking
+ * from the issue shows up in Amplitude as the newsletter's, by issue
+ * (campaign) and by home (content). wander.com carries UTMs from landing
+ * onto every event, so tagging the link is all it takes.
  */
-function stayHref(
-  url: string,
-  stay: { checkIn: string; checkOut: string } | null | undefined,
-) {
-  if (!stay) return url;
+export function newsletterLink(url: string, campaign: string) {
   const link = new URL(url);
-  link.searchParams.set("checkIn", stay.checkIn);
-  link.searchParams.set("checkOut", stay.checkOut);
+  link.search = "";
+  link.searchParams.set("utm_source", "newsletter");
+  link.searchParams.set("utm_medium", "email");
+  link.searchParams.set("utm_campaign", utmSlug(campaign));
+  link.searchParams.set(
+    "utm_content",
+    link.pathname.split("/").filter(Boolean).pop() ?? "home",
+  );
   return link.toString();
 }
 
-/** Everything the digest takes from a matched home, photo included. */
+/**
+ * Everything the digest takes from a matched home, photo included. The price
+ * and savings are the paste's when it gave them, so the email quotes what the
+ * issue was planned around; a home the paste did not price shows its
+ * cheapest stay on wander.com.
+ */
 async function propertyFromHome(input: {
   property: DigestProperty;
   row: HomeRow;
   brandId: string;
   userId: string;
+  campaign: string;
 }): Promise<DigestProperty> {
   const { row } = input;
   const property = splitCityFromName(input.property);
   const tier = badgedTier(row.tier);
-  const stay = row.cheapestStay
-    ? {
-        totalUsd: stayTotalUsd(
-          row.cheapestStay.totalCents ?? row.cheapestStay.priceCents,
-        ),
-        nights: row.cheapestStay.nights,
-        checkIn: row.cheapestStay.checkIn,
-        checkOut: row.cheapestStay.checkOut,
-      }
-    : null;
+  const cheapest = row.cheapestStay;
+  const pasted = Boolean(property.priceLabel?.trim());
   const heroUrl = row.heroSourceUrl;
   return {
     ...property,
@@ -119,15 +136,26 @@ async function propertyFromHome(input: {
     // The card's own rounding: 9.74 out of 10 prints as 4.9.
     rating: row.rating ? Math.round(row.rating * 5) / 10 : null,
     sleeps: row.guests ?? property.sleeps ?? null,
-    href: stayHref(row.url, stay),
+    href: newsletterLink(row.url, input.campaign),
     tier,
-    stay,
-    savingsUsd: row.cheapestStay
-      ? otaSavingsUsd({
-          priceCents: row.cheapestStay.priceCents,
-          country: row.country,
-        })
-      : null,
+    priceLabel: pasted
+      ? property.priceLabel
+      : cheapest
+        ? stayLabel({
+            totalUsd: stayTotalUsd(cheapest.totalCents ?? cheapest.priceCents),
+            nights: cheapest.nights,
+            checkIn: cheapest.checkIn,
+            checkOut: cheapest.checkOut,
+          })
+        : null,
+    savingsUsd: pasted
+      ? (property.savingsUsd ?? null)
+      : cheapest
+        ? otaSavingsUsd({
+            priceCents: cheapest.priceCents,
+            country: row.country,
+          })
+        : null,
     heroUrl,
     imageUrl: heroUrl
       ? await renderHomeEmailImage({
@@ -139,7 +167,6 @@ async function propertyFromHome(input: {
         })
       : (property.imageUrl ?? null),
     candidates: null,
-    stayUnavailable: null,
   };
 }
 
@@ -169,6 +196,7 @@ async function matchProperty(input: {
   place: string;
   brandId: string;
   userId: string;
+  campaign: string;
 }): Promise<{ property: DigestProperty; outcome: DigestMatchOutcome }> {
   const { property } = input;
   const matchedRow = property.homeId
@@ -219,6 +247,7 @@ async function matchProperty(input: {
       row,
       brandId: input.brandId,
       userId: input.userId,
+      campaign: input.campaign,
     }),
     outcome: { name: property.name, status: "matched" },
   };
@@ -233,6 +262,8 @@ export async function matchDigestHomes(input: {
   digest: ListingsDigest;
   orgId: string;
   userId: string;
+  /** The issue, for the links' utm_campaign: its title, else the theme. */
+  campaign?: string | null;
   only?: { section: number; property: number };
 }): Promise<{ digest: ListingsDigest; outcomes: DigestMatchOutcome[] }> {
   const brand = await wanderBrandFor(input.orgId);
@@ -258,6 +289,7 @@ export async function matchDigestHomes(input: {
           place: section.heading,
           brandId: brand.id,
           userId: input.userId,
+          campaign: input.campaign || input.digest.theme || "newsletter",
         });
         properties.push(result.property);
         outcomes.push(result.outcome);
@@ -280,80 +312,7 @@ export async function matchDigestHomes(input: {
           null),
     });
   }
-  const matched = { ...input.digest, sections };
-  return {
-    digest: matched.stayWindow
-      ? await quoteStayWindow({
-          digest: matched,
-          brandId: brand.id,
-          window: matched.stayWindow,
-        })
-      : matched,
-    outcomes,
-  };
-}
-
-/**
- * Every matched home quoted for the issue's own stay, in one search pinned to
- * those listings: what a reader sees on wander.com for those dates, savings
- * line included. A home the dates cannot be booked for loses its price and
- * is flagged, rather than quietly keeping a price for some other week.
- */
-async function quoteStayWindow(input: {
-  digest: ListingsDigest;
-  brandId: string;
-  window: NonNullable<ListingsDigest["stayWindow"]>;
-}): Promise<ListingsDigest> {
-  const homeIds = input.digest.sections.flatMap((section) =>
-    section.properties.flatMap((property) =>
-      property.homeId ? [property.homeId] : [],
-    ),
-  );
-  if (homeIds.length === 0) return input.digest;
-  const rows = await db.query.homeTable.findMany({
-    where: and(
-      eq(homeTable.brandId, input.brandId),
-      inArray(homeTable.id, homeIds),
-    ),
-    columns: { id: true, externalId: true, url: true, country: true },
-  });
-  const rowById = new Map(rows.map((row) => [row.id, row]));
-  const quotes = await quoteMarketplaceStays({
-    unitIds: rows.map((row) => row.externalId),
-    checkIn: input.window.checkIn,
-    checkOut: input.window.checkOut,
-  });
-  return {
-    ...input.digest,
-    sections: input.digest.sections.map((section) => ({
-      ...section,
-      properties: section.properties.map((property) => {
-        const row = property.homeId ? rowById.get(property.homeId) : null;
-        if (!row) return property;
-        const quote = quotes.get(row.externalId);
-        const stay = quote
-          ? {
-              totalUsd: stayTotalUsd(quote.totalCents ?? quote.priceCents),
-              nights: quote.nights,
-              checkIn: quote.checkIn,
-              checkOut: quote.checkOut,
-            }
-          : null;
-        return {
-          ...property,
-          stay,
-          stayUnavailable: !quote,
-          savingsUsd: quote
-            ? otaSavingsUsd({
-                priceCents: quote.priceCents,
-                country: row.country,
-              })
-            : null,
-          href: stayHref(row.url, stay ?? input.window),
-        };
-      }),
-    })),
-  };
+  return { digest: { ...input.digest, sections }, outcomes };
 }
 
 /**

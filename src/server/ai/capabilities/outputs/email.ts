@@ -189,9 +189,6 @@ export const createDigestFromRowOutputSchema = z.strictObject({
       matched: z.number(),
       needPick: z.array(z.string()),
       failed: z.array(z.string()),
-      stayWindow: z
-        .strictObject({ checkIn: z.string(), checkOut: z.string() })
-        .nullable(),
     })
     .nullable(),
 });

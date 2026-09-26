@@ -12,12 +12,7 @@ const home = {
   rating: 5,
   href: "https://www.wander.com/property/wander-park-city-lighthouse?checkIn=2026-10-04&checkOut=2026-10-07",
   imageUrl: "https://example.r2.dev/lighthouse.jpg",
-  stay: {
-    totalUsd: 3457,
-    nights: 3,
-    checkIn: "2026-10-04",
-    checkOut: "2026-10-07",
-  },
+  priceLabel: "$3,457 for 3 nights (October 4-7)",
   savingsUsd: 300,
 };
 

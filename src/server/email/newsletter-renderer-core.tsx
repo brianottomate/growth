@@ -2,7 +2,7 @@ import { marked } from "marked";
 import sanitizeHtml from "sanitize-html";
 
 import type { EmailDocumentDraft } from "@/lib/email-document";
-import { savingsLabel, stayLabel } from "@/lib/listings-digest";
+import { savingsLabel } from "@/lib/listings-digest";
 
 type GenericHtmlProps = {
   preview: string;
@@ -101,10 +101,10 @@ async function renderListingsDigest(input: {
           .join(", "),
         guests: property.sleeps ?? undefined,
         title: property.name,
-        // A home matched to wander.com quotes the stay its card advertises;
-        // one typed in quotes whatever rate the paste stated.
-        priceLabel: property.stay
-          ? stayLabel(property.stay)
+        // The price line the issue carries (the paste's, or the home's
+        // cheapest stay on wander.com); else whatever rate the paste stated.
+        priceLabel: property.priceLabel?.trim()
+          ? property.priceLabel.trim()
           : [
               money(property.nightlyUsd)
                 ? `${money(property.nightlyUsd)}/night`

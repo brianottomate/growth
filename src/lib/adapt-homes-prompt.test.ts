@@ -14,19 +14,12 @@ describe("adaptHomesPrompt", () => {
     expect(prompt).toContain("Issue: Follow the fall colors");
     expect(prompt).toContain("Send date: Saturday, October 10, 2026");
     expect(prompt).toContain("Premise: Take the long way through autumn.");
-    expect(prompt).toContain("Stays: YYYY-MM-DD to YYYY-MM-DD");
     expect(prompt).toContain("Links (same order as the homes):");
   });
 
-  test("pins the stay when the issue has one, else asks for one", () => {
-    expect(
-      adaptHomesPrompt({
-        ...base,
-        stayWindow: { checkIn: "2026-10-16", checkOut: "2026-10-19" },
-      }),
-    ).toContain(
-      "Stay: Friday, October 16, 2026 to Monday, October 19, 2026. Quote every home for exactly these dates.",
-    );
-    expect(adaptHomesPrompt(base)).toContain("Propose one three-night stay");
+  test("asks for one shared stay, written into each price line", () => {
+    const prompt = adaptHomesPrompt(base);
+    expect(prompt).toContain("quote every home for those same dates");
+    expect(prompt).toContain("$TOTAL for 3 nights (Month D-D) | Save ~$X");
   });
 });
