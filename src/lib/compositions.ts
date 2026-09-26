@@ -61,6 +61,20 @@ export const COMPOSITION_TEMPLATES = [
       "One bold statement, the hook and the place, then the facts and a guest-rating pill over a dark foot gradient. The mark is optional, top left. The listing card.",
   },
   {
+    id: "catalog-amenities",
+    version: 1,
+    label: "Catalog · amenities",
+    description:
+      "A headline about the space, the facts, then the guest rating and up to four amenity pills over a dark foot gradient. The mark is optional, top left.",
+  },
+  {
+    id: "catalog-amenities-place",
+    version: 1,
+    label: "Catalog · amenities & place",
+    description:
+      "The amenities card with the location as a tag in the top right, opposite the mark.",
+  },
+  {
     id: "catalog-review",
     version: 1,
     label: "Catalog · review",
@@ -136,7 +150,9 @@ export type CompositionFieldKey =
   | "subtitle"
   | "cta"
   | "accent"
-  | "rating";
+  | "rating"
+  | "pills"
+  | "location";
 
 export type CompositionField = {
   key: CompositionFieldKey;
@@ -163,6 +179,54 @@ const accent = (hint: string): CompositionField => ({
  * this, so a field that exists on screen is a field the render reads, and the
  * label says what it means on that layout.
  */
+/**
+ * What each catalog card's copy is for. The copy prompt reads it, so a card
+ * is written to its layout: the place card sells an amenity and a place, the
+ * amenities cards leave the amenities to their pills and describe the space.
+ */
+export type CatalogCopyIntent = {
+  intent: string;
+  /** Characters that stay on two lines: the lead on a place card, else the headline. */
+  headlineChars: number;
+  /** The headline ends " in {place}". */
+  placeSuffix: boolean;
+  /** How many amenity pills the card draws. */
+  pills: number;
+};
+
+export const CATALOG_COPY_INTENTS = {
+  "catalog-place": {
+    intent:
+      'An amenity-led card: "{lead} in {place}". The lead names the one or two amenities or features this home is chosen for ("Private sauna & hot tub", "Rooftop deck & skyline views"), and the place says where it is.',
+    headlineChars: 28,
+    placeSuffix: true,
+    pills: 0,
+  },
+  "catalog-copy": {
+    intent:
+      "One statement with no place line: what this home is and what it offers, amenity or space, whichever sells it best.",
+    headlineChars: 40,
+    placeSuffix: false,
+    pills: 0,
+  },
+  "catalog-amenities": {
+    intent:
+      'A space-led card. The pills below carry the amenities, so the headline never lists them: it describes the space itself, the way a friend who has stayed there would ("Two suites joined for groups", "Log cabin on 12 wooded acres", "Glass house above the vineyards"). A headline that names two amenities is doing what the pills are for. Then choose the pills: the two or three amenities a guest would filter a search by and pick this home for (a hot tub, a pool, a soaking tub, a river or city view, a rooftop deck, pets welcome, free parking, a fireplace, a game room), most pulling first, each a short label (1–3 words) of something this listing actually has.',
+    headlineChars: 40,
+    placeSuffix: false,
+    pills: 3,
+  },
+  "catalog-amenities-place": {
+    intent:
+      'A space-led card with the location already tagged in its corner, so the headline never names the city. The pills below carry the amenities, so the headline never lists them: it describes the space itself, the way a friend who has stayed there would ("Two suites joined for groups", "Log cabin on 12 wooded acres"). A headline that names two amenities is doing what the pills are for. Then choose the pills: the two or three amenities a guest would filter a search by and pick this home for (a hot tub, a pool, a soaking tub, a river or city view, a rooftop deck, pets welcome, free parking, a fireplace, a game room), most pulling first, each a short label (1–3 words) of something this listing actually has.',
+    headlineChars: 40,
+    placeSuffix: false,
+    pills: 3,
+  },
+} as const satisfies Partial<Record<CompositionTemplateId, CatalogCopyIntent>>;
+
+export type CatalogCopyTemplateId = keyof typeof CATALOG_COPY_INTENTS;
+
 export const COMPOSITION_FIELDS: Record<
   CompositionTemplateId,
   CompositionField[]
@@ -188,6 +252,31 @@ export const COMPOSITION_FIELDS: Record<
       hint: "3 bedrooms · 3.5 baths · 14 guests",
     },
     { key: "rating", label: "Guest rating", hint: "4.9" },
+    accent("colours the rating pill"),
+  ],
+  "catalog-amenities": [
+    mark,
+    { key: "title", label: "Headline", hint: "Two suites joined for groups" },
+    {
+      key: "subtitle",
+      label: "Facts",
+      hint: "8 bedrooms · 4 baths · 16 guests",
+    },
+    { key: "rating", label: "Guest rating", hint: "4.9" },
+    { key: "pills", label: "Amenities", hint: "Up to four, e.g. Soaking tub" },
+    accent("colours the rating pill"),
+  ],
+  "catalog-amenities-place": [
+    mark,
+    { key: "location", label: "Location", hint: "Louisville, KY" },
+    { key: "title", label: "Headline", hint: "Two suites joined for groups" },
+    {
+      key: "subtitle",
+      label: "Facts",
+      hint: "8 bedrooms · 4 baths · 16 guests",
+    },
+    { key: "rating", label: "Guest rating", hint: "4.9" },
+    { key: "pills", label: "Amenities", hint: "Up to four, e.g. Soaking tub" },
     accent("colours the rating pill"),
   ],
   "catalog-review": [
@@ -286,6 +375,10 @@ const compositionShape = {
    * "4.9 guest rating" pill on the place card.
    */
   rating: z.number().min(1).max(5).multipleOf(0.1).optional(),
+  /** Amenity labels drawn as pills on the amenities cards. */
+  pills: z.array(z.string().trim().min(1).max(24)).max(4).optional(),
+  /** The place tag in the top right of the amenities-and-place card. */
+  location: z.string().trim().max(40).optional(),
   /**
    * Which version of the brand mark a card draws. `auto` picks white over a
    * photo and colour on a light ground; the rest force it or drop it.
@@ -413,6 +506,8 @@ export function compositionPreviewFromParams(params: URLSearchParams) {
           : undefined,
       scrim: params.get("scrim") || undefined,
       rating: params.get("rating") ? Number(params.get("rating")) : undefined,
+      pills: params.getAll("pill").length ? params.getAll("pill") : undefined,
+      location: params.get("location") || undefined,
       mark: params.get("mark") || "auto",
     }),
   };

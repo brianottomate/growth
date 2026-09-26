@@ -51,6 +51,7 @@ const patchSchema = z.object({
   mode: z.enum(["compose", "finished"]).nullable().optional(),
   imageAssetId: z.string().min(1).nullable().optional(),
   finishedAssetId: z.string().min(1).nullable().optional(),
+  pills: z.array(z.string().trim().min(1).max(24)).max(4).nullable().optional(),
 });
 export async function POST(
   request: Request,

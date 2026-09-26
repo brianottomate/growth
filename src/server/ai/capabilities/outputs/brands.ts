@@ -63,7 +63,12 @@ const performanceSettingsShape = {
     .optional(),
   agreedAdSpend: z.number().nullable().optional(),
   catalogTemplateId: z
-    .enum(["catalog-place", "catalog-copy"])
+    .enum([
+      "catalog-place",
+      "catalog-copy",
+      "catalog-amenities",
+      "catalog-amenities-place",
+    ])
     .nullable()
     .optional(),
   effectiveDate: z.string().nullable().optional(),

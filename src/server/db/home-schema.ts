@@ -116,6 +116,8 @@ export const homeTable = pgTable(
       .text()
       .references(() => mediaAssetTable.id, { onDelete: "set null" }),
     catalogExcluded: t.boolean().default(false).notNull(),
+    /** Amenity pills an amenities card draws; null takes the default pick. */
+    catalogPills: t.jsonb().$type<string[]>(),
     /**
      * Who signed the card off, and the card as it was then. Any later change
      * to what the card shows (an edit, a new hero, a changed default) no

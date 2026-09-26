@@ -31,6 +31,10 @@ export const catalogCardSchema = z.object({
   showLogo: z.boolean(),
   /** The home's guest rating out of 5, for the catalog-place pill. */
   rating: z.number().nullable().optional(),
+  /** Amenity pills, drawn by the amenities cards. */
+  pills: z.array(z.string()).optional(),
+  /** "Louisville, KY": the place tag on the amenities-and-place card. */
+  location: z.string().optional(),
   /** Signed off as it stands now; derived on read, never saved from a client. */
   approved: z.boolean().optional(),
 });
@@ -57,6 +61,8 @@ export type CatalogOverrides = {
   /** Supplied artwork a finished card uses as-is. */
   finished?: { assetId: string; url: string } | null;
   excluded?: boolean;
+  /** Amenity pills chosen for the amenities cards. */
+  pills?: string[] | null;
 };
 export type CatalogHome = HotelFeedHome & {
   rating?: number;
@@ -86,7 +92,12 @@ export type CatalogExport = {
  * the chat, and nothing exports until a person approves the card.
  */
 /** The catalog templates a brand can default to. */
-export const CATALOG_TEMPLATES = ["catalog-place", "catalog-copy"] as const;
+export const CATALOG_TEMPLATES = [
+  "catalog-place",
+  "catalog-copy",
+  "catalog-amenities",
+  "catalog-amenities-place",
+] as const;
 export type CatalogTemplateId = (typeof CATALOG_TEMPLATES)[number];
 
 export function catalogBaselineTitle(
@@ -96,6 +107,34 @@ export function catalogBaselineTitle(
   const where = templateId === "catalog-place" ? place(home) : null;
   const lead = home.guests ? `Sleeps ${home.guests}` : "Vacation home";
   return where ? `${lead} in ${where}` : lead;
+}
+
+/**
+ * Amenities a guest picks a home for, most pulling first: the pills a card
+ * shows until New copy chooses its own.
+ */
+const PILL_PULL = [
+  /sauna/i,
+  /hot tub/i,
+  /pool/i,
+  /soaking tub/i,
+  /lake|river|ocean|mountain|city view|view/i,
+  /fireplace|fire pit/i,
+  /game room|arcade|billiard|pool table/i,
+  /pet/i,
+  /elevator/i,
+  /parking/i,
+];
+
+export function defaultCatalogPills(home: CatalogHome) {
+  const amenities = home.amenities ?? [];
+  const picked: string[] = [];
+  for (const pull of PILL_PULL) {
+    const hit = amenities.find((a) => pull.test(a) && !picked.includes(a));
+    if (hit && hit.length <= 24) picked.push(hit);
+    if (picked.length === 3) break;
+  }
+  return picked;
 }
 
 /** What a card shows, as one string: approval holds while this is unchanged. */
@@ -114,6 +153,10 @@ export function catalogCardFingerprint(card: CatalogCard) {
     card.subtitle,
     card.imagePosition,
     card.showLogo,
+    // Only cards that draw them: earlier fingerprints stay valid.
+    ...(card.templateId.startsWith("catalog-amenities")
+      ? [card.pills ?? [], card.location ?? null]
+      : []),
   ]);
 }
 
@@ -163,6 +206,8 @@ export function catalogDraft(
           imagePosition: o.imagePosition ?? "center",
           showLogo: o.showLogo ?? true,
           rating: ratingOutOfFive(home.rating),
+          pills: o.pills ?? defaultCatalogPills(home),
+          location: place(home) || undefined,
         };
         return {
           ...card,
@@ -237,6 +282,10 @@ export function catalogCardPreviewUrl(brandId: string, card: CatalogCard) {
   });
   if (copy.eyebrow) params.set("eyebrow", copy.eyebrow);
   if (copy.rating) params.set("rating", String(copy.rating));
+  if (card.templateId.startsWith("catalog-amenities"))
+    for (const pill of card.pills ?? []) params.append("pill", pill);
+  if (card.templateId === "catalog-amenities-place" && card.location)
+    params.set("location", card.location);
   params.set(
     card.assetId ? "sourceMediaAssetId" : "sourceUrl",
     card.assetId ?? card.imageUrl,

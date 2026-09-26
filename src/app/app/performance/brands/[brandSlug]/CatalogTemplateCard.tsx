@@ -113,12 +113,12 @@ export function CatalogTemplateCard({
 
 /**
  * The same card on another template. The place card splits "{lead} in
- * {place}"; the copy card has no place line, so it shows the lead alone.
+ * {place}"; the others have no place line, so they show the lead alone.
  */
 function asTemplate(card: CatalogCard, templateId: CatalogTemplateId) {
   const at = card.title.lastIndexOf(" in ");
   const title =
-    templateId === "catalog-copy" && at > 0
+    templateId !== "catalog-place" && at > 0
       ? card.title.slice(0, at)
       : card.title;
   return { ...card, templateId, title };

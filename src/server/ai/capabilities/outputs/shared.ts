@@ -77,6 +77,8 @@ export const cardsSchema = z.strictObject({
     "photo-only",
     "catalog-copy",
     "catalog-place",
+    "catalog-amenities",
+    "catalog-amenities-place",
     "catalog-review",
     "tall-statement",
     "tall-welcome",

@@ -1489,7 +1489,7 @@ export const catalogHomeFactsAction = growthAction({
 export const editCatalogCardAction = growthAction({
   outputSchema: editCatalogCardActionOutputSchema,
   description:
-    "Change one home's card in a Performance client's catalog draft: the headline printed on the image (title, e.g. 'Exposed-brick loft in Louisville, KY'), the facts line (subtitle), the composition template, the crop focus, the logo, or whether the home is in the export, and mark it approved. Send only the fields to change. Saves the draft; nothing is exported or pushed. Approval is a review bookmark, not an export gate; a later change to what the card shows clears it.",
+    "Change one home's card in a Performance client's catalog draft: the headline printed on the image (title, e.g. 'Exposed-brick loft in Louisville, KY'), the facts line (subtitle), the composition template, the crop focus, the logo, whether the home is in the export, the amenity pills on the amenities cards, and mark it approved. Send only the fields to change. Saves the draft; nothing is exported or pushed. Approval is a review bookmark, not an export gate; a later change to what the card shows clears it.",
   inputSchema: z.object({
     brandId: z.string().min(1),
     homeId: z.string().min(1).describe("The WanderOS listing id."),
@@ -1509,6 +1509,13 @@ export const editCatalogCardAction = growthAction({
     imagePosition: z.enum(["top", "center", "bottom"]).optional(),
     showLogo: z.boolean().optional(),
     included: z.boolean().optional(),
+    pills: z
+      .array(z.string().trim().min(1).max(24))
+      .max(4)
+      .optional()
+      .describe(
+        "Amenity pills on the amenities cards: two to four short labels of amenities this listing has.",
+      ),
     approved: z
       .boolean()
       .optional()

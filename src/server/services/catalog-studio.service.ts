@@ -77,6 +77,7 @@ async function catalogRows(brandId: string) {
       catalogFinishedAssetId: true,
       catalogExcluded: true,
       catalogApproval: true,
+      catalogPills: true,
     },
   });
   return new Map(rows.map((row) => [row.externalId, row]));
@@ -106,6 +107,7 @@ function overridesOf(
         : null,
     finished: asset(row.catalogFinishedAssetId),
     excluded: row.catalogExcluded,
+    pills: row.catalogPills,
   };
 }
 const IMAGE_POSITIONS = ["top", "center", "bottom"] as const;
@@ -379,6 +381,8 @@ export type CatalogCardPatch = {
   imageAssetId?: string | null;
   /** Supplied artwork for a finished card. */
   finishedAssetId?: string | null;
+  /** Amenity pills for the amenities cards. */
+  pills?: string[] | null;
 };
 
 /** Change one home's catalog card on its row. */
@@ -399,6 +403,12 @@ export async function editCatalogCard(input: {
     throw new Error("A headline is 1–120 characters");
   if (patch.subtitle && patch.subtitle.length > 220)
     throw new Error("The facts line is at most 220 characters");
+  if (
+    patch.pills &&
+    (patch.pills.length > 4 ||
+      patch.pills.some((p) => !p.trim() || p.length > 24))
+  )
+    throw new Error("Up to four amenity pills, each at most 24 characters");
   if (title) {
     const row = await db.query.homeTable.findFirst({
       where: and(
@@ -443,6 +453,7 @@ export async function editCatalogCard(input: {
     ...(patch.finishedAssetId !== undefined
       ? { catalogFinishedAssetId: patch.finishedAssetId }
       : {}),
+    ...(patch.pills !== undefined ? { catalogPills: patch.pills } : {}),
   };
   if (Object.keys(set).length) {
     const [updated] = await db
