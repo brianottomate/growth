@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { Logo } from "@wandercom/design-system-web/ui/logo";
 import { usePathname, useRouter } from "next/navigation";
@@ -41,6 +42,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { useTheme } from "@/components/ui/theme";
 import { authClient } from "@/server/better-auth/client";
@@ -64,6 +66,11 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const { isMobile, setOpenMobile } = useSidebar();
+  // On a phone the sidebar is a sheet over the page: going somewhere closes it.
+  useEffect(() => {
+    if (isMobile) setOpenMobile(false);
+  }, [pathname, isMobile, setOpenMobile]);
   const { data: orgs } = useQuery(orpc.org.list.queryOptions());
   const { themeMode, setTheme } = useTheme();
 
