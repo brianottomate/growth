@@ -202,17 +202,12 @@ describe("the fields a blueprint declares", () => {
     }
   });
 
-  test("the place, amenities and review cards are the ones with a rating", () => {
+  test("the place and review cards are the ones with a rating", () => {
     expect(
       COMPOSITION_TEMPLATES.filter((t) =>
         compositionHasField(t.id, "rating"),
       ).map((t) => t.id),
-    ).toEqual([
-      "catalog-place",
-      "catalog-amenities",
-      "catalog-amenities-place",
-      "catalog-review",
-    ]);
+    ).toEqual(["catalog-place", "catalog-review"]);
   });
 });
 

@@ -1402,13 +1402,15 @@ export function renderComposition(
       ? wrapText(clamp(spec.title, 90), square ? 26 : 24)
       : placeStatement(spec);
     const facts = clamp(spec.subtitle, 80);
-    const rating = spec.rating ? Math.round(spec.rating * 10) / 10 : null;
-    // One row: the rating and three pills fit the portrait width.
-    const pills = amenities ? (spec.pills ?? []).slice(0, rating ? 3 : 4) : [];
+    // The amenities cards leave the rating out; the place variant leads its
+    // pill row with the location instead.
+    const rating =
+      !amenities && spec.rating ? Math.round(spec.rating * 10) / 10 : null;
     const location =
       spec.templateId === "catalog-amenities-place"
         ? clamp(spec.location, 32)
         : "";
+    const pills = amenities ? (spec.pills ?? []).slice(0, 3) : [];
     content = (
       <div
         style={{
@@ -1448,7 +1450,7 @@ export function renderComposition(
         {/* The mark is optional here: an ad in the feed already shows the
             brand above the card, but a catalog card can ask for it. Same
             corner and light top scrim as catalog-copy. */}
-        {spec.mark !== "none" || location ? (
+        {spec.mark !== "none" ? (
           <div
             style={{
               display: "flex",
@@ -1460,25 +1462,6 @@ export function renderComposition(
               background: `linear-gradient(180deg, ${scrim(0.45)} 0%, ${scrim(0)} 100%)`,
             }}
           />
-        ) : null}
-        {location ? (
-          <div
-            style={{
-              display: "flex",
-              position: "absolute",
-              top: pad - 6,
-              right: pad,
-              padding: `${Math.round(10 * scale)}px ${Math.round(22 * scale)}px`,
-              borderRadius: 999,
-              border: "2px solid rgba(255,255,255,0.55)",
-              background: "rgba(0,0,0,0.28)",
-              color: "#ffffff",
-              fontSize: Math.round(26 * scale),
-              fontWeight: 600,
-            }}
-          >
-            {location}
-          </div>
         ) : null}
         {spec.mark !== "none" ? (
           <div
@@ -1539,7 +1522,7 @@ export function renderComposition(
               {facts}
             </div>
           ) : null}
-          {rating || pills.length ? (
+          {rating || location || pills.length ? (
             <div
               style={{
                 display: "flex",
@@ -1563,10 +1546,23 @@ export function renderComposition(
                 >
                   <Stars count={1} size={Math.round(26 * scale)} />
                   <div style={{ display: "flex" }}>
-                    {amenities
-                      ? rating.toFixed(1)
-                      : `${rating.toFixed(1)} guest rating`}
+                    {`${rating.toFixed(1)} guest rating`}
                   </div>
+                </div>
+              ) : null}
+              {location ? (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    padding: `${Math.round(12 * scale)}px ${Math.round(26 * scale)}px`,
+                    borderRadius: 999,
+                    background: accent,
+                    fontSize: Math.round(26 * scale),
+                    fontWeight: 600,
+                  }}
+                >
+                  {location}
                 </div>
               ) : null}
               {pills.map((pill) => (

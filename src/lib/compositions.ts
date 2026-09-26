@@ -81,14 +81,14 @@ export const COMPOSITION_TEMPLATES = [
     version: 1,
     label: "Catalog · amenities",
     description:
-      "A headline about the space, the facts, then the guest rating and up to four amenity pills over a dark foot gradient. The mark is optional, top left.",
+      "A headline about the space, the facts, then up to three amenity pills over a dark foot gradient. The mark is optional, top left.",
   },
   {
     id: "catalog-amenities-place",
     version: 1,
     label: "Catalog · amenities & place",
     description:
-      "The amenities card with the location as a tag in the top right, opposite the mark.",
+      "The amenities card with the location as the first pill, in the accent colour.",
   },
   {
     id: "catalog-review",
@@ -235,7 +235,7 @@ export const CATALOG_COPY_INTENTS = {
   },
   "catalog-amenities-place": {
     intent:
-      'A space-led card with the location already tagged in its corner, so the headline never names the city. The pills below carry the amenities, so the headline never lists them: it describes the space itself, the way a friend who has stayed there would ("Two suites joined for groups", "Log cabin on 12 wooded acres"). A headline that names two amenities is doing what the pills are for. Then choose the pills: the two or three amenities a guest would filter a search by and pick this home for (a hot tub, a pool, a soaking tub, a river or city view, a rooftop deck, pets welcome, free parking, a fireplace, a game room), most pulling first, each a short label (1–3 words) of something this listing actually has.',
+      'A space-led card with the location already shown as its first pill, so the headline never names the city. The pills below carry the amenities, so the headline never lists them: it describes the space itself, the way a friend who has stayed there would ("Two suites joined for groups", "Log cabin on 12 wooded acres"). A headline that names two amenities is doing what the pills are for. Then choose the pills: the two or three amenities a guest would filter a search by and pick this home for (a hot tub, a pool, a soaking tub, a river or city view, a rooftop deck, pets welcome, free parking, a fireplace, a game room), most pulling first, each a short label (1–3 words) of something this listing actually has.',
     headlineChars: 40,
     placeSuffix: false,
     pills: 3,
@@ -280,9 +280,7 @@ export const COMPOSITION_FIELDS: Record<
       label: "Facts",
       hint: "8 bedrooms · 4 baths · 16 guests",
     },
-    { key: "rating", label: "Guest rating", hint: "4.9" },
-    { key: "pills", label: "Amenities", hint: "Up to four, e.g. Soaking tub" },
-    accent("colours the rating pill"),
+    { key: "pills", label: "Amenities", hint: "Up to three, e.g. Soaking tub" },
   ],
   "catalog-amenities-place": [
     mark,
@@ -293,9 +291,8 @@ export const COMPOSITION_FIELDS: Record<
       label: "Facts",
       hint: "8 bedrooms · 4 baths · 16 guests",
     },
-    { key: "rating", label: "Guest rating", hint: "4.9" },
-    { key: "pills", label: "Amenities", hint: "Up to four, e.g. Soaking tub" },
-    accent("colours the rating pill"),
+    { key: "pills", label: "Amenities", hint: "Up to three, e.g. Soaking tub" },
+    accent("colours the location pill"),
   ],
   "catalog-review": [
     mark,
@@ -395,7 +392,7 @@ const compositionShape = {
   rating: z.number().min(1).max(5).multipleOf(0.1).optional(),
   /** Amenity labels drawn as pills on the amenities cards. */
   pills: z.array(z.string().trim().min(1).max(24)).max(4).optional(),
-  /** The place tag in the top right of the amenities-and-place card. */
+  /** The location pill leading the amenities-and-place card's pill row. */
   location: z.string().trim().max(40).optional(),
   /**
    * Which version of the brand mark a card draws. `auto` picks white over a

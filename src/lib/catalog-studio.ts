@@ -281,7 +281,8 @@ export function catalogCardPreviewUrl(brandId: string, card: CatalogCard) {
     mark: card.showLogo ? "auto" : "none",
   });
   if (copy.eyebrow) params.set("eyebrow", copy.eyebrow);
-  if (copy.rating) params.set("rating", String(copy.rating));
+  if (copy.rating && !card.templateId.startsWith("catalog-amenities"))
+    params.set("rating", String(copy.rating));
   if (card.templateId.startsWith("catalog-amenities"))
     for (const pill of card.pills ?? []) params.append("pill", pill);
   if (card.templateId === "catalog-amenities-place" && card.location)
