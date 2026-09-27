@@ -27,6 +27,7 @@ import {
 import { safeHomeUrl } from "@/lib/ad-preview-links";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 import { ReviewInChatButton } from "../ReviewInChatButton";
+import { CatalogPreview } from "./CatalogPreview";
 
 async function readResponse<T = unknown>(response: Response): Promise<T> {
   const body: unknown = await response.json();
@@ -69,7 +70,7 @@ export function CatalogCards({
         ? 2500
         : false,
   });
-  const [view, setView] = useState<"studio" | "exports">("studio");
+  const [view, setView] = useState<"studio" | "preview" | "exports">("studio");
   const [layout, setLayout] = useState<"grid" | "list">("grid");
   const [details, setDetails] = useState<CatalogCard | null>(null);
   const [library, setLibrary] = useState(false);
@@ -203,6 +204,12 @@ export function CatalogCards({
             onClick={() => setView("studio")}
           >
             Studio
+          </Button>
+          <Button
+            variant={view === "preview" ? "secondary" : "ghost"}
+            onClick={() => setView("preview")}
+          >
+            Preview
           </Button>
           <Button
             variant={view === "exports" ? "secondary" : "ghost"}
@@ -523,6 +530,15 @@ export function CatalogCards({
           )}
         </>
       )}
+      {view === "preview" && draft && (
+        <CatalogPreview
+          brandId={brandId}
+          brandName={brandName}
+          homes={homes}
+          draft={draft}
+          exports={query.data?.exports ?? []}
+        />
+      )}
       {view === "exports" && (
         <div className="space-y-5">
           {!query.data?.exports.length && (
@@ -536,6 +552,7 @@ export function CatalogCards({
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h3 className="font-medium">
+                    {item.label ? `${item.label} · ` : ""}
                     {new Date(item.createdAt).toLocaleString()}
                   </h3>
                   <p className="text-sm text-muted-foreground">

@@ -86,6 +86,8 @@ export type CatalogExport = {
     format: string;
   }[];
   rows?: HotelFeedRow[];
+  /** What the export's cards are: "Supplied artwork", "Catalog · destination". */
+  label?: string;
 };
 /**
  * The headline a card carries until someone writes a better one. Plain and

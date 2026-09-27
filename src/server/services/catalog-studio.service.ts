@@ -24,7 +24,10 @@ import {
   type CatalogTemplateId,
 } from "@/lib/catalog-studio";
 import { brandWideAmenities } from "@/lib/catalog-copy";
-import { compositionTemplateIdSchema } from "@/lib/compositions";
+import {
+  COMPOSITION_TEMPLATES,
+  compositionTemplateIdSchema,
+} from "@/lib/compositions";
 import { brandHomeInventory } from "./home-inventory.service";
 import { ingestBrandHomes } from "./homes.service";
 import { brandWebsiteId } from "./wanderos-listings.service";
@@ -219,8 +222,27 @@ export async function catalogState(
       status: run.status,
       error: run.error,
       createdAt: run.createdAt.toISOString(),
+      label: exportLabel(run.input),
     })),
   };
+}
+
+/** What an export's cards are, from the draft it froze: "Catalog · destination". */
+function exportLabel(input: unknown) {
+  const cards = (input as { draft?: { cards?: CatalogCard[] } } | null)?.draft
+    ?.cards;
+  if (!cards?.length) return undefined;
+  const kinds = new Set(
+    cards
+      .filter((card) => card.included)
+      .map((card) =>
+        card.mode === "finished"
+          ? "Supplied artwork"
+          : (COMPOSITION_TEMPLATES.find((t) => t.id === card.templateId)
+              ?.label ?? card.templateId),
+      ),
+  );
+  return [...kinds].join(" + ");
 }
 
 /**
