@@ -225,6 +225,7 @@ const portraitSchema = z.strictObject({
     "catalog-place",
     "catalog-amenities",
     "catalog-amenities-place",
+    "catalog-destination",
     "catalog-review",
     "tall-statement",
     "tall-welcome",

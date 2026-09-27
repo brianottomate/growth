@@ -98,7 +98,17 @@ export const CATALOG_TEMPLATES = [
   "catalog-copy",
   "catalog-amenities",
   "catalog-amenities-place",
+  "catalog-destination",
 ] as const;
+
+/** Catalog cards that draw amenity pills. */
+export const drawsPills = (templateId: string) =>
+  templateId.startsWith("catalog-amenities") ||
+  templateId === "catalog-destination";
+/** Catalog cards that print the location themselves. */
+export const drawsLocation = (templateId: string) =>
+  templateId === "catalog-amenities-place" ||
+  templateId === "catalog-destination";
 export type CatalogTemplateId = (typeof CATALOG_TEMPLATES)[number];
 
 /** Where a card says the home is: its market's label, else its own town. */
@@ -165,7 +175,7 @@ export function catalogCardFingerprint(card: CatalogCard) {
     card.imagePosition,
     card.showLogo,
     // Only cards that draw them: earlier fingerprints stay valid.
-    ...(card.templateId.startsWith("catalog-amenities")
+    ...(drawsPills(card.templateId)
       ? [card.pills ?? [], card.location ?? null]
       : []),
   ]);
@@ -246,12 +256,12 @@ export function catalogCardCopy(card: CatalogCard): {
   location?: string;
 } {
   // The amenities cards draw pills (and a location) instead of the rating.
-  const amenities = card.templateId.startsWith("catalog-amenities");
+  const amenities = drawsPills(card.templateId);
   const base = {
     subtitle: card.subtitle,
     ...(card.rating && !amenities ? { rating: card.rating } : {}),
     ...(amenities && card.pills?.length ? { pills: card.pills } : {}),
-    ...(card.templateId === "catalog-amenities-place" && card.location
+    ...(drawsLocation(card.templateId) && card.location
       ? { location: card.location }
       : {}),
   };
@@ -302,11 +312,11 @@ export function catalogCardPreviewUrl(brandId: string, card: CatalogCard) {
     mark: card.showLogo ? "auto" : "none",
   });
   if (copy.eyebrow) params.set("eyebrow", copy.eyebrow);
-  if (copy.rating && !card.templateId.startsWith("catalog-amenities"))
+  if (copy.rating && !drawsPills(card.templateId))
     params.set("rating", String(copy.rating));
-  if (card.templateId.startsWith("catalog-amenities"))
+  if (drawsPills(card.templateId))
     for (const pill of card.pills ?? []) params.append("pill", pill);
-  if (card.templateId === "catalog-amenities-place" && card.location)
+  if (drawsLocation(card.templateId) && card.location)
     params.set("location", card.location);
   params.set(
     card.assetId ? "sourceMediaAssetId" : "sourceUrl",

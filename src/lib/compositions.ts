@@ -91,6 +91,13 @@ export const COMPOSITION_TEMPLATES = [
       "The amenities card with the location as the first pill, in the accent colour.",
   },
   {
+    id: "catalog-destination",
+    version: 1,
+    label: "Catalog · destination",
+    description:
+      "The place in spaced capitals above one big headline, the facts, and at most one pill. For brands whose guests travel to a region.",
+  },
+  {
     id: "catalog-review",
     version: 1,
     label: "Catalog · review",
@@ -228,17 +235,24 @@ export const CATALOG_COPY_INTENTS = {
   },
   "catalog-amenities": {
     intent:
-      'A space-led card. The pills below carry the amenities, so the headline never lists them: it describes the space itself, the way a friend who has stayed there would ("Two suites joined for groups", "Log cabin on 12 wooded acres", "Glass house above the vineyards"). A headline that names two amenities is doing what the pills are for. Then choose the pills: the two or three amenities a guest would filter a search by and pick this home for (a hot tub, a pool, a soaking tub, a river or city view, a rooftop deck, pets welcome, free parking, a fireplace, a game room), most pulling first, each a short label (1–3 words) of something this listing actually has, written the way a guest reads it ("Outdoor pool", "Fireplace", "Pets welcome"), not the raw listing label ("Pool outdoor", "Fire place"). Prefer what sets this home apart; an amenity nearly every home in the catalog has (the brand-wide list) only when nothing else sells it.',
-    headlineChars: 42,
+      'A space-led card. The headline is what being there feels like, the line a friend would say showing you the photo, grounded in this listing: "Fall asleep to the waterfall", "Two suites joined for the whole crew", "Your own pond, your own deck", "Log cabin on 12 acres by a stream". Room layouts, bed setups and access details are facts for the listing, not headlines. The pills carry the amenities, so the headline never lists them. Choose one or two pills from the draws a guest picks a home for (a sauna, a pool, a pond, a game room, a view, a fireplace, pets welcome): first the ones this home has and most of the catalog does not; when the catalog shares them all, the strongest one or two. Everyday appliances and supplies (a dishwasher, a microwave, linens) never earn a pill. Write each pill the way a guest reads it ("Outdoor pool", "Fireplace", "Pets welcome"), never a raw listing label ("Pool outdoor", "Fire place").',
+    headlineChars: 36,
     placeSuffix: false,
-    pills: 3,
+    pills: 2,
   },
   "catalog-amenities-place": {
     intent:
-      'A space-led card with the location already shown as its first pill, so the headline never names the city or the place. The pills below carry the amenities, so the headline never lists them: it describes the space itself, the way a friend who has stayed there would ("Two suites joined for groups", "Log cabin on 12 wooded acres"). A headline that names two amenities is doing what the pills are for. Then choose the pills: the two or three amenities a guest would filter a search by and pick this home for (a hot tub, a pool, a soaking tub, a river or city view, a rooftop deck, pets welcome, free parking, a fireplace, a game room), most pulling first, each a short label (1–3 words) of something this listing actually has, written the way a guest reads it ("Outdoor pool", "Fireplace", "Pets welcome"), not the raw listing label ("Pool outdoor", "Fire place"). Prefer what sets this home apart; an amenity nearly every home in the catalog has (the brand-wide list) only when nothing else sells it.',
-    headlineChars: 42,
+      'A space-led card whose first pill already shows the location, so the headline never names the place. The headline is what being there feels like, the line a friend would say showing you the photo, grounded in this listing: "Fall asleep to the waterfall", "Two suites joined for the whole crew", "Your own pond, your own deck", "Log cabin on 12 acres by a stream". Room layouts, bed setups and access details are facts for the listing, not headlines. The other pills carry the amenities, so the headline never lists them. Choose one or two from the draws a guest picks a home for (a sauna, a pool, a pond, a game room, a view, a fireplace, pets welcome): first the ones this home has and most of the catalog does not; when the catalog shares them all, the strongest one or two. Everyday appliances and supplies (a dishwasher, a microwave, linens) never earn a pill. Write each pill the way a guest reads it ("Outdoor pool", "Fireplace", "Pets welcome"), never a raw listing label ("Pool outdoor", "Fire place").',
+    headlineChars: 36,
     placeSuffix: false,
-    pills: 3,
+    pills: 2,
+  },
+  "catalog-destination": {
+    intent:
+      'A destination-led card: the place is printed in capitals above the headline, so the headline never names it. The headline is the moment you would feel there, in a few words, the line a friend would say showing you the photo, grounded in this listing: "Fall asleep to the waterfall", "Two suites joined for the whole crew", "Your own pond, your own deck", "Log cabin on 12 acres by a stream". Room layouts, bed setups and access details are facts for the listing, not headlines. One pill at most: the draw this home has that the others in the catalog do not (a private pond, a sauna, a game room), or none. Never an appliance, a supply or an access detail. Write each pill the way a guest reads it ("Outdoor pool", "Fireplace", "Pets welcome"), never a raw listing label ("Pool outdoor", "Fire place").',
+    headlineChars: 32,
+    placeSuffix: false,
+    pills: 1,
   },
 } as const satisfies Partial<Record<CompositionTemplateId, CatalogCopyIntent>>;
 
@@ -293,6 +307,13 @@ export const COMPOSITION_FIELDS: Record<
     },
     { key: "pills", label: "Amenities", hint: "Up to three, e.g. Soaking tub" },
     accent("colours the location pill"),
+  ],
+  "catalog-destination": [
+    mark,
+    { key: "location", label: "Destination", hint: "Hocking Hills, Ohio" },
+    { key: "title", label: "Headline", hint: "Fall asleep to the waterfall" },
+    { key: "subtitle", label: "Facts", hint: "2 bedrooms · 1 bath · 4 guests" },
+    { key: "pills", label: "Signature", hint: "One, e.g. Private pond" },
   ],
   "catalog-review": [
     mark,

@@ -7,7 +7,7 @@ import { z } from "zod";
 
 import { brandWideAmenities, hasEmDash } from "@/lib/catalog-copy";
 import { catalogHeadlineIssue } from "@/lib/catalog-studio";
-import { marketOf } from "@/lib/markets";
+import { marketOf, type Market } from "@/lib/markets";
 import {
   CATALOG_COPY_INTENTS,
   type CatalogCopyTemplateId,
@@ -151,7 +151,11 @@ function copyProblem(
   );
   if (repeated)
     return `It repeats ${repeated}, which the facts line under it already shows. Say something the facts line does not.`;
-  if (templateId === "catalog-amenities-place" && place) {
+  if (
+    (templateId === "catalog-amenities-place" ||
+      templateId === "catalog-destination") &&
+    place
+  ) {
     const city = place.split(",")[0]!.trim().toLowerCase();
     if (city && headline.toLowerCase().includes(city))
       return `The location pill already says ${place}; the headline should not name it.`;
@@ -181,8 +185,11 @@ function copyProblem(
     );
     if (echoed.length)
       return `The headline repeats what the pills already say (${echoed.join(", ")}). Describe the space and leave amenities to the pills.`;
-    if (output.pills.length < 2 || output.pills.length > layout.pills)
-      return `Choose two to ${layout.pills} amenity pills.`;
+    const least = layout.pills > 1 ? 1 : 0;
+    if (output.pills.length < least || output.pills.length > layout.pills)
+      return layout.pills > 1
+        ? `Choose one to ${layout.pills} amenity pills.`
+        : "Choose at most one pill.";
     const listing = [
       ctx.home.name,
       ...ctx.amenities,
@@ -223,6 +230,8 @@ export async function newCatalogCopy(input: {
   place?: string | null;
   /** False returns the copy without saving it to the card. */
   save?: boolean;
+  /** The home's market when it is not confirmed yet. */
+  market?: Market | null;
 }) {
   const ctx = await catalogHomeContext(
     input.userId,
@@ -244,7 +253,7 @@ export async function newCatalogCopy(input: {
     name: ctx.home.name,
     currentHeadline: ctx.card?.title ?? null,
     currentPills: ctx.card?.pills ?? [],
-    market: marketOf(ctx.brand.markets, ctx.home.city),
+    market: input.market ?? marketOf(ctx.brand.markets, ctx.home.city),
     bedrooms: ctx.home.bedrooms ?? null,
     bathrooms: ctx.home.bathrooms ?? null,
     guests: ctx.home.guests ?? null,
@@ -306,6 +315,15 @@ const photoSchema = z.object({
     .describe("The new hero's number on the sheets."),
 });
 
+/** Today's time of year and the market's seasons, for picking a hero that fits. */
+function seasonNote(market: Market | null) {
+  const month = new Date().toLocaleString("en-US", { month: "long" });
+  const seasons = market?.seasons?.length
+    ? ` In ${market.label}: ${market.seasons.map((s) => `${s.name} (${s.when})`).join("; ")}.`
+    : "";
+  return `It is ${month}.${seasons}`;
+}
+
 /** Pick a better hero for one card and save it. */
 export async function newCatalogPhoto(input: {
   userId: string;
@@ -315,6 +333,8 @@ export async function newCatalogPhoto(input: {
   keepIfGood?: boolean;
   /** False returns the pick without making it the home's hero. */
   save?: boolean;
+  /** The home's market when it is not confirmed yet, for its seasons. */
+  market?: Market | null;
 }) {
   const ctx = await catalogHomeContext(
     input.userId,
@@ -382,7 +402,13 @@ export async function newCatalogPhoto(input: {
   for (let attempt = 0; attempt < 2; attempt++) {
     const { output } = await generateText({
       model: anthropic(MODEL),
-      system: catalogNewPhotoPrompt({ story, judge: input.keepIfGood }),
+      system: catalogNewPhotoPrompt({
+        story,
+        judge: input.keepIfGood,
+        season: seasonNote(
+          input.market ?? marketOf(ctx.brand.markets, ctx.home.city),
+        ),
+      }),
       messages: [{ role: "user", content }],
       output: Output.object({ schema: photoSchema }),
       providerOptions: FAST,

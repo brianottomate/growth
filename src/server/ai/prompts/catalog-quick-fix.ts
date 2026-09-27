@@ -31,6 +31,8 @@ export function catalogNewPhotoPrompt(input: {
   story: string;
   /** Judging a card in a full pass rather than answering a New photo click. */
   judge?: boolean;
+  /** "late September", and the market's seasons, so the hero can fit the time of year. */
+  season?: string | null;
 }): string {
   const task = input.judge
     ? "Judge whether the current hero is the best photo for the card, and pick a better one only when it clearly is."
@@ -39,7 +41,7 @@ export function catalogNewPhotoPrompt(input: {
 
 ${catalogCopyRules({ place: null, brandWide: [] }).split("\n\n").at(-1)}
 
-The card is a 4:5 portrait crop of the photo with a two-line headline over its bottom third, so the subject must survive the crop and the bottom of the frame must stay calm enough to read text over. Prefer the photo that shows what the headline promises. Heroes the operator approved elsewhere in this catalog, when shown, are the look to match. Where the brand story and the general rules differ, the brand story wins.`;
+The card is a 4:5 portrait crop of the photo with a two-line headline over its bottom third, so the subject must survive the crop and the bottom of the frame must stay calm enough to read text over. Prefer the photo that shows what the headline promises, and that stops a thumb in a feed: people enjoying the place, warm light, a view.${input.season ? ` ${input.season} All else equal, prefer a frame that fits the time of year (autumn colour in fall, snow in winter, green in summer); never pick a worse photo for its season.` : ""} Heroes the operator approved elsewhere in this catalog, when shown, are the look to match. Where the brand story and the general rules differ, the brand story wins.`;
 }
 
 /**
