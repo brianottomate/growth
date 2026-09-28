@@ -129,7 +129,7 @@ export function PushToPlatform({
           }
         >
           <UploadCloud className="size-3.5" />
-          {push.isPending ? "Pushing paused…" : `Push to ${platformName}`}
+          {push.isPending ? "Pushing…" : `Push to ${platformName}`}
         </Button>
         {push.error && (
           <p
@@ -238,7 +238,7 @@ export function PushToPlatform({
               })
             }
           >
-            Push paused
+            Push
           </Button>
         </DialogFooter>
         {push.isSuccess &&

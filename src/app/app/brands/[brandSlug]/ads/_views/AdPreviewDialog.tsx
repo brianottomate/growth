@@ -128,7 +128,7 @@ export function AdPreviewDialog({
           ) : isVideo ? (
             <p className="text-xs text-muted-foreground">
               Meta cannot render a video draft before it is pushed. The local
-              preview above is the shape; push paused to see the real thing.
+              preview above is the shape; push to see the real thing.
             </p>
           ) : metaPreview.data ? (
             <div className="flex max-h-[50vh] gap-3 overflow-auto">
