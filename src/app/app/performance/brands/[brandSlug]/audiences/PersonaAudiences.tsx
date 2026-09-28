@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
+import { DefinePersonasButton } from "@/app/app/brands/[brandSlug]/ads/DefinePersonasButton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SimpleSelect } from "@/components/ui/select";
@@ -96,6 +97,7 @@ export function PersonaAudiences({
             />
             Refresh from Meta
           </Button>
+          <DefinePersonasButton brandId={brand.id} brandName={brand.name} />
           <Button size="sm" onClick={() => setCreating(true)}>
             <Plus className="size-3.5" />
             New persona

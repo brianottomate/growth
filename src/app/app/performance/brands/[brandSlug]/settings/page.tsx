@@ -1,3 +1,4 @@
+import { ClientConnectCard } from "@/app/app/brands/[brandSlug]/ClientConnectCard";
 import { SharedAdsConnections } from "@/app/app/brands/[brandSlug]/SharedAdsConnections";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
@@ -96,6 +97,7 @@ export default async function PerformanceBrandSettingsPage({
   return (
     <div className="space-y-3">
       <SectionLabel>Settings</SectionLabel>
+      <ClientConnectCard brandId={brand.id} />
       <SharedAdsConnections brandId={brand.id} />
       <SettingsCard
         derived={derived}

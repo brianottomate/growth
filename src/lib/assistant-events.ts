@@ -125,19 +125,6 @@ export type StartClientCampaignIntent = {
 };
 
 /**
- * "Design an ad preview for this brand": the chat runs the brand-ad-preview
- * playbook (a home's photo, the house card, copy in their voice, the art
- * director, then the card saved onto the brand). Fired from the Performance
- * brand page's Ad previews section.
- */
-export type DesignAdPreviewIntent = {
-  type: "design_ad_preview";
-  brandId: string;
-  brandName: string;
-  visibleText: string;
-};
-
-/**
  * Work one home of a Performance client's catalog: its hero photo and its
  * card copy. Fired from the catalog's list rows; `focus` says which of the
  * row's buttons opened it.
@@ -154,7 +141,6 @@ export type WorkCatalogHomeIntent = {
 export type CatalogHomeWorkContext = Omit<WorkCatalogHomeIntent, "visibleText">;
 
 export type AssistantIntent =
-  | DesignAdPreviewIntent
   | WorkCatalogHomeIntent
   | StartClientCampaignIntent
   | DefinePersonasIntent
