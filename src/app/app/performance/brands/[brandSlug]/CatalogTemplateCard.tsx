@@ -22,12 +22,10 @@ import { COMPOSITION_TEMPLATES } from "@/lib/compositions";
 export function CatalogTemplateCard({
   brandId,
   heroHomeId,
-  onChosen,
 }: {
   brandId: string;
   /** The hero home's listing id; the first included card without one. */
   heroHomeId: string | null;
-  onChosen?: (templateId: CatalogTemplateId) => void;
 }) {
   const router = useRouter();
   const client = useQueryClient();
@@ -64,12 +62,11 @@ export function CatalogTemplateCard({
     if (!response.ok) return toast.error("Unable to save the catalog card");
     await client.invalidateQueries({ queryKey: ["catalog-studio", brandId] });
     router.refresh();
-    onChosen?.(templateId);
   }
 
   if (!card) return null;
   return (
-    <div className="space-y-3 rounded-xl border p-4">
+    <div>
       <div className="grid grid-cols-2 gap-3 @2xl:grid-cols-4">
         {CATALOG_TEMPLATES.map((templateId) => {
           const label =

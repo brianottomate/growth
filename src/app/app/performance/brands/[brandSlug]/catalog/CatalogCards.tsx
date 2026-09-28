@@ -5,11 +5,12 @@ import {
   Check,
   ExternalLink,
   MessageSquare,
-  RefreshCw,
+  ChevronDown,
   Sparkles,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/components/ui/lib/utils";
 import { Input } from "@/components/ui/input";
 import {
   Dialog,
@@ -96,12 +97,11 @@ export function CatalogCards({
   /** Cards with a New copy or New photo call in flight. */
   const [fixing, setFixing] = useState<Record<string, "copy" | "photo">>({});
   const [busy, setBusy] = useState(false);
-  /** The card picker, open from the toolbar. */
+  /** The catalog card accordion. */
   const [picker, setPicker] = useState(false);
-  /** Set by a template switch: the cards to rewrite for the new card. */
-  const [rewrite, setRewrite] = useState<string[] | null>(null);
-  /** "Write all cards" progress, while it runs. */
+  /** Progress of a batch run, and which one. */
   const [writing, setWriting] = useState<{
+    action: "autofill" | "newCopy";
     done: number;
     total: number;
   } | null>(null);
@@ -204,16 +204,18 @@ export function CatalogCards({
       },
       "Unable to update approval",
     );
-  const unwritten = query.data?.unwritten ?? [];
+  // Every card still open for changes: included, not signed off, drawn by
+  // us rather than supplied as finished artwork.
+  const open = (draft?.cards ?? [])
+    .filter((c) => c.included && !c.approved && c.mode !== "finished")
+    .map((c) => c.homeId);
   // One card per request, five in flight: each call fits a function, and the
-  // cards fill in as they land.
-  async function writeAll(
-    list: string[] = unwritten,
-    action: "autofill" | "newCopy" = "autofill",
-  ) {
-    const ids = [...list];
+  // cards fill in as they land. "newCopy" rewrites the copy for the card's
+  // template on the photo it has; "autofill" checks and swaps the photo first.
+  async function writeAll(action: "autofill" | "newCopy") {
+    const ids = [...open];
     const total = ids.length;
-    setWriting({ done: 0, total });
+    setWriting({ action, done: 0, total });
     let done = 0;
     let failed = 0;
     const next = async (): Promise<void> => {
@@ -229,7 +231,7 @@ export function CatalogCards({
         .then(() => true)
         .catch(() => false);
       if (!ok) failed++;
-      setWriting({ done: ++done, total });
+      setWriting({ action, done: ++done, total });
       if (done % 5 === 0) void reload();
       return next();
     };
@@ -243,13 +245,10 @@ export function CatalogCards({
   }
   const unapproved = draft ? catalogUnapproved(draft) : [];
   const visible = reviewOnly ? unapproved : (draft?.cards ?? []);
-  async function run(action: "export" | "refresh") {
+  async function run(action: "export") {
     setBusy(true);
-    const done = await post(
-      { action },
-      action === "export" ? "Unable to export" : "Unable to refresh homes",
-    );
-    if (done && action === "export") setView("exports");
+    const done = await post({ action }, "Unable to export");
+    if (done) setView("exports");
     setBusy(false);
   }
   const activeExport = query.data?.exports.some((e) =>
@@ -306,50 +305,19 @@ export function CatalogCards({
                 brandName={brandName}
                 surface="catalog"
               />
-              <Button
-                variant="outline"
-                disabled={busy}
-                aria-label="Refresh homes"
-                onClick={() => void run("refresh")}
-              >
-                <RefreshCw aria-hidden="true" className="size-4 @xl:hidden" />
-                <span className="hidden @xl:inline">Refresh homes</span>
-              </Button>
-              <Button
-                variant={picker ? "secondary" : "outline"}
-                onClick={() => setPicker((open) => !open)}
-              >
-                Card:{" "}
-                {COMPOSITION_TEMPLATES.find(
-                  (t) => t.id === query.data?.defaultTemplate,
-                )?.label.replace(/^Catalog · /, "") ?? "place"}
-              </Button>
-              {rewrite?.length && !writing ? (
+              {(["newCopy", "autofill"] as const).map((action) => (
                 <Button
+                  key={action}
                   variant="outline"
-                  disabled={busy}
-                  onClick={() => {
-                    const ids = rewrite;
-                    setRewrite(null);
-                    void writeAll(ids, "newCopy");
-                  }}
+                  disabled={busy || Boolean(writing) || open.length === 0}
+                  onClick={() => void writeAll(action)}
                 >
                   <Sparkles aria-hidden="true" className="size-4" />
-                  Rewrite {rewrite.length} cards
+                  {writing?.action === action
+                    ? `${action === "newCopy" ? "Rewriting" : "Fixing"} ${writing.done}/${writing.total}`
+                    : `${action === "newCopy" ? "Rewrite copy" : "Fix photos + copy"} ${open.length}`}
                 </Button>
-              ) : null}
-              {unwritten.length || writing ? (
-                <Button
-                  variant="outline"
-                  disabled={busy || Boolean(writing)}
-                  onClick={() => void writeAll()}
-                >
-                  <Sparkles aria-hidden="true" className="size-4" />
-                  {writing
-                    ? `Writing ${writing.done}/${writing.total}`
-                    : `Write all cards ${unwritten.length}`}
-                </Button>
-              ) : null}
+              ))}
               <Button
                 variant="outline"
                 disabled={busy || unapproved.length === 0}
@@ -371,23 +339,40 @@ export function CatalogCards({
               </Button>
             </div>
           </div>
-          {picker ? (
-            <CatalogTemplateCard
-              brandId={brandId}
-              heroHomeId={heroHomeId}
-              onChosen={() =>
-                // Headlines were written for the last card: offer to rewrite
-                // the ones not yet signed off.
-                setRewrite(
-                  (draft.cards ?? [])
-                    .filter(
-                      (c) => c.included && !c.approved && c.mode !== "finished",
-                    )
-                    .map((c) => c.homeId),
-                )
-              }
-            />
-          ) : null}
+          <div className="rounded-xl border">
+            <button
+              type="button"
+              aria-expanded={picker}
+              onClick={() => setPicker((o) => !o)}
+              className="flex w-full items-center justify-between gap-2 p-3 text-left text-sm"
+            >
+              <span>
+                <span className="font-medium">Catalog card</span>
+                <span className="text-muted-foreground">
+                  {" "}
+                  ·{" "}
+                  {COMPOSITION_TEMPLATES.find(
+                    (t) => t.id === query.data?.defaultTemplate,
+                  )?.label.replace(/^Catalog · /, "") ?? "place"}
+                </span>
+              </span>
+              <ChevronDown
+                aria-hidden="true"
+                className={cn(
+                  "size-4 transition-transform",
+                  picker && "rotate-180",
+                )}
+              />
+            </button>
+            {picker ? (
+              <div className="border-t p-3">
+                <CatalogTemplateCard
+                  brandId={brandId}
+                  heroHomeId={heroHomeId}
+                />
+              </div>
+            ) : null}
+          </div>
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <div className="flex rounded-lg border p-0.5">
               {(["grid", "list"] as const).map((l) => (
