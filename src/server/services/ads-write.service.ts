@@ -3704,6 +3704,9 @@ async function recordCompiledCampaign(input: {
               adPlatformSpec(input.draft.platform)?.campaignManageUrl(
                 input.adAccountId,
                 input.externalCampaignId,
+                input.sets.flatMap((set) =>
+                  set.externalId ? [set.externalId] : [],
+                ),
               ) ?? null,
           }
         : {}),
