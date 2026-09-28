@@ -3,9 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { ideaSource } from "@/lib/ad-idea-studio";
-import { isFeedPlacement } from "@/lib/meta-placement-plan";
 import { sendAssistantIntent } from "@/lib/assistant-events";
-import { Loader2, MessageSquare } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
@@ -81,9 +80,6 @@ export function AdIdeaCard({
       ? "details"
       : "overview",
   );
-  const [approvalOpen, setApprovalOpen] = useState(false);
-  const [exportShapes, setExportShapes] = useState<IdeaShape[]>([]);
-  const [approvalVersion, setApprovalVersion] = useState(ad.updatedAt);
   useEffect(() => {
     const prepare = (event: Event) => {
       const detail = (event as CustomEvent<{ adId: string; shape: IdeaShape }>)
@@ -103,9 +99,8 @@ export function AdIdeaCard({
         toast.success(
           approved
             ? "Draft reopened. Previously pushed ads are unchanged."
-            : "Ad approved and creative saved",
+            : "Ad approved",
         );
-        setApprovalOpen(false);
         setView("overview");
         router.refresh();
       },
@@ -322,8 +317,7 @@ export function AdIdeaCard({
       editing={editing}
       frozenUrl={
         approved
-          ? (ad.content.ideaStudio?.approval?.renders[shape]?.[index]?.url ??
-            null)
+          ? ad.content.ideaStudio?.approval?.renders[shape]?.[index]?.url
           : undefined
       }
       onEdit={() => openEditor("slide", slide.id)}
@@ -474,20 +468,19 @@ export function AdIdeaCard({
             variant={approved ? "outline" : "default"}
             disabled={busy || approval.isPending || editor !== null}
             onClick={() =>
-              approved
-                ? approval.mutate({
-                    adId: ad.id,
-                    status: approved ? "drawn" : "approved",
-                    expectedUpdatedAt: savedState.version,
-                  })
-                : (() => {
-                    setExportShapes([
-                      ...(savedState.document.exportShapes ??
-                        savedState.document.shapes),
-                    ]);
-                    setApprovalVersion(savedState.version);
-                    setApprovalOpen(true);
-                  })()
+              approval.mutate({
+                adId: ad.id,
+                status: approved ? "drawn" : "approved",
+                expectedUpdatedAt: savedState.version,
+                ...(approved
+                  ? {}
+                  : {
+                      exportShapes: [
+                        ...(savedState.document.exportShapes ??
+                          savedState.document.shapes),
+                      ],
+                    }),
+              })
             }
           >
             {approval.isPending
@@ -498,116 +491,6 @@ export function AdIdeaCard({
           </Button>
         </div>
       </div>
-      <Dialog
-        open={approvalOpen}
-        onOpenChange={(open) => {
-          if (!approval.isPending) setApprovalOpen(open);
-        }}
-      >
-        <DialogContent showCloseButton={!approval.isPending}>
-          <DialogHeader>
-            <DialogTitle>Approve ad</DialogTitle>
-            <DialogDescription>
-              Choose the finished image sizes to include. Approval freezes the
-              creative and copy; it does not publish the ad.
-            </DialogDescription>
-          </DialogHeader>
-          <fieldset disabled={approval.isPending} className="space-y-3">
-            <legend className="mb-3 text-sm font-medium">Export sizes</legend>
-            {IDEA_SHAPES.map((size) => (
-              <label key={size} className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={exportShapes.includes(size)}
-                  onChange={(event) =>
-                    setExportShapes((current) =>
-                      event.target.checked
-                        ? [...current, size]
-                        : current.filter((value) => value !== size),
-                    )
-                  }
-                />
-                {IDEA_SHAPE_LABELS[size]}
-              </label>
-            ))}
-          </fieldset>
-          {isStatic &&
-            savedState.document.intendedPlacements?.some(
-              (p) => !isFeedPlacement(p),
-            ) &&
-            !exportShapes.includes("story") && (
-              <p className="text-sm text-muted-foreground">
-                Stories or Reels are intended, but no vertical export is
-                selected. Those placements will remain incomplete.
-              </p>
-            )}
-          {approval.isPending ? (
-            <div
-              role="status"
-              aria-live="polite"
-              className="flex items-center gap-3 rounded-lg border bg-muted/30 p-4"
-            >
-              <Loader2
-                aria-hidden="true"
-                className="size-5 shrink-0 animate-spin motion-reduce:animate-none"
-              />
-              <div className="space-y-1">
-                <p className="text-sm font-medium">
-                  Approving{" "}
-                  {savedState.document.cards.length * exportShapes.length}{" "}
-                  {savedState.document.cards.length * exportShapes.length === 1
-                    ? "image"
-                    : "images"}
-                  …
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  This may take a moment. We’ll close this dialog when they’re
-                  ready.
-                </p>
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              {savedState.document.cards.length} {isStatic ? "image" : "slides"}{" "}
-              × {exportShapes.length} sizes ={" "}
-              {savedState.document.cards.length * exportShapes.length} saved
-              images.
-            </p>
-          )}
-          {approvalVersion !== savedState.version && (
-            <p role="alert" className="text-sm">
-              This ad changed. Close this dialog and review the latest version
-              before approving.
-            </p>
-          )}
-          <DialogFooter>
-            <Button
-              variant="outline"
-              disabled={approval.isPending}
-              onClick={() => setApprovalOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              disabled={
-                approval.isPending ||
-                !exportShapes.length ||
-                approvalVersion !== savedState.version
-              }
-              onClick={() =>
-                approval.mutate({
-                  adId: ad.id,
-                  status: "approved",
-                  expectedUpdatedAt: approvalVersion,
-                  exportShapes,
-                })
-              }
-            >
-              {approval.isPending ? "Approving…" : "Approve"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
       {collapsed && (
         <AdIdeaPreview
           brandId={brandId}

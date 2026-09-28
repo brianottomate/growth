@@ -12,6 +12,7 @@ import {
 import { ideaAwaitingArtwork } from "@/lib/ad-idea-studio";
 import { META_URL_TAGS } from "@/lib/ad-utm";
 import "server-only";
+import { freezeApprovedAd } from "./ad-approval.service";
 
 import { createHash } from "node:crypto";
 
@@ -1702,6 +1703,19 @@ export async function previewDraftAd(
   },
   context: AdsWriteContext,
 ) {
+  const owner = await db.query.adTable.findFirst({
+    where: eq(adTable.id, input.adId),
+    columns: { brandId: true },
+  });
+  const ownerBrand =
+    owner &&
+    (await db.query.brandTable.findFirst({
+      where: eq(brandTable.id, owner.brandId),
+      columns: { organizationId: true },
+    }));
+  // The platform renders the preview from real URLs, so freeze first.
+  if (ownerBrand?.organizationId === context.organizationId)
+    await freezeApprovedAd(input.adId);
   const ad = await db.query.adTable.findFirst({
     where: eq(adTable.id, input.adId),
     with: { campaign: { columns: { landingUrl: true } } },
@@ -2221,7 +2235,7 @@ export async function pushDraftToPlatform(
     adAccountId: input.adAccountId,
   });
 
-  const [audiences, ads] = await Promise.all([
+  const [audiences, loadedAds] = await Promise.all([
     db.query.audienceTable.findMany({
       where: eq(audienceTable.campaignId, campaign.id),
     }),
@@ -2229,6 +2243,7 @@ export async function pushDraftToPlatform(
       where: eq(adTable.campaignId, campaign.id),
     }),
   ]);
+  let ads = loadedAds;
   if (ads.length === 0) {
     throw new Error("This campaign has no drafted ads — add ads first");
   }
@@ -2253,6 +2268,19 @@ export async function pushDraftToPlatform(
     throw new Error(
       `Artwork is still missing for an included size: ${awaitingArtwork.map((ad) => ad.name).join(", ")}. Add artwork, use the base image, or exclude that size before pushing.`,
     );
+  // Approval is a sign-off; the images it signed off are rendered and saved
+  // here, the first time something needs their real URLs.
+  let froze = false;
+  for (let i = 0; i < ads.length; i += 4) {
+    const batch = await Promise.all(
+      ads.slice(i, i + 4).map((ad) => freezeApprovedAd(ad.id)),
+    );
+    if (batch.includes(true)) froze = true;
+  }
+  if (froze)
+    ads = await db.query.adTable.findMany({
+      where: eq(adTable.campaignId, campaign.id),
+    });
   // A shell is an ad someone meant to fill and did not. Sending the rest
   // around it would ship a set with a hole nobody chose.
   const shells = ads.filter(

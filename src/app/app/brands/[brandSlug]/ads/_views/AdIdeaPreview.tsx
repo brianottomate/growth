@@ -39,11 +39,9 @@ export function AdIdeaPreview({
     studio.document.cards.flatMap((slide, index) => {
       const url =
         studio.approval?.renders[size]?.[index]?.url ??
-        (studio.approval && !platform
-          ? null
-          : slide.mode === "supplied"
-            ? ideaSource(slide, size)?.url
-            : ideaEditorPreviewUrl(brandId, slide, size));
+        (slide.mode === "supplied"
+          ? ideaSource(slide, size)?.url
+          : ideaEditorPreviewUrl(brandId, slide, size));
       return url ? [{ url, type: "image" }] : [];
     });
   const media = mediaFor(shape);

@@ -30,7 +30,139 @@ import {
 } from "./composition.service";
 import { deleteMedia, importImageBuffer } from "./media.service";
 
-/** Freeze all sizes before the atomic transition. Failed/stale renders never approve an ad. */
+type Brand = typeof brandTable.$inferSelect;
+
+/**
+ * Render every card at each of `shapes` into the brand's library. Returns the
+ * renders by shape and the ids created, so a caller whose save fails can
+ * delete them: an uncommitted export must not outlive its ad.
+ */
+async function renderApprovalExports(input: {
+  ad: typeof adTable.$inferSelect;
+  brand: Brand;
+  document: IdeaStudio["document"];
+  shapes: IdeaShape[];
+  userId: string;
+  sourceVersion: string;
+  generated: string[];
+}) {
+  const { ad, brand, document } = input;
+  const campaign = ad.campaignId
+    ? await db.query.campaignTable.findFirst({
+        where: eq(campaignTable.id, ad.campaignId),
+        columns: { name: true },
+      })
+    : null;
+  const byShape: NonNullable<IdeaStudio["approval"]>["renders"] = {};
+  for (const shape of input.shapes) {
+    const renders: { assetId: string; url: string; reused?: true }[] = [];
+    for (const [index, card] of document.cards.entries()) {
+      const url = new URL(
+        ideaPreviewUrl(brand.id, card, shape)!,
+        "http://local",
+      );
+      const spec = compositionPreviewSchema.parse(
+        Object.fromEntries(url.searchParams),
+      );
+      const resolved = await resolveCompositionContext(input.userId, spec, {
+        sourceUrl: url.searchParams.get("sourceUrl"),
+      });
+      const reusable = reusableApprovalAsset(card, shape, resolved.sourceAsset);
+      if (reusable) {
+        renders.push(reusable);
+        continue;
+      }
+      const context = await loadCompositionSource(resolved);
+      const bytes = Buffer.from(
+        await renderComposition(spec, context).arrayBuffer(),
+      );
+      const format = getCompositionFormat(shape);
+      const asset = await importImageBuffer({
+        brandId: brand.id,
+        uploadedBy: input.userId,
+        body: bytes,
+        contentType: "image/png",
+        filename: `${ad.id}-${index + 1}-${shape}.png`,
+        title: `${ad.name} · ${index + 1} · ${shape}`,
+        width: format.width,
+        height: format.height,
+        metadata: {
+          adApproval: {
+            adId: ad.id,
+            adName: ad.name,
+            campaignId: ad.campaignId,
+            campaignName: campaign?.name,
+            sourceVersion: input.sourceVersion,
+            shape,
+            cardId: card.id,
+          },
+        },
+      });
+      input.generated.push(asset.id);
+      renders.push({ assetId: asset.id, url: asset.url! });
+    }
+    byShape[shape] = renders;
+  }
+  return byShape;
+}
+
+/**
+ * Render and save the images an approved ad has not frozen yet. Approval is a
+ * sign-off; the files are made when something needs real URLs (a push, a
+ * platform preview), as the approver. Returns whether anything was frozen.
+ */
+export async function freezeApprovedAd(adId: string): Promise<boolean> {
+  const ad = await db.query.adTable.findFirst({ where: eq(adTable.id, adId) });
+  if (!ad || !("media" in ad.content)) return false;
+  const studio = ad.content.ideaStudio;
+  const approval = studio?.approval;
+  if (!studio || !approval) return false;
+  const document = studio.document;
+  const missing = document.shapes.filter(
+    (shape) => approval.renders[shape]?.length !== document.cards.length,
+  );
+  if (!missing.length) return false;
+  const brand = await db.query.brandTable.findFirst({
+    where: and(eq(brandTable.id, ad.brandId), isNull(brandTable.deletedAt)),
+  });
+  if (!brand) throw new Error("Ad not found");
+  const generated: string[] = [];
+  try {
+    const renders = await renderApprovalExports({
+      ad,
+      brand,
+      document,
+      shapes: missing,
+      userId: approval.approvedBy,
+      sourceVersion: approval.sourceVersion,
+      generated,
+    });
+    const next = projectIdea(
+      brand.id,
+      ad.content,
+      {
+        ...studio,
+        approval: { ...approval, renders: { ...approval.renders, ...renders } },
+      },
+      ad.placements,
+    );
+    const [saved] = await db
+      .update(adTable)
+      .set({ ...next, updatedAt: new Date() })
+      .where(and(eq(adTable.id, ad.id), eq(adTable.updatedAt, ad.updatedAt)))
+      .returning({ id: adTable.id });
+    if (!saved)
+      throw new Error(
+        `${ad.name} changed while its images were saved. Try again.`,
+      );
+  } catch (error) {
+    for (const id of generated) await deleteMedia(id);
+    throw error;
+  }
+  return true;
+}
+
+/** Approval signs off copy and creative; the images are frozen at push. */
 export async function transitionAdApproval(input: {
   adId: string;
   orgId: string;
@@ -75,102 +207,34 @@ export async function transitionAdApproval(input: {
   if (input.status === "approved" && previous)
     return { adId: ad.id, status: "approved" as const };
   const studio: IdeaStudio = { document };
-  const campaign = ad.campaignId
-    ? await db.query.campaignTable.findFirst({
-        where: eq(campaignTable.id, ad.campaignId),
-        columns: { name: true },
-      })
-    : null;
-  const generated: string[] = [];
-  try {
-    if (input.status === "approved") {
-      if (!document.cards.length || ideaAwaitingArtwork(document))
-        throw new Error(
-          "Add artwork for every included size before approving.",
-        );
-      if (
-        !document.copy.headline.trim() ||
-        !document.copy.body.trim() ||
-        !document.copy.linkUrl
-      )
-        throw new Error(
-          "Add a headline, primary text, and destination URL before approving.",
-        );
-      studio.approval = {
-        approvedAt: new Date().toISOString(),
-        approvedBy: input.userId,
-        sourceVersion: input.expectedUpdatedAt,
-        renders: {},
-      };
-      for (const shape of document.shapes) {
-        const renders: { assetId: string; url: string; reused?: true }[] = [];
-        for (const [index, card] of document.cards.entries()) {
-          const url = new URL(
-            ideaPreviewUrl(brand.id, card, shape)!,
-            "http://local",
-          );
-          const spec = compositionPreviewSchema.parse(
-            Object.fromEntries(url.searchParams),
-          );
-          const resolved = await resolveCompositionContext(input.userId, spec, {
-            sourceUrl: url.searchParams.get("sourceUrl"),
-          });
-          const reusable = reusableApprovalAsset(
-            card,
-            shape,
-            resolved.sourceAsset,
-          );
-          if (reusable) {
-            renders.push(reusable);
-            continue;
-          }
-          const context = await loadCompositionSource(resolved);
-          const bytes = Buffer.from(
-            await renderComposition(spec, context).arrayBuffer(),
-          );
-          const format = getCompositionFormat(shape);
-          const asset = await importImageBuffer({
-            brandId: brand.id,
-            uploadedBy: input.userId,
-            body: bytes,
-            contentType: "image/png",
-            filename: `${ad.id}-${index + 1}-${shape}.png`,
-            title: `${ad.name} · ${index + 1} · ${shape}`,
-            width: format.width,
-            height: format.height,
-            metadata: {
-              adApproval: {
-                adId: ad.id,
-                adName: ad.name,
-                campaignId: ad.campaignId,
-                campaignName: campaign?.name,
-                sourceVersion: input.expectedUpdatedAt,
-                shape,
-                cardId: card.id,
-              },
-            },
-          });
-          generated.push(asset.id);
-          renders.push({ assetId: asset.id, url: asset.url! });
-        }
-        studio.approval.renders[shape] = renders;
-      }
-    }
-    const next = projectIdea(brand.id, ad.content, studio, ad.placements);
-    const [saved] = await db
-      .update(adTable)
-      .set({ ...next, status: input.status, updatedAt: new Date() })
-      .where(and(eq(adTable.id, ad.id), eq(adTable.updatedAt, ad.updatedAt)))
-      .returning({ id: adTable.id });
-    if (!saved)
+  if (input.status === "approved") {
+    if (!document.cards.length || ideaAwaitingArtwork(document))
+      throw new Error("Add artwork for every included size before approving.");
+    if (
+      !document.copy.headline.trim() ||
+      !document.copy.body.trim() ||
+      !document.copy.linkUrl
+    )
       throw new Error(
-        "This ad changed during approval. Review it and approve again.",
+        "Add a headline, primary text, and destination URL before approving.",
       );
-  } catch (error) {
-    // Uncommitted exports cannot be referenced by this ad, so they go.
-    for (const id of generated) await deleteMedia(id);
-    throw error;
+    studio.approval = {
+      approvedAt: new Date().toISOString(),
+      approvedBy: input.userId,
+      sourceVersion: input.expectedUpdatedAt,
+      renders: {},
+    };
   }
+  const next = projectIdea(brand.id, ad.content, studio, ad.placements);
+  const [saved] = await db
+    .update(adTable)
+    .set({ ...next, status: input.status, updatedAt: new Date() })
+    .where(and(eq(adTable.id, ad.id), eq(adTable.updatedAt, ad.updatedAt)))
+    .returning({ id: adTable.id });
+  if (!saved)
+    throw new Error(
+      "This ad changed during approval. Review it and approve again.",
+    );
   if (input.status === "drawn" && previous) {
     const published = await db.query.platformAdTable.findFirst({
       where: eq(platformAdTable.adId, ad.id),

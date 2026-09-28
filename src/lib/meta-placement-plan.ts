@@ -181,6 +181,9 @@ export function metaPlacementMedia(
       media: [],
       issue: "Approve and save this idea before previewing or publishing.",
     };
+  // Approval is a sign-off; the push renders and saves the images.
+  if (studio?.approval && !Object.keys(studio.approval.renders).length)
+    return { media: [], issue: "Images are saved at push." };
   if (studio?.approval) {
     const shape = studio.document.shapes.includes("portrait")
       ? "portrait"
