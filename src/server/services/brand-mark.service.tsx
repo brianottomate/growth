@@ -605,3 +605,108 @@ export async function clearBrandMark(brandId: string): Promise<void> {
     .set({ brandMark: null })
     .where(eq(brandTable.id, brandId));
 }
+
+const pickSchema = z.object({
+  choice: z.number().int().describe("The candidate's number."),
+  reason: z.string().describe("One short sentence."),
+});
+
+/**
+ * The mark a brand starts with, chosen the way an operator would on Setup:
+ * the site logo alone, or a lockup of the favicon beside the name in the
+ * brand's heading font, whichever still reads at the size a card draws it.
+ * A wide wordmark served small is the common loser. Runs once, on creation
+ * or enrichment, before anyone opens the page; the operator can change it.
+ */
+export async function chooseBrandMark(input: {
+  brandId: string;
+  userId: string;
+}): Promise<{ recipe: BrandMarkRecipe; reason: string } | null> {
+  const brand = await loadMarkBrand(input.brandId);
+  const favicon =
+    brand.brandIdentity?.favicon ?? brand.websiteMeta?.favicon ?? null;
+  const recipes: BrandMarkRecipe[] = [
+    ...(brand.logo ? [{ source: "logo" } as const] : []),
+    ...(favicon ? [{ source: "lockup", iconFrom: "favicon" } as const] : []),
+    { source: "lockup", iconFrom: null },
+  ];
+  // Each candidate at card scale: a mark on a card is about 44 px tall on a
+  // 1080 px canvas, so a candidate that is thin there is thin for real.
+  const HEIGHT = 44;
+  const tiles: { recipe: BrandMarkRecipe; png: Buffer }[] = [];
+  for (const recipe of recipes) {
+    try {
+      const png = await renderBrandMark(recipe, brand, "white");
+      const meta = await sharp(png).metadata();
+      const width = Math.round(
+        (HEIGHT * (meta.width ?? 1)) / Math.max(meta.height ?? 1, 1),
+      );
+      tiles.push({
+        recipe,
+        png: await sharp(png)
+          .resize(Math.min(width, 520), HEIGHT, { fit: "inside" })
+          .toBuffer(),
+      });
+    } catch (error) {
+      console.warn("brand mark candidate failed", recipe, error);
+    }
+  }
+  if (!tiles.length) return null;
+  const ROW = HEIGHT + 40;
+  const sheet = await sharp({
+    create: {
+      width: 600,
+      height: ROW * tiles.length,
+      channels: 3,
+      background: "#1c1c1c",
+    },
+  })
+    .composite(
+      tiles.flatMap((tile, i) => [
+        {
+          input: Buffer.from(
+            `<svg width="40" height="${ROW}"><text x="8" y="${ROW / 2 + 6}" font-size="18" fill="#888">${i + 1}</text></svg>`,
+          ),
+          left: 0,
+          top: i * ROW,
+        },
+        { input: tile.png, left: 48, top: i * ROW + 20 },
+      ]),
+    )
+    .png()
+    .toBuffer();
+  const { output } = await generateText({
+    model: anthropic("claude-sonnet-5"),
+    system:
+      "You pick a brand's mark for the corner of an ad card, shown here at the size the card draws it, in white on dark. Choose the candidate that reads best at this size: legible, not thin or faint, clearly the brand. A wordmark that has gone hairline loses to a lockup of an icon and the name set in the brand font. A lockup whose icon is itself a wordmark repeats the name; prefer the plain logo or the text-only lockup then.",
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: `Brand: ${brand.name}. Candidates: ${tiles.map((t, i) => `${i + 1} = ${t.recipe.source === "lockup" ? (t.recipe.iconFrom ? `lockup, ${t.recipe.iconFrom} icon + name` : "name only") : "site logo alone"}`).join("; ")}.`,
+          },
+          { type: "file", data: sheet, mediaType: "image/png" },
+        ],
+      },
+    ],
+    output: Output.object({ schema: pickSchema }),
+    providerOptions: { anthropic: { effort: "low" } },
+  });
+  const chosen = tiles[output.choice - 1] ?? tiles[0]!;
+  const tuning =
+    chosen.recipe.source === "lockup"
+      ? await critiqueBrandMark({
+          brandId: input.brandId,
+          recipe: chosen.recipe,
+        })
+      : null;
+  await setBrandMark({
+    brandId: input.brandId,
+    userId: input.userId,
+    recipe: chosen.recipe,
+    tuning,
+  });
+  return { recipe: chosen.recipe, reason: output.reason };
+}
