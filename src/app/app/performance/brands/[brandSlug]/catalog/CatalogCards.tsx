@@ -502,6 +502,7 @@ export function CatalogCards({
                     >
                       {homeOf(card)?.name}
                     </button>
+                    <HomeLink url={homeOf(card)?.url} />
                     <IncludeButton
                       card={card}
                       onInclude={(included) => update({ ...card, included })}
@@ -531,8 +532,9 @@ export function CatalogCards({
                       </div>
                       <div className="min-w-0 space-y-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <p className="text-sm font-medium">
+                          <p className="flex items-center gap-1.5 text-sm font-medium">
                             {homeOf(card)?.name}
+                            <HomeLink url={homeOf(card)?.url} />
                           </p>
                           {!editing && (
                             <div className="flex flex-wrap gap-2">
@@ -1169,4 +1171,22 @@ function cardPatch(prev: CatalogCard, next: CatalogCard) {
   if (prev.finishedArtwork?.assetId !== next.finishedArtwork?.assetId)
     patch.finishedAssetId = next.finishedArtwork?.assetId ?? null;
   return patch;
+}
+
+/** The home's own listing, in a new tab. */
+function HomeLink({ url }: { url: string | undefined }) {
+  const href = safeHomeUrl(url);
+  if (!href) return null;
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Open the listing"
+      title="Open the listing"
+      className="shrink-0 text-muted-foreground hover:text-foreground"
+    >
+      <ExternalLink className="size-3.5" aria-hidden="true" />
+    </a>
+  );
 }

@@ -783,7 +783,9 @@ export function placeStatement(
   spec: Pick<CompositionSpec, "title" | "formatId"> &
     Partial<Pick<CompositionSpec, "eyebrow">>,
 ) {
-  const perLine = spec.formatId === "square" ? 24 : 28;
+  // Characters that fit one line at the card's headline size: the copy rules
+  // allow a 28-character lead, so a square card must hold it on one line.
+  const perLine = spec.formatId === "square" ? 30 : 28;
   const place = clamp(spec.title.trim(), 40);
   const hook = clamp(spec.eyebrow?.trim() ?? "", 60);
   if (!hook) return wrapText(place, perLine);
