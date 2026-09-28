@@ -1,7 +1,13 @@
 "use client";
 import { catalogAddressIssues } from "@/lib/catalog-addresses";
 import { useEffect, useState } from "react";
-import { Check, ExternalLink, MessageSquare, RefreshCw } from "lucide-react";
+import {
+  Check,
+  ExternalLink,
+  MessageSquare,
+  RefreshCw,
+  Sparkles,
+} from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,6 +60,7 @@ export function CatalogCards({
     enrichmentError?: string;
     homes: CatalogHome[];
     draft: CatalogDraft;
+    unwritten: string[];
     exports: CatalogExport[];
   }>({
     queryKey: ["catalog-studio", brandId],
@@ -61,6 +68,7 @@ export function CatalogCards({
       readResponse<{
         homes: CatalogHome[];
         draft: CatalogDraft;
+        unwritten: string[];
         exports: CatalogExport[];
       }>(await fetch(url)),
     refetchInterval: (q) =>
@@ -81,6 +89,11 @@ export function CatalogCards({
   /** Cards with a New copy or New photo call in flight. */
   const [fixing, setFixing] = useState<Record<string, "copy" | "photo">>({});
   const [busy, setBusy] = useState(false);
+  /** "Write all cards" progress, while it runs. */
+  const [writing, setWriting] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
   const [error, setError] = useState("");
   const draft = query.data?.draft;
   const homes = query.data?.homes ?? [];
@@ -180,6 +193,40 @@ export function CatalogCards({
       },
       "Unable to update approval",
     );
+  const unwritten = query.data?.unwritten ?? [];
+  // One card per request, five in flight: each call fits a function, and the
+  // cards fill in as they land.
+  async function writeAll() {
+    const ids = [...unwritten];
+    const total = ids.length;
+    setWriting({ done: 0, total });
+    let done = 0;
+    let failed = 0;
+    const next = async (): Promise<void> => {
+      const homeId = ids.shift();
+      if (!homeId) return;
+      const ok = await readResponse(
+        await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "autofill", homeId }),
+        }),
+      )
+        .then(() => true)
+        .catch(() => false);
+      if (!ok) failed++;
+      setWriting({ done: ++done, total });
+      if (done % 5 === 0) void reload();
+      return next();
+    };
+    await Promise.all(Array.from({ length: 5 }, next));
+    await reload();
+    setWriting(null);
+    if (failed)
+      setError(
+        `${failed} card${failed === 1 ? "" : "s"} could not be written; New copy on the card retries it.`,
+      );
+  }
   const unapproved = draft ? catalogUnapproved(draft) : [];
   const visible = reviewOnly ? unapproved : (draft?.cards ?? []);
   async function run(action: "export" | "refresh") {
@@ -254,6 +301,18 @@ export function CatalogCards({
                 <RefreshCw aria-hidden="true" className="size-4 @xl:hidden" />
                 <span className="hidden @xl:inline">Refresh homes</span>
               </Button>
+              {unwritten.length || writing ? (
+                <Button
+                  variant="outline"
+                  disabled={busy || Boolean(writing)}
+                  onClick={() => void writeAll()}
+                >
+                  <Sparkles aria-hidden="true" className="size-4" />
+                  {writing
+                    ? `Writing ${writing.done}/${writing.total}`
+                    : `Write all cards ${unwritten.length}`}
+                </Button>
+              ) : null}
               <Button
                 variant="outline"
                 disabled={busy || unapproved.length === 0}

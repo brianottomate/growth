@@ -5,6 +5,7 @@ import { compositionTemplateIdSchema } from "@/lib/compositions";
 import { CATALOG_TEMPLATES } from "@/lib/catalog-studio";
 import { ingestBrandHomes } from "@/server/services/homes.service";
 import {
+  autofillCatalogCard,
   newCatalogCopy,
   newCatalogPhoto,
 } from "@/server/services/catalog-quick-fix.service";
@@ -12,6 +13,7 @@ import {
   catalogBrand,
   catalogState,
   editCatalogCard,
+  scheduleCatalogWrite,
   startCatalogExport,
   renderCatalogExport,
   setCatalogApproval,
@@ -83,7 +85,7 @@ export async function POST(
           templateId: z.enum(CATALOG_TEMPLATES),
         }),
         z.object({
-          action: z.enum(["newCopy", "newPhoto"]),
+          action: z.enum(["newCopy", "newPhoto", "autofill"]),
           homeId: z.string().min(1),
         }),
         z.object({
@@ -103,7 +105,12 @@ export async function POST(
     switch (body.action) {
       case "refresh": {
         const brand = await catalogBrand(userId, brandId);
-        await ingestBrandHomes({ brandId: brand.id, website: brand.website });
+        const { created } = await ingestBrandHomes({
+          brandId: brand.id,
+          website: brand.website,
+        });
+        if (created.length)
+          scheduleCatalogWrite({ userId, brandId, homeIds: created });
         return NextResponse.json(await catalogState(userId, brandId, true));
       }
       case "export": {
@@ -132,6 +139,10 @@ export async function POST(
       case "newCopy":
         return NextResponse.json(
           await newCatalogCopy({ userId, brandId, homeId: body.homeId }),
+        );
+      case "autofill":
+        return NextResponse.json(
+          await autofillCatalogCard({ userId, brandId, homeId: body.homeId }),
         );
       case "newPhoto":
         return NextResponse.json(

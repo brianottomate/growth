@@ -1,4 +1,6 @@
 import "server-only";
+
+import { after } from "next/server";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/server/db";
 import {
@@ -126,8 +128,12 @@ async function catalogHomes(brand: CatalogBrand, refresh = false) {
   let rows = await catalogRows(brand.id);
   // A brand not yet ingested, or a listing new since the last ingest, gets
   // its rows on first read so every card has somewhere to keep an edit.
+  let created: string[] = [];
   if (inventory.homes.some((home) => !rows.has(home.id))) {
-    await ingestBrandHomes({ brandId: brand.id, website: brand.website });
+    ({ created } = await ingestBrandHomes({
+      brandId: brand.id,
+      website: brand.website,
+    }));
     rows = await catalogRows(brand.id);
   }
   const homes: CatalogHome[] = inventory.homes.map((home) => {
@@ -171,18 +177,25 @@ async function catalogHomes(brand: CatalogBrand, refresh = false) {
         : [],
     ),
   );
-  return {
-    inventory,
+  const draft = catalogDraft(
     homes,
-    rows,
-    draft: catalogDraft(
-      homes,
-      overrides,
-      approvals,
-      brand.settings?.catalogTemplateId ?? "catalog-place",
-      brand.markets,
-    ),
-  };
+    overrides,
+    approvals,
+    brand.settings?.catalogTemplateId ?? "catalog-place",
+    brand.markets,
+  );
+  // Cards still on the starter headline that nobody wrote, approved or gave
+  // supplied artwork: what "Write all cards" works through.
+  const unwritten = draft.cards
+    .filter(
+      (card) =>
+        card.included &&
+        !card.approved &&
+        card.mode !== "finished" &&
+        !rows.get(card.homeId)?.catalogTitle,
+    )
+    .map((card) => card.homeId);
+  return { inventory, homes, rows, draft, unwritten, created };
 }
 
 /** The homes whose cards go out: brand-wide reads count only these. */
@@ -202,7 +215,12 @@ export async function catalogState(
   refresh = false,
 ) {
   const brand = await catalogBrand(userId, brandId);
-  const { inventory, homes, draft } = await catalogHomes(brand, refresh);
+  const { inventory, homes, draft, unwritten, created } = await catalogHomes(
+    brand,
+    refresh,
+  );
+  if (created.length)
+    scheduleCatalogWrite({ userId, brandId, homeIds: created });
   const runs = await db.query.creativeRunTable.findMany({
     where: and(
       eq(creativeRunTable.brandId, brandId),
@@ -216,6 +234,7 @@ export async function catalogState(
     syncedAt: inventory.syncedAt,
     defaultTemplate: brand.settings?.catalogTemplateId ?? "catalog-place",
     draft,
+    unwritten,
     exports: runs.map((run): CatalogExport => ({
       ...run.providerOutput,
       id: run.id,
@@ -790,4 +809,27 @@ async function finishedCatalogAsset(brandId: string, assetId: string) {
       "Choose ready finished artwork from this brand’s media library",
     );
   return asset;
+}
+
+/**
+ * Homes new at ingest get their cards written after the response, the same
+ * pass as "Write all cards". Outside a request (a script) there is no after();
+ * the cards then wait for the button.
+ */
+export function scheduleCatalogWrite(input: {
+  userId: string;
+  brandId: string;
+  homeIds: string[];
+}) {
+  try {
+    after(() =>
+      import("./catalog-quick-fix.service").then(({ writeCatalogCards }) =>
+        writeCatalogCards(input).catch((error: unknown) =>
+          console.error("catalog write after ingest failed", error),
+        ),
+      ),
+    );
+  } catch {
+    // No request scope.
+  }
 }

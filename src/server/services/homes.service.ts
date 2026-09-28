@@ -593,12 +593,16 @@ export async function ingestBrandHomes(input: {
     : listings;
   let withDetail = 0;
   const failed: { id: string; error: string }[] = [];
+  // Rows this ingest created: their cards have never been written.
+  const created: string[] = [];
+  const started = Date.now() - 1000;
   // Ten detail reads at a time keeps a large brand off the listing API's back.
   for (let offset = 0; offset < selected.length; offset += 10) {
     await Promise.all(
       selected.slice(offset, offset + 10).map(async (listing) => {
         try {
           const row = await ensureHome({ brandId: input.brandId, listing });
+          if (row.createdAt.getTime() >= started) created.push(listing.id);
           const detail = await fetchWanderOsListingDetail({
             websiteId,
             propertyId: listing.id,
@@ -639,7 +643,7 @@ export async function ingestBrandHomes(input: {
       }),
     );
   }
-  return { listings: selected.length, withDetail, failed };
+  return { listings: selected.length, withDetail, failed, created };
 }
 
 /**

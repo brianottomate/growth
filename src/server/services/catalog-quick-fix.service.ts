@@ -585,6 +585,44 @@ export async function autofillCatalogCard(input: {
   return { photo, copy };
 }
 
+/**
+ * "Write all cards": the photo check and copy for every card nobody has
+ * written yet, or for the given homes among them, five at a time. A written,
+ * approved or supplied card is never touched.
+ */
+export async function writeCatalogCards(input: {
+  userId: string;
+  brandId: string;
+  homeIds?: string[];
+}) {
+  const { unwritten } = await catalogState(input.userId, input.brandId);
+  const ids = input.homeIds
+    ? unwritten.filter((id) => input.homeIds!.includes(id))
+    : unwritten;
+  let written = 0;
+  const failed: { homeId: string; error: string }[] = [];
+  for (let i = 0; i < ids.length; i += 5)
+    await Promise.all(
+      ids.slice(i, i + 5).map(async (homeId) => {
+        // One retry: a copy that fails its own checks usually passes next time.
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            await autofillCatalogCard({ ...input, homeId });
+            written++;
+            return;
+          } catch (error) {
+            if (attempt === 2)
+              failed.push({
+                homeId,
+                error: error instanceof Error ? error.message : String(error),
+              });
+          }
+        }
+      }),
+    );
+  return { written, failed };
+}
+
 const setSchema = z.object({
   edits: z.array(
     z.object({
