@@ -89,7 +89,7 @@ export function CatalogCards({
   /** A card whose photo is being swapped straight from its row, saved on pick. */
   const [picking, setPicking] = useState<CatalogCard | null>(null);
   const [limit, setLimit] = useState(10);
-  const [reviewOnly, setReviewOnly] = useState(false);
+  const [filter, setFilter] = useState<"all" | "review" | "approved">("all");
   /** Cards with a New copy or New photo call in flight. */
   const [fixing, setFixing] = useState<Record<string, "copy" | "photo">>({});
   const [busy, setBusy] = useState(false);
@@ -252,7 +252,15 @@ export function CatalogCards({
       ? { pass: startWrite.variables?.pass, done: 0, total: open.length }
       : null;
   const unapproved = draft ? catalogUnapproved(draft) : [];
-  const visible = reviewOnly ? unapproved : (draft?.cards ?? []);
+  const approvedCards = (draft?.cards ?? []).filter(
+    (c) => c.included && c.approved,
+  );
+  const visible =
+    filter === "review"
+      ? unapproved
+      : filter === "approved"
+        ? approvedCards
+        : (draft?.cards ?? []);
   async function exportCatalog() {
     setBusy(true);
     const done = await act(
@@ -410,15 +418,19 @@ export function CatalogCards({
               ))}
             </div>
             <div className="flex rounded-lg border p-0.5">
-              {([false, true] as const).map((only) => (
+              {(["all", "review", "approved"] as const).map((key) => (
                 <Button
-                  key={String(only)}
-                  variant={reviewOnly === only ? "secondary" : "ghost"}
+                  key={key}
+                  variant={filter === key ? "secondary" : "ghost"}
                   size="sm"
-                  aria-pressed={reviewOnly === only}
-                  onClick={() => setReviewOnly(only)}
+                  aria-pressed={filter === key}
+                  onClick={() => setFilter(key)}
                 >
-                  {only ? `Needs review ${unapproved.length}` : "All"}
+                  {key === "review"
+                    ? `Needs review ${unapproved.length}`
+                    : key === "approved"
+                      ? `Approved ${approvedCards.length}`
+                      : "All"}
                 </Button>
               ))}
             </div>
