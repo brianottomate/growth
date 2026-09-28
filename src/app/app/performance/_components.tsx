@@ -186,6 +186,33 @@ export function SpendCell({ campaign }: { campaign: DeskCampaign }) {
 }
 
 /** One campaign as a row: dot, name over its client, platforms, money. */
+const STATE_WORD: Record<DeskCampaign["state"], string> = {
+  draft: "Draft",
+  pushed: "Pushed, paused",
+  live: "Live",
+  ended: "Ended",
+};
+
+/** "Sep 21", with the year only when it is not this one. */
+function createdOn(date: Date) {
+  const sameYear = date.getFullYear() === new Date().getFullYear();
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    ...(sameYear ? {} : { year: "numeric" }),
+  });
+}
+
+/**
+ * A composition preview renders on request; its source photo is the cheap
+ * stand-in at thumbnail size.
+ */
+function thumbSrc(url: string) {
+  if (!url.includes("/api/compositions/preview")) return url;
+  const query = url.slice(url.indexOf("?") + 1);
+  return new URLSearchParams(query).get("sourceUrl") ?? url;
+}
+
 export function CampaignRow({
   brand,
   campaign,
@@ -212,12 +239,35 @@ export function CampaignRow({
         >
           {campaign.name}
         </Link>
-        {showBrand ? (
-          <span className="block truncate text-[11px] text-muted-foreground">
-            {client}
-          </span>
-        ) : null}
+        <span className="block truncate text-[11px] text-muted-foreground">
+          {[
+            showBrand ? client : null,
+            `Created ${createdOn(campaign.createdAt)}`,
+            STATE_WORD[campaign.state],
+            campaign.adCount
+              ? `${campaign.adCount} ad${campaign.adCount === 1 ? "" : "s"}${campaign.approvedCount ? ` · ${campaign.approvedCount} approved` : ""}`
+              : "no ads",
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </span>
       </div>
+      {campaign.thumbs.length > 0 ? (
+        <span className="hidden shrink-0 gap-1 @3xl:flex">
+          {[...new Set(campaign.thumbs.map(thumbSrc))]
+            .slice(0, 4)
+            .map((src) => (
+              // oxlint-disable-next-line nextjs/no-img-element
+              <img
+                key={src}
+                src={src}
+                alt=""
+                loading="lazy"
+                className="size-9 rounded-md bg-muted object-cover"
+              />
+            ))}
+        </span>
+      ) : null}
       <span className="col-span-2 flex items-center gap-1.5 text-muted-foreground @lg:col-span-1">
         {campaign.platforms.map((row) => (
           <span

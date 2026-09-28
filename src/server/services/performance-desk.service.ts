@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import {
   DELIVERY_STAGES,
@@ -41,6 +41,9 @@ export type DeskCampaign = {
   /** Where spend sits against time, when the platform rows carry dates. */
   pace: "ahead" | "on" | "behind" | null;
   adCount: number;
+  approvedCount: number;
+  /** The first image of up to four ads, for the row's preview strip. */
+  thumbs: string[];
   /**
    * The client this campaign is billed to when it runs under Wander's own
    * brand: the account on the cycle it is attached to. Null when the campaign
@@ -181,7 +184,19 @@ export async function loadPerformanceDesk(
         createdAt: true,
         performanceCycleId: true,
       },
-      with: { ads: { columns: { id: true } } },
+      with: {
+        ads: {
+          columns: { id: true, status: true },
+          // Only the first card's image, not the whole ad document.
+          extras: {
+            thumb: sql<
+              string | null
+            >`coalesce(content -> 'media' -> 0 ->> 'thumbnail', content -> 'media' -> 0 ->> 'url')`.as(
+              "thumb",
+            ),
+          },
+        },
+      },
       orderBy: (campaign, { desc }) => [desc(campaign.createdAt)],
     }),
     db.query.performanceAccountTable.findMany({
@@ -273,6 +288,12 @@ export async function loadPerformanceDesk(
       budget: platformBudget > 0 ? platformBudget : (campaign.budget ?? 0),
       pace: paceOf(rows, spend),
       adCount: campaign.ads.length,
+      approvedCount: campaign.ads.filter((ad) => ad.status === "approved")
+        .length,
+      thumbs: campaign.ads
+        .map((ad) => ad.thumb)
+        .filter((url): url is string => Boolean(url))
+        .slice(0, 6),
       accountName: campaign.performanceCycleId
         ? (accountNameByCycle.get(campaign.performanceCycleId) ?? null)
         : null,
