@@ -113,6 +113,10 @@ export const drawsLocation = (templateId: string) =>
   templateId === "catalog-destination";
 export type CatalogTemplateId = (typeof CATALOG_TEMPLATES)[number];
 
+/** The Studio's batch passes: Rewrite copy, and Fix photos + copy. */
+export const CATALOG_WRITE_PASSES = ["copy", "photosAndCopy"] as const;
+export type CatalogWritePass = (typeof CATALOG_WRITE_PASSES)[number];
+
 /** Where a card says the home is: its market's label, else its own town. */
 export function catalogLocation(
   home: CatalogHome,

@@ -7,6 +7,7 @@ import { googleDriveRouter } from "@/server/api/routers/googleDrive.router";
 import { brandRouter } from "@/server/api/routers/brand.router";
 import { blogRouter } from "@/server/api/routers/blog.router";
 import { cadenceRouter } from "@/server/api/routers/cadence.router";
+import { catalogRouter } from "@/server/api/routers/catalog.router";
 import { channelRouter } from "@/server/api/routers/channel.router";
 import { channelSuggestionRouter } from "@/server/api/routers/channelSuggestion.router";
 import { contentRouter } from "@/server/api/routers/content.router";
@@ -55,6 +56,7 @@ export const appRouter = {
   brand: brandRouter,
   blog: blogRouter,
   cadence: cadenceRouter,
+  catalog: catalogRouter,
   channel: channelRouter,
   channelSuggestion: channelSuggestionRouter,
   content: contentRouter,

@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { cn } from "@/components/ui/lib/utils";
 import { toast } from "@/components/ui/toast";
@@ -10,10 +9,10 @@ import {
   CATALOG_TEMPLATES,
   catalogCardPreviewUrl,
   type CatalogCard,
-  type CatalogDraft,
   type CatalogTemplateId,
 } from "@/lib/catalog-studio";
 import { COMPOSITION_TEMPLATES } from "@/lib/compositions";
+import { orpc } from "@/orpc/client";
 
 /**
  * The catalog card every home uses unless it has its own: the hero home's
@@ -29,40 +28,23 @@ export function CatalogTemplateCard({
 }) {
   const router = useRouter();
   const client = useQueryClient();
-  const url = `/api/performance/catalog/${brandId}/studio`;
-  const query = useQuery<{
-    draft: CatalogDraft;
-    defaultTemplate: CatalogTemplateId;
-  }>({
-    queryKey: ["catalog-studio", brandId],
-    queryFn: async () => {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error("Unable to load the catalog");
-      return (await response.json()) as {
-        draft: CatalogDraft;
-        defaultTemplate: CatalogTemplateId;
-      };
-    },
-  });
-  const [saving, setSaving] = useState<CatalogTemplateId | null>(null);
+  const state = orpc.catalog.state.queryOptions({ input: { brandId } });
+  const query = useQuery(state);
+  const save = useMutation(
+    orpc.catalog.setDefaultTemplate.mutationOptions({
+      onError: () => toast.error("Unable to save the catalog card"),
+      onSuccess: async () => {
+        await client.invalidateQueries({ queryKey: state.queryKey });
+        router.refresh();
+      },
+    }),
+  );
+  const saving = save.isPending ? (save.variables?.templateId ?? null) : null;
   const cards = query.data?.draft.cards ?? [];
   const drawn = cards.filter((c) => c.mode !== "finished");
   const card =
     drawn.find((c) => c.homeId === heroHomeId) ?? drawn.find((c) => c.included);
   const current = query.data?.defaultTemplate ?? "catalog-place";
-
-  async function choose(templateId: CatalogTemplateId) {
-    setSaving(templateId);
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "defaultTemplate", templateId }),
-    });
-    setSaving(null);
-    if (!response.ok) return toast.error("Unable to save the catalog card");
-    await client.invalidateQueries({ queryKey: ["catalog-studio", brandId] });
-    router.refresh();
-  }
 
   if (!card) return null;
   return (
@@ -81,7 +63,7 @@ export function CatalogTemplateCard({
               key={templateId}
               aria-pressed={current === templateId}
               disabled={saving !== null}
-              onClick={() => void choose(templateId)}
+              onClick={() => save.mutate({ brandId, templateId })}
               className={cn(
                 "space-y-2 rounded-lg border p-2 text-left text-sm",
                 current === templateId && "ring-2 ring-foreground",

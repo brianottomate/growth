@@ -2,12 +2,16 @@ import "server-only";
 
 import { anthropic } from "@ai-sdk/anthropic";
 import { generateText, Output, type UserContent } from "ai";
-import { and, eq, isNotNull, isNull, ne } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, ne } from "drizzle-orm";
 import sharp from "sharp";
 import { z } from "zod";
 
 import { brandWideAmenities, hasEmDash } from "@/lib/catalog-copy";
-import { catalogHeadlineIssue } from "@/lib/catalog-studio";
+import {
+  CATALOG_WRITE_PASSES,
+  catalogHeadlineIssue,
+  type CatalogWritePass,
+} from "@/lib/catalog-studio";
 import { marketOf, type Market } from "@/lib/markets";
 import {
   CATALOG_COPY_INTENTS,
@@ -21,7 +25,7 @@ import {
   catalogNewPhotoPrompt,
 } from "@/server/ai/prompts";
 import { db } from "@/server/db";
-import { brandTable, homeTable } from "@/server/db/schema";
+import { brandTable, creativeRunTable, homeTable } from "@/server/db/schema";
 
 import {
   catalogBrand,
@@ -586,41 +590,197 @@ export async function autofillCatalogCard(input: {
 }
 
 /**
- * "Write all cards": the photo check and copy for every card nobody has
- * written yet, or for the given homes among them, five at a time. A written,
- * approved or supplied card is never touched.
+ * Every card still open for changes: included, not signed off, and drawn by
+ * us rather than supplied as finished artwork.
+ */
+async function openCatalogCards(userId: string, brandId: string) {
+  const { draft } = await catalogState(userId, brandId);
+  return draft.cards
+    .filter((c) => c.included && !c.approved && c.mode !== "finished")
+    .map((c) => c.homeId);
+}
+
+/**
+ * A batch pass over the open cards, five at a time: "copy" rewrites the copy
+ * for each card's template on the photo it has; "photosAndCopy" checks and
+ * swaps the photo first.
  */
 export async function writeCatalogCards(input: {
   userId: string;
   brandId: string;
+  pass: CatalogWritePass;
+  /** Only these among the open cards. */
   homeIds?: string[];
+  onProgress?: (progress: CatalogWriteProgress) => Promise<unknown>;
+  /** Start no card after this time; the rest stay as they are. */
+  until?: number;
 }) {
-  const { unwritten } = await catalogState(input.userId, input.brandId);
-  const ids = input.homeIds
-    ? unwritten.filter((id) => input.homeIds!.includes(id))
-    : unwritten;
-  let written = 0;
+  const open = await openCatalogCards(input.userId, input.brandId);
+  const queue = input.homeIds
+    ? open.filter((id) => input.homeIds!.includes(id))
+    : open;
+  const total = queue.length;
+  let done = 0;
   const failed: { homeId: string; error: string }[] = [];
-  for (let i = 0; i < ids.length; i += 5)
-    await Promise.all(
-      ids.slice(i, i + 5).map(async (homeId) => {
-        // One retry: a copy that fails its own checks usually passes next time.
-        for (let attempt = 1; attempt <= 2; attempt++) {
-          try {
-            await autofillCatalogCard({ ...input, homeId });
-            written++;
-            return;
-          } catch (error) {
-            if (attempt === 2)
-              failed.push({
-                homeId,
-                error: error instanceof Error ? error.message : String(error),
-              });
-          }
+  // Serialized so a slow write never lands after a newer count.
+  let reported = Promise.resolve<unknown>(undefined);
+  const worker = async () => {
+    while (queue.length && !(input.until && Date.now() > input.until)) {
+      const card = {
+        userId: input.userId,
+        brandId: input.brandId,
+        homeId: queue.shift()!,
+      };
+      // One retry: a copy that fails its own checks usually passes next time.
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          await (input.pass === "copy"
+            ? newCatalogCopy(card)
+            : autofillCatalogCard(card));
+          break;
+        } catch (error) {
+          if (attempt === 2)
+            failed.push({
+              homeId: card.homeId,
+              error: error instanceof Error ? error.message : String(error),
+            });
         }
-      }),
+      }
+      done++;
+      const progress = { done, total, failed: failed.length };
+      reported = reported.then(() => input.onProgress?.(progress));
+      await reported;
+    }
+  };
+  await Promise.all(Array.from({ length: 5 }, worker));
+  return { done, total, failed, left: queue.length };
+}
+
+export type CatalogWriteProgress = {
+  done: number;
+  total: number;
+  failed: number;
+};
+
+const WRITE_PROVIDER = "catalog-write";
+/** Past the function's 800 s limit a run that still says processing was cut off. */
+const WRITE_STALE_MS = 15 * 60_000;
+/** Room under that limit for the cards in flight when the budget runs out. */
+const WRITE_BUDGET_MS = 10 * 60_000;
+
+function catalogWriteRun(run: typeof creativeRunTable.$inferSelect) {
+  const output = run.providerOutput ?? {};
+  const cutOff =
+    (run.status === "queued" || run.status === "processing") &&
+    Date.now() - run.createdAt.getTime() > WRITE_STALE_MS;
+  const pass = CATALOG_WRITE_PASSES.find((p) => p === run.input.pass);
+  return {
+    runId: run.id,
+    pass: pass ?? "photosAndCopy",
+    status: cutOff ? ("error" as const) : run.status,
+    error: cutOff
+      ? "Stopped before it finished. Run it again for the rest."
+      : run.error,
+    done: Number(output.done ?? 0),
+    total: Number(output.total ?? 0),
+    failed: Number(output.failed ?? 0),
+    /** Cards the run had no time left for. */
+    left: Number(output.left ?? 0),
+    createdAt: run.createdAt.toISOString(),
+  };
+}
+
+/** The brand's latest batch pass over its cards. */
+export async function catalogWriteStatus(input: {
+  userId: string;
+  brandId: string;
+}) {
+  const brand = await catalogBrand(input.userId, input.brandId);
+  const run = await db.query.creativeRunTable.findFirst({
+    where: and(
+      eq(creativeRunTable.brandId, brand.id),
+      eq(creativeRunTable.provider, WRITE_PROVIDER),
+    ),
+    orderBy: [desc(creativeRunTable.createdAt)],
+  });
+  return { run: run ? catalogWriteRun(run) : null };
+}
+
+/**
+ * Queue a batch pass over the open cards. A run already going for the brand,
+ * of either pass, is returned instead of starting a second.
+ */
+export async function startCatalogWrite(input: {
+  userId: string;
+  brandId: string;
+  pass: CatalogWritePass;
+}) {
+  const brand = await catalogBrand(input.userId, input.brandId);
+  const { run: latest } = await catalogWriteStatus(input);
+  if (latest && (latest.status === "queued" || latest.status === "processing"))
+    return { started: false, homeIds: [], run: latest };
+  const homeIds = await openCatalogCards(input.userId, input.brandId);
+  if (!homeIds.length)
+    throw new Error(
+      "No card is open for changes: every included card is approved or supplied artwork.",
     );
-  return { written, failed };
+  const [run] = await db
+    .insert(creativeRunTable)
+    .values({
+      brandId: brand.id,
+      organizationId: brand.organizationId,
+      createdBy: input.userId,
+      provider: WRITE_PROVIDER,
+      kind: "image",
+      model: MODEL,
+      prompt:
+        input.pass === "copy"
+          ? "Rewrite the copy of every open catalog card"
+          : "Check the hero and write the copy of every open catalog card",
+      input: { pass: input.pass, homeIds },
+      providerOutput: { done: 0, total: homeIds.length, failed: 0 },
+    })
+    .returning();
+  return { started: true, homeIds, run: catalogWriteRun(run!) };
+}
+
+/** The run's body, after the response: progress lands on the run row. */
+export async function runCatalogWrite(
+  runId: string,
+  input: {
+    userId: string;
+    brandId: string;
+    pass: CatalogWritePass;
+    homeIds: string[];
+  },
+) {
+  const save = (set: Partial<typeof creativeRunTable.$inferInsert>) =>
+    db.update(creativeRunTable).set(set).where(eq(creativeRunTable.id, runId));
+  try {
+    await save({ status: "processing" });
+    const result = await writeCatalogCards({
+      ...input,
+      until: Date.now() + WRITE_BUDGET_MS,
+      onProgress: (progress) =>
+        save({ status: "processing", providerOutput: progress }),
+    });
+    await save({
+      status: "ready",
+      completedAt: new Date(),
+      providerOutput: {
+        done: result.done,
+        total: result.total,
+        failed: result.failed.length,
+        failures: result.failed,
+        left: result.left,
+      },
+    });
+  } catch (error) {
+    await save({
+      status: "error",
+      error: error instanceof Error ? error.message : "Writing cards failed",
+    });
+  }
 }
 
 const setSchema = z.object({

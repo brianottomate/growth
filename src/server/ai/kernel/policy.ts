@@ -269,6 +269,9 @@ export const growthActionPolicies = {
     ideaHomePhotos: read(),
     ideaContext: read(),
     catalogHomeFacts: read(),
+    // Reading can ingest a home new since the last read, so it has a row.
+    catalogState: read(),
+    catalogWriteStatus: read(),
     suggestCampaignAudiences: read("model-read"),
     // Renders via Meta's preview API; creates nothing.
     previewAd: read("provider-read"),
@@ -302,6 +305,19 @@ export const growthActionPolicies = {
     setAdHome: write({ idempotent: true }),
     setHomeHero: write({ idempotent: true }),
     editCatalogCard: write({ idempotent: true }),
+    // Catalog: local home rows and our own R2 renders, no provider call.
+    refreshCatalogHomes: write({ idempotent: true }),
+    newCatalogCopy: write({ consequence: "model-write" }),
+    newCatalogPhoto: write({ consequence: "model-write" }),
+    // Only cards nobody wrote, and a running run is returned, not doubled.
+    writeCatalogCards: write({
+      consequence: "background-run",
+      idempotent: true,
+    }),
+    setCatalogApproval: write({ idempotent: true }),
+    setCatalogIncluded: write({ idempotent: true }),
+    setCatalogDefaultTemplate: write({ idempotent: true }),
+    exportCatalog: write({ consequence: "background-run" }),
     editAdCards: write(),
     // Sets one field on local rows; the push is still the provider step.
     attachAdSet: write({ idempotent: true }),

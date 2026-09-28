@@ -53,6 +53,18 @@ import {
   freezePlacementAction,
   unfreezePlacementAction,
 } from "./ads";
+import {
+  catalogStateAction,
+  catalogWriteStatusAction,
+  exportCatalogAction,
+  newCatalogCopyAction,
+  newCatalogPhotoAction,
+  refreshCatalogHomesAction,
+  setCatalogApprovalAction,
+  setCatalogDefaultTemplateAction,
+  setCatalogIncludedAction,
+  writeCatalogCardsAction,
+} from "./catalog";
 import { diagnoseAlignment } from "./alignment";
 import { AMPLIFICATION_TOOLS } from "./amplification";
 import {
@@ -425,6 +437,8 @@ export const adsRead = growthDomainTool({
     ideaHomePhotos: ideaHomePhotosAction,
     ideaContext: ideaContextAction,
     catalogHomeFacts: catalogHomeFactsAction,
+    catalogState: catalogStateAction,
+    catalogWriteStatus: catalogWriteStatusAction,
     suggestCampaignAudiences: suggestCampaignAudiencesAction,
     previewAd: previewAdAction,
     diagnoseAlignment,
@@ -449,6 +463,14 @@ export const adsWrite = growthDomainTool({
     setAdHome: setAdHomeAction,
     setHomeHero: setHomeHeroAction,
     editCatalogCard: editCatalogCardAction,
+    refreshCatalogHomes: refreshCatalogHomesAction,
+    newCatalogCopy: newCatalogCopyAction,
+    newCatalogPhoto: newCatalogPhotoAction,
+    writeCatalogCards: writeCatalogCardsAction,
+    setCatalogApproval: setCatalogApprovalAction,
+    setCatalogIncluded: setCatalogIncludedAction,
+    setCatalogDefaultTemplate: setCatalogDefaultTemplateAction,
+    exportCatalog: exportCatalogAction,
     editAdCards: editAdCardsAction,
     attachAdSet: attachAdSetAction,
     replaceAdCard: replaceAdCardAction,

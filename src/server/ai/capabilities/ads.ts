@@ -152,7 +152,7 @@ import {
 import { AD_PLACEMENT_SPECS } from "@/lib/ad-placements";
 import { HAND_MADE_AD_FORMATS, MAX_SET_HOMES } from "@/lib/performance-ads";
 
-import { growthAction } from "./types";
+import { GrowthActionError, growthAction } from "./types";
 
 // Optional analysis window — both default to "last 365 days" (resolved in the
 // service). The model only needs to pass dates when the operator names a range.
@@ -1523,19 +1523,37 @@ export const createAdsFromAssetsAction = growthAction({
 export const setHomeHeroAction = growthAction({
   outputSchema: setHomeHeroActionOutputSchema,
   description:
-    "Make one of a Performance client's home photos that home's hero: the photo its ads, previews and catalog card draw on. photoNumber is the 1-based number printed on the home's contact sheet in the catalog conversation. Replaces the previous hero; run it again to change it.",
+    "Make one of a Performance client's home photos that home's hero: the photo its ads, previews and catalog card draw on. photoNumber is the 1-based number printed on the home's contact sheet in the catalog conversation; photoUrl is one of the home's gallery photo URLs instead. Replaces the previous hero; run it again to change it.",
   inputSchema: z.object({
     brandId: z.string().min(1),
     homeId: z.string().min(1).describe("The WanderOS listing id."),
-    photoNumber: z.number().int().min(1),
+    photoNumber: z.number().int().min(1).optional(),
+    photoUrl: z
+      .string()
+      .url()
+      .optional()
+      .describe("A photo from the home's own gallery, when not by number."),
   }),
-  examples: [{ brandId: "brd_01", homeId: "1234567890123", photoNumber: 4 }],
-  execute: ({ photoNumber, ...input }, ctx) =>
-    setCatalogHomeHero({
+  examples: [
+    { brandId: "brd_01", homeId: "1234567890123", photoNumber: 4 },
+    {
+      brandId: "brd_01",
+      homeId: "1234567890123",
+      photoUrl: "https://example.com/photo.jpg",
+    },
+  ],
+  execute: ({ photoNumber, photoUrl, ...input }, ctx) => {
+    if ((photoNumber === undefined) === (photoUrl === undefined))
+      throw new GrowthActionError(
+        "invalid_input",
+        "Give either photoNumber or photoUrl.",
+      );
+    return setCatalogHomeHero({
       ...input,
       userId: ctx.userId,
-      photo: { number: photoNumber },
-    }),
+      photo: photoUrl ? { url: photoUrl } : { number: photoNumber! },
+    });
+  },
 });
 
 export const suggestCampaignAudiencesAction = growthAction({
@@ -1571,7 +1589,7 @@ export const catalogHomeFactsAction = growthAction({
 export const editCatalogCardAction = growthAction({
   outputSchema: editCatalogCardActionOutputSchema,
   description:
-    "Change one home's card in a Performance client's catalog draft: the headline printed on the image (title, e.g. 'Exposed-brick loft in Louisville, KY'), the facts line (subtitle), the composition template, the crop focus, the logo, whether the home is in the export, the amenity pills on the amenities cards, and mark it approved. Send only the fields to change. Saves the draft; nothing is exported or pushed. Approval is a review bookmark, not an export gate; a later change to what the card shows clears it.",
+    "Change one home's card in a Performance client's catalog draft: the headline printed on the image (title, e.g. 'Exposed-brick loft in Louisville, KY'), the facts line (subtitle), the composition template, the crop focus, the logo, whether the home is in the export, the amenity pills on the amenities cards, the library image or supplied artwork it uses, and mark it approved. Send only the fields to change. Saves the draft; nothing is exported or pushed. Approval is a review bookmark, not an export gate; a later change to what the card shows clears it.",
   inputSchema: z.object({
     brandId: z.string().min(1),
     homeId: z.string().min(1).describe("The WanderOS listing id."),
@@ -1597,6 +1615,29 @@ export const editCatalogCardAction = growthAction({
       .optional()
       .describe(
         "Amenity pills on the amenities cards: two to four short labels of amenities this listing has.",
+      ),
+    mode: z
+      .enum(["compose", "finished"])
+      .nullable()
+      .optional()
+      .describe(
+        "finished: the card is supplied artwork (finishedAssetId) used as-is; compose: drawn from a photo and the template; null: back to the default.",
+      ),
+    imageAssetId: z
+      .string()
+      .min(1)
+      .nullable()
+      .optional()
+      .describe(
+        "A brand media library image to draw the card on instead of the home's hero; null goes back to the hero.",
+      ),
+    finishedAssetId: z
+      .string()
+      .min(1)
+      .nullable()
+      .optional()
+      .describe(
+        "Supplied artwork from the brand's media library for a finished card; null clears it.",
       ),
     approved: z
       .boolean()

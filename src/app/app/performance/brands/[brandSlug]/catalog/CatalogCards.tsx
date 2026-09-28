@@ -1,6 +1,6 @@
 "use client";
 import { catalogAddressIssues } from "@/lib/catalog-addresses";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Check,
   ExternalLink,
@@ -8,7 +8,8 @@ import {
   ChevronDown,
   Sparkles,
 } from "lucide-react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ORPCError } from "@orpc/client";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/components/ui/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -22,32 +23,32 @@ import {
 import { MediaPickerDialog } from "@/app/app/content/[contentId]/MediaPickerDialog";
 import { COMPOSITION_FORMATS, COMPOSITION_TEMPLATES } from "@/lib/compositions";
 import {
+  CATALOG_WRITE_PASSES,
   catalogArtworkIssues,
   catalogCardFingerprint,
   catalogCardPreviewUrl,
   catalogUnapproved,
   type CatalogCard,
-  type CatalogDraft,
   type CatalogHome,
-  type CatalogExport,
-  type CatalogTemplateId,
 } from "@/lib/catalog-studio";
 import { safeHomeUrl } from "@/lib/ad-preview-links";
 import { sendAssistantIntent } from "@/lib/assistant-events";
+import { orpc, type RouterInputs } from "@/orpc/client";
 import { ReviewInChatButton } from "../ReviewInChatButton";
 import { CatalogPreview } from "./CatalogPreview";
 import { CatalogTemplateCard } from "../CatalogTemplateCard";
 
-async function readResponse<T = unknown>(response: Response): Promise<T> {
-  const body: unknown = await response.json();
-  if (!response.ok)
-    throw new Error(
-      typeof body === "object" && body && "error" in body
-        ? String(body.error)
-        : "Catalog request failed",
-    );
-  return body as T;
+/** The server's own sentence, or the first input issue it refused. */
+function errorMessage(error: unknown, fallback: string) {
+  if (error instanceof ORPCError) {
+    const issues = (error.data as { issues?: { message?: string }[] } | null)
+      ?.issues;
+    return issues?.[0]?.message ?? error.message;
+  }
+  return error instanceof Error ? error.message : fallback;
 }
+const running = (status?: string) =>
+  status === "queued" || status === "processing";
 const PORTRAIT = COMPOSITION_FORMATS.find((f) => f.id === "portrait")!;
 const preview = catalogCardPreviewUrl;
 export function CatalogCards({
@@ -61,31 +62,19 @@ export function CatalogCards({
   heroHomeId?: string | null;
 }) {
   const client = useQueryClient();
-  const url = `/api/performance/catalog/${brandId}/studio`;
-  const query = useQuery<{
-    enrichmentError?: string;
-    homes: CatalogHome[];
-    draft: CatalogDraft;
-    unwritten: string[];
-    defaultTemplate: CatalogTemplateId;
-    exports: CatalogExport[];
-  }>({
-    queryKey: ["catalog-studio", brandId],
-    queryFn: async () =>
-      readResponse<{
-        homes: CatalogHome[];
-        draft: CatalogDraft;
-        unwritten: string[];
-        defaultTemplate: CatalogTemplateId;
-        exports: CatalogExport[];
-      }>(await fetch(url)),
+  const state = orpc.catalog.state.queryOptions({ input: { brandId } });
+  const query = useQuery({
+    ...state,
     refetchInterval: (q) =>
-      q.state.data?.exports.some((e) =>
-        ["queued", "processing"].includes(e.status),
-      )
-        ? 2500
-        : false,
+      q.state.data?.exports.some((e) => running(e.status)) ? 2500 : false,
   });
+  const writeStatus = orpc.catalog.writeStatus.queryOptions({
+    input: { brandId },
+  });
+  const writeRun = useQuery({
+    ...writeStatus,
+    refetchInterval: (q) => (running(q.state.data?.run?.status) ? 2500 : false),
+  }).data?.run;
   const [view, setView] = useState<"studio" | "preview" | "exports">("studio");
   const [layout, setLayout] = useState<"grid" | "list">("grid");
   const [details, setDetails] = useState<CatalogCard | null>(null);
@@ -99,49 +88,39 @@ export function CatalogCards({
   const [busy, setBusy] = useState(false);
   /** The catalog card accordion. */
   const [picker, setPicker] = useState(false);
-  /** Progress of a batch run, and which one. */
-  const [writing, setWriting] = useState<{
-    action: "autofill" | "newCopy";
-    done: number;
-    total: number;
-  } | null>(null);
   const [error, setError] = useState("");
   const draft = query.data?.draft;
   const homes = query.data?.homes ?? [];
   const homeOf = (card: CatalogCard) => homes.find((h) => h.id === card.homeId);
-  const reload = () =>
-    client.invalidateQueries({ queryKey: ["catalog-studio", brandId] });
+  const reload = () => client.invalidateQueries({ queryKey: state.queryKey });
   // Chat edits the same rows; show its writes as they land.
   useEffect(() => {
-    const onWrite = () =>
-      void client.invalidateQueries({ queryKey: ["catalog-studio", brandId] });
+    const onWrite = () => {
+      void client.invalidateQueries({ queryKey: state.queryKey });
+      void client.invalidateQueries({ queryKey: writeStatus.queryKey });
+    };
     window.addEventListener("growth:write", onWrite);
     return () => window.removeEventListener("growth:write", onWrite);
-  }, [client, brandId]);
-  async function post(body: Record<string, unknown>, fallback: string) {
+  }, [client, state.queryKey, writeStatus.queryKey]);
+  async function act(request: () => Promise<unknown>, fallback: string) {
     setError("");
     try {
-      const result = await readResponse(
-        await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        }),
-      );
+      const result = await request();
       await reload();
       return result;
     } catch (e) {
-      setError(e instanceof Error ? e.message : fallback);
+      setError(errorMessage(e, fallback));
       return null;
     }
   }
   async function quickFix(card: CatalogCard, kind: "copy" | "photo") {
     setFixing((f) => ({ ...f, [card.homeId]: kind }));
-    await post(
-      {
-        action: kind === "copy" ? "newCopy" : "newPhoto",
-        homeId: card.homeId,
-      },
+    const input = { brandId, homeId: card.homeId };
+    await act(
+      () =>
+        kind === "copy"
+          ? orpc.catalog.newCopy.call(input)
+          : orpc.catalog.newPhoto.call(input),
       kind === "copy" ? "Unable to write new copy" : "Unable to find a photo",
     );
     setFixing(({ [card.homeId]: _, ...rest }) => rest);
@@ -164,8 +143,13 @@ export function CatalogCards({
     });
   };
   async function setHero(card: CatalogCard, photoUrl: string) {
-    const done = await post(
-      { action: "hero", homeId: card.homeId, url: photoUrl },
+    const done = await act(
+      () =>
+        orpc.catalog.setHero.call({
+          brandId,
+          homeId: card.homeId,
+          photoUrl,
+        }),
       "Unable to set the hero",
     );
     if (done)
@@ -186,22 +170,28 @@ export function CatalogCards({
     if (!prev) return;
     const patch = cardPatch(prev, next);
     if (Object.keys(patch).length)
-      void post(
-        { action: "card", homeId: next.homeId, patch },
+      void act(
+        () =>
+          orpc.catalog.editCard.call({
+            brandId,
+            homeId: next.homeId,
+            ...patch,
+          }),
         "Unable to save the card",
       );
   };
   /** Sign cards off as shown, or take it back; the server refuses stale ones. */
   const approve = (cards: CatalogCard[], approved: boolean) =>
-    void post(
-      {
-        action: "approve",
-        approved,
-        cards: cards.map((card) => ({
-          homeId: card.homeId,
-          fingerprint: catalogCardFingerprint(card),
-        })),
-      },
+    void act(
+      () =>
+        orpc.catalog.setApproval.call({
+          brandId,
+          approved,
+          cards: cards.map((card) => ({
+            homeId: card.homeId,
+            fingerprint: catalogCardFingerprint(card),
+          })),
+        }),
       "Unable to update approval",
     );
   // Every card still open for changes: included, not signed off, drawn by
@@ -209,51 +199,60 @@ export function CatalogCards({
   const open = (draft?.cards ?? [])
     .filter((c) => c.included && !c.approved && c.mode !== "finished")
     .map((c) => c.homeId);
-  // One card per request, five in flight: each call fits a function, and the
-  // cards fill in as they land. "newCopy" rewrites the copy for the card's
-  // template on the photo it has; "autofill" checks and swaps the photo first.
-  async function writeAll(action: "autofill" | "newCopy") {
-    const ids = [...open];
-    const total = ids.length;
-    setWriting({ action, done: 0, total });
-    let done = 0;
-    let failed = 0;
-    const next = async (): Promise<void> => {
-      const homeId = ids.shift();
-      if (!homeId) return;
-      const ok = await readResponse(
-        await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action, homeId }),
-        }),
-      )
-        .then(() => true)
-        .catch(() => false);
-      if (!ok) failed++;
-      setWriting({ action, done: ++done, total });
-      if (done % 5 === 0) void reload();
-      return next();
-    };
-    await Promise.all(Array.from({ length: 5 }, next));
-    await reload();
-    setWriting(null);
-    if (failed)
+  const startWrite = useMutation(
+    orpc.catalog.writeCards.mutationOptions({
+      onMutate: () => setError(""),
+      onSuccess: ({ run }) =>
+        client.setQueryData(writeStatus.queryKey, { run }),
+      onError: (e) => setError(errorMessage(e, "Unable to write the cards")),
+    }),
+  );
+  // Follow the run: cards fill in as they land, and a finished run says what
+  // it could not do.
+  const lastRun = useRef<{ id: string; status: string; batch: number }>(null);
+  useEffect(() => {
+    if (!writeRun) return;
+    const last = lastRun.current;
+    const batch = Math.floor(writeRun.done / 5);
+    lastRun.current = { id: writeRun.runId, status: writeRun.status, batch };
+    if (last?.id !== writeRun.runId) return;
+    if (last.status === writeRun.status && last.batch === batch) return;
+    void client.invalidateQueries({ queryKey: state.queryKey });
+    if (!running(last.status) || running(writeRun.status)) return;
+    const { failed, left } = writeRun;
+    if (writeRun.status === "error")
+      setError(writeRun.error ?? "Unable to write the cards");
+    else if (failed || left)
       setError(
-        `${failed} card${failed === 1 ? "" : "s"} could not be written; New copy on the card retries it.`,
+        [
+          failed
+            ? `${failed} card${failed === 1 ? "" : "s"} could not be written; New copy on the card retries it.`
+            : "",
+          left
+            ? `${left} card${left === 1 ? " was" : "s were"} not reached in time; run it again for the rest.`
+            : "",
+        ]
+          .filter(Boolean)
+          .join(" "),
       );
-  }
+  }, [writeRun, client, state.queryKey]);
+  const writing = running(writeRun?.status)
+    ? writeRun
+    : startWrite.isPending
+      ? { pass: startWrite.variables?.pass, done: 0, total: open.length }
+      : null;
   const unapproved = draft ? catalogUnapproved(draft) : [];
   const visible = reviewOnly ? unapproved : (draft?.cards ?? []);
-  async function run(action: "export") {
+  async function exportCatalog() {
     setBusy(true);
-    const done = await post({ action }, "Unable to export");
+    const done = await act(
+      () => orpc.catalog.exportCatalog.call({ brandId }),
+      "Unable to export",
+    );
     if (done) setView("exports");
     setBusy(false);
   }
-  const activeExport = query.data?.exports.some((e) =>
-    ["queued", "processing"].includes(e.status),
-  );
+  const activeExport = query.data?.exports.some((e) => running(e.status));
   return (
     <section className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -305,17 +304,17 @@ export function CatalogCards({
                 brandName={brandName}
                 surface="catalog"
               />
-              {(["newCopy", "autofill"] as const).map((action) => (
+              {CATALOG_WRITE_PASSES.map((pass) => (
                 <Button
-                  key={action}
+                  key={pass}
                   variant="outline"
                   disabled={busy || Boolean(writing) || open.length === 0}
-                  onClick={() => void writeAll(action)}
+                  onClick={() => startWrite.mutate({ brandId, pass })}
                 >
                   <Sparkles aria-hidden="true" className="size-4" />
-                  {writing?.action === action
-                    ? `${action === "newCopy" ? "Rewriting" : "Fixing"} ${writing.done}/${writing.total}`
-                    : `${action === "newCopy" ? "Rewrite copy" : "Fix photos + copy"} ${open.length}`}
+                  {writing?.pass === pass
+                    ? `${pass === "copy" ? "Rewriting" : "Fixing"} ${writing.done}/${writing.total}`
+                    : `${pass === "copy" ? "Rewrite copy" : "Fix photos + copy"} ${open.length}`}
                 </Button>
               ))}
               <Button
@@ -333,7 +332,7 @@ export function CatalogCards({
                   !draft.cards.some((c) => c.included) ||
                   catalogArtworkIssues(draft).length > 0
                 }
-                onClick={() => void run("export")}
+                onClick={() => void exportCatalog()}
               >
                 {busy ? "Working…" : "Create export"}
               </Button>
@@ -408,8 +407,12 @@ export function CatalogCards({
                 variant="ghost"
                 size="sm"
                 onClick={() =>
-                  void post(
-                    { action: "includeAll", included: true },
+                  void act(
+                    () =>
+                      orpc.catalog.setIncluded.call({
+                        brandId,
+                        included: true,
+                      }),
                     "Unable to update the catalog",
                   )
                 }
@@ -420,8 +423,12 @@ export function CatalogCards({
                 variant="ghost"
                 size="sm"
                 onClick={() =>
-                  void post(
-                    { action: "includeAll", included: false },
+                  void act(
+                    () =>
+                      orpc.catalog.setIncluded.call({
+                        brandId,
+                        included: false,
+                      }),
                     "Unable to update the catalog",
                   )
                 }
@@ -807,15 +814,16 @@ export function CatalogCards({
             const card = picking;
             setPicking(null);
             setLibrary(false);
-            void post(
-              {
-                action: "card",
-                homeId: card.homeId,
-                patch:
-                  card.mode === "finished"
-                    ? { finishedAssetId: item.assetId }
-                    : { imageAssetId: item.assetId },
-              },
+            const assetId = item.assetId;
+            void act(
+              () =>
+                orpc.catalog.editCard.call({
+                  brandId,
+                  homeId: card.homeId,
+                  ...(card.mode === "finished"
+                    ? { finishedAssetId: assetId }
+                    : { imageAssetId: assetId }),
+                }),
               "Unable to save the photo",
             );
             return;
@@ -1096,16 +1104,15 @@ function CardEditor({
 
 /** The row fields a card edit changes; null puts one back on its default. */
 function cardPatch(prev: CatalogCard, next: CatalogCard) {
-  const patch: Record<string, unknown> = {};
-  for (const key of [
-    "title",
-    "subtitle",
-    "templateId",
-    "imagePosition",
-    "showLogo",
-    "included",
-  ] as const)
-    if (prev[key] !== next[key]) patch[key] = next[key];
+  const patch: Omit<RouterInputs["catalog"]["editCard"], "brandId" | "homeId"> =
+    {};
+  if (prev.title !== next.title) patch.title = next.title;
+  if (prev.subtitle !== next.subtitle) patch.subtitle = next.subtitle;
+  if (prev.templateId !== next.templateId) patch.templateId = next.templateId;
+  if (prev.imagePosition !== next.imagePosition)
+    patch.imagePosition = next.imagePosition;
+  if (prev.showLogo !== next.showLogo) patch.showLogo = next.showLogo;
+  if (prev.included !== next.included) patch.included = next.included;
   if ((prev.mode ?? "compose") !== (next.mode ?? "compose"))
     patch.mode = next.mode ?? null;
   if (prev.assetId !== next.assetId) patch.imageAssetId = next.assetId ?? null;
