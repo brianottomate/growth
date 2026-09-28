@@ -520,6 +520,7 @@ export function AdIdeaCard({
               {(
                 [
                   ["Headline", savedState.document.copy.headline],
+                  ["Description", savedState.document.copy.description],
                   ["Primary text", savedState.document.copy.body],
                   ["Destination URL", savedState.document.copy.linkUrl],
                   ["Call to action", savedState.document.copy.callToAction],

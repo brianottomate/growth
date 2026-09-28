@@ -7,6 +7,7 @@ import type { AdCreativeContent } from "@/server/db/ads-schema";
 import { metaPreviewMedia } from "@/lib/meta-preview";
 import { FROZEN_AT_PUSH } from "@/lib/meta-placement-plan";
 import { CompactAdMock } from "@/components/ad-mock";
+import { ctaLabel } from "@/components/social-mock";
 import { META_PLACEMENTS, type MetaPlacement } from "@/lib/meta-placement-plan";
 import {
   ideaEditorPreviewUrl,
@@ -43,7 +44,16 @@ export function AdIdeaPreview({
         (slide.mode === "supplied"
           ? ideaSource(slide, size)?.url
           : ideaEditorPreviewUrl(brandId, slide, size));
-      return url ? [{ url, type: "image" }] : [];
+      return url
+        ? [
+            {
+              url,
+              type: "image",
+              headline: slide.copy?.headline?.trim() || null,
+              description: slide.copy?.description?.trim() || null,
+            },
+          ]
+        : [];
     });
   const media = mediaFor(shape);
   const copy = studio.document.copyOverrides[shape] ?? studio.document.copy;
@@ -69,10 +79,7 @@ export function AdIdeaPreview({
       return null;
     }
   })();
-  const ctaLabel = copy.callToAction
-    ?.toLowerCase()
-    .replaceAll("_", " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  const cta = copy.callToAction ? ctaLabel(copy.callToAction) : null;
   return (
     <div className="space-y-4">
       {platform ? (
@@ -160,11 +167,30 @@ export function AdIdeaPreview({
                     className="h-auto w-full rounded-lg"
                   />
                 </a>
+                {(item.headline || item.description) && (
+                  <div className="space-y-0.5 text-xs">
+                    {item.headline && (
+                      <p className="font-medium">{item.headline}</p>
+                    )}
+                    {item.description && (
+                      <p className="text-muted-foreground">
+                        {item.description}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
           <div className="max-w-2xl space-y-2 text-sm">
-            <p className="font-medium">{copy.headline || "Headline not set"}</p>
+            <div>
+              <p className="font-medium">
+                {copy.headline || "Headline not set"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {copy.description?.trim() || "Description not set"}
+              </p>
+            </div>
             <div className="space-y-1">
               <p
                 ref={descriptionRef}
@@ -186,7 +212,7 @@ export function AdIdeaPreview({
               )}
             </div>
             <div className="flex min-w-0 items-center gap-3 border-t pt-3 text-xs">
-              {ctaLabel && <Badge variant="secondary">{ctaLabel}</Badge>}
+              {cta && <Badge variant="secondary">{cta}</Badge>}
               {destination ? (
                 <a
                   href={destination.href}
