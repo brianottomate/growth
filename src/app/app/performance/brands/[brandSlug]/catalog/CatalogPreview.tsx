@@ -38,7 +38,8 @@ export function CatalogPreview({
 }) {
   const ready = exports.filter((e) => e.status === "ready" && e.assets?.length);
   const [source, setSource] = useState<Source>("studio");
-  const [crop, setCrop] = useState<Crop>("square");
+  // 4:5 is what the export uploads; square is the check for placements that cut it.
+  const [crop, setCrop] = useState<Crop>("portrait");
   const [text, setText] = useState(
     `Find your next ${brandName} escape. Private homes, booked direct.`,
   );
@@ -95,7 +96,7 @@ export function CatalogPreview({
               aria-pressed={crop === c}
               onClick={() => setCrop(c)}
             >
-              {c === "square" ? "Square crop" : "Card's own 4:5"}
+              {c === "square" ? "Square crop" : "4:5 as exported"}
             </Button>
           ))}
         </div>

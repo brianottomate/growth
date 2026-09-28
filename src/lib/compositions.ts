@@ -249,10 +249,10 @@ export const CATALOG_COPY_INTENTS = {
   },
   "catalog-destination": {
     intent:
-      'A destination-led card: the place is printed in capitals above the headline, so the headline never names it. The headline is the moment you would feel there, in a few words, the line a friend would say showing you the photo, grounded in this listing: "Fall asleep to the waterfall", "Two suites joined for the whole crew", "Your own pond, your own deck", "Log cabin on 12 acres by a stream". Room layouts, bed setups and access details are facts for the listing, not headlines. One pill at most: the draw this home has that the others in the catalog do not (a private pond, a sauna, a game room), or none. Never an appliance, a supply or an access detail. Write each pill the way a guest reads it ("Outdoor pool", "Fireplace", "Pets welcome"), never a raw listing label ("Pool outdoor", "Fire place").',
+      'A destination-led card: the place is printed in capitals above the headline, so the headline never names it. The headline is the moment you would feel there, in a few words, the line a friend would say showing you the photo, grounded in this listing: "Fall asleep to the waterfall", "Two suites joined for the whole crew", "Your own pond, your own deck", "Log cabin on 12 acres by a stream". Room layouts, bed setups and access details are facts for the listing, not headlines. Up to two pills: the draws this home has that the others in the catalog do not (a private pond, a sauna, a game room), the strongest first, or none. Never an appliance, a supply or an access detail. Write each pill the way a guest reads it ("Outdoor pool", "Fireplace", "Pets welcome"), never a raw listing label ("Pool outdoor", "Fire place").',
     headlineChars: 32,
     placeSuffix: false,
-    pills: 1,
+    pills: 2,
   },
 } as const satisfies Partial<Record<CompositionTemplateId, CatalogCopyIntent>>;
 

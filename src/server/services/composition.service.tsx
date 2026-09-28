@@ -1386,7 +1386,7 @@ export function renderComposition(
             left: 0,
             right: 0,
             bottom: 0,
-            height: "62%",
+            height: Math.round(format.height * 0.62) + squareSafeInset(format),
             background: `linear-gradient(180deg, ${scrim(0)} 0%, ${scrim(0.6)} 45%, ${scrim(0.88)} 100%)`,
           }}
         />
@@ -1399,7 +1399,7 @@ export function renderComposition(
             left: 0,
             right: 0,
             top: 0,
-            height: "26%",
+            height: Math.round(format.height * 0.26) + squareSafeInset(format),
             background: `linear-gradient(180deg, ${scrim(0.45)} 0%, ${scrim(0)} 100%)`,
           }}
         />
@@ -1504,10 +1504,9 @@ export function renderComposition(
     const pillFont = Math.round(30 * scale);
     // One row: the location pill first, then the amenities that still fit.
     const pillRow = pillsOnOneRow(
-      [
-        location,
-        ...(amenities ? (spec.pills ?? []).slice(0, destination ? 1 : 2) : []),
-      ].filter(Boolean),
+      [location, ...(amenities ? (spec.pills ?? []).slice(0, 2) : [])].filter(
+        Boolean,
+      ),
       format.width - pad * 2,
       pillFont,
       Math.round(28 * scale),
@@ -1546,7 +1545,7 @@ export function renderComposition(
             left: 0,
             right: 0,
             bottom: 0,
-            height: "58%",
+            height: Math.round(format.height * 0.58) + squareSafeInset(format),
             background: `linear-gradient(180deg, ${scrim(0)} 0%, ${scrim(0.56)} 40%, ${scrim(0.9)} 100%)`,
           }}
         />
@@ -1561,7 +1560,8 @@ export function renderComposition(
               left: 0,
               right: 0,
               top: 0,
-              height: "26%",
+              height:
+                Math.round(format.height * 0.26) + squareSafeInset(format),
               background: `linear-gradient(180deg, ${scrim(0.45)} 0%, ${scrim(0)} 100%)`,
             }}
           />

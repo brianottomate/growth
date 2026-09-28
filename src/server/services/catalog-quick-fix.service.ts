@@ -347,20 +347,43 @@ const usableSchema = z.object({
   problem: z
     .string()
     .describe(
-      "What is baked into the photo, in a few words; empty when usable.",
+      "What is wrong with the photo, in a few words; empty when usable.",
     ),
 });
 
+/** A hero source shorter than this on either side blurs on a 1080 px card. */
+const MIN_HERO_PX = 700;
+
 /**
  * A second look at the winner at full size. The judge picks from
- * thumbnails, where a map pin or a line of promo text is invisible.
+ * thumbnails, where a map pin, a line of promo text or softness is
+ * invisible. Size is checked in code first: some listings serve a
+ * thumbnail under a full-res name.
  */
 async function heroUsable(url: string) {
-  const { body } = await fetchPublicImage(url);
+  const { body: raw } = await fetchPublicImage(url);
+  const meta = await sharp(raw).metadata();
+  const w = meta.width ?? 0;
+  const h = meta.height ?? 0;
+  if (Math.min(w, h) < MIN_HERO_PX)
+    return {
+      usable: false,
+      problem: `only ${w}×${h} px, too small for a card`,
+    };
+  // The middle half at 1:1, where the crop lands, so softness stays visible.
+  const body = await sharp(raw)
+    .extract({
+      left: Math.round(w * 0.25),
+      top: Math.round(h * 0.25),
+      width: Math.round(w * 0.5),
+      height: Math.round(h * 0.5),
+    })
+    .jpeg({ quality: 90 })
+    .toBuffer();
   const { output } = await generateText({
     model: anthropic(MODEL),
     system:
-      "You check one listing photo before it becomes an ad's hero. It is unusable if anything is baked into it: text, a logo, a map pin or marker, a map, a watermark, a promo banner, a collage, a screenshot, a floor plan. Ordinary signage in the scene (a house name plaque) is fine.",
+      "You check the middle of one listing photo before it becomes an ad's hero, shown at full size. It is unusable if anything is baked into it (text, a logo, a map pin or marker, a map, a watermark, a promo banner, a collage, a screenshot, a floor plan) or if it would look poor full-screen: soft or blurry, upscaled or heavily compressed, very dark or blown out, tilted. Ordinary signage in the scene (a house name plaque) is fine, and a good photo with a minor flaw is usable.",
     messages: [
       {
         role: "user",
