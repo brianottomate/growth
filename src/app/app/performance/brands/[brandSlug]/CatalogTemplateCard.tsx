@@ -57,8 +57,15 @@ export function CatalogTemplateCard({
   const format = query.data?.format ?? "portrait";
   const cards = query.data?.draft.cards ?? [];
   const drawn = cards.filter((c) => c.mode !== "finished");
-  const card =
-    drawn.find((c) => c.homeId === heroHomeId) ?? drawn.find((c) => c.included);
+  // A catalog of supplied artwork still has homes and photos: draw the hero
+  // home's own photo in each template, so the choice can be made before any
+  // card is switched to Compose.
+  const pick =
+    drawn.find((c) => c.homeId === heroHomeId) ??
+    drawn.find((c) => c.included) ??
+    cards.find((c) => c.homeId === heroHomeId) ??
+    cards.find((c) => c.included);
+  const card = pick && { ...pick, mode: "compose" as const };
   const current = query.data?.defaultTemplate ?? "catalog-place";
 
   if (!card) return null;
