@@ -149,6 +149,32 @@ type CopyFacts = {
   petsAllowed: boolean | null;
 };
 
+const COUNT_WORDS: Record<string, number> = {
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+  fourteen: 14,
+  sixteen: 16,
+  twenty: 20,
+};
+
+/** The guest count a headline promises: "for six", "sleeps 8", "room for 12". */
+function promisedGuests(headline: string): number | null {
+  const match = /\b(?:sleeps?|for|fits)\s+(\d+|[a-z]+)\b/i.exec(headline);
+  if (!match) return null;
+  const word = match[1]!.toLowerCase();
+  const n = /^\d+$/.test(word) ? Number(word) : COUNT_WORDS[word];
+  return n && n > 1 ? n : null;
+}
+
 function copyProblem(
   output: { headline: string; pills: string[] },
   ctx: CopyFacts,
@@ -170,6 +196,11 @@ function copyProblem(
   );
   if (repeated)
     return `It repeats ${repeated}, which the facts line under it already shows. Say something the facts line does not.`;
+  // "Three arched beds for six" on a suite that sleeps 2: a capacity the
+  // listing does not offer reads as a promise the stay breaks.
+  const promised = promisedGuests(headline);
+  if (promised && ctx.home.guests && promised > ctx.home.guests)
+    return `It promises room for ${promised}, but the listing sleeps ${ctx.home.guests}.`;
   if (
     (templateId === "catalog-amenities-place" ||
       templateId === "catalog-destination" ||

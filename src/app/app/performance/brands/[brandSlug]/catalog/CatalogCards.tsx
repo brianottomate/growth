@@ -598,6 +598,7 @@ export function CatalogCards({
                                 </dd>
                               </div>
                             ))}
+                            <Amenities list={homeOf(card)?.amenities ?? []} />
                           </dl>
                         )}
                         {!editing && (
@@ -1188,5 +1189,36 @@ function HomeLink({ url }: { url: string | undefined }) {
     >
       <ExternalLink className="size-3.5" aria-hidden="true" />
     </a>
+  );
+}
+
+/** The listing's amenities, the first dozen and the rest on request. */
+function Amenities({ list }: { list: readonly string[] }) {
+  const [all, setAll] = useState(false);
+  if (!list.length) return null;
+  const shown = all ? list : list.slice(0, 12);
+  return (
+    <div>
+      <dt className="text-xs text-muted-foreground">Amenities</dt>
+      <dd className="mt-1 flex flex-wrap gap-1.5">
+        {shown.map((amenity) => (
+          <span
+            key={amenity}
+            className="rounded-full border px-2 py-0.5 text-xs"
+          >
+            {amenity}
+          </span>
+        ))}
+        {list.length > 12 && (
+          <button
+            type="button"
+            onClick={() => setAll((open) => !open)}
+            className="text-xs font-medium underline-offset-4 hover:underline"
+          >
+            {all ? "Show fewer" : `Show all ${list.length}`}
+          </button>
+        )}
+      </dd>
+    </div>
   );
 }
