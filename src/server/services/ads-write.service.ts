@@ -1964,14 +1964,13 @@ async function compileAudienceTargeting(input: {
     .map((code) => usStateName(code))
     .filter((name): name is string => name !== null);
   const regionNames = [
-    ...new Set([
-      ...(geography.regions ?? []),
-      ...namedStates,
-      // Cities ride the same resolution; Zernio's create takes them as region
-      // keys of type city via the same search. Modeled coarsely until a real
-      // city campaign needs radius targeting.
-      ...(geography.cities ?? []),
-    ]),
+    ...new Set([...(geography.regions ?? []), ...namedStates]),
+  ];
+  // A city key is not a region key: Zernio takes cities in their own field.
+  const cityNames = [...new Set(geography.cities ?? [])];
+  const places = [
+    ...regionNames.map((name) => ({ name, geoType: "all" as const })),
+    ...cityNames.map((name) => ({ name, geoType: "city" as const })),
   ];
   for (const code of geography.states ?? []) {
     if (usStateName(code) === null) {
@@ -1980,11 +1979,11 @@ async function compileAudienceTargeting(input: {
       );
     }
   }
-  if (regionNames.length > 0 && !canTarget.regions) {
+  if (places.length > 0 && !canTarget.regions) {
     // Country-level platforms: say what was dropped, and never let a plan
     // that named US states compile to a worldwide buy.
     warnings.push(
-      `${audience.name}: ${platformSpec.shortLabel} targets at country level only through Zernio — ${regionNames.join(", ")} left out`,
+      `${audience.name}: ${platformSpec.shortLabel} targets at country level only through Zernio — ${places.map((place) => place.name).join(", ")} left out`,
     );
     if (!spec.countries?.length && namedStates.length > 0) {
       spec.countries = ["US"];
@@ -1992,15 +1991,16 @@ async function compileAudienceTargeting(input: {
         `${audience.name}: no countries set, so US was inferred from the state codes`,
       );
     }
-  } else if (regionNames.length > 0) {
-    const resolved: Array<{ key: string }> = [];
-    for (const name of regionNames) {
+  } else if (places.length > 0) {
+    const regions: Array<{ key: string }> = [];
+    const cities: Array<{ key: string }> = [];
+    for (const { name, geoType } of places) {
       try {
         const { results } = await searchZernioTargeting({
           accountId: input.connectionAccountId,
           q: name,
           dimension: "geo",
-          geoType: "all",
+          geoType,
           countryCode: geography.countries?.[0],
           limit: 5,
         });
@@ -2008,7 +2008,8 @@ async function compileAudienceTargeting(input: {
           results.find(
             (row) => row.name.toLowerCase() === name.toLowerCase(),
           ) ?? results[0];
-        if (match) resolved.push({ key: match.id });
+        if (match)
+          (match.type === "city" ? cities : regions).push({ key: match.id });
         else
           warnings.push(
             `"${name}" did not resolve to a targetable location on ${input.platform} — it was left out`,
@@ -2019,12 +2020,13 @@ async function compileAudienceTargeting(input: {
         );
       }
     }
-    if (resolved.length > 0) {
-      spec.regions = resolved;
+    if (regions.length > 0) spec.regions = regions;
+    if (cities.length > 0) spec.cities = cities;
+    if (regions.length > 0 || cities.length > 0) {
       // Countries scope lookup; including them in delivery conflicts with their states.
       if (input.platform === "meta_ads") delete spec.countries;
     }
-    if (resolved.length === 0 && !spec.countries?.length) {
+    if (!regions.length && !cities.length && !spec.countries?.length) {
       warnings.push(
         `${audience.name}: no location resolved and no countries set — this targets WORLDWIDE`,
       );

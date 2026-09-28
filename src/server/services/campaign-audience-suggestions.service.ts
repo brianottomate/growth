@@ -94,15 +94,12 @@ const suggestionSchema = z.object({
   name: z
     .string()
     .describe(
-      "In the house convention the campaign page uses, e.g. 'Atlanta drive-in · 25-64'.",
+      "In the house convention the campaign page uses, e.g. 'Georgia drive-in · 25-64'.",
     ),
   kind: z.enum(["geo", "lookalike", "retargeting"]),
-  cities: z
+  states: z
     .array(z.string())
-    .describe(
-      "Geo only: the market's cities, spelled as the shortlist gives them.",
-    ),
-  states: z.array(z.string()).describe("Geo only: two-letter state codes."),
+    .describe("Geo only: two-letter codes of the whole states to target."),
   ageMin: z.number().int(),
   ageMax: z.number().int(),
   platformAudienceId: z
@@ -117,6 +114,7 @@ const suggestionSchema = z.object({
 const pickSchema = z.object({ audiences: z.array(suggestionSchema) });
 
 export type AudienceSuggestion = z.infer<typeof suggestionSchema> & {
+  cities: string[];
   countries: string[];
   regions: string[];
 };
@@ -232,6 +230,13 @@ export async function suggestCampaignAudiences(input: {
       notes: market.notes ?? null,
     })),
     feederMarkets: feeders,
+    // Geo audiences are whole states; a feeder city only says which state.
+    feederStates: [
+      ...new Set(feeders.flatMap((f) => (f.state ? [f.state] : []))),
+    ].map((state) => ({
+      state: `${state} (${usStateName(state) ?? state})`,
+      feederCities: feeders.filter((f) => f.state === state).map((f) => f.city),
+    })),
     bookingWindow: window,
     existingAudiences: offerable.map((asset) => ({
       id: asset.id,
@@ -279,25 +284,24 @@ export async function suggestCampaignAudiences(input: {
       providerOptions: { anthropic: { effort: "low" } },
     });
     const known = new Set(offerable.map((asset) => asset.id));
-    const feederCities = new Set(feeders.map((f) => f.city.toLowerCase()));
     suggestions = output.audiences
+      .map((s) => ({
+        ...s,
+        states: s.states
+          .map((state) => usStateCode(state))
+          .filter((state): state is string => Boolean(state)),
+      }))
       .filter((s) =>
         s.kind === "geo"
-          ? s.cities.every((city) => feederCities.has(city.toLowerCase())) &&
-            (s.cities.length || s.states.length)
+          ? s.states.length > 0
           : Boolean(s.platformAudienceId && known.has(s.platformAudienceId)),
       )
       .slice(0, count)
       .map((s) => {
-        // Cities and a state together would target the whole state; a geo
-        // audience is one or the other.
-        const states = s.cities.length
-          ? []
-          : s.states
-              .map((state) => usStateCode(state))
-              .filter((state): state is string => Boolean(state));
+        const states = s.kind === "geo" ? s.states : [];
         return {
           ...s,
+          cities: [],
           states,
           countries: s.kind === "geo" ? ["US"] : [],
           regions: states.map((state) => usStateName(state) ?? state),

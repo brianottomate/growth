@@ -1064,6 +1064,8 @@ export type ZernioAdTargeting = {
   countries?: string[];
   /** Region keys from GET /v1/ads/targeting/search — ids, never names. */
   regions?: Array<{ key: string }>;
+  /** City keys from the same search (Meta, Google, TikTok); Meta adds ~16 km. */
+  cities?: Array<{ key: string }>;
   ageMin?: number;
   ageMax?: number;
   languages?: string[];
