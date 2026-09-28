@@ -208,7 +208,13 @@ export const auth = betterAuth({
                 "Sign-ups are restricted to @wander.com email addresses.",
             });
           }
-          return { data: user };
+          // Verification emails are off (above), so password sign-ups would
+          // stay unverified forever, and Better Auth refuses to link a Google
+          // login onto an unverified local user (`account_not_linked`). The
+          // domain gate is the ownership check here, so mark the row verified
+          // at creation. `requireLocalEmailVerified: false` would do the same
+          // but is deprecated and disappears on the next minor.
+          return { data: { ...user, emailVerified: true } };
         },
         after: async (user) => {
           try {

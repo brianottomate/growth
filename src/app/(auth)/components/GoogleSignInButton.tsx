@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,27 @@ interface GoogleSignInButtonProps {
   /** Prefill for invite-aware callback URLs (e.g. the typed email). */
   email?: string;
   disabled?: boolean;
+}
+
+/**
+ * Better Auth's OAuth callback redirects failures to `errorCallbackURL` with a
+ * machine-readable `?error=` code. Without one it lands on the home page, where
+ * nothing reads the code and the person sees a silent no-op.
+ */
+const OAUTH_ERROR_MESSAGES: Record<string, string> = {
+  account_not_linked:
+    "This email already has a password account that Google couldn't be linked to. Sign in with your password, or ask an admin to reset it.",
+  email_not_found: "Google didn't share an email address for that account.",
+  invalid_code: "Google sign-in timed out. Try again.",
+  signup_disabled: "Sign-ups are restricted to @wander.com email addresses.",
+};
+
+function describeOAuthError(code: string | null) {
+  if (!code) return null;
+  return (
+    OAUTH_ERROR_MESSAGES[code] ??
+    `Google sign-in failed (${code.replace(/_/g, " ")}).`
+  );
 }
 
 /** Google mark (official 4-color G), inlined so there's no external asset. */
@@ -54,9 +75,12 @@ export function GoogleSignInButton({
   email,
   disabled = false,
 }: GoogleSignInButtonProps) {
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() =>
+    describeOAuthError(searchParams.get("error")),
+  );
 
   const handleClick = async () => {
     setIsLoading(true);
@@ -67,11 +91,20 @@ export function GoogleSignInButton({
       isNewSignup,
     });
 
+    // Come back to this page (with its invite params) so the error renders
+    // above the button instead of on the marketing home page.
+    const returnParams = new URLSearchParams(searchParams);
+    returnParams.delete("error");
+    returnParams.delete("error_description");
+    const query = returnParams.toString();
+    const errorCallbackURL = query ? `${pathname}?${query}` : pathname;
+
     try {
       // Redirects to Google on success; only returns here on error.
       const { error: socialError } = await authClient.signIn.social({
         provider: "google",
         callbackURL,
+        errorCallbackURL,
       });
       if (socialError) {
         setError(socialError.message ?? "Failed to continue with Google");
