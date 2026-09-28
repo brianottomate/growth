@@ -468,6 +468,22 @@ async function requireAdDestination(input: {
  * guard. Run scope still replays a genuine in-flight retry, because runId and
  * payload are identical there.
  */
+/**
+ * After a failed push deletes its shell, the next attempt must mint a new
+ * one. The shell's key carries the draft's edit time, so moving that time on
+ * is what stops Zernio replaying the deleted campaign (Legacy RnR, 2026-09-28:
+ * "Ad Sets may not be added to deleted Campaigns").
+ */
+async function retireShellKey(draftId: string) {
+  await db
+    .update(platformCampaignTable)
+    .set({ updatedAt: new Date() })
+    .where(eq(platformCampaignTable.id, draftId))
+    .catch((error: unknown) =>
+      console.error("could not retire the shell key", draftId, error),
+    );
+}
+
 function idempotencyKey(
   context: AdsWriteContext,
   action: string,
@@ -3176,6 +3192,7 @@ async function pushToMeta(args: PushArgs) {
     }).catch((cleanupError) => {
       console.error("push rollback failed", shellId, cleanupError);
     });
+    await retireShellKey(draft.id);
     throw new Error(
       `Push failed after ${perSet.length} of ${compiled.length} audiences — the campaign was removed from Meta so nothing is half-built. ${
         error instanceof Error ? error.message : String(error)
@@ -3594,6 +3611,7 @@ async function pushToLinkedIn(args: PushArgs) {
         console.error("push rollback failed", shellId, cleanupError);
         return false;
       });
+    await retireShellKey(draft.id);
     throw new Error(
       `Push failed after ${perSet.length} of ${compiled.length} audiences — ${
         cleanedUp
