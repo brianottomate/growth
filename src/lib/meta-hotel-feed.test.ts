@@ -52,8 +52,9 @@ describe("hotel feed", () => {
     const [header, row] = csv.split("\r\n");
     expect(header).toBe(HOTEL_FEED_COLUMNS.join(","));
     expect(row).toContain('"Red Quill Villa 709, ""The Nest"""');
+    expect(header).toStartWith("id,brand,description,title,link,image[0].url,");
     // Country is spelled out the way the template's sample row does.
-    expect(row).toContain(",Winter Park,CO,United States,");
+    expect(row).toContain(",Winter Park,CO,,United States,");
   });
 
   test("XML is the hotel listings document, with markup in names escaped", () => {

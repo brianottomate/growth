@@ -378,53 +378,6 @@ export function catalogExportRows(
   );
 }
 
-// Meta hotel feed field names (distinct from an ecommerce product feed).
-export const CATALOG_FEED_COLUMNS = [
-  "hotel_id",
-  "name",
-  "description",
-  "brand",
-  "url",
-  "image[0].url",
-  "address.addr1",
-  "address.postal_code",
-  "address.city",
-  "address.region",
-  "address.country",
-  "latitude",
-  "longitude",
-  "base_price",
-] as const;
-export function catalogFeedCells(row: HotelFeedRow) {
-  return [
-    row.id,
-    row.title,
-    row.description,
-    row.brand,
-    row.link,
-    row.imageUrl,
-    [row.streetAddress, row.streetAddress2, row.streetAddress3]
-      .filter(Boolean)
-      .join(", "),
-    row.postalCode ?? "",
-    row.city,
-    row.region,
-    row.country,
-    row.latitude == null ? "" : String(row.latitude),
-    row.longitude == null ? "" : String(row.longitude),
-    row.price,
-  ];
-}
-export function catalogFeedCsv(rows: HotelFeedRow[]) {
-  const cell = (s: string) => `"${s.replaceAll('"', '""')}"`;
-  return (
-    [
-      CATALOG_FEED_COLUMNS.join(","),
-      ...rows.map((row) => catalogFeedCells(row).map(cell).join(",")),
-    ].join("\r\n") + "\r\n"
-  );
-}
-
 /** Never synthesize another size or apply a composition to supplied artwork. */
 export function catalogArtworkIssues(draft: CatalogDraft): string[] {
   return draft.cards

@@ -8,9 +8,9 @@ import {
   catalogLocation,
   catalogUnapproved,
   catalogExportRows,
-  catalogFeedCsv,
   DEFAULT_CATALOG_TEMPLATE,
 } from "./catalog-studio";
+import { hotelFeedCsv } from "./meta-hotel-feed";
 const homes = [
   {
     id: "123456789012345678",
@@ -77,8 +77,8 @@ test("export has one row per included home and uses its frozen primary artwork",
   expect(rows).toHaveLength(1);
   expect(rows[0]?.imageUrl).toBe(assets[0]!.url);
   expect(rows[0]?.id).toBe(homes[0]!.id);
-  const csv = catalogFeedCsv(rows);
-  expect(csv).toContain("hotel_id,name");
+  const csv = hotelFeedCsv(rows);
+  expect(csv).toContain(assets[0]!.url);
   expect(csv).toContain('A ""quiet"" home');
   expect(csv).not.toContain(homes[0]!.imageUrl);
   homes[0]!.name = "Changed later";

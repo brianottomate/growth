@@ -56,7 +56,11 @@ export type HotelFeedRow = {
   guests: number | null;
 };
 
-/** Meta's hotel template header, with the image columns the template omits but the ads need. */
+/**
+ * The one hotel feed layout every CSV and XLSX download uses: field names from
+ * Meta's "Hotels and rentals" upload template, in its order, plus the image
+ * column the template omits but every catalog ad needs.
+ */
 export const HOTEL_FEED_COLUMNS = [
   "id",
   "brand",
@@ -64,10 +68,12 @@ export const HOTEL_FEED_COLUMNS = [
   "title",
   "link",
   "image[0].url",
-  "image[0].tag[0]",
   "address.addr1",
+  "address.addr2",
+  "address.addr3",
   "address.city",
   "address.region",
+  "address.postal_code",
   "address.country",
   "latitude",
   "longitude",
@@ -79,6 +85,8 @@ export const HOTEL_FEED_COLUMNS = [
   "price",
   "hotel_category",
 ] as const;
+
+export type HotelFeedColumn = (typeof HOTEL_FEED_COLUMNS)[number];
 
 const COUNTRY_NAMES: Record<string, string> = {
   US: "United States",
@@ -157,45 +165,47 @@ export function hotelFeedRows(
   });
 }
 
+/** A row's cells in `HOTEL_FEED_COLUMNS` order; the id stays a string so 18-digit ids survive spreadsheets. */
+export function hotelFeedCells(row: HotelFeedRow): (string | number | null)[] {
+  const cells: Record<HotelFeedColumn, string | number | null> = {
+    id: row.id,
+    brand: row.brand,
+    description: row.description,
+    title: row.title,
+    link: row.link,
+    "image[0].url": row.imageUrl,
+    "address.addr1": row.streetAddress ?? "",
+    "address.addr2": row.streetAddress2 ?? "",
+    "address.addr3": row.streetAddress3 ?? "",
+    "address.city": row.city,
+    "address.region": row.region,
+    "address.postal_code": row.postalCode ?? "",
+    "address.country": row.country,
+    latitude: row.latitude ?? null,
+    longitude: row.longitude ?? null,
+    "neighborhood[0]": row.city,
+    custom_label_0: row.region,
+    custom_label_1: row.bedrooms ? `${row.bedrooms} bedrooms` : "",
+    custom_number_0: row.guests ?? null,
+    custom_number_1: row.bedrooms ?? null,
+    price: row.price,
+    hotel_category: "vacation rental",
+  };
+  return HOTEL_FEED_COLUMNS.map((column) => cells[column]);
+}
+
 function csvCell(value: string | number | null | undefined): string {
   if (value == null || value === "") return "";
   const text = String(value);
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-/** The feed as Meta's hotel CSV, header row first. */
+/** The feed as a Meta hotel CSV, header row first. */
 export function hotelFeedCsv(rows: HotelFeedRow[]): string {
-  const lines = [HOTEL_FEED_COLUMNS.join(",")];
-  for (const row of rows) {
-    const cells: Record<
-      (typeof HOTEL_FEED_COLUMNS)[number],
-      string | number | null
-    > = {
-      id: row.id,
-      brand: row.brand,
-      description: row.description,
-      title: row.title,
-      link: row.link,
-      "image[0].url": row.imageUrl,
-      "image[0].tag[0]": "Exterior",
-      "address.addr1": row.streetAddress ?? "",
-      "address.city": row.city,
-      "address.region": row.region,
-      "address.country": row.country,
-      latitude: row.latitude ?? "",
-      longitude: row.longitude ?? "",
-      "neighborhood[0]": row.city,
-      custom_label_0: row.region,
-      custom_label_1: row.bedrooms ? `${row.bedrooms} bedrooms` : "",
-      custom_number_0: row.guests,
-      custom_number_1: row.bedrooms,
-      price: row.price,
-      hotel_category: "vacation rental",
-    };
-    lines.push(
-      HOTEL_FEED_COLUMNS.map((column) => csvCell(cells[column])).join(","),
-    );
-  }
+  const lines = [
+    HOTEL_FEED_COLUMNS.join(","),
+    ...rows.map((row) => hotelFeedCells(row).map(csvCell).join(",")),
+  ];
   return `${lines.join("\r\n")}\r\n`;
 }
 
@@ -229,6 +239,12 @@ export function hotelFeedXml(rows: HotelFeedRow[], feedTitle: string): string {
         "    </image>",
         '    <address format="simple">',
         `      <component name="addr1">${xml(row.streetAddress)}</component>`,
+        row.streetAddress2
+          ? `      <component name="addr2">${xml(row.streetAddress2)}</component>`
+          : null,
+        row.streetAddress3
+          ? `      <component name="addr3">${xml(row.streetAddress3)}</component>`
+          : null,
         `      <component name="postal_code">${xml(row.postalCode)}</component>`,
         `      <component name="city">${xml(row.city)}</component>`,
         `      <component name="region">${xml(row.region)}</component>`,

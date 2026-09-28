@@ -1,12 +1,12 @@
 import ExcelJS from "exceljs";
 import { getSession } from "@/server/better-auth/server";
 import { catalogExport } from "@/server/services/catalog-studio.service";
-import { hotelFeedXml } from "@/lib/meta-hotel-feed";
 import {
-  catalogFeedCells,
-  CATALOG_FEED_COLUMNS,
-  catalogFeedCsv,
-} from "@/lib/catalog-studio";
+  HOTEL_FEED_COLUMNS,
+  hotelFeedCells,
+  hotelFeedCsv,
+  hotelFeedXml,
+} from "@/lib/meta-hotel-feed";
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ brandId: string; runId: string }> },
@@ -26,8 +26,8 @@ export async function GET(
     if (format === "xlsx") {
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet("Hotels");
-      sheet.addRow([...CATALOG_FEED_COLUMNS]);
-      for (const row of snapshot.rows) sheet.addRow(catalogFeedCells(row));
+      sheet.addRow([...HOTEL_FEED_COLUMNS]);
+      for (const row of snapshot.rows) sheet.addRow(hotelFeedCells(row));
       sheet.getRow(1).font = { bold: true };
       sheet.views = [{ state: "frozen", ySplit: 1 }];
       sheet.columns.forEach((column) => {
@@ -46,7 +46,7 @@ export async function GET(
       return new Response(hotelFeedXml(snapshot.rows, "Catalog"), {
         headers: { ...headers, "Content-Type": "application/xml" },
       });
-    return new Response(catalogFeedCsv(snapshot.rows), {
+    return new Response(hotelFeedCsv(snapshot.rows), {
       headers: { ...headers, "Content-Type": "text/csv; charset=utf-8" },
     });
   } catch (error) {
