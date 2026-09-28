@@ -13,7 +13,6 @@ import {
   catalogBrand,
   catalogState,
   editCatalogCard,
-  scheduleCatalogWrite,
   startCatalogExport,
   renderCatalogExport,
   setCatalogApproval,
@@ -105,12 +104,7 @@ export async function POST(
     switch (body.action) {
       case "refresh": {
         const brand = await catalogBrand(userId, brandId);
-        const { created } = await ingestBrandHomes({
-          brandId: brand.id,
-          website: brand.website,
-        });
-        if (created.length)
-          scheduleCatalogWrite({ userId, brandId, homeIds: created });
+        await ingestBrandHomes({ brandId: brand.id, website: brand.website });
         return NextResponse.json(await catalogState(userId, brandId, true));
       }
       case "export": {

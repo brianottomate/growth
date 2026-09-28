@@ -1,6 +1,5 @@
 import "server-only";
 
-import { after } from "next/server";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/server/db";
 import {
@@ -128,12 +127,8 @@ async function catalogHomes(brand: CatalogBrand, refresh = false) {
   let rows = await catalogRows(brand.id);
   // A brand not yet ingested, or a listing new since the last ingest, gets
   // its rows on first read so every card has somewhere to keep an edit.
-  let created: string[] = [];
   if (inventory.homes.some((home) => !rows.has(home.id))) {
-    ({ created } = await ingestBrandHomes({
-      brandId: brand.id,
-      website: brand.website,
-    }));
+    await ingestBrandHomes({ brandId: brand.id, website: brand.website });
     rows = await catalogRows(brand.id);
   }
   const homes: CatalogHome[] = inventory.homes.map((home) => {
@@ -195,7 +190,7 @@ async function catalogHomes(brand: CatalogBrand, refresh = false) {
         !rows.get(card.homeId)?.catalogTitle,
     )
     .map((card) => card.homeId);
-  return { inventory, homes, rows, draft, unwritten, created };
+  return { inventory, homes, rows, draft, unwritten };
 }
 
 /** The homes whose cards go out: brand-wide reads count only these. */
@@ -215,12 +210,10 @@ export async function catalogState(
   refresh = false,
 ) {
   const brand = await catalogBrand(userId, brandId);
-  const { inventory, homes, draft, unwritten, created } = await catalogHomes(
+  const { inventory, homes, draft, unwritten } = await catalogHomes(
     brand,
     refresh,
   );
-  if (created.length)
-    scheduleCatalogWrite({ userId, brandId, homeIds: created });
   const runs = await db.query.creativeRunTable.findMany({
     where: and(
       eq(creativeRunTable.brandId, brandId),
@@ -809,27 +802,4 @@ async function finishedCatalogAsset(brandId: string, assetId: string) {
       "Choose ready finished artwork from this brand’s media library",
     );
   return asset;
-}
-
-/**
- * Homes new at ingest get their cards written after the response, the same
- * pass as "Write all cards". Outside a request (a script) there is no after();
- * the cards then wait for the button.
- */
-export function scheduleCatalogWrite(input: {
-  userId: string;
-  brandId: string;
-  homeIds: string[];
-}) {
-  try {
-    after(() =>
-      import("./catalog-quick-fix.service").then(({ writeCatalogCards }) =>
-        writeCatalogCards(input).catch((error: unknown) =>
-          console.error("catalog write after ingest failed", error),
-        ),
-      ),
-    );
-  } catch {
-    // No request scope.
-  }
 }

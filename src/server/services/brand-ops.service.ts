@@ -34,7 +34,6 @@ import {
 } from "@/server/clients/zernio.client";
 import { newConnectToken } from "@/server/services/brand-connect.service";
 import { MediaService } from "@/server/services/media.service";
-import { chooseBrandMark } from "./brand-mark.service";
 import { enrichBrandFromWebsite } from "@/server/services/brand-enrichment.service";
 
 // ---- BRAND OPS: create + enrich, shared by oRPC and chat/MCP ----------
@@ -169,12 +168,6 @@ export async function enrichBrandById(
     .where(eq(brandTable.id, brandId))
     .returning();
   if (!brand) throw new Error("Brand enrichment was not saved");
-  // A first mark, chosen at card scale, so Setup opens with one; an
-  // operator's own choice is never replaced. Best effort.
-  if (!brand.brandMark && brand.ownerId)
-    await chooseBrandMark({ brandId: brand.id, userId: brand.ownerId }).catch(
-      (error: unknown) => console.warn("brand mark not chosen", error),
-    );
   const audit = appliedEvidenceSchema.parse({
     evidence: [
       {
