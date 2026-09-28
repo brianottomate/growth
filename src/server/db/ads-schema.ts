@@ -6,6 +6,7 @@ import { index, pgEnum, pgTable, uniqueIndex } from "drizzle-orm/pg-core";
 import { brandTable, personaTable } from "./brand-schema";
 import { channelPlatformEnum, channelTable } from "./channel-schema";
 import type { AdFormat } from "@/lib/performance-ads";
+import type { AdPushGoal } from "@/lib/ad-platforms";
 
 import type { MediaItem } from "./content-schema";
 import { homeTable } from "./home-schema";
@@ -274,6 +275,9 @@ export type PlatformCampaignSettings = {
     businessName?: string;
   };
   meta?: {
+    /** The ad account (and the connection that reaches it) the push uses. */
+    destination?: { connectionAccountId: string; adAccountId: string };
+    goal?: AdPushGoal;
     /** Explicitly bypass inherited dates; omitted preserves legacy inheritance. */
     startWhenLaunched?: boolean;
     runUntilPaused?: boolean;

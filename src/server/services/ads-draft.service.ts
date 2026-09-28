@@ -154,7 +154,7 @@ export async function createDraftCampaign(input: {
   landingUrl?: string | null;
   description?: string | null;
   platforms?: DraftAdPlatform[];
-  /** ADVISORY total, whole dollars. Seeds the platform drafts. */
+  /** ADVISORY total, whole dollars. Platform drafts set their own spend. */
   budget?: number | null;
   startAt?: Date | null;
   endAt?: Date | null;
@@ -221,8 +221,9 @@ async function planPlatformInternal(input: {
       campaignId: input.campaign.id,
       name: input.campaign.name,
       status: "draft",
-      // Seeded from the plan's advisory number; authoritative once edited.
-      budget: input.campaign.budget,
+      // Left for a person to set: the plan's number is a total with no flight
+      // (an intake's is monthly), so copying it in as daily overspends.
+      budget: null,
       budgetType: "daily",
       startAt: input.campaign.startAt,
       endAt: input.campaign.endAt,

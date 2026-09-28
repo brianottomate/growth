@@ -9,6 +9,7 @@ export type MatrixAdRow = {
   id: string;
   name: string;
   status: string;
+  updatedAt: Date;
   content: unknown;
   placements?: AdPlacements | null;
   homeId: string | null;
@@ -32,6 +33,7 @@ export function toMatrixHomes(ads: MatrixAdRow[]): MatrixHome[] {
       name: ad.name,
       format: AD_FORMAT_LABEL[adFormatOf(content)],
       status: ad.status === "approved" ? "approved" : "drawn",
+      updatedAt: ad.updatedAt.toISOString(),
       base: {
         headline: content.headline,
         body: content.body,

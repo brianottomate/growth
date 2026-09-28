@@ -53,6 +53,18 @@ type Audience = {
 };
 const DEFAULT_PROJECTION_EXPANSION: Record<string, boolean> = {};
 
+/** "connection:adAccount", the select's key, as the draft's saved destination. */
+function destinationOf(key: string) {
+  const at = key.indexOf(":");
+  if (at <= 0) return {};
+  return {
+    destination: {
+      connectionAccountId: key.slice(0, at),
+      adAccountId: key.slice(at + 1),
+    },
+  };
+}
+
 export function MetaPlatformCard({
   campaignId,
   campaignName,
@@ -86,8 +98,13 @@ export function MetaPlatformCard({
     defaultValue: DEFAULT_PROJECTION_EXPANSION,
   });
 
-  const [destinationKey, setDestinationKey] = useState("");
-  const [goal, setGoal] = useState<AdPushGoal>("conversions");
+  const saved = pc.settings?.meta;
+  const [destinationKey, setDestinationKey] = useState(
+    saved?.destination
+      ? `${saved.destination.connectionAccountId}:${saved.destination.adAccountId}`
+      : "",
+  );
+  const [goal, setGoal] = useState<AdPushGoal>(saved?.goal ?? "conversions");
   const sectionId = useId();
   const destinations = useQuery(
     orpc.ads.destinations.queryOptions({
@@ -746,8 +763,7 @@ function MetaSettings({
           </select>
         </label>
         <p className="text-xs text-muted-foreground">
-          Account and goal apply to this push session. Budget, schedule and
-          tracking are saved to the platform draft.
+          Saved to the platform draft with the budget, schedule and tracking.
         </p>
         <fieldset className="space-y-2">
           <legend className="text-sm font-medium">Placements</legend>
@@ -914,6 +930,8 @@ function MetaSettings({
                 budget: amount ? Number(amount) : null,
                 budgetType,
                 meta: {
+                  ...destinationOf(draftDestination),
+                  goal: draftGoal,
                   startWhenLaunched: !scheduledStart,
                   runUntilPaused: !scheduledEnd,
                   placements,

@@ -3119,7 +3119,7 @@ async function pushToMeta(args: PushArgs) {
     {
       accountId: input.connectionAccountId,
       adAccountId: destination.adAccount.id,
-      name: campaign.name,
+      name: metaCampaignName,
       goal: input.goal,
       ...(useCbo ? { budgetAmount, budgetType } : {}),
       status: "PAUSED",

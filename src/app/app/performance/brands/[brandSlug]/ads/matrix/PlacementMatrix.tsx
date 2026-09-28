@@ -64,6 +64,8 @@ export type MatrixAd = {
   name: string;
   format: string;
   status: "drawn" | "approved";
+  /** The version approval checks against, so a stale view cannot approve. */
+  updatedAt: string;
   base: { headline: string; body: string; callToAction: string | null };
   photoOnly: boolean;
   coverage: {
@@ -323,6 +325,7 @@ function AdRow({
               approve.mutate({
                 adId: ad.id,
                 status: approved ? "drawn" : "approved",
+                expectedUpdatedAt: ad.updatedAt,
               })
             }
             title={

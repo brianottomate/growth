@@ -4,7 +4,10 @@ import {
   type AppliedEvidence,
 } from "@/lib/applied-evidence";
 
-import { advanceDeliveryStage } from "./brand-relationship.service";
+import {
+  advanceBusinessStage,
+  advanceDeliveryStage,
+} from "./brand-relationship.service";
 
 import { and, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { z } from "zod";
@@ -234,13 +237,11 @@ export async function submitPerformanceIntake(input: {
   // Deliberately NOT touching the account's `status` or `signedAt`. Money is
   // tracked separately, and `signedAt` is a contract date that cohort reports
   // are built from — an intake submission is not a signature.
+  // The business stage moves with the relationship, or the brand stays on
+  // the Prospects tab while everything else treats it as a client.
   await advanceDeliveryStage(brand.id, "intake_submitted");
-  if (brand.relationship === "prospect") {
-    await db
-      .update(brandTable)
-      .set({ relationship: "client" })
-      .where(eq(brandTable.id, brand.id));
-  }
+  if (brand.relationship === "prospect")
+    await advanceBusinessStage(brand.id, "signed");
 
   return { intakeId: intake!.id };
 }

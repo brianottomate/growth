@@ -290,7 +290,9 @@ export const draftCampaignAction = growthAction({
       .int()
       .min(0)
       .optional()
-      .describe("Total intended budget in whole dollars."),
+      .describe(
+        "Total intended budget in whole dollars (an intake's is monthly). Advisory only: the platform draft's daily or lifetime budget is set separately with setPlatformDraft before a push.",
+      ),
     campaignId: z.string().trim().min(1).optional(),
   }),
   execute: async (input, ctx) => {
@@ -1163,6 +1165,16 @@ export const setPlatformDraftAction = growthAction({
       .optional(),
     meta: z
       .object({
+        destination: z
+          .object({
+            connectionAccountId: z.string().trim().min(1),
+            adAccountId: z.string().trim().min(1),
+          })
+          .optional()
+          .describe(
+            "The ad account the push uses, from listDestinations. Saved so every later push and preview reuses it.",
+          ),
+        goal: z.enum(AD_PUSH_GOALS).optional(),
         startWhenLaunched: z
           .boolean()
           .optional()
