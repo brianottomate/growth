@@ -28,9 +28,10 @@ import { money } from "./format";
 
 /**
  * Compile the plan onto one platform, PAUSED. Budget, dates and settings come
- * from the platform draft, so this dialog asks only for the destination and
- * the goal — the click is the approval, and spend starts only when the
- * delivery switch is flipped afterwards.
+ * from the platform draft. With the setup saved (ad account, Page, goal) the
+ * button pushes straight away: the click is the approval, and spend starts
+ * only when the delivery switch is flipped afterwards. Without it, a dialog
+ * asks for the destination and the goal.
  */
 export function PushToPlatform({
   campaignId,
@@ -105,6 +106,44 @@ export function PushToPlatform({
   );
 
   const canPush = Boolean(chosen) && budget != null && !push.isPending;
+  if (configuration) {
+    return (
+      <div className="flex flex-col items-end gap-1">
+        <Button
+          size="sm"
+          disabled={!canPush}
+          loading={push.isPending}
+          title={
+            budget == null
+              ? `Set the budget on the ${platformName} draft first`
+              : undefined
+          }
+          onClick={() =>
+            push.mutate({
+              campaignId,
+              platform,
+              connectionAccountId: configuration.connectionAccountId,
+              adAccountId: configuration.adAccountId,
+              goal,
+            })
+          }
+        >
+          <UploadCloud className="size-3.5" />
+          {push.isPending ? "Pushing paused…" : `Push to ${platformName}`}
+        </Button>
+        {push.error && (
+          <p
+            role="alert"
+            title={push.error.message}
+            className="line-clamp-3 max-w-md text-right text-xs text-destructive"
+          >
+            {push.error.message}
+          </p>
+        )}
+      </div>
+    );
+  }
+
   const setSummary =
     audienceCount === 0
       ? "1 broad ad set"
@@ -130,55 +169,46 @@ export function PushToPlatform({
             , all paused. Nothing spends until you launch.
           </DialogDescription>
         </DialogHeader>
-        {configuration && (
-          <p className="text-sm">
-            {configuration.label} · {goal}
-          </p>
-        )}
         <div className="space-y-3">
-          {!configuration && (
-            <>
-              <div className="space-y-1.5">
-                <Label htmlFor="push-destination">Ad account</Label>
-                <select
-                  id="push-destination"
-                  value={chosen?.key ?? ""}
-                  onChange={(event) => setDestinationKey(event.target.value)}
-                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                >
-                  <option value="" disabled>
-                    {destinations.isPending
-                      ? "Loading destinations…"
-                      : options.length === 0
-                        ? "No allowlisted destination"
-                        : "Pick the ad account"}
+          <>
+            <div className="space-y-1.5">
+              <Label htmlFor="push-destination">Ad account</Label>
+              <select
+                id="push-destination"
+                value={chosen?.key ?? ""}
+                onChange={(event) => setDestinationKey(event.target.value)}
+                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="" disabled>
+                  {destinations.isPending
+                    ? "Loading destinations…"
+                    : options.length === 0
+                      ? "No allowlisted destination"
+                      : "Pick the ad account"}
+                </option>
+                {options.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
                   </option>
-                  {options.map((option) => (
-                    <option key={option.key} value={option.key}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="push-goal">Goal</Label>
-                <select
-                  id="push-goal"
-                  value={goal}
-                  onChange={(event) =>
-                    setGoal(event.target.value as typeof goal)
-                  }
-                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                >
-                  {goals.map((value) => (
-                    <option key={value} value={value}>
-                      {value}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </>
-          )}
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="push-goal">Goal</Label>
+              <select
+                id="push-goal"
+                value={goal}
+                onChange={(event) => setGoal(event.target.value as typeof goal)}
+                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                {goals.map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
           {destinations.error && (
             <p role="alert">{destinations.error.message}</p>
           )}
