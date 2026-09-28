@@ -29,6 +29,7 @@ import {
   type PlatformCampaignSettings,
 } from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
+import { newCampaignCodename } from "./campaign-codename.service";
 import {
   requireAdPlatformSpec,
   type PlannableAdPlatform,
@@ -160,18 +161,22 @@ export async function createDraftCampaign(input: {
   endAt?: Date | null;
 }) {
   const brand = await requireOwnedBrand(input);
+  const houseName = campaignDraftName({
+    brandName: brand.name,
+    isClient: brand.relationship === "client",
+  });
+  // A house-named draft gets a codename; a typed or imported name is kept as is.
+  const codename =
+    (input.name ?? houseName) === houseName
+      ? await newCampaignCodename(input.organizationId)
+      : null;
 
   const [campaign] = await db
     .insert(campaignTable)
     .values({
       id: createId("camp"),
       brandId: brand.id,
-      name:
-        input.name ??
-        campaignDraftName({
-          brandName: brand.name,
-          isClient: brand.relationship === "client",
-        }),
+      name: codename ? `${houseName}_${codename}` : (input.name ?? houseName),
       status: "planned",
       goal: input.goal ?? null,
       landingUrl: input.landingUrl ?? null,
