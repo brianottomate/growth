@@ -121,6 +121,18 @@ function wrapText(value: string, maxCharacters: number) {
 }
 
 /**
+ * The band a centred square crop cuts from the top and the bottom of a 4:5
+ * card: a catalog carousel may draw its cards square, so a catalog card keeps
+ * its mark and its text inside that square. Zero on every other shape.
+ */
+function squareSafeInset(format: { width: number; height: number }) {
+  const ratio = format.height / format.width;
+  return ratio > 1 && ratio < 1.3
+    ? Math.round((format.height - format.width) / 2)
+    : 0;
+}
+
+/**
  * Two lines of about equal length instead of a full first line and a stray
  * word or two below it. Falls back to plain wrapping past two lines.
  */
@@ -1395,7 +1407,7 @@ export function renderComposition(
           style={{
             display: "flex",
             position: "absolute",
-            top: pad,
+            top: pad + squareSafeInset(format),
             left: pad,
           }}
         >
@@ -1413,7 +1425,7 @@ export function renderComposition(
             position: "absolute",
             left: pad,
             right: pad,
-            bottom: pad,
+            bottom: pad + squareSafeInset(format),
             color: "#ffffff",
           }}
         >
@@ -1559,7 +1571,7 @@ export function renderComposition(
             style={{
               display: "flex",
               position: "absolute",
-              top: pad,
+              top: pad + squareSafeInset(format),
               left: pad,
             }}
           >
@@ -1580,7 +1592,10 @@ export function renderComposition(
             right: pad,
             // Stories and Reels lay their own UI over the bottom fifth of the
             // frame; the foot block sits above that band on the story canvas.
-            bottom: spec.formatId === "story" ? pad + 240 : pad,
+            bottom:
+              spec.formatId === "story"
+                ? pad + 240
+                : pad + squareSafeInset(format),
             color: "#ffffff",
           }}
         >
