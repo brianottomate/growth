@@ -156,7 +156,8 @@ function copyProblem(
     return `It repeats ${repeated}, which the facts line under it already shows. Say something the facts line does not.`;
   if (
     (templateId === "catalog-amenities-place" ||
-      templateId === "catalog-destination") &&
+      templateId === "catalog-destination" ||
+      templateId === "catalog-headline") &&
     place
   ) {
     const city = place.split(",")[0]!.trim().toLowerCase();

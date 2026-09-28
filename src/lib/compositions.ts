@@ -98,6 +98,13 @@ export const COMPOSITION_TEMPLATES = [
       "The place in spaced capitals above one big headline, the facts, and at most one pill. For brands whose guests travel to a region.",
   },
   {
+    id: "catalog-headline",
+    version: 1,
+    label: "Catalog · headline",
+    description:
+      "The photo, the optional mark, the place in spaced capitals and one big headline. No facts line, no pills: the words do the selling.",
+  },
+  {
     id: "catalog-review",
     version: 1,
     label: "Catalog · review",
@@ -254,6 +261,13 @@ export const CATALOG_COPY_INTENTS = {
     placeSuffix: false,
     pills: 2,
   },
+  "catalog-headline": {
+    intent:
+      'A headline-only card: the place is printed in capitals above it and nothing else is on the card, so the one line carries the whole ad. It is the moment you would feel there, in a few words, the line a friend would say showing you the photo, grounded in this listing: "Fall asleep to the waterfall", "Two suites joined for the whole crew", "Your own pond, your own deck". It never names the place, never repeats the bedroom or guest count, and never lists amenities.',
+    headlineChars: 32,
+    placeSuffix: false,
+    pills: 0,
+  },
 } as const satisfies Partial<Record<CompositionTemplateId, CatalogCopyIntent>>;
 
 export type CatalogCopyTemplateId = keyof typeof CATALOG_COPY_INTENTS;
@@ -314,6 +328,11 @@ export const COMPOSITION_FIELDS: Record<
     { key: "title", label: "Headline", hint: "Fall asleep to the waterfall" },
     { key: "subtitle", label: "Facts", hint: "2 bedrooms · 1 bath · 4 guests" },
     { key: "pills", label: "Signature", hint: "One, e.g. Private pond" },
+  ],
+  "catalog-headline": [
+    mark,
+    { key: "location", label: "Eyebrow", hint: "Hocking Hills, Ohio" },
+    { key: "title", label: "Headline", hint: "Fall asleep to the waterfall" },
   ],
   "catalog-review": [
     mark,

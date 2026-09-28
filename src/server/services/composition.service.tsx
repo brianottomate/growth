@@ -1455,7 +1455,8 @@ export function renderComposition(
     spec.templateId === "catalog-place" ||
     spec.templateId === "catalog-amenities" ||
     spec.templateId === "catalog-amenities-place" ||
-    spec.templateId === "catalog-destination"
+    spec.templateId === "catalog-destination" ||
+    spec.templateId === "catalog-headline"
   ) {
     // The listing card: one bold statement (the hook and the place as a single
     // headline, the way the reference layouts set it), the facts, and the
@@ -1469,9 +1470,13 @@ export function renderComposition(
     const amenities = spec.templateId !== "catalog-place";
     // The destination card names the place above one big line and keeps a
     // single pill; the amenities cards are sized to read at phone width.
-    const destination = spec.templateId === "catalog-destination";
+    // The headline card is the destination card with only the words left:
+    // the place above, one bigger line, no facts and no pills.
+    const headlineOnly = spec.templateId === "catalog-headline";
+    const destination =
+      spec.templateId === "catalog-destination" || headlineOnly;
     const headlineSize = Math.round(
-      (destination ? 76 : amenities ? 68 : 60) * scale,
+      (headlineOnly ? 84 : destination ? 76 : amenities ? 68 : 60) * scale,
     );
     const statement = amenities
       ? balancedLines(
@@ -1479,7 +1484,7 @@ export function renderComposition(
           Math.round(((square ? 26 : 24) * 60 * scale) / headlineSize),
         )
       : placeStatement(spec);
-    const facts = clamp(spec.subtitle, 80);
+    const facts = headlineOnly ? "" : clamp(spec.subtitle, 80);
     // The amenities cards leave the rating out; the place variant leads its
     // pill row with the location instead.
     const rating =
@@ -1492,9 +1497,10 @@ export function renderComposition(
     const pillFont = Math.round(30 * scale);
     // One row: the location pill first, then the amenities that still fit.
     const pillRow = pillsOnOneRow(
-      [location, ...(amenities ? (spec.pills ?? []).slice(0, 2) : [])].filter(
-        Boolean,
-      ),
+      [
+        location,
+        ...(amenities && !headlineOnly ? (spec.pills ?? []).slice(0, 2) : []),
+      ].filter(Boolean),
       format.width - pad * 2,
       pillFont,
       Math.round(28 * scale),

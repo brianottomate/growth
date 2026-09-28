@@ -105,6 +105,7 @@ export const CATALOG_TEMPLATES = [
   "catalog-amenities",
   "catalog-amenities-place",
   "catalog-destination",
+  "catalog-headline",
 ] as const;
 
 /** Catalog cards that draw amenity pills. */
@@ -114,7 +115,8 @@ export const drawsPills = (templateId: string) =>
 /** Catalog cards that print the location themselves. */
 export const drawsLocation = (templateId: string) =>
   templateId === "catalog-amenities-place" ||
-  templateId === "catalog-destination";
+  templateId === "catalog-destination" ||
+  templateId === "catalog-headline";
 export type CatalogTemplateId = (typeof CATALOG_TEMPLATES)[number];
 
 /** The Studio's batch passes: Rewrite copy, and Fix photos + copy. */

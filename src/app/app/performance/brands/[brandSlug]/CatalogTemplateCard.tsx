@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
@@ -85,7 +86,7 @@ export function CatalogTemplateCard({
           </Button>
         ))}
       </div>
-      <ul className="divide-y">
+      <div className="grid grid-cols-2 gap-3 @2xl:grid-cols-3 @5xl:grid-cols-4">
         {CATALOG_TEMPLATES.map((templateId) => {
           const label =
             COMPOSITION_TEMPLATES.find((t) => t.id === templateId)?.label ??
@@ -98,16 +99,19 @@ export function CatalogTemplateCard({
           );
           const chosen = current === templateId;
           return (
-            <li key={templateId}>
+            <div
+              key={templateId}
+              className={cn(
+                "space-y-2 rounded-lg border p-2 text-sm",
+                chosen && "ring-2 ring-foreground",
+              )}
+            >
               <button
                 type="button"
                 aria-pressed={chosen}
                 disabled={saving !== null}
                 onClick={() => save.mutate({ brandId, templateId })}
-                className={cn(
-                  "flex w-full items-start gap-4 rounded-lg p-2 text-left text-sm hover:bg-muted/50",
-                  chosen && "bg-muted",
-                )}
+                className="block w-full space-y-2 text-left"
               >
                 {src && (
                   // oxlint-disable-next-line nextjs/no-img-element
@@ -115,40 +119,25 @@ export function CatalogTemplateCard({
                     src={src}
                     alt={label}
                     className={cn(
-                      "w-24 shrink-0 rounded-md object-cover",
+                      "w-full rounded-md object-cover",
                       format === "square" ? "aspect-square" : "aspect-[4/5]",
                     )}
                   />
                 )}
-                <span className="min-w-0 space-y-1">
-                  <span className="block font-medium">
-                    {label}
-                    {chosen
-                      ? " · default"
-                      : saving === templateId
-                        ? " · saving…"
-                        : ""}
-                  </span>
-                  {guide && (
-                    <>
-                      <span className="block text-xs text-muted-foreground">
-                        Headline ≤{guide.headlineChars} characters
-                        {guide.placeSuffix
-                          ? " · ends “in {place}”"
-                          : " · no place in the headline"}
-                        {guide.pills ? ` · ${guide.pills} amenity pills` : ""}
-                      </span>
-                      <span className="block text-muted-foreground">
-                        {guide.intent}
-                      </span>
-                    </>
-                  )}
+                <span className="block font-medium">
+                  {label}
+                  {chosen
+                    ? " · default"
+                    : saving === templateId
+                      ? " · saving…"
+                      : ""}
                 </span>
               </button>
-            </li>
+              {guide && <Guide guide={guide} />}
+            </div>
           );
         })}
-      </ul>
+      </div>
     </div>
   );
 }
@@ -169,4 +158,36 @@ function asTemplate(card: CatalogCard, templateId: CatalogTemplateId) {
         ? card.title.slice(0, at)
         : card.title;
   return { ...card, templateId, title };
+}
+
+/** A template's copy rules: the limits on one line, the brief clamped. */
+function Guide({
+  guide,
+}: {
+  guide: (typeof CATALOG_COPY_INTENTS)[keyof typeof CATALOG_COPY_INTENTS];
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="space-y-1">
+      <p className="text-xs text-muted-foreground">
+        Headline ≤{guide.headlineChars} characters
+        {guide.placeSuffix
+          ? " · ends “in {place}”"
+          : " · no place in the headline"}
+        {guide.pills ? ` · ${guide.pills} amenity pills` : ""}
+      </p>
+      <p
+        className={cn("text-xs text-muted-foreground", !open && "line-clamp-2")}
+      >
+        {guide.intent}
+      </p>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="text-xs font-medium underline-offset-4 hover:underline"
+      >
+        {open ? "Show less" : "Show more"}
+      </button>
+    </div>
+  );
 }

@@ -70,6 +70,7 @@ const performanceSettingsShape = {
       "catalog-amenities",
       "catalog-amenities-place",
       "catalog-destination",
+      "catalog-headline",
     ])
     .nullable()
     .optional(),
