@@ -22,7 +22,6 @@ import {
   performanceAccountTable,
   performanceCycleTable,
   platformCampaignTable,
-  type HomesRun,
   type PlatformCampaign,
 } from "@/server/db/schema";
 
@@ -42,7 +41,6 @@ export type DeskCampaign = {
   /** Where spend sits against time, when the platform rows carry dates. */
   pace: "ahead" | "on" | "behind" | null;
   adCount: number;
-  lastHomesRun: HomesRun | null;
   /**
    * The client this campaign is billed to when it runs under Wander's own
    * brand: the account on the cycle it is attached to. Null when the campaign
@@ -181,7 +179,6 @@ export async function loadPerformanceDesk(
         name: true,
         budget: true,
         createdAt: true,
-        homesRun: true,
         performanceCycleId: true,
       },
       with: { ads: { columns: { id: true } } },
@@ -276,7 +273,6 @@ export async function loadPerformanceDesk(
       budget: platformBudget > 0 ? platformBudget : (campaign.budget ?? 0),
       pace: paceOf(rows, spend),
       adCount: campaign.ads.length,
-      lastHomesRun: campaign.homesRun ?? null,
       accountName: campaign.performanceCycleId
         ? (accountNameByCycle.get(campaign.performanceCycleId) ?? null)
         : null,

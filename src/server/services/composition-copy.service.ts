@@ -20,7 +20,7 @@ import type { WanderOsListing } from "@/server/clients/wanderos-site.client";
 import { db } from "@/server/db";
 import { brandTable, mediaAssetTable, memberTable } from "@/server/db/schema";
 import { CompositionAccessError } from "@/server/services/composition.service";
-import { homeFacts } from "@/server/services/property-ads.service";
+import { homeFacts } from "@/server/services/home-facts";
 import { brandListings } from "@/server/services/wanderos-listings.service";
 
 const MODEL = "claude-sonnet-5";

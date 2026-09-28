@@ -2,7 +2,7 @@
 id: new-client-setup
 title: "New client from a URL"
 kind: procedure
-summary: "Set up a website as a client, step by step. Create and enrich the brand, set its mark, read its listing photos, open a campaign shell, draft ads from its homes, stop before any push."
+summary: "Set up a website as a client, step by step. Create and enrich the brand, set its mark, feature its homes, open a campaign shell, generate starter ideas from the featured homes, stop before any push."
 tags: [ads, performance, onboarding, procedure]
 ---
 
@@ -25,13 +25,13 @@ Work in this order. Each step reads before it writes, and re-running any step is
 
 ## 3. Mark
 
-`brandWrite.setMark` with source `logo`. This renders the three tones every card draws. If the result note says the logo already carries the name or the logo is tiny, leave it; do not try lockups unless the operator asks.
+`brandWrite.suggestMark` with the brandId. It renders each candidate at card size, picks the one that reads best and saves its three tones, the same as Suggest on Setup. Say its reason in one line. Use `brandWrite.setMark` only when the operator names a specific mark.
 
 ## 4. Photos
 
 1. `mediaLibraryRead.listingPhotos` for the brand. An empty result means the website is not a WanderOS site: say so, and offer `mediaLibraryRead.list` for whatever the library already holds.
-2. Do not import the photos here. `adsWrite.draftAdsFromHomes` in step 6 imports the heroes it needs and only those. Import separately only when the operator asks for photos without ads.
-3. Feature the homes the operator named with `performanceWrite.updateHome` (`featured: true`), one call per home, using each `homeId` from the listing read. A `homeId` of null means the brand's homes are not ingested yet: ask the operator to press Refresh homes on the Setup page, then read again.
+2. Do not import the photos here. The ideas in step 6 draw on each featured home's own gallery.
+3. Feature the homes the operator named with `performanceWrite.updateHome` (`featured: true`), one call per home, using each `homeId` from the listing read. The ideas in step 6 are made from the featured homes, so this step decides what they show. A `homeId` of null means the brand's homes are not ingested yet: ask the operator to press Refresh homes on the Setup page, then read again.
 4. Set the hero with `brandWrite.update` and `heroHomeId`: the home the operator named, or else the featured home with the strongest cover photo, and say in one line which and why. Nothing sets a hero on its own, so a brand without one shows empty previews until this step.
 
 ## 5. Campaign shell
@@ -40,8 +40,8 @@ Work in this order. Each step reads before it writes, and re-running any step is
 
 ## 6. Ads
 
-`adsWrite.draftAdsFromHomes` with the campaignId. Six homes unless the operator said otherwise; pass `listingUrls` from step 4 if they named homes. This writes copy, renders a card per home, has the art director judge each card, and drafts one static ad and one carousel. Read the notes back to the operator: which cards the director adjusted and why.
+`adsWrite.generateStarterIdeas` with the campaignId. It makes a static and a carousel per featured home plus a portfolio carousel, choosing photos from each home's gallery and writing the copy. Every idea lands unapproved. Say in one line how many it made; if it failed, say why.
 
 ## 7. Hand back
 
-Give the campaign page path (`/app/brands/<slug>/ads/<campaignId>`) and the three things left for the operator: check the cards, add an audience if broad is not right, set the platform budget and push. Do not call `adsWrite.push` or `adsWrite.setDelivery` from this playbook.
+Give the campaign page (`handoff.reviewPath` from `adsWrite.draftCampaign`) and what is left for the operator: review and approve each idea, add an audience if broad is not right, set the platform budget, preview and push. Do not call `adsWrite.push` or `adsWrite.setDelivery` from this playbook.

@@ -92,6 +92,8 @@ export const growthActionPolicies = {
     // Renders three tones into our own library and points the brand at them;
     // the model-write consequence covers the lockup critique.
     setMark: write({ idempotent: true, consequence: "model-write" }),
+    // The model picks among rendered candidates; re-running may pick another.
+    suggestMark: write({ consequence: "model-write" }),
     // A reference onto the brand row; the card already exists in the library.
     addAdPreview: write({ idempotent: true }),
     // A merge into the brand's settings JSONB; the same patch twice is a no-op.
@@ -276,15 +278,21 @@ export const growthActionPolicies = {
     // Local DB rows only; no provider call, no spend. Push is separate.
     draftCampaign: write(),
     draftAd: write(),
-    // Renders one image per home and drafts two ads. Local rows and our own
-    // R2 bytes, no provider call, but it is a heavier call than the rest of
-    // this domain and re-running adds another pair of drafts.
-    draftAdsFromHomes: write(),
     // Writes every ad in the set and one model call for the captions. Local
     // rows only, no provider call; re-running replaces the last set rather
     // than stacking a second one, which is why it is idempotent.
     buildAdSet: write({ idempotent: true, consequence: "model-write" }),
-    setAdStatus: write({ idempotent: true }),
+    // Rewrites headline and caption on drawn ads from one model call.
+    writeSetCopy: write({ idempotent: true, consequence: "model-write" }),
+    // Several model calls per home; lands unapproved drafts only.
+    generateStarterIdeas: write({ consequence: "model-write" }),
+    // Approval is the person's sign-off that gates the push, so chat asks
+    // for it with the approval card rather than deciding on its own.
+    setAdStatus: write({
+      idempotent: true,
+      approval: "user",
+      surfaces: APPROVAL_PRODUCT,
+    }),
     setAdCopy: write({ idempotent: true }),
     saveIdea: write(),
     // Shells, bindings and cards: local ad rows, no provider call.

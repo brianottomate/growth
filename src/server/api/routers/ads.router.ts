@@ -8,7 +8,6 @@ import {
 import { z } from "zod";
 
 import {
-  writeSetCopy,
   setAdPhotoOnly,
   setAdTextOnly,
   setCardCopy,
@@ -24,6 +23,7 @@ import {
   setDeliveryAction,
   draftCampaignAction,
   buildAdSetAction,
+  writeSetCopyAction,
   addAdShellAction,
   createAdsFromAssetsAction,
   addAudienceAction,
@@ -78,20 +78,7 @@ export const adsRouter = {
   buildAdSet: actionProcedure(buildAdSetAction),
 
   /** The copy pass: AI words onto the drafts already drawn. Headline/body only. */
-  writeSetCopy: workspaceProcedure
-    .input(
-      z.object({
-        brandId: z.string().min(1),
-        campaignId: z.string().min(1).optional(),
-      }),
-    )
-    .handler(async ({ context: ctx, input }) =>
-      writeSetCopy({
-        brandId: input.brandId,
-        orgId: ctx.workspace.orgId,
-        campaignId: input.campaignId,
-      }),
-    ),
+  writeSetCopy: actionProcedure(writeSetCopyAction),
 
   saveIdea: actionProcedure(saveIdeaAction),
 

@@ -146,9 +146,9 @@ const BUILD_FIRST =
 function campaignFocusPrompt(focus: AdCampaignWorkContext["focus"]) {
   switch (focus) {
     case "photos":
-      return `\n\nThe operator asked from the Photos step: fill this campaign's pool. Check mediaLibraryRead.list for the brand first; adsWrite.draftAdsFromHomes both imports their listing photos and renders cards from them, and adsWrite.setCreativePool sets the pool from library assets.${BUILD_FIRST}`;
+      return `\n\nThe operator asked from the Photos step: fill this campaign's pool. Check mediaLibraryRead.list for the brand first; mediaLibraryWrite.importListingPhotos brings in their listing photos, and adsWrite.setCreativePool sets the pool from library assets.${BUILD_FIRST}`;
     case "ads":
-      return `\n\nThe operator asked from the Ads step: they want ads drafted or improved. For a brand with a WanderOS site, adsWrite.draftAdsFromHomes is the fast path (cards per home, one static, one carousel); otherwise adsWrite.draftAd with pool media. Write the copy yourself, do not ask them for it.${BUILD_FIRST}`;
+      return `\n\nThe operator asked from the Ads step: they want ads drafted or improved. For a brand with featured WanderOS homes, adsWrite.generateStarterIdeas is the fast path (a static and a carousel per featured home); otherwise adsWrite.draftAd with pool media. Write the copy yourself, do not ask them for it.${BUILD_FIRST}`;
     case "audiences":
       return `\n\nThe operator asked from the Audiences step: create the audience. Broad with a geography is the default that leaves the learning phase at these budgets; derive the geography from where the brand's guests come from or, failing that, its homes' region and the brand's personas. Create it with adsWrite.addAudience.${BUILD_FIRST}`;
     case "platforms":

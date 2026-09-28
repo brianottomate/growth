@@ -196,7 +196,7 @@ export function BrandMarkCard({
             variant={mark ? "outline" : "default"}
             disabled={busy}
             loading={suggest.isPending}
-            onClick={() => suggest.mutate({ id: brandId })}
+            onClick={() => suggest.mutate({ brandId })}
           >
             <Sparkles className="size-3.5" />
             {suggest.isPending

@@ -21,6 +21,7 @@ import {
   setBrandRelationship,
 } from "@/server/services/brand-relationship.service";
 import {
+  chooseBrandMark,
   critiqueBrandMark,
   setBrandMark,
 } from "@/server/services/brand-mark.service";
@@ -478,6 +479,32 @@ export const setBrandMarkAction = growthAction({
       variants: mark.variants,
       note: tuning?.note ?? null,
       path: `/app/brands/${brand.slug ?? brand.id}`,
+    };
+  },
+});
+
+export const suggestBrandMarkAction = growthAction({
+  description:
+    "Pick and save the brand mark, the same as Suggest on the Setup page: renders each candidate (the scraped logo, the icon cut from it, the favicon or the name set as a lockup) at card size, has the art director choose the one that reads best, and saves its three tones. Run brandWrite.enrich first. Re-running replaces the mark; use setMark to set a specific one.",
+  inputSchema: z.object({ brandId: z.string().trim().min(1) }),
+  outputSchema: z.object({
+    brandId: z.string(),
+    source: z.enum(["logo", "favicon", "lockup"]),
+    reason: z.string(),
+  }),
+  examples: [{ brandId: "brd_01" }],
+  execute: async (input, ctx) => {
+    const brand = await assertOwnedBrand(input.brandId, ctx.orgId);
+    const chosen = await chooseBrandMark({
+      brandId: brand.id,
+      userId: ctx.userId,
+    });
+    if (!chosen)
+      throw new Error("No logo, favicon or name to build a mark from.");
+    return {
+      brandId: brand.id,
+      source: chosen.recipe.source,
+      reason: chosen.reason,
     };
   },
 });

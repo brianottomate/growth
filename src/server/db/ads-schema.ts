@@ -366,13 +366,16 @@ export const campaignTable = pgTable(
      */
     creativePool: t.jsonb().$type<MediaItem[]>().default([]),
 
-    /** Progress and outcome of the last homes run; null until one is started. */
+    /**
+     * RETIRED with "draft ads from their homes": nothing writes or reads it.
+     * Kept so the build's schema push does not stop on a column drop.
+     */
     homesRun: t.jsonb().$type<HomesRun>(),
 
     /**
      * ADVISORY total (whole dollars): what the operator intends to spend
-     * across platforms. Nothing spends this number — it seeds the platform
-     * drafts, and the campaign page shows it next to the authoritative
+     * across platforms. Nothing spends this number, and platform drafts do not
+     * copy it; the campaign page shows it next to the authoritative
      * per-platform budgets and actual spend.
      */
     budget: t.integer(),

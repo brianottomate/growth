@@ -113,13 +113,15 @@ import {
   setPlatformDraft,
   updateAudience,
 } from "@/server/services/ads-draft.service";
-import { draftAdsFromHomes } from "@/server/services/property-ads.service";
 import {
   catalogHomeFacts,
   editCatalogCard,
   setCatalogHomeHero,
 } from "@/server/services/catalog-studio.service";
-import { requireOwnedCampaign } from "@/server/services/ads-draft.service";
+import {
+  requireOwnedCampaign,
+  starterIdeaHomes,
+} from "@/server/services/ads-draft.service";
 import { MediaService } from "@/server/services/media.service";
 import { mediaTypeForUrl } from "@/lib/media-url";
 import { and, eq, isNull } from "drizzle-orm";
@@ -140,7 +142,13 @@ import {
   setAdStatus,
   setPlacementCopy,
   unfreezePlacement,
+  writeSetCopy,
 } from "@/server/services/ad-set.service";
+import {
+  runStarterGeneration,
+  startStarterGeneration,
+  starterGenerationStatus,
+} from "@/server/services/starter-ad-generation.service";
 import { AD_PLACEMENT_SPECS } from "@/lib/ad-placements";
 import { HAND_MADE_AD_FORMATS, MAX_SET_HOMES } from "@/lib/performance-ads";
 
@@ -852,54 +860,6 @@ export const listCampaignsAction = growthAction({
     listBrandCampaigns({ brandId: input.brandId, organizationId: ctx.orgId }),
 });
 
-export const draftAdsFromHomesAction = growthAction({
-  description:
-    "Build draft ads for a Performance client from their own listings: writes the ad and card copy, renders a card per home from its hero photo, has an art director check each card (crop, copy length, scrim tint) and re-render the ones that need it, then drafts one single-home static ad and one carousel. Also returns catalog feed rows for the homes that currently quote a price. Local drafts and rendered images only; the platform push is what decides whether any of it runs.",
-  inputSchema: z.object({
-    campaignId: z.string().min(1),
-    carouselSize: z.number().int().min(1).max(10).optional(),
-    listingUrls: z
-      .array(z.string().url())
-      .max(10)
-      .optional()
-      .describe(
-        "Which homes, by listing URL from mediaLibraryRead.listingPhotos, in carousel order. Omit for the campaign's own ranking.",
-      ),
-  }),
-  outputSchema: z.object({
-    campaignId: z.string(),
-    adIds: z.array(z.string()),
-    homesUsed: z.array(z.object({ name: z.string(), url: z.string() })),
-    feedRows: z.array(
-      z.object({
-        id: z.string(),
-        title: z.string(),
-        description: z.string(),
-        availability: z.literal("in stock"),
-        condition: z.literal("new"),
-        price: z.string(),
-        link: z.string(),
-        image_link: z.string(),
-        brand: z.string(),
-      }),
-    ),
-    /** Anything an operator should read: skipped homes, missing prices. */
-    notes: z.array(z.string()),
-  }),
-  examples: [
-    { campaignId: "camp_01" },
-    { campaignId: "camp_01", carouselSize: 4 },
-  ],
-  execute: (input, ctx) =>
-    draftAdsFromHomes({
-      organizationId: ctx.orgId,
-      userId: ctx.userId,
-      campaignId: input.campaignId,
-      carouselSize: input.carouselSize,
-      listingUrls: input.listingUrls,
-    }),
-});
-
 export const replaceAdCardAction = growthAction({
   outputSchema: replaceAdCardActionOutputSchema,
   description:
@@ -1395,6 +1355,93 @@ export const buildAdSetAction = growthAction({
       copy: ctx.surface === "app" ? "defer" : "ai",
     });
     return { ok: true as const, ...result };
+  },
+});
+
+export const writeSetCopyAction = growthAction({
+  description:
+    "Write the headline and caption onto ads already drawn, in one model pass that sees each home's photos: the brand's unassigned set (unapproved ads only), or one campaign's ads when campaignId is given (approved ads too, since the operator asked for that campaign by name; artwork is never touched). The same as Write copy in the app.",
+  inputSchema: z.object({
+    brandId: z.string().min(1),
+    campaignId: z.string().min(1).optional(),
+  }),
+  outputSchema: z.object({ brandId: z.string(), updated: z.number() }),
+  examples: [
+    { brandId: "brand_01" },
+    { brandId: "brand_01", campaignId: "camp_01" },
+  ],
+  execute: (input, ctx) => writeSetCopy({ ...input, orgId: ctx.orgId }),
+});
+
+export const generateStarterIdeasAction = growthAction({
+  description:
+    "Generate a campaign's starter ad ideas, the same as Generate ideas on the campaign page: from the brand's featured homes (source featured, the default: per home a static and a carousel with photos chosen from its gallery, plus a portfolio hero carousel) or three copy-only brand concepts (source brand). Every idea lands as an unapproved draft for the operator to review and approve; nothing is pushed. Waits for the run to finish and reports what it made.",
+  inputSchema: z.object({
+    campaignId: z.string().min(1),
+    source: z.enum(["featured", "brand"]).default("featured"),
+    homeIds: z
+      .array(z.string().min(1))
+      .max(10)
+      .optional()
+      .describe(
+        "Featured home row ids. Omit for every featured home that has photos, up to ten.",
+      ),
+    stories: z
+      .boolean()
+      .default(true)
+      .describe("Also plan Facebook and Instagram Stories for featured ideas."),
+  }),
+  outputSchema: z.object({
+    runId: z.string(),
+    status: z.enum(["queued", "processing", "ready", "error", "cancelled"]),
+    created: z.number(),
+    total: z.number(),
+    error: z.string().nullable(),
+  }),
+  examples: [
+    { campaignId: "camp_01" },
+    { campaignId: "camp_01", source: "brand" },
+  ],
+  execute: async (input, ctx) => {
+    const homeIds =
+      input.source === "brand"
+        ? []
+        : (input.homeIds ??
+          (
+            await starterIdeaHomes({
+              campaignId: input.campaignId,
+              organizationId: ctx.orgId,
+            })
+          )
+            .filter((home) => home.photos.length)
+            .slice(0, 10)
+            .map((home) => home.id));
+    const args = {
+      campaignId: input.campaignId,
+      source: input.source,
+      homeIds,
+      intendedPlacements: [
+        "facebook-feed" as const,
+        "instagram-feed" as const,
+        ...(input.source === "featured" && input.stories
+          ? (["facebook-story", "instagram-story"] as const)
+          : []),
+      ],
+      organizationId: ctx.orgId,
+    };
+    const { runId } = await startStarterGeneration(args);
+    await runStarterGeneration(runId, args);
+    const run = await starterGenerationStatus({
+      campaignId: input.campaignId,
+      organizationId: ctx.orgId,
+    });
+    return {
+      runId,
+      status: run?.status ?? ("error" as const),
+      created: run?.created ?? 0,
+      total: run?.total ?? 0,
+      error: run?.error ?? null,
+    };
   },
 });
 

@@ -6,6 +6,16 @@ import { usePathname, useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { Loader2, Sparkles, X } from "lucide-react";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/components/ui/lib/utils";
 import { toast } from "@/components/ui/toast";
@@ -74,6 +84,7 @@ export function AdPreviewsWorkspace({
   const pathname = usePathname();
   const [count, setCount] = useState(DEFAULT_COUNT);
   const [campaignId, setCampaignId] = useState(campaigns[0]?.id ?? "");
+  const [confirmRebuild, setConfirmRebuild] = useState(false);
   const build = useMutation(
     orpc.ads.buildAdSet.mutationOptions({
       onSuccess: (result) => {
@@ -151,9 +162,39 @@ export function AdPreviewsWorkspace({
   const allAds = matrixHomes.flatMap((home) => home.ads);
   const approved = allAds.filter((ad) => ad.status === "approved").length;
   const drafted = allAds.length > 0;
+  const unapproved = allAds.length - approved;
+  const runBuild = () =>
+    build.mutate(
+      pickedHomes.length > 0
+        ? { brandId, propertyIds: pickedHomes.map((h) => h.id) }
+        : { brandId, count },
+    );
 
   return (
     <div className="space-y-7">
+      <AlertDialog open={confirmRebuild} onOpenChange={setConfirmRebuild}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Rebuild the shells?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {unapproved} unapproved ad{unapproved === 1 ? "" : "s"} and any
+              edits on {unapproved === 1 ? "it" : "them"} are replaced.
+              {approved > 0 ? ` ${approved} approved stay as they are.` : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmRebuild(false);
+                runBuild();
+              }}
+            >
+              Rebuild
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {/* 1 · The homes the set runs on, as chips, and the build. */}
       <section className="space-y-2.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -205,14 +246,9 @@ export function AdPreviewsWorkspace({
                 size="sm"
                 disabled={build.isPending}
                 onClick={() =>
-                  build.mutate(
-                    pickedHomes.length > 0
-                      ? {
-                          brandId,
-                          propertyIds: pickedHomes.map((h) => h.id),
-                        }
-                      : { brandId, count },
-                  )
+                  drafted && allAds.length > approved
+                    ? setConfirmRebuild(true)
+                    : runBuild()
                 }
                 shape="round"
                 density="editorial"

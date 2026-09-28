@@ -23,7 +23,6 @@ const SPEND_CAPABLE = [
 
 /** Local rows only: safe to expose everywhere, including MCP. */
 const LOCAL_ONLY = [
-  "setAdStatus",
   "planPlatform",
   "draftCampaign",
   "draftAd",
@@ -52,6 +51,13 @@ describe("ads action policy", () => {
       expect(adsWrite[action].surfaces).toContain("mcp");
     });
   }
+
+  it("approving an ad is the operator's sign-off, not the model's", () => {
+    // Approval is what the push requires, so a model approving its own ideas
+    // would make the gate meaningless.
+    expect(adsWrite.setAdStatus.approval).toBe("user");
+    expect(adsWrite.setAdStatus.surfaces).not.toContain("mcp");
+  });
 
   it("deleting a live campaign is irreversible, unlike pausing it", () => {
     expect(adsWrite.deletePlatformCampaign.reversible).toBe(false);

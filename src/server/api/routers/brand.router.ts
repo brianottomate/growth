@@ -20,6 +20,7 @@ import {
   enrichBrandAction,
   listBrands,
   setBrandMarkAction,
+  suggestBrandMarkAction,
 } from "@/server/ai/capabilities/brands";
 import {
   type Brand,
@@ -63,7 +64,6 @@ import {
 import {
   clearBrandMark,
   critiqueBrandMark,
-  chooseBrandMark,
 } from "@/server/services/brand-mark.service";
 import {
   brandWebsiteState,
@@ -580,19 +580,7 @@ export const brandRouter = {
       }
     }),
 
-  /** One click: render every candidate at card size, let the AI pick, save it. */
-  suggestMark: protectedProcedure
-    .input(z.object({ id: z.string() }))
-    .handler(async ({ context: ctx, input }) => {
-      await assertBrandManageable(ctx, input.id);
-      const chosen = await chooseBrandMark({
-        brandId: input.id,
-        userId: ctx.session.user.id,
-      });
-      if (!chosen)
-        throw new Error("No logo, favicon or name to build a mark from.");
-      return { reason: chosen.reason };
-    }),
+  suggestMark: actionProcedure(suggestBrandMarkAction),
 
   clearMark: protectedProcedure
     .input(z.object({ id: z.string() }))

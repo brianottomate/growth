@@ -20,6 +20,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "setRelationship",
     "enrich",
     "setMark",
+    "suggestMark",
     "addAdPreview",
     "setPerformanceSettings",
     "update",
@@ -139,8 +140,9 @@ export const GROWTH_CAPABILITY_ACTIONS = {
   adsWrite: [
     "draftCampaign",
     "draftAd",
-    "draftAdsFromHomes",
     "buildAdSet",
+    "writeSetCopy",
+    "generateStarterIdeas",
     "setAdStatus",
     "setAdCopy",
     "saveIdea",

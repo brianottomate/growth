@@ -1189,6 +1189,8 @@ export async function replaceDraftAdMedia(input: {
     ad.campaignId,
     input.organizationId,
   );
+  if (ad.status === "approved")
+    throw new Error("Reopen this approved ad before editing it");
   const content = ad.content;
   if (!("media" in content) || !Array.isArray(content.media)) {
     throw new Error("This ad has no cards to replace");
