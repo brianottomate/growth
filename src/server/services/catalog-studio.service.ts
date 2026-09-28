@@ -61,6 +61,22 @@ export async function catalogBrand(userId: string, brandId: string) {
 }
 type CatalogBrand = Awaited<ReturnType<typeof catalogBrand>>;
 
+/**
+ * An approved card is signed off as it stands, and the export ships only
+ * signed-off cards. `force` lets a local dev server change or export anyway,
+ * to try versions; deployed, it is ignored.
+ */
+export const catalogLockBypass = (force?: boolean) =>
+  Boolean(force) && process.env.NODE_ENV === "development";
+
+export function assertCardOpen(
+  card: Pick<CatalogCard, "approved"> | null | undefined,
+  force?: boolean,
+) {
+  if (card?.approved && !catalogLockBypass(force))
+    throw new Error("This card is approved. Reopen it before changing it.");
+}
+
 /** Every home row on the brand, by its listing id. */
 async function catalogRows(brandId: string) {
   const rows = await db.query.homeTable.findMany({
@@ -371,12 +387,14 @@ export async function setCatalogHomeHero(input: {
   homeId: string;
   /** The contact-sheet number (chat), or the photo's URL (the editor). */
   photo: { number: number } | { url: string };
+  force?: boolean;
 }) {
   const ctx = await catalogHomeContext(
     input.userId,
     input.brandId,
     input.homeId,
   );
+  assertCardOpen(ctx.card, input.force);
   const wanted = input.photo;
   const photo =
     "number" in wanted
@@ -429,9 +447,18 @@ export async function editCatalogCard(input: {
   patch: CatalogCardPatch;
   /** Mark the card as reviewed in the state this edit leaves it in. */
   approved?: boolean;
+  force?: boolean;
 }) {
   const brand = await catalogBrand(input.userId, input.brandId);
   const { patch } = input;
+  // Taking a card in or out of the export is not a change to what it shows.
+  if (Object.keys(patch).some((key) => key !== "included")) {
+    const { draft } = await catalogHomes(brand);
+    assertCardOpen(
+      draft.cards.find((c) => c.homeId === input.homeId),
+      input.force,
+    );
+  }
   for (const id of [patch.imageAssetId, patch.finishedAssetId])
     if (id) await finishedCatalogAsset(brand.id, id);
   const title = patch.title?.trim();
@@ -614,11 +641,20 @@ export async function setCatalogIncluded(input: {
 }
 
 /** Freeze the catalog as it stands on the rows into a new export run. */
-export async function startCatalogExport(userId: string, brandId: string) {
+export async function startCatalogExport(
+  userId: string,
+  brandId: string,
+  force?: boolean,
+) {
   const brand = await catalogBrand(userId, brandId);
   const { homes, draft } = await catalogHomes(brand);
   const included = draft.cards.filter((c) => c.included);
   if (!included.length) throw new Error("Include at least one home");
+  const unapproved = included.filter((c) => !c.approved).length;
+  if (unapproved && !catalogLockBypass(force))
+    throw new Error(
+      `Approve every included card before exporting: ${unapproved} not approved yet.`,
+    );
   const artworkIssues = catalogArtworkIssues(draft);
   if (artworkIssues.length) throw new Error(artworkIssues.join(" · "));
   for (const card of included.filter((c) => c.mode === "finished")) {

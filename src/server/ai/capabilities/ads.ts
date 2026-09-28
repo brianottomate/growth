@@ -1523,7 +1523,7 @@ export const createAdsFromAssetsAction = growthAction({
 export const setHomeHeroAction = growthAction({
   outputSchema: setHomeHeroActionOutputSchema,
   description:
-    "Make one of a Performance client's home photos that home's hero: the photo its ads, previews and catalog card draw on. photoNumber is the 1-based number printed on the home's contact sheet in the catalog conversation; photoUrl is one of the home's gallery photo URLs instead. Replaces the previous hero; run it again to change it.",
+    "Make one of a Performance client's home photos that home's hero: the photo its ads, previews and catalog card draw on. photoNumber is the 1-based number printed on the home's contact sheet in the catalog conversation; photoUrl is one of the home's gallery photo URLs instead. Replaces the previous hero; run it again to change it. Refused while the home's catalog card is approved.",
   inputSchema: z.object({
     brandId: z.string().min(1),
     homeId: z.string().min(1).describe("The WanderOS listing id."),
@@ -1533,6 +1533,12 @@ export const setHomeHeroAction = growthAction({
       .url()
       .optional()
       .describe("A photo from the home's own gallery, when not by number."),
+    force: z
+      .boolean()
+      .optional()
+      .describe(
+        "Local development only: change an approved card anyway. Ignored when deployed.",
+      ),
   }),
   examples: [
     { brandId: "brd_01", homeId: "1234567890123", photoNumber: 4 },
@@ -1589,7 +1595,7 @@ export const catalogHomeFactsAction = growthAction({
 export const editCatalogCardAction = growthAction({
   outputSchema: editCatalogCardActionOutputSchema,
   description:
-    "Change one home's card in a Performance client's catalog draft: the headline printed on the image (title, e.g. 'Exposed-brick loft in Louisville, KY'), the facts line (subtitle), the composition template, the crop focus, the logo, whether the home is in the export, the amenity pills on the amenities cards, the library image or supplied artwork it uses, and mark it approved. Send only the fields to change. Saves the draft; nothing is exported or pushed. Approval is a review bookmark, not an export gate; a later change to what the card shows clears it.",
+    "Change one home's card in a Performance client's catalog draft: the headline printed on the image (title, e.g. 'Exposed-brick loft in Louisville, KY'), the facts line (subtitle), the composition template, the crop focus, the logo, whether the home is in the export, the amenity pills on the amenities cards, and the library image or supplied artwork it uses. Send only the fields to change. Saves the draft; nothing is exported or pushed. An approved card is locked: only whether it is in the export can change until the operator reopens it. Approval is the operator's, through setCatalogApproval.",
   inputSchema: z.object({
     brandId: z.string().min(1),
     homeId: z.string().min(1).describe("The WanderOS listing id."),
@@ -1639,11 +1645,11 @@ export const editCatalogCardAction = growthAction({
       .describe(
         "Supplied artwork from the brand's media library for a finished card; null clears it.",
       ),
-    approved: z
+    force: z
       .boolean()
       .optional()
       .describe(
-        "Mark the card reviewed (true) or unreviewed (false) as it stands after this edit. Set it when the operator asks to approve.",
+        "Local development only: change an approved card anyway. Ignored when deployed.",
       ),
   }),
   examples: [
@@ -1653,8 +1659,8 @@ export const editCatalogCardAction = growthAction({
       title: "Exposed-brick loft in Louisville, KY",
     },
   ],
-  execute: ({ brandId, homeId, approved, ...patch }, ctx) =>
-    editCatalogCard({ userId: ctx.userId, brandId, homeId, patch, approved }),
+  execute: ({ brandId, homeId, force, ...patch }, ctx) =>
+    editCatalogCard({ userId: ctx.userId, brandId, homeId, patch, force }),
 });
 
 export const setAdHomeAction = growthAction({

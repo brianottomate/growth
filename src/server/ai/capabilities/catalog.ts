@@ -38,6 +38,12 @@ import { growthAction } from "./types";
 const brandInput = z.object({ brandId: z.string().min(1) });
 const homeInput = brandInput.extend({
   homeId: z.string().min(1).describe("The WanderOS listing id."),
+  force: z
+    .boolean()
+    .optional()
+    .describe(
+      "Local development only: change an approved card anyway. Ignored when deployed.",
+    ),
 });
 
 export const catalogStateAction = growthAction({
@@ -75,7 +81,7 @@ export const refreshCatalogHomesAction = growthAction({
 export const newCatalogCopyAction = growthAction({
   outputSchema: newCatalogCopyActionOutputSchema,
   description:
-    "Write a new headline (and amenity pills, on the amenities cards) for one home's catalog card with the card's photo in view, and save it. One model call; the card's approval clears because what it shows changed. Refused on a finished card, whose headline is part of the supplied artwork.",
+    "Write a new headline (and amenity pills, on the amenities cards) for one home's catalog card with the card's photo in view, and save it. One model call. Refused on an approved card (reopen it first) and on a finished card, whose headline is part of the supplied artwork.",
   inputSchema: homeInput,
   examples: [{ brandId: "brd_01", homeId: "1234567890123" }],
   execute: (input, ctx) => newCatalogCopy({ ...input, userId: ctx.userId }),
@@ -84,7 +90,7 @@ export const newCatalogCopyAction = growthAction({
 export const newCatalogPhotoAction = growthAction({
   outputSchema: newCatalogPhotoActionOutputSchema,
   description:
-    "Pick a better hero for one home's catalog card from its listing photos and make it the home's hero, so its ads and previews follow. One model call; never picks the current hero again. Fails with the reason when no clean photo is left.",
+    "Pick a better hero for one home's catalog card from its listing photos and make it the home's hero, so its ads and previews follow. One model call; never picks the current hero again. Refused on an approved card. Fails with the reason when no clean photo is left.",
   inputSchema: homeInput,
   examples: [{ brandId: "brd_01", homeId: "1234567890123" }],
   execute: async (input, ctx) => {
@@ -127,7 +133,7 @@ export const writeCatalogCardsAction = growthAction({
 export const setCatalogApprovalAction = growthAction({
   outputSchema: setCatalogApprovalActionOutputSchema,
   description:
-    "Sign catalog cards off as the operator saw them, or take the sign-off back. Each approval carries the card's fingerprint from the page; a card that changed since is refused rather than approved unseen. For one card from chat, editCatalogCard with approved is simpler.",
+    "Sign catalog cards off as the operator saw them, or reopen them (approved false). Approving needs each card's fingerprint as shown on the page, so a card that changed since is refused rather than approved unseen; from chat, reopen only, and ask the operator to approve on the page. Approved cards are locked and are what the export ships.",
   inputSchema: brandInput.extend({
     approved: z.boolean(),
     cards: z
@@ -179,11 +185,18 @@ export const setCatalogDefaultTemplateAction = growthAction({
 export const exportCatalogAction = growthAction({
   outputSchema: exportCatalogActionOutputSchema,
   description:
-    "Freeze the included catalog cards into a new export: renders every card into the brand's media library in the background and snapshots the matching feed rows. Returns the run id at once; its progress is in catalogState's exports. Nothing is uploaded to an ad platform.",
-  inputSchema: brandInput,
+    "Freeze the included catalog cards into a new export: renders every card into the brand's media library in the background and snapshots the matching feed rows. Refused until every included card is approved. Returns the run id at once; its progress is in catalogState's exports. Nothing is uploaded to an ad platform.",
+  inputSchema: brandInput.extend({
+    force: z
+      .boolean()
+      .optional()
+      .describe(
+        "Local development only: export with unapproved cards. Ignored when deployed.",
+      ),
+  }),
   examples: [{ brandId: "brd_01" }],
-  execute: async ({ brandId }, ctx) => {
-    const run = await startCatalogExport(ctx.userId, brandId);
+  execute: async ({ brandId, force }, ctx) => {
+    const run = await startCatalogExport(ctx.userId, brandId, force);
     after(() => renderCatalogExport(run, ctx.userId));
     return { runId: run.run.id };
   },

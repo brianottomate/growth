@@ -49,6 +49,12 @@ function errorMessage(error: unknown, fallback: string) {
 }
 const running = (status?: string) =>
   status === "queued" || status === "processing";
+/** A local dev server may change approved cards and export unapproved ones. */
+const DEV = process.env.NODE_ENV === "development";
+const FORCE = DEV ? { force: true } : {};
+/** Approved cards are signed off; they change only after Reopen. */
+const locked = (card: CatalogCard) => Boolean(card.approved) && !DEV;
+const LOCKED_TITLE = "Approved. Reopen it to change it.";
 const PORTRAIT = COMPOSITION_FORMATS.find((f) => f.id === "portrait")!;
 const preview = catalogCardPreviewUrl;
 export function CatalogCards({
@@ -115,7 +121,7 @@ export function CatalogCards({
   }
   async function quickFix(card: CatalogCard, kind: "copy" | "photo") {
     setFixing((f) => ({ ...f, [card.homeId]: kind }));
-    const input = { brandId, homeId: card.homeId };
+    const input = { brandId, homeId: card.homeId, ...FORCE };
     await act(
       () =>
         kind === "copy"
@@ -149,6 +155,7 @@ export function CatalogCards({
           brandId,
           homeId: card.homeId,
           photoUrl,
+          ...FORCE,
         }),
       "Unable to set the hero",
     );
@@ -176,6 +183,7 @@ export function CatalogCards({
             brandId,
             homeId: next.homeId,
             ...patch,
+            ...FORCE,
           }),
         "Unable to save the card",
       );
@@ -246,7 +254,7 @@ export function CatalogCards({
   async function exportCatalog() {
     setBusy(true);
     const done = await act(
-      () => orpc.catalog.exportCatalog.call({ brandId }),
+      () => orpc.catalog.exportCatalog.call({ brandId, ...FORCE }),
       "Unable to export",
     );
     if (done) setView("exports");
@@ -330,11 +338,21 @@ export function CatalogCards({
                   busy ||
                   activeExport ||
                   !draft.cards.some((c) => c.included) ||
-                  catalogArtworkIssues(draft).length > 0
+                  catalogArtworkIssues(draft).length > 0 ||
+                  (unapproved.length > 0 && !DEV)
+                }
+                title={
+                  unapproved.length > 0
+                    ? `${unapproved.length} included card${unapproved.length === 1 ? "" : "s"} not approved yet`
+                    : undefined
                 }
                 onClick={() => void exportCatalog()}
               >
-                {busy ? "Working…" : "Create export"}
+                {busy
+                  ? "Working…"
+                  : unapproved.length > 0 && DEV
+                    ? "Create export (dev, unapproved)"
+                    : "Create export"}
               </Button>
             </div>
           </div>
@@ -456,6 +474,8 @@ export function CatalogCards({
                 >
                   <button
                     className="block w-full"
+                    disabled={locked(card)}
+                    title={locked(card) ? LOCKED_TITLE : undefined}
                     onClick={() => setDetails({ ...card })}
                     aria-label={`Edit ${homeOf(card)?.name}`}
                   >
@@ -470,7 +490,8 @@ export function CatalogCards({
                   <div className="flex items-end justify-between gap-2 p-3">
                     <button
                       className="line-clamp-2 text-left text-sm"
-                      title={homeOf(card)?.name}
+                      title={locked(card) ? LOCKED_TITLE : homeOf(card)?.name}
+                      disabled={locked(card)}
                       onClick={() => setDetails({ ...card })}
                     >
                       {homeOf(card)?.name}
@@ -516,6 +537,8 @@ export function CatalogCards({
                               <Button
                                 size="sm"
                                 variant="secondary"
+                                disabled={locked(card)}
+                                title={locked(card) ? LOCKED_TITLE : undefined}
                                 onClick={() => setDetails({ ...card })}
                               >
                                 Edit
@@ -591,7 +614,10 @@ export function CatalogCards({
                                 key={label}
                                 size="xs"
                                 variant="ghost"
-                                disabled={Boolean(fixing[card.homeId])}
+                                disabled={
+                                  Boolean(fixing[card.homeId]) || locked(card)
+                                }
+                                title={locked(card) ? LOCKED_TITLE : undefined}
                                 onClick={onClick}
                               >
                                 {label}
@@ -823,6 +849,7 @@ export function CatalogCards({
                   ...(card.mode === "finished"
                     ? { finishedAssetId: assetId }
                     : { imageAssetId: assetId }),
+                  ...FORCE,
                 }),
               "Unable to save the photo",
             );
@@ -878,6 +905,7 @@ function ApproveButton({
       variant={card.approved ? "secondary" : "outline"}
       aria-pressed={Boolean(card.approved)}
       disabled={!card.included}
+      title={card.approved ? "Reopen to change it" : undefined}
       onClick={() => onApprove(!card.approved)}
     >
       {card.approved && <Check aria-hidden="true" className="size-3.5" />}

@@ -309,12 +309,17 @@ export const growthActionPolicies = {
     refreshCatalogHomes: write({ idempotent: true }),
     newCatalogCopy: write({ consequence: "model-write" }),
     newCatalogPhoto: write({ consequence: "model-write" }),
-    // Only cards nobody wrote, and a running run is returned, not doubled.
+    // Open cards only (never approved ones); a running run is returned, not doubled.
     writeCatalogCards: write({
       consequence: "background-run",
       idempotent: true,
     }),
-    setCatalogApproval: write({ idempotent: true }),
+    // The export ships only approved cards, so approval is the operator's.
+    setCatalogApproval: write({
+      idempotent: true,
+      approval: "user",
+      surfaces: APPROVAL_PRODUCT,
+    }),
     setCatalogIncluded: write({ idempotent: true }),
     setCatalogDefaultTemplate: write({ idempotent: true }),
     exportCatalog: write({ consequence: "background-run" }),
