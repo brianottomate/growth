@@ -16,15 +16,17 @@ type Hero = {
 };
 
 /**
- * The brand's hero: the one home (and photo) that stands for the brand in
- * its previews. Empty until an operator or the agent chooses one; nothing is
- * picked on anyone's behalf.
+ * The brand's hero: the one home (and photo) that stands for the brand, with
+ * the previews drawn from it underneath, so a new hero redraws them in view.
+ * Empty until an operator or the agent chooses one; nothing is picked on
+ * anyone's behalf.
  */
 export function HeroCard({
   brandId,
   hero,
   options,
   heroUrl,
+  children,
 }: {
   brandId: string;
   /** What the previews draw now, or null when no hero is chosen. */
@@ -32,6 +34,8 @@ export function HeroCard({
   options: HeroOption[];
   /** The hero home's listing URL, to mark it in the picker. */
   heroUrl: string | null;
+  /** Drawn from the hero, under it: the brand previews. */
+  children?: React.ReactNode;
 }) {
   const more = hero?.photoCount
     ? hero.photoCount - 1 - (hero.photos?.length ?? 0)
@@ -42,7 +46,7 @@ export function HeroCard({
         <div>
           <h2 className="text-base font-semibold">Hero</h2>
           <p className="text-xs text-muted-foreground">
-            The home that stands for the brand. The previews below draw from it.
+            The home that stands for the brand. The previews draw from it.
           </p>
         </div>
         <HeroHomePicker
@@ -101,6 +105,7 @@ export function HeroCard({
       ) : (
         <p className="text-sm text-muted-foreground">No hero chosen yet.</p>
       )}
+      {children}
     </section>
   );
 }

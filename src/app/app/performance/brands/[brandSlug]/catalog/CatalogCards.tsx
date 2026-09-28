@@ -29,11 +29,13 @@ import {
   type CatalogDraft,
   type CatalogHome,
   type CatalogExport,
+  type CatalogTemplateId,
 } from "@/lib/catalog-studio";
 import { safeHomeUrl } from "@/lib/ad-preview-links";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 import { ReviewInChatButton } from "../ReviewInChatButton";
 import { CatalogPreview } from "./CatalogPreview";
+import { CatalogTemplateCard } from "../CatalogTemplateCard";
 
 async function readResponse<T = unknown>(response: Response): Promise<T> {
   const body: unknown = await response.json();
@@ -50,9 +52,12 @@ const preview = catalogCardPreviewUrl;
 export function CatalogCards({
   brandId,
   brandName = "",
+  heroHomeId = null,
 }: {
   brandId: string;
   brandName?: string;
+  /** The brand's hero home, drawn in the card picker. */
+  heroHomeId?: string | null;
 }) {
   const client = useQueryClient();
   const url = `/api/performance/catalog/${brandId}/studio`;
@@ -61,6 +66,7 @@ export function CatalogCards({
     homes: CatalogHome[];
     draft: CatalogDraft;
     unwritten: string[];
+    defaultTemplate: CatalogTemplateId;
     exports: CatalogExport[];
   }>({
     queryKey: ["catalog-studio", brandId],
@@ -69,6 +75,7 @@ export function CatalogCards({
         homes: CatalogHome[];
         draft: CatalogDraft;
         unwritten: string[];
+        defaultTemplate: CatalogTemplateId;
         exports: CatalogExport[];
       }>(await fetch(url)),
     refetchInterval: (q) =>
@@ -89,6 +96,10 @@ export function CatalogCards({
   /** Cards with a New copy or New photo call in flight. */
   const [fixing, setFixing] = useState<Record<string, "copy" | "photo">>({});
   const [busy, setBusy] = useState(false);
+  /** The card picker, open from the toolbar. */
+  const [picker, setPicker] = useState(false);
+  /** Set by a template switch: the cards to rewrite for the new card. */
+  const [rewrite, setRewrite] = useState<string[] | null>(null);
   /** "Write all cards" progress, while it runs. */
   const [writing, setWriting] = useState<{
     done: number;
@@ -196,8 +207,11 @@ export function CatalogCards({
   const unwritten = query.data?.unwritten ?? [];
   // One card per request, five in flight: each call fits a function, and the
   // cards fill in as they land.
-  async function writeAll() {
-    const ids = [...unwritten];
+  async function writeAll(
+    list: string[] = unwritten,
+    action: "autofill" | "newCopy" = "autofill",
+  ) {
+    const ids = [...list];
     const total = ids.length;
     setWriting({ done: 0, total });
     let done = 0;
@@ -209,7 +223,7 @@ export function CatalogCards({
         await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "autofill", homeId }),
+          body: JSON.stringify({ action, homeId }),
         }),
       )
         .then(() => true)
@@ -301,6 +315,29 @@ export function CatalogCards({
                 <RefreshCw aria-hidden="true" className="size-4 @xl:hidden" />
                 <span className="hidden @xl:inline">Refresh homes</span>
               </Button>
+              <Button
+                variant={picker ? "secondary" : "outline"}
+                onClick={() => setPicker((open) => !open)}
+              >
+                Card:{" "}
+                {COMPOSITION_TEMPLATES.find(
+                  (t) => t.id === query.data?.defaultTemplate,
+                )?.label.replace(/^Catalog · /, "") ?? "place"}
+              </Button>
+              {rewrite?.length && !writing ? (
+                <Button
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => {
+                    const ids = rewrite;
+                    setRewrite(null);
+                    void writeAll(ids, "newCopy");
+                  }}
+                >
+                  <Sparkles aria-hidden="true" className="size-4" />
+                  Rewrite {rewrite.length} cards
+                </Button>
+              ) : null}
               {unwritten.length || writing ? (
                 <Button
                   variant="outline"
@@ -334,6 +371,23 @@ export function CatalogCards({
               </Button>
             </div>
           </div>
+          {picker ? (
+            <CatalogTemplateCard
+              brandId={brandId}
+              heroHomeId={heroHomeId}
+              onChosen={() =>
+                // Headlines were written for the last card: offer to rewrite
+                // the ones not yet signed off.
+                setRewrite(
+                  (draft.cards ?? [])
+                    .filter(
+                      (c) => c.included && !c.approved && c.mode !== "finished",
+                    )
+                    .map((c) => c.homeId),
+                )
+              }
+            />
+          ) : null}
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <div className="flex rounded-lg border p-0.5">
               {(["grid", "list"] as const).map((l) => (

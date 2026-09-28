@@ -19,7 +19,8 @@ import type { BrandIdentity } from "@/server/db/brand-schema";
 import { orpc } from "@/orpc/client";
 
 /**
- * Try the brand's fonts on live cards of one home before saving them. A
+ * Inside the hero card: try the brand's fonts on live cards of the hero home
+ * before saving them. A
  * picked font is a draft until saved; saved fonts outlive a re-enrich until
  * reset to the site's.
  */
@@ -53,9 +54,9 @@ export function BrandPreviewCard({
   );
 
   return (
-    <section className="space-y-3 rounded-xl border p-4">
+    <div className="space-y-3 border-t pt-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <h2 className="text-base font-semibold">Preview</h2>
+        <h3 className="text-sm font-medium">Preview</h3>
         <div className="flex items-center gap-2">
           {dirty ? (
             <>
@@ -104,6 +105,6 @@ export function BrandPreviewCard({
           dirty && fonts.heading !== saved.heading ? fonts.heading : null
         }
       />
-    </section>
+    </div>
   );
 }

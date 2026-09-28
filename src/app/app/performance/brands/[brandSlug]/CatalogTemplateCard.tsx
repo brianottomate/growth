@@ -16,15 +16,18 @@ import {
 import { COMPOSITION_TEMPLATES } from "@/lib/compositions";
 
 /**
- * The catalog card every home uses unless it has its own: the hero home drawn
- * in each template, one click to make it the brand's default.
+ * The catalog card every home uses unless it has its own: the hero home's
+ * card drawn in each template, one click to make it the brand's default.
  */
 export function CatalogTemplateCard({
   brandId,
-  heroImageUrl,
+  heroHomeId,
+  onChosen,
 }: {
   brandId: string;
-  heroImageUrl: string | null;
+  /** The hero home's listing id; the first included card without one. */
+  heroHomeId: string | null;
+  onChosen?: (templateId: CatalogTemplateId) => void;
 }) {
   const router = useRouter();
   const client = useQueryClient();
@@ -45,9 +48,9 @@ export function CatalogTemplateCard({
   });
   const [saving, setSaving] = useState<CatalogTemplateId | null>(null);
   const cards = query.data?.draft.cards ?? [];
+  const drawn = cards.filter((c) => c.mode !== "finished");
   const card =
-    cards.find((c) => c.imageUrl === heroImageUrl && c.mode !== "finished") ??
-    cards.find((c) => c.included && c.mode !== "finished");
+    drawn.find((c) => c.homeId === heroHomeId) ?? drawn.find((c) => c.included);
   const current = query.data?.defaultTemplate ?? "catalog-place";
 
   async function choose(templateId: CatalogTemplateId) {
@@ -61,12 +64,12 @@ export function CatalogTemplateCard({
     if (!response.ok) return toast.error("Unable to save the catalog card");
     await client.invalidateQueries({ queryKey: ["catalog-studio", brandId] });
     router.refresh();
+    onChosen?.(templateId);
   }
 
   if (!card) return null;
   return (
-    <section className="space-y-3 rounded-xl border p-4">
-      <h2 className="text-base font-semibold">Catalog card</h2>
+    <div className="space-y-3 rounded-xl border p-4">
       <div className="grid grid-cols-2 gap-3 @2xl:grid-cols-4">
         {CATALOG_TEMPLATES.map((templateId) => {
           const label =
@@ -107,7 +110,7 @@ export function CatalogTemplateCard({
           );
         })}
       </div>
-    </section>
+    </div>
   );
 }
 
