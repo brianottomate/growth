@@ -19,6 +19,9 @@ import {
   refreshPerformanceCycleSpendAction,
   promoteToClientAction,
   clientCampaignContextAction,
+  previewIntakeApplyAction,
+  applyIntakeAction,
+  verifyIntakeAccessAction,
 } from "@/server/ai/capabilities/performance";
 
 // Performance accounts (/app/performance/accounts) — the clients paying for
@@ -95,4 +98,8 @@ export const performanceRouter = {
 
   // What a new campaign draft opens with for a Performance client.
   campaignPrefill: actionProcedure(clientCampaignContextAction),
+
+  previewIntakeApply: actionProcedure(previewIntakeApplyAction),
+  applyIntake: actionProcedure(applyIntakeAction),
+  verifyIntakeAccess: actionProcedure(verifyIntakeAccessAction),
 };

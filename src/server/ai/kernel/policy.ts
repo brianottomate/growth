@@ -158,8 +158,9 @@ export const growthActionPolicies = {
     promoteToClient: write({ idempotent: true }),
     // Writes the client's own answers into the records that own each fact.
     // Refuses a second run on the same intake, because re-applying would
-    // reopen a cycle an operator may have since corrected.
-    applyIntake: write(),
+    // reopen a cycle an operator may have since corrected. It sets the
+    // month's media budget, so chat asks with the approval card.
+    applyIntake: write({ approval: "user", surfaces: APPROVAL_PRODUCT }),
     // Reads Zernio and stamps our own verification columns. No provider
     // mutation and no spend; re-running just re-checks.
     verifyIntakeAccess: write({ idempotent: true }),

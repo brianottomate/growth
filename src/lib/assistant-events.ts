@@ -79,7 +79,7 @@ export type ReviewPortfolioIntent = {
   visibleText: string;
 };
 
-/** "Review and apply": a fresh chat walks one intake submission to applied. */
+/** "Review in chat": a fresh chat walks one intake submission to applied. */
 export type ReviewIntakeIntent = {
   type: "review_intake";
   newThread: true;

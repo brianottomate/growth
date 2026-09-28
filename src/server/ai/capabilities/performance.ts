@@ -139,7 +139,7 @@ export const featuredHomesAction = growthAction({
 
 export const suggestFeaturedHomesAction = growthAction({
   description:
-    "Suggest which homes a Performance brand should feature: its hallmark homes, ranked on direct-site bookings over 12 months, then how the home sells across all channels over 90 days, then reviews, with one look at the shortlist's hero photos to break ties. Returns the picks and the scored shortlist. Read-only itself; when the operator asked for featured homes, feature the picks with performanceWrite.updateHome straight away and show the numbers, since featuring is reversible and reviewed on the Setup page. Open nights are context, never a reason to drop a home: a booked-out hallmark home still earns the click.",
+    "Suggest which homes a Performance brand should feature: its hallmark homes, ranked on direct-site bookings over 12 months, then how the home sells across all channels over 90 days, then reviews, with one look at the shortlist's hero photos to break ties. Returns the picks and the scored shortlist. Read-only itself: show the picks with the numbers and feature them with performanceWrite.updateHome once the operator agrees (a playbook the operator started counts as agreeing). Open nights are context, never a reason to drop a home: a booked-out hallmark home still earns the click.",
   inputSchema: z.object({
     brandId: brandIdInput,
     count: z
@@ -183,7 +183,7 @@ export const suggestFeaturedHomesAction = growthAction({
 
 export const reviewPortfolioAction = growthAction({
   description:
-    "Review a brand's creative as a set: every included catalog card (surface catalog), or every ad of a campaign or of the brand's draft set with no campaign (surface ads). Renders the cards onto numbered sheets and returns an overall read plus up to twelve surgical notes, each naming one card by homeId or adId. Changes nothing itself. Present the overall read, then apply the notes you agree with directly, one card at a time (a catalog note's headline is the exact replacement title; on a finished card the text is part of the supplied artwork, so list those headlines for whoever remakes it instead of saving them), with the per-card tools (adsWrite.editCatalogCard and adsWrite.setHomeHero for catalog cards; adsWrite.setAdCopy, adsWrite.replaceAdCard or adsWrite.editAdCards for ads), and report what changed in a short list. If a note reveals something about the brand as a whole, add it to the brand story with brandWrite.update.",
+    "Review a brand's creative as a set: every included catalog card (surface catalog), or every ad of a campaign or of the brand's draft set with no campaign (surface ads). Renders the cards onto numbered sheets and returns an overall read plus up to twelve surgical notes, each naming one card by homeId or adId. Changes nothing itself. Present the overall read and the changes you would make, ask once which to apply, then apply those one card at a time (a catalog note's headline is the exact replacement title; on a finished card the text is part of the supplied artwork, so list those headlines for whoever remakes it instead of saving them), with the per-card tools (adsWrite.editCatalogCard and adsWrite.setHomeHero for catalog cards; adsWrite.setAdCopy, adsWrite.replaceAdCard or adsWrite.editAdCards for ads), and report what changed in a short list. If a note reveals something about the brand as a whole, add it to the brand story with brandWrite.update.",
   inputSchema: z.object({
     brandId: brandIdInput,
     surface: z.enum(["catalog", "ads"]),

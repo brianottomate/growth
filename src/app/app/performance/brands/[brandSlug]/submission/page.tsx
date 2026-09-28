@@ -11,6 +11,7 @@ import { homeTable, performanceIntakeTable } from "@/server/db/schema";
 import { SectionLabel } from "../../../_components";
 import { IntakeAnswers, type IntakeHome } from "../../../IntakeAnswers";
 import { loadPerformanceBrand } from "../_data";
+import { IntakeActions } from "./IntakeActions";
 import { ReviewIntakeInChat } from "./ReviewIntakeInChat";
 
 export const metadata: Metadata = { title: "Submission · Wander Performance" };
@@ -106,11 +107,15 @@ export default async function PerformanceBrandSubmissionPage({
             {latest!.status}
           </Badge>
           {latest!.status !== "applied" && (
-            <div className="ml-auto">
+            <div className="ml-auto flex flex-wrap items-center gap-2">
               <ReviewIntakeInChat
                 brandId={brand.id}
                 brandName={brand.name}
                 intakeId={latest!.id}
+              />
+              <IntakeActions
+                intakeId={latest!.id}
+                verified={Boolean(latest!.zernioVerifiedAt)}
               />
             </div>
           )}

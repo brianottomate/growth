@@ -31,7 +31,7 @@ export function ReviewIntakeInChat({
       }
     >
       <MessageSquare className="size-3.5" />
-      Review and apply
+      Review in chat
     </Button>
   );
 }
