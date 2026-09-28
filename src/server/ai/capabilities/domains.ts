@@ -55,10 +55,13 @@ import {
 import { diagnoseAlignment } from "./alignment";
 import { AMPLIFICATION_TOOLS } from "./amplification";
 import {
+  assignPersonaAudienceAction,
   createPersona,
+  createPersonaLookalikeAction,
   deletePersona,
   listPersonas,
   updatePersona,
+  uploadPersonaSeedListAction,
 } from "./personas";
 import { getBrandMap } from "./brand-map";
 import {
@@ -468,6 +471,9 @@ export const adsWrite = growthDomainTool({
     createSpecializedMetaDraft: createSpecializedMetaDraftAction,
     createAudience: createAudienceAction,
     addAudienceUsers: addAudienceUsersAction,
+    uploadPersonaSeedList: uploadPersonaSeedListAction,
+    createPersonaLookalike: createPersonaLookalikeAction,
+    assignPersonaAudience: assignPersonaAudienceAction,
     boostMetaPost: boostMetaPostAction,
     duplicateMetaCampaign: duplicateMetaCampaignAction,
   },

@@ -27,6 +27,7 @@
     "db:apply:lifecycle-split": "bun --conditions=react-server scripts/apply-lifecycle-split.ts",
     "db:apply:pregen-verdict": "bun --conditions=react-server scripts/apply-pregen-verdict-schema.ts",
     "db:apply:persona-demand-geography": "bun --conditions=react-server scripts/apply-persona-demand-geography.ts",
+    "db:apply:platform-audience-persona": "bun --conditions=react-server scripts/apply-platform-audience-persona.ts",
     "db:apply:home-gallery-cache": "bun --conditions=react-server scripts/apply-home-gallery-cache.ts",
     "db:apply:home-marketplace-columns": "bun --conditions=react-server scripts/apply-home-marketplace-columns.ts",
     "db:apply:brand-story": "bun --conditions=react-server scripts/apply-brand-story.ts",

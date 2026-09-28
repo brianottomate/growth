@@ -372,6 +372,23 @@ export const growthActionPolicies = {
       reversible: true,
       surfaces: APPROVAL_PRODUCT,
     }),
+    // Create + upload, and create a lookalike: provider writes, no spend.
+    // Both create a Meta audience, which Zernio cannot make idempotent.
+    uploadPersonaSeedList: write({
+      consequence: "provider-write",
+      approval: "user",
+      idempotent: false,
+      reversible: true,
+      surfaces: APPROVAL_PRODUCT,
+    }),
+    createPersonaLookalike: write({
+      consequence: "provider-write",
+      approval: "user",
+      idempotent: false,
+      reversible: true,
+      surfaces: APPROVAL_PRODUCT,
+    }),
+    assignPersonaAudience: write({ idempotent: true }),
     createSpecializedMetaDraft: write({
       consequence: "provider-write",
       approval: "user",

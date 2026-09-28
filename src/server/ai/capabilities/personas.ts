@@ -3,6 +3,9 @@ import {
   createPersonaOutputSchema,
   updatePersonaOutputSchema,
   deletePersonaOutputSchema,
+  uploadPersonaSeedListOutputSchema,
+  createPersonaLookalikeOutputSchema,
+  assignPersonaAudienceOutputSchema,
 } from "./outputs/personas";
 import "server-only";
 
@@ -14,6 +17,11 @@ import { db } from "@/server/db";
 import { brandTable, personaTable } from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
 import { demandGeographySchema } from "@/lib/persona-geography";
+import {
+  assignPersonaAudience,
+  createPersonaLookalike,
+  uploadPersonaSeedList,
+} from "@/server/services/persona-audience.service";
 import { growthAction } from "./types";
 
 // ---- PERSONAS ----------------------------------------------------------
@@ -148,4 +156,69 @@ export const deletePersona = growthAction({
       .where(eq(personaTable.id, persona.id));
     return { deleted: true, id: persona.id };
   },
+});
+
+// ---- PERSONA AUDIENCES (the Meta assets a persona is bought through) --------
+
+export const uploadPersonaSeedListAction = growthAction({
+  outputSchema: uploadPersonaSeedListOutputSchema,
+  description:
+    "Create a Meta customer list for a persona and upload its members (plaintext email and/or phone; Zernio hashes server-side). The list becomes the persona's Meta asset, which every campaign audience derived from the persona targets. The ad account is the brand's allowlisted Meta destination unless one is named. Provider write, no spend; creation is NOT idempotent, so report a failure instead of retrying.",
+  inputSchema: z.object({
+    personaId: z.string().trim().min(1),
+    users: z
+      .array(
+        z.object({
+          email: z.string().email().optional(),
+          phone: z.string().trim().min(5).optional(),
+        }),
+      )
+      .min(1)
+      .max(50_000),
+    name: z.string().trim().min(1).max(255).optional(),
+    adAccountId: z.string().trim().min(1).optional(),
+  }),
+  execute: async (input, ctx) =>
+    uploadPersonaSeedList(input, {
+      organizationId: ctx.orgId,
+      runId: ctx.runId,
+    }),
+});
+
+export const createPersonaLookalikeAction = growthAction({
+  outputSchema: createPersonaLookalikeOutputSchema,
+  description:
+    "Build a Meta lookalike from a persona's seed list (a platform audience with a Meta id) and make it the persona's Meta asset, replacing the seed as what its campaigns target. Ratio defaults to 0.01 (closest 1%); country defaults to the persona's first demand country, then US. Provider write, no spend; NOT idempotent.",
+  inputSchema: z.object({
+    seedPlatformAudienceId: z
+      .string()
+      .trim()
+      .min(1)
+      .describe("The paud_ row of the seed list."),
+    personaId: z
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .describe("Defaults to the persona the seed belongs to."),
+    ratio: z.number().min(0.01).max(0.2).optional(),
+    country: z.string().trim().length(2).optional(),
+  }),
+  execute: async (input, ctx) =>
+    createPersonaLookalike(input, {
+      organizationId: ctx.orgId,
+      runId: ctx.runId,
+    }),
+});
+
+export const assignPersonaAudienceAction = growthAction({
+  outputSchema: assignPersonaAudienceOutputSchema,
+  description:
+    "Make an audience already in the ad account (synced or created earlier) the persona's asset on its platform, or pass personaId null to clear it. Replaces the persona's previous asset on that platform. Local rows only.",
+  inputSchema: z.object({
+    platformAudienceId: z.string().trim().min(1),
+    personaId: z.string().trim().min(1).nullable(),
+  }),
+  execute: async (input, ctx) =>
+    assignPersonaAudience({ ...input, organizationId: ctx.orgId }),
 });

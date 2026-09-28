@@ -821,6 +821,15 @@ export const platformAudienceTable = pgTable(
     audienceId: t
       .text()
       .references(() => audienceTable.id, { onDelete: "set null" }),
+    /**
+     * The persona this asset is bought for. At most one per persona per
+     * platform: a campaign audience derived from the persona targets it when
+     * it has no direct `audienceId` link of its own, so one lookalike serves
+     * every campaign built for that persona.
+     */
+    personaId: t
+      .text()
+      .references(() => personaTable.id, { onDelete: "set null" }),
     /** The asset this one was derived from (lookalike seed, etc.). */
     sourceId: t.text(),
 
@@ -847,6 +856,7 @@ export const platformAudienceTable = pgTable(
     index("platform_audience_brand_idx").on(table.brandId),
     index("platform_audience_channel_idx").on(table.channelId),
     index("platform_audience_plan_idx").on(table.audienceId),
+    index("platform_audience_persona_idx").on(table.personaId),
     uniqueIndex("platform_audience_external_id_idx")
       .on(table.channelId, table.externalId)
       .where(sql`${table.externalId} IS NOT NULL`),
@@ -973,6 +983,10 @@ export const platformAudienceRelations = relations(
     audience: one(audienceTable, {
       fields: [platformAudienceTable.audienceId],
       references: [audienceTable.id],
+    }),
+    persona: one(personaTable, {
+      fields: [platformAudienceTable.personaId],
+      references: [personaTable.id],
     }),
   }),
 );

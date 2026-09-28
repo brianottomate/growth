@@ -767,7 +767,16 @@ export async function getDraftCampaign(
       }),
       db.query.platformAudienceTable.findMany({
         where: eq(platformAudienceTable.brandId, brand.id),
-        columns: { id: true, name: true, type: true, sizeLabel: true },
+        columns: {
+          id: true,
+          name: true,
+          type: true,
+          sizeLabel: true,
+          externalId: true,
+          audienceId: true,
+          personaId: true,
+        },
+        with: { channel: { columns: { platform: true } } },
       }),
     ]);
 

@@ -844,8 +844,14 @@ export const openCampaignActionOutputSchema = z.strictObject({
   ),
   platformAudiences: z.array(
     z.strictObject({
+      audienceId: z.string().nullable(),
+      channel: z.strictObject({
+        platform: z.enum(channelPlatformEnum.enumValues),
+      }),
+      externalId: z.string().nullable(),
       id: z.string(),
       name: z.string(),
+      personaId: z.string().nullable(),
       sizeLabel: z.string().nullable(),
       type: z.enum(audienceTypeEnum.enumValues),
     }),

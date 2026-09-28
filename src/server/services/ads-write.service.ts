@@ -15,7 +15,16 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 
-import { and, desc, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  or,
+  sql,
+} from "drizzle-orm";
 
 import {
   adWriteIdempotencyKey,
@@ -95,6 +104,7 @@ import {
   platformAdSetTable,
   platformAdTable,
   platformAudienceTable,
+  personaTable,
   type Ad,
   type AdCreativeContent,
   type AdTextContent,
@@ -1140,6 +1150,12 @@ export type CreateAdAudienceInput = {
    * the platform asset becoming its own orphan definition.
    */
   planAudienceId?: string;
+  /**
+   * The persona this asset is bought for. Stamping it supersedes the persona's
+   * previous asset on the same platform, so campaigns built for the persona
+   * move to this one.
+   */
+  personaId?: string;
 };
 
 /**
@@ -1362,6 +1378,40 @@ export function estimateMonthlyKeywordCost(
   };
 }
 
+/**
+ * A persona has at most one asset per platform, the one its campaigns target.
+ * Clearing the previous holder before stamping a new one keeps the push's
+ * choice explicit instead of "whichever is newest".
+ */
+export async function clearPersonaAssetOnPlatform(
+  personaId: string,
+  platform: PushableAdPlatform,
+) {
+  const holders = await db
+    .select({ id: platformAudienceTable.id })
+    .from(platformAudienceTable)
+    .innerJoin(
+      channelTable,
+      eq(channelTable.id, platformAudienceTable.channelId),
+    )
+    .where(
+      and(
+        eq(platformAudienceTable.personaId, personaId),
+        eq(channelTable.platform, platform),
+      ),
+    );
+  if (holders.length === 0) return;
+  await db
+    .update(platformAudienceTable)
+    .set({ personaId: null })
+    .where(
+      inArray(
+        platformAudienceTable.id,
+        holders.map((row) => row.id),
+      ),
+    );
+}
+
 export async function createAdAudience(
   input: CreateAdAudienceInput,
   context: AdsWriteContext,
@@ -1393,6 +1443,18 @@ export async function createAdAudience(
       throw new Error("That audience belongs to a different brand");
     }
   }
+  if (input.personaId) {
+    const persona = await db.query.personaTable.findFirst({
+      where: and(
+        eq(personaTable.id, input.personaId),
+        isNull(personaTable.deletedAt),
+      ),
+      columns: { brandId: true },
+    });
+    if (persona?.brandId !== destination.brand.id) {
+      throw new Error("That persona belongs to a different brand");
+    }
+  }
 
   const provider = await createZernioAdAudience({
     accountId: input.connectionAccountId,
@@ -1421,6 +1483,9 @@ export async function createAdAudience(
   });
   let mirrored = null;
   if (channel) {
+    if (input.personaId) {
+      await clearPersonaAssetOnPlatform(input.personaId, "meta_ads");
+    }
     [mirrored] = await db
       .insert(platformAudienceTable)
       .values({
@@ -1428,6 +1493,7 @@ export async function createAdAudience(
         channelId: channel.id,
         brandId: destination.brand.id,
         audienceId: input.planAudienceId ?? null,
+        personaId: input.personaId ?? null,
         // A lookalike remembers its seed — that chain is platform-side.
         sourceId: input.sourceAudienceId ?? null,
         name: input.name,
@@ -1814,33 +1880,44 @@ export async function setCampaignDelivery(
 /**
  * The platform audience asset a plan audience should target, or null for
  * demographic-only targeting. Resolution is via lineage: a platform_audience
- * row pointing at the plan audience, in an ad account on this platform.
+ * row pointing at the plan audience wins; failing that, the asset bought for
+ * the persona the plan audience derives from. Either way it must live in an
+ * ad account on this platform.
  */
 async function platformAudienceExternalIdFor(
-  planAudienceId: string,
+  planAudience: { id: string; personaId: string | null },
   brandId: string,
   platform: PushableAdPlatform,
 ): Promise<string | null> {
-  const rows = await db
-    .select({ externalId: platformAudienceTable.externalId })
-    .from(platformAudienceTable)
-    .innerJoin(
-      channelTable,
-      eq(channelTable.id, platformAudienceTable.channelId),
-    )
-    .where(
-      and(
-        eq(platformAudienceTable.audienceId, planAudienceId),
-        eq(platformAudienceTable.brandId, brandId),
-        eq(channelTable.platform, platform),
-        isNotNull(platformAudienceTable.externalId),
-      ),
-    )
-    // Deterministic when several assets are linked: newest wins. linkAudience
-    // also unlinks same-platform siblings, so this is the backstop.
-    .orderBy(desc(platformAudienceTable.updatedAt))
-    .limit(1);
-  return rows[0]?.externalId ?? null;
+  const lineage = [
+    eq(platformAudienceTable.audienceId, planAudience.id),
+    ...(planAudience.personaId
+      ? [eq(platformAudienceTable.personaId, planAudience.personaId)]
+      : []),
+  ];
+  for (const link of lineage) {
+    const rows = await db
+      .select({ externalId: platformAudienceTable.externalId })
+      .from(platformAudienceTable)
+      .innerJoin(
+        channelTable,
+        eq(channelTable.id, platformAudienceTable.channelId),
+      )
+      .where(
+        and(
+          link,
+          eq(platformAudienceTable.brandId, brandId),
+          eq(channelTable.platform, platform),
+          isNotNull(platformAudienceTable.externalId),
+        ),
+      )
+      // Deterministic when several assets are linked: newest wins. The link
+      // actions also unlink same-platform siblings, so this is the backstop.
+      .orderBy(desc(platformAudienceTable.updatedAt))
+      .limit(1);
+    if (rows[0]?.externalId) return rows[0].externalId;
+  }
+  return null;
 }
 
 /**
@@ -1953,7 +2030,7 @@ async function compileAudienceTargeting(input: {
   }
 
   const assetId = await platformAudienceExternalIdFor(
-    audience.id,
+    audience,
     input.brandId,
     input.platform,
   );

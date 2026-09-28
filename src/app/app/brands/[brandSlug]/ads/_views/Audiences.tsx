@@ -60,6 +60,7 @@ export function Audiences({
   brandName,
   audiences,
   personas,
+  metaTargets = {},
   geoPrefill,
   emptyActions,
 }: {
@@ -69,6 +70,8 @@ export function Audiences({
   brandName: string;
   audiences: AudienceRow[];
   personas: PersonaOption[];
+  /** The Meta audience each ad set will target, by campaign audience id. */
+  metaTargets?: Record<string, { name: string; via: "audience" | "persona" }>;
   /** Where this client's homes are, rolled up from their property rows. */
   geoPrefill?: {
     countries?: string[];
@@ -373,6 +376,14 @@ export function Audiences({
                     {row.persona && (
                       <p className="text-xs text-muted-foreground">
                         {row.persona.name}
+                      </p>
+                    )}
+                    {metaTargets[row.id] && (
+                      <p className="text-xs text-muted-foreground">
+                        Meta audience: {metaTargets[row.id]!.name}
+                        {metaTargets[row.id]!.via === "persona"
+                          ? " · from persona"
+                          : ""}
                       </p>
                     )}
                   </div>

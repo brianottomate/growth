@@ -54,12 +54,16 @@ import {
   deleteAdDraftAction,
   attachCampaignAction,
   replaceAdCardAction,
+  pullPlatformAudiencesAction,
 } from "@/server/ai/capabilities/ads";
 
 export const adsRouter = {
   // The /overview top-ads card refetches here when its controls change, with
   // no model round-trip.
   topAds: actionProcedure(topAds),
+
+  /** Mirror the ad account's audiences; the Audiences tab's refresh. */
+  pullAudiences: actionProcedure(pullPlatformAudiencesAction),
 
   /**
    * The Launch/Pause button. A provider write that starts or stops spend, so

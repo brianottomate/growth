@@ -11,6 +11,7 @@ const TABS = [
   { label: "Submission", tab: "submission" },
   { label: "Catalog", tab: "catalog" },
   { label: "Campaigns", tab: "campaigns" },
+  { label: "Audiences", tab: "audiences" },
   { label: "Settings", tab: "settings" },
   { label: "Unassigned creatives", tab: "ads" },
 ] as const;

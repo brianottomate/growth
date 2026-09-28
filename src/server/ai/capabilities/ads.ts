@@ -501,6 +501,14 @@ export const createAudienceAction = growthAction({
       .describe(
         "The first-party audience_target this platform asset fulfils (from audienceRead). Stamp it so the who stays defined once.",
       ),
+    personaId: z
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .describe(
+        "The persona this asset is bought for. Every campaign audience derived from the persona then targets it; it replaces the persona's previous asset on Meta.",
+      ),
   }),
   execute: async (input, ctx) =>
     createAdAudience(input, {

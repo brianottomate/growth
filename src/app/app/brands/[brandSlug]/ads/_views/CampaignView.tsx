@@ -23,6 +23,7 @@ import { cn } from "@/components/ui/lib/utils";
 import { getDraftCampaign } from "@/server/services/ads-draft.service";
 import { brandListings } from "@/server/services/wanderos-listings.service";
 import { toWallAd, type AdState, type WallAd } from "@/lib/ad-wall";
+import { targetedAsset } from "@/lib/audience-asset";
 import { AddAdDialog } from "@/app/app/performance/brands/[brandSlug]/ads/AddAdDialog";
 import { AdIdeasList } from "./AdIdeasList";
 import { AdTile } from "./AdWall";
@@ -77,7 +78,20 @@ export async function CampaignView({
   );
   if (draft?.brand.slug !== brandSlug) notFound();
 
-  const { campaign, audiences, ads, platformCampaigns, personas } = draft;
+  const {
+    campaign,
+    audiences,
+    ads,
+    platformCampaigns,
+    personas,
+    platformAudiences,
+  } = draft;
+  const metaTargets = Object.fromEntries(
+    audiences.flatMap((row) => {
+      const hit = targetedAsset(row, platformAudiences, "meta_ads");
+      return hit ? [[row.id, { name: hit.asset.name, via: hit.via }]] : [];
+    }),
+  );
   const brand = draft.brand;
   const brandName = brand.name;
 
@@ -367,6 +381,7 @@ export async function CampaignView({
               brandName={brandName}
               audiences={audiences}
               personas={personas}
+              metaTargets={metaTargets}
               geoPrefill={prefill?.geography ?? null}
               emptyActions={ask(
                 "audiences",

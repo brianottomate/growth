@@ -33,3 +33,23 @@ export const deletePersonaOutputSchema = z.strictObject({
   deleted: z.boolean(),
   id: z.string(),
 });
+
+export const uploadPersonaSeedListOutputSchema = z.strictObject({
+  adAccountId: z.string(),
+  platformAudienceId: z.string(),
+  total: z.number(),
+  uploaded: z.number(),
+});
+
+export const createPersonaLookalikeOutputSchema = z.strictObject({
+  adAccountId: z.string(),
+  country: z.string(),
+  platformAudienceId: z.string().nullable(),
+  ratio: z.number(),
+});
+
+export const assignPersonaAudienceOutputSchema = z.strictObject({
+  id: z.string(),
+  name: z.string(),
+  personaId: z.string().nullable(),
+});
