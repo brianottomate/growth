@@ -2753,7 +2753,11 @@ async function pushToMeta(args: PushArgs) {
     );
   for (const { ad, content } of usable) {
     for (const placement of placementPlan) {
-      const issue = metaPlacementMedia(content, placement).issue;
+      const resolved = metaPlacementMedia(content, placement);
+      // The push froze every approved ad above; still pending means it did not.
+      const issue =
+        resolved.issue ??
+        ("pending" in resolved ? "Its images were not saved" : null);
       if (issue) throw new Error(`${ad.name}: ${issue}`);
     }
   }

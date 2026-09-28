@@ -13,6 +13,26 @@ const content: AdCreativeContent = {
   media: [{ type: "image", url: "https://cdn.example/feed.jpg" }],
 };
 describe("Meta placement delivery", () => {
+  it("an approval waiting for its push is pending, not a blocker", () => {
+    const approved = {
+      ...content,
+      media: [],
+      ideaStudio: {
+        document: { shapes: ["portrait"], cards: [] },
+        approval: {
+          approvedAt: "now",
+          approvedBy: "user",
+          sourceVersion: "v1",
+          renders: {},
+        },
+      },
+    } as unknown as AdCreativeContent;
+    expect(metaPlacementMedia(approved, "facebook-feed")).toEqual({
+      media: [],
+      issue: null,
+      pending: true,
+    });
+  });
   it("sends exactly the selected publisher positions", () => {
     expect(
       metaProviderPlacements(["instagram-feed", "instagram-story"]),

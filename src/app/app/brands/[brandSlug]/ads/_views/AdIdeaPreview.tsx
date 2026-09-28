@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
 import type { AdCreativeContent } from "@/server/db/ads-schema";
 import { metaPreviewMedia } from "@/lib/meta-preview";
+import { FROZEN_AT_PUSH } from "@/lib/meta-placement-plan";
 import { CompactAdMock } from "@/components/ad-mock";
 import { META_PLACEMENTS, type MetaPlacement } from "@/lib/meta-placement-plan";
 import {
@@ -130,7 +131,8 @@ export function AdIdeaPreview({
                     />
                   ) : (
                     <p className="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">
-                      {resolved.issue}
+                      {resolved.issue ??
+                        ("pending" in resolved ? FROZEN_AT_PUSH : null)}
                     </p>
                   )}
                 </section>
