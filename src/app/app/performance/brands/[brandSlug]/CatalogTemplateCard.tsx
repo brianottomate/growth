@@ -13,7 +13,10 @@ import {
   type CatalogTemplateId,
   CATALOG_FORMATS,
 } from "@/lib/catalog-studio";
-import { COMPOSITION_TEMPLATES } from "@/lib/compositions";
+import {
+  CATALOG_COPY_INTENTS,
+  COMPOSITION_TEMPLATES,
+} from "@/lib/compositions";
 import { orpc } from "@/orpc/client";
 
 /**
@@ -75,63 +78,88 @@ export function CatalogTemplateCard({
           </Button>
         ))}
       </div>
-      <div className="grid grid-cols-2 gap-3 @2xl:grid-cols-4">
+      <ul className="divide-y">
         {CATALOG_TEMPLATES.map((templateId) => {
           const label =
             COMPOSITION_TEMPLATES.find((t) => t.id === templateId)?.label ??
             templateId;
+          const guide = CATALOG_COPY_INTENTS[templateId];
           const src = catalogCardPreviewUrl(
             brandId,
             asTemplate(card, templateId),
             format,
           );
+          const chosen = current === templateId;
           return (
-            <button
-              key={templateId}
-              aria-pressed={current === templateId}
-              disabled={saving !== null}
-              onClick={() => save.mutate({ brandId, templateId })}
-              className={cn(
-                "space-y-2 rounded-lg border p-2 text-left text-sm",
-                current === templateId && "ring-2 ring-foreground",
-              )}
-            >
-              {src && (
-                // oxlint-disable-next-line nextjs/no-img-element
-                <img
-                  src={src}
-                  alt={label}
-                  className={cn(
-                    "w-full rounded-md object-cover",
-                    format === "square" ? "aspect-square" : "aspect-[4/5]",
+            <li key={templateId}>
+              <button
+                type="button"
+                aria-pressed={chosen}
+                disabled={saving !== null}
+                onClick={() => save.mutate({ brandId, templateId })}
+                className={cn(
+                  "flex w-full items-start gap-4 rounded-lg p-2 text-left text-sm hover:bg-muted/50",
+                  chosen && "bg-muted",
+                )}
+              >
+                {src && (
+                  // oxlint-disable-next-line nextjs/no-img-element
+                  <img
+                    src={src}
+                    alt={label}
+                    className={cn(
+                      "w-24 shrink-0 rounded-md object-cover",
+                      format === "square" ? "aspect-square" : "aspect-[4/5]",
+                    )}
+                  />
+                )}
+                <span className="min-w-0 space-y-1">
+                  <span className="block font-medium">
+                    {label}
+                    {chosen
+                      ? " · default"
+                      : saving === templateId
+                        ? " · saving…"
+                        : ""}
+                  </span>
+                  {guide && (
+                    <>
+                      <span className="block text-xs text-muted-foreground">
+                        Headline ≤{guide.headlineChars} characters
+                        {guide.placeSuffix
+                          ? " · ends “in {place}”"
+                          : " · no place in the headline"}
+                        {guide.pills ? ` · ${guide.pills} amenity pills` : ""}
+                      </span>
+                      <span className="block text-muted-foreground">
+                        {guide.intent}
+                      </span>
+                    </>
                   )}
-                />
-              )}
-              <span className="block">
-                {label}
-                {current === templateId
-                  ? " · default"
-                  : saving === templateId
-                    ? " · saving…"
-                    : ""}
-              </span>
-            </button>
+                </span>
+              </button>
+            </li>
           );
         })}
-      </div>
+      </ul>
     </div>
   );
 }
 
 /**
- * The same card on another template. The place card splits "{lead} in
- * {place}"; the others have no place line, so they show the lead alone.
+ * The same card on another template. The place card reads "{lead} in
+ * {place}", so a headline written without a place gets the card's; the
+ * others have no place line, so they show the lead alone.
  */
 function asTemplate(card: CatalogCard, templateId: CatalogTemplateId) {
   const at = card.title.lastIndexOf(" in ");
   const title =
-    templateId !== "catalog-place" && at > 0
-      ? card.title.slice(0, at)
-      : card.title;
+    templateId === "catalog-place"
+      ? at > 0 || !card.location
+        ? card.title
+        : `${card.title} in ${card.location}`
+      : at > 0
+        ? card.title.slice(0, at)
+        : card.title;
   return { ...card, templateId, title };
 }
