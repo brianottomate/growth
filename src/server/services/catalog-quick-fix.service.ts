@@ -132,6 +132,8 @@ const copySchema = z.object({
 type CopyFacts = {
   home: { name: string; guests?: number | null; bedrooms?: number | null };
   card: { title: string } | null;
+  /** The other cards' headlines: a repeat is sent back. */
+  siblings?: readonly { headline?: string | null }[];
   amenities: readonly string[];
   description: string | null;
   locationDescription: string | null;
@@ -147,6 +149,10 @@ function copyProblem(
   const { headline } = output;
   if (hasEmDash(headline)) return "It uses an em dash.";
   if (headline === ctx.card?.title) return "It is the current headline.";
+  // The prompt lists the other cards; this makes a repeat a retry, not a card.
+  const same = headline.trim().toLowerCase();
+  if (ctx.siblings?.some((s) => s.headline?.trim().toLowerCase() === same))
+    return "Another card in this catalog already has that headline. Find what only this home offers.";
   const layout = CATALOG_COPY_INTENTS[templateId as CatalogCopyTemplateId];
   if (!layout) return null;
   // The facts line under the headline already prints these counts.

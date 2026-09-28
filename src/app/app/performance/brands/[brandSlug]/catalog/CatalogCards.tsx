@@ -83,7 +83,7 @@ export function CatalogCards({
     refetchInterval: (q) => (running(q.state.data?.run?.status) ? 2500 : false),
   }).data?.run;
   const [view, setView] = useState<"studio" | "preview" | "exports">("studio");
-  const [layout, setLayout] = useState<"grid" | "list">("grid");
+  const [layout, setLayout] = useState<"grid" | "list">("list");
   const [details, setDetails] = useState<CatalogCard | null>(null);
   const [library, setLibrary] = useState(false);
   /** A card whose photo is being swapped straight from its row, saved on pick. */
