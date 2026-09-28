@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { Button } from "@/components/ui/button";
 import { cn } from "@/components/ui/lib/utils";
 import { toast } from "@/components/ui/toast";
 import {
@@ -10,6 +11,7 @@ import {
   catalogCardPreviewUrl,
   type CatalogCard,
   type CatalogTemplateId,
+  CATALOG_FORMATS,
 } from "@/lib/catalog-studio";
 import { COMPOSITION_TEMPLATES } from "@/lib/compositions";
 import { orpc } from "@/orpc/client";
@@ -40,6 +42,16 @@ export function CatalogTemplateCard({
     }),
   );
   const saving = save.isPending ? (save.variables?.templateId ?? null) : null;
+  const setFormat = useMutation(
+    orpc.catalog.setFormat.mutationOptions({
+      onError: () => toast.error("Unable to change the catalog size"),
+      onSuccess: async () => {
+        await client.invalidateQueries({ queryKey: state.queryKey });
+        router.refresh();
+      },
+    }),
+  );
+  const format = query.data?.format ?? "portrait";
   const cards = query.data?.draft.cards ?? [];
   const drawn = cards.filter((c) => c.mode !== "finished");
   const card =
@@ -48,7 +60,21 @@ export function CatalogTemplateCard({
 
   if (!card) return null;
   return (
-    <div>
+    <div className="space-y-3">
+      <div className="flex w-fit rounded-lg border p-0.5 text-sm">
+        {CATALOG_FORMATS.map((id) => (
+          <Button
+            key={id}
+            size="sm"
+            variant={format === id ? "secondary" : "ghost"}
+            aria-pressed={format === id}
+            disabled={setFormat.isPending}
+            onClick={() => setFormat.mutate({ brandId, formatId: id })}
+          >
+            {id === "square" ? "Square 1:1" : "Portrait 4:5"}
+          </Button>
+        ))}
+      </div>
       <div className="grid grid-cols-2 gap-3 @2xl:grid-cols-4">
         {CATALOG_TEMPLATES.map((templateId) => {
           const label =
@@ -57,6 +83,7 @@ export function CatalogTemplateCard({
           const src = catalogCardPreviewUrl(
             brandId,
             asTemplate(card, templateId),
+            format,
           );
           return (
             <button
@@ -74,7 +101,10 @@ export function CatalogTemplateCard({
                 <img
                   src={src}
                   alt={label}
-                  className="aspect-[4/5] w-full rounded-md object-cover"
+                  className={cn(
+                    "w-full rounded-md object-cover",
+                    format === "square" ? "aspect-square" : "aspect-[4/5]",
+                  )}
                 />
               )}
               <span className="block">

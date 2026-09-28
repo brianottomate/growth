@@ -3,7 +3,11 @@ import "server-only";
 import { after } from "next/server";
 import { z } from "zod";
 
-import { CATALOG_TEMPLATES, CATALOG_WRITE_PASSES } from "@/lib/catalog-studio";
+import {
+  CATALOG_TEMPLATES,
+  CATALOG_WRITE_PASSES,
+  CATALOG_FORMATS,
+} from "@/lib/catalog-studio";
 import {
   newCatalogCopy,
   newCatalogPhoto,
@@ -17,6 +21,7 @@ import {
   renderCatalogExport,
   setCatalogApproval,
   setCatalogDefaultTemplate,
+  setCatalogFormat,
   setCatalogIncluded,
   startCatalogExport,
 } from "@/server/services/catalog-studio.service";
@@ -30,6 +35,7 @@ import {
   newCatalogPhotoActionOutputSchema,
   setCatalogApprovalActionOutputSchema,
   setCatalogDefaultTemplateActionOutputSchema,
+  setCatalogFormatActionOutputSchema,
   setCatalogIncludedActionOutputSchema,
   writeCatalogCardsActionOutputSchema,
 } from "./outputs/catalog";
@@ -166,6 +172,18 @@ export const setCatalogIncludedAction = growthAction({
   examples: [{ brandId: "brd_01", included: true }],
   execute: async (input, ctx) => {
     await setCatalogIncluded({ ...input, userId: ctx.userId });
+    return input;
+  },
+});
+
+export const setCatalogFormatAction = growthAction({
+  outputSchema: setCatalogFormatActionOutputSchema,
+  description:
+    "Set the canvas a Performance client's catalog is drawn and exported at: portrait (4:5, 1080x1350) or square (1:1, 1080x1080). Every card template works at both; supplied artwork must match. Copy does not change; the next export uses the new size.",
+  inputSchema: brandInput.extend({ formatId: z.enum(CATALOG_FORMATS) }),
+  examples: [{ brandId: "brd_01", formatId: "square" }],
+  execute: async (input, ctx) => {
+    await setCatalogFormat({ ...input, userId: ctx.userId });
     return input;
   },
 });

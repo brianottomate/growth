@@ -160,6 +160,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "setCatalogApproval",
     "setCatalogIncluded",
     "setCatalogDefaultTemplate",
+    "setCatalogFormat",
     "exportCatalog",
     "editAdCards",
     "attachAdSet",

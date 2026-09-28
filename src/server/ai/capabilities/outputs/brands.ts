@@ -62,6 +62,7 @@ const performanceSettingsShape = {
     )
     .optional(),
   agreedAdSpend: z.number().nullable().optional(),
+  catalogFormatId: z.enum(["portrait", "square"]).nullable().optional(),
   catalogTemplateId: z
     .enum([
       "catalog-place",

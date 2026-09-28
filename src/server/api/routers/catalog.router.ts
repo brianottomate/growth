@@ -12,6 +12,7 @@ import {
   refreshCatalogHomesAction,
   setCatalogApprovalAction,
   setCatalogDefaultTemplateAction,
+  setCatalogFormatAction,
   setCatalogIncludedAction,
   writeCatalogCardsAction,
 } from "@/server/ai/capabilities/catalog";
@@ -27,6 +28,7 @@ export const catalogRouter = {
   setApproval: actionProcedure(setCatalogApprovalAction),
   setIncluded: actionProcedure(setCatalogIncludedAction),
   setDefaultTemplate: actionProcedure(setCatalogDefaultTemplateAction),
+  setFormat: actionProcedure(setCatalogFormatAction),
   exportCatalog: actionProcedure(exportCatalogAction),
   writeCards: actionProcedure(writeCatalogCardsAction),
   writeStatus: actionProcedure(catalogWriteStatusAction),

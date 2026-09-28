@@ -23,6 +23,7 @@ import {
   type CatalogHome,
   type CatalogOverrides,
   type CatalogTemplateId,
+  type CatalogFormatId,
 } from "@/lib/catalog-studio";
 import { brandWideAmenities } from "@/lib/catalog-copy";
 import {
@@ -194,6 +195,7 @@ async function catalogHomes(brand: CatalogBrand, refresh = false) {
     approvals,
     brand.settings?.catalogTemplateId ?? "catalog-place",
     brand.markets,
+    brand.settings?.catalogFormatId ?? "portrait",
   );
   // Cards still on the starter headline that nobody wrote, approved or gave
   // supplied artwork: what "Write all cards" works through.
@@ -242,6 +244,7 @@ export async function catalogState(
     enrichmentError: inventory.enrichmentError,
     syncedAt: inventory.syncedAt,
     defaultTemplate: brand.settings?.catalogTemplateId ?? "catalog-place",
+    format: brand.settings?.catalogFormatId ?? "portrait",
     draft,
     unwritten,
     exports: runs.map((run): CatalogExport => ({
@@ -623,6 +626,21 @@ export async function setCatalogDefaultTemplate(input: {
     .update(brandTable)
     .set({
       performanceSettings: sql`coalesce(${brandTable.performanceSettings}, '{}'::jsonb) || ${JSON.stringify({ catalogTemplateId: input.templateId, updatedAt: new Date().toISOString(), updatedBy: input.userId })}::jsonb`,
+    })
+    .where(eq(brandTable.id, brand.id));
+}
+
+/** The canvas the brand's catalog is drawn and exported at. */
+export async function setCatalogFormat(input: {
+  userId: string;
+  brandId: string;
+  formatId: CatalogFormatId;
+}) {
+  const brand = await catalogBrand(input.userId, input.brandId);
+  await db
+    .update(brandTable)
+    .set({
+      performanceSettings: sql`coalesce(${brandTable.performanceSettings}, '{}'::jsonb) || ${JSON.stringify({ catalogFormatId: input.formatId, updatedAt: new Date().toISOString(), updatedBy: input.userId })}::jsonb`,
     })
     .where(eq(brandTable.id, brand.id));
 }

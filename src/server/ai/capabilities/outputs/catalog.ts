@@ -4,6 +4,7 @@ import {
   CATALOG_TEMPLATES,
   CATALOG_WRITE_PASSES,
   catalogCardSchema,
+  CATALOG_FORMATS,
 } from "@/lib/catalog-studio";
 import { compositionFormatIdSchema } from "@/lib/compositions";
 import { creativeRunStatusEnum } from "@/server/db/creative-work-schema";
@@ -84,6 +85,7 @@ export const catalogStateActionOutputSchema = z.strictObject({
   enrichmentError: z.string().optional(),
   syncedAt: z.string(),
   defaultTemplate: z.enum(CATALOG_TEMPLATES),
+  format: z.enum(CATALOG_FORMATS),
   draft: z.strictObject({
     cards: z.array(catalogCardSchema),
     formats: z.array(compositionFormatIdSchema),
@@ -143,6 +145,11 @@ export const setCatalogApprovalActionOutputSchema = z.strictObject({
 export const setCatalogIncludedActionOutputSchema = z.strictObject({
   brandId: z.string(),
   included: z.boolean(),
+});
+
+export const setCatalogFormatActionOutputSchema = z.strictObject({
+  brandId: z.string(),
+  formatId: z.enum(CATALOG_FORMATS),
 });
 
 export const setCatalogDefaultTemplateActionOutputSchema = z.strictObject({

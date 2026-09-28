@@ -10,6 +10,7 @@ import {
   type CatalogDraft,
   type CatalogExport,
   type CatalogHome,
+  type CatalogFormatId,
 } from "@/lib/catalog-studio";
 
 /** "studio" for the live cards, else an export id. */
@@ -20,26 +21,29 @@ type Crop = "square" | "portrait";
  * The catalog as a feed shows it: a carousel ad with the brand's header,
  * one primary text and a strip of cards, each with the home's name, its
  * nightly price and the button, at phone width. A local mock; nothing
- * reaches Meta. The square crop is how a catalog carousel may draw a card,
- * so an overlay that only fits the portrait frame shows up here first.
+ * reaches Meta. Meta's catalog tiles are square: a 4:5 card is fitted inside
+ * with bars at the sides (seen on Winter Park's live catalog, 2026-09-28), so
+ * the square tile shows a portrait catalog the way Meta will.
  */
 export function CatalogPreview({
   brandId,
   brandName,
   homes,
   draft,
+  format,
   exports,
 }: {
   brandId: string;
   brandName: string;
   homes: CatalogHome[];
   draft: CatalogDraft;
+  /** The canvas the catalog exports at. */
+  format: CatalogFormatId;
   exports: CatalogExport[];
 }) {
   const ready = exports.filter((e) => e.status === "ready" && e.assets?.length);
   const [source, setSource] = useState<Source>("studio");
-  // 4:5 is what the export uploads; square is the check for placements that cut it.
-  const [crop, setCrop] = useState<Crop>("portrait");
+  const [crop, setCrop] = useState<Crop>(format);
   const [text, setText] = useState(
     `Find your next ${brandName} escape. Private homes, booked direct.`,
   );
@@ -56,7 +60,7 @@ export function CatalogPreview({
         .filter((c) => c.included)
         .map((card) => ({
           key: card.homeId,
-          image: catalogCardPreviewUrl(brandId, card) ?? card.imageUrl,
+          image: catalogCardPreviewUrl(brandId, card, format) ?? card.imageUrl,
           home: byId.get(card.homeId),
           name: byId.get(card.homeId)?.name ?? card.homeId,
         }));
@@ -96,7 +100,7 @@ export function CatalogPreview({
               aria-pressed={crop === c}
               onClick={() => setCrop(c)}
             >
-              {c === "square" ? "Square crop" : "4:5 as exported"}
+              {c === "square" ? "Square tile" : "4:5"}
             </Button>
           ))}
         </div>
@@ -135,8 +139,12 @@ export function CatalogPreview({
                 alt={card.name}
                 loading="lazy"
                 className={cn(
-                  "w-full object-cover",
+                  "w-full",
                   crop === "square" ? "aspect-square" : "aspect-[4/5]",
+                  // A 4:5 card in a square tile is fitted, not cropped.
+                  crop === "square" && format === "portrait"
+                    ? "bg-neutral-700 object-contain"
+                    : "object-cover",
                 )}
               />
               <div className="flex items-center gap-2 px-2.5 py-2">

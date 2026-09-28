@@ -40,6 +40,10 @@ export const catalogCardSchema = z.object({
   approved: z.boolean().optional(),
 });
 export type CatalogCard = z.infer<typeof catalogCardSchema>;
+/** The canvases a catalog runs in: 4:5 portrait, or 1:1 square. */
+export const CATALOG_FORMATS = ["portrait", "square"] as const;
+export type CatalogFormatId = (typeof CATALOG_FORMATS)[number];
+
 export type CatalogDraft = {
   cards: CatalogCard[];
   formats: CompositionFormatId[];
@@ -204,10 +208,12 @@ export function catalogDraft(
   defaultTemplate: CatalogTemplateId = "catalog-place",
   /** The brand's markets: a card's location is its market's label. */
   markets?: BrandMarkets | null,
+  /** The canvas every card is drawn and exported at. */
+  format: CatalogFormatId = "portrait",
 ): CatalogDraft {
   return {
-    formats: ["portrait"],
-    primaryFormat: "portrait",
+    formats: [format],
+    primaryFormat: format,
     cards: homes
       .filter((h) => h.imageUrl)
       .map((home): CatalogCard => {
@@ -223,7 +229,7 @@ export function catalogDraft(
                 finishedArtwork: {
                   assetId: o.finished.assetId,
                   url: o.finished.url,
-                  format: "portrait",
+                  format,
                 },
               }
             : {}),
@@ -302,16 +308,20 @@ export function catalogHeadlineIssue(
 
 /**
  * The URL a card draws at: its finished artwork, or its composition on the
- * portrait canvas the catalog runs in. Shared by the Catalog tab and the
- * server-side portfolio review, so both see the same card.
+ * canvas the catalog runs in. Shared by the Catalog tab and the server-side
+ * portfolio review, so both see the same card.
  */
-export function catalogCardPreviewUrl(brandId: string, card: CatalogCard) {
+export function catalogCardPreviewUrl(
+  brandId: string,
+  card: CatalogCard,
+  formatId: CatalogFormatId = "portrait",
+) {
   if (card.mode === "finished") return card.finishedArtwork?.url;
   const copy = catalogCardCopy(card);
   const params = new URLSearchParams({
     brandId,
     templateId: card.templateId,
-    formatId: "portrait",
+    formatId,
     title: copy.title,
     subtitle: copy.subtitle,
     imagePosition: card.imagePosition,

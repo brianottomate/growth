@@ -30,6 +30,7 @@ import {
   catalogUnapproved,
   type CatalogCard,
   type CatalogHome,
+  type CatalogFormatId,
 } from "@/lib/catalog-studio";
 import { safeHomeUrl } from "@/lib/ad-preview-links";
 import { sendAssistantIntent } from "@/lib/assistant-events";
@@ -55,7 +56,6 @@ const FORCE = DEV ? { force: true } : {};
 /** Approved cards are signed off; they change only after Reopen. */
 const locked = (card: CatalogCard) => Boolean(card.approved) && !DEV;
 const LOCKED_TITLE = "Approved. Reopen it to change it.";
-const PORTRAIT = COMPOSITION_FORMATS.find((f) => f.id === "portrait")!;
 const preview = catalogCardPreviewUrl;
 export function CatalogCards({
   brandId,
@@ -96,6 +96,7 @@ export function CatalogCards({
   const [picker, setPicker] = useState(false);
   const [error, setError] = useState("");
   const draft = query.data?.draft;
+  const format = query.data?.format ?? "portrait";
   const homes = query.data?.homes ?? [];
   const homeOf = (card: CatalogCard) => homes.find((h) => h.id === card.homeId);
   const reload = () => client.invalidateQueries({ queryKey: state.queryKey });
@@ -479,7 +480,11 @@ export function CatalogCards({
                     onClick={() => setDetails({ ...card })}
                     aria-label={`Edit ${homeOf(card)?.name}`}
                   >
-                    <CardPreview brandId={brandId} card={card} />
+                    <CardPreview
+                      brandId={brandId}
+                      card={card}
+                      format={format}
+                    />
                   </button>
                   {card.mode === "finished" && (
                     <p className="px-3 pt-2 text-xs text-muted-foreground">
@@ -517,7 +522,11 @@ export function CatalogCards({
                   >
                     <div className="grid grid-cols-1 items-start gap-5 @xl:grid-cols-[minmax(0,240px)_minmax(0,1fr)]">
                       <div className="mx-auto w-full max-w-xs overflow-hidden rounded-lg">
-                        <CardPreview brandId={brandId} card={shown} />
+                        <CardPreview
+                          brandId={brandId}
+                          card={shown}
+                          format={format}
+                        />
                       </div>
                       <div className="min-w-0 space-y-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -667,6 +676,7 @@ export function CatalogCards({
           brandName={brandName}
           homes={homes}
           draft={draft}
+          format={format}
           exports={query.data?.exports ?? []}
         />
       )}
@@ -767,7 +777,7 @@ export function CatalogCards({
           </DialogHeader>
           {details && (
             <div className="grid gap-6 md:grid-cols-2">
-              <CardPreview brandId={brandId} card={details} />
+              <CardPreview brandId={brandId} card={details} format={format} />
               <CardEditor
                 card={details}
                 home={homeOf(details)}
@@ -863,7 +873,7 @@ export function CatalogCards({
                     finishedArtwork: {
                       assetId: item.assetId,
                       url: item.url,
-                      format: "portrait",
+                      format,
                     },
                   }
                 : { ...details, imageUrl: item.url, assetId: item.assetId },
@@ -917,18 +927,26 @@ function ApproveButton({
 function CardPreview({
   brandId,
   card,
+  format,
 }: {
   brandId: string;
   card: CatalogCard;
+  format: CatalogFormatId;
 }) {
   const src =
     card.mode === "finished" || card.title.trim()
-      ? preview(brandId, card)
+      ? preview(brandId, card, format)
       : undefined;
   const empty =
     card.mode === "finished" ? "Choose finished artwork" : "Add a headline";
   return (
-    <PreviewImage key={src ?? empty} src={src} alt={card.title} empty={empty} />
+    <PreviewImage
+      key={src ?? empty}
+      src={src}
+      alt={card.title}
+      empty={empty}
+      format={format}
+    />
   );
 }
 
@@ -936,13 +954,16 @@ function PreviewImage({
   src,
   alt,
   empty,
+  format,
 }: {
   src: string | undefined;
   alt: string;
   empty: string;
+  format: CatalogFormatId;
 }) {
   const [failed, setFailed] = useState(false);
-  const aspectRatio = `${PORTRAIT.width}/${PORTRAIT.height}`;
+  const size = COMPOSITION_FORMATS.find((f) => f.id === format)!;
+  const aspectRatio = `${size.width}/${size.height}`;
   if (!src || failed)
     return (
       <div

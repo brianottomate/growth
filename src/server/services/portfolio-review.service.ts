@@ -63,7 +63,13 @@ async function catalogItems(userId: string, brandId: string) {
   );
   const brandWide = brandWideAmenities(includedHomes(homes, draft));
   const items = draft.cards.flatMap((card): Item[] => {
-    const url = card.included ? catalogCardPreviewUrl(brandId, card) : null;
+    const url = card.included
+      ? catalogCardPreviewUrl(
+          brandId,
+          card,
+          draft.primaryFormat === "square" ? "square" : "portrait",
+        )
+      : null;
     if (!url) return [];
     return [
       {
