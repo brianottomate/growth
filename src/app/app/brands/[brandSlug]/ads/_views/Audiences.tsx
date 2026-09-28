@@ -23,6 +23,8 @@ import { Label } from "@/components/ui/label";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 import { orpc } from "@/orpc/client";
 
+import { SuggestAudiencesButton } from "./SuggestAudiencesButton";
+
 type AudienceRow = {
   id: string;
   name: string;
@@ -155,7 +157,8 @@ export function Audiences({
             : "flex items-center justify-end gap-2"
         }
       >
-        <div className="ml-auto">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+          <SuggestAudiencesButton campaignId={campaignId} />
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button size="sm" variant="outline">
@@ -343,6 +346,7 @@ export function Audiences({
           description="The push runs one broad ad set. Add an audience to narrow by age or place."
           actions={
             <>
+              <SuggestAudiencesButton campaignId={campaignId} />
               <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
                 <Plus className="size-3.5" />
                 Add audience

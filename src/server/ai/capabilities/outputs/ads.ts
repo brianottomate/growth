@@ -1126,6 +1126,43 @@ export const setHomeHeroActionOutputSchema = z.strictObject({
   heroUrl: z.string(),
 });
 
+export const suggestCampaignAudiencesActionOutputSchema = z.strictObject({
+  campaignId: z.string(),
+  suggestions: z.array(
+    z.strictObject({
+      name: z.string(),
+      kind: z.enum(["geo", "lookalike", "retargeting"]),
+      cities: z.array(z.string()),
+      states: z.array(z.string()),
+      countries: z.array(z.string()),
+      regions: z.array(z.string()),
+      ageMin: z.number(),
+      ageMax: z.number(),
+      platformAudienceId: z.string().nullable(),
+      why: z.string(),
+    }),
+  ),
+  evidence: z.strictObject({
+    markets: z.array(z.string()),
+    bookingWindow: z
+      .strictObject({
+        bookings: z.number(),
+        medianNights: z.number().nullable(),
+        medianLeadDays: z.number().nullable(),
+      })
+      .nullable(),
+    existingAudiences: z.number(),
+    inUse: z.array(
+      z.strictObject({
+        id: z.string(),
+        name: z.string(),
+        campaign: z.string(),
+      }),
+    ),
+    note: z.string(),
+  }),
+});
+
 export const catalogHomeFactsActionOutputSchema = z.strictObject({
   homes: z.array(
     z.strictObject({

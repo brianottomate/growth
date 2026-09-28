@@ -131,6 +131,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "ideaHomePhotos",
     "ideaContext",
     "catalogHomeFacts",
+    "suggestCampaignAudiences",
     "previewAd",
     "diagnoseAlignment",
     "inspectConversions",

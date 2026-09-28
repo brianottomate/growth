@@ -27,6 +27,8 @@ import {
   addAdShellAction,
   createAdsFromAssetsAction,
   addAudienceAction,
+  suggestCampaignAudiencesAction,
+  linkAudienceAction,
   setPlatformDraftAction,
   setCreativePoolAction,
   setPlacementCopyAction,
@@ -194,6 +196,8 @@ export const adsRouter = {
   replaceAdMedia: actionProcedure(replaceAdCardAction),
 
   addAudience: actionProcedure(addAudienceAction),
+  suggestCampaignAudiences: actionProcedure(suggestCampaignAudiencesAction),
+  linkAudience: actionProcedure(linkAudienceAction),
 
   importAdCreative: actionProcedure(importCreativeAction),
 

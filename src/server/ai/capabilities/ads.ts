@@ -36,6 +36,7 @@ import {
   setAdHomeActionOutputSchema,
   setHomeHeroActionOutputSchema,
   catalogHomeFactsActionOutputSchema,
+  suggestCampaignAudiencesActionOutputSchema,
   editCatalogCardActionOutputSchema,
   editAdCardsActionOutputSchema,
   attachAdSetActionOutputSchema,
@@ -51,6 +52,7 @@ import {
   ideaContextActionOutputSchema,
 } from "./outputs/ads";
 import { adChatContext } from "@/server/services/ad-chat-context.service";
+import { suggestCampaignAudiences } from "@/server/services/campaign-audience-suggestions.service";
 import {
   importMetaCampaign,
   importMetaCampaignSchema,
@@ -1467,6 +1469,19 @@ export const setHomeHeroAction = growthAction({
       userId: ctx.userId,
       photo: { number: photoNumber },
     }),
+});
+
+export const suggestCampaignAudiencesAction = growthAction({
+  outputSchema: suggestCampaignAudiencesActionOutputSchema,
+  description:
+    "Propose 1 to 5 audiences for a Performance client's campaign from the evidence: the brand's confirmed market (feeder cities), what its direct bookings say about the booking window, and the audiences already synced in its ad account. Each suggestion says why; add the ones the operator wants with addAudience (geo: cities, states, countries, ages; lookalike or retargeting: the platformAudienceId names the asset). Nothing is saved or pushed. Guest-origin data is not available for WanderOS sites, so geo suggestions rest on the market confirmed on Setup.",
+  inputSchema: z.object({
+    campaignId: z.string().min(1),
+    count: z.number().int().min(1).max(5).optional(),
+  }),
+  examples: [{ campaignId: "camp_01" }],
+  execute: (input, ctx) =>
+    suggestCampaignAudiences({ ...input, organizationId: ctx.orgId }),
 });
 
 export const catalogHomeFactsAction = growthAction({

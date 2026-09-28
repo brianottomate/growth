@@ -13,6 +13,7 @@
  *   interpolates them.
  */
 export * from "./brand-story";
+export * from "./campaign-audiences";
 export * from "./catalog-copy";
 export * from "./catalog-home";
 export * from "./catalog-quick-fix";
