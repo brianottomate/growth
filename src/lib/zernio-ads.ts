@@ -101,6 +101,15 @@ export const LINKEDIN_PUSH_GOALS = [
  */
 export const META_DEFAULT_CALL_TO_ACTION = "BOOK_NOW";
 
+/**
+ * The button type Meta receives. The API takes BOOK_NOW, but Ads Manager
+ * reads it back as "Unknown (BOOK_NOW)" and asset-feed ads under OUTCOME_SALES
+ * refuse it (error 1885396). BOOK_TRAVEL is Meta's "Book now" button.
+ */
+export function metaCallToActionType(callToAction: string): string {
+  return callToAction === "BOOK_NOW" ? "BOOK_TRAVEL" : callToAction;
+}
+
 export const LINKEDIN_CALL_TO_ACTIONS = [
   "LEARN_MORE",
   "SIGN_UP",

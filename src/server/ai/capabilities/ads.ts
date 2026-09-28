@@ -1159,7 +1159,7 @@ export const setPlatformDraftAction = growthAction({
           .enum(["host", "pixel"])
           .optional()
           .describe(
-            "Client brands only. host (default) optimises on a conversion scoped to the client's site; pixel optimises on the raw pixel event, which also counts bookings on other Wander sites. Use pixel only when the operator asks for it.",
+            "Client brands only. pixel (default) optimises on the shared pixel event, for volume; host optimises on the conversion scoped to the client's site. Either way the site-scoped conversion is provisioned for reporting. Use host only when the operator asks for it.",
           ),
         budgetMode: z
           .enum(["cbo", "abo"])

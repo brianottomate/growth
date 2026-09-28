@@ -320,9 +320,9 @@ export function MetaPlatformCard({
                   meta?.customConversionId ||
                   (meta?.customEventType
                     ? `${meta.customEventType} · ${
-                        meta.conversionScope === "pixel"
-                          ? "raw pixel"
-                          : "client site"
+                        meta.conversionScope === "host"
+                          ? "client site"
+                          : "shared pixel"
                       }`
                     : "No conversion set")
                 }
@@ -645,7 +645,7 @@ function MetaSettings({
   const [event, setEvent] = useState(meta?.customEventType ?? "");
   const [conversion, setConversion] = useState(meta?.customConversionId ?? "");
   const [scope, setScope] = useState<"host" | "pixel">(
-    meta?.conversionScope ?? "host",
+    meta?.conversionScope ?? "pixel",
   );
   const [mode, setMode] = useState<"cbo" | "abo">(meta?.budgetMode ?? "cbo");
   const dateValue = (d: Date | null) =>
@@ -709,7 +709,7 @@ function MetaSettings({
           setPixel(meta?.pixelId ?? "");
           setEvent(meta?.customEventType ?? "");
           setConversion(meta?.customConversionId ?? "");
-          setScope(meta?.conversionScope ?? "host");
+          setScope(meta?.conversionScope ?? "pixel");
           setMode(meta?.budgetMode ?? "cbo");
           setStart(dateValue(effective.startAt));
           setEnd(dateValue(effective.endAt));
@@ -840,8 +840,8 @@ function MetaSettings({
             value={scope}
             onChange={(e) => setScope(e.target.value as "host" | "pixel")}
           >
+            <option value="pixel">Shared pixel event (all Wander sites)</option>
             <option value="host">This client&apos;s site only</option>
-            <option value="pixel">Raw pixel event (all Wander sites)</option>
           </select>
         </label>
         <label className="space-y-1 text-sm">

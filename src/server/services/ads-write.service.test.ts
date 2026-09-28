@@ -15,6 +15,7 @@ import {
   videoPayloadFor,
 } from "@/server/services/ads-write.service";
 import { withAdUtms } from "@/lib/ad-utm";
+import { metaCallToActionType } from "@/lib/zernio-ads";
 import type { CreateZernioStandaloneAdInput } from "@/server/clients/zernio.client";
 
 /**
@@ -618,7 +619,7 @@ describe("what a Meta ad set optimises toward", () => {
     throw new Error("must not provision");
   };
 
-  it("scopes a client brand's purchase to its own host through a custom conversion", async () => {
+  it("optimises a client on the shared event and provisions its host-scoped conversion for reporting", async () => {
     const calls: unknown[] = [];
     const warnings: string[] = [];
     const result = await metaPromotedObjectFor({
@@ -632,7 +633,7 @@ describe("what a Meta ad set optimises toward", () => {
       warnings,
     });
 
-    expect(result).toEqual({ customConversionId: "cc_wpe" });
+    expect(result).toEqual(purchase);
     expect(calls).toEqual([
       {
         name: "META_PERF+WINTER+PARK+ESCAPES_PURCHASE",
@@ -647,7 +648,7 @@ describe("what a Meta ad set optimises toward", () => {
       },
     ]);
     expect(warnings).toEqual([
-      "Meta optimises on META_PERF+WINTER+PARK+ESCAPES_PURCHASE (PURCHASE on winterparkescapes.com), reused as custom conversion cc_wpe",
+      "Meta optimises on the shared PURCHASE event on pixel 340252052212435; winterparkescapes.com bookings report through META_PERF+WINTER+PARK+ESCAPES_PURCHASE (PURCHASE on winterparkescapes.com), reused as custom conversion cc_wpe",
     ]);
   });
 
@@ -680,17 +681,20 @@ describe("what a Meta ad set optimises toward", () => {
     expect(warnings[0]).toMatch(/no website/);
   });
 
-  it("runs a client on the raw pixel event when the operator chose pixel scope", async () => {
+  it("optimises on the host-scoped conversion when the operator chose host scope", async () => {
     const warnings: string[] = [];
     const result = await metaPromotedObjectFor({
       brand: client,
-      meta: { ...purchase, conversionScope: "pixel" },
+      meta: { ...purchase, conversionScope: "host" },
       validateOnly: false,
-      ensureCustomConversion: neverCalled,
+      ensureCustomConversion: async () => ({
+        customConversionId: "cc_wpe",
+        reused: false,
+      }),
       warnings,
     });
-    expect(result).toEqual(purchase);
-    expect(warnings[0]).toMatch(/any Wander site/);
+    expect(result).toEqual({ customConversionId: "cc_wpe" });
+    expect(warnings[0]).toMatch(/^Meta optimises on META_PERF/);
   });
 
   it("provisions nothing on a dry run", async () => {
@@ -787,5 +791,26 @@ describe("Google draft display crops", () => {
     expect(() => googleDisplayImages(undefined, undefined)).toThrow(
       "needs landscape and square",
     );
+  });
+});
+
+describe("metaCallToActionType", () => {
+  it("sends Meta's Book now button, never the type Ads Manager reads as Unknown", () => {
+    expect(metaCallToActionType("BOOK_NOW")).toBe("BOOK_TRAVEL");
+    expect(metaCallToActionType("LEARN_MORE")).toBe("LEARN_MORE");
+  });
+});
+
+describe("tagMetaAdUtms campaign override", () => {
+  it("tags an attached ad with the campaign it joins, not its own name", () => {
+    const out = tagMetaAdUtms(
+      { ...base, name: "META_PERF+X_STATIC_Home", adSetId: "set_1" },
+      "META_PERF+X_SALES_PURCHASE_202609",
+    );
+    const u = new URL(out.linkUrl!);
+    expect(u.searchParams.get("utm_campaign")).toBe(
+      "META_PERF+X_SALES_PURCHASE_202609",
+    );
+    expect(u.searchParams.get("utm_content")).toBe("META_PERF+X_STATIC_Home");
   });
 });

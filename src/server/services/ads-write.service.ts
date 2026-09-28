@@ -39,6 +39,7 @@ import {
   linkedInCreativeRequirement,
   linkedInDraftProviderControls,
   META_DEFAULT_CALL_TO_ACTION,
+  metaCallToActionType,
   metaDraftProviderControls,
   sameAdAccountId,
   type ZernioAdPlatform,
@@ -676,8 +677,11 @@ export function assertMetaAdPayload(
  */
 export function tagMetaAdUtms(
   payload: CreateZernioStandaloneAdInput,
+  campaignName?: string,
 ): CreateZernioStandaloneAdInput {
-  const campaign = payload.campaignName ?? payload.name;
+  // An attach or join-campaign payload names the ad or ad set, not the
+  // campaign, so the caller passes the campaign name it is building under.
+  const campaign = campaignName ?? payload.campaignName ?? payload.name;
   const content = payload.adName ?? payload.name;
   const base = { ...META_AD_UTM, campaign };
   return {
@@ -705,12 +709,13 @@ async function createMetaAd(
     idempotencyKey: string;
     adAccount: { currency?: string; minimumDailyBudget?: number };
     carouselSeedBudget?: number;
+    campaignName?: string;
   },
 ) {
-  const tagged = tagMetaAdUtms({
-    ...payload,
-    pageId: options.pageId ?? undefined,
-  });
+  const tagged = tagMetaAdUtms(
+    { ...payload, pageId: options.pageId ?? undefined },
+    options.campaignName,
+  );
   assertMetaAdPayload(tagged, options.adAccount);
   return createZernioStandaloneAd(tagged, {
     idempotencyKey: options.idempotencyKey,
@@ -1788,7 +1793,7 @@ export async function previewDraftAd(
             ...(content.callToAction
               ? {
                   call_to_action: {
-                    type: content.callToAction,
+                    type: metaCallToActionType(content.callToAction),
                     value: { link },
                   },
                 }
@@ -1803,7 +1808,7 @@ export async function previewDraftAd(
           ...(content.callToAction
             ? {
                 call_to_action: {
-                  type: content.callToAction,
+                  type: metaCallToActionType(content.callToAction),
                   value: { link },
                 },
               }
@@ -2593,21 +2598,17 @@ export async function metaPromotedObjectFor(args: {
   ) {
     return onEvent;
   }
-  if (meta.conversionScope === "pixel") {
-    warnings.push(
-      `${brand.name} optimises on the raw ${meta.customEventType} event on pixel ${meta.pixelId}; Meta will credit it with bookings made on any Wander site`,
-    );
-    return onEvent;
-  }
-
   const host = normalizeDomain(brand.website);
   if (!host) {
     warnings.push(
-      `${brand.name} has no website on the brand, so Meta optimises on the raw ${meta.customEventType} event and will credit bookings made on any Wander site. Set the website and re-push to scope it.`,
+      `${brand.name} has no website on the brand, so Meta optimises on the raw ${meta.customEventType} event and there is no site-scoped conversion to report on. Set the website and re-push.`,
     );
     return onEvent;
   }
 
+  // Provisioned on every client push, whichever way the ad set optimises: a
+  // custom conversion only counts events from its creation on, and it is how
+  // the client's own bookings are reported apart from the fleet's.
   const name = performanceConversionName({
     customer: brand.name,
     isClient: true,
@@ -2619,12 +2620,17 @@ export async function metaPromotedObjectFor(args: {
     customEventType: meta.customEventType,
     rule: hostScopedConversionRule(host, meta.customEventType),
   });
+  const provisioned = `${name} (${meta.customEventType} on ${host}), ${
+    conversion.reused ? "reused" : "created"
+  } as custom conversion ${conversion.customConversionId}`;
+  if (meta.conversionScope === "host") {
+    warnings.push(`Meta optimises on ${provisioned}`);
+    return { customConversionId: conversion.customConversionId };
+  }
   warnings.push(
-    `Meta optimises on ${name} (${meta.customEventType} on ${host}), ${
-      conversion.reused ? "reused" : "created"
-    } as custom conversion ${conversion.customConversionId}`,
+    `Meta optimises on the shared ${meta.customEventType} event on pixel ${meta.pixelId}; ${host} bookings report through ${provisioned}`,
   );
-  return { customConversionId: conversion.customConversionId };
+  return onEvent;
 }
 
 // ---- META COMPILE ------------------------------------------------------
@@ -2739,19 +2745,11 @@ async function pushToMeta(args: PushArgs) {
     );
   }
   const metaCallToAction = (content: AdCreativeContent) =>
-    isClient
-      ? META_DEFAULT_CALL_TO_ACTION
-      : (content.callToAction ?? META_DEFAULT_CALL_TO_ACTION);
-  // An ad with a story asset goes to Meta as an asset feed, which Meta treats
-  // as dynamic creative: under OUTCOME_SALES it refuses BOOK_NOW (error 1885396,
-  // Legacy RnR push 2026-09-28). BOOK_TRAVEL is the travel button it accepts
-  // there, and it also reads "Book now".
-  const assetFeedCallToAction = (content: AdCreativeContent) => {
-    const cta = metaCallToAction(content);
-    return placementAssetsFor(content) && cta === "BOOK_NOW"
-      ? "BOOK_TRAVEL"
-      : cta;
-  };
+    metaCallToActionType(
+      isClient
+        ? META_DEFAULT_CALL_TO_ACTION
+        : (content.callToAction ?? META_DEFAULT_CALL_TO_ACTION),
+    );
 
   // House naming at every level. A campaign, ad set or ad already in the
   // convention keeps its name; anything else is renamed on the way out.
@@ -2938,7 +2936,7 @@ async function pushToMeta(args: PushArgs) {
             headline: lead.content.headline,
             body: lead.content.body,
             linkUrl: lead.content.linkUrl ?? linkUrl,
-            callToAction: assetFeedCallToAction(lead.content),
+            callToAction: metaCallToAction(lead.content),
             ...(shape === "carousel"
               ? { carouselCards: carouselCardsFor(lead.content) }
               : {
@@ -2957,6 +2955,7 @@ async function pushToMeta(args: PushArgs) {
         payload,
       ),
       adAccount: destination.adAccount,
+      campaignName: metaCampaignName,
     });
 
     if (setArgs.validateOnly || result.validateOnly) {
@@ -2981,7 +2980,7 @@ async function pushToMeta(args: PushArgs) {
           headline: content.headline,
           body: content.body,
           linkUrl: content.linkUrl ?? linkUrl,
-          callToAction: assetFeedCallToAction(content),
+          callToAction: metaCallToAction(content),
           ...(isCarousel(content)
             ? { carouselCards: carouselCardsFor(content) }
             : {
@@ -3002,6 +3001,7 @@ async function pushToMeta(args: PushArgs) {
               attachPayload,
             ),
             adAccount: destination.adAccount,
+            campaignName: metaCampaignName,
             carouselSeedBudget:
               brand.metaPageId &&
               !connectionRunsAsBrandPage(brand, destination.connection)

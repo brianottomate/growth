@@ -293,15 +293,16 @@ export type PlatformCampaignSettings = {
     customEventType?: string;
     /**
      * Optimise toward this Custom Conversion instead of the raw event. Set
-     * by hand to pin one; a client brand with a website gets a host-scoped
-     * one provisioned at push time when this is empty.
+     * by hand to pin one. A client brand with a website always gets a
+     * host-scoped one provisioned at push time, for reporting.
      */
     customConversionId?: string;
     /**
-     * What a client ad set optimises on when no conversion is pinned. "host"
-     * (the default) scopes the event to the client's own site; "pixel" runs
-     * on the raw fleet-wide event, which also credits bookings made on other
-     * Wander sites. Meta freezes the choice once the ad set is published.
+     * What a client ad set optimises on when no conversion is pinned. "pixel"
+     * (the default) runs on the shared fleet-wide event, for volume; "host"
+     * optimises on the host-scoped custom conversion. Reporting reads the
+     * host-scoped conversion either way. Meta freezes the choice once the
+     * ad set is published.
      */
     conversionScope?: "host" | "pixel";
     /**
