@@ -2726,6 +2726,16 @@ async function pushToMeta(args: PushArgs) {
     isClient
       ? META_DEFAULT_CALL_TO_ACTION
       : (content.callToAction ?? META_DEFAULT_CALL_TO_ACTION);
+  // An ad with a story asset goes to Meta as an asset feed, which Meta treats
+  // as dynamic creative: under OUTCOME_SALES it refuses BOOK_NOW (error 1885396,
+  // Legacy RnR push 2026-09-28). BOOK_TRAVEL is the travel button it accepts
+  // there, and it also reads "Book now".
+  const assetFeedCallToAction = (content: AdCreativeContent) => {
+    const cta = metaCallToAction(content);
+    return placementAssetsFor(content) && cta === "BOOK_NOW"
+      ? "BOOK_TRAVEL"
+      : cta;
+  };
 
   // House naming at every level. A campaign, ad set or ad already in the
   // convention keeps its name; anything else is renamed on the way out.
@@ -2912,7 +2922,7 @@ async function pushToMeta(args: PushArgs) {
             headline: lead.content.headline,
             body: lead.content.body,
             linkUrl: lead.content.linkUrl ?? linkUrl,
-            callToAction: metaCallToAction(lead.content),
+            callToAction: assetFeedCallToAction(lead.content),
             ...(shape === "carousel"
               ? { carouselCards: carouselCardsFor(lead.content) }
               : {
@@ -2955,7 +2965,7 @@ async function pushToMeta(args: PushArgs) {
           headline: content.headline,
           body: content.body,
           linkUrl: content.linkUrl ?? linkUrl,
-          callToAction: metaCallToAction(content),
+          callToAction: assetFeedCallToAction(content),
           ...(isCarousel(content)
             ? { carouselCards: carouselCardsFor(content) }
             : {

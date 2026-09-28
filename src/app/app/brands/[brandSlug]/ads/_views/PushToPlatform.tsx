@@ -59,11 +59,6 @@ export function PushToPlatform({
   const spec = requireAdPlatformSpec(platform);
   const platformName = spec.shortLabel;
   const goals = spec.features.goals;
-  const dryRunReason = !spec.features.dryRun
-    ? `${platformName} has no dry run — Zernio's validate-only is Meta's own`
-    : audienceCount > 1
-      ? `${platformName} has no dry run for the multi-audience shape`
-      : undefined;
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [selectedGoal, setGoal] = useState<AdPushGoal>(goals[0] ?? "traffic");
@@ -100,14 +95,11 @@ export function PushToPlatform({
   const push = useMutation(
     orpc.ads.pushDraftToPlatform.mutationOptions({
       onSuccess: (result) => {
-        // A dry run stays open to show its result; a real push lands on the
-        // platform campaign it just made real.
-        if (!result.validateOnly) {
-          setOpen(false);
-          if (configuration) router.refresh();
-          else if ("path" in result && result.path) router.push(result.path);
-          else router.refresh();
-        }
+        // The push lands on the platform campaign it just made real.
+        setOpen(false);
+        if (configuration) router.refresh();
+        else if ("path" in result && result.path) router.push(result.path);
+        else router.refresh();
       },
     }),
   );
@@ -187,11 +179,6 @@ export function PushToPlatform({
               </div>
             </>
           )}
-          {dryRunReason && (
-            <p className="text-sm text-muted-foreground">
-              {dryRunReason}. Review Setup and Projection before pushing paused.
-            </p>
-          )}
           {destinations.error && (
             <p role="alert">{destinations.error.message}</p>
           )}
@@ -206,26 +193,6 @@ export function PushToPlatform({
           )}
         </div>
         <DialogFooter>
-          <Button
-            size="sm"
-            variant="outline"
-            title={dryRunReason}
-            disabled={!canPush || Boolean(dryRunReason)}
-            loading={push.isPending}
-            onClick={() =>
-              chosen &&
-              push.mutate({
-                campaignId,
-                platform,
-                connectionAccountId: chosen.connectionAccountId,
-                adAccountId: chosen.adAccountId,
-                goal,
-                validateOnly: true,
-              })
-            }
-          >
-            Dry run
-          </Button>
           <Button
             size="sm"
             disabled={!canPush}
@@ -244,13 +211,6 @@ export function PushToPlatform({
             Push paused
           </Button>
         </DialogFooter>
-        {push.isSuccess && push.data.validateOnly && (
-          <p className="text-xs text-emerald-400">
-            Dry run passed: {platformName} accepted the ad set and the first ad.
-            The other {draftAdCount > 1 ? draftAdCount - 1 : 0} are checked on
-            push.
-          </p>
-        )}
         {push.isSuccess &&
           "warnings" in push.data &&
           (push.data.warnings ?? []).map((warning) => (
