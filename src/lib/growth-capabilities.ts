@@ -82,6 +82,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "createIdea",
     "updateWorkItem",
     "setFirstComment",
+    "setPublishSettings",
     "setThread",
     "addCrossPost",
     "createPlatformPost",

@@ -19,6 +19,7 @@ import {
   channelTable,
   type MediaItem,
   platformPostTable,
+  type PublishSettings,
 } from "@/server/db/schema";
 import { isStoryFormat, sequenceScheduledAt } from "@/lib/platform-sequence";
 import { buildZernioReschedulePayload } from "@/lib/zernio-reschedule";
@@ -162,11 +163,22 @@ function validateLinkedIn(item: DeliveryItem) {
   return { text, media };
 }
 
-function validateFacebook(item: DeliveryItem) {
+function isReelFormat(format: string | null) {
+  return format?.toLowerCase().endsWith(".reel") ?? false;
+}
+
+function requireSingleVideo(media: ReturnType<typeof publicMedia>) {
+  if (media.length !== 1 || media[0]!.type !== "video") {
+    throw new Error("A Reel needs exactly one vertical (9:16) video");
+  }
+}
+
+function validateFacebook(item: DeliveryItem, format: string | null) {
   const text = item.text?.trim() ?? "";
   const media = publicMedia(item.media);
   const images = media.filter((entry) => entry.type === "image");
   const videos = media.filter((entry) => entry.type === "video");
+  if (isReelFormat(format)) requireSingleVideo(media);
   if (!text && !media.length) {
     throw new Error("Add copy or media before publishing");
   }
@@ -197,6 +209,9 @@ function validateInstagram(item: DeliveryItem, format: string | null) {
   if (isStory && media.length !== 1) {
     throw new Error("Instagram Stories require exactly one media item");
   }
+  // Zernio turns a lone video into a Reel on its own; an image would quietly
+  // go to the feed instead, so a Reel spot must carry the video.
+  if (isReelFormat(format)) requireSingleVideo(media);
   return { text, media, isStory };
 }
 
@@ -230,11 +245,12 @@ function validateX(item: DeliveryItem) {
   return { text, media };
 }
 
-function deliveryPayload(input: {
+export function deliveryPayload(input: {
   platform: SocialPublishingPlatform;
   format: string | null;
   items: DeliveryItem[];
   firstComment?: string | null;
+  publishSettings?: PublishSettings | null;
 }): DeliveryPayload {
   const root = input.items[0];
   if (!root) throw new Error("Platform post not found");
@@ -263,9 +279,16 @@ function deliveryPayload(input: {
     if (input.items.length > 1) {
       throw new Error("Facebook thread groups are not supported");
     }
+    const settings = input.publishSettings ?? {};
+    const reel = isReelFormat(input.format);
+    const data = {
+      ...(reel ? { contentType: "reel" } : {}),
+      ...(reel && settings.title ? { title: settings.title } : {}),
+      ...(firstComment ? { firstComment } : {}),
+    };
     return {
-      ...validateFacebook(root),
-      platformSpecificData: firstComment ? { firstComment } : undefined,
+      ...validateFacebook(root, input.format),
+      platformSpecificData: Object.keys(data).length ? data : undefined,
     };
   }
   if (input.platform === "instagram") {
@@ -273,16 +296,32 @@ function deliveryPayload(input: {
       throw new Error("Instagram thread groups are not supported");
     }
     const { text, media, isStory } = validateInstagram(root, input.format);
+    const settings = input.publishSettings ?? {};
+    const reel = isReelFormat(input.format);
+    const data = {
+      ...(isStory ? { contentType: "story" } : {}),
+      ...(firstComment ? { firstComment } : {}),
+      ...(reel && settings.coverUrl
+        ? { instagramThumbnail: settings.coverUrl }
+        : {}),
+      ...(reel && settings.coverOffsetMs !== undefined
+        ? { thumbOffset: settings.coverOffsetMs }
+        : {}),
+      ...(reel && settings.shareToFeed !== undefined
+        ? { shareToFeed: settings.shareToFeed }
+        : {}),
+      ...(reel && settings.trial
+        ? { trialParams: { graduationStrategy: settings.trial } }
+        : {}),
+      ...(!isStory && settings.collaborators?.length
+        ? { collaborators: settings.collaborators }
+        : {}),
+      ...(settings.isAiGenerated ? { isAiGenerated: true } : {}),
+    };
     return {
       text,
       media,
-      platformSpecificData:
-        isStory || firstComment
-          ? {
-              ...(isStory ? { contentType: "story" } : {}),
-              ...(firstComment ? { firstComment } : {}),
-            }
-          : undefined,
+      platformSpecificData: Object.keys(data).length ? data : undefined,
     };
   }
 
@@ -415,6 +454,7 @@ async function loadSocialSpot(platformPostId: string) {
         format: spot.format,
         items,
         firstComment: spot.firstCommentText,
+        publishSettings: spot.publishSettings,
       });
   if (story) {
     items.forEach((item, index) => validateStoryFrame(item, index + 1));
@@ -767,6 +807,91 @@ export async function saveSocialFirstComment(input: {
   };
 }
 
+/**
+ * Check publish options against what Zernio accepts for this platform and
+ * format, so a Reel-only field never rides along on a feed post unnoticed.
+ */
+export function validatePublishSettings(input: {
+  platform: string;
+  format: string | null;
+  settings: PublishSettings;
+}): PublishSettings {
+  const reel = isReelFormat(input.format);
+  const story = isStoryFormat(input.format);
+  const settings = Object.fromEntries(
+    Object.entries(input.settings).filter(([, value]) => value !== undefined),
+  ) as PublishSettings;
+  const reject = (field: string, where: string) => {
+    throw new Error(`${field} is only available on ${where}`);
+  };
+  if (input.platform === "instagram") {
+    if (!reel) {
+      if (settings.coverUrl) reject("A cover image", "Instagram Reels");
+      if (settings.coverOffsetMs !== undefined)
+        reject("A cover frame", "Instagram Reels");
+      if (settings.shareToFeed !== undefined)
+        reject("Share to feed", "Instagram Reels");
+      if (settings.trial) reject("Trial Reels", "Instagram Reels");
+    }
+    if (story && settings.collaborators?.length) {
+      reject("Collaborators", "Instagram feed posts, carousels and Reels");
+    }
+    if (settings.title) reject("A Reel title", "Facebook Reels");
+  } else if (input.platform === "facebook") {
+    const { title, ...rest } = settings;
+    if (Object.keys(rest).length) {
+      throw new Error("Facebook takes only a Reel title");
+    }
+    if (title && !reel) reject("A Reel title", "Facebook Reels");
+  } else if (Object.keys(settings).length) {
+    throw new Error("Publish options are available on Instagram and Facebook");
+  }
+  if (settings.collaborators) {
+    settings.collaborators = settings.collaborators
+      .map((name) => name.trim().replace(/^@/, ""))
+      .filter(Boolean);
+    if (settings.collaborators.length > 3) {
+      throw new Error("Instagram allows at most 3 collaborators");
+    }
+  }
+  if (settings.coverUrl && !settings.coverUrl.startsWith("https://")) {
+    throw new Error("The cover image needs a public https URL");
+  }
+  return settings;
+}
+
+export async function saveSocialPublishSettings(input: {
+  platformPostId: string;
+  settings: PublishSettings | null;
+}) {
+  const spot = await db.query.platformPostTable.findFirst({
+    where: eq(platformPostTable.id, input.platformPostId),
+  });
+  if (!spot) throw new Error("Platform post not found");
+  if (spot.parentPlatformPostId) {
+    throw new Error("Set publish options on the root post");
+  }
+  if (spot.deliveryExternalId) {
+    throw new Error(
+      "This post is already in Zernio. Its publish options were sent with the job.",
+    );
+  }
+  const settings = input.settings
+    ? validatePublishSettings({
+        platform: spot.platform,
+        format: spot.format,
+        settings: input.settings,
+      })
+    : null;
+  const publishSettings =
+    settings && Object.keys(settings).length ? settings : null;
+  await db
+    .update(platformPostTable)
+    .set({ publishSettings })
+    .where(eq(platformPostTable.id, spot.id));
+  return { platformPostId: spot.id, publishSettings };
+}
+
 /** Provider update for a first comment on an already queued post. */
 export async function updateQueuedSocialFirstComment(input: {
   platformPostId: string;
@@ -797,6 +922,7 @@ export async function updateQueuedSocialFirstComment(input: {
     format: spot.format,
     items,
     firstComment,
+    publishSettings: spot.publishSettings,
   });
   const current = await getZernioPost(spot.deliveryExternalId);
   if (!current) throw new Error("The Zernio post no longer exists");

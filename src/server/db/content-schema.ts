@@ -67,6 +67,28 @@ export type MediaItem = {
   derivedFrom?: string; // source media_asset.id this rendition came from
 };
 
+/**
+ * Provider publish options for one owned spot, sent to Zernio with the post.
+ * Only the fields the spot's platform and format accept are allowed; see
+ * `validatePublishSettings`.
+ */
+export type PublishSettings = {
+  /** Reel cover image (IG `instagramThumbnail`), JPEG or PNG, 1080x1920. */
+  coverUrl?: string;
+  /** Reel cover frame, ms from the start. Ignored when `coverUrl` is set. */
+  coverOffsetMs?: number;
+  /** IG Reels: false keeps the Reel off the main grid (Reels tab only). */
+  shareToFeed?: boolean;
+  /** IG Reels shown only to non-followers first. */
+  trial?: "MANUAL" | "SS_PERFORMANCE";
+  /** IG: up to 3 public Business/Creator usernames invited as collaborators. */
+  collaborators?: string[];
+  /** Facebook Reels: title shown separately from the caption. */
+  title?: string;
+  /** IG: Meta's "AI info" label for AI-generated images or video. */
+  isAiGenerated?: boolean;
+};
+
 // ---- FORMAT (two axes; both soft text validated against the registry) ----
 //
 // `archetype` = publish MECHANIC (image | carousel | video_short | text | …);
@@ -512,6 +534,9 @@ export const platformPostTable = pgTable(
     firstCommentStatus: t.text(),
     firstCommentError: t.text(),
     firstCommentUpdatedAt: t.timestamp({ withTimezone: true }),
+    // Zernio publish options (Reel cover, trial, collaborators...). Local
+    // until the spot is handed to Zernio, then frozen with the job.
+    publishSettings: t.jsonb().$type<PublishSettings>(),
 
     // The connector that most recently hydrated this mirror. Kept separate
     // from `provider`: a native Instagram post may be ingested through Zernio,

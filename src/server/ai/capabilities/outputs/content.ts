@@ -10,6 +10,16 @@ import {
 import { z } from "zod";
 
 /** Wire results for this capability. Dates are ISO strings after JSON normalization. */
+export const publishSettingsSchema = z.strictObject({
+  coverUrl: z.string().optional(),
+  coverOffsetMs: z.number().optional(),
+  shareToFeed: z.boolean().optional(),
+  trial: z.enum(["MANUAL", "SS_PERFORMANCE"]).optional(),
+  collaborators: z.array(z.string()).optional(),
+  title: z.string().optional(),
+  isAiGenerated: z.boolean().optional(),
+});
+
 const mediaItemSchema = z.strictObject({
   assetId: z.string().optional(),
   derivedFrom: z.string().optional(),
@@ -84,6 +94,7 @@ export const getContentWorkItemOutputSchema = z.strictObject({
       firstCommentError: z.string().nullable(),
       firstCommentStatus: z.string().nullable(),
       firstCommentUpdatedAt: z.iso.datetime().nullable(),
+      publishSettings: publishSettingsSchema.nullable(),
       format: z.string().nullable(),
       id: z.string(),
       media: z.array(mediaItemSchema),
@@ -177,6 +188,11 @@ export const updateContentWorkItemOutputSchema = z.strictObject({
   ok: z.literal(true),
   updatedPlatformPosts: z.array(z.string()),
   url: z.string(),
+});
+
+export const setPlatformPostPublishSettingsOutputSchema = z.strictObject({
+  platformPostId: z.string(),
+  publishSettings: publishSettingsSchema.nullable(),
 });
 
 export const setPlatformPostFirstCommentOutputSchema = z.strictObject({

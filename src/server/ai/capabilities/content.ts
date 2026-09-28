@@ -3,6 +3,7 @@ import {
   searchContentWorkItemsOutputSchema,
   updateContentWorkItemOutputSchema,
   setPlatformPostFirstCommentOutputSchema,
+  setPlatformPostPublishSettingsOutputSchema,
   setPlatformPostThreadOutputSchema,
   addContentCrossPostOutputSchema,
   attachChatImageToContentOutputSchema,
@@ -57,7 +58,10 @@ import {
   ContentService,
   deliveryBlockReason,
 } from "@/server/services/content.service";
-import { saveSocialFirstComment } from "@/server/services/content-publishing.service";
+import {
+  saveSocialFirstComment,
+  saveSocialPublishSettings,
+} from "@/server/services/content-publishing.service";
 import { MediaService } from "@/server/services/media.service";
 import { analyzeStoredMediaAsset } from "@/server/services/media-asset-analysis.service";
 import {
@@ -224,6 +228,7 @@ export const getContentWorkItem = growthAction({
         firstCommentStatus: group.root.firstCommentStatus,
         firstCommentError: group.root.firstCommentError,
         firstCommentUpdatedAt: group.root.firstCommentUpdatedAt,
+        publishSettings: group.root.publishSettings,
         media: group.root.media ?? [],
         assetLinks: group.root.assetLinks ?? [],
         threadItems: group.items.map((post, index) => ({
@@ -526,6 +531,70 @@ export const setPlatformPostFirstComment = growthAction({
       );
     }
     return saveSocialFirstComment(input);
+  },
+});
+
+export const setPlatformPostPublishSettings = growthAction({
+  outputSchema: setPlatformPostPublishSettingsOutputSchema,
+  description:
+    "Set or clear the Zernio publish options on one owned Instagram or Facebook post before it is scheduled. Replaces the whole set; pass null to clear. Instagram Reels (format instagram.reel): coverUrl, coverOffsetMs, shareToFeed, trial. Instagram feed, carousels and Reels: collaborators, isAiGenerated. Facebook Reels (format facebook.reel): title. Local only; refused once the post is in Zernio.",
+  inputSchema: z.object({
+    platformPostId: z.string(),
+    settings: z
+      .object({
+        coverUrl: z
+          .string()
+          .url()
+          .optional()
+          .describe(
+            "Public https JPEG or PNG for the Reel cover, ideally 1080x1920. Use a library media URL.",
+          ),
+        coverOffsetMs: z
+          .number()
+          .int()
+          .min(0)
+          .optional()
+          .describe(
+            "Frame to use as the cover, ms from the start. Ignored with coverUrl.",
+          ),
+        shareToFeed: z
+          .boolean()
+          .optional()
+          .describe(
+            "false keeps the Reel in the Reels tab only. Instagram defaults to true.",
+          ),
+        trial: z
+          .enum(["MANUAL", "SS_PERFORMANCE"])
+          .optional()
+          .describe(
+            "Trial Reel, shown to non-followers first. SS_PERFORMANCE graduates it to followers automatically when it performs; MANUAL waits for the account owner.",
+          ),
+        collaborators: z
+          .array(z.string())
+          .max(3)
+          .optional()
+          .describe("Up to 3 public Business or Creator usernames, without @."),
+        title: z.string().max(255).optional().describe("Facebook Reel title."),
+        isAiGenerated: z
+          .boolean()
+          .optional()
+          .describe(
+            "Instagram AI info label, for AI-generated images or video only.",
+          ),
+      })
+      .nullable(),
+  }),
+  execute: async (input, ctx) => {
+    const post = await db.query.platformPostTable.findFirst({
+      where: eq(platformPostTable.id, input.platformPostId),
+      with: { brand: true },
+    });
+    if (post?.source !== "owned" || post?.brand?.organizationId !== ctx.orgId) {
+      throw new Error(
+        "That owned social post is not available in this organization",
+      );
+    }
+    return saveSocialPublishSettings(input);
   },
 });
 

@@ -273,7 +273,7 @@ export const PLATFORM_FORMATS: PlatformFormat[] = [
     archetype: "video_short",
     label: "Reel",
     surface: "reels",
-    media: { kinds: ["video"], aspectRatios: ["9:16"], maxDurationSec: 90 },
+    media: { kinds: ["video"], aspectRatios: ["9:16"], maxDurationSec: 60 },
   },
   {
     id: "facebook.story",

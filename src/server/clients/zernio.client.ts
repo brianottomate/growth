@@ -180,7 +180,11 @@ export async function createZernioProfile(input: {
 // https://docs.zernio.com/connect
 
 export type ZernioConnectPlatform =
-  | { kind: "posting"; platform: string }
+  | {
+      kind: "posting";
+      platform: string;
+      loginMethod?: "instagram_login" | "facebook_login";
+    }
   | { kind: "ads"; platform: string };
 
 export async function getZernioConnectUrl(input: {
@@ -192,6 +196,9 @@ export async function getZernioConnectUrl(input: {
     profileId: input.profileId,
     redirect_url: input.redirectUrl,
   });
+  if (input.target.kind === "posting" && input.target.loginMethod) {
+    params.set("loginMethod", input.target.loginMethod);
+  }
   const path =
     input.target.kind === "ads"
       ? `/connect/${input.target.platform}/ads`

@@ -209,6 +209,7 @@ export const growthActionPolicies = {
     createIdea: write(),
     updateWorkItem: write({ idempotent: true }),
     setFirstComment: write({ idempotent: true }),
+    setPublishSettings: write({ idempotent: true }),
     setThread: write({ idempotent: true }),
     addCrossPost: write(),
     createPlatformPost: write(),

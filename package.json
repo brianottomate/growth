@@ -15,6 +15,7 @@
     "db:apply:hubspot-sync": "bun --conditions=react-server scripts/apply-hubspot-company-sync-schema.ts",
     "db:apply:pregen-evaluation-receipts": "bun --conditions=react-server scripts/apply-pregen-evaluation-receipt-schema.ts",
     "db:apply:content-parity": "bun --conditions=react-server scripts/apply-content-parity-schema.ts",
+    "db:apply:publish-settings": "bun --conditions=react-server scripts/apply-publish-settings-column.ts",
     "db:apply:catalog-approval": "bun --conditions=react-server scripts/apply-catalog-approval-schema.ts",
     "db:apply:brand-markets": "bun --conditions=react-server scripts/apply-brand-markets-column.ts",
     "db:apply:catalog-pills": "bun --conditions=react-server scripts/apply-catalog-pills-column.ts",

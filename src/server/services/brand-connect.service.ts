@@ -40,7 +40,14 @@ export const BRAND_CONNECT_CHANNELS = [
   {
     key: "instagram",
     label: "Instagram",
-    target: { kind: "posting", platform: "instagram" },
+    // Facebook Login reaches accounts Wander manages through a Business
+    // Portfolio grant (Leadsie), so staff can connect without the client's
+    // Instagram password. It is also the login the ads scopes need.
+    target: {
+      kind: "posting",
+      platform: "instagram",
+      loginMethod: "facebook_login",
+    },
     channelPlatform: "instagram",
   },
   {
