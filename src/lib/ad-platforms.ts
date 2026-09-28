@@ -74,6 +74,13 @@ export type AdPlatformSpec = {
     /** The campaign's ad sets, when known: the link opens on their ads. */
     adSetIds?: string[],
   ) => string | undefined;
+  /** One ad, opened in the platform's editor; only where it has a link. */
+  adManageUrl?: (input: {
+    accountId: string;
+    campaignId: string;
+    adSetId: string;
+    adId: string;
+  }) => string;
 };
 
 const identity = (value: string) => value;
@@ -122,6 +129,8 @@ export const AD_PLATFORM_SPECS: readonly AdPlatformSpec[] = [
     accountManageUrl: metaAccountUrl,
     // The Ads view, filtered to the campaign and its ad sets: the level an
     // operator reviews a push at.
+    adManageUrl: ({ accountId, campaignId, adSetId, adId }) =>
+      `https://adsmanager.facebook.com/adsmanager/manage/ads/edit/standalone?act=${accountId.replace(/^act_/i, "")}&selected_campaign_ids=${campaignId}&selected_adset_ids=${adSetId}&selected_ad_ids=${adId}&current_step=0`,
     campaignManageUrl: (accountId, campaignId, adSetIds) =>
       `https://adsmanager.facebook.com/adsmanager/manage/ads?act=${accountId.replace(/^act_/i, "")}&selected_campaign_ids=${campaignId}${
         adSetIds?.length ? `&selected_adset_ids=${adSetIds.join(",")}` : ""

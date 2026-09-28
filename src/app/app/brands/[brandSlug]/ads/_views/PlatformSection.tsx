@@ -10,6 +10,7 @@ import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { isPushableAdPlatform } from "@/lib/ad-platforms";
 import { db } from "@/server/db";
 import { eq } from "drizzle-orm";
+import { adPlatformSpec } from "@/lib/ad-platforms";
 import { platformAdTable, type PlatformCampaign } from "@/server/db/schema";
 
 import { fmtDate, money, statusStyle } from "./format";
@@ -164,6 +165,26 @@ export async function PlatformSection({
   });
   const stats = platformCampaign.stats ?? {};
   const running = platformCampaign.status === "live";
+  // Each ad opens on its own editor in the platform. The account is the one
+  // the push used, or the act= of a synced campaign's link.
+  const adAccountId =
+    platformCampaign.settings?.meta?.destination?.adAccountId ??
+    actOf(platformCampaign.manageUrl);
+  const adLink = (ad: (typeof ads)[number]) => {
+    const build = adPlatformSpec(platform)?.adManageUrl;
+    return build &&
+      adAccountId &&
+      platformCampaign.externalId &&
+      ad.externalAdSetId &&
+      ad.externalId
+      ? build({
+          accountId: adAccountId,
+          campaignId: platformCampaign.externalId,
+          adSetId: ad.externalAdSetId,
+          adId: ad.externalId,
+        })
+      : null;
+  };
   const figures = [
     {
       label: "Spend",
@@ -263,10 +284,20 @@ export async function PlatformSection({
         <div className="flex w-full gap-2 overflow-x-auto">
           {ads.map((ad) => {
             const image = posterForMedia(ad.media?.[0]) ?? ad.thumbnailUrl;
+            const href = adLink(ad);
+            const Tile = href ? "a" : "div";
             return (
-              <div
+              <Tile
                 key={ad.id}
-                className="w-32 shrink-0 overflow-hidden rounded-lg border bg-background"
+                {...(href
+                  ? {
+                      href,
+                      target: "_blank",
+                      rel: "noreferrer",
+                      title: `Open ${ad.name ?? "this ad"} in ${label}`,
+                    }
+                  : {})}
+                className="w-32 shrink-0 overflow-hidden rounded-lg border bg-background hover:border-foreground/40"
               >
                 <div className="relative h-20 bg-muted">
                   {image && (
@@ -292,11 +323,21 @@ export async function PlatformSection({
                     </p>
                   )}
                 </div>
-              </div>
+              </Tile>
             );
           })}
         </div>
       )}
     </div>
   );
+}
+
+/** The ad account in an Ads Manager link, or null. */
+function actOf(url: string | null) {
+  if (!url) return null;
+  try {
+    return new URL(url).searchParams.get("act");
+  } catch {
+    return null;
+  }
 }
