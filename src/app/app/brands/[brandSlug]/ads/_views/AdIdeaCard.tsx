@@ -874,6 +874,20 @@ export function AdIdeaCard({
                     />
                   </label>
                   <label className="block space-y-1 text-xs">
+                    Description
+                    <Input
+                      value={document.copy.description ?? ""}
+                      maxLength={120}
+                      placeholder="Blank lets Meta use the landing page's"
+                      onChange={(e) =>
+                        edit((d) => ({
+                          ...d,
+                          copy: { ...d.copy, description: e.target.value },
+                        }))
+                      }
+                    />
+                  </label>
+                  <label className="block space-y-1 text-xs">
                     Primary text
                     <Textarea
                       value={document.copy.body}

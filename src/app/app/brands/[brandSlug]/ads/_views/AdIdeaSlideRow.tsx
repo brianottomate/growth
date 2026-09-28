@@ -352,6 +352,32 @@ export function AdIdeaSlideRow({
                 </>
               )}
 
+              {!isStatic && (
+                <div className="space-y-3 border-t pt-3">
+                  <h5 className="text-xs font-medium">Card copy · Meta</h5>
+                  {(["headline", "description"] as const).map((key) => (
+                    <label key={key} className="block space-y-1 text-xs">
+                      {key === "headline" ? "Headline" : "Description"}
+                      <Input
+                        value={card.copy?.[key] ?? ""}
+                        maxLength={key === "headline" ? 300 : 120}
+                        placeholder={
+                          key === "headline"
+                            ? "Blank uses the ad's headline"
+                            : "Blank uses the ad's description"
+                        }
+                        onChange={(e) =>
+                          updateCard((c) => ({
+                            ...c,
+                            copy: { ...c.copy, [key]: e.target.value },
+                          }))
+                        }
+                      />
+                    </label>
+                  ))}
+                </div>
+              )}
+
               <div className="space-y-3 border-t pt-3">
                 <h5 className="text-xs font-medium">
                   Image settings · {IDEA_SHAPE_LABELS[shape]}

@@ -27,6 +27,9 @@ import { posterForMedia } from "@/lib/media-url";
 
 export type SocialMockMedia = {
   url: string;
+  /** A carousel card's own headline and description; blank uses the ad's. */
+  headline?: string | null;
+  description?: string | null;
   /** Loose on purpose: call sites carry their own row types with `type?: string`. */
   type?: string | null;
   thumbnail?: string | null;
@@ -42,6 +45,7 @@ export type SocialMockAvatar = {
 
 export type SocialMockAd = {
   headline: string | null;
+  description?: string | null;
   link: string | null;
   callToAction: string | null;
 };
@@ -82,13 +86,16 @@ const CROP_CLASS: Record<Exclude<SocialMockCrop, "auto">, string> = {
 };
 
 export const ctaLabel = (cta: string | null | undefined) =>
-  cta
-    ? cta
-        .toLowerCase()
-        .split("_")
-        .map((word) => word[0]?.toUpperCase() + word.slice(1))
-        .join(" ")
-    : "Learn more";
+  // Meta labels both booking types "Book now".
+  cta === "BOOK_NOW" || cta === "BOOK_TRAVEL"
+    ? "Book now"
+    : cta
+      ? cta
+          .toLowerCase()
+          .split("_")
+          .map((word) => word[0]?.toUpperCase() + word.slice(1))
+          .join(" ")
+      : "Learn more";
 
 export const domainOf = (url: string | null | undefined) => {
   if (!url) return "";
@@ -425,16 +432,27 @@ function Copy({
   );
 }
 
-function AdCard({ ad, name }: { ad: SocialMockAd; name: string }) {
+function AdCard({
+  ad,
+  name,
+  card,
+}: {
+  ad: SocialMockAd;
+  name: string;
+  card?: SocialMockMedia;
+}) {
+  const headline = card?.headline || ad.headline;
+  const description = card?.description || ad.description;
   return (
     <div className="flex items-center gap-2 bg-neutral-100 px-3 py-2">
       <div className="min-w-0 flex-1">
         <p className="text-[10px] tracking-wide text-neutral-500">
           {domainOf(ad.link)}
         </p>
-        <p className="truncate text-[13px] font-semibold">
-          {ad.headline ?? name}
-        </p>
+        <p className="truncate text-[13px] font-semibold">{headline ?? name}</p>
+        {description && (
+          <p className="truncate text-[12px] text-neutral-500">{description}</p>
+        )}
       </div>
       <span className="shrink-0 rounded bg-neutral-200 px-2.5 py-1 text-[12px] font-medium">
         {ctaLabel(ad.callToAction)}
@@ -498,7 +516,7 @@ function FacebookMock({
             onCard={onCard}
             play={play}
           />
-          <AdCard ad={post.ad} name={post.name} />
+          <AdCard ad={post.ad} name={post.name} card={post.media[card ?? 0]} />
         </>
       ) : (
         <FacebookPhotos media={post.media} crop={crop} play={play} />
@@ -670,7 +688,9 @@ function GenericMock({ post, crop, card, onCard, play, clampText }: MockProps) {
           play={play}
         />
       )}
-      {post.ad && <AdCard ad={post.ad} name={post.name} />}
+      {post.ad && (
+        <AdCard ad={post.ad} name={post.name} card={post.media[card ?? 0]} />
+      )}
       {post.firstComment && (
         <p className="border-t px-3 py-2 text-[11px] leading-relaxed text-neutral-600">
           <span className="font-medium">First comment · </span>

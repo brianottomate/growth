@@ -18,6 +18,9 @@ export type AdMockMedia = {
   url: string;
   thumbnail?: string | null;
   type?: string | null;
+  /** A carousel card's own headline and description; blank uses the ad's. */
+  headline?: string | null;
+  description?: string | null;
 };
 
 /**
@@ -55,6 +58,7 @@ export function AdMock({
   brandLogo,
   body,
   headline,
+  description = null,
   link,
   callToAction,
   media,
@@ -83,6 +87,8 @@ export function AdMock({
   brandLogo: string | null;
   body: string | null;
   headline: string | null;
+  /** Meta's line under the headline. */
+  description?: string | null;
   link: string | null;
   callToAction: string | null;
   media: AdMockMedia[];
@@ -134,7 +140,7 @@ export function AdMock({
           ...(preserveArtwork ? { fit: "contain" as const } : {}),
         })),
         sponsored: true,
-        ad: { headline, link, callToAction },
+        ad: { headline, description, link, callToAction },
       }}
     />
   );

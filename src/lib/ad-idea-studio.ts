@@ -37,8 +37,15 @@ export type IdeaRecipe = z.infer<typeof ideaRecipeSchema>;
 export const ideaCopySchema = z.object({
   headline: z.string().max(300),
   body: z.string().max(5000),
+  /** Meta's grey line under the headline; empty lets Meta scrape the page. */
+  description: z.string().max(120).optional(),
   linkUrl: z.union([z.string().url(), z.literal("")]),
   callToAction: z.string().max(60),
+});
+/** One carousel card's own words on Meta; blank falls back to the ad's. */
+export const ideaCardCopySchema = z.object({
+  headline: z.string().max(300).optional(),
+  description: z.string().max(120).optional(),
 });
 export const ideaSourceSchema = z.object({
   label: z.string().optional(),
@@ -72,6 +79,7 @@ export const ideaDocumentSchema = z
           mode: z.enum(["supplied", "compose"]),
           recipe: ideaRecipeSchema,
           overrides: z.partialRecord(ideaShapeSchema, ideaRecipeSchema),
+          copy: ideaCardCopySchema.optional(),
         }),
       )
       .max(10),
@@ -140,6 +148,7 @@ export function ideaDocumentFromAd(ad: {
     copy: {
       headline: c.headline ?? "",
       body: c.body ?? "",
+      ...(c.description ? { description: c.description } : {}),
       linkUrl: c.linkUrl ?? "",
       callToAction: c.callToAction ?? "BOOK_NOW",
     },
@@ -167,7 +176,18 @@ export function ideaDocumentFromAd(ad: {
         };
         mode = c.photoOnly ? "supplied" : "compose";
       }
-      return { id: `card-${index}`, source, recipe, mode, overrides: {} };
+      const copy =
+        media.headline || media.description
+          ? { headline: media.headline, description: media.description }
+          : undefined;
+      return {
+        id: `card-${index}`,
+        source,
+        recipe,
+        mode,
+        overrides: {},
+        ...(copy ? { copy } : {}),
+      };
     }),
   });
 }
@@ -256,6 +276,15 @@ export const IDEA_PLACEMENT_KEYS: Record<IdeaShape, string[]> = {
   story: ["meta_ads:story"],
   wide: ["meta_ads:landscape"],
 };
+/** A card's own Meta copy, trimmed; blank fields are left for the ad's. */
+function cardCopy(card: IdeaImage): Pick<AdCard, "headline" | "description"> {
+  const headline = card.copy?.headline?.trim();
+  const description = card.copy?.description?.trim();
+  return {
+    ...(headline ? { headline } : {}),
+    ...(description ? { description } : {}),
+  };
+}
 /** Project the rich idea into existing ad content and placement fields; never discard the recipe. */
 export function projectIdea(
   brandId: string,
@@ -295,6 +324,8 @@ export function projectIdea(
   const next: AdCreativeContent = {
     ...content,
     ...baseCopy,
+    // Cleared in the idea means cleared on the ad, not the old value kept.
+    description: baseCopy.description?.trim() || undefined,
     photoOnly: false,
     format: doc.role === "hero_static" ? "static" : "carousel",
     ideaStudio: studio,
@@ -302,6 +333,7 @@ export function projectIdea(
       ? []
       : baseCards.map((card, index) => ({
           ...card!,
+          ...cardCopy(doc.cards[index]!),
           ...(stories[index]
             ? { story: { ...stories[index], via: "render" as const } }
             : {}),

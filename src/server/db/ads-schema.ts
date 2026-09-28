@@ -176,6 +176,9 @@ export type AdPlacements = Record<string, AdPlacementCell>;
  */
 export type AdCard = MediaItem & {
   story?: AdPlacementVariant;
+  /** Carousel card's own Meta headline and description; blank uses the ad's. */
+  headline?: string;
+  description?: string;
 };
 
 /** Content of a `creative` ad: one image/carousel plus its copy. */
@@ -198,6 +201,8 @@ export type AdCreativeContent = {
   format?: AdFormat;
   headline: string;
   body: string;
+  /** Meta's line under the headline; absent lets Meta scrape the landing page. */
+  description?: string;
   /** Falls back to the campaign's landing URL. */
   linkUrl?: string;
   callToAction?: string;

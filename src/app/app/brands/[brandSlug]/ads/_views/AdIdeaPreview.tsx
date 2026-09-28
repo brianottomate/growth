@@ -115,6 +115,7 @@ export function AdIdeaPreview({
                       brandLogo={brandLogo}
                       body={surfaceCopy.body}
                       headline={surfaceCopy.headline}
+                      description={surfaceCopy.description ?? null}
                       link={surfaceCopy.linkUrl ?? null}
                       callToAction={surfaceCopy.callToAction ?? null}
                       media={surfaceMedia}

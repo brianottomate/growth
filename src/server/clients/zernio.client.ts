@@ -1209,6 +1209,8 @@ export type CreateZernioStandaloneAdInput = {
     // body — those seed the ad set, not the individual ads.
     headline: string;
     body: string;
+    /** Meta link description; omitted lets Meta scrape the destination. */
+    description?: string;
     /** Image creative; mutually exclusive with `video`. */
     imageUrl?: string;
     /** Video creative: url + a still-image thumbnail. Replaces imageUrl. */

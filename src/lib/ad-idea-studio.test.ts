@@ -225,3 +225,42 @@ test("retains export selection independently of editable sizes and compositions"
     ideaDocumentSchema.parse({ ...document, exportShapes: [] }).exportShapes,
   ).toEqual([]);
 });
+
+describe("Meta copy per card", () => {
+  test("a card's own headline and description reach the ad; blanks inherit", () => {
+    const document = draft();
+    document.copy = {
+      ...document.copy,
+      description: "Sleeps 12 · private pool",
+    };
+    document.cards = [
+      {
+        ...document.cards[0]!,
+        copy: { headline: "  The pool  ", description: "" },
+      },
+      { ...document.cards[0]!, id: "two" },
+    ];
+    const result = projectIdea("brand-one", content, { document }, null);
+    expect(result.content.description).toBe("Sleeps 12 · private pool");
+    expect(result.content.media[0]!.headline).toBe("The pool");
+    expect(result.content.media[0]!.description).toBeUndefined();
+    expect(result.content.media[1]!.headline).toBeUndefined();
+  });
+
+  test("clearing the description in the idea clears it on the ad", () => {
+    const document = draft();
+    const result = projectIdea(
+      "brand-one",
+      { ...content, description: "Old line" },
+      {
+        document: { ...document, copy: { ...document.copy, description: " " } },
+      },
+      null,
+    );
+    expect(result.content.description).toBeUndefined();
+  });
+
+  test("old documents without card copy still parse", () => {
+    expect(ideaDocumentSchema.safeParse(draft()).success).toBe(true);
+  });
+});

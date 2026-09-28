@@ -1766,7 +1766,10 @@ export async function previewDraftAd(
           child_attachments: content.media.slice(0, 10).map((item) => ({
             link,
             picture: item.url,
-            name: content.headline,
+            name: item.headline ?? content.headline,
+            ...((item.description ?? content.description)
+              ? { description: item.description ?? content.description }
+              : {}),
             ...(content.callToAction
               ? {
                   call_to_action: {
@@ -1781,6 +1784,7 @@ export async function previewDraftAd(
           link,
           message: content.body,
           name: content.headline,
+          ...(content.description ? { description: content.description } : {}),
           picture: content.media[0]!.url,
           ...(content.callToAction
             ? {
@@ -2783,8 +2787,12 @@ async function pushToMeta(args: PushArgs) {
   const carouselCardsFor = (content: AdCreativeContent) =>
     content.media.slice(0, 10).map((item, index) => ({
       imageUrl: item.url,
+      // A card's own words win; blank inherits the ad's, as on every
+      // platform that only knows one headline.
       headline:
-        index === 0 ? content.headline : (content.headline ?? campaign.name),
+        item.headline ??
+        (index === 0 ? content.headline : (content.headline ?? campaign.name)),
+      description: item.description ?? content.description,
       linkUrl: content.linkUrl ?? linkUrl,
       callToAction: metaCallToAction(content),
     }));
@@ -2796,6 +2804,7 @@ async function pushToMeta(args: PushArgs) {
       // multi-creative shape; Meta does not fall back per creative.
       headline: content.headline,
       body: content.body,
+      description: content.description,
       ...(isVideoContent(content)
         ? { video: videoPayloadFor(ad.name, content) }
         : { imageUrl: content.media[0]!.url }),
@@ -2942,6 +2951,7 @@ async function pushToMeta(args: PushArgs) {
             adName: adNameFor(lead.ad, lead.content),
             headline: lead.content.headline,
             body: lead.content.body,
+            description: lead.content.description,
             linkUrl: lead.content.linkUrl ?? linkUrl,
             callToAction: metaCallToAction(lead.content),
             ...(shape === "carousel"
@@ -2985,6 +2995,7 @@ async function pushToMeta(args: PushArgs) {
           goal: input.goal,
           headline: content.headline,
           body: content.body,
+          description: content.description,
           linkUrl: content.linkUrl ?? linkUrl,
           callToAction: metaCallToAction(content),
           ...(isCarousel(content)

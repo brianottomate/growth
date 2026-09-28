@@ -1256,6 +1256,7 @@ function ProjectedAd({
                   brandLogo={brandLogo}
                   body={content.body}
                   headline={content.headline}
+                  description={content.description ?? null}
                   link={content.linkUrl ?? null}
                   callToAction={
                     content.callToAction ?? META_DEFAULT_CALL_TO_ACTION
