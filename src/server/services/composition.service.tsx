@@ -620,7 +620,9 @@ function Message({
       ? 22
       : spec.formatId === "portrait" || spec.formatId === "square"
         ? 26
-        : 42,
+        : spec.formatId === "wide"
+          ? 22
+          : 42,
   );
   const subtitleLines = wrapText(
     clamp(spec.subtitle, 220),
@@ -818,7 +820,10 @@ export function renderComposition(
           paddingRight: 96,
         }
       : { padding };
-  const titleSize = portrait ? 78 : 68;
+  // A 16:9 ad is 1920 wide but shows at feed width like a 1080 card, so its
+  // type is set about 1.4x larger to read the same.
+  const video = spec.formatId === "wide";
+  const titleSize = portrait ? 78 : video ? 96 : 68;
   // A focal point pans the cover crop so that point of the photo lands at the
   // same fraction of the canvas, which keeps it in frame whatever the ratio.
   const imagePosition = spec.focal
@@ -837,12 +842,20 @@ export function renderComposition(
     // headline and drops the pill for plain text.
     const story = spec.formatId === "story";
     const wide = format.width > format.height;
-    const overlayPadding = story ? 96 : wide ? 72 : 68;
+    const overlayPadding = story ? 96 : video ? 100 : wide ? 72 : 68;
     const link = spec.formatId === "landscape";
-    const headlineSize = story ? 80 : link ? 54 : wide ? 60 : square ? 68 : 72;
+    const headlineSize = story
+      ? 80
+      : link
+        ? 54
+        : video
+          ? 100
+          : square
+            ? 68
+            : 72;
     // Character budgets that keep satori from wrapping a line a second time
     // at these sizes; the break then falls where the words say.
-    const perLine = story ? 18 : link ? 26 : wide ? 30 : 20;
+    const perLine = story ? 18 : link ? 26 : video ? 24 : 20;
     const headlineLines = wrapText(clamp(spec.title, 90), perLine);
     const button = spec.cta?.trim();
     content = (
@@ -917,7 +930,7 @@ export function renderComposition(
             style={{
               display: "flex",
               flexDirection: "column",
-              maxWidth: story ? "88%" : link ? "72%" : wide ? "60%" : "90%",
+              maxWidth: story ? "88%" : link ? "72%" : video ? "76%" : "90%",
               marginTop: 0,
               color: "#ffffff",
               fontSize: headlineSize,
@@ -939,6 +952,7 @@ export function renderComposition(
                 logo={context.logo}
                 tone={spec.mark}
                 inverse
+                {...(video ? { markSize: 52, textSize: 36 } : {})}
               />
             </div>
             {headlineLines.map((line, index) => (
@@ -973,11 +987,15 @@ export function renderComposition(
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  padding: wide ? "20px 38px" : "24px 44px",
+                  padding: video
+                    ? "30px 58px"
+                    : wide
+                      ? "20px 38px"
+                      : "24px 44px",
                   borderRadius: 999,
                   background: "#ffffff",
                   color: "#111111",
-                  fontSize: wide ? 30 : 34,
+                  fontSize: video ? 46 : wide ? 30 : 34,
                   fontWeight: 600,
                 }}
               >
@@ -1036,6 +1054,7 @@ export function renderComposition(
             width: "100%",
             height: "100%",
             ...overlayInsets,
+            ...(video ? { padding: 96 } : {}),
           }}
         >
           <BrandMark
@@ -1043,6 +1062,7 @@ export function renderComposition(
             logo={context.logo}
             tone={spec.mark}
             inverse
+            {...(video ? { markSize: 52, textSize: 36 } : {})}
           />
           <div
             style={{
@@ -1710,7 +1730,7 @@ export function renderComposition(
   ) {
     const centred = spec.templateId === "tall-statement";
     const story = spec.formatId === "story";
-    const pad = story ? 72 : 64;
+    const pad = story ? 72 : video ? 96 : 64;
     const headline = wrapText(
       clamp(spec.title, 110),
       centred ? (story ? 24 : 22) : 20,
@@ -1784,8 +1804,8 @@ export function renderComposition(
             logo={context.logo}
             tone={spec.mark}
             inverse
-            markSize={40}
-            textSize={26}
+            markSize={video ? 56 : 40}
+            textSize={video ? 38 : 26}
           />
           <div
             style={{
@@ -1793,7 +1813,7 @@ export function renderComposition(
               flexDirection: "column",
               alignItems: centred ? "center" : "flex-start",
               marginTop: centred ? 64 : 40,
-              fontSize: story ? 68 : 60,
+              fontSize: story ? 68 : video ? 92 : 60,
               fontWeight: 700,
               lineHeight: 1.1,
               letterSpacing: "-0.03em",
@@ -1841,7 +1861,7 @@ export function renderComposition(
                 style={{
                   display: "flex",
                   color: "#ffffff",
-                  fontSize: 28,
+                  fontSize: story ? 40 : video ? 42 : 28,
                   fontWeight: 600,
                 }}
               >

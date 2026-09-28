@@ -120,7 +120,7 @@ export const COMPOSITION_TEMPLATES = [
   },
   {
     id: "tall-statement",
-    version: 3,
+    version: 4,
     label: "Tall · statement",
     description:
       "Logo and a centred headline high on the photo, a quiet call to action at the base. Stories and Reels.",
@@ -134,14 +134,14 @@ export const COMPOSITION_TEMPLATES = [
   },
   {
     id: "hero-overlay",
-    version: 3,
+    version: 4,
     label: "Hero · overlay",
     description:
       "The photo full-bleed, a bold headline top left under a soft scrim, a white pill button at the foot. Centred on the story canvas. The awareness card, in every size.",
   },
   {
     id: "image-hero",
-    version: 3,
+    version: 4,
     label: "Image hero",
     description:
       "A full-bleed image with a restrained, readable message block.",
