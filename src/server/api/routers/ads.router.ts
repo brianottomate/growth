@@ -29,6 +29,7 @@ import {
   addAudienceAction,
   suggestCampaignAudiencesAction,
   linkAudienceAction,
+  createReportingConversionAction,
   setPlatformDraftAction,
   setCreativePoolAction,
   setPlacementCopyAction,
@@ -189,6 +190,7 @@ export const adsRouter = {
   addAudience: actionProcedure(addAudienceAction),
   suggestCampaignAudiences: actionProcedure(suggestCampaignAudiencesAction),
   linkAudience: actionProcedure(linkAudienceAction),
+  createReportingConversion: actionProcedure(createReportingConversionAction),
 
   importAdCreative: actionProcedure(importCreativeAction),
 

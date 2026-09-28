@@ -5,7 +5,7 @@ import {
 } from "@/lib/product-atlas";
 import { brandRelationshipEnum } from "@/server/db/brand-schema";
 import { currencyEnum } from "@/server/db/auth-schema";
-import { homesSchema } from "./shared";
+import { homesSchema, metaReportingConversionsSchema } from "./shared";
 import { z } from "zod";
 
 import { brandMarketsSchema } from "@/lib/markets";
@@ -390,6 +390,7 @@ const performanceSettingsSchema = z.strictObject({
       z.strictObject({ customEventType: z.string(), pixelId: z.string() }),
     )
     .optional(),
+  metaReportingConversions: metaReportingConversionsSchema,
   reportEmails: z.string().nullable().optional(),
   socialMediaPosts: z.string().nullable().optional(),
   ugcPermission: z.string().nullable().optional(),

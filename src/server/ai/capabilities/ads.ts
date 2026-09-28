@@ -30,6 +30,7 @@ import {
   pushDraftActionOutputSchema,
   setDeliveryActionOutputSchema,
   deletePlatformCampaignActionOutputSchema,
+  createReportingConversionActionOutputSchema,
   buildAdSetActionOutputSchema,
   addAdShellActionOutputSchema,
   createAdsFromAssetsActionOutputSchema,
@@ -87,6 +88,7 @@ import {
   createMetaAdDraft,
   deletePlatformCampaign,
   duplicateMetaCampaign,
+  ensureBrandReportingConversion,
   listAdsWriteDestinations,
   createAdAudience,
   addAdAudienceUsers,
@@ -847,6 +849,19 @@ export const linkAudienceAction = growthAction({
   }),
   execute: async (input, ctx) =>
     linkPlatformAudience({ ...input, organizationId: ctx.orgId }),
+});
+
+export const createReportingConversionAction = growthAction({
+  outputSchema: createReportingConversionActionOutputSchema,
+  description:
+    "Create (or reuse) a Performance client's reporting conversion on one Meta ad account: a custom conversion for the account's default tracking event, scoped to the brand's website, so the client's own bookings report apart from the fleet's. It only counts events from its creation on. Run it once per client when asked; pushes do not create it.",
+  inputSchema: z.object({
+    brandSlug: z.string().trim().min(1),
+    connectionAccountId: z.string().trim().min(1),
+    adAccountId: z.string().trim().min(1),
+  }),
+  execute: async (input, ctx) =>
+    ensureBrandReportingConversion(input, { organizationId: ctx.orgId }),
 });
 
 export const listCampaignsAction = growthAction({

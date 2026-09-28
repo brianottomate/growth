@@ -350,6 +350,15 @@ export const growthActionPolicies = {
       idempotent: true,
     }),
     linkAudience: write({ idempotent: true }),
+    // Creates a custom conversion on the ad account, or reuses the matching
+    // one; spends nothing and changes no campaign. A conversion mutation, so
+    // the operator approves it.
+    createReportingConversion: write({
+      consequence: "provider-write",
+      approval: "user",
+      idempotent: true,
+      surfaces: APPROVAL_PRODUCT,
+    }),
     // Downloads from the platform CDN into R2; dedupes by source url.
     importCreative: write({ idempotent: true, reversible: true }),
     // Draft deletes drop local rows and are refused once the thing exists on

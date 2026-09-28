@@ -179,6 +179,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "importMetaCampaign",
     "pullPlatformAudiences",
     "linkAudience",
+    "createReportingConversion",
     "importCreative",
     "deleteCampaignDraft",
     "deleteAudience",

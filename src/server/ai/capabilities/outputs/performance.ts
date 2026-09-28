@@ -1,3 +1,4 @@
+import { metaReportingConversionsSchema } from "./shared";
 import { performanceCycleStatusEnum } from "@/server/db/performance-schema";
 import { performanceAccountStatusEnum } from "@/server/db/performance-schema";
 import { campaignStatusEnum } from "@/server/db/ads-schema";
@@ -764,6 +765,7 @@ export const previewIntakeApplyActionOutputSchema = z.strictObject({
                 }),
               )
               .optional(),
+            metaReportingConversions: metaReportingConversionsSchema,
             reportEmails: z.string().nullable().optional(),
             socialMediaPosts: z.string().nullable().optional(),
             ugcPermission: z.string().nullable().optional(),

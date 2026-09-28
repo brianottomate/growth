@@ -119,3 +119,17 @@ export const homesSchema = z.strictObject({
   thumbUrl: z.string().optional(),
   url: z.string(),
 });
+
+/** Brand performanceSettings.metaReportingConversions, keyed by ad account. */
+export const metaReportingConversionsSchema = z
+  .record(
+    z.string(),
+    z.strictObject({
+      customConversionId: z.string(),
+      name: z.string(),
+      host: z.string(),
+      pixelId: z.string(),
+      customEventType: z.string(),
+    }),
+  )
+  .optional();

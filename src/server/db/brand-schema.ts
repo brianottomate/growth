@@ -172,6 +172,22 @@ export type PerformanceSettings = {
     { pixelId: string; customEventType: string }
   >;
 
+  /**
+   * The client's site-scoped custom conversion per paying Meta account, made
+   * on demand from the brand's Ads page. Reporting reads it; an ad set
+   * optimises on it only when its campaign asks for host scope.
+   */
+  metaReportingConversions?: Record<
+    string,
+    {
+      customConversionId: string;
+      name: string;
+      host: string;
+      pixelId: string;
+      customEventType: string;
+    }
+  >;
+
   /** Brand whose Zernio connection is explicitly shared for paid ads only. */
   adsConnectionBrandId?: string;
   homeInventory?: import("@/server/services/home-inventory.service").HomeInventory;

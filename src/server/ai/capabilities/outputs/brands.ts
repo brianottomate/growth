@@ -1,4 +1,4 @@
-import { homesSchema } from "./shared";
+import { homesSchema, metaReportingConversionsSchema } from "./shared";
 import { z } from "zod";
 import { appliedEvidenceSchema } from "@/lib/applied-evidence";
 import type { PerformanceSettings } from "@/server/db/brand-schema";
@@ -61,6 +61,7 @@ const performanceSettingsShape = {
       z.strictObject({ customEventType: z.string(), pixelId: z.string() }),
     )
     .optional(),
+  metaReportingConversions: metaReportingConversionsSchema,
   agreedAdSpend: z.number().nullable().optional(),
   catalogFormatId: z.enum(["portrait", "square"]).nullable().optional(),
   catalogTemplateId: z

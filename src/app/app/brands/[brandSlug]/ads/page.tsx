@@ -28,6 +28,8 @@ import { ImportMetaCampaignButton } from "./ImportMetaCampaignButton";
 import { NewCampaignButton } from "./NewCampaignButton";
 import { DeleteCampaignButton } from "./_views/DeleteCampaignButton";
 import { DefinePersonasButton } from "./DefinePersonasButton";
+import { ReportingConversion } from "./ReportingConversion";
+import { normalizeDomain } from "@/server/services/hubspot-contact-mirror";
 
 const plural = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
 
@@ -451,6 +453,17 @@ export default async function BrandAdsPage({
             {plural(platformCampaigns.length, "platform campaign")} ·{" "}
             {plural(personas.length, "persona")} · {money(totalSpend)} / 30d
           </p>
+          {brand.relationship === "client" && brand.slug && (
+            <div className="mt-3">
+              <ReportingConversion
+                brandSlug={brand.slug}
+                saved={
+                  brand.performanceSettings?.metaReportingConversions ?? {}
+                }
+                host={normalizeDomain(brand.website)}
+              />
+            </div>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <CopyButton text={md} label="Copy for ChatGPT / Claude" />

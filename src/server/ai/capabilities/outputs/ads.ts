@@ -4,7 +4,11 @@ import { audienceTypeEnum } from "@/server/db/ads-schema";
 import { platformCampaignStatusEnum } from "@/server/db/ads-schema";
 import { brandRelationshipEnum } from "@/server/db/brand-schema";
 import { channelPlatformEnum } from "@/server/db/channel-schema";
-import { homesSchema, cardsSchema } from "./shared";
+import {
+  homesSchema,
+  cardsSchema,
+  metaReportingConversionsSchema,
+} from "./shared";
 import { z } from "zod";
 import { jsonValueSchema } from "../../kernel/output";
 
@@ -721,6 +725,7 @@ export const duplicateMetaCampaignActionOutputSchema = z.strictObject({
             }),
           )
           .optional(),
+        metaReportingConversions: metaReportingConversionsSchema,
         reportEmails: z.string().nullable().optional(),
         socialMediaPosts: z.string().nullable().optional(),
         ugcPermission: z.string().nullable().optional(),
@@ -956,6 +961,16 @@ export const linkAudienceActionOutputSchema = z.strictObject({
   audienceId: z.string().nullable(),
   id: z.string(),
   name: z.string(),
+});
+
+export const createReportingConversionActionOutputSchema = z.strictObject({
+  customConversionId: z.string(),
+  name: z.string(),
+  host: z.string(),
+  pixelId: z.string(),
+  customEventType: z.string(),
+  adAccountId: z.string(),
+  reused: z.boolean(),
 });
 
 export const listCampaignsActionOutputSchema = z.array(

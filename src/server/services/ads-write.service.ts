@@ -2539,75 +2539,115 @@ async function pushToGoogle(args: PushArgs) {
  * ad set be edited afterwards (subcode 3260011). Wander's own brands keep the raw event, and an
  * explicit `customConversionId` in the settings always wins.
  */
-export async function metaPromotedObjectFor(args: {
-  brand: Pick<Brand, "name" | "relationship" | "website">;
+export function metaPromotedObjectFor(args: {
+  brand: Pick<Brand, "name" | "relationship">;
   meta: {
     pixelId?: string;
     customEventType?: string;
     customConversionId?: string;
     conversionScope?: "host" | "pixel";
   };
-  /** A dry run must not provision anything, so it optimises on the event. */
-  validateOnly: boolean;
-  ensureCustomConversion: (input: {
-    name: string;
-    pixelId: string;
-    customEventType: string;
-    rule: Record<string, unknown>;
-  }) => Promise<{ customConversionId: string; reused: boolean }>;
-  warnings: string[];
-}): Promise<CreateZernioStandaloneAdInput["promotedObject"]> {
-  const { brand, meta, warnings } = args;
+  /** The brand's site-scoped custom conversion on this ad account, if made. */
+  reporting?: { customConversionId: string; host: string };
+  /** The brand's website host today; a conversion made for another is stale. */
+  host?: string | null;
+}): CreateZernioStandaloneAdInput["promotedObject"] {
+  const { brand, meta } = args;
   if (meta.customConversionId) {
     return { customConversionId: meta.customConversionId };
   }
   if (!meta.pixelId && !meta.customEventType) return undefined;
+  if (brand.relationship === "client" && meta.conversionScope === "host") {
+    if (!args.reporting) {
+      throw new Error(
+        `${brand.name} has no reporting conversion on this ad account. Create it on the brand's Ads page, or optimise on the shared pixel event.`,
+      );
+    }
+    if (args.host && args.reporting.host !== args.host) {
+      throw new Error(
+        `${brand.name}'s reporting conversion is scoped to ${args.reporting.host}, but the website is now ${args.host}. Recreate it on the brand's Ads page.`,
+      );
+    }
+    return { customConversionId: args.reporting.customConversionId };
+  }
+  return { pixelId: meta.pixelId, customEventType: meta.customEventType };
+}
 
-  const onEvent = {
-    pixelId: meta.pixelId,
-    customEventType: meta.customEventType,
-  };
-  if (
-    brand.relationship !== "client" ||
-    !meta.pixelId ||
-    !meta.customEventType ||
-    args.validateOnly
-  ) {
-    return onEvent;
+/**
+ * The client's own bookings, apart from the fleet's: a custom conversion on
+ * the paying account's pixel, scoped to the brand's website. Made on demand
+ * from the brand's Ads page, once, because it only counts events from its
+ * creation on. Reuses a matching one already on the ad account.
+ */
+export async function ensureBrandReportingConversion(
+  input: {
+    brandSlug: string;
+    connectionAccountId: string;
+    adAccountId: string;
+  },
+  context: { organizationId: string },
+) {
+  const destination = await requireAdDestination({
+    organizationId: context.organizationId,
+    brandSlug: input.brandSlug,
+    platform: "meta",
+    connectionAccountId: input.connectionAccountId,
+    adAccountId: input.adAccountId,
+  });
+  const brand = await db.query.brandTable.findFirst({
+    where: eq(brandTable.id, destination.brand.id),
+    columns: { id: true, name: true, relationship: true, website: true },
+  });
+  if (brand?.relationship !== "client") {
+    throw new Error("Reporting conversions are for Performance clients.");
   }
   const host = normalizeDomain(brand.website);
-  if (!host) {
-    warnings.push(
-      `${brand.name} has no website on the brand, so Meta optimises on the raw ${meta.customEventType} event and there is no site-scoped conversion to report on. Set the website and re-push.`,
-    );
-    return onEvent;
-  }
-
-  // Provisioned on every client push, whichever way the ad set optimises: a
-  // custom conversion only counts events from its creation on, and it is how
-  // the client's own bookings are reported apart from the fleet's.
-  const name = performanceConversionName({
-    customer: brand.name,
-    isClient: true,
-    event: meta.customEventType,
-  });
-  const conversion = await args.ensureCustomConversion({
-    name,
-    pixelId: meta.pixelId,
-    customEventType: meta.customEventType,
-    rule: hostScopedConversionRule(host, meta.customEventType),
-  });
-  const provisioned = `${name} (${meta.customEventType} on ${host}), ${
-    conversion.reused ? "reused" : "created"
-  } as custom conversion ${conversion.customConversionId}`;
-  if (meta.conversionScope === "host") {
-    warnings.push(`Meta optimises on ${provisioned}`);
-    return { customConversionId: conversion.customConversionId };
-  }
-  warnings.push(
-    `Meta optimises on the shared ${meta.customEventType} event on pixel ${meta.pixelId}; ${host} bookings report through ${provisioned}`,
+  if (!host) throw new Error(`Set ${brand.name}'s website first.`);
+  const tracking = await metaTrackingDefaults(
+    brand.id,
+    destination.adAccount.id,
   );
-  return onEvent;
+  if (!tracking) {
+    throw new Error(
+      "Set the default conversion tracking for this ad account first.",
+    );
+  }
+  const conversion = {
+    name: performanceConversionName({
+      customer: brand.name,
+      isClient: true,
+      event: tracking.customEventType,
+    }),
+    pixelId: tracking.pixelId,
+    customEventType: tracking.customEventType,
+    rule: hostScopedConversionRule(host, tracking.customEventType),
+  };
+  const existing = await listZernioCustomConversions({
+    accountId: input.connectionAccountId,
+    adAccountId: destination.adAccount.id,
+  });
+  const listed = reusableCustomConversion(existing, conversion);
+  const { customConversionId, reused } = listed
+    ? { customConversionId: listed, reused: true }
+    : await createZernioCustomConversion({
+        accountId: input.connectionAccountId,
+        adAccountId: destination.adAccount.id,
+        ...conversion,
+      });
+  const saved = {
+    customConversionId,
+    name: conversion.name,
+    host,
+    pixelId: conversion.pixelId,
+    customEventType: conversion.customEventType,
+  };
+  await db
+    .update(brandTable)
+    .set({
+      performanceSettings: sql`jsonb_set(coalesce(${brandTable.performanceSettings}, '{}'::jsonb), '{metaReportingConversions}', coalesce(${brandTable.performanceSettings}->'metaReportingConversions', '{}'::jsonb) || ${JSON.stringify({ [destination.adAccount.id]: saved })}::jsonb)`,
+    })
+    .where(eq(brandTable.id, brand.id));
+  return { ...saved, adAccountId: destination.adAccount.id, reused };
 }
 
 // ---- META COMPILE ------------------------------------------------------
@@ -2684,24 +2724,14 @@ async function pushToMeta(args: PushArgs) {
     }
   }
   const useCbo = (meta.budgetMode ?? "cbo") === "cbo";
-  const promotedObject = await metaPromotedObjectFor({
+  const promotedObject = metaPromotedObjectFor({
     brand,
     meta,
-    validateOnly: Boolean(input.validateOnly),
-    ensureCustomConversion: async (conversion) => {
-      const existing = await listZernioCustomConversions({
-        accountId: input.connectionAccountId,
-        adAccountId: destination.adAccount.id,
-      });
-      const reuse = reusableCustomConversion(existing, conversion);
-      if (reuse) return { customConversionId: reuse, reused: true };
-      return createZernioCustomConversion({
-        accountId: input.connectionAccountId,
-        adAccountId: destination.adAccount.id,
-        ...conversion,
-      });
-    },
-    warnings,
+    reporting:
+      brand.performanceSettings?.metaReportingConversions?.[
+        destination.adAccount.id
+      ],
+    host: normalizeDomain(brand.website),
   });
 
   const isCarousel = (content: AdCreativeContent) =>
