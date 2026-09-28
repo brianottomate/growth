@@ -89,6 +89,7 @@ import {
   type CompanyProperties,
 } from "@/server/clients/hubspot.client";
 import { ORPCError } from "@orpc/server";
+import { normalizeDomain } from "@/server/services/hubspot-contact-mirror";
 
 /**
  * Leads router — read surface over the leads.* prospecting tables.
@@ -234,10 +235,15 @@ export const leadsRouter = {
       // both "what can I work" and "how many am I not being shown".
       const conds: SQL[] = [];
       if (input.q) {
+        // A pasted URL ("https://www.x.com/") matches its bare domain.
+        const host = normalizeDomain(input.q);
         conds.push(
           or(
             ilike(leadDomainTable.domain, `%${input.q}%`),
             ilike(leadDomainTable.companyName, `%${input.q}%`),
+            ...(host && host !== input.q.toLowerCase()
+              ? [ilike(leadDomainTable.domain, `%${host}%`)]
+              : []),
           )!,
         );
       }
