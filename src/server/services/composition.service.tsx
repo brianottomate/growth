@@ -121,18 +121,6 @@ function wrapText(value: string, maxCharacters: number) {
 }
 
 /**
- * The band a centred square crop cuts from the top and the bottom of a 4:5
- * card: a catalog carousel may draw its cards square, so a catalog card keeps
- * its mark and its text inside that square. Zero on every other shape.
- */
-function squareSafeInset(format: { width: number; height: number }) {
-  const ratio = format.height / format.width;
-  return ratio > 1 && ratio < 1.3
-    ? Math.round((format.height - format.width) / 2)
-    : 0;
-}
-
-/**
  * Two lines of about equal length instead of a full first line and a stray
  * word or two below it. Falls back to plain wrapping past two lines.
  */
@@ -1386,7 +1374,7 @@ export function renderComposition(
             left: 0,
             right: 0,
             bottom: 0,
-            height: Math.round(format.height * 0.62) + squareSafeInset(format),
+            height: Math.round(format.height * 0.62),
             background: `linear-gradient(180deg, ${scrim(0)} 0%, ${scrim(0.6)} 45%, ${scrim(0.88)} 100%)`,
           }}
         />
@@ -1399,7 +1387,7 @@ export function renderComposition(
             left: 0,
             right: 0,
             top: 0,
-            height: Math.round(format.height * 0.26) + squareSafeInset(format),
+            height: Math.round(format.height * 0.26),
             background: `linear-gradient(180deg, ${scrim(0.45)} 0%, ${scrim(0)} 100%)`,
           }}
         />
@@ -1407,7 +1395,7 @@ export function renderComposition(
           style={{
             display: "flex",
             position: "absolute",
-            top: pad + squareSafeInset(format),
+            top: pad,
             left: pad,
           }}
         >
@@ -1425,7 +1413,7 @@ export function renderComposition(
             position: "absolute",
             left: pad,
             right: pad,
-            bottom: pad + squareSafeInset(format),
+            bottom: pad,
             color: "#ffffff",
           }}
         >
@@ -1545,7 +1533,7 @@ export function renderComposition(
             left: 0,
             right: 0,
             bottom: 0,
-            height: Math.round(format.height * 0.58) + squareSafeInset(format),
+            height: Math.round(format.height * 0.58),
             background: `linear-gradient(180deg, ${scrim(0)} 0%, ${scrim(0.56)} 40%, ${scrim(0.9)} 100%)`,
           }}
         />
@@ -1560,8 +1548,7 @@ export function renderComposition(
               left: 0,
               right: 0,
               top: 0,
-              height:
-                Math.round(format.height * 0.26) + squareSafeInset(format),
+              height: Math.round(format.height * 0.26),
               background: `linear-gradient(180deg, ${scrim(0.45)} 0%, ${scrim(0)} 100%)`,
             }}
           />
@@ -1571,7 +1558,7 @@ export function renderComposition(
             style={{
               display: "flex",
               position: "absolute",
-              top: pad + squareSafeInset(format),
+              top: pad,
               left: pad,
             }}
           >
@@ -1592,10 +1579,7 @@ export function renderComposition(
             right: pad,
             // Stories and Reels lay their own UI over the bottom fifth of the
             // frame; the foot block sits above that band on the story canvas.
-            bottom:
-              spec.formatId === "story"
-                ? pad + 240
-                : pad + squareSafeInset(format),
+            bottom: spec.formatId === "story" ? pad + 240 : pad,
             color: "#ffffff",
           }}
         >
