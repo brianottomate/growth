@@ -1723,8 +1723,7 @@ export async function unfreezePlacement(input: {
 // shells with factual words; this rewrites the persuasive text once the
 // compositions and placements look right. It touches ad-level headline/body
 // only — never the on-card title, so no card re-renders — and it leaves any
-// per-placement copy override in `placements` alone, since that was a
-// deliberate choice.
+// per-placement copy override alone, since that was a deliberate choice.
 
 export async function writeSetCopy(input: {
   brandId: string;
@@ -1824,11 +1823,32 @@ export async function writeSetCopy(input: {
         continue;
       }
     }
-    if (headline === content.headline && body === content.body) continue;
-    await db
-      .update(adTable)
-      .set({ content: { ...content, headline, body } })
-      .where(eq(adTable.id, ad.id));
+    // An idea-studio ad sends the projection of its document, so the words
+    // go into the document and are projected again; writing only the ad-level
+    // fields left Meta sending copy the editor no longer showed.
+    const studio = content.ideaStudio;
+    const docCopy = studio?.document.copy;
+    if (
+      headline === content.headline &&
+      body === content.body &&
+      (!docCopy || (docCopy.headline === headline && docCopy.body === body))
+    )
+      continue;
+    const next = studio
+      ? projectIdea(
+          brand.id,
+          content,
+          {
+            ...studio,
+            document: {
+              ...studio.document,
+              copy: { ...studio.document.copy, headline, body },
+            },
+          },
+          ad.placements,
+        )
+      : { content: { ...content, headline, body } };
+    await db.update(adTable).set(next).where(eq(adTable.id, ad.id));
     updated += 1;
   }
   return { brandId: brand.id, updated };

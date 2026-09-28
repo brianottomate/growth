@@ -3129,12 +3129,17 @@ async function pushToMeta(args: PushArgs) {
         context,
         "push-shell",
         { campaignId: campaign.id },
-        `shell:${campaign.id}:meta`,
+        // The draft's edit time is in the key: a replayed shell carries the old
+        // budget, or a campaign deleted after a failed push.
+        `shell:${campaign.id}:meta:${draft.updatedAt.getTime()}`,
       ),
     },
   );
   const shellId =
-    shell.campaign?.platformCampaignId ?? shell.campaign?.id ?? null;
+    shell.campaignId ??
+    shell.campaign?.platformCampaignId ??
+    shell.campaign?.id ??
+    null;
   if (!shellId) throw new Error("Zernio returned no campaign id for the shell");
 
   const perSet = [];
@@ -3538,12 +3543,17 @@ async function pushToLinkedIn(args: PushArgs) {
         context,
         "push-shell",
         { campaignId: campaign.id },
-        `shell:${campaign.id}:linkedin`,
+        // The draft's edit time is in the key: a replayed shell carries the old
+        // budget, or a campaign deleted after a failed push.
+        `shell:${campaign.id}:linkedin:${draft.updatedAt.getTime()}`,
       ),
     },
   );
   const shellId =
-    shell.campaign?.platformCampaignId ?? shell.campaign?.id ?? null;
+    shell.campaignId ??
+    shell.campaign?.platformCampaignId ??
+    shell.campaign?.id ??
+    null;
   if (!shellId) {
     throw new Error("Zernio returned no campaign group id for the shell");
   }

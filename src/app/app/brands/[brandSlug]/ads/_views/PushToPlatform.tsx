@@ -41,7 +41,6 @@ export function PushToPlatform({
   budget,
   budgetType,
   configuration,
-  intent = "push",
 }: {
   campaignId: string;
   brandSlug: string;
@@ -56,7 +55,6 @@ export function PushToPlatform({
     goal: AdPushGoal;
     label: string;
   };
-  intent?: "push" | "validate";
 }) {
   const spec = requireAdPlatformSpec(platform);
   const platformName = spec.shortLabel;
@@ -123,28 +121,21 @@ export function PushToPlatform({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button
-          size="sm"
-          variant={intent === "validate" ? "outline" : "default"}
-        >
+        <Button size="sm">
           <UploadCloud className="size-3.5" />
-          {intent === "validate" ? "Validate" : `Push to ${platformName}`}
+          Push to {platformName}
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>
-            {intent === "validate"
-              ? `Validate ${platformName} delivery`
-              : `Push this plan to ${platformName}?`}
-          </DialogTitle>
+          <DialogTitle>Push this plan to {platformName}?</DialogTitle>
           <DialogDescription>
             Compiles {setSummary} × {draftAdCount} ad
             {draftAdCount === 1 ? "" : "s"} at{" "}
             {budget != null
               ? `${money(budget)}${budgetType === "lifetime" ? " lifetime" : "/day"}`
-              : "no budget"}{" "}
-            — all PAUSED. Nothing spends until you hit Launch afterwards.
+              : "no budget"}
+            , all paused. Nothing spends until you launch.
           </DialogDescription>
         </DialogHeader>
         {configuration && (
@@ -235,30 +226,29 @@ export function PushToPlatform({
           >
             Dry run
           </Button>
-          {intent === "push" && (
-            <Button
-              size="sm"
-              disabled={!canPush}
-              loading={push.isPending}
-              onClick={() =>
-                chosen &&
-                push.mutate({
-                  campaignId,
-                  platform,
-                  connectionAccountId: chosen.connectionAccountId,
-                  adAccountId: chosen.adAccountId,
-                  goal,
-                })
-              }
-            >
-              Push paused
-            </Button>
-          )}
+          <Button
+            size="sm"
+            disabled={!canPush}
+            loading={push.isPending}
+            onClick={() =>
+              chosen &&
+              push.mutate({
+                campaignId,
+                platform,
+                connectionAccountId: chosen.connectionAccountId,
+                adAccountId: chosen.adAccountId,
+                goal,
+              })
+            }
+          >
+            Push paused
+          </Button>
         </DialogFooter>
         {push.isSuccess && push.data.validateOnly && (
           <p className="text-xs text-emerald-400">
-            Dry run passed — {platformName} validated the whole tree without
-            creating it.
+            Dry run passed: {platformName} accepted the ad set and the first ad.
+            The other {draftAdCount > 1 ? draftAdCount - 1 : 0} are checked on
+            push.
           </p>
         )}
         {push.isSuccess &&

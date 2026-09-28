@@ -152,6 +152,17 @@ export function MetaPlatformCard({
   });
   const scheduleError = metaScheduleIssue(schedule, pc.budgetType);
   const placementPlan = meta?.placements ?? META_DEFAULT_PLACEMENTS;
+  const selectedPlacements = META_PLACEMENTS.filter((p) =>
+    placementPlan.includes(p.id),
+  );
+  const placementSummary =
+    selectedPlacements.length === META_PLACEMENTS.length
+      ? `All ${META_PLACEMENTS.length} placements`
+      : selectedPlacements.length > 0
+        ? `${selectedPlacements.length} of ${META_PLACEMENTS.length} placements`
+        : meta?.importSource
+          ? importedPlacementLabel(meta.importSource.adSets)
+          : "No placements";
   const missingCreative = creativeAds.some(
     (ad) =>
       "media" in ad.content &&
@@ -212,38 +223,30 @@ export function MetaPlatformCard({
             {expanded ? "Collapse" : "Expand"}
           </Button>
           {!ready && (
-            <>
-              <Button size="sm" variant="outline" disabled>
-                Validate
-              </Button>
-              <Button size="sm" disabled>
-                Push to Meta
-              </Button>
-            </>
+            <Button size="sm" disabled>
+              Push to Meta
+            </Button>
           )}
-          {ready &&
-            (["validate", "push"] as const).map((intent) => (
-              <PushToPlatform
-                key={intent}
-                intent={intent}
-                configuration={configuration}
-                campaignId={campaignId}
-                brandSlug={brandSlug}
-                platform="meta_ads"
-                draftAdCount={creativeAds.length}
-                audienceCount={audiences.length}
-                budget={pc.budget}
-                budgetType={pc.budgetType}
-              />
-            ))}
+          {ready && (
+            <PushToPlatform
+              configuration={configuration}
+              campaignId={campaignId}
+              brandSlug={brandSlug}
+              platform="meta_ads"
+              draftAdCount={creativeAds.length}
+              audienceCount={audiences.length}
+              budget={pc.budget}
+              budgetType={pc.budgetType}
+            />
+          )}
         </div>
       </div>
       {!ready && !destinations.isPending && (
         <div
           className="space-y-1 text-sm text-muted-foreground"
-          aria-label="Required before validation"
+          aria-label="Required before pushing"
         >
-          <p className="font-medium">Before validating</p>
+          <p className="font-medium">Before pushing</p>
           <ul className="list-disc pl-5">
             {blockers.map((message) => (
               <li key={message}>{message}</li>
@@ -277,104 +280,92 @@ export function MetaPlatformCard({
                 }}
               />
             </div>
-            <div className="grid grid-cols-1 gap-4 @2xl:grid-cols-2">
-              <div className="space-y-4 rounded-lg border p-4">
-                <h5 className="text-sm font-semibold">Identity & objective</h5>
-                <dl className="grid grid-cols-2 gap-3 text-sm">
-                  <dt className="text-muted-foreground">Ad account</dt>
-                  <dd>
-                    {chosen?.adAccountName ??
-                      chosen?.adAccountId ??
-                      (destinations.isPending ? "Loading…" : "Not selected")}
-                  </dd>
-                  <dt className="text-muted-foreground">Facebook Page</dt>
-                  <dd>{chosen?.pageId ?? "Not selected"}</dd>
-                  <dt className="text-muted-foreground">Placements</dt>
-                  <dd>
-                    {META_PLACEMENTS.filter((p) => placementPlan.includes(p.id))
-                      .map((p) => p.label)
-                      .join(", ") ||
-                      (meta?.importSource
-                        ? importedPlacementLabel(meta.importSource.adSets)
-                        : "Not selected")}
-                  </dd>
-                  <dt className="text-muted-foreground">Goal</dt>
-                  <dd>{goal}</dd>
-                </dl>
-                {destinations.error && (
-                  <p role="alert" className="text-sm">
-                    {destinations.error.message}
-                  </p>
-                )}
-                {chosen && !chosen.runsAsBrandPage && (
-                  <p role="alert" className="text-sm">
-                    This destination does not match the brand’s Facebook Page.
-                    Choose a matching connection before pushing.
-                  </p>
-                )}
-                {!destinations.isPending &&
-                  !destinations.error &&
-                  !choices.length && (
-                    <p className="text-sm text-muted-foreground">
-                      No allowlisted Meta destination is connected to this
-                      brand.
-                    </p>
-                  )}
-                <p className="text-xs text-muted-foreground">
-                  Account and goal are selected for this push. The brand’s Page
-                  supplies the advertising identity; Instagram identity is not
-                  separately configurable here.
+            <dl className="grid grid-cols-2 gap-3 @2xl:grid-cols-4">
+              <SetupFact
+                label="Budget"
+                value={
+                  pc.budget
+                    ? `${money(pc.budget)}${pc.budgetType === "lifetime" ? " lifetime" : " / day"}`
+                    : "Not set"
+                }
+                detail={
+                  meta?.budgetMode === "abo"
+                    ? "Per ad set (ABO)"
+                    : "Campaign (CBO)"
+                }
+              />
+              <SetupFact
+                label="Goal"
+                value={
+                  goal.charAt(0).toUpperCase() + goal.slice(1).replace("_", " ")
+                }
+                detail={
+                  meta?.customConversionId ||
+                  (meta?.customEventType
+                    ? `${meta.customEventType} · ${
+                        meta.conversionScope === "pixel"
+                          ? "raw pixel"
+                          : "client site"
+                      }`
+                    : "No conversion set")
+                }
+              />
+              <SetupFact
+                label="Schedule"
+                value={
+                  schedule.startAt
+                    ? new Date(schedule.startAt).toLocaleDateString()
+                    : "When launched"
+                }
+                detail={
+                  schedule.endAt
+                    ? `Until ${new Date(schedule.endAt).toLocaleDateString()}`
+                    : "Runs until paused"
+                }
+              />
+              <SetupFact
+                label="Ad account"
+                value={
+                  chosen?.adAccountName ??
+                  chosen?.adAccountId ??
+                  (destinations.isPending ? "Loading…" : "Not selected")
+                }
+                detail={chosen?.pageId ? `Page ${chosen.pageId}` : "No Page"}
+              />
+            </dl>
+            {destinations.error && (
+              <p role="alert" className="text-sm">
+                {destinations.error.message}
+              </p>
+            )}
+            {chosen && !chosen.runsAsBrandPage && (
+              <p role="alert" className="text-sm">
+                This destination does not match the brand’s Facebook Page.
+                Choose a matching connection before pushing.
+              </p>
+            )}
+            {!destinations.isPending &&
+              !destinations.error &&
+              !choices.length && (
+                <p className="text-sm text-muted-foreground">
+                  No allowlisted Meta destination is connected to this brand.
                 </p>
-              </div>
-              <div className="space-y-4 rounded-lg border p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <h4 className="text-sm font-semibold">
-                    Budget, schedule & tracking
-                  </h4>
-                </div>
-                <dl className="grid grid-cols-2 gap-3 text-sm">
-                  <dt className="text-muted-foreground">Budget</dt>
-                  <dd>
-                    {pc.budget
-                      ? `${money(pc.budget)} ${pc.budgetType === "lifetime" ? "lifetime" : "/ day"}`
-                      : "Not set"}
-                  </dd>
-                  <dt className="text-muted-foreground">Budget allocation</dt>
-                  <dd>
-                    {meta?.budgetMode === "abo"
-                      ? "Per ad set (ABO)"
-                      : "Campaign (CBO)"}
-                  </dd>
-                  <dt className="text-muted-foreground">Start</dt>
-                  <dd>
-                    {schedule.startAt
-                      ? new Date(schedule.startAt).toLocaleString()
-                      : "When launched"}
-                  </dd>
-                  <dt className="text-muted-foreground">End</dt>
-                  <dd>
-                    {schedule.endAt
-                      ? new Date(schedule.endAt).toLocaleString()
-                      : "Run until paused"}
-                  </dd>
-                  <dt className="text-muted-foreground">Pixel / dataset</dt>
-                  <dd className="break-all">
-                    {meta?.pixelId || "Not configured"}
-                  </dd>
-                  <dt className="text-muted-foreground">Conversion</dt>
-                  <dd>
-                    {meta?.customConversionId ||
-                      (meta?.customEventType
-                        ? `${meta.customEventType} · ${
-                            meta.conversionScope === "pixel"
-                              ? "raw pixel"
-                              : "client site"
-                          }`
-                        : "Not configured")}
-                  </dd>
-                </dl>
-              </div>
-            </div>
+              )}
+            <details className="group text-xs text-muted-foreground">
+              <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 [&::-webkit-details-marker]:hidden">
+                <ChevronRight className="size-3 transition-transform group-open:rotate-90" />
+                <span>{placementSummary}</span>
+                <span aria-hidden>·</span>
+                <span className="break-all">
+                  Pixel {meta?.pixelId || "not configured"}
+                </span>
+              </summary>
+              {selectedPlacements.length > 0 && (
+                <p className="mt-2 pl-5">
+                  {selectedPlacements.map((p) => p.label).join(", ")}
+                </p>
+              )}
+            </details>
           </section>
           <section className="space-y-4 border-t pt-5" aria-label="Projection">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -572,6 +563,28 @@ export function MetaPlatformCard({
         </div>
       )}
     </section>
+  );
+}
+
+function SetupFact({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <div className="min-w-0 rounded-lg border p-3">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="mt-1 truncate text-base font-semibold" title={value}>
+        {value}
+      </dd>
+      <dd className="truncate text-xs text-muted-foreground" title={detail}>
+        {detail}
+      </dd>
+    </div>
   );
 }
 

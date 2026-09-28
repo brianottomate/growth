@@ -1290,6 +1290,8 @@ export async function createZernioAdCampaign(
   },
   options: { idempotencyKey: string },
 ): Promise<{
+  /** The documented 201: the Meta campaign id at the root. */
+  campaignId?: string;
   campaign?: { id?: string; platformCampaignId?: string; objective?: string };
 }> {
   return zernioFetch("/ads/campaigns", {
