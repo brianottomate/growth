@@ -13,8 +13,9 @@ import { orpc } from "@/orpc/client";
 
 /**
  * Where the brand's homes are, as guests think of it. Drafted by AI from the
- * homes' towns and listings; the operator confirms or edits the labels. Only
- * the label and towns change a card; the rest is context for the prompts.
+ * homes' towns and listings and used straight away; the operator edits or
+ * redrafts to overwrite. Only the label and towns change a card; the rest is
+ * context for the prompts.
  */
 export function MarketsCard({
   brandId,
@@ -29,7 +30,6 @@ export function MarketsCard({
   const router = useRouter();
   const [draft, setDraft] = useState<Market[] | null>(null);
   const list = draft ?? markets?.markets ?? [];
-  const confirmed = Boolean(markets?.confirmedAt);
 
   const save = useMutation(
     orpc.brand.setMarkets.mutationOptions({
@@ -58,14 +58,7 @@ export function MarketsCard({
   return (
     <section className="space-y-3 rounded-xl border p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <h2 className="text-base font-semibold">
-          Markets
-          {markets && !confirmed ? (
-            <span className="ml-2 text-xs font-normal text-muted-foreground">
-              Draft
-            </span>
-          ) : null}
-        </h2>
+        <h2 className="text-base font-semibold">Markets</h2>
         <div className="flex items-center gap-2">
           {draft ? (
             <>
@@ -103,17 +96,6 @@ export function MarketsCard({
                   onClick={() => setDraft(markets.markets)}
                 >
                   Edit
-                </Button>
-              ) : null}
-              {markets && !confirmed ? (
-                <Button
-                  size="sm"
-                  loading={save.isPending}
-                  onClick={() =>
-                    save.mutate({ brandId, markets: markets.markets })
-                  }
-                >
-                  Confirm
                 </Button>
               ) : null}
             </>

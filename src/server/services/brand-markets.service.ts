@@ -60,7 +60,7 @@ const draftSchema = z.object({
     .max(12),
 });
 
-/** Draft the brand's markets from its homes' towns and listings, unconfirmed. */
+/** Draft the brand's markets from its homes' towns and listings; used at once. */
 export async function draftBrandMarkets(input: { brandId: string }) {
   const brand = await db.query.brandTable.findFirst({
     where: eq(brandTable.id, input.brandId),

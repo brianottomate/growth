@@ -45,14 +45,14 @@ export type BrandMarkets = z.infer<typeof brandMarketsSchema>;
 const norm = (town: string) => town.trim().toLowerCase();
 
 /**
- * The market a home's town belongs to, once an operator confirmed the list:
- * a fresh draft never changes what a live card says.
+ * The market a home's town belongs to. A draft is used as soon as it exists,
+ * like the brand story: an operator overwrites it by editing or redrafting.
  */
 export function marketOf(
   markets: BrandMarkets | null | undefined,
   city: string | null | undefined,
 ): Market | null {
-  if (!city || !markets?.confirmedAt) return null;
+  if (!city || !markets) return null;
   const town = norm(city);
   return (
     markets.markets.find((market) =>

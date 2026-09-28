@@ -20,10 +20,11 @@ type IconChoice = "logo" | "logo-icon" | "favicon" | "none" | "library";
 type FontChoice = "heading" | "body" | "house";
 
 /**
- * The mark a brand's cards carry. Shows the current one three ways, and lets
- * the operator point at the site logo or favicon, or build a lockup of an icon
- * beside the name in the brand font. Every choice renders colour, white and
- * dark variants, which is how a brand-coloured mark stays legible on a photo.
+ * The mark a brand's cards carry, shown three ways. "Suggest a mark" renders
+ * every candidate at card size and lets the AI pick and save one; Edit opens
+ * the lockup editor and the plain logo or favicon for anything by hand. Every
+ * choice renders colour, white and dark variants, which is how a
+ * brand-coloured mark stays legible on a photo.
  */
 export function BrandMarkCard({
   brandId,
@@ -123,33 +124,25 @@ export function BrandMarkCard({
     }),
   );
 
-  // A saved lockup, back in the editor as it was saved, judged straight away.
-  // The critique runs on the saved recipe itself, so what it corrects is the
-  // mark on the cards and not a re-typed approximation of it.
-  const fixSavedLockup = () => {
-    if (mark?.source !== "lockup") return;
-    setIcon(mark.iconFrom ?? (mark.iconAssetId ? "library" : "none"));
-    setIconAssetId(mark.iconAssetId ?? "");
-    setText(mark.text ?? brandName);
-    setFont(
-      mark.fontFamily == null
-        ? "house"
-        : mark.fontFamily === bodyFont
-          ? "body"
-          : "heading",
-    );
+  // The editor opens on the saved lockup, so an edit starts from what the
+  // cards show and not from defaults.
+  const openEditor = () => {
+    if (building) return setBuilding(false);
+    if (mark?.source === "lockup") {
+      setIcon(mark.iconFrom ?? (mark.iconAssetId ? "library" : "none"));
+      setIconAssetId(mark.iconAssetId ?? "");
+      setText(mark.text ?? brandName);
+      setFont(
+        mark.fontFamily == null
+          ? "house"
+          : mark.fontFamily === bodyFont
+            ? "body"
+            : "heading",
+      );
+    }
     setTone("color");
     setTuning(null);
     setBuilding(true);
-    critique.mutate({
-      id: brandId,
-      iconAssetId: mark.iconAssetId ?? null,
-      iconFrom: mark.iconFrom ?? undefined,
-      text: mark.text ?? null,
-      fontFamily: mark.fontFamily ?? null,
-      fontWeight: mark.fontWeight ?? null,
-      letterSpacing: mark.letterSpacing ?? null,
-    });
   };
 
   const onDone = (message: string) => () => {
@@ -169,7 +162,16 @@ export function BrandMarkCard({
       onError: (error) => toast.error(error.message),
     }),
   );
-  const busy = setMark.isPending || clearMark.isPending;
+  const suggest = useMutation(
+    orpc.brand.suggestMark.mutationOptions({
+      onSuccess: () => {
+        setBuilding(false);
+        router.refresh();
+      },
+      onError: (error) => toast.error(error.message),
+    }),
+  );
+  const busy = setMark.isPending || clearMark.isPending || suggest.isPending;
 
   return (
     <section
@@ -180,48 +182,39 @@ export function BrandMarkCard({
         <div className="min-w-0">
           <h2 className="text-base font-semibold">Brand mark</h2>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            {mark
-              ? `${describe(mark, brandName)}. Cards draw the white version over photos and the colour version on light grounds.`
-              : "No mark chosen. Cards fall back to the scraped logo, cut white over photos."}
+            {mark ? describe(mark, brandName) : "No mark yet"}
           </p>
+          {mark?.reason ? (
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {mark.reason}
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
           <Button
             size="sm"
-            variant="outline"
-            disabled={busy || !logo}
-            onClick={() => setMark.mutate({ brandId, source: "logo" })}
-          >
-            Use logo
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
+            variant={mark ? "outline" : "default"}
             disabled={busy}
-            onClick={() => setMark.mutate({ brandId, source: "favicon" })}
+            loading={suggest.isPending}
+            onClick={() => suggest.mutate({ id: brandId })}
           >
-            Use favicon
+            <Sparkles className="size-3.5" />
+            {suggest.isPending
+              ? "Trying marks…"
+              : mark
+                ? "Suggest again"
+                : "Suggest a mark"}
           </Button>
           <Button
             size="sm"
             variant={building ? "default" : "outline"}
             disabled={busy}
-            onClick={() => setBuilding((b) => !b)}
+            onClick={openEditor}
           >
-            Build lockup
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled
-            title="Generated marks are coming later"
-          >
-            <Sparkles className="mr-1.5 size-3.5" /> Generate
+            Edit
           </Button>
         </div>
       </div>
-
-      <Critique mark={mark} />
 
       {variants ? (
         <div className="grid grid-cols-3 gap-2">
@@ -246,7 +239,26 @@ export function BrandMarkCard({
 
       {building ? (
         <div className="space-y-3 rounded-lg border p-3">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-muted-foreground">Use as is:</span>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={busy || !logo}
+              onClick={() => setMark.mutate({ brandId, source: "logo" })}
+            >
+              Site logo
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={busy}
+              onClick={() => setMark.mutate({ brandId, source: "favicon" })}
+            >
+              Favicon
+            </Button>
+          </div>
+          <div className="grid grid-cols-1 gap-3 @xl:grid-cols-3">
             <div className="space-y-1.5">
               <Label>Icon</Label>
               <SimpleSelect
@@ -406,6 +418,16 @@ export function BrandMarkCard({
                   : "Fix with AI"}
             </Button>
             <div className="flex gap-2">
+              {mark ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() => clearMark.mutate({ id: brandId })}
+                >
+                  Clear mark
+                </Button>
+              ) : null}
               <Button
                 size="sm"
                 variant="ghost"
@@ -431,55 +453,17 @@ export function BrandMarkCard({
           </div>
         </div>
       ) : null}
-
-      {mark ? (
-        <div className="flex justify-end gap-2">
-          {mark.source === "lockup" && !building ? (
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={busy || critique.isPending}
-              onClick={fixSavedLockup}
-              title="Reopen the saved lockup, have Claude judge it, and apply its corrections to the preview"
-            >
-              <Wand2
-                className={cn(
-                  "mr-1.5 size-3.5",
-                  critique.isPending && "animate-pulse",
-                )}
-              />
-              {critique.isPending ? "Judging…" : "Fix with AI"}
-            </Button>
-          ) : null}
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={busy}
-            onClick={() => clearMark.mutate({ id: brandId })}
-          >
-            Clear mark
-          </Button>
-        </div>
-      ) : null}
     </section>
   );
 }
 
 function describe(mark: BrandMark, brandName: string) {
-  if (mark.source === "logo") return "Using the site logo";
-  if (mark.source === "favicon") return "Using the favicon";
-  return `Lockup: “${mark.text ?? brandName}”${mark.fontFamily ? ` in ${mark.fontFamily}` : ""}`;
-}
-
-/** What the art-director pass said when the lockup was saved. */
-function Critique({ mark }: { mark: BrandMark | null }) {
-  const note = mark?.tuning?.note;
-  if (!note) return null;
-  return (
-    <p className="rounded-lg border border-dashed p-3 text-[11px] leading-4 text-muted-foreground">
-      <span className="font-medium">Art director:</span> {note}
-    </p>
-  );
+  if (mark.source === "logo") return "The site logo";
+  if (mark.source === "favicon") return "The favicon";
+  const name = `“${mark.text ?? brandName}”${mark.fontFamily ? ` in ${mark.fontFamily}` : ""}`;
+  if (mark.iconFrom === "logo-icon") return `Logo icon and ${name}`;
+  if (mark.iconFrom || mark.iconAssetId) return `Icon and ${name}`;
+  return `Name only, ${name}`;
 }
 
 function Swatch({

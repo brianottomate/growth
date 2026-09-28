@@ -128,6 +128,8 @@ export type BrandMark = {
   fontWeight?: 400 | 500 | 600 | 700 | null;
   /** Lockup only: tracking in em; null means -0.02. */
   letterSpacing?: number | null;
+  /** Why this mark, when "Suggest a mark" chose it. */
+  reason?: string | null;
   variants: { color: string; white: string; dark: string };
   /**
    * The mark traced to SVG, when the shape traces cleanly: white and dark

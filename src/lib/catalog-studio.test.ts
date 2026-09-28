@@ -212,14 +212,14 @@ test("a catalog-place headline the card cannot draw is refused, others pass", ()
   expect(catalogHeadlineIssue(long, "catalog-copy")).toBeNull();
 });
 
-test("a card names its confirmed market, never a draft", () => {
+test("a card names its market as soon as it is drafted, else the town", () => {
   const home = { ...homes[0]!, city: "Logan", state: "OH" };
   const markets = {
     markets: [{ id: "hh", label: "Hocking Hills, Ohio", towns: ["Logan"] }],
   };
-  expect(catalogLocation(home, markets)).toBe("Logan, OH");
-  expect(catalogLocation(home, { ...markets, confirmedAt: "2026-09-26" })).toBe(
-    "Hocking Hills, Ohio",
+  expect(catalogLocation(home, markets)).toBe("Hocking Hills, Ohio");
+  expect(catalogLocation({ ...home, city: "Athens" }, markets)).toBe(
+    "Athens, OH",
   );
 });
 

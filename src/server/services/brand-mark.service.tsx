@@ -264,6 +264,11 @@ async function fetchPng(url: string): Promise<Buffer> {
  * such gap (a single wordmark) comes back whole.
  */
 async function leadingGlyph(png: Buffer): Promise<Buffer> {
+  return (await cutLeadingGlyph(png)) ?? png;
+}
+
+/** The cut, or null when the logo has no icon separate from its wordmark. */
+async function cutLeadingGlyph(png: Buffer): Promise<Buffer | null> {
   // Components are found on a small copy: the shapes are the same, the work
   // is a fraction, and the box is scaled back up before the cut.
   const full = await sharp(png).metadata();
@@ -310,7 +315,7 @@ async function leadingGlyph(png: Buffer): Promise<Buffer> {
       }
       boxes.push(box);
     }
-  if (!boxes.length) return png;
+  if (!boxes.length) return null;
   // Rows of a stacked logo: ink bands split by a clear horizontal gap.
   const rowInk = new Uint8Array(height);
   for (const box of boxes) rowInk.fill(1, box.y0, box.y1 + 1);
@@ -350,7 +355,7 @@ async function leadingGlyph(png: Buffer): Promise<Buffer> {
     ? Math.min(full.height ?? 1, Math.ceil((firstRowEnd + 1) / scale))
     : (full.height ?? 1);
   if (icon.x1 - icon.x0 > width * 0.5) {
-    if (!stacked) return png;
+    if (!stacked) return null;
     icon.x0 = Math.min(...boxes.map((box) => box.x0));
     icon.x1 = Math.max(...boxes.map((box) => box.x1));
   }
@@ -672,6 +677,8 @@ export async function setBrandMark(input: {
   recipe: BrandMarkRecipe;
   /** What the operator accepted from "Fix with AI", if they asked for it. */
   tuning?: MarkTuning | null;
+  /** Why this mark, when it was suggested rather than picked by hand. */
+  reason?: string | null;
 }): Promise<BrandMark> {
   const brand = await loadMarkBrand(input.brandId);
   const tuning =
@@ -722,12 +729,18 @@ export async function setBrandMark(input: {
     iconAssetId: input.recipe.iconAssetId ?? null,
     iconFrom: input.recipe.iconFrom ?? null,
     text: input.recipe.text ?? null,
-    fontFamily: input.recipe.fontFamily ?? null,
+    // Undefined means "the brand's heading font", which is what was drawn; the
+    // stored mark names it so the editor reopens on the same face.
+    fontFamily:
+      input.recipe.fontFamily === undefined
+        ? brandFontFamily(brand.brandIdentity)
+        : input.recipe.fontFamily,
     fontWeight: input.recipe.fontWeight ?? null,
     letterSpacing: input.recipe.letterSpacing ?? null,
     variants: { color: ids.color!, white: ids.white!, dark: ids.dark! },
     vector,
     tuning,
+    reason: input.reason ?? null,
     updatedAt: new Date().toISOString(),
   };
   await db
@@ -763,13 +776,27 @@ export async function chooseBrandMark(input: {
   const brand = await loadMarkBrand(input.brandId);
   const favicon =
     brand.brandIdentity?.favicon ?? brand.websiteMeta?.favicon ?? null;
+  const logoUrl = brand.brandIdentity?.logo ?? brand.logo;
+  // Offered only when the logo has an icon apart from its name: otherwise the
+  // "cut" is the whole logo again, beside the name it already carries.
+  const cuttable = logoUrl
+    ? await fetchPng(logoUrl)
+        .then(cutLeadingGlyph)
+        .then(Boolean)
+        .catch(() => false)
+    : false;
   const recipes: BrandMarkRecipe[] = [
-    ...(brand.logo ? [{ source: "logo" } as const] : []),
-    ...(brand.logo
-      ? [{ source: "lockup", iconFrom: "logo-icon" } as const]
-      : []),
+    ...(logoUrl ? [{ source: "logo" } as const] : []),
+    ...(cuttable ? [{ source: "lockup", iconFrom: "logo-icon" } as const] : []),
     ...(favicon ? [{ source: "lockup", iconFrom: "favicon" } as const] : []),
     { source: "lockup", iconFrom: null },
+    {
+      source: "lockup",
+      iconFrom: null,
+      text: brand.name.toUpperCase(),
+      fontWeight: 600,
+      letterSpacing: 0.14,
+    },
   ];
   // Each candidate at card scale: a mark on a card is about 44 px tall on a
   // 1080 px canvas, so a candidate that is thin there is thin for real.
@@ -819,14 +846,14 @@ export async function chooseBrandMark(input: {
   const { output } = await generateText({
     model: anthropic("claude-sonnet-5"),
     system:
-      "You pick a brand's mark for the corner of an ad card, shown here at the size the card draws it, in white on dark. Choose the candidate that reads best at this size: legible, not thin or faint, clearly the brand. A wordmark that has gone hairline loses to a lockup of an icon and the name set in the brand font. A lockup whose icon is itself a wordmark repeats the name; prefer the plain logo or the text-only lockup then. When the icon cut from the brand's own logo is offered and reads cleanly, prefer it to a favicon badge or to the name alone: it is the brand's real mark.",
+      "You pick a brand's mark for the corner of an ad card, shown here at the size the card draws it, in white on dark. Choose the candidate that reads best at this size: legible, not thin or faint, clearly the brand. A wordmark that has gone hairline, or a logo that has become a white box or a smudge, loses to a lockup of an icon and the name, or to the name alone. A lockup whose icon is itself a wordmark repeats the name; prefer the name alone then. When the icon cut from the brand's own logo is offered and reads cleanly, prefer it to a favicon badge or to the name alone: it is the brand's real mark. The reason is for the operator: say in plain words why this one, in one sentence.",
     messages: [
       {
         role: "user",
         content: [
           {
             type: "text",
-            text: `Brand: ${brand.name}. Candidates: ${tiles.map((t, i) => `${i + 1} = ${t.recipe.source === "lockup" ? (t.recipe.iconFrom === "logo-icon" ? "lockup, the icon cut from the logo + name" : t.recipe.iconFrom ? `lockup, ${t.recipe.iconFrom} icon + name` : "name only") : "site logo alone"}`).join("; ")}.`,
+            text: `Brand: ${brand.name}. Candidates: ${tiles.map((t, i) => `${i + 1} = ${describeRecipe(t.recipe)}`).join("; ")}.`,
           },
           { type: "file", data: sheet, mediaType: "image/png" },
         ],
@@ -836,8 +863,10 @@ export async function chooseBrandMark(input: {
     providerOptions: { anthropic: { effort: "low" } },
   });
   const chosen = tiles[output.choice - 1] ?? tiles[0]!;
+  // Only a favicon badge is judged and nudged: a cut icon is already set to
+  // the cap height, and a name alone has no icon to move.
   const tuning =
-    chosen.recipe.source === "lockup"
+    chosen.recipe.source === "lockup" && chosen.recipe.iconFrom === "favicon"
       ? await critiqueBrandMark({
           brandId: input.brandId,
           recipe: chosen.recipe,
@@ -848,6 +877,15 @@ export async function chooseBrandMark(input: {
     userId: input.userId,
     recipe: chosen.recipe,
     tuning,
+    reason: output.reason,
   });
   return { recipe: chosen.recipe, reason: output.reason };
+}
+
+function describeRecipe(recipe: BrandMarkRecipe): string {
+  if (recipe.source !== "lockup") return `site ${recipe.source} alone`;
+  if (recipe.iconFrom === "logo-icon")
+    return "the icon cut from the logo + name";
+  if (recipe.iconFrom) return `${recipe.iconFrom} icon + name`;
+  return recipe.letterSpacing ? "name alone, spaced capitals" : "name alone";
 }

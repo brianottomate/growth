@@ -296,6 +296,7 @@ const brandMarkSchema = z.strictObject({
     .nullable()
     .optional(),
   letterSpacing: z.number().nullable().optional(),
+  reason: z.string().nullable().optional(),
   iconAssetId: z.string().nullable().optional(),
   iconFrom: z.enum(["logo", "favicon", "logo-icon"]).nullable().optional(),
   source: z.enum(["logo", "favicon", "lockup"]),

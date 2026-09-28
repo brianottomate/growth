@@ -30,7 +30,7 @@ import { requireOwnedCampaign } from "./ads-draft.service";
 //
 // Guest origin is the evidence that would settle this, and the warehouse
 // does not have it for WanderOS sites: the Segment tables carry wander.com
-// only (checked 2026-09-28). So the shortlist is the brand's confirmed
+// only (checked 2026-09-28). So the shortlist is the brand's
 // market (its feeder cities), what the brand's direct bookings say about
 // the booking window, and the audiences already synced in its ad account.
 
@@ -141,7 +141,7 @@ export async function suggestCampaignAudiences(input: {
     columns: { externalId: true, source: true, city: true, state: true },
   });
 
-  // Confirmed markets only: a draft never drives targeting.
+  // Every market the brand has, drafted or edited.
   const markets = new Map<string, Market>();
   for (const home of homes) {
     const market = marketOf(brand.markets, home.city);
@@ -154,8 +154,6 @@ export async function suggestCampaignAudiences(input: {
         .filter((s): s is string => Boolean(s)),
     ),
   ];
-  const drafted =
-    Boolean(brand.markets?.markets?.length) && !brand.markets?.confirmedAt;
 
   const window = await bookingWindow(
     homes
@@ -243,11 +241,8 @@ export async function suggestCampaignAudiences(input: {
     })),
     note: [
       window
-        ? "Guest origin by session is not available for this site; feeder cities come from the confirmed market."
-        : "No direct bookings in the last 12 months and no guest-origin data; feeder cities come from the confirmed market.",
-      drafted
-        ? "The market is drafted but not confirmed on Setup, so its feeder cities are not used yet."
-        : "",
+        ? "Guest origin by session is not available for this site; feeder cities come from the market."
+        : "No direct bookings in the last 12 months and no guest-origin data; feeder cities come from the market.",
     ]
       .filter(Boolean)
       .join(" "),
@@ -265,9 +260,7 @@ export async function suggestCampaignAudiences(input: {
       ageMin: 25,
       ageMax: 64,
       platformAudienceId: null,
-      why: drafted
-        ? "The market is drafted but not confirmed on Setup; until it is, the homes' own state."
-        : "No confirmed market, no session data and no synced audiences yet: the homes' own state.",
+      why: "No market, no session data and no synced audiences yet: the homes' own state.",
     }));
 
   let suggestions: AudienceSuggestion[];

@@ -228,7 +228,7 @@ export async function newCatalogCopy(input: {
   thorough?: boolean;
   /** Write for another template than the card's, e.g. a comparison export. */
   templateId?: string;
-  /** The place the card will show, when it is not the confirmed market's. */
+  /** The place the card will show, when it is not the market's. */
   place?: string | null;
   /** False returns the copy without saving it to the card. */
   save?: boolean;
