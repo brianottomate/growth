@@ -4,6 +4,10 @@ import { useState } from "react";
 
 import { cn } from "@/components/ui/lib/utils";
 import {
+  DEFAULT_CATALOG_FORMAT,
+  DEFAULT_CATALOG_TEMPLATE,
+} from "@/lib/catalog-studio";
+import {
   getCompositionFormat,
   type CompositionFormatId,
   type CompositionTemplateId,
@@ -39,13 +43,15 @@ const CTA = "Explore your next escape";
 // and last feed card, image-hero between, tall-statement on the story
 // canvas), plus the catalog card.
 const STARTER: Card[] = [
-  // Squares first, then the tall story, then the wide landscape.
+  // The catalog card as a new catalog draws it, then the feed cards, the
+  // tall story and the wide landscape.
   {
-    templateId: "catalog-copy",
-    formatId: "portrait",
+    templateId: DEFAULT_CATALOG_TEMPLATE,
+    formatId: DEFAULT_CATALOG_FORMAT,
     label: "Catalog",
     fields: (home, brandName) => ({
-      title: home?.name ?? brandName,
+      eyebrow: "Your stay in",
+      title: home?.place ?? home?.name ?? brandName,
       subtitle: home?.facts ?? "",
     }),
   },
