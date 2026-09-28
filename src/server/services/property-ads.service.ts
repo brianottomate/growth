@@ -27,6 +27,7 @@ import {
   findImportedImage,
   importRemoteImage,
 } from "@/server/services/media.service";
+import { contactSheet } from "./starter-ad-generation.service";
 import {
   brandListings,
   normalizeListingUrl,
@@ -172,6 +173,7 @@ async function writeCopy(input: {
     subtitle: string;
     facts: string;
     nightlyFrom: number | null;
+    heroUrl: string | null;
   }[];
 }): Promise<z.infer<typeof CopySchema>> {
   const fallback = {
@@ -184,25 +186,60 @@ async function writeCopy(input: {
     cards: [],
   };
 
+  // The heroes on one numbered sheet, in order, so each card's words are
+  // written for the photo they are drawn on.
+  const heroes =
+    input.homes.length <= 16 && input.homes.every((home) => home.heroUrl)
+      ? await contactSheet({
+          id: "set",
+          name: input.brandName,
+          url: "",
+          photos: input.homes.map((home) => ({ url: home.heroUrl! })),
+        }).catch(() => null)
+      : null;
+
   try {
     const { output } = await generateText({
       model: anthropic(MODEL),
       output: Output.object({ schema: CopySchema }),
       system:
         "You write short paid-social ad copy for vacation rentals. Use only the facts given. Never invent amenities, ratings, distances or availability. No exclamation marks, no all-caps, no emoji.",
-      prompt: [
-        `Property manager: ${input.brandName}`,
-        input.where ? `Where: ${input.where}` : null,
-        "Homes:",
-        ...input.homes.map(
-          (home) =>
-            `- ${home.name} (${[home.subtitle, home.facts].filter(Boolean).join("; ")}${home.nightlyFrom ? `, from $${home.nightlyFrom}/night` : ""})`,
-        ),
-        "Write a headline and body for a single-home ad about the first home, and a headline and body for a carousel of all of them.",
-        "Then, for each home in the order listed, write the copy printed on its image card. The title is the home's name. Drop a suffix that repeats the location or the brand (the brand's mark is already on the card), and keep the rest whole: it must still identify the home. The card breaks the title after about 22 characters, so a title either fits on one line or breaks into two balanced lines. The line under it is the home's facts (bedrooms, baths, guests) as given, in that order, separated by ' · '; if there are none, use the place.",
-      ]
-        .filter(Boolean)
-        .join("\n"),
+      messages: [
+        {
+          role: "user",
+          content: [
+            ...(heroes
+              ? [
+                  {
+                    type: "file" as const,
+                    data: heroes.image,
+                    mediaType: "image/jpeg" as const,
+                  },
+                  {
+                    type: "text" as const,
+                    text: "Each home's hero photo is on the numbered sheet, in the order listed. A card's words are drawn onto that photo, so they must be true of what it shows.",
+                  },
+                ]
+              : []),
+            {
+              type: "text" as const,
+              text: [
+                `Property manager: ${input.brandName}`,
+                input.where ? `Where: ${input.where}` : null,
+                "Homes:",
+                ...input.homes.map(
+                  (home) =>
+                    `- ${home.name} (${[home.subtitle, home.facts].filter(Boolean).join("; ")}${home.nightlyFrom ? `, from $${home.nightlyFrom}/night` : ""})`,
+                ),
+                "Write a headline and body for a single-home ad about the first home, and a headline and body for a carousel of all of them.",
+                "Then, for each home in the order listed, write the copy printed on its image card. The title is the home's name. Drop a suffix that repeats the location or the brand (the brand's mark is already on the card), and keep the rest whole: it must still identify the home. The card breaks the title after about 22 characters, so a title either fits on one line or breaks into two balanced lines. The line under it is the home's facts (bedrooms, baths, guests) as given, in that order, separated by ' · '; if there are none, use the place.",
+              ]
+                .filter(Boolean)
+                .join("\n"),
+            },
+          ],
+        },
+      ],
       temperature: 0.7,
     });
     return output;
@@ -427,6 +464,7 @@ async function draftAdsFromChosenHomes({
       subtitle: homeSubtitle(row),
       facts: homeFacts(row),
       nightlyFrom: row.nightlyFrom ?? null,
+      heroUrl: row.imageUrl ?? null,
     })),
   });
 

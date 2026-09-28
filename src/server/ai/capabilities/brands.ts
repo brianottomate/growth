@@ -371,7 +371,7 @@ export const setBrandMarkAction = growthAction({
       .nullish()
       .describe("Lockup only: the wordmark text. Defaults to the brand name."),
     iconFrom: z
-      .enum(["logo", "favicon"])
+      .enum(["logo", "favicon", "logo-icon"])
       .nullish()
       .describe(
         "Lockup only: which scraped image is the icon. Default logo; null for a wordmark with no icon.",

@@ -644,7 +644,7 @@ export async function buildAdSet(input: {
     throw new AdSetError(422, "None of those homes have a photo to draw on");
   }
 
-  const copyHomes = usable.map(({ listing, detail }): CopyHome => ({
+  const copyHomes = usable.map(({ listing, detail, hero }): CopyHome => ({
     name: listing.name,
     place: [listing.city, listing.state].filter(Boolean).join(", "),
     bedrooms: listing.bedrooms ?? null,
@@ -653,6 +653,7 @@ export async function buildAdSet(input: {
     nightlyFrom: listing.nightlyFrom ?? null,
     amenities: detail.amenities,
     description: detail.description,
+    heroUrl: hero,
   }));
   // The first pass defers copy: shells with factual words, no model call. The
   // words come later, from writeSetCopy, once the compositions and placements
@@ -1783,6 +1784,7 @@ export async function writeSetCopy(input: {
         nightlyFrom: listing.nightlyFrom ?? null,
         amenities: detail.amenities,
         description: detail.description,
+        heroUrl: listing.imageUrl ?? null,
       });
     }),
   );

@@ -16,7 +16,7 @@ import { orpc } from "@/orpc/client";
 
 type Variants = { color: string; white: string; dark: string };
 type Tuning = NonNullable<BrandMark["tuning"]>;
-type IconChoice = "logo" | "favicon" | "none" | "library";
+type IconChoice = "logo" | "logo-icon" | "favicon" | "none" | "library";
 type FontChoice = "heading" | "body" | "house";
 
 /**
@@ -80,7 +80,8 @@ export function BrandMarkCard({
     if (text.trim()) params.set("text", text.trim());
     if (fontFamily !== null) params.set("fontFamily", fontFamily);
     // A lockup with the site logo or favicon as its icon reuses those sources.
-    if (icon === "logo" || icon === "favicon") params.set("iconFrom", icon);
+    if (icon === "logo" || icon === "logo-icon" || icon === "favicon")
+      params.set("iconFrom", icon);
     if (tuning) {
       params.set("iconScale", String(tuning.iconScale));
       params.set("iconShift", String(tuning.iconShift));
@@ -91,7 +92,10 @@ export function BrandMarkCard({
 
   const recipe = {
     iconAssetId: icon === "library" ? iconAssetId : null,
-    iconFrom: icon === "logo" || icon === "favicon" ? icon : null,
+    iconFrom:
+      icon === "logo" || icon === "logo-icon" || icon === "favicon"
+        ? icon
+        : null,
     text: text.trim() || null,
     fontFamily: fontFamily === "" ? null : fontFamily,
   };
@@ -158,7 +162,7 @@ export function BrandMarkCard({
           <h2 className="text-base font-semibold">Brand mark</h2>
           <p className="mt-0.5 text-sm text-muted-foreground">
             {mark
-              ? `${describe(mark)}. Cards draw the white version over photos and the colour version on light grounds.`
+              ? `${describe(mark, brandName)}. Cards draw the white version over photos and the colour version on light grounds.`
               : "No mark chosen. Cards fall back to the scraped logo, cut white over photos."}
           </p>
         </div>
@@ -232,7 +236,12 @@ export function BrandMarkCard({
                   setIcon(value as IconChoice),
                 )}
                 options={[
-                  ...(logo ? [{ value: "logo", label: "Site logo" }] : []),
+                  ...(logo
+                    ? [
+                        { value: "logo", label: "Site logo" },
+                        { value: "logo-icon", label: "Icon cut from the logo" },
+                      ]
+                    : []),
                   { value: "favicon", label: "Favicon" },
                   { value: "library", label: "Library image" },
                   { value: "none", label: "No icon" },
@@ -437,10 +446,10 @@ export function BrandMarkCard({
   );
 }
 
-function describe(mark: BrandMark) {
+function describe(mark: BrandMark, brandName: string) {
   if (mark.source === "logo") return "Using the site logo";
   if (mark.source === "favicon") return "Using the favicon";
-  return `Lockup: “${mark.text ?? ""}”${mark.fontFamily ? ` in ${mark.fontFamily}` : ""}`;
+  return `Lockup: “${mark.text ?? brandName}”${mark.fontFamily ? ` in ${mark.fontFamily}` : ""}`;
 }
 
 /** What the art-director pass said when the lockup was saved. */

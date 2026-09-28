@@ -517,7 +517,7 @@ export const brandRouter = {
       z.object({
         id: z.string(),
         iconAssetId: z.string().nullish(),
-        iconFrom: z.enum(["logo", "favicon"]).nullish(),
+        iconFrom: z.enum(["logo", "favicon", "logo-icon"]).nullish(),
         text: z.string().trim().max(60).nullish(),
         fontFamily: z.string().trim().max(80).nullish(),
       }),

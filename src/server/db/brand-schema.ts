@@ -118,7 +118,8 @@ export type BrandMark = {
   /** Lockup only: the icon beside the name, a library asset. */
   iconAssetId?: string | null;
   /** Lockup only: the icon taken from the scraped logo or favicon instead. */
-  iconFrom?: "logo" | "favicon" | null;
+  /** "logo-icon": the logo's leading glyph, isolated from its wordmark. */
+  iconFrom?: "logo" | "favicon" | "logo-icon" | null;
   /** Lockup only: the wordmark text. Defaults to the brand name. */
   text?: string | null;
   /** Lockup only: the family the text is set in; null means the house font. */

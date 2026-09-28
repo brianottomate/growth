@@ -14,7 +14,7 @@ const query = z.object({
   source: z.enum(["logo", "favicon", "lockup"]),
   tone: z.enum(["color", "white", "dark"]).default("color"),
   iconAssetId: z.string().optional(),
-  iconFrom: z.enum(["logo", "favicon"]).optional(),
+  iconFrom: z.enum(["logo", "favicon", "logo-icon"]).optional(),
   text: z.string().max(60).optional(),
   /** Absent = the brand's heading font; "" = the house font. */
   fontFamily: z.string().max(80).optional(),

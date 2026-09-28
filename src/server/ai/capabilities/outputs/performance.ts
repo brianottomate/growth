@@ -585,7 +585,10 @@ export const previewIntakeApplyActionOutputSchema = z.strictObject({
           .strictObject({
             fontFamily: z.string().nullable().optional(),
             iconAssetId: z.string().nullable().optional(),
-            iconFrom: z.enum(["logo", "favicon"]).nullable().optional(),
+            iconFrom: z
+              .enum(["logo", "favicon", "logo-icon"])
+              .nullable()
+              .optional(),
             source: z.enum(["logo", "favicon", "lockup"]),
             text: z.string().nullable().optional(),
             tuning: z

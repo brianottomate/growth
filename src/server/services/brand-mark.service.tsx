@@ -103,7 +103,8 @@ export async function critiqueLockup(input: {
 export type BrandMarkRecipe = {
   source: BrandMark["source"];
   iconAssetId?: string | null;
-  iconFrom?: "logo" | "favicon" | null;
+  /** "logo-icon": the logo's leading glyph, isolated from its wordmark. */
+  iconFrom?: "logo" | "favicon" | "logo-icon" | null;
   text?: string | null;
   fontFamily?: string | null;
 };
@@ -165,7 +166,8 @@ export async function resolveMarkIconUrl(
   const logo = brand.brandIdentity?.logo ?? brand.logo;
   if (recipe.source === "favicon") return favicon;
   if (recipe.source === "logo") return logo;
-  if (recipe.iconFrom === "logo") return logo;
+  if (recipe.iconFrom === "logo" || recipe.iconFrom === "logo-icon")
+    return logo;
   if (recipe.iconFrom === "favicon") return favicon;
   if (!recipe.iconAssetId) return null;
   const asset = await db.query.mediaAssetTable.findFirst({
@@ -245,6 +247,82 @@ async function fetchPng(url: string): Promise<Buffer> {
   // Tight bounds, so every later measurement is of the mark and not its
   // padding: the icon's size against the text, and the traced viewBox.
   return trimTransparent(png);
+}
+
+/**
+ * The leading glyph of a logo: the first run of ink before the first clear
+ * gap, which on an icon-plus-wordmark logo is the icon. A logo with no such
+ * gap (a single wordmark) comes back whole.
+ */
+async function leadingGlyph(png: Buffer): Promise<Buffer> {
+  // Components are found on a small copy: the shapes are the same, the work
+  // is a fraction, and the box is scaled back up before the cut.
+  const full = await sharp(png).metadata();
+  const scale = Math.min(1, 240 / Math.max(full.height ?? 1, 1));
+  const { data, info } = await sharp(png)
+    .ensureAlpha()
+    .resize({ height: Math.max(1, Math.round((full.height ?? 1) * scale)) })
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const { width, height } = info;
+  const ink = (x: number, y: number) => data[(y * width + x) * 4 + 3]! > 24;
+  const seen = new Uint8Array(width * height);
+  type Box = { x0: number; x1: number; y0: number; y1: number };
+  const boxes: Box[] = [];
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) {
+      if (seen[y * width + x] || !ink(x, y)) continue;
+      const box: Box = { x0: x, x1: x, y0: y, y1: y };
+      const stack = [[x, y]];
+      seen[y * width + x] = 1;
+      while (stack.length) {
+        const [cx, cy] = stack.pop()!;
+        box.x0 = Math.min(box.x0, cx!);
+        box.x1 = Math.max(box.x1, cx!);
+        box.y0 = Math.min(box.y0, cy!);
+        box.y1 = Math.max(box.y1, cy!);
+        for (const [dx, dy] of [
+          [1, 0],
+          [-1, 0],
+          [0, 1],
+          [0, -1],
+          [1, 1],
+          [-1, -1],
+          [1, -1],
+          [-1, 1],
+        ]) {
+          const nx = cx! + dx!,
+            ny = cy! + dy!;
+          if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+          if (seen[ny * width + nx] || !ink(nx, ny)) continue;
+          seen[ny * width + nx] = 1;
+          stack.push([nx, ny]);
+        }
+      }
+      boxes.push(box);
+    }
+  if (!boxes.length) return png;
+  // The icon is the leftmost shape, plus any shape sharing its columns (a
+  // dot over an i, a detached ray): those are its pieces, not the next glyph.
+  boxes.sort((a, b) => a.x0 - b.x0);
+  const icon = { ...boxes[0]! };
+  const margin = Math.max(1, Math.round(height * 0.02));
+  for (const box of boxes.slice(1)) {
+    if (box.x0 > icon.x1 + margin) continue;
+    icon.x1 = Math.max(icon.x1, box.x1);
+    icon.y0 = Math.min(icon.y0, box.y0);
+    icon.y1 = Math.max(icon.y1, box.y1);
+  }
+  // No separable icon: the leftmost shape runs most of the width.
+  if (icon.x1 - icon.x0 > width * 0.5) return png;
+  const left = Math.floor(icon.x0 / scale);
+  const right = Math.min(full.width ?? 1, Math.ceil((icon.x1 + 1) / scale));
+  return trimTransparent(
+    await sharp(png)
+      .extract({ left, top: 0, width: right - left, height: full.height ?? 1 })
+      .png()
+      .toBuffer(),
+  );
 }
 
 /** The icon in the tone: as-is for colour, a silhouette otherwise. */
@@ -397,7 +475,9 @@ export async function renderBrandMark(
   tuning: MarkTuning = NO_TUNING,
 ): Promise<Buffer> {
   const iconUrl = await resolveMarkIconUrl(recipe, brand);
-  const iconPng = iconUrl ? await fetchPng(iconUrl) : null;
+  let iconPng = iconUrl ? await fetchPng(iconUrl) : null;
+  if (iconPng && recipe.iconFrom === "logo-icon")
+    iconPng = await leadingGlyph(iconPng);
 
   if (recipe.source !== "lockup") {
     if (!iconPng) throw new Error("This brand has no logo or favicon to use.");
@@ -627,6 +707,9 @@ export async function chooseBrandMark(input: {
     brand.brandIdentity?.favicon ?? brand.websiteMeta?.favicon ?? null;
   const recipes: BrandMarkRecipe[] = [
     ...(brand.logo ? [{ source: "logo" } as const] : []),
+    ...(brand.logo
+      ? [{ source: "lockup", iconFrom: "logo-icon" } as const]
+      : []),
     ...(favicon ? [{ source: "lockup", iconFrom: "favicon" } as const] : []),
     { source: "lockup", iconFrom: null },
   ];
@@ -678,14 +761,14 @@ export async function chooseBrandMark(input: {
   const { output } = await generateText({
     model: anthropic("claude-sonnet-5"),
     system:
-      "You pick a brand's mark for the corner of an ad card, shown here at the size the card draws it, in white on dark. Choose the candidate that reads best at this size: legible, not thin or faint, clearly the brand. A wordmark that has gone hairline loses to a lockup of an icon and the name set in the brand font. A lockup whose icon is itself a wordmark repeats the name; prefer the plain logo or the text-only lockup then.",
+      "You pick a brand's mark for the corner of an ad card, shown here at the size the card draws it, in white on dark. Choose the candidate that reads best at this size: legible, not thin or faint, clearly the brand. A wordmark that has gone hairline loses to a lockup of an icon and the name set in the brand font. A lockup whose icon is itself a wordmark repeats the name; prefer the plain logo or the text-only lockup then. When the icon cut from the brand's own logo is offered and reads cleanly, prefer it to a favicon badge or to the name alone: it is the brand's real mark.",
     messages: [
       {
         role: "user",
         content: [
           {
             type: "text",
-            text: `Brand: ${brand.name}. Candidates: ${tiles.map((t, i) => `${i + 1} = ${t.recipe.source === "lockup" ? (t.recipe.iconFrom ? `lockup, ${t.recipe.iconFrom} icon + name` : "name only") : "site logo alone"}`).join("; ")}.`,
+            text: `Brand: ${brand.name}. Candidates: ${tiles.map((t, i) => `${i + 1} = ${t.recipe.source === "lockup" ? (t.recipe.iconFrom === "logo-icon" ? "lockup, the icon cut from the logo + name" : t.recipe.iconFrom ? `lockup, ${t.recipe.iconFrom} icon + name` : "name only") : "site logo alone"}`).join("; ")}.`,
           },
           { type: "file", data: sheet, mediaType: "image/png" },
         ],

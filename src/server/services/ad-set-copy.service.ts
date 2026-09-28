@@ -1,5 +1,6 @@
 import "server-only";
 import { brandStorySection } from "@/server/ai/prompts";
+import { contactSheet } from "./starter-ad-generation.service";
 
 import { anthropic } from "@ai-sdk/anthropic";
 import { Output, generateText } from "ai";
@@ -63,6 +64,8 @@ export type CopyHome = {
   nightlyFrom: number | null;
   amenities: string[];
   description: string | null;
+  /** The hero the card is drawn on, for the call that writes onto it. */
+  heroUrl?: string | null;
 };
 
 const facts = (home: CopyHome) =>
@@ -179,6 +182,17 @@ export async function writeAdSetCopy(input: {
     ...new Set(input.homes.map((home) => home.place).filter(Boolean)),
   ];
   const where = places.length === 1 ? places[0]! : places.join(", ");
+  // The heroes on one numbered sheet, in the homes' order, so the card title
+  // is written for the photo it will be drawn on. One sheet holds sixteen.
+  const heroes =
+    input.homes.length <= 16 && input.homes.every((home) => home.heroUrl)
+      ? await contactSheet({
+          id: "set",
+          name: input.brandName,
+          url: "",
+          photos: input.homes.map((home) => ({ url: home.heroUrl! })),
+        }).catch(() => null)
+      : null;
 
   try {
     const { output } = await generateText({
@@ -228,30 +242,55 @@ export async function writeAdSetCopy(input: {
           story: input.brandStory,
         }),
       ].join("\n"),
-      prompt: [
-        `Property manager: ${input.brandName}`,
-        where ? `Where: ${where}` : null,
-        "",
-        "Homes, in order. Return one copy object per home in this same order:",
-        ...input.homes.map((home, index) =>
-          [
-            `${index + 1}. ${home.name}`,
-            `   where: ${home.place || "unstated"}`,
-            `   facts: ${facts(home) || "unstated"}`,
-            home.nightlyFrom ? `   from: $${home.nightlyFrom} a night` : null,
-            `   amenities: ${home.amenities.length ? home.amenities.join(", ") : "none listed"}`,
-            home.description
-              ? `   their description: ${home.description.slice(0, 700)}`
-              : null,
-          ]
-            .filter(Boolean)
-            .join("\n"),
-        ),
-        "",
-        "Then write the portfolio caption, for a carousel of all of these homes in order, and the catalog caption, for an ad where the platform picks which of these homes each viewer sees. Both should read as the manager's whole offer rather than one home.",
-      ]
-        .filter((line) => line !== null)
-        .join("\n"),
+      messages: [
+        {
+          role: "user",
+          content: [
+            ...(heroes
+              ? [
+                  {
+                    type: "file" as const,
+                    data: heroes.image,
+                    mediaType: "image/jpeg" as const,
+                  },
+                  {
+                    type: "text" as const,
+                    text: "Each home's hero photo is on the numbered sheet, in the order below. The cardTitle is drawn onto that photo, so it must be true of what the photo shows.",
+                  },
+                ]
+              : []),
+            {
+              type: "text" as const,
+              text: [
+                `Property manager: ${input.brandName}`,
+                where ? `Where: ${where}` : null,
+                "",
+                "Homes, in order. Return one copy object per home in this same order:",
+                ...input.homes.map((home, index) =>
+                  [
+                    `${index + 1}. ${home.name}`,
+                    `   where: ${home.place || "unstated"}`,
+                    `   facts: ${facts(home) || "unstated"}`,
+                    home.nightlyFrom
+                      ? `   from: $${home.nightlyFrom} a night`
+                      : null,
+                    `   amenities: ${home.amenities.length ? home.amenities.join(", ") : "none listed"}`,
+                    home.description
+                      ? `   their description: ${home.description.slice(0, 700)}`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join("\n"),
+                ),
+                "",
+                "Then write the portfolio caption, for a carousel of all of these homes in order, and the catalog caption, for an ad where the platform picks which of these homes each viewer sees. Both should read as the manager's whole offer rather than one home.",
+              ]
+                .filter((line) => line !== null)
+                .join("\n"),
+            },
+          ],
+        },
+      ],
     });
     if (output?.homes.length !== input.homes.length) {
       return deterministicSetCopy(input.homes, input.brandName);

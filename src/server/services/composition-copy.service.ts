@@ -3,6 +3,8 @@ import { brandStorySection } from "@/server/ai/prompts";
 
 import { anthropic } from "@ai-sdk/anthropic";
 import { generateText, Output } from "ai";
+import sharp from "sharp";
+import { fetchPublicImage } from "@/server/services/media.service";
 import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
@@ -104,7 +106,13 @@ export async function writeCompositionCopy(input: {
       eq(mediaAssetTable.brandId, brand.id),
       isNull(mediaAssetTable.deletedAt),
     ),
-    columns: { id: true, title: true, alt: true, metadata: true },
+    columns: {
+      url: true,
+      id: true,
+      title: true,
+      alt: true,
+      metadata: true,
+    },
   });
   if (!source) {
     throw new CompositionAccessError(
@@ -142,6 +150,18 @@ export async function writeCompositionCopy(input: {
       : null,
   ].filter(Boolean);
 
+  // The words go on this photo: the model writes with it in view.
+  const photo = source.url
+    ? await fetchPublicImage(source.url)
+        .then(({ body }) =>
+          sharp(body)
+            .resize(1024, 1024, { fit: "inside", withoutEnlargement: true })
+            .jpeg({ quality: 82 })
+            .toBuffer(),
+        )
+        .catch(() => null)
+    : null;
+
   try {
     const { output } = await generateText({
       model: anthropic(MODEL),
@@ -152,37 +172,59 @@ export async function writeCompositionCopy(input: {
         "Return null for any field the layout does not use.",
         brandStorySection({ brandName: brand.name, story: brand.story }),
       ].join("\n"),
-      prompt: [
-        `Brand: ${brand.name}${brand.tagline ? ` — ${brand.tagline}` : ""}.`,
-        brand.description
-          ? `About the brand: ${brand.description.slice(0, 600)}`
-          : null,
-        ...voice,
-        home
-          ? `The photo is of ${home.name}${place ? ` in ${place}` : ""}${facts ? ` (${facts})` : ""}${home.nightlyFrom ? `, from $${home.nightlyFrom}/night` : ""}.`
-          : `The photo is titled “${source.title ?? source.alt ?? "untitled"}”; nothing else is known about it.`,
-        `Layout: ${getCompositionTemplate(input.spec.templateId).label}. ${getCompositionTemplate(input.spec.templateId).description}`,
-        "Fields the layout uses, and what goes in each:",
-        has("eyebrow")
-          ? "- eyebrow: the hook that opens the headline, ending in a preposition so it runs straight into the title as one sentence (for example “A ski-in, ski-out condo in”, “Sleeps 14 with a hot tub in”). The card sets the hook on its own line and the preposition goes down with the place, so keep the hook to 28 characters before the preposition; 30 in total. Same bold type as the place. Build it from the facts given, never from guesses."
-          : "- eyebrow: null.",
-        input.spec.templateId === "catalog-place"
-          ? "- title: the place only, as “Town, ST” (for example “Winter Park, CO”). If the place is unknown, use the home's name."
-          : input.spec.templateId === "catalog-copy"
-            ? "- title: the home's name, whole, with a suffix that repeats the location or the brand dropped. The card breaks a title after about 22 characters, so it either fits one line or breaks into two balanced lines."
-            : "- title: a headline of at most 60 characters about staying with this brand, grounded in the home if one is known.",
-        has("subtitle")
-          ? input.spec.templateId.startsWith("catalog")
-            ? "- subtitle: the home's facts as given, in the order given, separated by “ · ”; null if there are none."
-            : "- subtitle: one supporting line of at most 90 characters, or null."
-          : "- subtitle: null.",
-        has("cta")
-          ? "- cta: a short button label of at most 30 characters, such as “See the home” or “Book direct”."
-          : "- cta: null.",
-        "- note: one sentence saying what you wrote the copy from.",
-      ]
-        .filter(Boolean)
-        .join("\n"),
+      messages: [
+        {
+          role: "user",
+          content: [
+            ...(photo
+              ? [
+                  {
+                    type: "file" as const,
+                    data: photo,
+                    mediaType: "image/jpeg" as const,
+                  },
+                ]
+              : []),
+            {
+              type: "text" as const,
+              text: [
+                photo
+                  ? "The photo the words are printed on is attached; what you write must be true of it."
+                  : null,
+                `Brand: ${brand.name}${brand.tagline ? ` — ${brand.tagline}` : ""}.`,
+                brand.description
+                  ? `About the brand: ${brand.description.slice(0, 600)}`
+                  : null,
+                ...voice,
+                home
+                  ? `The photo is of ${home.name}${place ? ` in ${place}` : ""}${facts ? ` (${facts})` : ""}${home.nightlyFrom ? `, from $${home.nightlyFrom}/night` : ""}.`
+                  : `The photo is titled “${source.title ?? source.alt ?? "untitled"}”; nothing else is known about it.`,
+                `Layout: ${getCompositionTemplate(input.spec.templateId).label}. ${getCompositionTemplate(input.spec.templateId).description}`,
+                "Fields the layout uses, and what goes in each:",
+                has("eyebrow")
+                  ? "- eyebrow: the hook that opens the headline, ending in a preposition so it runs straight into the title as one sentence (for example “A ski-in, ski-out condo in”, “Sleeps 14 with a hot tub in”). The card sets the hook on its own line and the preposition goes down with the place, so keep the hook to 28 characters before the preposition; 30 in total. Same bold type as the place. Build it from the facts given, never from guesses."
+                  : "- eyebrow: null.",
+                input.spec.templateId === "catalog-place"
+                  ? "- title: the place only, as “Town, ST” (for example “Winter Park, CO”). If the place is unknown, use the home's name."
+                  : input.spec.templateId === "catalog-copy"
+                    ? "- title: the home's name, whole, with a suffix that repeats the location or the brand dropped. The card breaks a title after about 22 characters, so it either fits one line or breaks into two balanced lines."
+                    : "- title: a headline of at most 60 characters about staying with this brand, grounded in the home if one is known.",
+                has("subtitle")
+                  ? input.spec.templateId.startsWith("catalog")
+                    ? "- subtitle: the home's facts as given, in the order given, separated by “ · ”; null if there are none."
+                    : "- subtitle: one supporting line of at most 90 characters, or null."
+                  : "- subtitle: null.",
+                has("cta")
+                  ? "- cta: a short button label of at most 30 characters, such as “See the home” or “Book direct”."
+                  : "- cta: null.",
+                "- note: one sentence saying what you wrote the copy from.",
+              ]
+                .filter(Boolean)
+                .join("\n"),
+            },
+          ],
+        },
+      ],
       temperature: 0.7,
     });
     return {
