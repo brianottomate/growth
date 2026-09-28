@@ -179,7 +179,9 @@ export function AdPreviewsWorkspace({
             <AlertDialogDescription>
               {unapproved} unapproved ad{unapproved === 1 ? "" : "s"} and any
               edits on {unapproved === 1 ? "it" : "them"} are replaced.
-              {approved > 0 ? ` ${approved} approved stay as they are.` : ""}
+              {approved > 0
+                ? ` ${approved} approved ${approved === 1 ? "stays as it is" : "stay as they are"}.`
+                : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

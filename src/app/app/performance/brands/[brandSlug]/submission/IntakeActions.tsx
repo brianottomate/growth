@@ -12,6 +12,12 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/toast";
 import { orpc } from "@/orpc/client";
 
+/** A listing URL's last path segment, read as words. */
+const homeLabel = (url: string) => {
+  const slug = url.split("?")[0]!.replace(/\/+$/, "").split("/").pop() ?? url;
+  return decodeURIComponent(slug).replace(/-/g, " ");
+};
+
 const money = (dollars: number | null) =>
   dollars == null ? "Not set" : `$${dollars.toLocaleString()}/mo`;
 
@@ -152,11 +158,17 @@ export function IntakeActions({
             </dd>
             <dt className="text-muted-foreground">New homes</dt>
             <dd>
-              {data.newProperties.length === 0
-                ? "None"
-                : data.newProperties
-                    .map((home) => home.title ?? home.siteUrl)
-                    .join(", ")}
+              {data.newProperties.length === 0 ? (
+                "None"
+              ) : (
+                <ul className="space-y-0.5">
+                  {data.newProperties.map((home) => (
+                    <li key={home.siteUrl} className="truncate">
+                      {home.title ?? homeLabel(home.siteUrl)}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </dd>
             {data.blockers.length > 0 && (
               <>
