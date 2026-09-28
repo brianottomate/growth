@@ -1259,6 +1259,12 @@ export type CreateZernioStandaloneAdInput = {
   endDate?: string;
   status?: "PAUSED";
   validateOnly?: boolean;
+  /**
+   * Meta: click-URL parameters for the creative's `url_tags`. Per ad, so an
+   * attach call must resend it. Meta macros such as {{ad.name}} pass through.
+   * https://docs.zernio.com/platforms/meta-ads/tracking-tags
+   */
+  tracking?: { urlTags?: Array<{ key: string; value: string }> };
   /** Meta only: one asset per placement on a single-image ad. */
   placementAssets?: ZernioPlacementAssets;
   placements?: ZernioPlacementAssets["rules"][number]["placements"];

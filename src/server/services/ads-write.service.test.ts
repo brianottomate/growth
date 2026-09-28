@@ -14,7 +14,6 @@ import {
   tagMetaAdUtms,
   videoPayloadFor,
 } from "@/server/services/ads-write.service";
-import { withAdUtms } from "@/lib/ad-utm";
 import { metaCallToActionType } from "@/lib/zernio-ads";
 import type { CreateZernioStandaloneAdInput } from "@/server/clients/zernio.client";
 
@@ -44,102 +43,27 @@ const creative = {
   imageUrl: "https://cdn.example.com/a.jpg",
 };
 
-describe("withAdUtms", () => {
-  const utms = {
-    source: "facebook",
-    medium: "paid_social",
-    campaign: "spring_2026",
-    content: "roam_river",
-  };
-
-  it("appends the campaign utm params to a bare url", () => {
-    const u = new URL(withAdUtms("https://winterparkescapes.com/", utms)!);
-    expect(u.searchParams.get("utm_source")).toBe("facebook");
-    expect(u.searchParams.get("utm_medium")).toBe("paid_social");
-    expect(u.searchParams.get("utm_campaign")).toBe("spring_2026");
-    expect(u.searchParams.get("utm_content")).toBe("roam_river");
-  });
-
-  it("never clobbers a utm an operator already set", () => {
-    const u = new URL(
-      withAdUtms("https://winterparkescapes.com/?utm_campaign=kept", utms)!,
-    );
-    expect(u.searchParams.get("utm_campaign")).toBe("kept");
-    expect(u.searchParams.get("utm_source")).toBe("facebook");
-  });
-
-  it("preserves unrelated existing query params", () => {
-    const u = new URL(withAdUtms("https://example.com/?key=wanderplus", utms)!);
-    expect(u.searchParams.get("key")).toBe("wanderplus");
-    expect(u.searchParams.get("utm_source")).toBe("facebook");
-  });
-
-  it("no-ops on a missing or non-absolute link", () => {
-    expect(withAdUtms(undefined, utms)).toBeUndefined();
-    expect(withAdUtms(null, utms)).toBeUndefined();
-    expect(withAdUtms("/relative/path", utms)).toBe("/relative/path");
-  });
-});
-
 describe("tagMetaAdUtms", () => {
-  it("tags the ad-level link with campaign name and ad name", () => {
+  it("puts the house UTMs on the creative's URL parameters and leaves links clean", () => {
     const out = tagMetaAdUtms({
       ...base,
-      campaignName: "META_PERF+_WPE_202609",
-      adName: "static_roam_river",
       linkUrl: "https://winterparkescapes.com/",
-    });
-    const u = new URL(out.linkUrl!);
-    expect(u.searchParams.get("utm_source")).toBe("facebook");
-    expect(u.searchParams.get("utm_medium")).toBe("paid_social");
-    expect(u.searchParams.get("utm_campaign")).toBe("META_PERF+_WPE_202609");
-    expect(u.searchParams.get("utm_content")).toBe("static_roam_river");
-  });
-
-  it("falls back to the ad name when campaignName/adName are absent", () => {
-    const out = tagMetaAdUtms({ ...base, linkUrl: "https://x.com/" });
-    const u = new URL(out.linkUrl!);
-    expect(u.searchParams.get("utm_campaign")).toBe(base.name);
-    expect(u.searchParams.get("utm_content")).toBe(base.name);
-  });
-
-  it("tags carousel cards by headline and leaves link-less cards to inherit", () => {
-    const out = tagMetaAdUtms({
-      ...base,
-      campaignName: "camp",
-      linkUrl: "https://winterparkescapes.com/",
-      imageUrl: undefined,
       carouselCards: [
         {
-          imageUrl: "https://cdn/x.jpg",
-          headline: "Roam River",
-          linkUrl: "https://winterparkescapes.com/roam",
-        },
-        { imageUrl: "https://cdn/y.jpg", headline: "No Link" },
-      ],
-    });
-    const card0 = new URL(out.carouselCards![0]!.linkUrl!);
-    expect(card0.searchParams.get("utm_content")).toBe("Roam River");
-    expect(card0.searchParams.get("utm_campaign")).toBe("camp");
-    // No own link → stays undefined so it inherits the tagged ad-level link.
-    expect(out.carouselCards![1]!.linkUrl).toBeUndefined();
-  });
-
-  it("tags each multi-creative link by creative name", () => {
-    const out = tagMetaAdUtms({
-      ...base,
-      imageUrl: undefined,
-      creatives: [
-        {
-          name: "cr_a",
-          headline: "A",
-          body: "b",
-          linkUrl: "https://winterparkescapes.com/a",
+          imageUrl: "https://cdn.example.com/a.jpg",
+          linkUrl: "https://x.com/",
         },
       ],
     });
-    const u = new URL(out.creatives![0]!.linkUrl!);
-    expect(u.searchParams.get("utm_content")).toBe("cr_a");
+    expect(out.linkUrl).toBe("https://winterparkescapes.com/");
+    expect(out.carouselCards?.[0]?.linkUrl).toBe("https://x.com/");
+    expect(out.tracking?.urlTags).toEqual([
+      { key: "utm_source", value: "facebook" },
+      { key: "utm_medium", value: "paid_social" },
+      { key: "utm_campaign", value: "{{campaign.name}}" },
+      { key: "utm_term", value: "{{adset.name}}" },
+      { key: "utm_content", value: "{{ad.name}}" },
+    ]);
   });
 });
 
@@ -798,19 +722,5 @@ describe("metaCallToActionType", () => {
   it("sends Meta's Book now button, never the type Ads Manager reads as Unknown", () => {
     expect(metaCallToActionType("BOOK_NOW")).toBe("BOOK_TRAVEL");
     expect(metaCallToActionType("LEARN_MORE")).toBe("LEARN_MORE");
-  });
-});
-
-describe("tagMetaAdUtms campaign override", () => {
-  it("tags an attached ad with the campaign it joins, not its own name", () => {
-    const out = tagMetaAdUtms(
-      { ...base, name: "META_PERF+X_STATIC_Home", adSetId: "set_1" },
-      "META_PERF+X_SALES_PURCHASE_202609",
-    );
-    const u = new URL(out.linkUrl!);
-    expect(u.searchParams.get("utm_campaign")).toBe(
-      "META_PERF+X_SALES_PURCHASE_202609",
-    );
-    expect(u.searchParams.get("utm_content")).toBe("META_PERF+X_STATIC_Home");
   });
 });
