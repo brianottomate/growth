@@ -520,6 +520,15 @@ export const brandRouter = {
         iconFrom: z.enum(["logo", "favicon", "logo-icon"]).nullish(),
         text: z.string().trim().max(60).nullish(),
         fontFamily: z.string().trim().max(80).nullish(),
+        fontWeight: z
+          .union([
+            z.literal(400),
+            z.literal(500),
+            z.literal(600),
+            z.literal(700),
+          ])
+          .nullish(),
+        letterSpacing: z.number().min(-0.05).max(0.3).nullish(),
       }),
     )
     .handler(async ({ context: ctx, input }) => {
@@ -532,6 +541,8 @@ export const brandRouter = {
           iconFrom: input.iconFrom ?? null,
           text: input.text ?? null,
           fontFamily: input.fontFamily,
+          fontWeight: input.fontWeight ?? null,
+          letterSpacing: input.letterSpacing ?? null,
         },
       });
     }),

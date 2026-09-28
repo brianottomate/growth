@@ -79,6 +79,10 @@ export function BrandMarkCard({
     if (icon === "library") params.set("iconAssetId", iconAssetId);
     if (text.trim()) params.set("text", text.trim());
     if (fontFamily !== null) params.set("fontFamily", fontFamily);
+    // Weight and tracking are set by the agent; the editor keeps them.
+    if (mark?.fontWeight) params.set("fontWeight", String(mark.fontWeight));
+    if (mark?.letterSpacing != null)
+      params.set("letterSpacing", String(mark.letterSpacing));
     // A lockup with the site logo or favicon as its icon reuses those sources.
     if (icon === "logo" || icon === "logo-icon" || icon === "favicon")
       params.set("iconFrom", icon);
@@ -88,7 +92,18 @@ export function BrandMarkCard({
       params.set("gapScale", String(tuning.gapScale));
     }
     return `/api/brands/mark-preview?${params.toString()}`;
-  }, [brandId, building, fontFamily, icon, iconAssetId, text, tone, tuning]);
+  }, [
+    brandId,
+    building,
+    fontFamily,
+    icon,
+    iconAssetId,
+    mark?.fontWeight,
+    mark?.letterSpacing,
+    text,
+    tone,
+    tuning,
+  ]);
 
   const recipe = {
     iconAssetId: icon === "library" ? iconAssetId : null,
@@ -98,6 +113,8 @@ export function BrandMarkCard({
         : null,
     text: text.trim() || null,
     fontFamily: fontFamily === "" ? null : fontFamily,
+    fontWeight: mark?.fontWeight ?? null,
+    letterSpacing: mark?.letterSpacing ?? null,
   };
   const critique = useMutation(
     orpc.brand.critiqueMark.mutationOptions({
@@ -130,6 +147,8 @@ export function BrandMarkCard({
       iconFrom: mark.iconFrom ?? undefined,
       text: mark.text ?? null,
       fontFamily: mark.fontFamily ?? null,
+      fontWeight: mark.fontWeight ?? null,
+      letterSpacing: mark.letterSpacing ?? null,
     });
   };
 

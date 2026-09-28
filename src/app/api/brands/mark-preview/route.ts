@@ -18,6 +18,13 @@ const query = z.object({
   text: z.string().max(60).optional(),
   /** Absent = the brand's heading font; "" = the house font. */
   fontFamily: z.string().max(80).optional(),
+  fontWeight: z.coerce
+    .number()
+    .pipe(
+      z.union([z.literal(400), z.literal(500), z.literal(600), z.literal(700)]),
+    )
+    .optional(),
+  letterSpacing: z.coerce.number().min(-0.05).max(0.3).optional(),
   iconScale: z.coerce.number().min(0.7).max(1.4).optional(),
   iconShift: z.coerce.number().min(-0.3).max(0.3).optional(),
   gapScale: z.coerce.number().min(0.6).max(1.6).optional(),
@@ -40,6 +47,8 @@ export async function GET(request: NextRequest) {
     fontFamily: params.has("fontFamily")
       ? params.get("fontFamily")!
       : undefined,
+    fontWeight: params.get("fontWeight") || undefined,
+    letterSpacing: params.get("letterSpacing") || undefined,
     iconScale: params.get("iconScale") || undefined,
     iconShift: params.get("iconShift") || undefined,
     gapScale: params.get("gapScale") || undefined,
@@ -94,6 +103,8 @@ export async function GET(request: NextRequest) {
           parsed.data.fontFamily === undefined
             ? undefined
             : parsed.data.fontFamily || null,
+        fontWeight: parsed.data.fontWeight ?? null,
+        letterSpacing: parsed.data.letterSpacing ?? null,
       },
     });
     return new NextResponse(new Uint8Array(png), {

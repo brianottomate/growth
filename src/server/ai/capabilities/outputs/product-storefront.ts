@@ -291,6 +291,11 @@ const brandListeningStorySchema = z.strictObject({
 
 const brandMarkSchema = z.strictObject({
   fontFamily: z.string().nullable().optional(),
+  fontWeight: z
+    .union([z.literal(400), z.literal(500), z.literal(600), z.literal(700)])
+    .nullable()
+    .optional(),
+  letterSpacing: z.number().nullable().optional(),
   iconAssetId: z.string().nullable().optional(),
   iconFrom: z.enum(["logo", "favicon", "logo-icon"]).nullable().optional(),
   source: z.enum(["logo", "favicon", "lockup"]),

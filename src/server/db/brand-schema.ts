@@ -124,6 +124,10 @@ export type BrandMark = {
   text?: string | null;
   /** Lockup only: the family the text is set in; null means the house font. */
   fontFamily?: string | null;
+  /** Lockup only: the wordmark weight; null means 700. */
+  fontWeight?: 400 | 500 | 600 | 700 | null;
+  /** Lockup only: tracking in em; null means -0.02. */
+  letterSpacing?: number | null;
   variants: { color: string; white: string; dark: string };
   /**
    * The mark traced to SVG, when the shape traces cleanly: white and dark

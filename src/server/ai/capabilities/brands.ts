@@ -360,7 +360,7 @@ export const enrichBrandAction = growthAction({
 
 export const setBrandMarkAction = growthAction({
   description:
-    "Set the brand mark drawn on every composition and card: three tones (colour, white, dark) rendered into the brand's library. source logo uses the scraped logo, favicon the site icon, lockup an icon beside the brand name in its heading font. A lockup is judged by the art director and its corrections applied before saving, the same as the Fix with AI button. Run brandWrite.enrich first so there is a logo to draw. Re-running replaces the mark.",
+    "Set the brand mark drawn on every composition and card: three tones (colour, white, dark) rendered into the brand's library. source logo uses the scraped logo, favicon the site icon, lockup an icon beside the brand name in its heading font. iconFrom logo-icon cuts the icon out of the logo (the leading glyph, or the top row of a stacked logo such as a monogram over the name) and sets it at exactly the wordmark's cap height; the usual fix for a stacked logo that goes illegible at card size. A lockup is judged by the art director and its corrections applied before saving, the same as the Fix with AI button. Run brandWrite.enrich first so there is a logo to draw. Re-running replaces the mark.",
   inputSchema: z.object({
     brandId: z.string().trim().min(1),
     source: z.enum(["logo", "favicon", "lockup"]).default("logo"),
@@ -389,6 +389,20 @@ export const setBrandMarkAction = growthAction({
       .nullish()
       .describe(
         "Lockup only: the wordmark font. Omit for the brand's heading font; null for the house font.",
+      ),
+    fontWeight: z
+      .union([z.literal(400), z.literal(500), z.literal(600), z.literal(700)])
+      .nullish()
+      .describe(
+        "Lockup only: the wordmark weight. Default 700. Match the brand's own wordmark: 400 for a light, high-contrast serif.",
+      ),
+    letterSpacing: z
+      .number()
+      .min(-0.05)
+      .max(0.3)
+      .nullish()
+      .describe(
+        "Lockup only: tracking in em. Default -0.02. Spaced capitals like a luxury wordmark sit around 0.12 to 0.18.",
       ),
     tuning: z
       .object({
@@ -432,6 +446,8 @@ export const setBrandMarkAction = growthAction({
             : input.iconFrom,
       text: input.text ?? null,
       fontFamily: lockup ? input.fontFamily : undefined,
+      fontWeight: lockup ? (input.fontWeight ?? null) : null,
+      letterSpacing: lockup ? (input.letterSpacing ?? null) : null,
     };
     // A lockup is measured, then looked at: the same vision pass the editor's
     // Fix with AI runs, applied before the tones are rendered. Corrections the

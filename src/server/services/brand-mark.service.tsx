@@ -16,6 +16,7 @@ import {
 import {
   brandFontFamily,
   loadGoogleFont,
+  type FontWeight,
   type LoadedFont,
 } from "@/server/services/composition-fonts";
 import {
@@ -107,7 +108,13 @@ export type BrandMarkRecipe = {
   iconFrom?: "logo" | "favicon" | "logo-icon" | null;
   text?: string | null;
   fontFamily?: string | null;
+  /** Lockup only: the wordmark weight; default 700. */
+  fontWeight?: MarkFontWeight | null;
+  /** Lockup only: tracking in em; default -0.02. */
+  letterSpacing?: number | null;
 };
+
+export type MarkFontWeight = FontWeight;
 
 type MarkBrand = {
   id: string;
@@ -251,8 +258,10 @@ async function fetchPng(url: string): Promise<Buffer> {
 
 /**
  * The leading glyph of a logo: the first run of ink before the first clear
- * gap, which on an icon-plus-wordmark logo is the icon. A logo with no such
- * gap (a single wordmark) comes back whole.
+ * gap, which on an icon-plus-wordmark logo is the icon. A stacked logo (a
+ * monogram over the name) is read from its top row only, so the icon is the
+ * monogram and not the first letter of the name below it. A logo with no
+ * such gap (a single wordmark) comes back whole.
  */
 async function leadingGlyph(png: Buffer): Promise<Buffer> {
   // Components are found on a small copy: the shapes are the same, the work
@@ -302,6 +311,27 @@ async function leadingGlyph(png: Buffer): Promise<Buffer> {
       boxes.push(box);
     }
   if (!boxes.length) return png;
+  // Rows of a stacked logo: ink bands split by a clear horizontal gap.
+  const rowInk = new Uint8Array(height);
+  for (const box of boxes) rowInk.fill(1, box.y0, box.y1 + 1);
+  const rowGap = Math.max(2, Math.round(height * 0.04));
+  let firstRowEnd = height - 1;
+  for (let y = 0, blank = 0, started = false; y < height; y++) {
+    if (rowInk[y]) {
+      if (started && blank >= rowGap) {
+        firstRowEnd = y - blank - 1;
+        break;
+      }
+      started = true;
+      blank = 0;
+    } else if (started) blank += 1;
+  }
+  const stacked = firstRowEnd < height - 1;
+  if (stacked) {
+    const top = boxes.filter((box) => box.y1 <= firstRowEnd);
+    boxes.length = 0;
+    boxes.push(...top);
+  }
   // The icon is the leftmost shape, plus any shape sharing its columns (a
   // dot over an i, a detached ray): those are its pieces, not the next glyph.
   boxes.sort((a, b) => a.x0 - b.x0);
@@ -313,13 +343,22 @@ async function leadingGlyph(png: Buffer): Promise<Buffer> {
     icon.y0 = Math.min(icon.y0, box.y0);
     icon.y1 = Math.max(icon.y1, box.y1);
   }
-  // No separable icon: the leftmost shape runs most of the width.
-  if (icon.x1 - icon.x0 > width * 0.5) return png;
+  // No separable icon within the row: the leftmost shape runs most of the
+  // width. A stacked logo's whole top row is then the icon; a flat logo has
+  // none to cut.
+  const topRowBottom = stacked
+    ? Math.min(full.height ?? 1, Math.ceil((firstRowEnd + 1) / scale))
+    : (full.height ?? 1);
+  if (icon.x1 - icon.x0 > width * 0.5) {
+    if (!stacked) return png;
+    icon.x0 = Math.min(...boxes.map((box) => box.x0));
+    icon.x1 = Math.max(...boxes.map((box) => box.x1));
+  }
   const left = Math.floor(icon.x0 / scale);
   const right = Math.min(full.width ?? 1, Math.ceil((icon.x1 + 1) / scale));
   return trimTransparent(
     await sharp(png)
-      .extract({ left, top: 0, width: right - left, height: full.height ?? 1 })
+      .extract({ left, top: 0, width: right - left, height: topRowBottom })
       .png()
       .toBuffer(),
   );
@@ -410,6 +449,8 @@ async function renderTextPng(input: {
   text: string;
   color: string;
   fontSize: number;
+  fontWeight: MarkFontWeight;
+  letterSpacing: number;
   fonts: LoadedFont[] | null;
 }): Promise<Buffer> {
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -428,6 +469,8 @@ function renderTextLayer(input: {
   text: string;
   color: string;
   fontSize: number;
+  fontWeight: MarkFontWeight;
+  letterSpacing: number;
   fonts: LoadedFont[] | null;
 }) {
   return new ImageResponse(
@@ -439,9 +482,9 @@ function renderTextLayer(input: {
         height: "100%",
         color: input.color,
         fontSize: input.fontSize,
-        fontWeight: 700,
+        fontWeight: input.fontWeight,
         lineHeight: 1,
-        letterSpacing: "-0.02em",
+        letterSpacing: `${input.letterSpacing}em`,
         whiteSpace: "nowrap",
         ...(input.fonts?.length ? { fontFamily: input.fonts[0]!.name } : {}),
       }}
@@ -453,7 +496,11 @@ function renderTextLayer(input: {
       // and buys nothing. 0.8em per character clears the widest faces.
       width: Math.min(
         8000,
-        Math.round(input.text.length * input.fontSize * 0.8) + 200,
+        Math.round(
+          input.text.length *
+            input.fontSize *
+            (0.8 + Math.max(0, input.letterSpacing)),
+        ) + 200,
       ),
       height: input.fontSize * 2,
       ...(input.fonts?.length ? { fonts: input.fonts } : {}),
@@ -489,7 +536,9 @@ export async function renderBrandMark(
     recipe.fontFamily === undefined
       ? brandFontFamily(brand.brandIdentity)
       : recipe.fontFamily;
-  const fonts = family ? await loadGoogleFont(family) : null;
+  const fontWeight = recipe.fontWeight ?? 700;
+  const letterSpacing = recipe.letterSpacing ?? -0.02;
+  const fonts = family ? await loadGoogleFont(family, [fontWeight]) : null;
   const color = markTextColor(tone, brand.brandIdentity);
   const fontSize = 200;
 
@@ -503,8 +552,9 @@ export async function renderBrandMark(
   const probe = /\p{Lu}/u.exec(text)?.[0] ?? "H";
   // One at a time: satori's renderer is a shared WASM instance, and two
   // renders in flight together corrupt each other's output.
-  const textPng = await renderTextPng({ text, color, fontSize, fonts });
-  const probePng = await renderTextPng({ text: probe, color, fontSize, fonts });
+  const type = { color, fontSize, fontWeight, letterSpacing, fonts };
+  const textPng = await renderTextPng({ text, ...type });
+  const probePng = await renderTextPng({ text: probe, ...type });
   const textInk = await inkOf(textPng);
   // A script with no capitals leaves the whole line as the only measure.
   const capInk = await inkOf(probePng).catch(() => textInk);
@@ -515,8 +565,11 @@ export async function renderBrandMark(
 
   // Set against the capitals, not the line box, and sized by how much ink
   // the mark carries: a solid one sits at cap height, a sparse outline goes
-  // up to a fifth taller so it holds its own beside the letters.
-  const coverage = await inkCoverage(iconPng);
+  // up to a fifth taller so it holds its own beside the letters. An icon cut
+  // from the brand's own logo is drawn in the same hand as its letters, so it
+  // sits at exactly cap height, top and bottom on the same lines.
+  const cutFromLogo = recipe.iconFrom === "logo-icon";
+  const coverage = cutFromLogo ? 1 : await inkCoverage(iconPng);
   const scale = 1 + 0.2 * (1 - Math.min(coverage / 0.5, 1));
   const source = await sharp(iconPng).metadata();
   const aspect = (source.width ?? 1) / (source.height ?? 1);
@@ -526,7 +579,10 @@ export async function renderBrandMark(
     Math.min(capHeight * scale, (capHeight * 2) / Math.max(aspect, 0.01)) *
       tuning.iconScale,
   );
-  const gap = Math.round(capHeight * 0.34 * tuning.gapScale);
+  // A cut letterform needs more air than a badge before the name starts.
+  const gap = Math.round(
+    capHeight * (cutFromLogo ? 0.6 : 0.34) * tuning.gapScale,
+  );
   const icon = await iconAtHeight(iconPng, tone, iconHeight);
   const iconMeta = await sharp(icon).metadata();
   const iconWidth = iconMeta.width ?? iconHeight;
@@ -667,6 +723,8 @@ export async function setBrandMark(input: {
     iconFrom: input.recipe.iconFrom ?? null,
     text: input.recipe.text ?? null,
     fontFamily: input.recipe.fontFamily ?? null,
+    fontWeight: input.recipe.fontWeight ?? null,
+    letterSpacing: input.recipe.letterSpacing ?? null,
     variants: { color: ids.color!, white: ids.white!, dark: ids.dark! },
     vector,
     tuning,
