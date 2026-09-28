@@ -1,5 +1,7 @@
 import "server-only";
 
+import { isPlaceCard } from "@/lib/catalog-studio";
+
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { ImageResponse } from "next/og";
 import sharp from "sharp";
@@ -740,7 +742,8 @@ export function catalogHeadline(
   spec: Pick<CompositionSpec, "title" | "formatId"> &
     Partial<Pick<CompositionSpec, "templateId" | "eyebrow">>,
 ) {
-  if (spec.templateId === "catalog-place") return placeStatement(spec);
+  if (spec.templateId && isPlaceCard(spec.templateId))
+    return placeStatement(spec);
   return balancedLines(
     clamp(spec.title, 90),
     spec.formatId === "square" ? 24 : 22,
@@ -1452,7 +1455,7 @@ export function renderComposition(
       </div>
     );
   } else if (
-    spec.templateId === "catalog-place" ||
+    isPlaceCard(spec.templateId) ||
     spec.templateId === "catalog-amenities" ||
     spec.templateId === "catalog-amenities-place" ||
     spec.templateId === "catalog-destination" ||
@@ -1467,7 +1470,7 @@ export function renderComposition(
     const scale = square ? 0.9 : 1;
     // The amenities cards set the headline alone and let pills carry the
     // amenities; the place card folds the place into the statement.
-    const amenities = spec.templateId !== "catalog-place";
+    const amenities = !isPlaceCard(spec.templateId);
     // The destination card names the place above one big line and keeps a
     // single pill; the amenities cards are sized to read at phone width.
     // The headline card is the destination card with only the words left:
@@ -1488,7 +1491,9 @@ export function renderComposition(
     // The amenities cards leave the rating out; the place variant leads its
     // pill row with the location instead.
     const rating =
-      !amenities && spec.rating ? Math.round(spec.rating * 10) / 10 : null;
+      !amenities && spec.rating && spec.templateId !== "catalog-place-plain"
+        ? Math.round(spec.rating * 10) / 10
+        : null;
     const location =
       spec.templateId === "catalog-amenities-place"
         ? clamp(spec.location, 32)

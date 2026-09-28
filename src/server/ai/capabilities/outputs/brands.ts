@@ -66,6 +66,7 @@ const performanceSettingsShape = {
   catalogTemplateId: z
     .enum([
       "catalog-place",
+      "catalog-place-plain",
       "catalog-copy",
       "catalog-amenities",
       "catalog-amenities-place",

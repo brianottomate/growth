@@ -13,6 +13,9 @@ import {
   type CatalogCard,
   type CatalogTemplateId,
   CATALOG_FORMATS,
+  DEFAULT_CATALOG_FORMAT,
+  DEFAULT_CATALOG_TEMPLATE,
+  isPlaceCard,
 } from "@/lib/catalog-studio";
 import {
   CATALOG_COPY_INTENTS,
@@ -55,7 +58,7 @@ export function CatalogTemplateCard({
       },
     }),
   );
-  const format = query.data?.format ?? "portrait";
+  const format = query.data?.format ?? DEFAULT_CATALOG_FORMAT;
   const cards = query.data?.draft.cards ?? [];
   const drawn = cards.filter((c) => c.mode !== "finished");
   // A catalog of supplied artwork still has homes and photos: draw the hero
@@ -67,7 +70,7 @@ export function CatalogTemplateCard({
     cards.find((c) => c.homeId === heroHomeId) ??
     cards.find((c) => c.included);
   const card = pick && { ...pick, mode: "compose" as const };
-  const current = query.data?.defaultTemplate ?? "catalog-place";
+  const current = query.data?.defaultTemplate ?? DEFAULT_CATALOG_TEMPLATE;
 
   if (!card) return null;
   return (
@@ -149,14 +152,13 @@ export function CatalogTemplateCard({
  */
 function asTemplate(card: CatalogCard, templateId: CatalogTemplateId) {
   const at = card.title.lastIndexOf(" in ");
-  const title =
-    templateId === "catalog-place"
-      ? at > 0 || !card.location
-        ? card.title
-        : `${card.title} in ${card.location}`
-      : at > 0
-        ? card.title.slice(0, at)
-        : card.title;
+  const title = isPlaceCard(templateId)
+    ? at > 0 || !card.location
+      ? card.title
+      : `${card.title} in ${card.location}`
+    : at > 0
+      ? card.title.slice(0, at)
+      : card.title;
   return { ...card, templateId, title };
 }
 

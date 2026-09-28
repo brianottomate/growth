@@ -1,3 +1,4 @@
+import { isPlaceCard } from "@/lib/catalog-studio";
 import "server-only";
 import { brandStorySection } from "@/server/ai/prompts";
 
@@ -204,7 +205,7 @@ export async function writeCompositionCopy(input: {
                 has("eyebrow")
                   ? "- eyebrow: the hook that opens the headline, ending in a preposition so it runs straight into the title as one sentence (for example “A ski-in, ski-out condo in”, “Sleeps 14 with a hot tub in”). The card sets the hook on its own line and the preposition goes down with the place, so keep the hook to 28 characters before the preposition; 30 in total. Same bold type as the place. Build it from the facts given, never from guesses."
                   : "- eyebrow: null.",
-                input.spec.templateId === "catalog-place"
+                isPlaceCard(input.spec.templateId)
                   ? "- title: the place only, as “Town, ST” (for example “Winter Park, CO”). If the place is unknown, use the home's name."
                   : input.spec.templateId === "catalog-copy"
                     ? "- title: the home's name, whole, with a suffix that repeats the location or the brand dropped. The card breaks a title after about 22 characters, so it either fits one line or breaks into two balanced lines."

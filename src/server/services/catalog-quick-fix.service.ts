@@ -11,6 +11,7 @@ import {
   CATALOG_WRITE_PASSES,
   catalogHeadlineIssue,
   type CatalogWritePass,
+  DEFAULT_CATALOG_TEMPLATE,
 } from "@/lib/catalog-studio";
 import { marketOf, type Market } from "@/lib/markets";
 import {
@@ -251,7 +252,7 @@ export async function newCatalogCopy(input: {
       "This card is finished artwork with its headline in the image. Remake the artwork instead.",
     );
   const templateId =
-    input.templateId ?? ctx.card?.templateId ?? "catalog-place";
+    input.templateId ?? ctx.card?.templateId ?? DEFAULT_CATALOG_TEMPLATE;
   const place = input.place !== undefined ? input.place : placeOf(ctx);
   const [story, approved] = await Promise.all([
     storyOf(ctx),

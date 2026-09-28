@@ -77,6 +77,13 @@ export const COMPOSITION_TEMPLATES = [
       "One bold statement, the hook and the place, then the facts and a guest-rating pill over a dark foot gradient. The mark is optional, top left. The listing card.",
   },
   {
+    id: "catalog-place-plain",
+    version: 1,
+    label: "Catalog · place, no rating",
+    description:
+      "Catalog · place without the guest-rating pill: the hook and the place as one bold statement, then the facts. The mark is optional, top left.",
+  },
+  {
     id: "catalog-amenities",
     version: 1,
     label: "Catalog · amenities",
@@ -233,6 +240,13 @@ export const CATALOG_COPY_INTENTS = {
     placeSuffix: true,
     pills: 0,
   },
+  "catalog-place-plain": {
+    intent:
+      'An amenity-led card: "{lead} in {place}". The lead names the one or two amenities or features this home is chosen for ("Private sauna & hot tub", "Rooftop deck & skyline views"), and the place says where it is.',
+    headlineChars: 28,
+    placeSuffix: true,
+    pills: 0,
+  },
   "catalog-copy": {
     intent:
       "One statement with no place line: what this home is and what it offers, amenity or space, whichever sells it best.",
@@ -298,6 +312,17 @@ export const COMPOSITION_FIELDS: Record<
       hint: "3 bedrooms · 3.5 baths · 14 guests",
     },
     { key: "rating", label: "Guest rating", hint: "4.9" },
+    accent("colours the rating pill"),
+  ],
+  "catalog-place-plain": [
+    mark,
+    { key: "eyebrow", label: "Lead-in", hint: "Arcade games & firepit in" },
+    { key: "title", label: "Place", hint: "Winter Park, CO" },
+    {
+      key: "subtitle",
+      label: "Facts",
+      hint: "3 bedrooms · 3.5 baths · 14 guests",
+    },
     accent("colours the rating pill"),
   ],
   "catalog-amenities": [

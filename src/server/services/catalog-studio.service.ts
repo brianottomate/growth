@@ -24,6 +24,8 @@ import {
   type CatalogOverrides,
   type CatalogTemplateId,
   type CatalogFormatId,
+  DEFAULT_CATALOG_FORMAT,
+  DEFAULT_CATALOG_TEMPLATE,
 } from "@/lib/catalog-studio";
 import { brandWideAmenities } from "@/lib/catalog-copy";
 import {
@@ -193,9 +195,9 @@ async function catalogHomes(brand: CatalogBrand, refresh = false) {
     homes,
     overrides,
     approvals,
-    brand.settings?.catalogTemplateId ?? "catalog-place",
+    brand.settings?.catalogTemplateId ?? DEFAULT_CATALOG_TEMPLATE,
     brand.markets,
-    brand.settings?.catalogFormatId ?? "portrait",
+    brand.settings?.catalogFormatId ?? DEFAULT_CATALOG_FORMAT,
   );
   // Cards still on the starter headline that nobody wrote, approved or gave
   // supplied artwork: what "Write all cards" works through.
@@ -243,8 +245,9 @@ export async function catalogState(
     homes,
     enrichmentError: inventory.enrichmentError,
     syncedAt: inventory.syncedAt,
-    defaultTemplate: brand.settings?.catalogTemplateId ?? "catalog-place",
-    format: brand.settings?.catalogFormatId ?? "portrait",
+    defaultTemplate:
+      brand.settings?.catalogTemplateId ?? DEFAULT_CATALOG_TEMPLATE,
+    format: brand.settings?.catalogFormatId ?? DEFAULT_CATALOG_FORMAT,
     draft,
     unwritten,
     exports: runs.map((run): CatalogExport => ({
@@ -491,7 +494,7 @@ export async function editCatalogCard(input: {
     );
     const issue = catalogHeadlineIssue(
       title,
-      template.success ? template.data : "catalog-place",
+      template.success ? template.data : DEFAULT_CATALOG_TEMPLATE,
     );
     if (issue) throw new Error(issue);
   }

@@ -100,6 +100,7 @@ export type CatalogExport = {
  */
 /** The catalog templates a brand can default to. */
 export const CATALOG_TEMPLATES = [
+  "catalog-place-plain",
   "catalog-place",
   "catalog-copy",
   "catalog-amenities",
@@ -107,6 +108,15 @@ export const CATALOG_TEMPLATES = [
   "catalog-destination",
   "catalog-headline",
 ] as const;
+
+/** The card a brand's catalog uses until someone picks another. */
+export const DEFAULT_CATALOG_TEMPLATE = "catalog-place-plain" as const;
+/** The canvas a brand's catalog uses until someone picks another. */
+export const DEFAULT_CATALOG_FORMAT = "square" as const;
+
+/** The place cards: "{lead} in {place}", with or without the rating pill. */
+export const isPlaceCard = (templateId: string) =>
+  templateId === "catalog-place" || templateId === "catalog-place-plain";
 
 /** Catalog cards that draw amenity pills. */
 export const drawsPills = (templateId: string) =>
@@ -133,11 +143,10 @@ export function catalogLocation(
 
 export function catalogBaselineTitle(
   home: CatalogHome,
-  templateId: CatalogCard["templateId"] = "catalog-place",
+  templateId: CatalogCard["templateId"] = DEFAULT_CATALOG_TEMPLATE,
   markets?: BrandMarkets | null,
 ) {
-  const where =
-    templateId === "catalog-place" ? catalogLocation(home, markets) : null;
+  const where = isPlaceCard(templateId) ? catalogLocation(home, markets) : null;
   const lead = home.guests ? `Sleeps ${home.guests}` : "Vacation home";
   return where ? `${lead} in ${where}` : lead;
 }
@@ -207,7 +216,7 @@ export function catalogDraft(
   overrides: ReadonlyMap<string, CatalogOverrides> = new Map(),
   approvals: ReadonlyMap<string, string> = new Map(),
   /** The brand's default card, for every home without its own. */
-  defaultTemplate: CatalogTemplateId = "catalog-place",
+  defaultTemplate: CatalogTemplateId = DEFAULT_CATALOG_TEMPLATE,
   /** The brand's markets: a card's location is its market's label. */
   markets?: BrandMarkets | null,
   /** The canvas every card is drawn and exported at. */
@@ -279,8 +288,7 @@ export function catalogCardCopy(card: CatalogCard): {
       ? { location: card.location }
       : {}),
   };
-  if (card.templateId !== "catalog-place")
-    return { ...base, title: card.title };
+  if (!isPlaceCard(card.templateId)) return { ...base, title: card.title };
   const at = card.title.lastIndexOf(" in ");
   if (at <= 0) return { ...base, title: card.title };
   return {
@@ -302,7 +310,7 @@ export function catalogHeadlineIssue(
   title: string,
   templateId: CatalogCard["templateId"],
 ) {
-  if (templateId !== "catalog-place") return null;
+  if (!isPlaceCard(templateId)) return null;
   const at = title.lastIndexOf(" in ");
   if (at <= 0 || at + 3 <= CATALOG_PLACE_LEAD_MAX) return null;
   return `"${title.slice(0, at)}" is too long for this card: keep the part before " in" to ${CATALOG_PLACE_LEAD_MAX - 3} characters, ideally 28 so it stays on two lines`;
@@ -330,7 +338,11 @@ export function catalogCardPreviewUrl(
     mark: card.showLogo ? "auto" : "none",
   });
   if (copy.eyebrow) params.set("eyebrow", copy.eyebrow);
-  if (copy.rating && !drawsPills(card.templateId))
+  if (
+    copy.rating &&
+    !drawsPills(card.templateId) &&
+    card.templateId !== "catalog-place-plain"
+  )
     params.set("rating", String(copy.rating));
   if (drawsPills(card.templateId))
     for (const pill of card.pills ?? []) params.append("pill", pill);

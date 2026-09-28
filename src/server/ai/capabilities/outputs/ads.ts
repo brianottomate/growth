@@ -223,6 +223,7 @@ const portraitSchema = z.strictObject({
     "photo-only",
     "catalog-copy",
     "catalog-place",
+    "catalog-place-plain",
     "catalog-amenities",
     "catalog-amenities-place",
     "catalog-destination",

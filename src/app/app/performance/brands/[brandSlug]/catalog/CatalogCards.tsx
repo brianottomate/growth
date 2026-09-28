@@ -31,6 +31,7 @@ import {
   type CatalogCard,
   type CatalogHome,
   type CatalogFormatId,
+  DEFAULT_CATALOG_FORMAT,
 } from "@/lib/catalog-studio";
 import { safeHomeUrl } from "@/lib/ad-preview-links";
 import { sendAssistantIntent } from "@/lib/assistant-events";
@@ -96,7 +97,7 @@ export function CatalogCards({
   const [picker, setPicker] = useState(false);
   const [error, setError] = useState("");
   const draft = query.data?.draft;
-  const format = query.data?.format ?? "portrait";
+  const format = query.data?.format ?? DEFAULT_CATALOG_FORMAT;
   const homes = query.data?.homes ?? [];
   const homeOf = (card: CatalogCard) => homes.find((h) => h.id === card.homeId);
   const reload = () => client.invalidateQueries({ queryKey: state.queryKey });

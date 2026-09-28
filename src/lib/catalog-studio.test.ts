@@ -9,6 +9,7 @@ import {
   catalogUnapproved,
   catalogExportRows,
   catalogFeedCsv,
+  DEFAULT_CATALOG_TEMPLATE,
 } from "./catalog-studio";
 const homes = [
   {
@@ -42,7 +43,7 @@ test("a card is its defaults until its row overrides a field", () => {
   // A null override is the default, not an empty line.
   expect(draft.cards[0]?.subtitle).toBe("8 guests");
   expect(draft.cards[1]?.included).toBe(true);
-  expect(draft.cards[1]?.templateId).toBe("catalog-place");
+  expect(draft.cards[1]?.templateId).toBe(DEFAULT_CATALOG_TEMPLATE);
 });
 test("a card draws on the home's hero unless it has its own library image", () => {
   const own = { assetId: "media_1", url: "https://media.example.com/own.jpg" };
@@ -101,7 +102,7 @@ test("finished artwork keeps the composition underneath it", () => {
     format: "portrait",
   });
   expect(draft.cards[0]?.imageUrl).toBe(homes[0]!.imageUrl);
-  expect(draft.cards[0]?.templateId).toBe("catalog-place");
+  expect(draft.cards[0]?.templateId).toBe(DEFAULT_CATALOG_TEMPLATE);
   expect(catalogArtworkIssues(draft)).toEqual([]);
 });
 test("finished artwork requires an original and cannot silently generate other export sizes", () => {
