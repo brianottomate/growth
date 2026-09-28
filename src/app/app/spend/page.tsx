@@ -170,7 +170,7 @@ export default async function SpendPage({
                 className={cn(
                   "rounded-md px-3 py-1 text-sm",
                   r.key === range
-                    ? "bg-secondary font-medium"
+                    ? "bg-muted font-medium"
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
