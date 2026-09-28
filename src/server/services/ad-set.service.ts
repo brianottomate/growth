@@ -66,6 +66,7 @@ import {
 import { amenitySource } from "@/lib/home-amenities";
 import {
   deterministicSetCopy,
+  homeFactsDescription,
   writeAdSetCopy,
   type CopyHome,
 } from "./ad-set-copy.service";
@@ -655,6 +656,13 @@ export async function buildAdSet(input: {
     description: detail.description,
     heroUrl: hero,
   }));
+  // A portfolio card is one home: its Meta headline names it and its
+  // description states its facts, so neither goes stale when the set's
+  // copy is rewritten.
+  const homeCardCopy = (home: CopyHome) => ({
+    headline: home.name.slice(0, 60),
+    description: homeFactsDescription(home),
+  });
   // The first pass defers copy: shells with factual words, no model call. The
   // words come later, from writeSetCopy, once the compositions and placements
   // look right.
@@ -789,6 +797,7 @@ export async function buildAdSet(input: {
         format,
         headline: homeCopy.headline,
         body: homeCopy.primaryText,
+        description: homeCopy.description,
         linkUrl: home.listing.url,
         callToAction: PERFORMANCE_AD_DEFAULTS.callToAction,
         propertyName: home.listing.name,
@@ -812,6 +821,7 @@ export async function buildAdSet(input: {
         format,
         headline: homeCopy.headline,
         body: homeCopy.primaryText,
+        description: homeCopy.description,
         linkUrl: home.listing.url,
         callToAction: PERFORMANCE_AD_DEFAULTS.callToAction,
         propertyName: home.listing.name,
@@ -829,6 +839,7 @@ export async function buildAdSet(input: {
         format,
         headline: homeCopy.headline,
         body: homeCopy.primaryText,
+        description: homeCopy.description,
         linkUrl: home.listing.url,
         callToAction: PERFORMANCE_AD_DEFAULTS.callToAction,
         propertyName: home.listing.name,
@@ -842,18 +853,24 @@ export async function buildAdSet(input: {
         format,
         headline: copy.portfolioHeadline,
         body: copy.portfolioPrimaryText,
+        description: copy.portfolioDescription,
         callToAction: PERFORMANCE_AD_DEFAULTS.callToAction,
-        media: usable.map(({ hero }, i) =>
-          heroCard(hero!, copy.homes[i]!.cardTitle),
-        ),
+        media: usable.map(({ hero }, i) => ({
+          ...heroCard(hero!, copy.homes[i]!.cardTitle),
+          ...homeCardCopy(copyHomes[i]!),
+        })),
       };
     } else if (item.kind === "all_properties_carousel") {
       content = {
         format,
         headline: copy.portfolioHeadline,
         body: copy.portfolioPrimaryText,
+        description: copy.portfolioDescription,
         callToAction: PERFORMANCE_AD_DEFAULTS.callToAction,
-        media: usable.map(({ hero, listing }) => listingCard(hero!, listing)),
+        media: usable.map(({ hero, listing }, i) => ({
+          ...listingCard(hero!, listing),
+          ...homeCardCopy(copyHomes[i]!),
+        })),
       };
     } else {
       // The catalog ad's cards are Meta's to render from the product set; the
@@ -862,6 +879,7 @@ export async function buildAdSet(input: {
         format,
         headline: copy.catalogHeadline,
         body: copy.catalogPrimaryText,
+        description: copy.catalogDescription,
         callToAction: PERFORMANCE_AD_DEFAULTS.callToAction,
         media: usable.map(({ hero, listing }) => listingCard(hero!, listing)),
       };
@@ -1470,16 +1488,59 @@ export async function setAdCopy(input: {
   orgId: string;
   headline?: string;
   body?: string;
+  description?: string;
+  /** Per carousel card, in order; a blank field inherits the ad's. */
+  cards?: { headline?: string; description?: string }[];
 }) {
   const ad = await requireOwnedAd(input);
   const content = creativeContent(ad);
+  const headline = input.headline ?? content.headline;
+  const body = input.body ?? content.body;
+  const description = input.description ?? content.description;
+  // An idea-studio ad sends the projection of its document, so the words go
+  // into the document and are projected again, as writeSetCopy does.
+  const studio = content.ideaStudio;
+  if (studio) {
+    const document = {
+      ...studio.document,
+      copy: { ...studio.document.copy, headline, body, description },
+      cards: studio.document.cards.map((card, i) => {
+        const next = input.cards?.[i];
+        return next ? { ...card, copy: { ...card.copy, ...next } } : card;
+      }),
+    };
+    await db
+      .update(adTable)
+      .set(
+        projectIdea(
+          ad.brandId,
+          content,
+          { ...studio, document },
+          ad.placements,
+        ),
+      )
+      .where(eq(adTable.id, ad.id));
+    return { adId: ad.id };
+  }
+  const media = content.media.map((card, i) => {
+    const next = input.cards?.[i];
+    if (!next) return card;
+    const merged = { ...card, ...next };
+    return {
+      ...merged,
+      headline: merged.headline?.trim() || undefined,
+      description: merged.description?.trim() || undefined,
+    };
+  });
   await db
     .update(adTable)
     .set({
       content: {
         ...content,
-        headline: input.headline ?? content.headline,
-        body: input.body ?? content.body,
+        headline,
+        body,
+        description: description?.trim() || undefined,
+        media,
       },
     })
     .where(eq(adTable.id, ad.id));
@@ -1804,21 +1865,25 @@ export async function writeSetCopy(input: {
     if (!Array.isArray(content.media)) continue;
     let headline = content.headline;
     let body = content.body;
+    let description = content.description;
     const homeCopy = ad.home?.externalId
       ? copyByHome.get(ad.home.externalId)
       : null;
     if (homeCopy) {
       headline = homeCopy.headline;
       body = homeCopy.primaryText;
+      description = homeCopy.description;
     } else {
       // The portfolio and catalog ads carry no home; the format says which.
       const format = adFormatOf(content);
       if (format === "portfolio") {
         headline = copy.portfolioHeadline;
         body = copy.portfolioPrimaryText;
+        description = copy.portfolioDescription;
       } else if (format === "catalog") {
         headline = copy.catalogHeadline;
         body = copy.catalogPrimaryText;
+        description = copy.catalogDescription;
       } else {
         continue;
       }
@@ -1831,7 +1896,11 @@ export async function writeSetCopy(input: {
     if (
       headline === content.headline &&
       body === content.body &&
-      (!docCopy || (docCopy.headline === headline && docCopy.body === body))
+      description === content.description &&
+      (!docCopy ||
+        (docCopy.headline === headline &&
+          docCopy.body === body &&
+          docCopy.description === description))
     )
       continue;
     const next = studio
@@ -1842,12 +1911,12 @@ export async function writeSetCopy(input: {
             ...studio,
             document: {
               ...studio.document,
-              copy: { ...studio.document.copy, headline, body },
+              copy: { ...studio.document.copy, headline, body, description },
             },
           },
           ad.placements,
         )
-      : { content: { ...content, headline, body } };
+      : { content: { ...content, headline, body, description } };
     await db.update(adTable).set(next).where(eq(adTable.id, ad.id));
     updated += 1;
   }

@@ -59,8 +59,11 @@ export function featuredStarterAdIdeas(homes: StarterHome[]) {
         format: "carousel",
         headline: "",
         body: "",
+        // One card per home, so each card's Meta headline names its home.
         media: homes.flatMap((h) =>
-          h.photos[0] ? [{ ...h.photos[0], type: "image" as const }] : [],
+          h.photos[0]
+            ? [{ ...h.photos[0], type: "image" as const, headline: h.name }]
+            : [],
         ),
       },
     },

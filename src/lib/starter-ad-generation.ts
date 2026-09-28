@@ -19,6 +19,8 @@ export const starterGenerationSchema = z.object({
 export const generatedCopySchema = z.object({
   headline: z.string().min(1).max(70),
   body: z.string().min(1).max(1200),
+  /** Meta's grey line under the headline. */
+  description: z.string().max(60),
 });
 const layoutSchema = z.object({
   title: z.string().min(1).max(65),
@@ -111,6 +113,7 @@ export const brandStarterCopySchema = z.object({
         format: z.enum(["static", "carousel"]),
         headline: z.string().min(1).max(70),
         body: z.string().min(1).max(1200),
+        description: z.string().max(60),
       }),
     )
     .length(3),

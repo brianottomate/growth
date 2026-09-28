@@ -94,6 +94,10 @@ export function inspectMetaCreative(raw: Record<string, unknown>) {
       string(
         labelled(feed.link_urls, defaultRule?.link_url_label)?.website_url,
       ) || string(link.link),
+    description:
+      string(
+        labelled(feed.descriptions, defaultRule?.description_label)?.text,
+      ) || string(link.description),
     callToAction:
       strings(feed.call_to_action_types)[0] ||
       string(object(link.call_to_action).type) ||
@@ -113,8 +117,21 @@ export function inspectMetaCreative(raw: Record<string, unknown>) {
     issues.push(
       "Multiple copy variants retained in source metadata; choose copy before reuse.",
     );
+  // A hand-built carousel's own words per card, kept where they differ from
+  // the ad's so an import round-trips instead of flattening every card.
+  const cardCopy = children.map((card) => {
+    const headline = string(card.name);
+    const description = string(card.description);
+    return {
+      ...(headline && headline !== copy.headline ? { headline } : {}),
+      ...(description && description !== copy.description
+        ? { description }
+        : {}),
+    };
+  });
   return {
     copy,
+    cardCopy,
     hashes: hashes.filter(Boolean),
     carousel: children.length > 0 || carouselVariants.length > 0,
     carouselVariants,
@@ -180,6 +197,9 @@ export function importedIdea(
         inspected.carousel ? "home_carousel" : "hero_static",
       ),
       overrides: {},
+      ...(inspected.carousel && Object.keys(inspected.cardCopy[i] ?? {}).length
+        ? { copy: inspected.cardCopy[i] }
+        : {}),
     }),
   );
   return {

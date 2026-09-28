@@ -32,11 +32,16 @@ const MODEL = "claude-sonnet-5";
 /** Under the 1,200 the ad editor accepts, with room for an operator's edit. */
 const BODY_MAX = 900;
 
+/** Meta cuts the description off early on most placements. */
+const DESCRIPTION_MAX = 60;
+
 const HomeCopySchema = z.object({
   /** The caption, in the per-home template. */
   primaryText: z.string().min(20).max(BODY_MAX),
   /** Meta's headline, under the image. */
   headline: z.string().max(60),
+  /** Meta's grey line under the headline. */
+  description: z.string().max(DESCRIPTION_MAX),
   /** The words drawn onto the card. No emoji: the renderer cannot draw them. */
   cardTitle: z.string().max(52),
 });
@@ -47,9 +52,11 @@ const SetCopySchema = z.object({
   /** The caption for the carousel of every home in the set. */
   portfolioPrimaryText: z.string().min(20).max(BODY_MAX),
   portfolioHeadline: z.string().max(60),
+  portfolioDescription: z.string().max(DESCRIPTION_MAX),
   /** The caption for the catalog ad, where Meta ranks the same homes. */
   catalogPrimaryText: z.string().min(20).max(BODY_MAX),
   catalogHeadline: z.string().max(60),
+  catalogDescription: z.string().max(DESCRIPTION_MAX),
 });
 
 export type AdSetCopy = z.infer<typeof SetCopySchema>;
@@ -88,6 +95,10 @@ const factsBullet = (home: CopyHome) => {
     .join(" · ");
   return line ? `🛏️ ${line}` : null;
 };
+
+/** The home's facts as a description: "5 bedrooms · 4 baths · sleeps 12". */
+export const homeFactsDescription = (home: CopyHome) =>
+  (facts(home) || home.place).slice(0, DESCRIPTION_MAX);
 
 const town = (place: string) => place.split(",")[0]?.trim() ?? "";
 
@@ -134,6 +145,13 @@ export function deterministicSetCopy(
   const setHeadline = (
     place ? `Your ${place} escape starts here` : brandName
   ).slice(0, 60);
+  const setDescription = (
+    homes.length === 1
+      ? homeFactsDescription(homes[0]!)
+      : sleepsUpTo >= 8
+        ? `${homes.length} homes · sleep up to ${sleepsUpTo}`
+        : `Book direct with ${brandName}`
+  ).slice(0, DESCRIPTION_MAX);
   return {
     homes: homes.map((home) => {
       const labels = amenitySource(home.amenities, home.description);
@@ -152,13 +170,16 @@ export function deterministicSetCopy(
           .join("\n")
           .slice(0, BODY_MAX),
         headline: home.name.slice(0, 60),
+        description: homeFactsDescription(home),
         cardTitle: (hook?.hook ?? home.name).slice(0, 52),
       };
     }),
     portfolioPrimaryText: setText,
     portfolioHeadline: setHeadline,
+    portfolioDescription: setDescription,
     catalogPrimaryText: setText,
     catalogHeadline: setHeadline,
+    catalogDescription: setDescription,
   };
 }
 
@@ -233,6 +254,7 @@ export async function writeAdSetCopy(input: {
         "The examples show the shape and tone only; their amenities are not facts about these homes. A portfolio or catalog bullet may only claim what most of the homes have.",
         "",
         "headline is the short line under the image. No emoji. Meta shows it with the primary text, so it never repeats the hook line: it adds something the primaryText does not open with. For the catalog and portfolio, never write “Homes in <place>”: lead on what the homes offer.",
+        "description is Meta's grey line under the headline, at most 60 characters: the plain facts a guest compares on (sleeps, bedrooms, one standout amenity), separated by ' · '. No emoji. It never repeats the headline. For the portfolio and catalog, what the set offers as a whole (how many homes, how many they sleep).",
         "cardTitle is drawn INTO the image by a renderer that cannot draw emoji and has little room: at most six words, no emoji, no punctuation at the end. Lead on the home's best amenity, not its name.",
         "",
         "Vary the hooks across homes. Do not start every home the same way.",

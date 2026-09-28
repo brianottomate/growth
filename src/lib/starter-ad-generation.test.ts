@@ -21,7 +21,11 @@ const layout = {
   imagePosition: "center" as const,
 };
 const generated: GeneratedHome = {
-  copy: { headline: "A lakeside escape", body: "Find your next getaway." },
+  copy: {
+    headline: "A lakeside escape",
+    body: "Find your next getaway.",
+    description: "Sleeps 8 · private dock",
+  },
   cards: [
     {
       photoIndex: 2,
@@ -57,6 +61,7 @@ test("generated statics and carousels share copy and use selected real photos wi
   expect(carousel.shapes).toEqual(["portrait", "story"]);
   expect(carousel.intendedPlacements).toEqual([...placements]);
   expect(carousel.copy.linkUrl).toBe(home.url);
+  expect(carousel.copy.description).toBe("Sleeps 8 · private dock");
 });
 test("feed-only requests do not imply vertical creative support", () => {
   const doc = generatedDocument(

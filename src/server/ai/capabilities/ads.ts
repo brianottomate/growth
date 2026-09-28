@@ -1781,7 +1781,7 @@ export const setAdStatusAction = growthAction({
 export const setAdCopyAction = growthAction({
   outputSchema: setAdCopyActionOutputSchema,
   description:
-    "Rewrite the words on one drafted ad: its headline, its primary text, or both. The cards are left alone. Emoji belong in primary text and never in the words drawn onto a card.",
+    "Rewrite the words on one drafted ad: its headline, primary text, description, and each carousel card's own Meta headline and description. The images are left alone. Emoji belong in primary text and never in the words drawn onto a card.",
   inputSchema: z.object({
     adId: z.string().min(1),
     headline: z
@@ -1790,6 +1790,25 @@ export const setAdCopyAction = growthAction({
       .optional()
       .describe("Never the primary text's first line; Meta shows both."),
     body: z.string().max(1200).optional(),
+    description: z
+      .string()
+      .max(120)
+      .optional()
+      .describe(
+        "Meta's grey line under the headline, ideally under 60 characters: plain facts such as sleeps, bedrooms, one amenity. Never the headline again. Empty string clears it.",
+      ),
+    cards: z
+      .array(
+        z.object({
+          headline: z.string().max(60).optional(),
+          description: z.string().max(120).optional(),
+        }),
+      )
+      .max(10)
+      .optional()
+      .describe(
+        "Carousel only, in card order: each card's own Meta headline and description. A card showing a different home should name it. Blank inherits the ad's.",
+      ),
   }),
   execute: (input, ctx) =>
     setAdCopy({
@@ -1797,6 +1816,8 @@ export const setAdCopyAction = growthAction({
       orgId: ctx.orgId,
       headline: input.headline,
       body: input.body,
+      description: input.description,
+      cards: input.cards,
     }),
 });
 

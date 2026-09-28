@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { isImportedMetaCatalog } from "./meta-import";
+import { inspectMetaCreative, isImportedMetaCatalog } from "./meta-import";
 
 describe("imported catalog classification", () => {
   test("recognizes product-backed templates even without recovered images", () => {
@@ -34,5 +34,29 @@ describe("imported catalog classification", () => {
       false,
     );
     expect(isImportedMetaCatalog({})).toBe(false);
+  });
+});
+
+describe("imported Meta copy", () => {
+  test("keeps the description and each card's own words", () => {
+    const parsed = inspectMetaCreative({
+      object_story_spec: {
+        link_data: {
+          link: "https://example.com/",
+          message: "Four homes.",
+          name: "Wine Country",
+          description: "Book direct",
+          child_attachments: [
+            { image_hash: "a", name: "R&R Ranch", description: "Sleeps 19" },
+            { image_hash: "b", name: "Wine Country" },
+          ],
+        },
+      },
+    });
+    expect(parsed.copy.description).toBe("Book direct");
+    expect(parsed.cardCopy).toEqual([
+      { headline: "R&R Ranch", description: "Sleeps 19" },
+      {},
+    ]);
   });
 });
