@@ -129,6 +129,12 @@ export const newCatalogCopyActionOutputSchema = z.strictObject({
   headline: z.string(),
   pills: z.array(z.string()),
   reason: z.string(),
+  showPhoto: z
+    .strictObject({ number: z.number(), url: z.string() })
+    .nullable()
+    .describe(
+      "A listing photo that shows what the headline sells better than the card's, to offer as the hero; null when the card's photo already does.",
+    ),
 });
 
 export const newCatalogPhotoActionOutputSchema = z.strictObject({
