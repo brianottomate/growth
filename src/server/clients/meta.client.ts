@@ -419,3 +419,211 @@ export async function fetchMetaCampaignDailyInsights(params: {
   );
   return all;
 }
+
+// =====================================================
+// CAROUSEL PLACEMENT CARDS
+// =====================================================
+
+const ADS_WRITE_URL = "https://graph.facebook.com/v23.0";
+
+type MetaPositions = {
+  publisherPlatforms: string[];
+  facebookPositions?: string[];
+  instagramPositions?: string[];
+};
+
+async function metaWrite<T>(path: string, body: Record<string, unknown>) {
+  const accessToken = env.FB_SYSUSER_TOKEN ?? env.META_ACCESS_TOKEN;
+  if (!accessToken) throw new Error("FB_SYSUSER_TOKEN is required");
+  const form = new URLSearchParams({ access_token: accessToken });
+  for (const [key, value] of Object.entries(body))
+    form.set(key, typeof value === "string" ? value : JSON.stringify(value));
+  const url = `${ADS_WRITE_URL}/${path}`;
+  const response = await fetch(url, { method: "POST", body: form });
+  const json = (await response.json()) as T & {
+    error?: { message: string; error_user_msg?: string };
+  };
+  if (json.error)
+    throw new Error(json.error.error_user_msg ?? json.error.message);
+  return json;
+}
+
+async function metaRead<T>(path: string, fields: string) {
+  const accessToken = env.FB_SYSUSER_TOKEN ?? env.META_ACCESS_TOKEN;
+  if (!accessToken) throw new Error("FB_SYSUSER_TOKEN is required");
+  const params = new URLSearchParams({ access_token: accessToken, fields });
+  const response = await fetch(`${ADS_WRITE_URL}/${path}?${params}`, {
+    cache: "no-store",
+  });
+  const json = (await response.json()) as T & { error?: { message: string } };
+  if (json.error) throw new Error(json.error.message);
+  return json;
+}
+
+async function uploadMetaAdImage(adAccountId: string, imageUrl: string) {
+  const image = await fetch(imageUrl);
+  if (!image.ok) throw new Error(`Image fetch ${image.status}: ${imageUrl}`);
+  const bytes = Buffer.from(await image.arrayBuffer()).toString("base64");
+  const result = await metaWrite<{ images: Record<string, { hash: string }> }>(
+    `${adAccountId}/adimages`,
+    { bytes },
+  );
+  return Object.values(result.images)[0]!.hash;
+}
+
+/**
+ * Give a pushed carousel ad its 9:16 cards in stories and reels. Zernio can
+ * only send one set of cards, which Meta letterboxes there. Meta's placement
+ * asset customization can pin a second set of cards per placement, the same
+ * as "Edit placement" in Ads Manager, so the ad's creative is rebuilt on the
+ * Graph API from the pushed one and swapped in. Same ad, same ad set.
+ * https://developers.facebook.com/docs/marketing-api/dynamic-creative/placement-asset-customization/
+ */
+export async function setMetaCarouselPlacementCards(input: {
+  adAccountId: string;
+  adId: string;
+  feedImageUrls: string[];
+  tallImageUrls: string[];
+  feedPositions: MetaPositions;
+  tallPositions: MetaPositions;
+}) {
+  const { creative } = await metaRead<{
+    creative: {
+      object_story_spec: {
+        page_id: string;
+        instagram_user_id?: string;
+        link_data: {
+          message: string;
+          call_to_action: { type: string };
+          child_attachments: {
+            name: string;
+            description?: string;
+            link: string;
+          }[];
+        };
+      };
+      url_tags?: string;
+      degrees_of_freedom_spec?: unknown;
+    };
+  }>(
+    input.adId,
+    "creative{object_story_spec,url_tags,degrees_of_freedom_spec}",
+  );
+  const story = creative.object_story_spec;
+  const cards = story.link_data.child_attachments;
+  if (
+    cards.length !== input.feedImageUrls.length ||
+    cards.length !== input.tallImageUrls.length
+  )
+    throw new Error("Card count differs from the pushed carousel");
+
+  const feedHashes = await Promise.all(
+    input.feedImageUrls.map((url) => uploadMetaAdImage(input.adAccountId, url)),
+  );
+  const tallHashes = await Promise.all(
+    input.tallImageUrls.map((url) => uploadMetaAdImage(input.adAccountId, url)),
+  );
+  // Meta refuses duplicate asset values, so equal texts share one entry.
+  const unique = (values: string[]) => [...new Set(values)];
+  const titles = unique(cards.map((card) => card.name));
+  const descriptions = unique(
+    cards.flatMap((card) => (card.description ? [card.description] : [])),
+  );
+  const links = unique(cards.map((card) => card.link));
+  const childAttachments = (side: "feed" | "tall") =>
+    cards.map((card, i) => ({
+      image_label: { name: `${side}_${i}` },
+      title_label: { name: `title_${titles.indexOf(card.name)}` },
+      ...(card.description
+        ? {
+            description_label: {
+              name: `description_${descriptions.indexOf(card.description)}`,
+            },
+          }
+        : {}),
+      link_url_label: { name: `link_${links.indexOf(card.link)}` },
+    }));
+  const spec = (positions: MetaPositions) => ({
+    publisher_platforms: positions.publisherPlatforms,
+    ...(positions.facebookPositions
+      ? { facebook_positions: positions.facebookPositions }
+      : {}),
+    ...(positions.instagramPositions
+      ? { instagram_positions: positions.instagramPositions }
+      : {}),
+  });
+
+  const { id: creativeId } = await metaWrite<{ id: string }>(
+    `${input.adAccountId}/adcreatives`,
+    {
+      object_story_spec: {
+        page_id: story.page_id,
+        ...(story.instagram_user_id
+          ? { instagram_user_id: story.instagram_user_id }
+          : {}),
+      },
+      ...(creative.url_tags ? { url_tags: creative.url_tags } : {}),
+      ...(creative.degrees_of_freedom_spec
+        ? { degrees_of_freedom_spec: creative.degrees_of_freedom_spec }
+        : {}),
+      asset_feed_spec: {
+        images: [
+          ...feedHashes.map((hash, i) => ({
+            hash,
+            adlabels: [{ name: `feed_${i}` }],
+          })),
+          ...tallHashes.map((hash, i) => ({
+            hash,
+            adlabels: [{ name: `tall_${i}` }],
+          })),
+        ],
+        titles: titles.map((text, i) => ({
+          text,
+          adlabels: [{ name: `title_${i}` }],
+        })),
+        ...(descriptions.length
+          ? {
+              descriptions: descriptions.map((text, i) => ({
+                text,
+                adlabels: [{ name: `description_${i}` }],
+              })),
+            }
+          : {}),
+        link_urls: links.map((website_url, i) => ({
+          website_url,
+          adlabels: [{ name: `link_${i}` }],
+        })),
+        bodies: [{ text: story.link_data.message }],
+        call_to_action_types: [story.link_data.call_to_action.type],
+        ad_formats: ["CAROUSEL"],
+        optimization_type: "PLACEMENT",
+        carousels: [
+          {
+            adlabels: [{ name: "carousel_feed" }],
+            child_attachments: childAttachments("feed"),
+            multi_share_end_card: false,
+          },
+          {
+            adlabels: [{ name: "carousel_tall" }],
+            child_attachments: childAttachments("tall"),
+            multi_share_end_card: false,
+          },
+        ],
+        asset_customization_rules: [
+          {
+            customization_spec: spec(input.feedPositions),
+            carousel_label: { name: "carousel_feed" },
+            priority: 1,
+          },
+          {
+            customization_spec: spec(input.tallPositions),
+            carousel_label: { name: "carousel_tall" },
+            priority: 2,
+          },
+        ],
+      },
+    },
+  );
+  await metaWrite(input.adId, { creative: { creative_id: creativeId } });
+  return { creativeId };
+}

@@ -12,6 +12,7 @@ import {
 } from "@/lib/meta-placement-plan";
 import { ideaAwaitingArtwork } from "@/lib/ad-idea-studio";
 import { META_URL_TAGS } from "@/lib/ad-utm";
+import { setMetaCarouselPlacementCards } from "@/server/clients/meta.client";
 import "server-only";
 import { freezeApprovedAd } from "./ad-approval.service";
 
@@ -3174,6 +3175,39 @@ async function pushToMeta(args: PushArgs) {
     return [...fromOpening, ...fromAttach];
   };
 
+  // Zernio sends one set of carousel cards, which stories and reels
+  // letterbox. Swap each pushed carousel onto a creative that pins its 9:16
+  // cards there. A failure leaves the pushed ad as it was.
+  const tallPlacements = placementPlan.filter((p) => !isFeedPlacement(p));
+  const feedPlacements = placementPlan.filter(isFeedPlacement);
+  const placeCarouselCards = async (
+    ads: ReturnType<typeof setAdsFor>,
+  ) => {
+    if (!tallPlacements.length || !feedPlacements.length) return;
+    for (const { planAd, externalId, media } of ads) {
+      if (
+        !externalId ||
+        media.length < 2 ||
+        media.some((card) => card.type === "video" || !card.story?.url)
+      )
+        continue;
+      await setMetaCarouselPlacementCards({
+        adAccountId: destination.adAccount.id,
+        adId: externalId,
+        feedImageUrls: media.map((card) => card.url),
+        tallImageUrls: media.map((card) => card.story!.url),
+        feedPositions: metaProviderPlacements(feedPlacements),
+        tallPositions: metaProviderPlacements(tallPlacements),
+      }).catch((error: unknown) => {
+        warnings.push(
+          `${planAd.name}: 9:16 carousel cards not applied, stories show the feed cards (${
+            error instanceof Error ? error.message : String(error)
+          })`,
+        );
+      });
+    }
+  };
+
   // ---- one (or no) audience: a single create --------------------------
   if (
     compiled.length <= 1 &&
@@ -3217,6 +3251,7 @@ async function pushToMeta(args: PushArgs) {
         },
       ],
     });
+    await placeCarouselCards(setAdsFor(set, usable));
     return {
       campaignId: campaign.id,
       platform: "meta_ads" as const,
@@ -3313,6 +3348,7 @@ async function pushToMeta(args: PushArgs) {
       ads: setAdsFor(set, usable),
     })),
   });
+  for (const { set } of perSet) await placeCarouselCards(setAdsFor(set, usable));
 
   return {
     campaignId: campaign.id,
