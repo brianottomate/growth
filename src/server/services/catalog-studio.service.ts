@@ -15,6 +15,7 @@ import {
   catalogArtworkIssues,
   catalogCardCopy,
   catalogCardFingerprint,
+  artworkFormat,
   catalogDraft,
   catalogHeadlineIssue,
   catalogExportRows,
@@ -31,6 +32,7 @@ import { brandWideAmenities } from "@/lib/catalog-copy";
 import {
   COMPOSITION_TEMPLATES,
   compositionTemplateIdSchema,
+  type CompositionFormatId,
 } from "@/lib/compositions";
 import { brandHomeInventory } from "./home-inventory.service";
 import { ingestBrandHomes } from "./homes.service";
@@ -113,11 +115,13 @@ type CatalogRow = NonNullable<
 function overridesOf(
   row: CatalogRow,
   assets: ReadonlyMap<string, string>,
+  formats: ReadonlyMap<string, CompositionFormatId | null>,
 ): CatalogOverrides {
   const asset = (id: string | null) =>
     id && assets.get(id) ? { assetId: id, url: assets.get(id)! } : null;
   const template = compositionTemplateIdSchema.safeParse(row.catalogTemplateId);
   const position = IMAGE_POSITIONS.find((p) => p === row.catalogImagePosition);
+  const finished = asset(row.catalogFinishedAssetId);
   return {
     title: row.catalogTitle,
     subtitle: row.catalogSubtitle,
@@ -129,7 +133,10 @@ function overridesOf(
       row.catalogMode === "finished" || row.catalogMode === "compose"
         ? row.catalogMode
         : null,
-    finished: asset(row.catalogFinishedAssetId),
+    finished: finished && {
+      ...finished,
+      format: formats.get(finished.assetId) ?? null,
+    },
     excluded: row.catalogExcluded,
     pills: row.catalogPills,
   };
@@ -175,14 +182,20 @@ async function catalogHomes(brand: CatalogBrand, refresh = false) {
           eq(mediaAssetTable.brandId, brand.id),
           isNull(mediaAssetTable.deletedAt),
         ),
-        columns: { id: true, url: true },
+        columns: { id: true, url: true, width: true, height: true },
       })
     : [];
   const urls = new Map(
     assets.flatMap((a) => (a.url ? [[a.id, a.url] as const] : [])),
   );
+  const formats = new Map(
+    assets.map((a) => [a.id, artworkFormat(a.width, a.height)] as const),
+  );
   const overrides = new Map(
-    [...rows.values()].map((row) => [row.externalId, overridesOf(row, urls)]),
+    [...rows.values()].map((row) => [
+      row.externalId,
+      overridesOf(row, urls, formats),
+    ]),
   );
   const approvals = new Map(
     [...rows.values()].flatMap((row) =>
@@ -197,7 +210,7 @@ async function catalogHomes(brand: CatalogBrand, refresh = false) {
     approvals,
     brand.settings?.catalogTemplateId ?? DEFAULT_CATALOG_TEMPLATE,
     brand.markets,
-    brand.settings?.catalogFormatId ?? DEFAULT_CATALOG_FORMAT,
+    DEFAULT_CATALOG_FORMAT,
   );
   // Cards still on the starter headline that nobody wrote, approved or gave
   // supplied artwork: what "Write all cards" works through.
@@ -247,7 +260,7 @@ export async function catalogState(
     syncedAt: inventory.syncedAt,
     defaultTemplate:
       brand.settings?.catalogTemplateId ?? DEFAULT_CATALOG_TEMPLATE,
-    format: brand.settings?.catalogFormatId ?? DEFAULT_CATALOG_FORMAT,
+    format: DEFAULT_CATALOG_FORMAT,
     draft,
     unwritten,
     exports: runs.map((run): CatalogExport => ({
@@ -629,21 +642,6 @@ export async function setCatalogDefaultTemplate(input: {
     .update(brandTable)
     .set({
       performanceSettings: sql`coalesce(${brandTable.performanceSettings}, '{}'::jsonb) || ${JSON.stringify({ catalogTemplateId: input.templateId, updatedAt: new Date().toISOString(), updatedBy: input.userId })}::jsonb`,
-    })
-    .where(eq(brandTable.id, brand.id));
-}
-
-/** The canvas the brand's catalog is drawn and exported at. */
-export async function setCatalogFormat(input: {
-  userId: string;
-  brandId: string;
-  formatId: CatalogFormatId;
-}) {
-  const brand = await catalogBrand(input.userId, input.brandId);
-  await db
-    .update(brandTable)
-    .set({
-      performanceSettings: sql`coalesce(${brandTable.performanceSettings}, '{}'::jsonb) || ${JSON.stringify({ catalogFormatId: input.formatId, updatedAt: new Date().toISOString(), updatedBy: input.userId })}::jsonb`,
     })
     .where(eq(brandTable.id, brand.id));
 }

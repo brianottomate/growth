@@ -1781,7 +1781,7 @@ export function renderComposition(
             left: 0,
             right: 0,
             bottom: 0,
-            height: "28%",
+            height: story ? "42%" : "28%",
             background: centred
               ? `linear-gradient(0deg, ${scrim(0.46)} 0%, ${scrim(0)} 100%)`
               : "linear-gradient(0deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 100%)",
@@ -1852,7 +1852,9 @@ export function renderComposition(
               position: "absolute",
               left: pad,
               right: pad,
-              bottom: story ? 420 : pad,
+              // Meta lays its CTA sticker and the Reels caption over the
+              // bottom third of a story, so the line sits above it.
+              bottom: story ? 680 : pad,
               justifyContent: centred ? "center" : "flex-start",
             }}
           >
@@ -1861,7 +1863,7 @@ export function renderComposition(
                 style={{
                   display: "flex",
                   color: "#ffffff",
-                  fontSize: story ? 40 : video ? 42 : 28,
+                  fontSize: story ? 48 : video ? 42 : 28,
                   fontWeight: 600,
                 }}
               >

@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import {
+  artworkFormat,
   catalogArtworkIssues,
   catalogCardCopy,
   catalogCardFingerprint,
@@ -55,7 +56,7 @@ test("a card draws on the home's hero unless it has its own library image", () =
 });
 test("export has one row per included home and uses its frozen primary artwork", () => {
   const draft = catalogDraft(homes);
-  draft.formats = ["portrait", "story"];
+  draft.formats = ["square", "story"];
   draft.cards[1]!.included = false;
   const assets = [
     {
@@ -63,7 +64,7 @@ test("export has one row per included home and uses its frozen primary artwork",
       name: "A",
       assetId: "1",
       url: "https://media.example.com/frozen.png",
-      format: "portrait",
+      format: "square",
     },
     {
       homeId: homes[0]!.id,
@@ -99,7 +100,7 @@ test("finished artwork keeps the composition underneath it", () => {
   );
   expect(draft.cards[0]?.finishedArtwork).toEqual({
     ...finished,
-    format: "portrait",
+    format: "square",
   });
   expect(draft.cards[0]?.imageUrl).toBe(homes[0]!.imageUrl);
   expect(draft.cards[0]?.templateId).toBe(DEFAULT_CATALOG_TEMPLATE);
@@ -113,9 +114,9 @@ test("finished artwork requires an original and cannot silently generate other e
   card.finishedArtwork = {
     assetId: "original",
     url: "https://example.com/finished.png",
-    format: "portrait",
+    format: "square",
   };
-  draft.formats = ["portrait", "story"];
+  draft.formats = ["square", "story"];
   expect(catalogArtworkIssues(draft)).toHaveLength(1);
   card.included = false;
   expect(catalogArtworkIssues(draft)).toEqual([]);
@@ -237,4 +238,25 @@ test("a frozen amenities card keeps its pills and location", () => {
     location: "Hocking Hills, Ohio",
   });
   expect(catalogCardCopy(card).rating).toBeUndefined();
+});
+
+test("4:5 supplied artwork on a square catalog is caught before export", () => {
+  const finished = {
+    assetId: "portrait-art",
+    url: "https://example.com/portrait.png",
+    format: artworkFormat(1080, 1350),
+  };
+  expect(finished.format).toBe("portrait");
+  const draft = catalogDraft(
+    homes,
+    new Map([[homes[0]!.id, { mode: "finished" as const, finished }]]),
+  );
+  expect(catalogArtworkIssues(draft)).toHaveLength(1);
+});
+
+test("artwork is labelled by its pixels, or not at all", () => {
+  expect(artworkFormat(2160, 2160)).toBe("square");
+  expect(artworkFormat(1080, 1920)).toBe("story");
+  expect(artworkFormat(1000, 700)).toBeNull();
+  expect(artworkFormat(null, 1080)).toBeNull();
 });

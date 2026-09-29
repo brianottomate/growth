@@ -12,7 +12,6 @@ import {
   catalogCardPreviewUrl,
   type CatalogCard,
   type CatalogTemplateId,
-  CATALOG_FORMATS,
   DEFAULT_CATALOG_FORMAT,
   DEFAULT_CATALOG_TEMPLATE,
   isPlaceCard,
@@ -22,6 +21,72 @@ import {
   COMPOSITION_TEMPLATES,
 } from "@/lib/compositions";
 import { orpc } from "@/orpc/client";
+
+/**
+ * The card the templates are drawn on: the hero home's own photo, forced to
+ * Compose so a catalog of supplied artwork can still pick a template.
+ */
+function useTemplatePreview(brandId: string, heroHomeId: string | null) {
+  const query = useQuery(
+    orpc.catalog.state.queryOptions({ input: { brandId } }),
+  );
+  const format = query.data?.format ?? DEFAULT_CATALOG_FORMAT;
+  const cards = query.data?.draft.cards ?? [];
+  const drawn = cards.filter((c) => c.mode !== "finished");
+  const pick =
+    drawn.find((c) => c.homeId === heroHomeId) ??
+    drawn.find((c) => c.included) ??
+    cards.find((c) => c.homeId === heroHomeId) ??
+    cards.find((c) => c.included);
+  const card = pick && { ...pick, mode: "compose" as const };
+  const current = query.data?.defaultTemplate ?? DEFAULT_CATALOG_TEMPLATE;
+  return { card, format, current };
+}
+
+const templateLabel = (templateId: CatalogTemplateId) =>
+  COMPOSITION_TEMPLATES.find((t) => t.id === templateId)?.label ?? templateId;
+
+/** The brand's default card, closed: its thumbnail and the copy it asks for. */
+export function CatalogTemplateSummary({
+  brandId,
+  heroHomeId,
+}: {
+  brandId: string;
+  heroHomeId: string | null;
+}) {
+  const { card, format, current } = useTemplatePreview(brandId, heroHomeId);
+  const guide = CATALOG_COPY_INTENTS[current];
+  const src = card
+    ? catalogCardPreviewUrl(brandId, asTemplate(card, current), format)
+    : null;
+  return (
+    <span className="flex min-w-0 items-center gap-3">
+      {src ? (
+        // oxlint-disable-next-line nextjs/no-img-element
+        <img
+          src={src}
+          alt=""
+          className="aspect-square w-12 shrink-0 rounded object-cover"
+        />
+      ) : null}
+      <span className="min-w-0 space-y-0.5">
+        <span className="block font-medium">
+          Catalog card · {templateLabel(current).replace(/^Catalog · /, "")}
+        </span>
+        {guide ? (
+          <>
+            <span className="block text-xs text-muted-foreground">
+              <GuideLimits guide={guide} />
+            </span>
+            <span className="line-clamp-1 text-xs text-muted-foreground">
+              {guide.intent}
+            </span>
+          </>
+        ) : null}
+      </span>
+    </span>
+  );
+}
 
 /**
  * The catalog card every home uses unless it has its own: the hero home's
@@ -38,7 +103,6 @@ export function CatalogTemplateCard({
   const router = useRouter();
   const client = useQueryClient();
   const state = orpc.catalog.state.queryOptions({ input: { brandId } });
-  const query = useQuery(state);
   const save = useMutation(
     orpc.catalog.setDefaultTemplate.mutationOptions({
       onError: () => toast.error("Unable to save the catalog card"),
@@ -49,51 +113,14 @@ export function CatalogTemplateCard({
     }),
   );
   const saving = save.isPending ? (save.variables?.templateId ?? null) : null;
-  const setFormat = useMutation(
-    orpc.catalog.setFormat.mutationOptions({
-      onError: () => toast.error("Unable to change the catalog size"),
-      onSuccess: async () => {
-        await client.invalidateQueries({ queryKey: state.queryKey });
-        router.refresh();
-      },
-    }),
-  );
-  const format = query.data?.format ?? DEFAULT_CATALOG_FORMAT;
-  const cards = query.data?.draft.cards ?? [];
-  const drawn = cards.filter((c) => c.mode !== "finished");
-  // A catalog of supplied artwork still has homes and photos: draw the hero
-  // home's own photo in each template, so the choice can be made before any
-  // card is switched to Compose.
-  const pick =
-    drawn.find((c) => c.homeId === heroHomeId) ??
-    drawn.find((c) => c.included) ??
-    cards.find((c) => c.homeId === heroHomeId) ??
-    cards.find((c) => c.included);
-  const card = pick && { ...pick, mode: "compose" as const };
-  const current = query.data?.defaultTemplate ?? DEFAULT_CATALOG_TEMPLATE;
+  const { card, format, current } = useTemplatePreview(brandId, heroHomeId);
 
   if (!card) return null;
   return (
     <div className="space-y-3">
-      <div className="flex w-fit rounded-lg border p-0.5 text-sm">
-        {CATALOG_FORMATS.map((id) => (
-          <Button
-            key={id}
-            size="sm"
-            variant={format === id ? "secondary" : "ghost"}
-            aria-pressed={format === id}
-            disabled={setFormat.isPending}
-            onClick={() => setFormat.mutate({ brandId, formatId: id })}
-          >
-            {id === "square" ? "Square 1:1" : "Portrait 4:5"}
-          </Button>
-        ))}
-      </div>
       <div className="grid grid-cols-2 gap-3 @2xl:grid-cols-3 @5xl:grid-cols-4">
         {CATALOG_TEMPLATES.map((templateId) => {
-          const label =
-            COMPOSITION_TEMPLATES.find((t) => t.id === templateId)?.label ??
-            templateId;
+          const label = templateLabel(templateId);
           const guide = CATALOG_COPY_INTENTS[templateId];
           const src = catalogCardPreviewUrl(
             brandId,
@@ -121,10 +148,7 @@ export function CatalogTemplateCard({
                   <img
                     src={src}
                     alt={label}
-                    className={cn(
-                      "w-full rounded-md object-cover",
-                      format === "square" ? "aspect-square" : "aspect-[4/5]",
-                    )}
+                    className="aspect-square w-full rounded-md object-cover"
                   />
                 )}
                 <span className="block font-medium">
@@ -163,20 +187,12 @@ function asTemplate(card: CatalogCard, templateId: CatalogTemplateId) {
 }
 
 /** A template's copy rules: the limits on one line, the brief clamped. */
-function Guide({
-  guide,
-}: {
-  guide: (typeof CATALOG_COPY_INTENTS)[keyof typeof CATALOG_COPY_INTENTS];
-}) {
+function Guide({ guide }: { guide: CopyGuide }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="space-y-1">
       <p className="text-xs text-muted-foreground">
-        Headline ≤{guide.headlineChars} characters
-        {guide.placeSuffix
-          ? " · ends “in {place}”"
-          : " · no place in the headline"}
-        {guide.pills ? ` · ${guide.pills} amenity pills` : ""}
+        <GuideLimits guide={guide} />
       </p>
       <p
         className={cn("text-xs text-muted-foreground", !open && "line-clamp-2")}
@@ -191,5 +207,20 @@ function Guide({
         {open ? "Show less" : "Show more"}
       </button>
     </div>
+  );
+}
+
+type CopyGuide =
+  (typeof CATALOG_COPY_INTENTS)[keyof typeof CATALOG_COPY_INTENTS];
+
+function GuideLimits({ guide }: { guide: CopyGuide }) {
+  return (
+    <>
+      Headline ≤{guide.headlineChars} characters
+      {guide.placeSuffix
+        ? " · ends “in {place}”"
+        : " · no place in the headline"}
+      {guide.pills ? ` · ${guide.pills} amenity pills` : ""}
+    </>
   );
 }

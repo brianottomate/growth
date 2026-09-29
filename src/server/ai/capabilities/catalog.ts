@@ -3,11 +3,7 @@ import "server-only";
 import { after } from "next/server";
 import { z } from "zod";
 
-import {
-  CATALOG_TEMPLATES,
-  CATALOG_WRITE_PASSES,
-  CATALOG_FORMATS,
-} from "@/lib/catalog-studio";
+import { CATALOG_TEMPLATES, CATALOG_WRITE_PASSES } from "@/lib/catalog-studio";
 import {
   newCatalogCopy,
   newCatalogPhoto,
@@ -21,7 +17,6 @@ import {
   renderCatalogExport,
   setCatalogApproval,
   setCatalogDefaultTemplate,
-  setCatalogFormat,
   setCatalogIncluded,
   startCatalogExport,
 } from "@/server/services/catalog-studio.service";
@@ -35,7 +30,6 @@ import {
   newCatalogPhotoActionOutputSchema,
   setCatalogApprovalActionOutputSchema,
   setCatalogDefaultTemplateActionOutputSchema,
-  setCatalogFormatActionOutputSchema,
   setCatalogIncludedActionOutputSchema,
   writeCatalogCardsActionOutputSchema,
 } from "./outputs/catalog";
@@ -176,18 +170,6 @@ export const setCatalogIncludedAction = growthAction({
   },
 });
 
-export const setCatalogFormatAction = growthAction({
-  outputSchema: setCatalogFormatActionOutputSchema,
-  description:
-    "Set the canvas a Performance client's catalog is drawn and exported at: portrait (4:5, 1080x1350) or square (1:1, 1080x1080). Every card template works at both; supplied artwork must match. Copy does not change; the next export uses the new size.",
-  inputSchema: brandInput.extend({ formatId: z.enum(CATALOG_FORMATS) }),
-  examples: [{ brandId: "brd_01", formatId: "square" }],
-  execute: async (input, ctx) => {
-    await setCatalogFormat({ ...input, userId: ctx.userId });
-    return input;
-  },
-});
-
 export const setCatalogDefaultTemplateAction = growthAction({
   outputSchema: setCatalogDefaultTemplateActionOutputSchema,
   description:
@@ -204,17 +186,10 @@ export const exportCatalogAction = growthAction({
   outputSchema: exportCatalogActionOutputSchema,
   description:
     "Freeze the included catalog cards into a new export: renders every card into the brand's media library in the background and snapshots the matching feed rows. Refused until every included card is approved. Returns the run id at once; its progress is in catalogState's exports. Nothing is uploaded to an ad platform.",
-  inputSchema: brandInput.extend({
-    force: z
-      .boolean()
-      .optional()
-      .describe(
-        "Local development only: export with unapproved cards. Ignored when deployed.",
-      ),
-  }),
+  inputSchema: brandInput,
   examples: [{ brandId: "brd_01" }],
-  execute: async ({ brandId, force }, ctx) => {
-    const run = await startCatalogExport(ctx.userId, brandId, force);
+  execute: async ({ brandId }, ctx) => {
+    const run = await startCatalogExport(ctx.userId, brandId);
     after(() => renderCatalogExport(run, ctx.userId));
     return { runId: run.run.id };
   },

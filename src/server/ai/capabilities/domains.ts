@@ -63,7 +63,6 @@ import {
   refreshCatalogHomesAction,
   setCatalogApprovalAction,
   setCatalogDefaultTemplateAction,
-  setCatalogFormatAction,
   setCatalogIncludedAction,
   writeCatalogCardsAction,
 } from "./catalog";
@@ -474,7 +473,6 @@ export const adsWrite = growthDomainTool({
     setCatalogApproval: setCatalogApprovalAction,
     setCatalogIncluded: setCatalogIncludedAction,
     setCatalogDefaultTemplate: setCatalogDefaultTemplateAction,
-    setCatalogFormat: setCatalogFormatAction,
     exportCatalog: exportCatalogAction,
     editAdCards: editAdCardsAction,
     attachAdSet: attachAdSetAction,

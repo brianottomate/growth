@@ -20,6 +20,14 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { MediaPickerDialog } from "@/app/app/content/[contentId]/MediaPickerDialog";
 import { COMPOSITION_FORMATS, COMPOSITION_TEMPLATES } from "@/lib/compositions";
 import {
@@ -36,9 +44,12 @@ import {
 import { safeHomeUrl } from "@/lib/ad-preview-links";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 import { orpc, type RouterInputs } from "@/orpc/client";
-import { ReviewInChatButton } from "../ReviewInChatButton";
+import { reviewInChat } from "../ReviewInChatButton";
 import { CatalogPreview } from "./CatalogPreview";
-import { CatalogTemplateCard } from "../CatalogTemplateCard";
+import {
+  CatalogTemplateCard,
+  CatalogTemplateSummary,
+} from "../CatalogTemplateCard";
 
 /** The server's own sentence, or the first input issue it refused. */
 function errorMessage(error: unknown, fallback: string) {
@@ -51,7 +62,10 @@ function errorMessage(error: unknown, fallback: string) {
 }
 const running = (status?: string) =>
   status === "queued" || status === "processing";
-/** A local dev server may change approved cards and export unapproved ones. */
+/**
+ * A local dev server may change approved cards. Exporting unapproved ones is
+ * `scripts/export-catalog-unapproved.ts`.
+ */
 const DEV = process.env.NODE_ENV === "development";
 const FORCE = DEV ? { force: true } : {};
 /** Approved cards are signed off; they change only after Reopen. */
@@ -264,7 +278,7 @@ export function CatalogCards({
   async function exportCatalog() {
     setBusy(true);
     const done = await act(
-      () => orpc.catalog.exportCatalog.call({ brandId, ...FORCE }),
+      () => orpc.catalog.exportCatalog.call({ brandId }),
       "Unable to export",
     );
     if (done) setView("exports");
@@ -317,39 +331,74 @@ export function CatalogCards({
               approved
             </span>
             <div className="flex flex-wrap gap-2">
-              <ReviewInChatButton
-                brandId={brandId}
-                brandName={brandName}
-                surface="catalog"
-              />
-              {CATALOG_WRITE_PASSES.map((pass) => (
-                <Button
-                  key={pass}
-                  variant="outline"
-                  disabled={busy || Boolean(writing) || open.length === 0}
-                  onClick={() => startWrite.mutate({ brandId, pass })}
-                >
-                  <Sparkles aria-hidden="true" className="size-4" />
-                  {writing?.pass === pass
-                    ? `${pass === "copy" ? "Rewriting" : "Fixing"} ${writing.done}/${writing.total}`
-                    : `${pass === "copy" ? "Rewrite copy" : "Fix photos + copy"} ${open.length}`}
-                </Button>
-              ))}
-              <Button
-                variant="outline"
-                disabled={busy || unapproved.length === 0}
-                onClick={() => approve(unapproved, true)}
-              >
-                <Check aria-hidden="true" className="size-4" />
-                Approve all
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline">
+                    {writing
+                      ? `${writing.pass === "copy" ? "Rewriting" : "Fixing"} ${writing.done}/${writing.total}`
+                      : "Bulk actions"}
+                    <ChevronDown aria-hidden="true" className="size-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-52">
+                  <DropdownMenuItem
+                    onSelect={() =>
+                      reviewInChat({ brandId, brandName, surface: "catalog" })
+                    }
+                  >
+                    <MessageSquare aria-hidden="true" />
+                    Review in chat
+                  </DropdownMenuItem>
+                  {CATALOG_WRITE_PASSES.map((pass) => (
+                    <DropdownMenuItem
+                      key={pass}
+                      disabled={busy || Boolean(writing) || open.length === 0}
+                      onSelect={() => startWrite.mutate({ brandId, pass })}
+                    >
+                      <Sparkles aria-hidden="true" />
+                      {pass === "copy" ? "Rewrite copy" : "Fix photos + copy"}
+                      <DropdownMenuShortcut>{open.length}</DropdownMenuShortcut>
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  {([true, false] as const).map((included) => (
+                    <DropdownMenuItem
+                      key={String(included)}
+                      disabled={busy}
+                      onSelect={() =>
+                        void act(
+                          () =>
+                            orpc.catalog.setIncluded.call({
+                              brandId,
+                              included,
+                            }),
+                          "Unable to update the catalog",
+                        )
+                      }
+                    >
+                      {included ? "Include all" : "Exclude all"}
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    disabled={busy || unapproved.length === 0}
+                    onSelect={() => approve(unapproved, true)}
+                  >
+                    <Check aria-hidden="true" />
+                    Approve all
+                    <DropdownMenuShortcut>
+                      {unapproved.length}
+                    </DropdownMenuShortcut>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button
                 disabled={
                   busy ||
                   activeExport ||
                   !draft.cards.some((c) => c.included) ||
                   catalogArtworkIssues(draft).length > 0 ||
-                  (unapproved.length > 0 && !DEV)
+                  unapproved.length > 0
                 }
                 title={
                   unapproved.length > 0
@@ -358,11 +407,7 @@ export function CatalogCards({
                 }
                 onClick={() => void exportCatalog()}
               >
-                {busy
-                  ? "Working…"
-                  : unapproved.length > 0 && DEV
-                    ? "Create export (dev, unapproved)"
-                    : "Create export"}
+                {busy ? "Working…" : "Create export"}
               </Button>
             </div>
           </div>
@@ -371,18 +416,12 @@ export function CatalogCards({
               type="button"
               aria-expanded={picker}
               onClick={() => setPicker((o) => !o)}
-              className="flex w-full items-center justify-between gap-2 p-3 text-left text-sm"
+              className="flex w-full items-center justify-between gap-3 p-3 text-left text-sm"
             >
-              <span>
-                <span className="font-medium">Catalog card</span>
-                <span className="text-muted-foreground">
-                  {" "}
-                  ·{" "}
-                  {COMPOSITION_TEMPLATES.find(
-                    (t) => t.id === query.data?.defaultTemplate,
-                  )?.label.replace(/^Catalog · /, "") ?? "place"}
-                </span>
-              </span>
+              <CatalogTemplateSummary
+                brandId={brandId}
+                heroHomeId={heroHomeId}
+              />
               <ChevronDown
                 aria-hidden="true"
                 className={cn(
@@ -433,40 +472,6 @@ export function CatalogCards({
                       : "All"}
                 </Button>
               ))}
-            </div>
-            <div className="flex">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() =>
-                  void act(
-                    () =>
-                      orpc.catalog.setIncluded.call({
-                        brandId,
-                        included: true,
-                      }),
-                    "Unable to update the catalog",
-                  )
-                }
-              >
-                Include all
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() =>
-                  void act(
-                    () =>
-                      orpc.catalog.setIncluded.call({
-                        brandId,
-                        included: false,
-                      }),
-                    "Unable to update the catalog",
-                  )
-                }
-              >
-                Exclude all
-              </Button>
             </div>
           </div>
           {catalogArtworkIssues(draft).length > 0 && (
@@ -692,7 +697,6 @@ export function CatalogCards({
           brandName={brandName}
           homes={homes}
           draft={draft}
-          format={format}
           exports={query.data?.exports ?? []}
         />
       )}

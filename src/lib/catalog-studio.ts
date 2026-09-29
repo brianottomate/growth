@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  COMPOSITION_FORMATS,
   compositionFormatIdSchema,
   compositionTemplateIdSchema,
   type CompositionFormatId,
@@ -40,8 +41,8 @@ export const catalogCardSchema = z.object({
   approved: z.boolean().optional(),
 });
 export type CatalogCard = z.infer<typeof catalogCardSchema>;
-/** The canvases a catalog runs in: 4:5 portrait, or 1:1 square. */
-export const CATALOG_FORMATS = ["portrait", "square"] as const;
+/** The canvas a catalog runs in. Meta shows catalog tiles square, so 4:5 is retired. */
+export const CATALOG_FORMATS = ["square"] as const;
 export type CatalogFormatId = (typeof CATALOG_FORMATS)[number];
 
 export type CatalogDraft = {
@@ -64,7 +65,12 @@ export type CatalogOverrides = {
   image?: { assetId: string; url: string } | null;
   mode?: "compose" | "finished" | null;
   /** Supplied artwork a finished card uses as-is. */
-  finished?: { assetId: string; url: string } | null;
+  finished?: {
+    assetId: string;
+    url: string;
+    /** The canvas the image is, read off its pixels; unknown when unmeasured. */
+    format?: CompositionFormatId | null;
+  } | null;
   excluded?: boolean;
   /** Amenity pills chosen for the amenities cards. */
   pills?: string[] | null;
@@ -111,7 +117,25 @@ export const CATALOG_TEMPLATES = [
 
 /** The card a brand's catalog uses until someone picks another. */
 export const DEFAULT_CATALOG_TEMPLATE = "catalog-place-plain" as const;
-/** The canvas a brand's catalog uses until someone picks another. */
+/**
+ * The composition canvas an image's pixels match, within a percent. Supplied
+ * artwork is labelled by what it is, so a 4:5 file on a square catalog is
+ * caught before export rather than shipped as a square.
+ */
+export function artworkFormat(
+  width: number | null | undefined,
+  height: number | null | undefined,
+): CompositionFormatId | null {
+  if (!width || !height) return null;
+  const ratio = width / height;
+  return (
+    COMPOSITION_FORMATS.find(
+      (f) => Math.abs(f.width / f.height - ratio) / ratio < 0.01,
+    )?.id ?? null
+  );
+}
+
+/** The canvas every catalog is drawn and exported at. */
 export const DEFAULT_CATALOG_FORMAT = "square" as const;
 
 /** The place cards: "{lead} in {place}", with or without the rating pill. */
@@ -220,7 +244,7 @@ export function catalogDraft(
   /** The brand's markets: a card's location is its market's label. */
   markets?: BrandMarkets | null,
   /** The canvas every card is drawn and exported at. */
-  format: CatalogFormatId = "portrait",
+  format: CatalogFormatId = DEFAULT_CATALOG_FORMAT,
 ): CatalogDraft {
   return {
     formats: [format],
@@ -240,7 +264,7 @@ export function catalogDraft(
                 finishedArtwork: {
                   assetId: o.finished.assetId,
                   url: o.finished.url,
-                  format,
+                  format: o.finished.format ?? format,
                 },
               }
             : {}),
@@ -324,7 +348,7 @@ export function catalogHeadlineIssue(
 export function catalogCardPreviewUrl(
   brandId: string,
   card: CatalogCard,
-  formatId: CatalogFormatId = "portrait",
+  formatId: CatalogFormatId = DEFAULT_CATALOG_FORMAT,
 ) {
   if (card.mode === "finished") return card.finishedArtwork?.url;
   const copy = catalogCardCopy(card);

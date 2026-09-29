@@ -21,15 +21,15 @@ import { panel, SectionLabel } from "../../_components";
 import { ReadinessChecklist } from "../../ReadinessChecklist";
 
 import { MediaStrip } from "./MediaStrip";
+import { SubmissionSection } from "./SubmissionSection";
 import { brandAvatarUrl, loadPerformanceBrand } from "./_data";
 
 export const metadata: Metadata = { title: "Brand · Wander Performance" };
 export const dynamic = "force-dynamic";
 
 /**
- * The client's Overview: where they stand on the checklist, the cards kept
- * as previews of their ads, what is in their library, what their site told
- * us about the brand, and who to talk to. Homes, ads and campaigns are the
+ * The client's Overview: where they stand on the checklist, what they filed
+ * on the intake, what is in their library, and who to talk to. Homes, ads and campaigns are the
  * other tabs.
  */
 export default async function PerformanceBrandPage({
@@ -140,10 +140,15 @@ export default async function PerformanceBrandPage({
           <ReadinessChecklist
             checklist={brandReadiness.checklist}
             links={readinessLinks(deskBrand)}
-            defaultOpen
           />
         </section>
       ) : null}
+
+      <SubmissionSection
+        brand={brand}
+        pitchUrl={deskBrand?.pitchUrl ?? null}
+        intakeUrl={deskBrand?.intakeUrl ?? null}
+      />
 
       <section className="space-y-2.5">
         <div className="flex items-baseline justify-between">

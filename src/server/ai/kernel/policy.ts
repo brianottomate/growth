@@ -323,7 +323,6 @@ export const growthActionPolicies = {
     }),
     setCatalogIncluded: write({ idempotent: true }),
     setCatalogDefaultTemplate: write({ idempotent: true }),
-    setCatalogFormat: write({ idempotent: true }),
     exportCatalog: write({ consequence: "background-run" }),
     editAdCards: write(),
     // Sets one field on local rows; the push is still the provider step.

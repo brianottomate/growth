@@ -1935,7 +1935,7 @@ export const importMetaCampaignAction = growthAction({
 export const ideaContextAction = growthAction({
   outputSchema: ideaContextActionOutputSchema,
   description:
-    "Read one ad's current editable document, version, ordered source-image URLs (including size variants), brand voice and facts for every represented home. Use before saveIdea. Image URLs are references; inspect them visually before making composition decisions.",
+    "Read one ad's current editable document, version, ordered source-image URLs (including size variants), brand voice and facts for every represented home. Use before saveIdea. Image URLs are references; inspect them visually before making composition decisions. Write copy from the homes' facts: a photo chooses which fact a slide leads with and must not be contradicted, but it never supplies the claim, so do not describe colours, decor or mood the listing does not state.",
   inputSchema: z.object({
     campaignId: z.string().min(1),
     adId: z.string().min(1),

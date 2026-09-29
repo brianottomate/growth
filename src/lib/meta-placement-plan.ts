@@ -226,3 +226,34 @@ export function metaPlacementMedia(
     return { media: [], issue: "Prepare and approve a vertical (9:16) image." };
   return { media: [{ ...first.story, type: "image" as const }], issue: null };
 }
+
+export type MetaPlacementKind = "feed" | "story" | "reel";
+/** Made for it, fitted by Meta from the feed cards, or nothing to show. */
+export type MetaPlacementFit = "made" | "fitted" | "missing";
+
+/**
+ * Per kind of placement the campaign runs, whether this ad has art for it.
+ * A carousel's cards serve every placement, so Meta fits them into stories
+ * and Reels itself; a static reaches them only with a 9:16 of its own.
+ */
+function fitFor(
+  kind: MetaPlacementKind,
+  ad: { carousel: boolean; hasStory: boolean },
+): MetaPlacementFit {
+  if (kind === "feed") return "made";
+  if (ad.carousel) return "fitted";
+  return ad.hasStory ? "made" : "missing";
+}
+
+export function metaPlacementFits(
+  plan: MetaPlacement[],
+  ad: { carousel: boolean; hasStory: boolean },
+) {
+  const kinds = (["feed", "story", "reel"] as const).filter((kind) =>
+    META_PLACEMENTS.some((p) => p.kind === kind && plan.includes(p.id)),
+  );
+  return kinds.map((kind) => ({
+    kind,
+    fit: fitFor(kind, ad),
+  }));
+}

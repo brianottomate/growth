@@ -153,11 +153,6 @@ export const setCatalogIncludedActionOutputSchema = z.strictObject({
   included: z.boolean(),
 });
 
-export const setCatalogFormatActionOutputSchema = z.strictObject({
-  brandId: z.string(),
-  formatId: z.enum(CATALOG_FORMATS),
-});
-
 export const setCatalogDefaultTemplateActionOutputSchema = z.strictObject({
   brandId: z.string(),
   templateId: z.enum(CATALOG_TEMPLATES),

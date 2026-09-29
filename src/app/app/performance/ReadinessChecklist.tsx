@@ -30,20 +30,13 @@ const sectionLabel =
 export function ReadinessChecklist({
   checklist,
   links,
-  defaultOpen = false,
 }: {
   checklist: Checklist;
   links: Record<ReadinessFix, string | null>;
-  /** A single client has room to show the list; a list of them does not. */
-  defaultOpen?: boolean;
 }) {
   const complete = checklist.done === checklist.total;
   return (
-    <Accordion
-      type="single"
-      collapsible
-      defaultValue={defaultOpen ? "checklist" : undefined}
-    >
+    <Accordion type="single" collapsible>
       <AccordionItem value="checklist" border="none">
         <AccordionTrigger appearance="compact">
           <span className="flex flex-1 items-baseline justify-between gap-3">

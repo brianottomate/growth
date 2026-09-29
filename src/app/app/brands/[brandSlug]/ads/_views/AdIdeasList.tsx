@@ -1,6 +1,7 @@
 import type { AdContent } from "@/server/db/schema";
 import { ideaDocumentFromAd } from "@/lib/ad-idea-studio";
 import { isImportedMetaCatalog } from "@/lib/meta-import";
+import type { MetaPlacement } from "@/lib/meta-placement-plan";
 import { AdIdeaCard } from "./AdIdeaCard";
 
 // The list files every ad under its creative type, the way a shared drive
@@ -39,6 +40,7 @@ export function AdIdeasList({
   brandId,
   brandName,
   brandLogo,
+  metaPlacements,
   states,
   fallback,
 }: {
@@ -48,6 +50,8 @@ export function AdIdeasList({
   brandId: string;
   brandName: string;
   brandLogo: string | null;
+  /** The Meta campaign's placements; null when the campaign skips Meta. */
+  metaPlacements: MetaPlacement[] | null;
   states: Record<string, string>;
   fallback: (id: string) => React.ReactNode;
   ads: {
@@ -105,6 +109,7 @@ export function AdIdeasList({
         brandId={brandId}
         brandName={brandName}
         brandLogo={brandLogo}
+        metaPlacements={metaPlacements}
         deliveryState={states[ad.id]}
         ad={{
           id: ad.id,

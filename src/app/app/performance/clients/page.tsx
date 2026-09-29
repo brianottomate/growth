@@ -168,7 +168,7 @@ function ClientRow({
               url={brand.intakeUrl}
               viewHref={
                 intake
-                  ? `/app/performance/brands/${brand.slug ?? brand.id}/submission`
+                  ? `/app/performance/brands/${brand.slug ?? brand.id}#submission`
                   : undefined
               }
               viewLabel="View submission"

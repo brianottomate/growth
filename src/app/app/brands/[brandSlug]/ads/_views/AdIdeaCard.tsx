@@ -4,7 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { ideaImagesSaved, ideaSource } from "@/lib/ad-idea-studio";
 import { sendAssistantIntent } from "@/lib/assistant-events";
-import { MessageSquare } from "lucide-react";
+import { Check, MessageSquare, Scaling } from "lucide-react";
+import { cn } from "@/components/ui/lib/utils";
+import {
+  metaPlacementFits,
+  type MetaPlacement,
+} from "@/lib/meta-placement-plan";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
@@ -64,6 +69,7 @@ export function AdIdeaCard({
   brandId,
   brandName,
   brandLogo,
+  metaPlacements,
   deliveryState,
 }: {
   ad: StudioAd;
@@ -71,6 +77,7 @@ export function AdIdeaCard({
   brandId: string;
   brandName: string;
   brandLogo: string | null;
+  metaPlacements: MetaPlacement[] | null;
   deliveryState?: string;
 }) {
   const router = useRouter();
@@ -371,6 +378,14 @@ export function AdIdeaCard({
               {deliveryState ? ` · ${deliveryState}` : ""}
             </span>
             {save.isPending && <span>· Saving…</span>}
+            {metaPlacements ? (
+              <PlacementFits
+                fits={metaPlacementFits(metaPlacements, {
+                  carousel: !isStatic,
+                  hasStory: savedState.document.shapes.includes("story"),
+                })}
+              />
+            ) : null}
             {ad.content.metaImport && <span aria-hidden="true">·</span>}
             {ad.content.metaImport && (
               <Dialog>
@@ -1180,5 +1195,48 @@ export function AdIdeaCard({
         }}
       />
     </article>
+  );
+}
+
+const PLACEMENT_KIND_LABELS = {
+  feed: "Feeds",
+  story: "Stories",
+  reel: "Reels",
+} as const;
+const PLACEMENT_FIT_NOTES = {
+  made: "Designed for this placement",
+  fitted: "Meta fits the feed cards into this placement",
+  missing: "No 9:16 artwork: this placement will not run it",
+} as const;
+
+/** Where the ad runs on Meta, at a glance: made for it, fitted, or missing. */
+function PlacementFits({
+  fits,
+}: {
+  fits: ReturnType<typeof metaPlacementFits>;
+}) {
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1">
+      {fits.map(({ kind, fit }) => (
+        <span
+          key={kind}
+          title={PLACEMENT_FIT_NOTES[fit]}
+          className={cn(
+            "inline-flex items-center gap-1 rounded-full border px-2 py-0.5",
+            fit === "made" && "text-foreground",
+            fit === "missing" && "border-dashed line-through",
+          )}
+        >
+          {fit === "made" ? (
+            <Check aria-hidden="true" className="size-3" />
+          ) : fit === "fitted" ? (
+            <Scaling aria-hidden="true" className="size-3" />
+          ) : null}
+          {PLACEMENT_KIND_LABELS[kind]}
+          {fit === "fitted" ? " · fitted by Meta" : ""}
+          <span className="sr-only">: {PLACEMENT_FIT_NOTES[fit]}</span>
+        </span>
+      ))}
+    </span>
   );
 }

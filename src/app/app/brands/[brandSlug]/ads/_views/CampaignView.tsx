@@ -8,6 +8,7 @@ import { workspaceActor } from "@/server/workspace-actor";
 import { starterGenerationStatus } from "@/server/services/starter-ad-generation.service";
 import { listBrandHomes } from "@/server/services/homes.service";
 import { isImportedMetaCatalog } from "@/lib/meta-import";
+import { META_DEFAULT_PLACEMENTS } from "@/lib/meta-placement-plan";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
@@ -141,6 +142,10 @@ export async function CampaignView({
     a.platform.localeCompare(b.platform),
   );
   const plannedPlatforms = planned.map((row) => row.platform);
+  const metaPlan = planned.find((row) => row.platform === "meta_ads");
+  const metaPlacements = metaPlan
+    ? (metaPlan.settings?.meta?.placements ?? META_DEFAULT_PLACEMENTS)
+    : null;
   const pushed = planned.filter((row) => row.externalId);
   const anyPushed = pushed.length > 0;
   const anyLive = planned.some((row) => row.status === "live");
@@ -316,6 +321,7 @@ export async function CampaignView({
           brandId={brand.id}
           brandName={brandName}
           brandLogo={brand.logo}
+          metaPlacements={metaPlacements}
           states={states}
           fallback={(id) => (
             <ul>

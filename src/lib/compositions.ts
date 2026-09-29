@@ -120,14 +120,14 @@ export const COMPOSITION_TEMPLATES = [
   },
   {
     id: "tall-statement",
-    version: 4,
+    version: 5,
     label: "Tall · statement",
     description:
       "Logo and a centred headline high on the photo, a quiet call to action at the base. Stories and Reels.",
   },
   {
     id: "tall-welcome",
-    version: 1,
+    version: 2,
     label: "Tall · welcome",
     description:
       "Left-set headline and supporting line under the logo, a pill button at the base.",

@@ -13,6 +13,7 @@ import {
   metaPromotedObjectFor,
   tagMetaAdUtms,
   videoPayloadFor,
+  withMetaAttribution,
 } from "@/server/services/ads-write.service";
 import { metaCallToActionType } from "@/lib/zernio-ads";
 import type { CreateZernioStandaloneAdInput } from "@/server/clients/zernio.client";
@@ -660,5 +661,29 @@ describe("metaCallToActionType", () => {
   it("sends Meta's Book now button, never the type Ads Manager reads as Unknown", () => {
     expect(metaCallToActionType("BOOK_NOW")).toBe("BOOK_TRAVEL");
     expect(metaCallToActionType("LEARN_MORE")).toBe("LEARN_MORE");
+  });
+});
+
+describe("withMetaAttribution", () => {
+  const base = {
+    accountId: "acc",
+    adAccountId: "act_1",
+    name: "Ad",
+    goal: "conversions" as const,
+    headline: "Stay",
+    body: "Book direct",
+  };
+
+  it("gives every new ad set 7-day click and 1-day view", () => {
+    expect(withMetaAttribution(base).attributionSpec).toEqual([
+      { eventType: "CLICK_THROUGH", windowDays: 7 },
+      { eventType: "VIEW_THROUGH", windowDays: 1 },
+    ]);
+  });
+
+  it("sends no window on an attach, which Zernio refuses", () => {
+    expect(
+      withMetaAttribution({ ...base, adSetId: "123" }).attributionSpec,
+    ).toBeUndefined();
   });
 });

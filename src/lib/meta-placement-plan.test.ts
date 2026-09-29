@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   META_DEFAULT_PLACEMENTS,
+  metaPlacementFits,
   metaPlacementMedia,
   metaProviderPlacements,
 } from "./meta-placement-plan";
@@ -237,5 +238,32 @@ describe("Meta source reconstruction", () => {
     });
     expect(parsed.carousel).toBe(true);
     expect(parsed.hashes).toEqual(["b", "a"]);
+  });
+});
+
+describe("metaPlacementFits", () => {
+  it("marks a carousel's stories and reels as fitted by Meta", () => {
+    expect(
+      metaPlacementFits(META_DEFAULT_PLACEMENTS, {
+        carousel: true,
+        hasStory: false,
+      }),
+    ).toEqual([
+      { kind: "feed", fit: "made" },
+      { kind: "story", fit: "fitted" },
+      { kind: "reel", fit: "fitted" },
+    ]);
+  });
+
+  it("needs a 9:16 before a static reaches stories", () => {
+    expect(
+      metaPlacementFits(["instagram-feed", "instagram-story"], {
+        carousel: false,
+        hasStory: false,
+      }),
+    ).toEqual([
+      { kind: "feed", fit: "made" },
+      { kind: "story", fit: "missing" },
+    ]);
   });
 });

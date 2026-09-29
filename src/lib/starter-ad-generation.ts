@@ -42,6 +42,15 @@ export const generatedHomeSchema = z.object({
 });
 export type GeneratedHome = z.infer<typeof generatedHomeSchema>;
 
+/** Slides in a generated home carousel: the opener, a detail, the close. */
+export const HOME_CAROUSEL_SLIDES = 3;
+
+/** Past the count, drop detail slides; the opener and the close stay. */
+export function trimHomeCards<T>(cards: T[], max: number): T[] {
+  if (cards.length <= max) return cards;
+  return [...cards.slice(0, max - 1), cards.at(-1)!];
+}
+
 /** Only selected, real photos can become editable ad cards. */
 export function generatedDocument(
   home: StarterHome,

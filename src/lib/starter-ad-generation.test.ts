@@ -1,5 +1,9 @@
-import { expect, test } from "bun:test";
-import { generatedDocument, type GeneratedHome } from "./starter-ad-generation";
+import { describe, expect, it, test } from "bun:test";
+import {
+  generatedDocument,
+  trimHomeCards,
+  type GeneratedHome,
+} from "./starter-ad-generation";
 
 const home = {
   id: "home",
@@ -113,4 +117,18 @@ test("starter compositions follow ad roles instead of model-selected templates",
   );
   expect(single.cards[0]?.recipe.templateId).toBe("hero-overlay");
   expect(single.cards[0]?.overrides.story?.templateId).toBe("tall-statement");
+});
+
+describe("trimHomeCards", () => {
+  it("keeps the opener and the close when the model returns too many", () => {
+    expect(trimHomeCards(["hero", "a", "b", "c", "close"], 3)).toEqual([
+      "hero",
+      "a",
+      "close",
+    ]);
+  });
+
+  it("leaves a carousel at or under the count alone", () => {
+    expect(trimHomeCards(["hero", "close"], 3)).toEqual(["hero", "close"]);
+  });
 });

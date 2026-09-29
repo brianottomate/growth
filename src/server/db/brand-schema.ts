@@ -220,8 +220,8 @@ export type PerformanceSettings = {
   agreedAdSpend?: number | null;
   /** The catalog card every home uses unless it has its own. */
   catalogTemplateId?: import("@/lib/catalog-studio").CatalogTemplateId | null;
-  /** The canvas the catalog is drawn and exported at; null means 4:5. */
-  catalogFormatId?: import("@/lib/catalog-studio").CatalogFormatId | null;
+  /** Retired: catalogs are square. Old rows still carry "portrait". */
+  catalogFormatId?: "portrait" | "square" | null;
   updatedAt?: string;
   updatedBy?: string | null;
   /** What last wrote here: the intake being applied, a person, or the agent. */

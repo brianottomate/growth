@@ -88,7 +88,8 @@ export function AddStarterIdeasButton({ campaignId }: { campaignId: string }) {
         <Plus className="size-3" />
         Add starter ad ideas
       </Button>
-      {progress.data && (
+      {/* A finished run has nothing left to say: its ideas are the list. */}
+      {progress.data && (generating || progress.data.status === "error") && (
         <div
           role="status"
           aria-live="polite"

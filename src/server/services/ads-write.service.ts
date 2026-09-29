@@ -680,6 +680,29 @@ export function tagMetaAdUtms(
   };
 }
 
+/**
+ * The attribution window every ad set we create reports and optimises on:
+ * 7-day click, 1-day view, the performance team's standard. Left to Meta, a
+ * new ad set came out 7-day click only (Hollyhock, 2026-09-29).
+ */
+export const META_ATTRIBUTION_SPEC: NonNullable<
+  CreateZernioStandaloneAdInput["attributionSpec"]
+> = [
+  { eventType: "CLICK_THROUGH", windowDays: 7 },
+  { eventType: "VIEW_THROUGH", windowDays: 1 },
+];
+
+/** A create gets the house window; an attach joins an ad set that has one. */
+export function withMetaAttribution(
+  payload: CreateZernioStandaloneAdInput,
+): CreateZernioStandaloneAdInput {
+  if (payload.adSetId) return { ...payload, attributionSpec: undefined };
+  return {
+    ...payload,
+    attributionSpec: payload.attributionSpec ?? META_ATTRIBUTION_SPEC,
+  };
+}
+
 /** The only way this service creates a Meta ad. Validates, then sends. */
 async function createMetaAd(
   payload: CreateZernioStandaloneAdInput,
@@ -690,10 +713,9 @@ async function createMetaAd(
     carouselSeedBudget?: number;
   },
 ) {
-  const tagged = tagMetaAdUtms({
-    ...payload,
-    pageId: options.pageId ?? undefined,
-  });
+  const tagged = tagMetaAdUtms(
+    withMetaAttribution({ ...payload, pageId: options.pageId ?? undefined }),
+  );
   assertMetaAdPayload(tagged, options.adAccount);
   return createZernioStandaloneAd(tagged, {
     idempotencyKey: options.idempotencyKey,

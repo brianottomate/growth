@@ -1269,6 +1269,15 @@ export type CreateZernioStandaloneAdInput = {
    * https://docs.zernio.com/platforms/meta-ads/tracking-tags
    */
   tracking?: { urlTags?: Array<{ key: string; value: string }> };
+  /**
+   * Meta only: the ad set's `attribution_spec`. Honoured on conversion goals,
+   * ignored on the rest, refused on the attach shape. Omitted, Meta picks.
+   * https://docs.zernio.com/ad-campaigns/create-standalone-ad
+   */
+  attributionSpec?: Array<
+    | { eventType: "CLICK_THROUGH"; windowDays: 7 | 28 }
+    | { eventType: "VIEW_THROUGH" | "ENGAGED_VIDEO_VIEW"; windowDays: 1 }
+  >;
   /** Meta only: one asset per placement on a single-image ad. */
   placementAssets?: ZernioPlacementAssets;
   placements?: ZernioPlacementAssets["rules"][number]["placements"];
