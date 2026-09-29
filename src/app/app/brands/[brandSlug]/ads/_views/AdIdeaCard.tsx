@@ -78,17 +78,6 @@ export function AdIdeaCard({
   const imagesSaved = Boolean(
     ad.content.ideaStudio && ideaImagesSaved(ad.content.ideaStudio),
   );
-  // The images are saved in the background after Approve; look again until
-  // they land, for a couple of minutes at most.
-  const [savePolls, setSavePolls] = useState(0);
-  useEffect(() => {
-    if (!approved || imagesSaved || savePolls >= 20) return;
-    const timer = setTimeout(() => {
-      setSavePolls((n) => n + 1);
-      router.refresh();
-    }, 6000);
-    return () => clearTimeout(timer);
-  }, [approved, imagesSaved, savePolls, router]);
   const [view, setView] = useState<"overview" | "details" | "platform">(() =>
     !approved && ideaDocumentFromAd(ad).cards.length === 0
       ? "details"
@@ -375,7 +364,7 @@ export function AdIdeaCard({
               {approved
                 ? imagesSaved
                   ? "Approved · images saved"
-                  : "Approved · saving images…"
+                  : "Approved"
                 : ad.content.metaImport
                   ? "Needs local review"
                   : "Draft idea"}

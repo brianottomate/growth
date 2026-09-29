@@ -1,6 +1,5 @@
 import { projectIdea, type IdeaShape } from "@/lib/ad-idea-studio";
-import { after } from "next/server";
-import { freezeApprovedAd, transitionAdApproval } from "./ad-approval.service";
+import { transitionAdApproval } from "./ad-approval.service";
 import "server-only";
 
 import { and, eq, inArray, isNull } from "drizzle-orm";
@@ -1414,25 +1413,11 @@ export async function setAdStatus(input: {
       throw new Error(
         "Review the ad and supply expectedUpdatedAt before changing approval.",
       );
-    const result = await transitionAdApproval({
+    return transitionAdApproval({
       ...input,
       userId: input.userId,
       expectedUpdatedAt: input.expectedUpdatedAt,
     });
-    // Approve is instant; the images are saved right after, so a push finds
-    // them ready. Outside a request (a script) the push saves them instead.
-    if (result.status === "approved") {
-      try {
-        after(() =>
-          freezeApprovedAd(ad.id).catch((error) =>
-            console.error("background image save failed", ad.id, error),
-          ),
-        );
-      } catch {
-        // No request scope.
-      }
-    }
-    return result;
   }
   await db
     .update(adTable)
