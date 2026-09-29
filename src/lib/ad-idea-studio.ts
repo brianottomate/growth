@@ -225,6 +225,16 @@ export function ideaSource(card: IdeaImage, shape: IdeaShape) {
   const override = card.sourceOverrides?.[shape];
   return override === undefined ? card.source : override;
 }
+/** An approved idea whose every size has its saved images. */
+export function ideaImagesSaved(studio: IdeaStudio) {
+  const { document, approval } = studio;
+  return Boolean(
+    approval &&
+    document.shapes.every(
+      (shape) => approval.renders[shape]?.length === document.cards.length,
+    ),
+  );
+}
 export function ideaAwaitingArtwork(document: IdeaDocument) {
   return document.cards.some((card) =>
     document.shapes.some((shape) => ideaSource(card, shape) === null),

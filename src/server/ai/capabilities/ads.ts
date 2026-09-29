@@ -1760,7 +1760,7 @@ export const attachAdSetAction = growthAction({
 export const setAdStatusAction = growthAction({
   outputSchema: setAdStatusActionOutputSchema,
   description:
-    "Approve an ad, freezing image compositions into media assets, or reopen it as an editable draft. Supply expectedUpdatedAt from the latest read. This never publishes to a platform.",
+    "Approve an ad (a sign-off on copy and creative), or reopen it as an editable draft. Its images are saved in the background right after approval, and any still missing are saved at push. Supply expectedUpdatedAt from the latest read. This never publishes to a platform.",
   inputSchema: z.object({
     adId: z.string().min(1),
     status: z.enum(["drawn", "approved"]),

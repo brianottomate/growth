@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { ideaSource } from "@/lib/ad-idea-studio";
+import { ideaImagesSaved, ideaSource } from "@/lib/ad-idea-studio";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 import { MessageSquare } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -75,6 +75,20 @@ export function AdIdeaCard({
 }) {
   const router = useRouter();
   const approved = Boolean(ad.content.ideaStudio?.approval);
+  const imagesSaved = Boolean(
+    ad.content.ideaStudio && ideaImagesSaved(ad.content.ideaStudio),
+  );
+  // The images are saved in the background after Approve; look again until
+  // they land, for a couple of minutes at most.
+  const [savePolls, setSavePolls] = useState(0);
+  useEffect(() => {
+    if (!approved || imagesSaved || savePolls >= 20) return;
+    const timer = setTimeout(() => {
+      setSavePolls((n) => n + 1);
+      router.refresh();
+    }, 6000);
+    return () => clearTimeout(timer);
+  }, [approved, imagesSaved, savePolls, router]);
   const [view, setView] = useState<"overview" | "details" | "platform">(() =>
     !approved && ideaDocumentFromAd(ad).cards.length === 0
       ? "details"
@@ -359,10 +373,9 @@ export function AdIdeaCard({
             <span aria-hidden="true">·</span>
             <span>
               {approved
-                ? Object.keys(ad.content.ideaStudio?.approval?.renders ?? {})
-                    .length
+                ? imagesSaved
                   ? "Approved · images saved"
-                  : "Approved"
+                  : "Approved · saving images…"
                 : ad.content.metaImport
                   ? "Needs local review"
                   : "Draft idea"}

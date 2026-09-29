@@ -15,6 +15,7 @@ import {
   ideaExportShapesSchema,
   type IdeaShape,
   ideaAwaitingArtwork,
+  ideaImagesSaved,
   ideaPreviewUrl,
   projectIdea,
   type IdeaStudio,
@@ -111,6 +112,14 @@ async function renderApprovalExports(input: {
  * sign-off; the files are made when something needs real URLs (a push, a
  * platform preview), as the approver. Returns whether anything was frozen.
  */
+/** Whether every approved size of the ad has its saved images. */
+export async function approvedAdFrozen(adId: string): Promise<boolean> {
+  const ad = await db.query.adTable.findFirst({ where: eq(adTable.id, adId) });
+  if (!ad || !("media" in ad.content)) return false;
+  const studio = ad.content.ideaStudio;
+  return Boolean(studio?.approval && ideaImagesSaved(studio));
+}
+
 export async function freezeApprovedAd(adId: string): Promise<boolean> {
   const ad = await db.query.adTable.findFirst({ where: eq(adTable.id, adId) });
   if (!ad || !("media" in ad.content)) return false;
@@ -151,10 +160,16 @@ export async function freezeApprovedAd(adId: string): Promise<boolean> {
       .set({ ...next, updatedAt: new Date() })
       .where(and(eq(adTable.id, ad.id), eq(adTable.updatedAt, ad.updatedAt)))
       .returning({ id: adTable.id });
-    if (!saved)
+    if (!saved) {
+      for (const id of generated) await deleteMedia(id);
+      generated.length = 0;
+      // The background save after Approve and a push can race; whichever
+      // lands second finds the images already saved and has nothing to do.
+      if (await approvedAdFrozen(ad.id)) return false;
       throw new Error(
         `${ad.name} changed while its images were saved. Try again.`,
       );
+    }
   } catch (error) {
     for (const id of generated) await deleteMedia(id);
     throw error;

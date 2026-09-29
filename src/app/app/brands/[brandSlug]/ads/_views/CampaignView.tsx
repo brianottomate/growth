@@ -400,7 +400,10 @@ export async function CampaignView({
             actions={
               planned.length > 0 ? (
                 <PlanPlatformButton
+                  brandId={brand.id}
+                  brandName={brandName}
                   campaignId={campaign.id}
+                  campaignName={campaign.name}
                   planned={plannedPlatforms}
                 />
               ) : null
@@ -413,16 +416,13 @@ export async function CampaignView({
                 title="No platform yet"
                 description="Plan one to set its budget. Nothing reaches the platform until you push."
                 actions={
-                  <>
-                    <PlanPlatformButton
-                      campaignId={campaign.id}
-                      planned={plannedPlatforms}
-                    />
-                    {ask(
-                      "platforms",
-                      `Plan the platform and budget for “${campaign.name}”`,
-                    )}
-                  </>
+                  <PlanPlatformButton
+                    brandId={brand.id}
+                    brandName={brandName}
+                    campaignId={campaign.id}
+                    campaignName={campaign.name}
+                    planned={plannedPlatforms}
+                  />
                 }
               />
             ) : (

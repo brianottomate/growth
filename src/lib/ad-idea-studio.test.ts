@@ -8,6 +8,7 @@ import {
   ideaSource,
   withIdeaPool,
   ideaAwaitingArtwork,
+  ideaImagesSaved,
 } from "./ad-idea-studio";
 import type { IdeaDocument } from "./ad-idea-studio";
 import type { AdCreativeContent } from "@/server/db/ads-schema";
@@ -262,5 +263,34 @@ describe("Meta copy per card", () => {
 
   test("old documents without card copy still parse", () => {
     expect(ideaDocumentSchema.safeParse(draft()).success).toBe(true);
+  });
+});
+
+describe("saved approval images", () => {
+  test("an approval counts as saved only when every size has every card", () => {
+    const document = { ...draft(), shapes: ["portrait", "story"] as const };
+    const render = { assetId: "a", url: "https://cdn/x.png" };
+    const approval = {
+      approvedAt: "2026-09-29T00:00:00.000Z",
+      approvedBy: "user",
+      sourceVersion: "v1",
+      renders: { portrait: [render] },
+    };
+    expect(
+      ideaImagesSaved({
+        document: { ...document, shapes: [...document.shapes] },
+        approval,
+      }),
+    ).toBe(false);
+    expect(
+      ideaImagesSaved({
+        document: { ...document, shapes: [...document.shapes] },
+        approval: {
+          ...approval,
+          renders: { portrait: [render], story: [render] },
+        },
+      }),
+    ).toBe(true);
+    expect(ideaImagesSaved({ document: draft() })).toBe(false);
   });
 });
