@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { compositionImagePositionSchema } from "./compositions";
 import {
   IDEA_SHAPES,
   ideaDocumentSchema,
@@ -25,7 +26,7 @@ export const generatedCopySchema = z.object({
 const layoutSchema = z.object({
   title: z.string().min(1).max(65),
   subtitle: z.string().max(100),
-  imagePosition: z.enum(["top", "center", "bottom"]),
+  imagePosition: compositionImagePositionSchema,
 });
 export const generatedHomeSchema = z.object({
   copy: generatedCopySchema,

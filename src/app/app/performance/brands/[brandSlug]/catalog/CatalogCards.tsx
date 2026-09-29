@@ -30,7 +30,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MediaPickerDialog } from "@/app/app/content/[contentId]/MediaPickerDialog";
-import { COMPOSITION_FORMATS, COMPOSITION_TEMPLATES } from "@/lib/compositions";
+import {
+  COMPOSITION_FORMATS,
+  COMPOSITION_IMAGE_POSITIONS,
+  COMPOSITION_TEMPLATES,
+} from "@/lib/compositions";
 import {
   CATALOG_WRITE_PASSES,
   catalogArtworkIssues,
@@ -105,6 +109,7 @@ export function CatalogCards({
   );
   const [layout, setLayout] = useState<"grid" | "list">("list");
   const [details, setDetails] = useState<CatalogCard | null>(null);
+  const [gridExports, setGridExports] = useState<string[]>([]);
   const [library, setLibrary] = useState(false);
   /** A card whose photo is being swapped straight from its row, saved on pick. */
   const [picking, setPicking] = useState<CatalogCard | null>(null);
@@ -752,6 +757,24 @@ export function CatalogCards({
                       Open in media library
                     </a>
                   )}
+                  {Boolean(item.assets?.length) && (
+                    <button
+                      type="button"
+                      className="underline"
+                      aria-expanded={gridExports.includes(item.id)}
+                      onClick={() =>
+                        setGridExports((open) =>
+                          open.includes(item.id)
+                            ? open.filter((id) => id !== item.id)
+                            : [...open, item.id],
+                        )
+                      }
+                    >
+                      {gridExports.includes(item.id)
+                        ? "Show as row"
+                        : "Show all"}
+                    </button>
+                  )}
                 </div>
               </div>
               {item.error && (
@@ -766,20 +789,30 @@ export function CatalogCards({
                     : "Addresses and coordinates saved with this export."}
                 </p>
               )}
-              <div className="flex gap-3 overflow-x-auto">
+              <div
+                className={
+                  gridExports.includes(item.id)
+                    ? "grid grid-cols-[repeat(auto-fill,minmax(8rem,1fr))] gap-3"
+                    : "flex gap-3 overflow-x-auto"
+                }
+              >
                 {item.assets?.map((a) => (
                   <a
                     key={a.assetId}
                     href={a.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="w-32 shrink-0"
+                    className={
+                      gridExports.includes(item.id)
+                        ? "min-w-0"
+                        : "w-32 shrink-0"
+                    }
                   >
                     <img
                       src={a.url}
                       alt={`${a.name} · ${a.format}`}
                       loading="lazy"
-                      className="h-40 w-32 rounded bg-muted object-contain"
+                      className="aspect-square w-full rounded bg-muted object-contain"
                     />
                     <p className="mt-1 text-xs">
                       {a.name} · {a.format}
@@ -1121,7 +1154,7 @@ function CardEditor({
                 })
               }
             >
-              {["top", "center", "bottom"].map((p) => (
+              {COMPOSITION_IMAGE_POSITIONS.map((p) => (
                 <option key={p}>{p}</option>
               ))}
             </select>

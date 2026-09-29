@@ -453,6 +453,17 @@ const formatIds = COMPOSITION_FORMATS.map((format) => format.id) as [
 
 export const compositionFormatIdSchema = z.enum(formatIds);
 export const compositionTemplateIdSchema = z.enum(templateIds);
+/** Which side of the photo the cover crop keeps. */
+export const COMPOSITION_IMAGE_POSITIONS = [
+  "top",
+  "center",
+  "bottom",
+  "left",
+  "right",
+] as const;
+export const compositionImagePositionSchema = z.enum(
+  COMPOSITION_IMAGE_POSITIONS,
+);
 
 const compositionShape = {
   brandId: z.string().min(1),
@@ -467,7 +478,7 @@ const compositionShape = {
     .string()
     .regex(/^#[0-9a-fA-F]{6}$/)
     .optional(),
-  imagePosition: z.enum(["top", "center", "bottom"]).default("center"),
+  imagePosition: compositionImagePositionSchema.default("center"),
   /**
    * The point of the photo that must stay in frame, as percentages of its
    * width and height. Set by the art director from what the crop cut off;

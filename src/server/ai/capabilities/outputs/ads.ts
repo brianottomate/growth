@@ -1,4 +1,7 @@
-import { compositionTemplateIdSchema } from "@/lib/compositions";
+import {
+  compositionImagePositionSchema,
+  compositionTemplateIdSchema,
+} from "@/lib/compositions";
 import { campaignStatusEnum } from "@/server/db/ads-schema";
 import { audienceTypeEnum } from "@/server/db/ads-schema";
 import { platformCampaignStatusEnum } from "@/server/db/ads-schema";
@@ -220,7 +223,7 @@ const approvalSchema = z.strictObject({
 const portraitSchema = z.strictObject({
   cta: z.string(),
   eyebrow: z.string(),
-  imagePosition: z.enum(["top", "center", "bottom"]),
+  imagePosition: compositionImagePositionSchema,
   showLogo: z.boolean(),
   subtitle: z.string(),
   templateId: z.enum([
@@ -1211,7 +1214,7 @@ export const editCatalogCardActionOutputSchema = z.strictObject({
   title: z.string(),
   subtitle: z.string(),
   templateId: compositionTemplateIdSchema,
-  imagePosition: z.enum(["top", "center", "bottom"]),
+  imagePosition: compositionImagePositionSchema,
   showLogo: z.boolean(),
   included: z.boolean(),
 });

@@ -1,6 +1,7 @@
 import { contentStatusEnum } from "@/server/db/content-schema";
 import { channelPlatformEnum } from "@/server/db/channel-schema";
 import { z } from "zod";
+import { compositionImagePositionSchema } from "@/lib/compositions";
 import { jsonValueSchema } from "../../kernel/output";
 
 /** Shared wire records used across capability result contracts. */
@@ -67,7 +68,7 @@ export const cardsSchema = z.strictObject({
     })
     .optional(),
   homeId: z.string(),
-  imagePosition: z.enum(["top", "center", "bottom"]),
+  imagePosition: compositionImagePositionSchema,
   imageUrl: z.string(),
   included: z.boolean(),
   mode: z.enum(["compose", "finished"]).optional(),

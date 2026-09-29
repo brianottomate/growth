@@ -828,11 +828,13 @@ export function renderComposition(
   // same fraction of the canvas, which keeps it in frame whatever the ratio.
   const imagePosition = spec.focal
     ? `${spec.focal.x}% ${spec.focal.y}%`
-    : spec.imagePosition === "top"
-      ? "center top"
-      : spec.imagePosition === "bottom"
-        ? "center bottom"
-        : "center center";
+    : {
+        top: "center top",
+        center: "center center",
+        bottom: "center bottom",
+        left: "left center",
+        right: "right center",
+      }[spec.imagePosition];
   const scrim = scrimRgba(spec.scrim);
 
   let content: React.ReactNode;

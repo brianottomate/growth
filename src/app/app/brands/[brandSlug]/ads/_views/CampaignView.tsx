@@ -15,7 +15,8 @@ import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { Radio } from "lucide-react";
 
 import { db } from "@/server/db";
-import { platformAdTable } from "@/server/db/schema";
+import { homeTable, platformAdTable } from "@/server/db/schema";
+import { safeHomeUrl } from "@/lib/ad-preview-links";
 import { getSession } from "@/server/better-auth/server";
 import { campaignPrefillFromIntake } from "@/server/services/performance-intake.service";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
@@ -114,6 +115,21 @@ export async function CampaignView({
     campaignId,
   });
   const orderedHomes = await listBrandHomes(brand.id);
+  const adHomeIds = [
+    ...new Set(ads.flatMap((ad) => (ad.homeId ? [ad.homeId] : []))),
+  ];
+  const adHomes = adHomeIds.length
+    ? await db.query.homeTable.findMany({
+        where: inArray(homeTable.id, adHomeIds),
+        columns: { id: true, name: true, url: true },
+      })
+    : [];
+  const homeLinks = Object.fromEntries(
+    adHomes.flatMap((home) => {
+      const url = safeHomeUrl(home.url);
+      return url ? [[home.id, { name: home.name, url }]] : [];
+    }),
+  );
   const listings = await brandListings({
     id: brand.id,
     website: brand.website,
@@ -316,6 +332,7 @@ export async function CampaignView({
             ["queued", "processing"].includes(generation.status)
           }
           homeOrder={orderedHomes.map((home) => home.id)}
+          homeLinks={homeLinks}
           campaignId={campaign.id}
           ads={ads}
           brandId={brand.id}

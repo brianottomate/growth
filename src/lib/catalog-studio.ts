@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   COMPOSITION_FORMATS,
   compositionFormatIdSchema,
+  compositionImagePositionSchema,
   compositionTemplateIdSchema,
   type CompositionFormatId,
 } from "./compositions";
@@ -29,7 +30,7 @@ export const catalogCardSchema = z.object({
   templateId: compositionTemplateIdSchema,
   title: z.string().trim().min(1).max(120),
   subtitle: z.string().max(220),
-  imagePosition: z.enum(["top", "center", "bottom"]),
+  imagePosition: compositionImagePositionSchema,
   showLogo: z.boolean(),
   /** The home's guest rating out of 5, for the catalog-place pill. */
   rating: z.number().nullable().optional(),

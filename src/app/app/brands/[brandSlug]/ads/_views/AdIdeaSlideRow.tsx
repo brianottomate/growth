@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  COMPOSITION_IMAGE_POSITIONS,
   COMPOSITION_TEMPLATES,
   getCompositionFields,
   getCompositionFormat,
@@ -22,6 +23,7 @@ import {
   ideaEditorPreviewUrl,
   ideaRecipe,
   ideaSource,
+  patchIdeaRecipe,
 } from "@/lib/ad-idea-studio";
 import type { IdeaImage, IdeaRecipe, IdeaShape } from "@/lib/ad-idea-studio";
 
@@ -67,17 +69,7 @@ export function AdIdeaSlideRow({
   const updateCard = onChange;
   const recipe = ideaRecipe(card, shape);
   const updateRecipe = (patch: Partial<IdeaRecipe>) =>
-    updateCard((c) =>
-      c.overrides[shape]
-        ? {
-            ...c,
-            overrides: {
-              ...c.overrides,
-              [shape]: { ...ideaRecipe(c, shape), ...patch },
-            },
-          }
-        : { ...c, recipe: { ...c.recipe, ...patch } },
-    );
+    updateCard((c) => patchIdeaRecipe(c, shape, patch));
   const awaitingArtwork = ideaSource(card, shape) === null;
   const preview = frozenUrl ?? ideaEditorPreviewUrl(brandId, card, shape) ?? "";
   const [previewUrl, setPreviewUrl] = useState(preview);
@@ -392,7 +384,7 @@ export function AdIdeaSlideRow({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {["top", "center", "bottom"].map((p) => (
+                      {COMPOSITION_IMAGE_POSITIONS.map((p) => (
                         <SelectItem key={p} value={p}>
                           Crop focus: {p}
                         </SelectItem>

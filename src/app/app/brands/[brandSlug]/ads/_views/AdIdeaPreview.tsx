@@ -22,6 +22,7 @@ export function AdIdeaPreview({
   brandLogo,
   platform = false,
   content,
+  home,
 }: {
   studio: IdeaStudio;
   brandId: string;
@@ -29,6 +30,7 @@ export function AdIdeaPreview({
   brandLogo: string | null;
   platform?: boolean;
   content?: AdCreativeContent;
+  home?: { name: string; url: string };
 }) {
   const [cards, setCards] = useState<Partial<Record<MetaPlacement, number>>>(
     {},
@@ -81,6 +83,18 @@ export function AdIdeaPreview({
   const cta = copy.callToAction ? ctaLabel(copy.callToAction) : null;
   return (
     <div className="space-y-4">
+      {home && (
+        <a
+          href={home.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+        >
+          {home.name}
+          <ExternalLink aria-hidden="true" className="size-3" />
+          <span className="sr-only">(opens in a new tab)</span>
+        </a>
+      )}
       {platform ? (
         <>
           <p className="text-xs text-muted-foreground">

@@ -5,7 +5,10 @@ import type {
   AdPlacements,
   AdCard,
 } from "@/server/db/ads-schema";
-import { compositionTemplateIdSchema } from "./compositions";
+import {
+  compositionImagePositionSchema,
+  compositionTemplateIdSchema,
+} from "./compositions";
 
 export const IDEA_SHAPES = ["portrait", "square", "story", "wide"] as const;
 export const IDEA_SHAPE_LABELS = {
@@ -31,7 +34,7 @@ export const ideaRecipeSchema = z.object({
   eyebrow: z.string().max(40),
   cta: z.string().max(60),
   showLogo: z.boolean(),
-  imagePosition: z.enum(["top", "center", "bottom"]),
+  imagePosition: compositionImagePositionSchema,
 });
 export type IdeaRecipe = z.infer<typeof ideaRecipeSchema>;
 export const ideaCopySchema = z.object({
@@ -167,9 +170,10 @@ export function ideaDocumentFromAd(ad: {
         for (const key of ["title", "subtitle", "eyebrow", "cta"] as const)
           recipe[key] = p.get(key) ?? "";
         recipe.showLogo = p.get("mark") !== "none";
-        const position = p.get("imagePosition");
-        if (position === "top" || position === "bottom")
-          recipe.imagePosition = position;
+        const position = compositionImagePositionSchema.safeParse(
+          p.get("imagePosition"),
+        );
+        if (position.success) recipe.imagePosition = position.data;
         source = {
           url: p.get("sourceUrl") ?? media.url,
           assetId: p.get("sourceMediaAssetId") ?? undefined,
@@ -220,6 +224,22 @@ export function withIdeaPool(
 }
 export function ideaRecipe(card: IdeaImage, shape: IdeaShape) {
   return card.overrides[shape] ?? card.recipe;
+}
+/** Edits the recipe this size draws: its override when it has one. */
+export function patchIdeaRecipe(
+  card: IdeaImage,
+  shape: IdeaShape,
+  patch: Partial<IdeaRecipe>,
+): IdeaImage {
+  return card.overrides[shape]
+    ? {
+        ...card,
+        overrides: {
+          ...card.overrides,
+          [shape]: { ...ideaRecipe(card, shape), ...patch },
+        },
+      }
+    : { ...card, recipe: { ...card.recipe, ...patch } };
 }
 export function ideaSource(card: IdeaImage, shape: IdeaShape) {
   const override = card.sourceOverrides?.[shape];

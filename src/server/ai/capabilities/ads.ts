@@ -59,7 +59,10 @@ import {
   importMetaCampaignSchema,
 } from "@/server/services/meta-campaign-import.service";
 import { metaPlacementPlanSchema } from "@/lib/meta-placement-plan";
-import { compositionTemplateIdSchema } from "@/lib/compositions";
+import {
+  compositionImagePositionSchema,
+  compositionTemplateIdSchema,
+} from "@/lib/compositions";
 import { EM_DASH_MESSAGE, hasEmDash } from "@/lib/catalog-copy";
 import "server-only";
 import { ideaSaveSchema, ideaExportShapesSchema } from "@/lib/ad-idea-studio";
@@ -1627,7 +1630,7 @@ export const editCatalogCardAction = growthAction({
       .refine((text) => !hasEmDash(text), EM_DASH_MESSAGE)
       .optional(),
     templateId: compositionTemplateIdSchema.optional(),
-    imagePosition: z.enum(["top", "center", "bottom"]).optional(),
+    imagePosition: compositionImagePositionSchema.optional(),
     showLogo: z.boolean().optional(),
     included: z.boolean().optional(),
     pills: z

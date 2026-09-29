@@ -35,6 +35,7 @@ function groupOf(ad: {
 export function AdIdeasList({
   ads,
   homeOrder,
+  homeLinks,
   preparingHero,
   campaignId,
   brandId,
@@ -45,6 +46,7 @@ export function AdIdeasList({
   fallback,
 }: {
   homeOrder: string[];
+  homeLinks: Record<string, { name: string; url: string }>;
   preparingHero: boolean;
   campaignId: string;
   brandId: string;
@@ -111,6 +113,7 @@ export function AdIdeasList({
         brandLogo={brandLogo}
         metaPlacements={metaPlacements}
         deliveryState={states[ad.id]}
+        home={ad.homeId ? homeLinks[ad.homeId] : undefined}
         ad={{
           id: ad.id,
           name: ad.name,

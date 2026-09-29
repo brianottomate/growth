@@ -1,5 +1,7 @@
 import { after } from "next/server";
 import { starterGenerationSchema } from "@/lib/starter-ad-generation";
+import { compositionFormatIdSchema } from "@/lib/compositions";
+import { suggestImagePosition } from "@/server/services/image-crop.service";
 import {
   startStarterGeneration,
   runStarterGeneration,
@@ -82,6 +84,12 @@ export const adsRouter = {
   writeSetCopy: actionProcedure(writeSetCopyAction),
 
   saveIdea: actionProcedure(saveIdeaAction),
+  /** The AI's crop for a newly chosen photo at one ad size. */
+  suggestCrop: workspaceProcedure
+    .input(
+      z.object({ url: z.string().url(), formatId: compositionFormatIdSchema }),
+    )
+    .handler(async ({ input }) => suggestImagePosition(input)),
 
   starterIdeaHomes: workspaceProcedure
     .input(z.object({ campaignId: z.string().min(1) }))

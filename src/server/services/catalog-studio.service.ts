@@ -30,6 +30,7 @@ import {
 } from "@/lib/catalog-studio";
 import { brandWideAmenities } from "@/lib/catalog-copy";
 import {
+  COMPOSITION_IMAGE_POSITIONS,
   COMPOSITION_TEMPLATES,
   compositionTemplateIdSchema,
   type CompositionFormatId,
@@ -120,7 +121,9 @@ function overridesOf(
   const asset = (id: string | null) =>
     id && assets.get(id) ? { assetId: id, url: assets.get(id)! } : null;
   const template = compositionTemplateIdSchema.safeParse(row.catalogTemplateId);
-  const position = IMAGE_POSITIONS.find((p) => p === row.catalogImagePosition);
+  const position = COMPOSITION_IMAGE_POSITIONS.find(
+    (p) => p === row.catalogImagePosition,
+  );
   const finished = asset(row.catalogFinishedAssetId);
   return {
     title: row.catalogTitle,
@@ -141,7 +144,6 @@ function overridesOf(
     pills: row.catalogPills,
   };
 }
-const IMAGE_POSITIONS = ["top", "center", "bottom"] as const;
 
 /**
  * The brand's homes as the catalog reads them: the feed inventory for facts
