@@ -571,7 +571,7 @@ export const draftAdAction = growthAction({
         .max(255)
         .optional()
         .describe(
-          "creative only; required for it. Meta shows it beside the primary text, so never repeat the body's first line.",
+          "creative only; required for it. 20 to 40 characters, sentence case, one idea. Meta shows it beside the primary text, so never repeat the body's first line.",
         ),
       body: z
         .string()
@@ -1791,8 +1791,16 @@ export const setAdCopyAction = growthAction({
       .string()
       .max(60)
       .optional()
-      .describe("Never the primary text's first line; Meta shows both."),
-    body: z.string().max(1200).optional(),
+      .describe(
+        '20 to 40 characters, sentence case, one idea: what the stay offers, who it is for or a proof point ("Room for 18 in the Hocking Hills woods"). Never the primary text\'s first line; Meta shows both.',
+      ),
+    body: z
+      .string()
+      .max(1200)
+      .optional()
+      .describe(
+        "For one home: a hook naming the place and what sets the home apart with one emoji, four to six emoji bullets, the facts bullet, one sentence on who it is for, a short closing line, blank lines between the parts.",
+      ),
     description: z
       .string()
       .max(120)

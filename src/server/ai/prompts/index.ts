@@ -17,6 +17,7 @@ export * from "./campaign-audiences";
 export * from "./campaign-copy";
 export * from "./campaign-codename";
 export * from "./catalog-copy";
+export * from "./meta-ad-copy";
 export * from "./catalog-home";
 export * from "./catalog-quick-fix";
 export * from "./featured-homes";
