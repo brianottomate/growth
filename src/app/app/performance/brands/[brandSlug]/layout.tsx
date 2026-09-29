@@ -70,12 +70,6 @@ export default async function PerformanceBrandLayout({
               Open brand workspace
             </Link>
             <Link
-              href={`/app/performance/brands/${slug}/campaigns`}
-              className="hover:underline"
-            >
-              Paid campaigns
-            </Link>
-            <Link
               href={`/app/brands/${slug}/content`}
               className="hover:underline"
             >

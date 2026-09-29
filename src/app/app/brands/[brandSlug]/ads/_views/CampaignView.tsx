@@ -207,37 +207,22 @@ export async function CampaignView({
   return (
     <div className="space-y-8">
       <header className="space-y-3">
-        <WorkspaceBreadcrumbs
-          items={
-            // The Performance brand layout already crumbs Clients / brand,
-            // and the name is the title right below.
-            workspace === "performance"
-              ? [
-                  {
-                    label: "Paid campaigns",
-                    href: campaignListPath(brandSlug, workspace),
-                  },
-                ]
-              : [
-                  {
-                    label: "Brands",
-                    href: "/app/brands",
-                  },
-                  { label: brandName, href: `/app/brands/${brandSlug}` },
-                  {
-                    label: "Paid campaigns",
-                    href: campaignListPath(brandSlug, workspace),
-                  },
-                  { label: campaign.name },
-                ]
-          }
-        />
-        <Link
-          className="text-sm underline"
-          href={`${campaignPath(brandSlug, campaignId, workspace)}/by-home`}
-        >
-          Review by home
-        </Link>
+        {/* The Performance brand layout already crumbs Clients / brand and
+            its Campaigns tab is the way back, so only the brand workspace
+            needs a trail. */}
+        {workspace !== "performance" && (
+          <WorkspaceBreadcrumbs
+            items={[
+              { label: "Brands", href: "/app/brands" },
+              { label: brandName, href: `/app/brands/${brandSlug}` },
+              {
+                label: "Paid campaigns",
+                href: campaignListPath(brandSlug, workspace),
+              },
+              { label: campaign.name },
+            ]}
+          />
+        )}
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2.5">
