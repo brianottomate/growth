@@ -409,14 +409,22 @@ export function catalogExportRows(
 
 /** Never synthesize another size or apply a composition to supplied artwork. */
 export function catalogArtworkIssues(draft: CatalogDraft): string[] {
-  return draft.cards
-    .filter((c) => c.included && c.mode === "finished")
-    .flatMap((c) => {
-      if (!c.finishedArtwork) return [`${c.title}: choose finished artwork`];
-      return draft.formats.some((f) => f !== c.finishedArtwork!.format)
-        ? [
-            `${c.title}: finished artwork is available only in ${c.finishedArtwork.format}; export that size or switch to Compose`,
-          ]
-        : [];
-    });
+  const finished = draft.cards.filter(
+    (c) => c.included && c.mode === "finished",
+  );
+  const missing = finished.filter((c) => !c.finishedArtwork).length;
+  const wrongSize = finished.filter(
+    (c) =>
+      c.finishedArtwork &&
+      draft.formats.some((f) => f !== c.finishedArtwork!.format),
+  ).length;
+  const cards = (n: number) => `${n} card${n === 1 ? "" : "s"}`;
+  return [
+    ...(missing ? [`${cards(missing)} need finished artwork`] : []),
+    ...(wrongSize
+      ? [
+          `${cards(wrongSize)} have finished artwork in another size than this ${draft.formats.join(" + ")} catalog: upload it in that size or switch to Compose`,
+        ]
+      : []),
+  ];
 }

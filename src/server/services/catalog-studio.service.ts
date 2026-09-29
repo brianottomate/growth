@@ -20,6 +20,7 @@ import {
   catalogHeadlineIssue,
   catalogExportRows,
   type CatalogCard,
+  type CatalogDraft,
   type CatalogExport,
   type CatalogHome,
   type CatalogOverrides,
@@ -48,6 +49,7 @@ export async function catalogBrand(userId: string, brandId: string) {
     .select({
       id: brandTable.id,
       name: brandTable.name,
+      slug: brandTable.slug,
       website: brandTable.website,
       organizationId: memberTable.organizationId,
       settings: brandTable.performanceSettings,
@@ -720,7 +722,7 @@ export async function renderCatalogExport(
       .insert(mediaFolderTable)
       .values({
         brandId: brand.id,
-        name: `Catalog · ${new Date().toISOString().replaceAll(":", "-")} · ${run.id}`,
+        name: `Catalog · ${draft.formats.join(" + ")} · ${new Date().toISOString().slice(0, 19).replace("T", " ")} UTC`,
         description: "Frozen catalog export",
       })
       .returning();
@@ -749,7 +751,8 @@ export async function renderCatalogExport(
           ...catalogCardCopy(card),
           imagePosition: card.imagePosition,
           mark: card.showLogo ? ("auto" as const) : ("none" as const),
-          assetTitle: `${home.name} · ${format}`,
+          // The renderer appends the format to the filename.
+          assetTitle: `${home.name} · Catalog`,
         };
         // Everything the renderer draws from: an unchanged card reuses the
         // last export's image instead of drawing it again.
@@ -780,7 +783,7 @@ export async function renderCatalogExport(
               filename: finished.filename ?? undefined,
               width: finished.width ?? undefined,
               height: finished.height ?? undefined,
-              title: `${home.name} · ${format} · Finished artwork`,
+              title: `${home.name} · Catalog · Finished artwork`,
             })
           : reused
             ? // A copy, not the same row: deleting one export's image
@@ -789,10 +792,10 @@ export async function renderCatalogExport(
                 brandId: brand.id,
                 uploadedBy: userId,
                 url: reused.url!,
-                filename: reused.filename ?? undefined,
+                filename: `${spec.assetTitle}-${format}.${reused.filename?.split(".").pop() ?? "png"}`,
                 width: reused.width ?? undefined,
                 height: reused.height ?? undefined,
-                title: reused.title ?? spec.assetTitle,
+                title: spec.assetTitle,
               })
             : await freezeComposition({
                 userId,
@@ -895,7 +898,7 @@ export async function catalogExport(
   brandId: string,
   runId: string,
 ) {
-  await catalogBrand(userId, brandId);
+  const brand = await catalogBrand(userId, brandId);
   const run = await db.query.creativeRunTable.findFirst({
     where: and(
       eq(creativeRunTable.id, runId),
@@ -905,9 +908,15 @@ export async function catalogExport(
     ),
   });
   if (!run) throw new Error("Completed export not found");
-  return run.providerOutput as unknown as Required<
-    Pick<CatalogExport, "rows" | "assets" | "folderId">
-  >;
+  const { draft } = run.input as { draft: CatalogDraft };
+  return {
+    ...(run.providerOutput as unknown as Required<
+      Pick<CatalogExport, "rows" | "assets" | "folderId">
+    >),
+    brand,
+    formats: draft.formats,
+    createdAt: run.createdAt,
+  };
 }
 
 async function finishedCatalogAsset(brandId: string, assetId: string) {

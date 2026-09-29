@@ -18,7 +18,13 @@ export async function GET(
     const { brandId, runId } = await params;
     const snapshot = await catalogExport(session.user.id, brandId, runId);
     const format = new URL(request.url).searchParams.get("format") ?? "csv";
-    const filename = `catalog-${runId}.${format}`;
+    // hollyhock-suites-hotel-catalog-square-2026-09-29-2339.csv
+    const stamp = snapshot.createdAt
+      .toISOString()
+      .slice(0, 16)
+      .replace("T", "-")
+      .replace(":", "");
+    const filename = `${snapshot.brand.slug ?? snapshot.brand.id}-hotel-catalog-${snapshot.formats.join("-")}-${stamp}.${format}`;
     const headers = {
       "Content-Disposition": `attachment; filename="${filename}"`,
       "Cache-Control": "no-store",
@@ -43,7 +49,7 @@ export async function GET(
       });
     }
     if (format === "xml")
-      return new Response(hotelFeedXml(snapshot.rows, "Catalog"), {
+      return new Response(hotelFeedXml(snapshot.rows, snapshot.brand.name), {
         headers: { ...headers, "Content-Type": "application/xml" },
       });
     return new Response(hotelFeedCsv(snapshot.rows), {
