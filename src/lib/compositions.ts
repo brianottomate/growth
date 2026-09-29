@@ -235,14 +235,14 @@ export type CatalogCopyIntent = {
 export const CATALOG_COPY_INTENTS = {
   "catalog-place": {
     intent:
-      'An amenity-led card: "{lead} in {place}". The lead names the one or two amenities or features this home is chosen for ("Private sauna & hot tub", "Rooftop deck & skyline views"), and the place says where it is.',
+      'A place card: "{lead} in {place}". The lead names what a guest books this home for, in one of two shapes: one or two features ("Private sauna & hot tub", "Rooftop deck & skyline views"), or the kind of home with one feature ("Lodge with private pool", "Log cabin for two", "Loft with river views"). Use the second shape when the kind of home is part of the draw. The place says where it is.',
     headlineChars: 28,
     placeSuffix: true,
     pills: 0,
   },
   "catalog-place-plain": {
     intent:
-      'An amenity-led card: "{lead} in {place}". The lead names the one or two amenities or features this home is chosen for ("Private sauna & hot tub", "Rooftop deck & skyline views"), and the place says where it is.',
+      'A place card: "{lead} in {place}". The lead names what a guest books this home for, in one of two shapes: one or two features ("Private sauna & hot tub", "Rooftop deck & skyline views"), or the kind of home with one feature ("Lodge with private pool", "Log cabin for two", "Loft with river views"). Use the second shape when the kind of home is part of the draw. The place says where it is.',
     headlineChars: 28,
     placeSuffix: true,
     pills: 0,
