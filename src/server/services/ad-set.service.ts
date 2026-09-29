@@ -77,6 +77,7 @@ import { ensureHome, setHomeHero } from "./homes.service";
 import { importImageBuffer } from "./media.service";
 import { pickHeroPhoto } from "./hero-pick.service";
 import { brandListings, brandWebsiteId } from "./wanderos-listings.service";
+import { videoAdCardFor } from "@/server/services/video-delivery.service";
 
 // Building the set a Performance client actually runs.
 //
@@ -378,10 +379,14 @@ async function deriveStory(input: {
 }): Promise<AdPlacementVariant> {
   const { brand, card } = input;
   if (card.type === "video") {
-    throw new AdSetError(
-      422,
-      "A story cut of a video is uploaded, not derived",
-    );
+    const cut = await videoAdCardFor(card);
+    if (!cut?.story) {
+      throw new AdSetError(
+        422,
+        "This video has no 9:16 rendition. Upload a vertical cut, or wait for its renditions to finish.",
+      );
+    }
+    return cut.story;
   }
   // A card drawn by the preview route is re-drawn on the story canvas by
   // changing one parameter; nothing to render or store.
@@ -1095,6 +1100,11 @@ export async function createAdsFromAssets(input: {
         ? ("video" as const)
         : group.format;
     const guessedHome = !listing && label && label !== group.cards[0]?.name;
+    // A library video brings its own 4:5 feed card and 9:16 story.
+    const videoCard =
+      format === "video" && !group.story
+        ? await videoAdCardFor(group.cards[0]!.item)
+        : null;
     const content: AdCreativeContent = {
       format,
       headline: group.headline ?? label ?? brand.name,
@@ -1104,12 +1114,14 @@ export async function createAdsFromAssets(input: {
       // the ad under that name on the wall.
       ...(guessedHome ? { propertyName: label } : {}),
       callToAction: PERFORMANCE_AD_DEFAULTS.callToAction,
-      media: group.cards.map((card, index) => ({
-        ...card.item,
-        ...(index === 0 && group.story
-          ? { story: { ...group.story.item, via: "upload" as const } }
-          : {}),
-      })),
+      media: videoCard
+        ? [videoCard]
+        : group.cards.map((card, index) => ({
+            ...card.item,
+            ...(index === 0 && group.story
+              ? { story: { ...group.story.item, via: "upload" as const } }
+              : {}),
+          })),
     };
     const [row] = await db
       .insert(adTable)

@@ -14,6 +14,7 @@ import {
   tagMetaAdUtms,
   videoPayloadFor,
   withMetaAttribution,
+  metaPlacementAssetsFor,
 } from "@/server/services/ads-write.service";
 import { metaCallToActionType } from "@/lib/zernio-ads";
 import type { CreateZernioStandaloneAdInput } from "@/server/clients/zernio.client";
@@ -684,6 +685,72 @@ describe("withMetaAttribution", () => {
   it("sends no window on an attach, which Zernio refuses", () => {
     expect(
       withMetaAttribution({ ...base, adSetId: "123" }).attributionSpec,
+    ).toBeUndefined();
+  });
+});
+
+describe("metaPlacementAssetsFor", () => {
+  const plan = ["facebook-feed", "instagram-feed", "instagram-reel"] as const;
+  it("pins a video ad's 9:16 cut to Reels in an all-video block", () => {
+    const assets = metaPlacementAssetsFor(
+      {
+        format: "video",
+        headline: "Falls",
+        body: "A hidden chalet",
+        media: [
+          {
+            type: "video",
+            url: "https://r2.test/feed.mp4",
+            thumbnail: "https://r2.test/feed.jpg",
+            story: {
+              type: "video",
+              url: "https://r2.test/delivery.mp4",
+              thumbnail: "https://r2.test/delivery.jpg",
+              via: "crop",
+            },
+          },
+        ],
+      },
+      [...plan],
+    );
+    expect(assets).toEqual({
+      defaultVideoUrl: "https://r2.test/feed.mp4",
+      defaultThumbnailUrl: "https://r2.test/feed.jpg",
+      rules: [
+        {
+          videoUrl: "https://r2.test/delivery.mp4",
+          thumbnailUrl: "https://r2.test/delivery.jpg",
+          placements: {
+            publisherPlatforms: ["instagram"],
+            instagramPositions: ["reels"],
+          },
+        },
+      ],
+    });
+    expect(JSON.stringify(assets)).not.toContain("imageUrl");
+  });
+
+  it("sends no block for a video whose story is a still", () => {
+    expect(
+      metaPlacementAssetsFor(
+        {
+          format: "video",
+          headline: "Falls",
+          body: "A hidden chalet",
+          media: [
+            {
+              type: "video",
+              url: "https://r2.test/feed.mp4",
+              story: {
+                type: "image",
+                url: "https://r2.test/story.jpg",
+                via: "upload",
+              },
+            },
+          ],
+        },
+        [...plan],
+      ),
     ).toBeUndefined();
   });
 });

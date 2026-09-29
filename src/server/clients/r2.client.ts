@@ -5,6 +5,7 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { readFile } from "node:fs/promises";
 
 import { env } from "@/env";
 
@@ -90,6 +91,11 @@ export function r2BuildThumbnailKey(
   extension = "webp",
 ): string {
   return `${originalKey}.thumb.${extension}`;
+}
+
+/** Key for a server-made rendition of a library video, e.g. `.delivery.mp4`. */
+export function r2BuildRenditionKey(originalKey: string, name: string): string {
+  return `${originalKey}.${name}`;
 }
 
 /**
@@ -264,6 +270,25 @@ export async function r2PutBuffer(
   return r2PublicUrl(key);
 }
 
+/** Server-side: PUT a local file (a rendition, tens of MB) to R2; returns the public URL. */
+export async function r2PutFile(
+  key: string,
+  path: string,
+  contentType: string,
+): Promise<{ url: string; size: number }> {
+  // Buffered on purpose: the SDK's stream body drops the socket under Bun.
+  const body = await readFile(path);
+  await getClient().send(
+    new PutObjectCommand({
+      Bucket: env.R2_BUCKET,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+    }),
+  );
+  return { url: r2PublicUrl(key), size: body.byteLength };
+}
+
 /**
  * Server-side: fetch bytes from a URL and PUT them to R2; returns public URL.
  *
@@ -316,6 +341,7 @@ export const R2 = {
   buildKey: r2BuildKey,
   buildThumbnailKey: r2BuildThumbnailKey,
   buildStoryboardKey: r2BuildStoryboardKey,
+  buildRenditionKey: r2BuildRenditionKey,
   buildStoryboardManifestKey: r2BuildStoryboardManifestKey,
   analysisKeyPrefix: r2AnalysisKeyPrefix,
   buildAnalysisKey: r2BuildAnalysisKey,
@@ -326,6 +352,7 @@ export const R2 = {
   presignPut: r2PresignPut,
   head: r2Head,
   putBuffer: r2PutBuffer,
+  putFile: r2PutFile,
   putFromUrl: r2PutFromUrl,
   needsRehost,
   delete: r2Delete,

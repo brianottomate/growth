@@ -8,6 +8,7 @@ import {
   metaPlacementPlanSchema,
   metaPlacementMedia,
   metaProviderPlacements,
+  type MetaPlacement,
 } from "@/lib/meta-placement-plan";
 import { ideaAwaitingArtwork } from "@/lib/ad-idea-studio";
 import { META_URL_TAGS } from "@/lib/ad-utm";
@@ -2149,6 +2150,43 @@ function isVideoContent(content: AdCreativeContent) {
  * The thumbnail comes from the media item; refusing here (by name) beats a
  * platform rejection after approval.
  */
+/**
+ * One ad, two files: the baseline for every placement, the 9:16 pinned to
+ * stories and reels. Meta's asset customization, which is how Brooke builds
+ * it by hand. A carousel's cards are the carousel's, so singles only.
+ */
+export function metaPlacementAssetsFor(
+  content: AdCreativeContent,
+  placementPlan: MetaPlacement[],
+): ZernioPlacementAssets | undefined {
+  const card = content.media[0];
+  if (!card || content.media.length !== 1) return undefined;
+  if (!card.story || !placementPlan.some((p) => !isFeedPlacement(p)))
+    return undefined;
+  const placements = metaProviderPlacements(
+    placementPlan.filter((p) => !isFeedPlacement(p)),
+  );
+  // Zernio takes an all-image or all-video block, never mixed.
+  if (card.type === "video") {
+    if (card.story.type !== "video") return undefined;
+    return {
+      defaultVideoUrl: card.url,
+      defaultThumbnailUrl: card.thumbnail,
+      rules: [
+        {
+          videoUrl: card.story.url,
+          thumbnailUrl: card.story.thumbnail,
+          placements,
+        },
+      ],
+    };
+  }
+  return {
+    defaultImageUrl: card.url,
+    rules: [{ imageUrl: card.story.url, placements }],
+  };
+}
+
 export function videoPayloadFor(adName: string, content: AdCreativeContent) {
   const lead = content.media[0]!;
   // A poster-less clip used to arrive with its own url as the "thumbnail",
@@ -2873,29 +2911,13 @@ async function pushToMeta(args: PushArgs) {
    * stories and reels. Meta's asset customization, which is how Brooke builds
    * it by hand. Statics only; a carousel's cards are the carousel's.
    */
-  const placementAssetsFor = (
-    content: AdCreativeContent,
-  ): ZernioPlacementAssets | undefined => {
-    const card = content.media[0];
-    if (!card || content.media.length !== 1 || card.type === "video") {
-      return undefined;
-    }
-    if (!card.story || !placementPlan.some((p) => !isFeedPlacement(p)))
-      return undefined;
-    return {
-      defaultImageUrl: card.url,
-      rules: [
-        {
-          imageUrl: card.story.url,
-          placements: {
-            ...metaProviderPlacements(
-              placementPlan.filter((p) => !isFeedPlacement(p)),
-            ),
-          },
-        },
-      ],
-    };
-  };
+  const placementAssetsFor = (content: AdCreativeContent) =>
+    metaPlacementAssetsFor(content, placementPlan);
+
+  const singleMediaFor = (ad: Ad, content: AdCreativeContent) =>
+    isVideoContent(content)
+      ? { video: videoPayloadFor(ad.name, content) }
+      : { imageUrl: content.media[0]!.url };
 
   /**
    * How a set's ads split across Meta's create shapes. The multi-creative
@@ -3013,7 +3035,7 @@ async function pushToMeta(args: PushArgs) {
             ...(shape === "carousel"
               ? { carouselCards: carouselCardsFor(lead.content) }
               : {
-                  imageUrl: lead.content.media[0]!.url,
+                  ...singleMediaFor(lead.ad, lead.content),
                   placementAssets: placementAssetsFor(lead.content),
                 }),
           }),
@@ -3057,7 +3079,7 @@ async function pushToMeta(args: PushArgs) {
           ...(isCarousel(content)
             ? { carouselCards: carouselCardsFor(content) }
             : {
-                imageUrl: content.media[0]!.url,
+                ...singleMediaFor(ad, content),
                 placementAssets: placementAssetsFor(content),
               }),
           ...metaDraftProviderControls(false),

@@ -104,6 +104,24 @@ describe("Meta placement delivery", () => {
       ).media[0]?.url,
     ).toBe("https://cdn.example/story.jpg");
   });
+  it("sends a video ad's 9:16 cut to Stories and Reels, and never its feed crop", () => {
+    const feed = {
+      type: "video" as const,
+      url: "https://cdn.example/feed.mp4",
+      thumbnail: "https://cdn.example/feed.jpg",
+    };
+    const video = { ...content, format: "video" as const, media: [feed] };
+    expect(metaPlacementMedia(video, "instagram-reel").issue).toContain("9:16");
+    const story = {
+      type: "video" as const,
+      url: "https://cdn.example/story.mp4",
+      thumbnail: "https://cdn.example/story.jpg",
+      via: "crop" as const,
+    };
+    const cut = { ...video, media: [{ ...feed, story }] };
+    expect(metaPlacementMedia(cut, "instagram-reel").media).toEqual([story]);
+    expect(metaPlacementMedia(cut, "facebook-feed").media).toEqual(cut.media);
+  });
   it("uses canonical carousel cards for vertical delivery", () => {
     expect(
       metaPlacementMedia(

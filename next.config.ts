@@ -12,7 +12,12 @@ const config: NextConfig = {
   // The published email registry is ESM-only. Keep it external so the Node
   // runtime loads its named exports natively instead of passing it through
   // webpack's CommonJS bridge.
-  serverExternalPackages: ["@wandercom/design-system-emails"],
+  serverExternalPackages: ["@wandercom/design-system-emails", "ffmpeg-static"],
+  // Only /api/media/renditions imports ffmpeg-static, so the binary ships
+  // with that one function.
+  outputFileTracingIncludes: {
+    "/api/media/renditions": ["./node_modules/ffmpeg-static/ffmpeg"],
+  },
   turbopack: {
     root: process.cwd(),
   },

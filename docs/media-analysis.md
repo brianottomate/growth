@@ -3,7 +3,7 @@
 ## What we have
 
 - **the growth workspace now analyzes timeline videos directly.** Starting an analysis is
-  the consent boundary: the growth workspace makes the source video durable in Blob, samples
+  the consent boundary: the growth workspace copies the source video to R2, samples
   timestamped frames in the operator's browser, persists the derived boards
   immediately, transcribes the durable video with OpenAI Whisper, and stores a
   frame-cited creative analysis. There is no second "keep" step.
@@ -14,7 +14,7 @@
   send the original directly to vision analysis. For several images, make a
   simple contact sheet with ImageMagick (`montage`) or an equivalent local
   command, then inspect that one sheet. Do not invent a separate tool name.
-- **Transcription has two routes:** the the growth workspace product uses the hosted OpenAI
+- **Transcription has two routes:** the growth workspace product uses the hosted OpenAI
   `whisper-1` endpoint because it provides word timestamps; local VidGrid can
   use faster-whisper for an operator-only workflow.
 
@@ -22,9 +22,9 @@
 
 ```text
 explicit Analyze action
--> durable source video in Blob
+-> durable source video on R2
 -> browser-local timestamped frame sampling
--> permanent storyboard boards in Blob
+-> permanent storyboard boards on R2
 -> hosted Whisper word transcript
 -> permanent frame-cited creative analysis
 ```

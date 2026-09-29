@@ -166,6 +166,16 @@ export function useMediaUpload(brandId: string) {
               ...(descriptor ? { storyboard: descriptor } : {}),
             });
             pendingMediaId = null;
+            if (isVideo) {
+              // Fire and forget: the server cuts the publishable H.264 files,
+              // and the hourly sweep retries anything this request misses.
+              void fetch("/api/media/renditions", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ mediaId }),
+                keepalive: true,
+              }).catch(() => undefined);
+            }
             out[index] = {
               url: publicUrl,
               type: isVideo ? "video" : "image",

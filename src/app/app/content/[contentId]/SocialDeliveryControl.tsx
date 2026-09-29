@@ -12,6 +12,7 @@ const LABELS: Record<string, string> = {
   facebook: "Facebook",
   instagram: "Instagram",
   linkedin: "LinkedIn",
+  tiktok: "TikTok",
   x: "X",
 };
 
@@ -33,7 +34,7 @@ export function SocialDeliveryControl({
   deliveryError,
 }: {
   spotId: string;
-  platform: "facebook" | "instagram" | "linkedin" | "x";
+  platform: "facebook" | "instagram" | "linkedin" | "tiktok" | "x";
   status: string;
   scheduledAt: string | null;
   connected: boolean;

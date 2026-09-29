@@ -217,11 +217,14 @@ export function metaPlacementMedia(
   // preserves those exact assets; it must not substitute alternate Story files.
   if (content.media.length > 1) return { media: content.media, issue: null };
   const first = content.media[0]!;
-  if (first.type === "video")
-    return {
-      media: [],
-      issue: "Vertical video mapping needs verification before delivery.",
-    };
+  if (first.type === "video") {
+    if (first.story?.type !== "video")
+      return {
+        media: [],
+        issue: "Add a vertical (9:16) cut of this video for Stories and Reels.",
+      };
+    return { media: [first.story], issue: null };
+  }
   if (!first.story)
     return { media: [], issue: "Prepare and approve a vertical (9:16) image." };
   return { media: [{ ...first.story, type: "image" as const }], issue: null };

@@ -537,7 +537,7 @@ export const setPlatformPostFirstComment = growthAction({
 export const setPlatformPostPublishSettings = growthAction({
   outputSchema: setPlatformPostPublishSettingsOutputSchema,
   description:
-    "Set or clear the Zernio publish options on one owned Instagram or Facebook post before it is scheduled. Replaces the whole set; pass null to clear. Instagram Reels (format instagram.reel): coverUrl, coverOffsetMs, shareToFeed, trial. Instagram feed, carousels and Reels: collaborators, isAiGenerated. Facebook Reels (format facebook.reel): title. Local only; refused once the post is in Zernio.",
+    "Set or clear the Zernio publish options on one owned Instagram, Facebook or TikTok post before it is scheduled. Replaces the whole set; pass null to clear. Instagram Reels (format instagram.reel): coverUrl, coverOffsetMs, shareToFeed, trial. Instagram feed, carousels and Reels: collaborators, isAiGenerated. Facebook Reels (format facebook.reel): title. TikTok (format tiktok.video): coverUrl, coverOffsetMs, isAiGenerated. Local only; refused once the post is in Zernio.",
   inputSchema: z.object({
     platformPostId: z.string(),
     settings: z
@@ -579,7 +579,7 @@ export const setPlatformPostPublishSettings = growthAction({
           .boolean()
           .optional()
           .describe(
-            "Instagram AI info label, for AI-generated images or video only.",
+            "Instagram AI info label or TikTok AI-generated disclosure, for AI-generated images or video only.",
           ),
       })
       .nullable(),

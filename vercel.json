@@ -55,6 +55,10 @@
     {
       "path": "/api/cron/pregen-send-queue",
       "schedule": "0 15 * * *"
+    },
+    {
+      "path": "/api/media/renditions",
+      "schedule": "0 * * * *"
     }
   ]
 }

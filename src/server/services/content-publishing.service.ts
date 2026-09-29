@@ -22,6 +22,7 @@ import {
   type PublishSettings,
 } from "@/server/db/schema";
 import { isStoryFormat, sequenceScheduledAt } from "@/lib/platform-sequence";
+import { deliveryMediaFor } from "@/server/services/video-delivery.service";
 import { buildZernioReschedulePayload } from "@/lib/zernio-reschedule";
 
 export type SocialDeliveryMode = "schedule" | "publish_now";
@@ -29,12 +30,14 @@ export type SocialPublishingPlatform =
   | "facebook"
   | "instagram"
   | "linkedin"
+  | "tiktok"
   | "x";
 
 const SUPPORTED_PLATFORMS = new Set<SocialPublishingPlatform>([
   "facebook",
   "instagram",
   "linkedin",
+  "tiktok",
   "x",
 ]);
 
@@ -49,6 +52,7 @@ const ZERNIO_PLATFORM: Record<SocialPublishingPlatform, string> = {
   facebook: "facebook",
   instagram: "instagram",
   linkedin: "linkedin",
+  tiktok: "tiktok",
   x: "twitter",
 };
 
@@ -116,6 +120,7 @@ async function requireActiveZernioAccount(input: {
     facebook: "Facebook",
     instagram: "Instagram",
     linkedin: "LinkedIn",
+    tiktok: "TikTok",
     x: "X",
   };
   throw new Error(
@@ -213,6 +218,21 @@ function validateInstagram(item: DeliveryItem, format: string | null) {
   // go to the feed instead, so a Reel spot must carry the video.
   if (isReelFormat(format)) requireSingleVideo(media);
   return { text, media, isStory };
+}
+
+function validateTikTok(item: DeliveryItem, format: string | null) {
+  const text = item.text?.trim() ?? "";
+  const media = publicMedia(item.media);
+  if (format?.toLowerCase() === "tiktok.photo") {
+    throw new Error("TikTok photo posts are not wired yet; post a video");
+  }
+  if (media.length !== 1 || media[0]!.type !== "video") {
+    throw new Error("A TikTok post needs exactly one vertical (9:16) video");
+  }
+  if (text.length > 2_200) {
+    throw new Error("TikTok captions can contain at most 2,200 characters");
+  }
+  return { text, media };
 }
 
 function validateStoryFrame(item: DeliveryItem, frameNumber: number) {
@@ -325,6 +345,34 @@ export function deliveryPayload(input: {
     };
   }
 
+  if (input.platform === "tiktok") {
+    if (input.items.length > 1) {
+      throw new Error("TikTok thread groups are not supported");
+    }
+    const settings = input.publishSettings ?? {};
+    return {
+      ...validateTikTok(root, input.format),
+      platformSpecificData: {
+        tiktokSettings: {
+          privacy_level: "PUBLIC_TO_EVERYONE",
+          allow_comment: true,
+          allow_duet: true,
+          allow_stitch: true,
+          // TikTok's consent flags. Hardcoded until the approve step shows
+          // the TikTok preview (Kristian, 2026-09-29).
+          content_preview_confirmed: true,
+          express_consent_given: true,
+          ...(settings.coverUrl
+            ? { video_cover_image_url: settings.coverUrl }
+            : settings.coverOffsetMs !== undefined
+              ? { video_cover_timestamp_ms: settings.coverOffsetMs }
+              : {}),
+          ...(settings.isAiGenerated ? { video_made_with_ai: true } : {}),
+        },
+      },
+    };
+  }
+
   if (input.platform !== "x") {
     throw new Error("This platform format is not available for publishing");
   }
@@ -375,7 +423,7 @@ async function loadSocialSpot(platformPostId: string) {
   if (spot.source !== "owned") throw new Error("Only owned posts can publish");
   if (!SUPPORTED_PLATFORMS.has(spot.platform as SocialPublishingPlatform)) {
     throw new Error(
-      "Zernio publishing supports Facebook, Instagram, LinkedIn, and X",
+      "Zernio publishing supports Facebook, Instagram, LinkedIn, TikTok, and X",
     );
   }
   const platform = spot.platform as SocialPublishingPlatform;
@@ -431,18 +479,24 @@ async function loadSocialSpot(platformPostId: string) {
     );
   }
 
-  const items: DeliveryItem[] = [
-    {
-      id: spot.id,
-      text: spot.text,
-      media: spot.media,
-      sequence: spot.sequence,
-      deliveryExternalId: spot.deliveryExternalId,
-      deliveryStatus: spot.deliveryStatus,
-      deliveryError: spot.deliveryError,
-    },
-    ...spot.children,
-  ].sort(
+  const unsorted: DeliveryItem[] = await Promise.all(
+    [
+      {
+        id: spot.id,
+        text: spot.text,
+        media: spot.media,
+        sequence: spot.sequence,
+        deliveryExternalId: spot.deliveryExternalId,
+        deliveryStatus: spot.deliveryStatus,
+        deliveryError: spot.deliveryError,
+      },
+      ...spot.children,
+    ].map(async (item) => ({
+      ...item,
+      media: item.media ? await deliveryMediaFor(item.media) : item.media,
+    })),
+  );
+  const items = unsorted.sort(
     (a, b) =>
       (a.sequence ?? Number.MAX_SAFE_INTEGER) -
       (b.sequence ?? Number.MAX_SAFE_INTEGER),
@@ -843,8 +897,17 @@ export function validatePublishSettings(input: {
       throw new Error("Facebook takes only a Reel title");
     }
     if (title && !reel) reject("A Reel title", "Facebook Reels");
+  } else if (input.platform === "tiktok") {
+    const allowed = ["coverUrl", "coverOffsetMs", "isAiGenerated"];
+    if (Object.keys(settings).some((key) => !allowed.includes(key))) {
+      throw new Error(
+        "TikTok takes a cover image or frame and the AI label, nothing else",
+      );
+    }
   } else if (Object.keys(settings).length) {
-    throw new Error("Publish options are available on Instagram and Facebook");
+    throw new Error(
+      "Publish options are available on Instagram, Facebook and TikTok",
+    );
   }
   if (settings.collaborators) {
     settings.collaborators = settings.collaborators

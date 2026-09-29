@@ -110,3 +110,60 @@ describe("validatePublishSettings", () => {
     ).toThrow("at most 3");
   });
 });
+
+describe("TikTok payloads", () => {
+  it("sends TikTok's required settings as a public post, with the cover frame", () => {
+    const payload = deliveryPayload({
+      platform: "tiktok",
+      format: "tiktok.video",
+      items: [item([video])],
+      publishSettings: { coverOffsetMs: 2_500 },
+    });
+    expect(payload.platformSpecificData).toEqual({
+      tiktokSettings: {
+        privacy_level: "PUBLIC_TO_EVERYONE",
+        allow_comment: true,
+        allow_duet: true,
+        allow_stitch: true,
+        content_preview_confirmed: true,
+        express_consent_given: true,
+        video_cover_timestamp_ms: 2_500,
+      },
+    });
+  });
+
+  it("refuses anything but one video, and first comments", () => {
+    expect(() =>
+      deliveryPayload({
+        platform: "tiktok",
+        format: "tiktok.video",
+        items: [item([image])],
+      }),
+    ).toThrow("exactly one vertical");
+    expect(() =>
+      deliveryPayload({
+        platform: "tiktok",
+        format: "tiktok.video",
+        items: [item([video])],
+        firstComment: "link in bio",
+      }),
+    ).toThrow("does not support a first comment");
+  });
+
+  it("takes only a cover and the AI label as publish options", () => {
+    expect(
+      validatePublishSettings({
+        platform: "tiktok",
+        format: "tiktok.video",
+        settings: { coverOffsetMs: 1_000, isAiGenerated: false },
+      }),
+    ).toEqual({ coverOffsetMs: 1_000, isAiGenerated: false });
+    expect(() =>
+      validatePublishSettings({
+        platform: "tiktok",
+        format: "tiktok.video",
+        settings: { shareToFeed: false },
+      }),
+    ).toThrow("TikTok takes");
+  });
+});

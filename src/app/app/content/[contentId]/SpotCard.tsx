@@ -152,7 +152,8 @@ export function SpotCard({
     spot.platform === "instagram" ||
     spot.platform === "linkedin" ||
     spot.platform === "x" ||
-    spot.platform === "facebook"
+    spot.platform === "facebook" ||
+    spot.platform === "tiktok"
       ? spot.platform
       : null;
   const providerPublishing = providerPublishingPlatform !== null;
