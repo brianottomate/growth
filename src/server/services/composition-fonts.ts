@@ -24,6 +24,30 @@ export function brandFontFamily(
 }
 
 /**
+ * A second family for the smaller text (facts, pills), when an operator chose
+ * one apart from the heading. Scraped fonts keep the one-family card.
+ */
+export function brandBodyFontFamily(
+  identity: BrandIdentity | null | undefined,
+): string | null {
+  if (!identity?.fontsChosen) return null;
+  const body = identity.fonts?.find((font) => font.role === "body")?.family;
+  return body && body !== brandFontFamily(identity) ? body : null;
+}
+
+/** The heading's weight when the brand sets one (a serif set regular), else null. */
+export function brandHeadingWeight(
+  identity: BrandIdentity | null | undefined,
+): FontWeight | null {
+  const fonts = identity?.fonts ?? [];
+  const weight = (fonts.find((font) => font.role === "heading") ?? fonts[0])
+    ?.weight;
+  return weight === 400 || weight === 500 || weight === 600 || weight === 700
+    ? weight
+    : null;
+}
+
+/**
  * Weight and url of every @font-face in a Google Fonts stylesheet whose
  * format satori can read: TrueType, OpenType or WOFF. WOFF2 is skipped.
  */

@@ -18,8 +18,11 @@ import { R2 } from "@/server/clients/r2.client";
 import { db } from "@/server/db";
 import { brandTable, mediaAssetTable, memberTable } from "@/server/db/schema";
 import {
+  brandBodyFontFamily,
   brandFontFamily,
+  brandHeadingWeight,
   loadGoogleFont,
+  type FontWeight,
   type LoadedFont,
 } from "@/server/services/composition-fonts";
 import {
@@ -61,6 +64,10 @@ export type RenderContext = CompositionContext & {
   sourceImage: string | null;
   logo: LogoImage | null;
   fonts: LoadedFont[] | null;
+  /** The family the smaller text is set in when it differs from the heading's. */
+  bodyFont?: string | null;
+  /** The heading's weight when the brand sets one. */
+  headingWeight?: FontWeight | null;
   /**
    * The tier badge only: the source blurred, which is what the pill's frosted
    * glass shows through (satori has no backdrop-filter), and the pill's face.
@@ -337,11 +344,15 @@ export async function loadCompositionSource(
     fontFamily?: string | null;
   } = {},
 ): Promise<RenderContext> {
-  const family =
-    options.fontFamily ?? brandFontFamily(context.brand.brandIdentity);
+  const identity = context.brand.brandIdentity;
+  const family = options.fontFamily ?? brandFontFamily(identity);
+  const headingWeight = options.fontFamily
+    ? null
+    : brandHeadingWeight(identity);
+  const body = options.fontFamily ? null : brandBodyFontFamily(identity);
   // The logo and the font are best effort: a card without them is still the
   // card. The source is not; its failure is the render's failure.
-  const [sourceImage, logo, fonts] = await Promise.all([
+  const [sourceImage, logo, headingFonts, bodyFonts] = await Promise.all([
     context.sourceUrl ? fetchSatoriImageSource(context.sourceUrl) : null,
     (context.brand.brandMark
       ? loadChosenMark(context.brand.brandMark)
@@ -352,8 +363,21 @@ export async function loadCompositionSource(
       console.error("brand mark unavailable", context.brand.id, error);
       return null;
     }),
-    family ? loadGoogleFont(family) : null,
+    family
+      ? loadGoogleFont(
+          family,
+          headingWeight ? [400, headingWeight, 700] : undefined,
+        )
+      : null,
+    body ? loadGoogleFont(body, [400, 500, 600]) : null,
   ]);
+  // The heading's faces stay first: the card's wrapper takes the first name.
+  const fonts = headingFonts ? [...headingFonts, ...(bodyFonts ?? [])] : null;
+  const faces = {
+    fonts,
+    bodyFont: headingFonts && bodyFonts ? body : null,
+    headingWeight: headingFonts ? headingWeight : null,
+  };
   if (context.templateId === "tier-badge" && sourceImage) {
     const [backdrop, badgeFonts] = await Promise.all([
       blurredSatoriSource(sourceImage, BADGE_BACKDROP_SIGMA),
@@ -363,11 +387,11 @@ export async function loadCompositionSource(
       ...context,
       sourceImage,
       logo,
-      fonts,
+      ...faces,
       badge: { backdrop, fonts: badgeFonts },
     };
   }
-  return { ...context, sourceImage, logo, fonts };
+  return { ...context, sourceImage, logo, ...faces };
 }
 
 // ---- The wander.com tier pill ---------------------------------------------
@@ -732,6 +756,13 @@ function renderInputs(
     brandLogo:
       context.brand.brandMark?.variants.color ?? context.brand.logo ?? null,
     fontFamily: brandFontFamily(context.brand.brandIdentity),
+    // Only when set, so cards of brands without them keep matching.
+    ...(brandBodyFontFamily(context.brand.brandIdentity)
+      ? { bodyFontFamily: brandBodyFontFamily(context.brand.brandIdentity) }
+      : {}),
+    ...(brandHeadingWeight(context.brand.brandIdentity)
+      ? { headingWeight: brandHeadingWeight(context.brand.brandIdentity) }
+      : {}),
     renderedAccent: resolveAccent(spec, context),
   };
 }
@@ -1502,8 +1533,12 @@ export function renderComposition(
     const headlineOnly = spec.templateId === "catalog-headline";
     const destination =
       spec.templateId === "catalog-destination" || headlineOnly;
+    // A face set regular reads smaller than the house bold at the same size.
+    const regular = context.headingWeight && context.headingWeight < 600;
     const headlineSize = Math.round(
-      (headlineOnly ? 84 : destination ? 76 : amenities ? 68 : 60) * scale,
+      (headlineOnly ? 84 : destination ? 76 : amenities ? 68 : 60) *
+        scale *
+        (regular ? 1.3 : 1),
     );
     const statement = amenities
       ? balancedLines(
@@ -1616,6 +1651,7 @@ export function renderComposition(
             // frame; the foot block sits above that band on the story canvas.
             bottom: spec.formatId === "story" ? pad + 240 : pad,
             color: "#ffffff",
+            ...(context.bodyFont ? { fontFamily: context.bodyFont } : {}),
           }}
         >
           {eyebrow ? (
@@ -1637,9 +1673,14 @@ export function renderComposition(
               display: "flex",
               flexDirection: "column",
               fontSize: headlineSize,
-              fontWeight: 700,
-              lineHeight: 1.06,
-              letterSpacing: "-0.03em",
+              // A brand face set at its own weight (a regular serif) keeps
+              // its drawn spacing; the house bold is tightened.
+              fontWeight: context.headingWeight ?? 700,
+              lineHeight: context.headingWeight ? 1.1 : 1.06,
+              letterSpacing: context.headingWeight ? "0" : "-0.03em",
+              ...(context.bodyFont && context.fonts?.[0]
+                ? { fontFamily: context.fonts[0].name }
+                : {}),
             }}
           >
             {statement.map((text) => (

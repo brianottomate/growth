@@ -55,6 +55,9 @@ export async function catalogBrand(userId: string, brandId: string) {
       settings: brandTable.performanceSettings,
       markets: brandTable.markets,
       logo: brandTable.logo,
+      // What the renderer draws the type from: the faces, and whether they were
+      // chosen (only a chosen body face is drawn).
+      fonts: sql<unknown>`jsonb_build_array(${brandTable.brandIdentity}->'fonts', ${brandTable.brandIdentity}->'fontsChosen' is not null)`,
     })
     .from(brandTable)
     .innerJoin(
@@ -764,6 +767,7 @@ export async function renderCatalogExport(
               catalogCardCopy(card),
               card.imageUrl,
               brand.logo,
+              brand.fonts ?? null,
             ]);
         const reused = renderKey ? previous.get(renderKey) : undefined;
         if (!finished && !reused && !sourceId)
