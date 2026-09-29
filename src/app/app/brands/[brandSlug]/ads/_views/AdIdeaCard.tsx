@@ -359,7 +359,10 @@ export function AdIdeaCard({
             <span aria-hidden="true">·</span>
             <span>
               {approved
-                ? "Approved · frozen creative"
+                ? Object.keys(ad.content.ideaStudio?.approval?.renders ?? {})
+                    .length
+                  ? "Approved · images saved"
+                  : "Approved"
                 : ad.content.metaImport
                   ? "Needs local review"
                   : "Draft idea"}

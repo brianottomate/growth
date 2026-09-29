@@ -46,7 +46,7 @@ export function AdIdeaSlideRow({
   frozenUrl,
 }: {
   editing: boolean;
-  frozenUrl?: string | null;
+  frozenUrl?: string;
   onEdit: () => void;
   card: IdeaImage;
   brandId: string;
@@ -79,10 +79,7 @@ export function AdIdeaSlideRow({
         : { ...c, recipe: { ...c.recipe, ...patch } },
     );
   const awaitingArtwork = ideaSource(card, shape) === null;
-  const preview =
-    frozenUrl === undefined
-      ? (ideaEditorPreviewUrl(brandId, card, shape) ?? "")
-      : (frozenUrl ?? "");
+  const preview = frozenUrl ?? ideaEditorPreviewUrl(brandId, card, shape) ?? "";
   const [previewUrl, setPreviewUrl] = useState(preview);
   const [previewFailed, setPreviewFailed] = useState(false);
   useEffect(() => {

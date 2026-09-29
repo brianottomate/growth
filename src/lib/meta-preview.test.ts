@@ -59,8 +59,8 @@ it("does not invent placements before delivery is configured", () => {
 });
 it("never previews recovered but unapproved artwork", () => {
   for (const placement of ["facebook-feed", "instagram-story"] as const) {
-    expect(metaPreviewMedia(imported, placement).media).toEqual([]);
-    expect(metaPreviewMedia(imported, placement)).toEqual(
+    expect(metaPreviewMedia(imported, placement, "brand").media).toEqual([]);
+    expect(metaPreviewMedia(imported, placement, "brand")).toEqual(
       metaPlacementMedia(imported, placement),
     );
   }
@@ -71,7 +71,9 @@ it("rejects unapproved and stale frozen assets in previews and publishing", () =
     media: [{ type: "image", url: "https://example.com/feed.jpg" }],
     ideaStudio: { document },
   };
-  expect(metaPreviewMedia(content, "facebook-feed").issue).toContain("Approve");
+  expect(metaPreviewMedia(content, "facebook-feed", "brand").issue).toContain(
+    "Approve",
+  );
   content.ideaStudio!.approval = {
     approvedAt: "now",
     approvedBy: "u",
@@ -80,11 +82,11 @@ it("rejects unapproved and stale frozen assets in previews and publishing", () =
       portrait: [{ assetId: "a", url: "https://example.com/feed.jpg" }],
     },
   };
-  expect(metaPreviewMedia(content, "facebook-feed").media).toEqual(
+  expect(metaPreviewMedia(content, "facebook-feed", "brand").media).toEqual(
     content.media,
   );
   content.media[0]!.url = "https://example.com/unapproved.jpg";
-  expect(metaPreviewMedia(content, "facebook-feed").media).toEqual([]);
+  expect(metaPreviewMedia(content, "facebook-feed", "brand").media).toEqual([]);
 });
 it("labels automatic source settings without pretending manual selection or observed delivery", () => {
   expect(importedPlacementLabel([{ targeting: { age_min: 18 } }])).toContain(
@@ -116,9 +118,35 @@ it("previews the same ordered carousel cards that ship, not alternate Story expo
     "instagram-story",
     "facebook-story",
   ] as const) {
-    expect(metaPreviewMedia(content, placement).media).toEqual(
+    expect(metaPreviewMedia(content, placement, "brand").media).toEqual(
       metaPlacementMedia(content, placement).media,
     );
-    expect(metaPreviewMedia(content, placement).media).toEqual(content.media);
+    expect(metaPreviewMedia(content, placement, "brand").media).toEqual(
+      content.media,
+    );
   }
+});
+it("previews an approval waiting for its push live, while publishing still refuses it", () => {
+  const content: AdCreativeContent = {
+    ...copy,
+    media: [],
+    ideaStudio: {
+      document,
+      approval: {
+        approvedAt: "now",
+        approvedBy: "u",
+        sourceVersion: "v",
+        renders: {},
+      },
+    },
+  };
+  const preview = metaPreviewMedia(content, "facebook-feed", "brand");
+  expect(preview.issue).toBeNull();
+  expect(preview.media.length).toBe(document.cards.length);
+  expect(preview.media[0]?.url).toContain("/api/compositions/preview");
+  expect(metaPlacementMedia(content, "facebook-feed")).toEqual({
+    media: [],
+    issue: null,
+    pending: true,
+  });
 });

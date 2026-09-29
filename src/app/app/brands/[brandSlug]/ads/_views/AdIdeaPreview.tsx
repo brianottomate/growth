@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
 import type { AdCreativeContent } from "@/server/db/ads-schema";
 import { metaPreviewMedia } from "@/lib/meta-preview";
-import { FROZEN_AT_PUSH } from "@/lib/meta-placement-plan";
 import { CompactAdMock } from "@/components/ad-mock";
 import { ctaLabel } from "@/components/social-mock";
 import { META_PLACEMENTS, type MetaPlacement } from "@/lib/meta-placement-plan";
@@ -85,7 +84,7 @@ export function AdIdeaPreview({
       {platform ? (
         <>
           <p className="text-xs text-muted-foreground">
-            Approved delivery assets · platform controls are illustrative.
+            Platform controls are illustrative.
           </p>
           <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] items-start gap-5">
             {META_PLACEMENTS.filter(
@@ -96,7 +95,7 @@ export function AdIdeaPreview({
                 surface.kind === "feed" ? surface.label : "Stories / Reels";
               const size = surface.kind !== "feed" ? "story" : shape;
               const resolved = content
-                ? metaPreviewMedia(content, surface.id)
+                ? metaPreviewMedia(content, surface.id, brandId)
                 : {
                     media: [],
                     issue: "Approve and save this idea before previewing.",
@@ -138,8 +137,7 @@ export function AdIdeaPreview({
                     />
                   ) : (
                     <p className="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">
-                      {resolved.issue ??
-                        ("pending" in resolved ? FROZEN_AT_PUSH : null)}
+                      {resolved.issue}
                     </p>
                   )}
                 </section>

@@ -163,9 +163,6 @@ export function metaProviderPlacements(ids: MetaPlacement[]) {
       : {}),
   };
 }
-/** Shown where an approved ad's images wait for the push to save them. */
-export const FROZEN_AT_PUSH = "Images are saved at push.";
-
 /** Shared review/push contract. Never invent a vertical crop to cover a missing mapping. */
 export function metaPlacementMedia(
   content: AdCreativeContent,

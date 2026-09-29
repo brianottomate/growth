@@ -1,5 +1,10 @@
 import type { AdCreativeContent } from "@/server/db/ads-schema";
-import { metaPlacementMedia, type MetaPlacement } from "./meta-placement-plan";
+import { ideaPreviewUrl } from "./ad-idea-studio";
+import {
+  isFeedPlacement,
+  metaPlacementMedia,
+  type MetaPlacement,
+} from "./meta-placement-plan";
 
 /** Previews resolve exactly the same assets and blockers as publishing. */
 export function metaPreviewPlacements(
@@ -18,7 +23,34 @@ const PREVIEWED = new Set<MetaPlacement>([
   "facebook-reel",
   "instagram-reel",
 ]);
-export const metaPreviewMedia = metaPlacementMedia;
+/**
+ * What a placement shows. An approved ad draws its saved images once the push
+ * has frozen them, and the approved design live until then; the push itself
+ * reads `metaPlacementMedia`, which never accepts a live render.
+ */
+export function metaPreviewMedia(
+  content: AdCreativeContent,
+  id: MetaPlacement,
+  brandId: string,
+) {
+  const resolved = metaPlacementMedia(content, id);
+  const doc = content.ideaStudio?.document;
+  if (!("pending" in resolved) || !doc) return resolved;
+  const base = doc.shapes.includes("portrait") ? "portrait" : doc.shapes[0]!;
+  // Same rule as delivery: a carousel keeps its cards on every placement; a
+  // single image needs its 9:16 export on Stories and Reels.
+  const single = doc.cards.length === 1;
+  if (!isFeedPlacement(id) && single && !doc.shapes.includes("story"))
+    return { media: [], issue: "Prepare and approve a vertical (9:16) image." };
+  const shape = !isFeedPlacement(id) && single ? "story" : base;
+  return {
+    media: doc.cards.flatMap((card) => {
+      const url = ideaPreviewUrl(brandId, card, shape);
+      return url ? [{ type: "image" as const, url }] : [];
+    }),
+    issue: null,
+  };
+}
 export function importedPlacementLabel(adSets: Record<string, unknown>[]) {
   if (!adSets.length) return "Imported placements · review source settings";
   const automatic = adSets.map((set) => {

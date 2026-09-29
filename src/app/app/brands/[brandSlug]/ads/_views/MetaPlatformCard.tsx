@@ -16,7 +16,6 @@ import {
   META_DEFAULT_PLACEMENTS,
   META_PLACEMENTS,
   metaPlacementMedia,
-  FROZEN_AT_PUSH,
   type MetaPlacement,
 } from "@/lib/meta-placement-plan";
 import { useRouter } from "next/navigation";
@@ -982,13 +981,11 @@ function ProjectionSummary({
   >();
   const issues = new Set<string>();
   for (const view of views) {
-    const resolved = metaPreviewMedia(content, view.id);
+    const resolved = metaPreviewMedia(content, view.id, ad.brandId);
     const vertical = view.kind !== "feed";
     const label = vertical ? "Vertical" : "Feed";
-    const note =
-      resolved.issue ?? ("pending" in resolved ? FROZEN_AT_PUSH : null);
-    if (note) {
-      issues.add(`${label}: ${note}`);
+    if (resolved.issue) {
+      issues.add(`${label}: ${resolved.issue}`);
       continue;
     }
     const key = JSON.stringify(resolved.media.map((item) => item.url));
@@ -1210,10 +1207,9 @@ function ProjectedAd({
         }
       >
         {(compare ? views : active ? [active] : []).map((view) => {
-          const resolved = metaPreviewMedia(content, view.id);
+          const resolved = metaPreviewMedia(content, view.id, ad.brandId);
           const { media } = resolved;
-          const issue =
-            resolved.issue ?? ("pending" in resolved ? FROZEN_AT_PUSH : null);
+          const issue = resolved.issue;
           return (
             <section
               key={view.id}
