@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { parseAsStringLiteral, useQueryState } from "nuqs";
 import { useQuery } from "@tanstack/react-query";
 
 import {
@@ -23,7 +24,15 @@ import { Tools } from "./Tools";
 import { Twitter } from "./Twitter";
 import { XListening } from "./XListening";
 
-type TabId = "monitor" | "reddit" | "instagram" | "x" | "llm" | "playbook";
+const TABS = [
+  "monitor",
+  "reddit",
+  "instagram",
+  "x",
+  "llm",
+  "playbook",
+] as const;
+type TabId = (typeof TABS)[number];
 
 export function Listen({
   defaultTab,
@@ -39,17 +48,11 @@ export function Listen({
     }),
   );
 
-  const [tab, setTab] = useState<TabId>(defaultTab);
-
-  const onTabChange = (v: string) => {
-    setTab(v as TabId);
-    // Shallow URL sync so tabs are shareable without a server round-trip.
-    if (typeof window !== "undefined") {
-      const url = new URL(window.location.href);
-      url.searchParams.set("tab", v);
-      window.history.replaceState(null, "", url);
-    }
-  };
+  // defaultTab carries the page's legacy ?tab= mapping.
+  const [tab, setTab] = useQueryState(
+    "tab",
+    parseAsStringLiteral(TABS).withDefault(defaultTab),
+  );
 
   if (isLoading) return <Skeleton label="listening strategy" />;
   if (isError) {
@@ -75,7 +78,7 @@ export function Listen({
     <Tabs
       key={data.brand.id}
       value={tab}
-      onValueChange={onTabChange}
+      onValueChange={(v) => void setTab(v as TabId)}
       className="space-y-6"
     >
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border bg-card p-4">

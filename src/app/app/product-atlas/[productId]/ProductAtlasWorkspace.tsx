@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { parseAsStringLiteral, useQueryState } from "nuqs";
 import { useMutation } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -54,7 +55,10 @@ export function ProductAtlasWorkspace({
   editors: Editors;
 }) {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>("overview");
+  const [tab, setTab] = useQueryState(
+    "tab",
+    parseAsStringLiteral(tabs.map((t) => t.id)).withDefault("overview"),
+  );
   const [atlas, setAtlas] = useState<ProductAtlas>(product.atlas);
   const [rawJson, setRawJson] = useState(
     JSON.stringify(product.atlas, null, 2),

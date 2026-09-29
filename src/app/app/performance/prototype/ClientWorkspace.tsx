@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ArrowLeft, ExternalLink } from "lucide-react";
+import { parseAsStringLiteral, useQueryState } from "nuqs";
 
 import { ButtonLink } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -65,8 +66,14 @@ const LIVE_TONE: Record<string, string> = {
   paused: "border-zinc-500/30 bg-zinc-500/10 text-muted-foreground",
 };
 
+const TABS = ["brief", "creative", "audience", "campaign", "catalog"] as const;
+
 export function ClientWorkspace({ data }: { data: WorkspaceData }) {
   const { brand } = data;
+  const [tab, setTab] = useQueryState(
+    "tab",
+    parseAsStringLiteral(TABS).withDefault("brief"),
+  );
   const initials = brand.name
     .split(/\s+/)
     .map((word) => word[0])
@@ -138,7 +145,11 @@ export function ClientWorkspace({ data }: { data: WorkspaceData }) {
         </div>
       </header>
 
-      <Tabs defaultValue="brief" className="min-w-0">
+      <Tabs
+        value={tab}
+        onValueChange={(v) => void setTab(v as (typeof TABS)[number])}
+        className="min-w-0"
+      >
         <div className="overflow-x-auto pb-1">
           <TabsList className="w-max">
             <TabsTrigger value="brief">Launch brief</TabsTrigger>

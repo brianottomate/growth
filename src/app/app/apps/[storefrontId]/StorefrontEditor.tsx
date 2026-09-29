@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { parseAsStringLiteral, useQueryState } from "nuqs";
 import { useMutation } from "@tanstack/react-query";
 import {
   ArrowDown,
@@ -37,7 +38,14 @@ type Editors = RouterOutputs["productStorefront"]["listEditors"];
 type Assets = RouterOutputs["productStorefront"]["listBrandAssets"];
 type Sibling =
   RouterOutputs["productStorefront"]["getProduct"]["storefronts"][number];
-type Tab = "content" | "preview" | "assets" | "references" | "json" | "history";
+const TABS = [
+  "content",
+  "preview",
+  "assets",
+  "references",
+  "json",
+  "history",
+] as const;
 type PickerTarget = "icon" | "screenshot" | "promotional" | "video";
 
 const itemId = (prefix: string) =>
@@ -55,7 +63,10 @@ export function StorefrontEditor({
   siblings: Sibling[];
 }) {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>("preview");
+  const [tab, setTab] = useQueryState(
+    "tab",
+    parseAsStringLiteral(TABS).withDefault("preview"),
+  );
   const [content, setContent] = useState<StorefrontContent>(storefront.content);
   const [rawJson, setRawJson] = useState(
     JSON.stringify(storefront.content, null, 2),
@@ -246,16 +257,7 @@ export function StorefrontEditor({
       </section>
 
       <nav className="flex gap-1 overflow-x-auto border-b">
-        {(
-          [
-            "content",
-            "preview",
-            "assets",
-            "references",
-            "json",
-            "history",
-          ] as Tab[]
-        ).map((item) => (
+        {TABS.map((item) => (
           <button
             key={item}
             onClick={() => setTab(item)}

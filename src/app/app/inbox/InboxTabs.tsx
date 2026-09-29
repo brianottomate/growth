@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
+import { parseAsStringLiteral, useQueryState } from "nuqs";
 
 export type InboxTabId = "all" | "dms" | "comments" | "ads";
 
@@ -24,7 +25,10 @@ export function InboxTabs({
     node: ReactNode;
   }[];
 }) {
-  const [active, setActive] = useState<InboxTabId>(defaultTab);
+  const [active, setActive] = useQueryState(
+    "tab",
+    parseAsStringLiteral(TABS.map((t) => t.id)).withDefault(defaultTab),
+  );
 
   return (
     <div>
@@ -33,7 +37,7 @@ export function InboxTabs({
           <button
             key={t.id}
             type="button"
-            onClick={() => setActive(t.id)}
+            onClick={() => void setActive(t.id)}
             className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
               active === t.id
                 ? "border-primary text-foreground"

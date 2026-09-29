@@ -1,6 +1,7 @@
 "use client";
 import { catalogAddressIssues } from "@/lib/catalog-addresses";
 import { useEffect, useRef, useState } from "react";
+import { parseAsStringLiteral, useQueryState } from "nuqs";
 import {
   Check,
   ExternalLink,
@@ -96,14 +97,22 @@ export function CatalogCards({
     ...writeStatus,
     refetchInterval: (q) => (running(q.state.data?.run?.status) ? 2500 : false),
   }).data?.run;
-  const [view, setView] = useState<"studio" | "preview" | "exports">("studio");
+  const [view, setView] = useQueryState(
+    "view",
+    parseAsStringLiteral(["studio", "preview", "exports"]).withDefault(
+      "studio",
+    ),
+  );
   const [layout, setLayout] = useState<"grid" | "list">("list");
   const [details, setDetails] = useState<CatalogCard | null>(null);
   const [library, setLibrary] = useState(false);
   /** A card whose photo is being swapped straight from its row, saved on pick. */
   const [picking, setPicking] = useState<CatalogCard | null>(null);
   const [limit, setLimit] = useState(10);
-  const [filter, setFilter] = useState<"all" | "review" | "approved">("all");
+  const [filter, setFilter] = useQueryState(
+    "filter",
+    parseAsStringLiteral(["all", "review", "approved"]).withDefault("all"),
+  );
   /** Cards with a New copy or New photo call in flight. */
   const [fixing, setFixing] = useState<Record<string, "copy" | "photo">>({});
   const [busy, setBusy] = useState(false);
@@ -281,7 +290,7 @@ export function CatalogCards({
       () => orpc.catalog.exportCatalog.call({ brandId }),
       "Unable to export",
     );
-    if (done) setView("exports");
+    if (done) void setView("exports");
     setBusy(false);
   }
   const activeExport = query.data?.exports.some((e) => running(e.status));
