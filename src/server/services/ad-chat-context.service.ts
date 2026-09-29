@@ -7,6 +7,7 @@ import { requireOwnedCampaign, starterIdeaHomes } from "./ads-draft.service";
 import { listBrandHomes } from "./homes.service";
 import { brandListings, brandWebsiteId } from "./wanderos-listings.service";
 import { fetchWanderOsListingDetail } from "@/server/clients/wanderos-site.client";
+import { campaignCopyRules } from "@/server/ai/prompts/campaign-copy";
 
 /** Current single-ad context shared by chat and MCP. No creative writes. */
 export async function adChatContext(input: {
@@ -92,5 +93,6 @@ export async function adChatContext(input: {
     },
     images,
     homes: facts,
+    copyRules: campaignCopyRules(),
   };
 }

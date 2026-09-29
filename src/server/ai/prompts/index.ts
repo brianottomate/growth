@@ -14,6 +14,7 @@
  */
 export * from "./brand-story";
 export * from "./campaign-audiences";
+export * from "./campaign-copy";
 export * from "./campaign-codename";
 export * from "./catalog-copy";
 export * from "./catalog-home";

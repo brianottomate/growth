@@ -4,6 +4,7 @@ import {
   trimHomeCards,
   type GeneratedHome,
 } from "./starter-ad-generation";
+import { CAMPAIGN_COPY_INTENTS } from "./compositions";
 
 const home = {
   id: "home",
@@ -117,6 +118,14 @@ test("starter compositions follow ad roles instead of model-selected templates",
   );
   expect(single.cards[0]?.recipe.templateId).toBe("hero-overlay");
   expect(single.cards[0]?.overrides.story?.templateId).toBe("tall-statement");
+  // Every slide the generator composes has a copy guide entry to write to.
+  const used = carousel.cards.flatMap((card) => [
+    card.recipe.templateId,
+    card.overrides.story?.templateId,
+  ]);
+  expect(used.every((id) => Boolean(id && id in CAMPAIGN_COPY_INTENTS))).toBe(
+    true,
+  );
 });
 
 describe("trimHomeCards", () => {

@@ -286,6 +286,44 @@ export const CATALOG_COPY_INTENTS = {
 
 export type CatalogCopyTemplateId = keyof typeof CATALOG_COPY_INTENTS;
 
+/**
+ * What each campaign slide's copy is for, on the templates starter ideas and
+ * the ad chat compose with. The campaign copy rules read it, so a slide is
+ * written to what its template draws: the opener and the close draw one
+ * headline and the fixed button, a detail slide draws a headline and a
+ * supporting line.
+ */
+export type CampaignCopyIntent = {
+  intent: string;
+  /** Characters that stay on two lines at feed size. */
+  headlineChars: number;
+  /** The supporting line's length; 0 where the template draws none. */
+  subtitleChars: number;
+};
+
+export const CAMPAIGN_COPY_INTENTS = {
+  "hero-overlay": {
+    intent:
+      'The opener or the closing card in feeds. One headline over the photo, then the fixed Explore your next escape button, and no supporting line, so the headline carries the message. On the opener it is the home\'s strongest selling point and names the city and state as "{lead} in {City, ST}", the lead a place word and one stated feature ("River-view city loft in Louisville, KY"); on the closing card it invites the stay, built on a different point and without the place.',
+    headlineChars: 40,
+    subtitleChars: 0,
+  },
+  "tall-statement": {
+    intent:
+      "The opener or the closing card in Stories and Reels: the same headline role as the feed opener and close, centred high on a 9:16 photo above the fixed button, with no supporting line.",
+    headlineChars: 48,
+    subtitleChars: 0,
+  },
+  "image-hero": {
+    intent:
+      "A detail slide. Line 1 is the headline: another selling point the listing states, never the opener's. Line 2 is a short supporting phrase that backs it with a stated fact or the setting. Neither repeats the city and state.",
+    headlineChars: 52,
+    subtitleChars: 52,
+  },
+} as const satisfies Partial<Record<CompositionTemplateId, CampaignCopyIntent>>;
+
+export type CampaignCopyTemplateId = keyof typeof CAMPAIGN_COPY_INTENTS;
+
 export const COMPOSITION_FIELDS: Record<
   CompositionTemplateId,
   CompositionField[]

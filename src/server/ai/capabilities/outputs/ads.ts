@@ -1334,6 +1334,8 @@ export const ideaContextActionOutputSchema = z.strictObject({
   }),
   campaignId: z.string(),
   campaignName: z.string(),
+  /** How the slides are written: the house rules and what each template holds. */
+  copyRules: z.string(),
   homes: z.array(
     z.strictObject({
       amenities: z.array(z.string()).optional(),
