@@ -110,6 +110,7 @@ export function CatalogCards({
   const [layout, setLayout] = useState<"grid" | "list">("list");
   const [details, setDetails] = useState<CatalogCard | null>(null);
   const [gridExports, setGridExports] = useState<string[]>([]);
+  const [fresh, setFresh] = useState(false);
   const [library, setLibrary] = useState(false);
   /** A card whose photo is being swapped straight from its row, saved on pick. */
   const [picking, setPicking] = useState<CatalogCard | null>(null);
@@ -292,7 +293,7 @@ export function CatalogCards({
   async function exportCatalog() {
     setBusy(true);
     const done = await act(
-      () => orpc.catalog.exportCatalog.call({ brandId }),
+      () => orpc.catalog.exportCatalog.call({ brandId, fresh }),
       "Unable to export",
     );
     if (done) void setView("exports");
@@ -406,6 +407,14 @@ export function CatalogCards({
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={fresh}
+                  onChange={(e) => setFresh(e.target.checked)}
+                />
+                Redraw every card
+              </label>
               <Button
                 disabled={
                   busy ||
@@ -732,7 +741,7 @@ export function CatalogCards({
                   </h3>
                   <p className="text-sm text-muted-foreground">
                     {item.status === "ready"
-                      ? `${item.rows?.length} homes · ${item.assets?.length} images`
+                      ? `${item.rows?.length} homes · ${item.assets?.length} images${item.assets?.some((a) => a.reused) ? ` · ${item.assets.filter((a) => a.reused).length} unchanged, copied from the last export` : ""}`
                       : item.status === "error"
                         ? "Export failed"
                         : `Rendering ${item.completed ?? 0} of ${item.total ?? 0} images…`}

@@ -95,6 +95,10 @@ export type CatalogExport = {
     assetId: string;
     url: string;
     format: string;
+    /** What the image was drawn from; an unchanged card reuses it. */
+    renderKey?: string;
+    /** Copied from the previous export rather than drawn again. */
+    reused?: boolean;
   }[];
   rows?: HotelFeedRow[];
   /** What the export's cards are: "Supplied artwork", "Catalog · destination". */

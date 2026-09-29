@@ -185,12 +185,12 @@ export const setCatalogDefaultTemplateAction = growthAction({
 export const exportCatalogAction = growthAction({
   outputSchema: exportCatalogActionOutputSchema,
   description:
-    "Freeze the included catalog cards into a new export: renders every card into the brand's media library in the background and snapshots the matching feed rows. Refused until every included card is approved. Returns the run id at once; its progress is in catalogState's exports. Nothing is uploaded to an ad platform.",
-  inputSchema: brandInput,
+    "Freeze the included catalog cards into a new export: renders every changed card into the brand's media library in the background, copies unchanged ones from the last export, and snapshots the matching feed rows. fresh redraws every card. Refused until every included card is approved. Returns the run id at once; its progress is in catalogState's exports. Nothing is uploaded to an ad platform.",
+  inputSchema: brandInput.extend({ fresh: z.boolean().optional() }),
   examples: [{ brandId: "brd_01" }],
-  execute: async ({ brandId }, ctx) => {
+  execute: async ({ brandId, fresh }, ctx) => {
     const run = await startCatalogExport(ctx.userId, brandId);
-    after(() => renderCatalogExport(run, ctx.userId));
+    after(() => renderCatalogExport({ ...run, fresh }, ctx.userId));
     return { runId: run.run.id };
   },
 });

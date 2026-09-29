@@ -33,6 +33,7 @@ import {
   COMPOSITION_IMAGE_POSITIONS,
   COMPOSITION_TEMPLATES,
   compositionTemplateIdSchema,
+  getCompositionIdentity,
   type CompositionFormatId,
 } from "@/lib/compositions";
 import { brandHomeInventory } from "./home-inventory.service";
@@ -51,6 +52,7 @@ export async function catalogBrand(userId: string, brandId: string) {
       organizationId: memberTable.organizationId,
       settings: brandTable.performanceSettings,
       markets: brandTable.markets,
+      logo: brandTable.logo,
     })
     .from(brandTable)
     .innerJoin(
@@ -701,7 +703,7 @@ export async function startCatalogExport(
   return { run: run!, brand, homes, draft };
 }
 export async function renderCatalogExport(
-  input: Awaited<ReturnType<typeof startCatalogExport>>,
+  input: Awaited<ReturnType<typeof startCatalogExport>> & { fresh?: boolean },
   userId: string,
 ) {
   const { run, brand, homes, draft } = input;
@@ -730,24 +732,46 @@ export async function renderCatalogExport(
         providerOutput: { folderId, total, completed: 0 },
       })
       .where(eq(creativeRunTable.id, run.id));
+    const previous = await previousRenders(brand.id, input.fresh);
     for (const card of draft.cards.filter((c) => c.included)) {
       const home = homes.find((h) => h.id === card.homeId)!;
       const finished =
         card.mode === "finished"
           ? await finishedCatalogAsset(brand.id, card.finishedArtwork!.assetId)
           : null;
-      const sourceId =
-        finished?.id ??
-        card.assetId ??
-        (
-          await importRemoteImage({
-            brandId: brand.id,
-            uploadedBy: userId,
-            url: card.imageUrl,
-            title: `${home.name} · Catalog source`,
-          })
-        ).id;
+      let sourceId = finished?.id ?? card.assetId;
       for (const format of draft.formats) {
+        const spec = {
+          brandId: brand.id,
+          sourceMediaAssetId: card.assetId ?? undefined,
+          templateId: card.templateId,
+          formatId: format,
+          ...catalogCardCopy(card),
+          imagePosition: card.imagePosition,
+          mark: card.showLogo ? ("auto" as const) : ("none" as const),
+          assetTitle: `${home.name} · ${format}`,
+        };
+        // Everything the renderer draws from: an unchanged card reuses the
+        // last export's image instead of drawing it again.
+        const renderKey = finished
+          ? undefined
+          : JSON.stringify([
+              getCompositionIdentity(spec),
+              // Pills and location draw but sit outside the identity.
+              catalogCardCopy(card),
+              card.imageUrl,
+              brand.logo,
+            ]);
+        const reused = renderKey ? previous.get(renderKey) : undefined;
+        if (!finished && !reused && !sourceId)
+          sourceId = (
+            await importRemoteImage({
+              brandId: brand.id,
+              uploadedBy: userId,
+              url: card.imageUrl,
+              title: `${home.name} · Catalog source`,
+            })
+          ).id;
         const asset = finished
           ? await importRemoteImage({
               brandId: brand.id,
@@ -758,23 +782,29 @@ export async function renderCatalogExport(
               height: finished.height ?? undefined,
               title: `${home.name} · ${format} · Finished artwork`,
             })
-          : await freezeComposition({
-              userId,
-              spec: {
+          : reused
+            ? // A copy, not the same row: deleting one export's image
+              // deletes its file.
+              await importRemoteImage({
                 brandId: brand.id,
-                sourceMediaAssetId: sourceId,
-                templateId: card.templateId,
-                formatId: format,
-                ...catalogCardCopy(card),
-                imagePosition: card.imagePosition,
-                mark: card.showLogo ? "auto" : "none",
-                assetTitle: `${home.name} · ${format}`,
-              },
-            });
+                uploadedBy: userId,
+                url: reused.url!,
+                filename: reused.filename ?? undefined,
+                width: reused.width ?? undefined,
+                height: reused.height ?? undefined,
+                title: reused.title ?? spec.assetTitle,
+              })
+            : await freezeComposition({
+                userId,
+                spec: { ...spec, sourceMediaAssetId: sourceId },
+              });
         if (!asset.url) throw new Error(`No image URL for ${home.name}`);
         await db
           .update(mediaAssetTable)
-          .set({ folderId })
+          .set({
+            folderId,
+            ...(reused ? { alt: reused.alt, metadata: reused.metadata } : {}),
+          })
           .where(eq(mediaAssetTable.id, asset.id));
         assets.push({
           homeId: home.id,
@@ -782,6 +812,8 @@ export async function renderCatalogExport(
           assetId: asset.id,
           url: asset.url,
           format,
+          ...(renderKey ? { renderKey } : {}),
+          ...(reused ? { reused: true } : {}),
         });
         await db
           .update(creativeRunTable)
@@ -822,6 +854,41 @@ export async function renderCatalogExport(
       })
       .where(eq(creativeRunTable.id, run.id));
   }
+}
+/** The last ready export's images by what they were drawn from. */
+async function previousRenders(brandId: string, fresh = false) {
+  const none = new Map<string, typeof mediaAssetTable.$inferSelect>();
+  if (fresh) return none;
+  const run = await db.query.creativeRunTable.findFirst({
+    where: and(
+      eq(creativeRunTable.brandId, brandId),
+      eq(creativeRunTable.provider, PROVIDER),
+      eq(creativeRunTable.status, "ready"),
+    ),
+    orderBy: (r, { desc }) => [desc(r.createdAt)],
+    columns: { providerOutput: true },
+  });
+  const keyed = (
+    (run?.providerOutput as CatalogExport | null)?.assets ?? []
+  ).filter((a) => a.renderKey);
+  if (!keyed.length) return none;
+  const rows = await db.query.mediaAssetTable.findMany({
+    where: and(
+      eq(mediaAssetTable.brandId, brandId),
+      inArray(
+        mediaAssetTable.id,
+        keyed.map((a) => a.assetId),
+      ),
+      eq(mediaAssetTable.status, "ready"),
+      isNull(mediaAssetTable.deletedAt),
+    ),
+  });
+  return new Map(
+    keyed.flatMap((a) => {
+      const row = rows.find((r) => r.id === a.assetId);
+      return row?.url ? [[a.renderKey!, row] as const] : [];
+    }),
+  );
 }
 export async function catalogExport(
   userId: string,
