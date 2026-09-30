@@ -1,7 +1,7 @@
 import "server-only";
 
 import { isDeepStrictEqual } from "node:util";
-import { isToolUIPart, type UIMessage } from "ai";
+import { isToolUIPart, type ModelMessage, type UIMessage } from "ai";
 
 export const APPROVAL_TTL_MS = 30 * 60 * 1_000;
 
@@ -114,4 +114,19 @@ export function isApprovalDenial(message: UIMessage) {
         part.approval.approved === false,
     )
   );
+}
+
+/**
+ * Context built for this request alone (contact sheets) goes after the last
+ * user message. An approval continuation ends on the assistant's tool call and
+ * the approval response, and the SDK reads approvals only off a trailing tool
+ * message: anything appended after it leaves the approved call unrun and
+ * without a result, which the provider rejects.
+ */
+export function withRequestContext(
+  messages: ModelMessage[],
+  context: ModelMessage[],
+): ModelMessage[] {
+  const at = messages.map((message) => message.role).lastIndexOf("user") + 1;
+  return [...messages.slice(0, at), ...context, ...messages.slice(at)];
 }

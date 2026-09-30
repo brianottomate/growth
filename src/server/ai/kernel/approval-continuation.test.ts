@@ -1,10 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import type { UIMessage } from "ai";
+import { generateText, tool, type ModelMessage, type UIMessage } from "ai";
+import { MockLanguageModelV4 } from "ai/test";
+import { z } from "zod";
 
 import {
   approvalHasExpired,
   isApprovalDenial,
   validateApprovalContinuation,
+  withRequestContext,
 } from "./approval-continuation";
 
 const pending = {
@@ -83,4 +86,92 @@ test("expired actions may be denied, while mixed or approved responses still req
   expect(isApprovalDenial({ id: "m", role: "assistant", parts: [] })).toBe(
     false,
   );
+});
+
+describe("withRequestContext", () => {
+  const sheet: ModelMessage = {
+    role: "user",
+    content: [{ type: "text", text: "Current ad images." }],
+  };
+  const prompt: ModelMessage = { role: "user", content: "Reopen the ad" };
+  const call: ModelMessage = {
+    role: "assistant",
+    content: [
+      {
+        type: "tool-call",
+        toolCallId: "call-1",
+        toolName: "setAdStatus",
+        input: { status: "drawn" },
+      },
+      {
+        type: "tool-approval-request",
+        approvalId: "approval-1",
+        toolCallId: "call-1",
+      },
+    ],
+  };
+  const approval: ModelMessage = {
+    role: "tool",
+    content: [
+      {
+        type: "tool-approval-response",
+        approvalId: "approval-1",
+        approved: true,
+      },
+    ],
+  };
+
+  test("appends after a user turn", () => {
+    expect(withRequestContext([prompt], [sheet])).toEqual([prompt, sheet]);
+  });
+
+  test("keeps an approval continuation ending on the tool message", () => {
+    expect(withRequestContext([prompt, call, approval], [sheet])).toEqual([
+      prompt,
+      sheet,
+      call,
+      approval,
+    ]);
+  });
+
+  test("runs the approved call the SDK would otherwise skip", async () => {
+    const run = async (messages: ModelMessage[]) => {
+      let executed = false;
+      const model = new MockLanguageModelV4({
+        doGenerate: {
+          content: [{ type: "text", text: "Reopened." }],
+          finishReason: { unified: "stop", raw: undefined },
+          usage: {
+            inputTokens: {
+              total: 1,
+              noCache: 1,
+              cacheRead: undefined,
+              cacheWrite: undefined,
+            },
+            outputTokens: { total: 1, text: 1, reasoning: undefined },
+          },
+          warnings: [],
+        },
+      });
+      await generateText({
+        model,
+        messages,
+        tools: {
+          setAdStatus: tool({
+            inputSchema: z.object({ status: z.string() }),
+            execute: async () => {
+              executed = true;
+              return { status: "drawn" };
+            },
+          }),
+        },
+        toolApproval: () => "user-approval",
+      });
+      return executed;
+    };
+    expect(await run([prompt, call, approval, sheet])).toBe(false);
+    expect(
+      await run(withRequestContext([prompt, call, approval], [sheet])),
+    ).toBe(true);
+  });
 });

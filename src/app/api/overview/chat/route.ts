@@ -25,6 +25,7 @@ import {
   isToolUIPart,
   stepCountIs,
   streamText,
+  type ModelMessage,
   type UIMessage,
 } from "ai";
 import { and, asc, eq, inArray, isNull, or } from "drizzle-orm";
@@ -71,6 +72,7 @@ import {
   approvalHasExpired,
   isApprovalDenial,
   validateApprovalContinuation,
+  withRequestContext,
 } from "@/server/ai/kernel/approval-continuation";
 import { runtimeClockSection } from "@/server/ai/kernel/runtime-clock";
 import type {
@@ -700,10 +702,11 @@ export async function POST(req: Request): Promise<Response> {
       history = persisted.slice(0, incomingIdx + 1).map((row) => row.message);
       staleTailIds = persisted.slice(incomingIdx + 1).map((row) => row.id);
     }
-    const modelMessages = await convertToModelMessages(
+    const historyMessages = await convertToModelMessages(
       sanitizeForModel(history).slice(-30),
     );
 
+    const sheets: ModelMessage[] = [];
     if (activeAd?.images.length) {
       for (let offset = 0; offset < activeAd.images.length; offset += 16) {
         const batch = activeAd.images.slice(offset, offset + 16);
@@ -713,7 +716,7 @@ export async function POST(req: Request): Promise<Response> {
           url: "",
           photos: batch.map((item) => item.source),
         });
-        modelMessages.push({
+        sheets.push({
           role: "user",
           content: [
             {
@@ -741,7 +744,7 @@ export async function POST(req: Request): Promise<Response> {
           },
           offset + 1,
         );
-        modelMessages.push({
+        sheets.push({
           role: "user",
           content: [
             {
@@ -753,6 +756,7 @@ export async function POST(req: Request): Promise<Response> {
         });
       }
     }
+    const modelMessages = withRequestContext(historyMessages, sheets);
 
     const context = composeGrowthContext({
       surface: "overview-chat",
