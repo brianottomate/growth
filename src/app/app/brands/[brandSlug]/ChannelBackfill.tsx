@@ -215,6 +215,7 @@ function PulledPost({
 
   const card = (
     <CompactPlatformPreview
+      play={false}
       className="w-52 max-w-52 shrink-0"
       platform={platform}
       format={null}

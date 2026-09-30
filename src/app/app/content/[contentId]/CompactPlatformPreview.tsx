@@ -69,12 +69,14 @@ function PreviewMedia({
   format,
   contentTitle,
   fallbackImage,
+  play,
 }: {
   item: CompactPreviewItem;
   platform: string;
   format: string | null;
   contentTitle: string;
   fallbackImage?: string | null;
+  play: boolean;
 }) {
   const firstMedia = item.media[0];
   if (!firstMedia && !fallbackImage) return null;
@@ -85,7 +87,21 @@ function PreviewMedia({
         cropClass(format, platform),
       )}
     >
-      {firstMedia?.type === "video" && !firstMedia.thumbnail ? (
+      {firstMedia?.type === "video" && play ? (
+        <video
+          src={firstMedia.url}
+          poster={
+            firstMedia.thumbnail && firstMedia.thumbnail !== firstMedia.url
+              ? firstMedia.thumbnail
+              : undefined
+          }
+          aria-label={`${platformLabel(platform)} preview for ${contentTitle}`}
+          className="size-full bg-black object-cover"
+          controls
+          playsInline
+          preload="metadata"
+        />
+      ) : firstMedia?.type === "video" && !firstMedia.thumbnail ? (
         <div className="flex size-full items-center justify-center bg-gradient-to-br from-muted via-background to-muted">
           <span className="flex size-9 items-center justify-center rounded-full bg-foreground/90 text-background">
             <Play className="ml-0.5 size-4 fill-current" />
@@ -134,6 +150,7 @@ export function CompactPlatformPreview({
   scheduled,
   caption,
   readiness,
+  play = true,
 }: {
   className?: string;
   platform: string;
@@ -157,6 +174,12 @@ export function CompactPlatformPreview({
    * platform (the brand page's backfill samples).
    */
   readiness?: boolean;
+  /**
+   * Play video in place (default), where an operator reviews the post. The
+   * brand page's backfill samples pass false: their provider URLs expire,
+   * and the rehosted poster is what still loads.
+   */
+  play?: boolean;
 }) {
   const identity = channelName ?? username ?? brandName;
   const items =
@@ -210,7 +233,7 @@ export function CompactPlatformPreview({
             media,
             meta: scheduled ? "Scheduled" : "Draft",
           }}
-          play={false}
+          play={play}
         />
       ) : (
         <div className="overflow-hidden rounded-lg border bg-background shadow-sm">
@@ -258,6 +281,7 @@ export function CompactPlatformPreview({
                 platform={platform}
                 format={format}
                 contentTitle={contentTitle}
+                play={play}
                 fallbackImage={
                   index === 0 && item.media.length === 0
                     ? linkCard?.image

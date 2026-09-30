@@ -4,6 +4,7 @@ import { and, eq, gte, inArray, isNull, lt, ne, or } from "drizzle-orm";
 import { AlertTriangle, CheckCircle2, CircleDashed } from "lucide-react";
 
 import { ContentStructureAssistantButton } from "@/components/content-structure-assistant-button";
+import { HoverVideo } from "@/components/hover-video";
 import { DeleteSeriesButton } from "../DeleteSeriesButton";
 import { getSeriesRunway } from "@/lib/series-runway";
 import { db } from "@/server/db";
@@ -13,6 +14,7 @@ import {
   contentPostTable,
   memberTable,
   seriesTable,
+  type MediaItem,
 } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { listBrandPillars } from "@/server/services/content-strategy.service";
@@ -281,6 +283,8 @@ export default async function SeriesDetailPage({
   // leading social-card thumbnail.
   const heroFor = (post: (typeof installments)[number]) =>
     post.media?.[0] ? (post.media[0].thumbnail ?? post.media[0].url) : null;
+  const videoOf = (media: MediaItem[] | null | undefined) =>
+    media?.[0]?.type === "video" ? media[0].url : null;
 
   // Prefer the real platform_post rows; fall back to the targetSpots intent
   // manifest for ideas whose spots haven't materialized yet. Thumbnails read
@@ -302,6 +306,7 @@ export default async function SeriesDetailPage({
             : spot.text
               ? null
               : poolThumb,
+          video: spot.media?.[0] ? videoOf(spot.media) : videoOf(post.media),
         }))
       : (post.targetSpots ?? []).map((spot, index) => ({
           id: `target-${index}`,
@@ -310,6 +315,7 @@ export default async function SeriesDetailPage({
           status: "slot",
           text: null,
           thumb: poolThumb,
+          video: videoOf(post.media),
         }));
   };
 
@@ -533,6 +539,7 @@ type SpotPreview = {
   status: string;
   text: string | null;
   thumb: string | null;
+  video: string | null;
 };
 
 const SPOT_DOT: Record<string, string> = {
@@ -562,7 +569,13 @@ function SpotTile({ spot }: { spot: SpotPreview }) {
       title={`${label} · ${spot.status.replace("_", " ")}`}
     >
       <div className="h-14">
-        {spot.thumb ? (
+        {spot.video ? (
+          <HoverVideo
+            src={spot.video}
+            poster={spot.thumb}
+            className="h-full w-full object-cover"
+          />
+        ) : spot.thumb ? (
           // oxlint-disable-next-line nextjs/no-img-element
           <img src={spot.thumb} alt="" className="h-full w-full object-cover" />
         ) : spot.text ? (
