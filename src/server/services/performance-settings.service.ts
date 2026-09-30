@@ -37,6 +37,7 @@ export const performanceSettingsPatchSchema = z.object({
   endDate: z.iso.date().or(z.literal("")).nullish(),
   siteLive: text.nullish(),
   agreedAdSpend: z.number().int().min(0).nullish(),
+  logoOnCreatives: z.boolean().nullish(),
 });
 
 export type PerformanceSettingsPatch = z.infer<

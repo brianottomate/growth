@@ -271,6 +271,8 @@ export async function runStarterGeneration(runId: string, input: Input) {
         brandWebsiteId(brand.id),
         db.query.brandTable.findFirst({ where: eq(brandTable.id, brand.id) }),
       ]);
+    const logoDefault =
+      fullBrand?.performanceSettings?.logoOnCreatives !== false;
     const selected = input.homeIds.map((id) =>
       available.find((h) => h.id === id)!,
     );
@@ -380,6 +382,7 @@ export async function runStarterGeneration(runId: string, input: Input) {
         output,
         input.intendedPlacements,
         "carousel",
+        logoDefault,
       );
       await save(
         `${home.name} · Static`,
@@ -388,6 +391,7 @@ export async function runStarterGeneration(runId: string, input: Input) {
           output,
           input.intendedPlacements,
           "static",
+          logoDefault,
         ),
         home.id,
       );

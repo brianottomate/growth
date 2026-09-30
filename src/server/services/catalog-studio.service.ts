@@ -220,6 +220,7 @@ async function catalogHomes(brand: CatalogBrand, refresh = false) {
     brand.settings?.catalogTemplateId ?? DEFAULT_CATALOG_TEMPLATE,
     brand.markets,
     DEFAULT_CATALOG_FORMAT,
+    brand.settings?.logoOnCreatives !== false,
   );
   // Cards still on the starter headline that nobody wrote, approved or gave
   // supplied artwork: what "Write all cards" works through.

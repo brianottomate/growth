@@ -198,6 +198,7 @@ export default async function PerformanceBrandHomesPage({
         mark={brand.brandMark ?? null}
         variants={markVariants}
         photo={previewHome?.imageUrl ?? null}
+        logoOnCreatives={brand.performanceSettings?.logoOnCreatives !== false}
       />
       <BrandStoryCard brandId={brand.id} story={brand.story} />
       <MarketsCard

@@ -250,6 +250,8 @@ export function catalogDraft(
   markets?: BrandMarkets | null,
   /** The canvas every card is drawn and exported at. */
   format: CatalogFormatId = DEFAULT_CATALOG_FORMAT,
+  /** The brand's default for the mark on a card that has not chosen. */
+  showLogo = true,
 ): CatalogDraft {
   return {
     formats: [format],
@@ -279,7 +281,7 @@ export function catalogDraft(
           title: o.title ?? catalogBaselineTitle(home, templateId, markets),
           subtitle: o.subtitle ?? copy.subtitle,
           imagePosition: o.imagePosition ?? "center",
-          showLogo: o.showLogo ?? true,
+          showLogo: o.showLogo ?? showLogo,
           rating: ratingOutOfFive(home.rating),
           pills: o.pills ?? defaultCatalogPills(home),
           location: catalogLocation(home, markets) || undefined,

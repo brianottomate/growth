@@ -58,6 +58,8 @@ export function generatedDocument(
   generated: GeneratedHome,
   placements: z.infer<typeof metaPlacementSchema>[],
   format: "static" | "carousel",
+  /** The brand's default for the mark on new cards. */
+  showLogo = true,
 ): IdeaDocument {
   const selected =
     format === "static" ? generated.cards.slice(0, 1) : generated.cards;
@@ -76,7 +78,7 @@ export function generatedDocument(
       : ("image-hero" as const),
     eyebrow: "",
     cta: hero ? "Explore your next escape" : "",
-    showLogo: true,
+    showLogo,
   });
   const cards = selected.map((card, i) => {
     const source = home.photos[card.photoIndex - 1];

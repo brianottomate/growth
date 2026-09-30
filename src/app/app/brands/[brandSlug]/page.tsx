@@ -64,6 +64,7 @@ export default async function BrandPage({
       brandIdentity: true,
       brandMark: true,
       websiteMeta: true,
+      performanceSettings: true,
     },
   });
   if (!brand) notFound();
@@ -229,6 +230,7 @@ export default async function BrandPage({
         identity={brand.brandIdentity ?? null}
         mark={brand.brandMark ?? null}
         variants={markVariants}
+        logoOnCreatives={brand.performanceSettings?.logoOnCreatives !== false}
         photo={
           brand.brandIdentity?.raw?.images?.ogImage ??
           brand.websiteMeta?.ogImage ??

@@ -54,6 +54,7 @@ const performanceSettingsShape = {
     })
     .optional(),
   influencer: z.string().nullable().optional(),
+  logoOnCreatives: z.boolean().nullable().optional(),
   invoiceEmail: z.string().nullable().optional(),
   metaTrackingDefaults: z
     .record(

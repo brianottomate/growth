@@ -34,6 +34,7 @@ export function BrandMarkCard({
   mark,
   variants,
   photo,
+  logoOnCreatives = true,
 }: {
   brandId: string;
   brandName: string;
@@ -43,6 +44,8 @@ export function BrandMarkCard({
   variants: Variants | null;
   /** A photo to preview the white mark over: the OG image or a hero. */
   photo: string | null;
+  /** Whether new ad and catalog cards carry the mark; a card can still override it. */
+  logoOnCreatives?: boolean;
 }) {
   const router = useRouter();
   const [building, setBuilding] = useState(false);
@@ -156,6 +159,12 @@ export function BrandMarkCard({
       onError: (error) => toast.error(error.message),
     }),
   );
+  const setLogoDefault = useMutation(
+    orpc.brand.setPerformanceSettings.mutationOptions({
+      onSuccess: () => router.refresh(),
+      onError: (error) => toast.error(error.message),
+    }),
+  );
   const clearMark = useMutation(
     orpc.brand.clearMark.mutationOptions({
       onSuccess: onDone("Brand mark cleared"),
@@ -190,6 +199,20 @@ export function BrandMarkCard({
             </p>
           ) : null}
         </div>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={logoOnCreatives}
+            disabled={setLogoDefault.isPending}
+            onChange={(event) =>
+              setLogoDefault.mutate({
+                brandId,
+                patch: { logoOnCreatives: event.target.checked },
+              })
+            }
+          />
+          Mark on new ad and catalog cards
+        </label>
         <div className="flex flex-wrap gap-2">
           <Button
             size="sm"

@@ -20,6 +20,7 @@ import {
   enrichBrandAction,
   listBrands,
   setBrandMarkAction,
+  setPerformanceSettingsAction,
   suggestBrandMarkAction,
 } from "@/server/ai/capabilities/brands";
 import {
@@ -511,6 +512,7 @@ export const brandRouter = {
     }),
 
   setMark: actionProcedure(setBrandMarkAction),
+  setPerformanceSettings: actionProcedure(setPerformanceSettingsAction),
 
   /** "Fix with AI": the art director's corrections for the lockup as edited. */
   critiqueMark: protectedProcedure
