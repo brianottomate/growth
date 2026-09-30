@@ -129,6 +129,7 @@ async function persistRevision(input: {
   source: "generation" | "manual" | "restore";
   note?: string;
   userId: string | null;
+  expectedRevision?: number;
 }) {
   const snapshot = snapshotOf(input.draft);
   return withTransaction(async (tx) => {
@@ -136,12 +137,29 @@ async function persistRevision(input: {
       where: eq(emailDocumentTable.id, input.emailDocumentId),
     });
     if (!current) throw new Error("Email document not found.");
+    if (
+      input.expectedRevision !== undefined &&
+      input.expectedRevision !== current.currentRevision
+    ) {
+      throw new Error(
+        "The email has a newer revision. Load it before saving your changes.",
+      );
+    }
     const revision = current.currentRevision + 1;
     const [document] = await tx
       .update(emailDocumentTable)
       .set({ ...snapshot, currentRevision: revision, updatedAt: new Date() })
-      .where(eq(emailDocumentTable.id, current.id))
+      .where(
+        and(
+          eq(emailDocumentTable.id, current.id),
+          eq(emailDocumentTable.currentRevision, current.currentRevision),
+        ),
+      )
       .returning();
+    if (!document)
+      throw new Error(
+        "The email changed during this save. Load its newest revision and retry.",
+      );
     await tx.insert(emailDocumentVersionTable).values({
       emailDocumentId: current.id,
       revision,
@@ -164,7 +182,7 @@ async function persistRevision(input: {
         .set({ status: "draft" })
         .where(eq(contentPostTable.id, input.contentPostId));
     }
-    return document!;
+    return document;
   });
 }
 
@@ -276,6 +294,7 @@ export async function saveEmailDocument(input: {
   userId: string;
   draft: EmailDocumentDraft;
   note?: string;
+  expectedRevision?: number;
 }) {
   const parsed = emailDocumentDraftSchema.parse(input.draft);
   const { document, spot } = await ensureEmailDocument(input);
@@ -286,6 +305,7 @@ export async function saveEmailDocument(input: {
     draft: parsed,
     source: "manual",
     note: input.note ?? "Manual save",
+    expectedRevision: input.expectedRevision,
     userId: input.userId,
   });
 }
@@ -612,6 +632,7 @@ export async function runEmailGenerationJob(jobId: string) {
       emailDocumentId: document.id,
       platformPostId: spot.id,
       contentPostId: spot.contentPostId,
+      expectedRevision: document.currentRevision,
       draft: {
         ...output,
         templateKey: document.templateKey,

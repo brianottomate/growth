@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -39,6 +39,31 @@ type Draft = Pick<
   | "digest"
 >;
 
+function editableDraft(document: Workspace["document"]): Draft {
+  const {
+    subject,
+    preheader,
+    bodyMarkdown,
+    ctaLabel,
+    ctaUrl,
+    templateKey,
+    handoffTargetRepo,
+    productUpdate,
+    digest,
+  } = document;
+  return {
+    subject,
+    preheader,
+    bodyMarkdown,
+    ctaLabel,
+    ctaUrl,
+    templateKey,
+    handoffTargetRepo,
+    productUpdate,
+    digest,
+  };
+}
+
 const controlClass =
   "bg-background border-input focus:ring-ring/30 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2";
 
@@ -49,24 +74,36 @@ function Editor({ workspace }: { workspace: Workspace }) {
       platformPostId: workspace.spot.id,
     },
   });
-  const [draft, setDraft] = useState<Draft>({
-    subject: workspace.document.subject,
-    preheader: workspace.document.preheader,
-    bodyMarkdown: workspace.document.bodyMarkdown,
-    ctaLabel: workspace.document.ctaLabel,
-    ctaUrl: workspace.document.ctaUrl,
-    templateKey: workspace.document.templateKey,
-    handoffTargetRepo: workspace.document.handoffTargetRepo,
-    productUpdate: workspace.document.productUpdate,
-    digest: workspace.document.digest,
-  });
+  const [draft, setDraft] = useState<Draft>(() =>
+    editableDraft(workspace.document),
+  );
+  const [savedDraft, setSavedDraft] = useState(() =>
+    editableDraft(workspace.document),
+  );
+  const [revision, setRevision] = useState(workspace.document.currentRevision);
+  const dirty = JSON.stringify(draft) !== JSON.stringify(savedDraft);
+  const stale = revision !== workspace.document.currentRevision;
+  const loadRevision = () => {
+    const next = editableDraft(workspace.document);
+    setDraft(next);
+    setSavedDraft(next);
+    setRevision(workspace.document.currentRevision);
+  };
+  useEffect(() => {
+    if (stale && !dirty) loadRevision();
+  }, [workspace.document.currentRevision]); // oxlint-disable-line react/exhaustive-deps
+  useEffect(() => {
+    if (!dirty) return;
+    const beforeUnload = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => window.removeEventListener("beforeunload", beforeUnload);
+  }, [dirty]);
+  const previewSequence = useRef(0);
   const [brief, setBrief] = useState("");
   const [previewHtml, setPreviewHtml] = useState("");
   const [fieldsOpen, setFieldsOpen] = useState(false);
   const [previewWarnings, setPreviewWarnings] = useState<string[]>([]);
-  // template = raw liquid as CIO receives it; the personas simulate CIO's
-  // per-recipient expansion. "sparse" is the fallback-shaker: a recipient with
-  // no attributes at all.
+  // Preview the stored fields, a sample guest, or a guest without attributes.
   const [viewAs, setViewAs] = useState<"template" | "full" | "sparse">(
     "template",
   );
@@ -76,7 +113,12 @@ function Editor({ workspace }: { workspace: Workspace }) {
   };
   const save = useMutation(
     orpc.newsletter.saveDocument.mutationOptions({
-      onSuccess: refreshWorkspace,
+      onMutate: () => draft,
+      onSuccess: async (result, _variables, submitted) => {
+        if (submitted) setSavedDraft(submitted);
+        setRevision(result.revision);
+        await refreshWorkspace();
+      },
     }),
   );
   const generate = useMutation(
@@ -89,27 +131,28 @@ function Editor({ workspace }: { workspace: Workspace }) {
       onSuccess: refreshWorkspace,
     }),
   );
-  const preview = useMutation(
-    orpc.newsletter.renderPreview.mutationOptions({
-      onSuccess: ({ html, warnings }) => {
-        setPreviewHtml(html);
-        setPreviewWarnings(warnings ?? []);
-      },
-    }),
-  );
-
-  // Every preview carries the editor's block ids, so a click in it opens
-  // that block; the saved draft never does.
+  const preview = useMutation(orpc.newsletter.renderPreview.mutationOptions());
   const previewDraft = (
     next: Draft = draft,
     as: "template" | "full" | "sparse" = viewAs,
-  ) =>
-    preview.mutate({
-      platformPostId: workspace.spot.id,
-      draft: { ...next, bodyMarkdown: previewBody(next.bodyMarkdown) },
-      viewAs: as,
-      blockIds: true,
-    });
+  ) => {
+    const request = ++previewSequence.current;
+    preview.mutate(
+      {
+        platformPostId: workspace.spot.id,
+        draft: { ...next, bodyMarkdown: previewBody(next.bodyMarkdown) },
+        viewAs: as,
+        blockIds: true,
+      },
+      {
+        onSuccess: ({ html, warnings }) => {
+          if (request !== previewSequence.current) return;
+          setPreviewHtml(html);
+          setPreviewWarnings(warnings ?? []);
+        },
+      },
+    );
+  };
   const renderPreview = (as: "template" | "full" | "sparse" = viewAs) =>
     previewDraft(draft, as);
   const [activePick, setActivePick] = useState<PreviewPick | null>(null);
@@ -119,11 +162,13 @@ function Editor({ workspace }: { workspace: Workspace }) {
   } | null>(null);
 
   useEffect(() => {
-    previewDraft();
-    // Generate the initial projection once per persisted revision. Subsequent
-    // unsaved changes are rendered explicitly so typing never causes requests.
-    // oxlint-disable-next-line react/exhaustive-deps
-  }, [workspace.document.currentRevision]);
+    ++previewSequence.current;
+    const timer = window.setTimeout(() => previewDraft(), 400);
+    return () => {
+      window.clearTimeout(timer);
+      ++previewSequence.current;
+    };
+  }, [draft, viewAs]); // oxlint-disable-line react/exhaustive-deps
 
   const activeJob =
     workspace.latestJob?.status === "queued" ||
@@ -188,6 +233,25 @@ function Editor({ workspace }: { workspace: Workspace }) {
         </div>
       </div>
 
+      {stale && dirty && (
+        <div role="alert" className="rounded-lg border p-3 text-sm">
+          A newer email revision is available. Your edits are kept here.{" "}
+          <button
+            type="button"
+            className="underline"
+            onClick={() => {
+              if (
+                window.confirm(
+                  "Discard your edits and load the newer revision?",
+                )
+              )
+                loadRevision();
+            }}
+          >
+            Load revision
+          </button>
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-5 @5xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.9fr)]">
         <div className="space-y-4">
           {/* Chat-first: the conversation is the write path for words (subject,
@@ -209,7 +273,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
           <EmailBlocksCard
             // A saved, restored or generated revision replaces the body; the
             // blocks re-read it.
-            key={workspace.document.currentRevision}
+            key={revision}
             platformPostId={workspace.spot.id}
             brandId={workspace.brand.id}
             campaign={workspace.content?.title || draft.subject}
@@ -228,7 +292,6 @@ function Editor({ workspace }: { workspace: Workspace }) {
             onChange={(change) => {
               const next = { ...draft, ...change };
               setDraft(next);
-              previewDraft(next);
             }}
           />
           {/* Wander's issues match their homes to wander.com; a brand's own
@@ -252,10 +315,11 @@ function Editor({ workspace }: { workspace: Workspace }) {
                   save.mutate({
                     platformPostId: workspace.spot.id,
                     changes: draft,
+                    expectedRevision: revision,
                     note: "Saved from the newsletter workspace",
                   })
                 }
-                disabled={save.isPending}
+                disabled={save.isPending || stale || !dirty}
                 className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
               >
                 {save.isPending ? (
@@ -413,7 +477,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
                   brief: brief.trim() || undefined,
                 })
               }
-              disabled={generate.isPending || activeJob}
+              disabled={generate.isPending || activeJob || dirty || stale}
               className="mt-2 flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
             >
               {generate.isPending || activeJob ? (
@@ -464,7 +528,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
                           versionId: version.id,
                         })
                       }
-                      disabled={restore.isPending}
+                      disabled={restore.isPending || dirty || stale}
                       className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs hover:bg-accent"
                     >
                       <RotateCcw className="size-3.5" /> Restore
@@ -708,10 +772,5 @@ export function NewsletterIssueWorkspace({
     );
   }
 
-  return (
-    <Editor
-      key={`${query.data.document.id}:${query.data.document.currentRevision}`}
-      workspace={query.data}
-    />
-  );
+  return <Editor key={query.data.document.id} workspace={query.data} />;
 }

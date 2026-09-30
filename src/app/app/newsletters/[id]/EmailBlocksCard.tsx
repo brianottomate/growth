@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
   ArrowDown,
@@ -110,6 +110,8 @@ export function EmailBlocksCard({
     // oxlint-disable-next-line react/exhaustive-deps
   }, []);
   const [open, setOpen] = useState<string | null>(null);
+  const latestBody = useRef(fields.bodyMarkdown);
+  latestBody.current = fields.bodyMarkdown;
   const [buffer, setBuffer] = useState("");
   const [bufferVersion, setBufferVersion] = useState(0);
   const [source, setSource] = useState(false);
@@ -170,6 +172,24 @@ export function EmailBlocksCard({
   const setSection = (index: number, section: DigestSection) =>
     onChange(withDigest(sections.map((s, i) => (i === index ? section : s))));
 
+  const editCopy = (value: string) => {
+    setBuffer(value);
+    commit(
+      blocks.map((block) =>
+        block.id === open ? { ...block, source: value } : block,
+      ),
+    );
+  };
+  const editImage = (value: { src: string; alt: string }) => {
+    setImageBuffer(value);
+    commit(
+      blocks.map((block) =>
+        block.id === open
+          ? { ...block, source: imageSource(value.src, value.alt, html) }
+          : block,
+      ),
+    );
+  };
   const done = (block: EmailBlock) => {
     const next =
       block.kind === "image"
@@ -246,9 +266,10 @@ export function EmailBlocksCard({
       <div className="grid grid-cols-1 gap-2">
         <input
           value={head.subject}
-          onChange={(event) =>
-            setHead({ ...head, subject: event.target.value })
-          }
+          onChange={(event) => {
+            setHead({ ...head, subject: event.target.value });
+            onChange({ subject: event.target.value });
+          }}
           onBlur={applyHead}
           aria-label="Subject"
           placeholder="Subject"
@@ -256,9 +277,10 @@ export function EmailBlocksCard({
         />
         <input
           value={head.preheader}
-          onChange={(event) =>
-            setHead({ ...head, preheader: event.target.value })
-          }
+          onChange={(event) => {
+            setHead({ ...head, preheader: event.target.value });
+            onChange({ preheader: event.target.value || null });
+          }}
           onBlur={applyHead}
           aria-label="Preheader"
           placeholder="Preheader"
@@ -338,7 +360,7 @@ export function EmailBlocksCard({
                   <input
                     value={imageBuffer.src}
                     onChange={(event) =>
-                      setImageBuffer({
+                      editImage({
                         ...imageBuffer,
                         src: event.target.value,
                       })
@@ -350,7 +372,7 @@ export function EmailBlocksCard({
                   <input
                     value={imageBuffer.alt}
                     onChange={(event) =>
-                      setImageBuffer({
+                      editImage({
                         ...imageBuffer,
                         alt: event.target.value,
                       })
@@ -380,7 +402,7 @@ export function EmailBlocksCard({
                   {source ? (
                     <textarea
                       value={buffer}
-                      onChange={(event) => setBuffer(event.target.value)}
+                      onChange={(event) => editCopy(event.target.value)}
                       aria-label="Block source"
                       rows={Math.min(12, Math.max(3, buffer.length / 70))}
                       className={`${input} font-mono text-xs`}
@@ -389,7 +411,7 @@ export function EmailBlocksCard({
                     <RichBlockEditor
                       key={bufferVersion}
                       html={buffer}
-                      onChange={setBuffer}
+                      onChange={editCopy}
                     />
                   )}
                   <div className="mt-2 flex gap-1.5">
@@ -403,7 +425,8 @@ export function EmailBlocksCard({
                     <button
                       type="button"
                       disabled={rewrite.isPending}
-                      onClick={() =>
+                      onClick={() => {
+                        const requestedBody = latestBody.current;
                         rewrite.mutate(
                           {
                             platformPostId,
@@ -415,12 +438,13 @@ export function EmailBlocksCard({
                           },
                           {
                             onSuccess: ({ block: next }) => {
-                              setBuffer(next);
+                              if (latestBody.current !== requestedBody) return;
+                              editCopy(next);
                               setBufferVersion((v) => v + 1);
                             },
                           },
-                        )
-                      }
+                        );
+                      }}
                       className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium hover:bg-accent disabled:opacity-50"
                     >
                       {rewrite.isPending ? (
@@ -529,9 +553,10 @@ export function EmailBlocksCard({
       <div className="mt-3 grid grid-cols-1 gap-2 @md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
         <input
           value={head.ctaLabel}
-          onChange={(event) =>
-            setHead({ ...head, ctaLabel: event.target.value })
-          }
+          onChange={(event) => {
+            setHead({ ...head, ctaLabel: event.target.value });
+            onChange({ ctaLabel: event.target.value || null });
+          }}
           onBlur={applyHead}
           aria-label="Button label"
           placeholder="Button label"
@@ -539,7 +564,10 @@ export function EmailBlocksCard({
         />
         <input
           value={head.ctaUrl}
-          onChange={(event) => setHead({ ...head, ctaUrl: event.target.value })}
+          onChange={(event) => {
+            setHead({ ...head, ctaUrl: event.target.value });
+            onChange({ ctaUrl: event.target.value || null });
+          }}
           onBlur={applyHead}
           aria-label="Button link"
           placeholder="Button link"

@@ -41,7 +41,7 @@ function escapeHtml(value: string) {
 export function unknownFields(text: string) {
   return [...text.matchAll(FIELD)]
     .map((match) => match[1]!)
-    .filter((name) => !(name in EMAIL_FIELDS));
+    .filter((name) => !Object.hasOwn(EMAIL_FIELDS, name));
 }
 
 /**
@@ -54,8 +54,9 @@ export function fillFields(
   options: { html: boolean },
 ) {
   return text.replace(FIELD, (_match, name: string, fallback?: string) => {
-    const value =
-      name in EMAIL_FIELDS ? recipient[name as EmailField]?.trim() : undefined;
+    const value = Object.hasOwn(EMAIL_FIELDS, name)
+      ? recipient[name as EmailField]?.trim()
+      : undefined;
     const filled = value || fallback?.trim() || "";
     return options.html ? escapeHtml(filled) : filled;
   });

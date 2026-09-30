@@ -1,6 +1,13 @@
 "use client";
 
-import { EditorContent, mergeAttributes, Node, useEditor } from "@tiptap/react";
+import {
+  EditorContent,
+  mergeAttributes,
+  Node,
+  useEditor,
+  useEditorState,
+} from "@tiptap/react";
+import { fieldHtml } from "./email-field-html";
 import StarterKit from "@tiptap/starter-kit";
 import { Bold, Italic, Link2, UserRound } from "lucide-react";
 
@@ -48,28 +55,6 @@ const FieldChip = Node.create({
   },
 });
 
-const TOKEN = /\{\{\s*([a-z_]+)\s*(?:\|([^}]*))?\}\}/g;
-const escape = (value: string) =>
-  value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
-
-function tokensToChips(html: string) {
-  return html.replace(
-    TOKEN,
-    (_match, name: string, fallback?: string) =>
-      `<span data-field="${escape(name)}" data-fallback="${escape(fallback?.trim() ?? "")}"></span>`,
-  );
-}
-
-function chipsToTokens(html: string) {
-  return html.replace(
-    /<span[^>]*data-field="([a-z_]+)"[^>]*?(?:data-fallback="([^"]*)")?[^>]*>.*?<\/span>/g,
-    (match, name: string) => {
-      const fallback = /data-fallback="([^"]*)"/.exec(match)?.[1] ?? "";
-      return fallback ? `{{${name}|${fallback}}}` : `{{${name}}}`;
-    },
-  );
-}
-
 const DEFAULT_FALLBACK: Record<EmailField, string> = {
   first_name: "there",
   last_home: "",
@@ -101,16 +86,24 @@ export function RichBlockEditor({
       }),
       FieldChip,
     ],
-    content: tokensToChips(html),
+    content: typeof DOMParser === "undefined" ? "" : fieldHtml(html, "chips"),
     editorProps: {
       attributes: {
         class:
           "min-h-16 rounded-lg border bg-background px-3 py-2 text-sm leading-6 outline-none focus:ring-2 focus:ring-ring/30 [&_a]:text-primary [&_a]:underline [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_h2]:text-base [&_h2]:font-semibold [&_p+p]:mt-2",
       },
     },
-    onUpdate: ({ editor }) => onChange(chipsToTokens(editor.getHTML())),
+    onUpdate: ({ editor }) => onChange(fieldHtml(editor.getHTML(), "tokens")),
   });
 
+  const active = useEditorState({
+    editor,
+    selector: ({ editor: current }) => ({
+      bold: current?.isActive("bold"),
+      italic: current?.isActive("italic"),
+      link: current?.isActive("link"),
+    }),
+  });
   if (!editor) return null;
 
   const setLink = () => {
@@ -128,7 +121,8 @@ export function RichBlockEditor({
         <button
           type="button"
           aria-label="Bold"
-          data-on={editor.isActive("bold")}
+          data-on={active?.bold}
+          aria-pressed={active?.bold}
           onClick={() => editor.chain().focus().toggleBold().run()}
           className={tool}
         >
@@ -137,7 +131,8 @@ export function RichBlockEditor({
         <button
           type="button"
           aria-label="Italic"
-          data-on={editor.isActive("italic")}
+          data-on={active?.italic}
+          aria-pressed={active?.italic}
           onClick={() => editor.chain().focus().toggleItalic().run()}
           className={tool}
         >
@@ -146,7 +141,8 @@ export function RichBlockEditor({
         <button
           type="button"
           aria-label="Link"
-          data-on={editor.isActive("link")}
+          data-on={active?.link}
+          aria-pressed={active?.link}
           onClick={setLink}
           className={tool}
         >
