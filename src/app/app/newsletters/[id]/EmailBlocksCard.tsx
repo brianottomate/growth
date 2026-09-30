@@ -28,6 +28,7 @@ import { BrandHomePicker } from "./BrandHomesCard";
 import {
   blockImage,
   blockSummary,
+  type EmailImage,
   type EmailBlock,
   fromBlocks,
   imageSource,
@@ -38,6 +39,7 @@ import {
   toBlocks,
 } from "./email-blocks";
 import type { PreviewPick } from "./EmailPreviewFrame";
+import { HeaderCardFields } from "./HeaderCardFields";
 import { HomeGroupEditor } from "./HomeGroupEditor";
 import { RichBlockEditor } from "./RichBlockEditor";
 
@@ -115,7 +117,10 @@ export function EmailBlocksCard({
   const [buffer, setBuffer] = useState("");
   const [bufferVersion, setBufferVersion] = useState(0);
   const [source, setSource] = useState(false);
-  const [imageBuffer, setImageBuffer] = useState({ src: "", alt: "" });
+  const [imageBuffer, setImageBuffer] = useState<EmailImage>({
+    src: "",
+    alt: "",
+  });
   const [instruction, setInstruction] = useState("");
   const [addingGroup, setAddingGroup] = useState(false);
   const [head, setHead] = useState({
@@ -180,12 +185,15 @@ export function EmailBlocksCard({
       ),
     );
   };
-  const editImage = (value: { src: string; alt: string }) => {
+  const editImage = (value: EmailImage) => {
     setImageBuffer(value);
     commit(
       blocks.map((block) =>
         block.id === open
-          ? { ...block, source: imageSource(value.src, value.alt, html) }
+          ? {
+              ...block,
+              source: imageSource(value.src, value.alt, html, value.card),
+            }
           : block,
       ),
     );
@@ -193,7 +201,7 @@ export function EmailBlocksCard({
   const done = (block: EmailBlock) => {
     const next =
       block.kind === "image"
-        ? imageSource(imageBuffer.src, imageBuffer.alt, html)
+        ? imageSource(imageBuffer.src, imageBuffer.alt, html, imageBuffer.card)
         : buffer.trim();
     if (next && next !== block.source) {
       commit(
@@ -381,6 +389,13 @@ export function EmailBlocksCard({
                     placeholder="Alt text"
                     className={input}
                   />
+                  {html && (
+                    <HeaderCardFields
+                      brandId={brandId}
+                      image={imageBuffer}
+                      onChange={editImage}
+                    />
+                  )}
                 </div>
               ) : block.kind === "homes" ? (
                 section ? (

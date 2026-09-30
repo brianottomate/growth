@@ -173,7 +173,20 @@ export function blockSummary(block: EmailBlock, html: boolean) {
   return (doc.body.textContent ?? "").replace(/\s+/g, " ").trim();
 }
 
-export function blockImage(block: EmailBlock, html: boolean) {
+/** A header card's settings, kept on its image so the card can be redone. */
+export type HeaderCard = {
+  source: string;
+  eyebrow: string;
+  title: string;
+  detail: string;
+};
+
+export type EmailImage = { src: string; alt: string; card?: HeaderCard };
+
+export function blockImage(
+  block: EmailBlock,
+  html: boolean,
+): EmailImage | null {
   if (block.kind !== "image") return null;
   if (!html) {
     const match = /^!\[([^\]]*)\]\(([^)]+)\)/.exec(block.source.trim());
@@ -181,14 +194,35 @@ export function blockImage(block: EmailBlock, html: boolean) {
   }
   const doc = new DOMParser().parseFromString(block.source, "text/html");
   const img = doc.querySelector("img");
-  return img
-    ? { alt: img.getAttribute("alt") ?? "", src: img.getAttribute("src") ?? "" }
-    : null;
+  if (!img) return null;
+  const source = img.getAttribute("data-card-source");
+  return {
+    alt: img.getAttribute("alt") ?? "",
+    src: img.getAttribute("src") ?? "",
+    ...(source
+      ? {
+          card: {
+            source,
+            eyebrow: img.getAttribute("data-card-eyebrow") ?? "",
+            title: img.getAttribute("data-card-title") ?? "",
+            detail: img.getAttribute("data-card-detail") ?? "",
+          },
+        }
+      : {}),
+  };
 }
 
-export function imageSource(src: string, alt: string, html: boolean) {
+export function imageSource(
+  src: string,
+  alt: string,
+  html: boolean,
+  card?: HeaderCard,
+) {
   if (!html) return `![${alt}](${src})`;
   const escape = (value: string) =>
     value.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
-  return `<p><img src="${escape(src)}" alt="${escape(alt)}"></p>`;
+  const attrs = card
+    ? ` data-card-source="${escape(card.source)}" data-card-eyebrow="${escape(card.eyebrow)}" data-card-title="${escape(card.title)}" data-card-detail="${escape(card.detail)}"`
+    : "";
+  return `<p><img src="${escape(src)}" alt="${escape(alt)}"${attrs}></p>`;
 }

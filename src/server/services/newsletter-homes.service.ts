@@ -540,3 +540,45 @@ export async function emailHomePhotos(input: {
     ),
   };
 }
+
+/**
+ * An email's header card: the photo with its eyebrow, headline and offer on
+ * it, frozen to an image the email links. The same card is reused when
+ * nothing about it changed.
+ */
+export async function renderEmailHeaderCard(input: {
+  brandId: string;
+  orgId: string;
+  userId: string;
+  sourceUrl: string;
+  eyebrow?: string;
+  title: string;
+  detail?: string;
+}) {
+  const brand = await requireOrgBrand(input.brandId, input.orgId);
+  const source =
+    (await findImportedImage({ brandId: brand.id, url: input.sourceUrl })) ??
+    (await importRemoteImage({
+      brandId: brand.id,
+      uploadedBy: input.userId,
+      url: input.sourceUrl,
+      title: `${input.title} · email header photo`,
+    }));
+  const spec = {
+    brandId: brand.id,
+    templateId: "email-header" as const,
+    formatId: "banner" as const,
+    sourceMediaAssetId: source.id,
+    title: input.title,
+    eyebrow: input.eyebrow || undefined,
+    subtitle: input.detail || undefined,
+    imagePosition: "center" as const,
+    mark: "none" as const,
+    assetTitle: `${input.title} · email header`,
+  };
+  const existing = await findFrozenComposition({ userId: input.userId, spec });
+  if (existing?.url) return { url: existing.url };
+  const frozen = await freezeComposition({ userId: input.userId, spec });
+  if (!frozen.url) throw new Error("The header card did not save.");
+  return { url: frozen.url };
+}

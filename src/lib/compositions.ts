@@ -45,6 +45,14 @@ export const COMPOSITION_FORMATS = [
     width: 1200,
     height: 800,
   },
+  {
+    // An email's header card, the width of the email and half as tall.
+    id: "banner",
+    label: "Banner",
+    detail: "Email header · 2:1",
+    width: 1200,
+    height: 600,
+  },
 ] as const;
 
 /**
@@ -173,6 +181,13 @@ export const COMPOSITION_TEMPLATES = [
     label: "Product proof",
     description:
       "A restrained copy column with a product card entering from the lower right.",
+  },
+  {
+    id: "email-header",
+    version: 2,
+    label: "Email header",
+    description:
+      "An email's opening photo with the offer on it: a small eyebrow, the headline and a white pill, lower left over a soft scrim.",
   },
   {
     id: "brand-statement",
@@ -432,6 +447,15 @@ export const COMPOSITION_FIELDS: Record<
   "editorial-overlay": [mark, ...message, accent("colours the CTA")],
   "product-proof": [mark, ...message, accent("colours the card edge")],
   "brand-statement": [mark, ...message, accent("warms the ground")],
+  "email-header": [
+    { key: "eyebrow", label: "Eyebrow", hint: "Christmas & New Year's" },
+    { key: "title", label: "Headline", hint: "The big homes go first" },
+    {
+      key: "subtitle",
+      label: "Offer",
+      hint: "$150 off 5+ nights · code WPE-HOLIDAY",
+    },
+  ],
 };
 
 export function getCompositionFields(id: CompositionTemplateId) {

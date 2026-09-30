@@ -1019,6 +1019,108 @@ export function renderComposition(
         </div>
       </div>
     );
+  } else if (spec.templateId === "email-header") {
+    // An email's header card (Brian Sun's promo headers, 2026-09): the photo
+    // with the offer on it, lower left over a soft bottom scrim. Scaled to the
+    // canvas so a banner and a 3:2 photo keep the same proportions.
+    const unit = format.width / 1200;
+    const detail = spec.subtitle?.trim();
+    content = (
+      <div
+        style={{
+          display: "flex",
+          width: "100%",
+          height: "100%",
+          position: "relative",
+          background: "#111111",
+        }}
+      >
+        {/* oxlint-disable-next-line nextjs/no-img-element */}
+        <img
+          src={context.sourceImage!}
+          alt=""
+          width={format.width}
+          height={format.height}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            objectPosition: imagePosition,
+          }}
+        />
+        <div
+          style={{
+            display: "flex",
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            background: `linear-gradient(180deg, ${scrim(0)} 0%, ${scrim(0)} 38%, ${scrim(0.34)} 64%, ${scrim(0.72)} 100%)`,
+          }}
+        />
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "flex-end",
+            alignItems: "flex-start",
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: format.width,
+            height: format.height,
+            padding: Math.round(56 * unit),
+            color: "#ffffff",
+          }}
+        >
+          {spec.eyebrow?.trim() ? (
+            <div
+              style={{
+                display: "flex",
+                fontSize: Math.round(22 * unit),
+                fontWeight: 700,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                marginBottom: Math.round(10 * unit),
+                opacity: 0.92,
+              }}
+            >
+              {clamp(spec.eyebrow, 48)}
+            </div>
+          ) : null}
+          <div
+            style={{
+              display: "flex",
+              maxWidth: "86%",
+              fontSize: Math.round(64 * unit),
+              fontWeight: 700,
+              lineHeight: 1.06,
+              letterSpacing: "-0.02em",
+              textWrap: "balance",
+            }}
+          >
+            {clamp(spec.title, 70)}
+          </div>
+          {detail ? (
+            <div
+              style={{
+                display: "flex",
+                marginTop: Math.round(20 * unit),
+                padding: `${Math.round(10 * unit)}px ${Math.round(22 * unit)}px`,
+                borderRadius: 999,
+                background: "#ffffff",
+                color: "#111111",
+                fontSize: Math.round(24 * unit),
+                fontWeight: 600,
+              }}
+            >
+              {clamp(detail, 70)}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
   } else if (spec.templateId === "image-hero") {
     content = (
       <div
@@ -2105,7 +2207,7 @@ export async function freezeComposition(input: {
   const png = Buffer.from(new Uint8Array(await image.arrayBuffer()));
   // An email photo goes to an inbox: a 1200×800 PNG of a photograph weighs
   // megabytes, the same frame as a JPEG a couple of hundred kilobytes.
-  const jpeg = format.id === "email";
+  const jpeg = format.id === "email" || format.id === "banner";
   const bytes = jpeg
     ? await sharp(png).jpeg({ quality: 86, mozjpeg: true }).toBuffer()
     : png;

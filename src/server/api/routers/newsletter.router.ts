@@ -34,6 +34,7 @@ import {
   digestSectionFromBrandHomes,
   emailHomePhotos,
   listBrandEmailHomes,
+  renderEmailHeaderCard,
   matchDigestHomes,
   setDigestHomeHero,
 } from "@/server/services/newsletter-homes.service";
@@ -183,6 +184,26 @@ export const newsletterRouter = {
         ctx.session.user.id,
       );
       return rewriteEmailBlock({ ...input, organizationId });
+    }),
+
+  /** Freeze an email header card and return its image. */
+  renderHeaderCard: protectedProcedure
+    .input(
+      z.object({
+        brandId: z.string().min(1),
+        sourceUrl: z.string().url(),
+        eyebrow: z.string().trim().max(60).optional(),
+        title: z.string().trim().min(1).max(90),
+        detail: z.string().trim().max(90).optional(),
+      }),
+    )
+    .handler(async ({ context: ctx, input }) => {
+      const orgId = await organizationIdForUser(ctx.db, ctx.session.user.id);
+      return renderEmailHeaderCard({
+        ...input,
+        orgId,
+        userId: ctx.session.user.id,
+      });
     }),
 
   /** A home's photos, to choose the one an issue's card shows. */
