@@ -422,10 +422,10 @@ export function catalogArtworkIssues(draft: CatalogDraft): string[] {
   ).length;
   const cards = (n: number) => `${n} card${n === 1 ? "" : "s"}`;
   return [
-    ...(missing ? [`${cards(missing)} need finished artwork`] : []),
+    ...(missing ? [`${cards(missing)} need artwork`] : []),
     ...(wrongSize
       ? [
-          `${cards(wrongSize)} have finished artwork in another size than this ${draft.formats.join(" + ")} catalog: upload it in that size or switch to Compose`,
+          `${cards(wrongSize)} have artwork in another size than this ${draft.formats.join(" + ")} catalog: upload it in that size or switch to Composed`,
         ]
       : []),
   ];

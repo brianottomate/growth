@@ -552,7 +552,7 @@ export function CatalogCards({
                   </button>
                   {card.mode === "finished" && (
                     <p className="px-3 pt-2 text-xs text-muted-foreground">
-                      Finished artwork
+                      Artwork
                       {card.finishedArtwork ? "" : " · Choose image"}
                     </p>
                   )}
@@ -639,7 +639,7 @@ export function CatalogCards({
                           />
                         ) : card.mode === "finished" ? (
                           <p className="text-sm text-muted-foreground">
-                            Finished artwork, with no added text or logo.
+                            Artwork used as-is, with no added text or logo.
                           </p>
                         ) : (
                           <dl className="space-y-3 text-sm">
@@ -1062,8 +1062,7 @@ function CardPreview({
     card.mode === "finished" || card.title.trim()
       ? preview(brandId, card, format)
       : undefined;
-  const empty =
-    card.mode === "finished" ? "Choose finished artwork" : "Add a headline";
+  const empty = card.mode === "finished" ? "Choose artwork" : "Add a headline";
   return (
     <PreviewImage
       key={src ?? empty}
@@ -1154,8 +1153,8 @@ function CardEditor({
             })
           }
         >
-          <option value="compose">Compose</option>
-          <option value="finished">Finished artwork</option>
+          <option value="compose">Composed</option>
+          <option value="finished">Artwork</option>
         </select>
       </label>
       {card.mode === "finished" ? (
@@ -1165,7 +1164,7 @@ function CardEditor({
             the image. Your composition is kept if you switch back.
           </p>
           <Button variant="outline" onClick={onLibrary}>
-            Choose finished artwork
+            Choose artwork
           </Button>
         </div>
       ) : (

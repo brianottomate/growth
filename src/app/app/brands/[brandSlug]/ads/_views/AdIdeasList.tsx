@@ -2,6 +2,7 @@ import type { AdContent } from "@/server/db/schema";
 import { ideaDocumentFromAd } from "@/lib/ad-idea-studio";
 import { isImportedMetaCatalog } from "@/lib/meta-import";
 import { AdIdeaCard } from "./AdIdeaCard";
+import { AdIdeaGroups } from "./AdIdeaGroups";
 
 // The list files every ad under its creative type, the way a shared drive
 // would: all-homes carousels first, then statics, then each home's carousel,
@@ -58,6 +59,7 @@ export function AdIdeasList({
   ads: {
     id: string;
     name: string;
+    status: string;
     content: AdContent;
     updatedAt: Date;
     homeId?: string | null;
@@ -145,39 +147,20 @@ export function AdIdeasList({
           No ads yet. Add an ad or a starter set to begin.
         </p>
       ) : (
-        <>
-          <nav
-            aria-label="Ad types"
-            className="sticky top-0 z-10 -mx-1 flex flex-wrap gap-1.5 bg-background/95 px-1 py-2 backdrop-blur"
-          >
-            {groups.map((group) => (
-              <a
-                key={group.id}
-                href={`#ads-${group.id}`}
-                className="rounded-full border px-3 py-1 text-xs text-muted-foreground hover:text-foreground"
-              >
-                {group.label}{" "}
-                <span className="tabular-nums">· {group.ads.length}</span>
-              </a>
-            ))}
-          </nav>
-          {groups.map((group) => (
-            <section
-              key={group.id}
-              id={`ads-${group.id}`}
-              aria-labelledby={`ads-${group.id}-heading`}
-              className="scroll-mt-14 space-y-3"
-            >
-              <h3
-                id={`ads-${group.id}-heading`}
-                className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
-              >
-                {group.label} · {group.ads.length}
-              </h3>
-              {group.ads.map(renderAd)}
-            </section>
-          ))}
-        </>
+        <AdIdeaGroups
+          groups={groups.map((group) => ({
+            id: group.id,
+            label: group.label,
+            ads: group.ads.map((ad) => ({
+              id: ad.id,
+              approved:
+                "media" in ad.content && ad.content.ideaStudio
+                  ? Boolean(ad.content.ideaStudio.approval)
+                  : ad.status === "approved",
+              node: renderAd(ad),
+            })),
+          }))}
+        />
       )}
       {catalogs.length > 0 && (
         <section

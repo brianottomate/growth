@@ -177,6 +177,21 @@ export async function freezeApprovedAd(adId: string): Promise<boolean> {
   return true;
 }
 
+/**
+ * A pushed ad is read-only: its images are frozen and Meta runs them. To change
+ * one, build a new ad or campaign and push that.
+ */
+export async function assertAdNotPushed(adId: string) {
+  const pushed = await db.query.platformAdTable.findFirst({
+    where: eq(platformAdTable.adId, adId),
+    columns: { id: true },
+  });
+  if (pushed)
+    throw new Error(
+      "This ad is pushed and read-only. Make a new ad or campaign to change it.",
+    );
+}
+
 /** Approval signs off copy and creative; the images are frozen at push. */
 export async function transitionAdApproval(input: {
   adId: string;
@@ -199,6 +214,7 @@ export async function transitionAdApproval(input: {
       ),
     }));
   if (!ad || !brand) throw new Error("Ad not found");
+  if (input.status === "drawn") await assertAdNotPushed(ad.id);
   if (ad.updatedAt.toISOString() !== input.expectedUpdatedAt)
     throw new Error(
       "This ad changed elsewhere. Reload and review the latest version.",

@@ -87,6 +87,9 @@ export function AdIdeaCard({
 }) {
   const router = useRouter();
   const approved = Boolean(ad.content.ideaStudio?.approval);
+  // Pushed is read-only: Meta runs the frozen images, so there is no reopen.
+  const pushed = Boolean(deliveryState);
+  const locked = approved || pushed;
   const imagesSaved = Boolean(
     ad.content.ideaStudio && ideaImagesSaved(ad.content.ideaStudio),
   );
@@ -111,11 +114,7 @@ export function AdIdeaCard({
   const approval = useMutation(
     orpc.ads.setAdStatus.mutationOptions({
       onSuccess: () => {
-        toast.success(
-          approved
-            ? "Draft reopened. Previously pushed ads are unchanged."
-            : "Ad approved",
-        );
+        toast.success(approved ? "Draft reopened." : "Ad approved");
         setView("overview");
         router.refresh();
       },
@@ -767,7 +766,7 @@ export function AdIdeaCard({
                       <Button
                         size="sm"
                         variant="outline"
-                        disabled={busy || approved}
+                        disabled={busy || locked}
                         onClick={() =>
                           save.mutate({
                             adId: ad.id,
@@ -808,32 +807,34 @@ export function AdIdeaCard({
           >
             <MessageSquare className="size-3.5" /> Start new chat
           </Button>
-          <Button
-            size="sm"
-            variant={approved ? "outline" : "default"}
-            disabled={busy || approval.isPending || editor !== null}
-            onClick={() =>
-              approval.mutate({
-                adId: ad.id,
-                status: approved ? "drawn" : "approved",
-                expectedUpdatedAt: savedState.version,
-                ...(approved
-                  ? {}
-                  : {
-                      exportShapes: [
-                        ...(savedState.document.exportShapes ??
-                          savedState.document.shapes),
-                      ],
-                    }),
-              })
-            }
-          >
-            {approval.isPending
-              ? "Working…"
-              : approved
-                ? "Reopen idea"
-                : "Approve"}
-          </Button>
+          {!pushed && (
+            <Button
+              size="sm"
+              variant={approved ? "outline" : "default"}
+              disabled={busy || approval.isPending || editor !== null}
+              onClick={() =>
+                approval.mutate({
+                  adId: ad.id,
+                  status: approved ? "drawn" : "approved",
+                  expectedUpdatedAt: savedState.version,
+                  ...(approved
+                    ? {}
+                    : {
+                        exportShapes: [
+                          ...(savedState.document.exportShapes ??
+                            savedState.document.shapes),
+                        ],
+                      }),
+                })
+              }
+            >
+              {approval.isPending
+                ? "Working…"
+                : approved
+                  ? "Reopen idea"
+                  : "Approve"}
+            </Button>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger
               appearance="icon"
@@ -875,7 +876,7 @@ export function AdIdeaCard({
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={approved || busy || editor !== null}
+                  disabled={locked || busy || editor !== null}
                   onClick={() => openEditor("copy")}
                 >
                   Edit copy
@@ -927,10 +928,11 @@ export function AdIdeaCard({
               </Button>
             ))}
           </div>
-          {approved && view === "details" && (
+          {locked && view === "details" && (
             <p className="text-sm text-muted-foreground">
-              Reopen the idea to edit. Approved exports remain fixed until you
-              approve again.
+              {pushed
+                ? "Pushed and read-only. Make a new ad or campaign to change it."
+                : "Reopen the idea to edit. Approved exports remain fixed until you approve again."}
             </p>
           )}
           {view !== "details" && (
@@ -967,7 +969,7 @@ export function AdIdeaCard({
                             className="size-4 accent-current"
                             aria-label={`Export ${IDEA_SHAPE_LABELS[size]}`}
                             disabled={
-                              approved ||
+                              locked ||
                               approval.isPending ||
                               busy ||
                               editor !== null
@@ -1013,13 +1015,13 @@ export function AdIdeaCard({
                     </h4>
                     <p className="max-w-sm text-sm text-muted-foreground">
                       {isStatic
-                        ? "Choose a photo or upload finished artwork. You can add text and adjust the composition next."
-                        : "Choose the photos or finished artwork for your slides. Then arrange them and add your message."}
+                        ? "Choose a photo or upload artwork. You can add text and adjust the composition next."
+                        : "Choose the photos or artwork for your slides. Then arrange them and add your message."}
                     </p>
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={approved || busy || editor !== null}
+                      disabled={locked || busy || editor !== null}
                       onClick={() => openEditor("pool")}
                     >
                       {isStatic ? "Add image" : "Add images"}
@@ -1046,7 +1048,7 @@ export function AdIdeaCard({
                           <fieldset
                             key={slide.id}
                             disabled={
-                              approved ||
+                              locked ||
                               approval.isPending ||
                               busy ||
                               editor !== null
@@ -1065,7 +1067,7 @@ export function AdIdeaCard({
                       <Button
                         size="sm"
                         variant="outline"
-                        disabled={approved || busy || editor !== null}
+                        disabled={locked || busy || editor !== null}
                         onClick={() => openEditor("pool")}
                       >
                         {isStatic

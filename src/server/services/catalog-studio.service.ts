@@ -294,7 +294,7 @@ function exportLabel(input: unknown) {
       .filter((card) => card.included)
       .map((card) =>
         card.mode === "finished"
-          ? "Supplied artwork"
+          ? "Artwork"
           : (COMPOSITION_TEMPLATES.find((t) => t.id === card.templateId)
               ?.label ?? card.templateId),
       ),
@@ -788,7 +788,7 @@ export async function renderCatalogExport(
               filename: finished.filename ?? undefined,
               width: finished.width ?? undefined,
               height: finished.height ?? undefined,
-              title: `${home.name} · Catalog · Finished artwork`,
+              title: `${home.name} · Catalog · Artwork`,
             })
           : reused
             ? // A copy, not the same row: deleting one export's image

@@ -10,6 +10,7 @@ import { compositionPreviewSchema } from "@/lib/compositions";
 import { db } from "@/server/db";
 import { adTable, brandTable } from "@/server/db/schema";
 import { resolveCompositionContext } from "./composition.service";
+import { assertAdNotPushed } from "./ad-approval.service";
 
 /** One shared edit path for humans and assistants. Saving keeps this a draft. */
 export async function saveAdIdea(
@@ -31,6 +32,7 @@ export async function saveAdIdea(
       ),
     }));
   if (!ad || !brand) throw new Error("Ad not found");
+  await assertAdNotPushed(ad.id);
   if (!("media" in ad.content))
     throw new Error(
       "This mini studio edits image ads; use the existing editor for text ads",

@@ -1,5 +1,5 @@
 import { projectIdea, type IdeaShape } from "@/lib/ad-idea-studio";
-import { transitionAdApproval } from "./ad-approval.service";
+import { assertAdNotPushed, transitionAdApproval } from "./ad-approval.service";
 import "server-only";
 
 import { and, eq, inArray, isNull } from "drizzle-orm";
@@ -192,6 +192,7 @@ async function requireOwnedAd(
   }
   if (!allowStudio && ad.status === "approved")
     throw new AdSetError(422, "Reopen this approved ad before editing it.");
+  if (!allowStudio) await assertAdNotPushed(ad.id);
   if (!allowStudio && "media" in ad.content && ad.content.ideaStudio) {
     throw new AdSetError(
       422,
@@ -1161,6 +1162,7 @@ export async function setAdHome(input: {
   homeName?: string | null;
 }) {
   const ad = await requireOwnedAd(input, true);
+  await assertAdNotPushed(ad.id);
   const content = creativeContent(ad);
   if (ad.status === "approved" || content.ideaStudio?.approval)
     throw new Error("Reopen this approved ad before changing its home.");
@@ -1416,6 +1418,7 @@ export async function setAdStatus(input: {
   exportShapes?: IdeaShape[];
 }) {
   const ad = await requireOwnedAd(input, true);
+  if (input.status === "drawn") await assertAdNotPushed(ad.id);
   if (
     "media" in ad.content &&
     ad.content.media.every((card) => card.type === "image") &&

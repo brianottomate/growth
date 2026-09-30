@@ -195,7 +195,7 @@ export function AdIdeaSlideRow({
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h5 className="text-sm font-medium">
                   {card.mode === "supplied"
-                    ? "Supplied artwork"
+                    ? "Artwork"
                     : (COMPOSITION_TEMPLATES.find(
                         (t) => t.id === recipe.templateId,
                       )?.label ?? "Composition")}
@@ -236,7 +236,7 @@ export function AdIdeaSlideRow({
                 </dl>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  Finished artwork, with no added text or logo.
+                  Artwork used as-is, with no added text or logo.
                 </p>
               )}
               <p className="text-xs text-muted-foreground">
@@ -261,14 +261,14 @@ export function AdIdeaSlideRow({
                     updateCard((c) => ({ ...c, mode: "supplied" }))
                   }
                 >
-                  Supplied artwork
+                  Artwork
                 </Button>
                 <Button
                   size="sm"
                   variant={card.mode === "compose" ? "secondary" : "outline"}
                   onClick={() => updateCard((c) => ({ ...c, mode: "compose" }))}
                 >
-                  Compose on photo
+                  Composed
                 </Button>
               </div>
               {card.mode === "supplied" ? (

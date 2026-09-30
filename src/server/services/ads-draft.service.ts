@@ -1,5 +1,6 @@
 import { resolveMetaSchedule, metaScheduleIssue } from "@/lib/meta-schedule";
 import "server-only";
+import { assertAdNotPushed } from "./ad-approval.service";
 
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 
@@ -713,6 +714,7 @@ export async function addDraftAd(input: {
 
   if (existing?.status === "approved")
     throw new Error("Reopen this approved ad before editing it.");
+  if (existing) await assertAdNotPushed(existing.id);
   if (existing && "media" in existing.content && existing.content.ideaStudio) {
     throw new Error(
       "This ad uses the mini studio. Edit it in Ad ideas or use saveIdea.",
@@ -1203,6 +1205,7 @@ export async function replaceDraftAdMedia(input: {
   );
   if (ad.status === "approved")
     throw new Error("Reopen this approved ad before editing it");
+  await assertAdNotPushed(ad.id);
   const content = ad.content;
   if (!("media" in content) || !Array.isArray(content.media)) {
     throw new Error("This ad has no cards to replace");
