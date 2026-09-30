@@ -22,6 +22,7 @@ import {
   exportEmailHandoff,
   renderEmailPreview,
   restoreEmailDocumentVersion,
+  rewriteEmailBlock,
 } from "@/server/services/email-document.service";
 import {
   approveMessageSend,
@@ -30,6 +31,9 @@ import {
 } from "@/server/services/email-delivery.service";
 import {
   digestHomePhotos,
+  digestSectionFromBrandHomes,
+  emailHomePhotos,
+  listBrandEmailHomes,
   matchDigestHomes,
   setDigestHomeHero,
 } from "@/server/services/newsletter-homes.service";
@@ -98,9 +102,11 @@ export const newsletterRouter = {
       z.object({
         platformPostId: z.string(),
         draft: emailDocumentDraftSchema.optional(),
-        // template = raw liquid as CIO receives it; full/sparse simulate the
-        // per-recipient expansion locally (seed sends stay the real check).
+        // template = per-guest fields as written; full/sparse fill them for a
+        // sample guest and for a guest with no data.
         viewAs: z.enum(["template", "full", "sparse"]).optional(),
+        /** The editor's block ids stay on the preview's blocks. */
+        blockIds: z.boolean().optional(),
       }),
     )
     .handler(async ({ context: ctx, input }) => {
@@ -157,6 +163,57 @@ export const newsletterRouter = {
         orgId,
         userId: ctx.session.user.id,
       });
+    }),
+
+  /** Rewrite one block of an email's body; the draft saves the result. */
+  rewriteBlock: protectedProcedure
+    .input(
+      z.object({
+        platformPostId: z.string(),
+        block: z.string().min(1).max(20_000),
+        format: z.enum(["html", "markdown"]),
+        instruction: z.string().trim().max(1_000).optional(),
+        subject: z.string().max(200),
+        bodyMarkdown: z.string().max(100_000),
+      }),
+    )
+    .handler(async ({ context: ctx, input }) => {
+      const organizationId = await organizationIdForUser(
+        ctx.db,
+        ctx.session.user.id,
+      );
+      return rewriteEmailBlock({ ...input, organizationId });
+    }),
+
+  /** A home's photos, to choose the one an issue's card shows. */
+  emailHomePhotos: protectedProcedure
+    .input(z.object({ homeId: z.string().min(1) }))
+    .handler(async ({ context: ctx, input }) => {
+      const orgId = await organizationIdForUser(ctx.db, ctx.session.user.id);
+      return emailHomePhotos({ ...input, orgId });
+    }),
+
+  /** The brand's own homes, to pick into an issue. */
+  brandHomes: protectedProcedure
+    .input(z.object({ brandId: z.string().min(1) }))
+    .handler(async ({ context: ctx, input }) => {
+      const orgId = await organizationIdForUser(ctx.db, ctx.session.user.id);
+      return listBrandEmailHomes({ ...input, orgId });
+    }),
+
+  /** Picked brand homes as a digest section; the draft saves it. */
+  digestSectionFromBrandHomes: protectedProcedure
+    .input(
+      z.object({
+        brandId: z.string().min(1),
+        homeIds: z.array(z.string().min(1)).min(1).max(12),
+        heading: z.string().trim().max(200),
+        campaign: z.string().trim().max(200).optional(),
+      }),
+    )
+    .handler(async ({ context: ctx, input }) => {
+      const orgId = await organizationIdForUser(ctx.db, ctx.session.user.id);
+      return digestSectionFromBrandHomes({ ...input, orgId });
     }),
 
   /** A matched home's photos, exteriors first, to choose its hero from. */

@@ -1,4 +1,8 @@
-import { metaReportingConversionsSchema } from "./shared";
+import {
+  brandEmailSenderSchema,
+  brandLegalIdentitySchema,
+  metaReportingConversionsSchema,
+} from "./shared";
 import { performanceCycleStatusEnum } from "@/server/db/performance-schema";
 import { performanceAccountStatusEnum } from "@/server/db/performance-schema";
 import { campaignStatusEnum } from "@/server/db/ads-schema";
@@ -782,6 +786,8 @@ export const previewIntakeApplyActionOutputSchema = z.strictObject({
         updatedAt: z.iso.datetime(),
         wanderOsCheckedAt: z.iso.datetime().nullable(),
         wanderOsWebsiteId: z.string().nullable(),
+        emailSender: brandEmailSenderSchema,
+        legalIdentity: brandLegalIdentitySchema,
         website: z.string().nullable(),
         websiteMeta: z
           .strictObject({

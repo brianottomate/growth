@@ -165,6 +165,58 @@ export type BrandMark = {
  * performance_property, spend on the platform rows.
  * Applied with scripts/apply-performance-settings-schema.ts.
  */
+/**
+ * Who legally stands behind a brand: what a German site prints as its
+ * Impressum. Marketing email prints the address (CAN-SPAM wants one), and a
+ * storefront can print the rest. Fill in per brand as needed.
+ */
+export type BrandLegalIdentity = {
+  /** "Wander.com, Inc." */
+  legalName?: string | null;
+  address?: {
+    line1: string;
+    line2?: string | null;
+    city: string;
+    region?: string | null;
+    postalCode?: string | null;
+    /** ISO 3166-1 alpha-2, e.g. "US". */
+    country?: string | null;
+  } | null;
+  email?: string | null;
+  phone?: string | null;
+  /** Company registration, e.g. "Delaware 1234567" or "HRB 12345". */
+  registration?: string | null;
+  vatId?: string | null;
+};
+
+/**
+ * How a brand's email presents itself: who it comes from and what its frame
+ * shows. Every block is optional; the email omits what a brand has not set.
+ */
+export type BrandEmailSender = {
+  fromName: string;
+  fromEmail?: string | null;
+  replyTo?: string | null;
+  /** The logo emails show: a hosted PNG or JPEG, never a data URI. */
+  logoUrl?: string | null;
+  /** One line under the footer logo. */
+  tagline?: string | null;
+  /** The brand's booking site: the main button, and the host for its images. */
+  siteUrl?: string | null;
+  siteCtaLabel?: string | null;
+  /** A number guests can text or call, and how the email offers it. */
+  contact?: {
+    phone: string;
+    note?: string | null;
+    imageUrl?: string | null;
+    heading?: string | null;
+    text?: string | null;
+    textLabel?: string | null;
+    callLabel?: string | null;
+  } | null;
+  valueProps?: { iconUrl: string; label: string }[] | null;
+};
+
 export type PerformanceSettings = {
   /** Verified tracking defaults, keyed by the paying Meta account id. */
   metaTrackingDefaults?: Record<
@@ -362,6 +414,10 @@ export const brandTable = pgTable(
      * remembering just as much as a hit.
      */
     wanderOsWebsiteId: t.text(),
+    /** Applied with scripts/apply-brand-email-sender.ts. */
+    emailSender: t.jsonb().$type<BrandEmailSender>(),
+    /** Applied with scripts/apply-brand-email-sender.ts. */
+    legalIdentity: t.jsonb().$type<BrandLegalIdentity>(),
     wanderOsCheckedAt: t.timestamp({ withTimezone: true }),
 
     // The domain of the `leads.lead_domain` row a prospect came from. A text

@@ -1,12 +1,14 @@
 import "server-only";
 
-import { and, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 
 import {
   stayLabel,
   type DigestProperty,
+  type DigestSection,
   type ListingsDigest,
 } from "@/lib/listings-digest";
+import { ratingOutOfFive } from "@/lib/home-ad-previews";
 import { otaSavingsUsd, stayTotalUsd } from "@/lib/ota-savings";
 import {
   badgedTier,
@@ -16,7 +18,7 @@ import {
   type MarketplaceListing,
 } from "@/server/clients/wander-marketplace.client";
 import { db } from "@/server/db";
-import { homeTable } from "@/server/db/schema";
+import { brandTable, homeTable } from "@/server/db/schema";
 import {
   findFrozenComposition,
   freezeComposition,
@@ -408,5 +410,133 @@ export async function setDigestHomeHero(input: {
       tier: badgedTier(row.tier),
       homeName: row.name,
     }),
+  };
+}
+
+async function requireOrgBrand(brandId: string, orgId: string) {
+  const brand = await db.query.brandTable.findFirst({
+    where: and(
+      eq(brandTable.id, brandId),
+      eq(brandTable.organizationId, orgId),
+      isNull(brandTable.deletedAt),
+    ),
+  });
+  if (!brand) throw new Error("Brand not found in this workspace.");
+  return brand;
+}
+
+/** A brand's own WanderOS homes, featured first, to pick into an issue. */
+export async function listBrandEmailHomes(input: {
+  brandId: string;
+  orgId: string;
+}) {
+  await requireOrgBrand(input.brandId, input.orgId);
+  return db
+    .select({
+      id: homeTable.id,
+      name: homeTable.name,
+      city: homeTable.city,
+      guests: homeTable.guests,
+      bedrooms: homeTable.bedrooms,
+      nightlyFrom: homeTable.nightlyFrom,
+      heroUrl: homeTable.heroSourceUrl,
+      featured: homeTable.featured,
+    })
+    .from(homeTable)
+    .where(
+      and(
+        eq(homeTable.brandId, input.brandId),
+        eq(homeTable.source, "wanderos"),
+        isNull(homeTable.deletedAt),
+      ),
+    )
+    .orderBy(
+      desc(homeTable.featured),
+      asc(homeTable.sortOrder),
+      asc(homeTable.name),
+    );
+}
+
+/**
+ * Picked homes as one digest section, in the order picked. Everything comes
+ * from the home rows: nothing is quoted that the brand's site does not show.
+ */
+export async function digestSectionFromBrandHomes(input: {
+  brandId: string;
+  orgId: string;
+  homeIds: string[];
+  heading: string;
+  campaign?: string;
+}): Promise<DigestSection> {
+  await requireOrgBrand(input.brandId, input.orgId);
+  const rows = await db.query.homeTable.findMany({
+    where: and(
+      eq(homeTable.brandId, input.brandId),
+      inArray(homeTable.id, input.homeIds),
+      isNull(homeTable.deletedAt),
+    ),
+  });
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  const properties = input.homeIds.flatMap((id): DigestProperty[] => {
+    const home = byId.get(id);
+    if (!home) return [];
+    return [
+      {
+        name: home.name,
+        city: home.city,
+        state: home.state,
+        sleeps: home.guests,
+        rating: ratingOutOfFive(home.rating),
+        operated: true,
+        href: newsletterLink(home.url, input.campaign ?? input.heading),
+        imageUrl: home.heroSourceUrl,
+        heroUrl: home.heroSourceUrl,
+        homeId: home.id,
+        priceLabel: home.nightlyFrom
+          ? `From $${home.nightlyFrom.toLocaleString("en-US")}/night`
+          : null,
+      },
+    ];
+  });
+  if (!properties.length)
+    throw new Error("None of those homes belong to this brand.");
+  return { heading: input.heading, properties };
+}
+
+/**
+ * Any home of the workspace's brands, with its photos exteriors first, to
+ * choose the photo one issue shows. Choosing sets the card's image only; the
+ * home's own hero (ads, other issues) stays as it is.
+ */
+export async function emailHomePhotos(input: {
+  homeId: string;
+  orgId: string;
+}) {
+  const [row] = await db
+    .select({
+      id: homeTable.id,
+      name: homeTable.name,
+      heroUrl: homeTable.heroSourceUrl,
+      photos: homeTable.galleryCache,
+    })
+    .from(homeTable)
+    .innerJoin(brandTable, eq(brandTable.id, homeTable.brandId))
+    .where(
+      and(
+        eq(homeTable.id, input.homeId),
+        eq(brandTable.organizationId, input.orgId),
+        isNull(homeTable.deletedAt),
+      ),
+    );
+  if (!row) throw new Error("Home not found in this workspace.");
+  const exterior = (room: string | null | undefined) =>
+    room === "Exterior" ? 0 : 1;
+  return {
+    homeId: row.id,
+    name: row.name,
+    heroUrl: row.heroUrl,
+    photos: [...(row.photos ?? [])].sort(
+      (a, b) => exterior(a.room) - exterior(b.room),
+    ),
   };
 }

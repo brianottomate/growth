@@ -35,6 +35,7 @@ export function DigestImageBoard({
   intro,
   campaign,
   brandId,
+  wanderMarketplace,
   onChange,
 }: {
   digest: ListingsDigest;
@@ -43,6 +44,8 @@ export function DigestImageBoard({
   /** The issue's title, which tags the homes' links (utm_campaign). */
   campaign?: string | null;
   brandId: string;
+  /** Wander's issues match homes to wander.com and export to Design Studio. */
+  wanderMarketplace: boolean;
   onChange: (next: ListingsDigest) => void;
 }) {
   // Which home a picker is choosing for, by position: names are not
@@ -136,41 +139,45 @@ export function DigestImageBoard({
             {missing === 0
               ? `All ${homes.length} homes have a photo`
               : `${missing} of ${homes.length} still need one`}
-            {matched > 0 ? ` · ${matched} on wander.com` : ""}
+            {wanderMarketplace && matched > 0
+              ? ` · ${matched} on wander.com`
+              : ""}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <button
-            type="button"
-            disabled={match.isPending}
-            onClick={() => runMatch()}
-            className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium hover:bg-accent disabled:opacity-50"
-          >
-            {matching === "all" ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <RefreshCw className="size-3.5" />
-            )}
-            Refresh from wander.com
-          </button>
-          <button
-            type="button"
-            onClick={async () => {
-              try {
-                await navigator.clipboard.writeText(
-                  digestDesignStudioCode(digest, { bodyMarkdown: intro }),
-                );
-                toast.success("Design Studio code copied");
-              } catch {
-                toast.error("Could not copy to the clipboard");
-              }
-            }}
-            className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium hover:bg-accent"
-          >
-            <Code2 className="size-3.5" />
-            Copy Design Studio code
-          </button>
-        </div>
+        {wanderMarketplace && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              disabled={match.isPending}
+              onClick={() => runMatch()}
+              className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium hover:bg-accent disabled:opacity-50"
+            >
+              {matching === "all" ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="size-3.5" />
+              )}
+              Refresh from wander.com
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(
+                    digestDesignStudioCode(digest, { bodyMarkdown: intro }),
+                  );
+                  toast.success("Design Studio code copied");
+                } catch {
+                  toast.error("Could not copy to the clipboard");
+                }
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium hover:bg-accent"
+            >
+              <Code2 className="size-3.5" />
+              Copy Design Studio code
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="space-y-4">

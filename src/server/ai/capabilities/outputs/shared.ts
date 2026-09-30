@@ -121,6 +121,57 @@ export const homesSchema = z.strictObject({
   url: z.string(),
 });
 
+/** Brand legalIdentity. */
+export const brandLegalIdentitySchema = z
+  .strictObject({
+    legalName: z.string().nullable().optional(),
+    address: z
+      .strictObject({
+        line1: z.string(),
+        line2: z.string().nullable().optional(),
+        city: z.string(),
+        region: z.string().nullable().optional(),
+        postalCode: z.string().nullable().optional(),
+        country: z.string().nullable().optional(),
+      })
+      .nullable()
+      .optional(),
+    email: z.string().nullable().optional(),
+    phone: z.string().nullable().optional(),
+    registration: z.string().nullable().optional(),
+    vatId: z.string().nullable().optional(),
+  })
+  .nullable();
+
+/** Brand emailSender. */
+export const brandEmailSenderSchema = z
+  .strictObject({
+    fromName: z.string(),
+    fromEmail: z.string().nullable().optional(),
+    replyTo: z.string().nullable().optional(),
+    logoUrl: z.string().nullable().optional(),
+    tagline: z.string().nullable().optional(),
+    siteUrl: z.string().nullable().optional(),
+    siteCtaLabel: z.string().nullable().optional(),
+    contact: z
+      .strictObject({
+        phone: z.string(),
+        note: z.string().nullable().optional(),
+        imageUrl: z.string().nullable().optional(),
+        heading: z.string().nullable().optional(),
+        text: z.string().nullable().optional(),
+        textLabel: z.string().nullable().optional(),
+        callLabel: z.string().nullable().optional(),
+      })
+      .nullable()
+      .optional(),
+    valueProps: z
+      .array(z.strictObject({ iconUrl: z.string(), label: z.string() }))
+      .nullable()
+      .optional(),
+  })
+  .nullable();
+
 /** Brand performanceSettings.metaReportingConversions, keyed by ad account. */
 export const metaReportingConversionsSchema = z
   .record(

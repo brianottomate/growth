@@ -4,26 +4,23 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Check,
-  Clipboard,
   ExternalLink,
   Loader2,
-  MailCheck,
   MessageSquare,
   Pencil,
   RefreshCw,
   RotateCcw,
   Save,
-  Send,
-  ShieldCheck,
   Sparkles,
 } from "lucide-react";
 
 import { SimpleDialog } from "@/components/ui/dialog";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 import { orpc, type RouterOutputs } from "@/orpc/client";
+import { EmailBlocksCard } from "./EmailBlocksCard";
+import { previewBody } from "./email-blocks";
 import { DigestImageBoard } from "./DigestImageBoard";
-import { EmailPreviewFrame } from "./EmailPreviewFrame";
+import { EmailPreviewFrame, type PreviewPick } from "./EmailPreviewFrame";
 import { FindHomesCard } from "./FindHomesCard";
 
 type Workspace = RouterOutputs["newsletter"]["workspace"];
@@ -73,13 +70,6 @@ function Editor({ workspace }: { workspace: Workspace }) {
   const [viewAs, setViewAs] = useState<"template" | "full" | "sparse">(
     "template",
   );
-  const [copied, setCopied] = useState(false);
-  const [providerBroadcastId, setProviderBroadcastId] = useState("");
-  const [segmentId, setSegmentId] = useState("");
-  const [audienceKind, setAudienceKind] = useState<
-    "wanderos_operators" | "guests" | "subscribers"
-  >("wanderos_operators");
-  const [sendConfirmation, setSendConfirmation] = useState("");
 
   const refreshWorkspace = async () => {
     await queryClient.invalidateQueries({ queryKey });
@@ -107,47 +97,33 @@ function Editor({ workspace }: { workspace: Workspace }) {
       },
     }),
   );
-  const prepareSend = useMutation(
-    orpc.newsletter.prepareSend.mutationOptions({
-      onSuccess: refreshWorkspace,
-    }),
-  );
-  const approveSend = useMutation(
-    orpc.newsletter.approveSend.mutationOptions({
-      onSuccess: refreshWorkspace,
-    }),
-  );
-  const sendApproved = useMutation(
-    orpc.newsletter.sendApproved.mutationOptions({
-      onSuccess: async () => {
-        setSendConfirmation("");
-        await refreshWorkspace();
-      },
-    }),
-  );
 
+  // Every preview carries the editor's block ids, so a click in it opens
+  // that block; the saved draft never does.
+  const previewDraft = (
+    next: Draft = draft,
+    as: "template" | "full" | "sparse" = viewAs,
+  ) =>
+    preview.mutate({
+      platformPostId: workspace.spot.id,
+      draft: { ...next, bodyMarkdown: previewBody(next.bodyMarkdown) },
+      viewAs: as,
+      blockIds: true,
+    });
   const renderPreview = (as: "template" | "full" | "sparse" = viewAs) =>
-    preview.mutate({ platformPostId: workspace.spot.id, draft, viewAs: as });
+    previewDraft(draft, as);
+  const [activePick, setActivePick] = useState<PreviewPick | null>(null);
+  const [previewSelect, setPreviewSelect] = useState<{
+    pick: PreviewPick;
+    nonce: number;
+  } | null>(null);
 
   useEffect(() => {
-    preview.mutate({ platformPostId: workspace.spot.id, draft, viewAs });
+    previewDraft();
     // Generate the initial projection once per persisted revision. Subsequent
     // unsaved changes are rendered explicitly so typing never causes requests.
     // oxlint-disable-next-line react/exhaustive-deps
   }, [workspace.document.currentRevision]);
-
-  const copyHandoff = async () => {
-    const result = await queryClient.fetchQuery(
-      orpc.newsletter.exportHandoff.queryOptions({
-        input: {
-          platformPostId: workspace.spot.id,
-        },
-      }),
-    );
-    await navigator.clipboard.writeText(result.markdown);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 2_000);
-  };
 
   const activeJob =
     workspace.latestJob?.status === "queued" ||
@@ -156,25 +132,6 @@ function Editor({ workspace }: { workspace: Workspace }) {
     workspace.spot.format === "newsletter.blast"
       ? "One-off blast"
       : "Newsletter issue";
-  const latestSend = workspace.messageSends[0];
-  const numericBroadcastId = Number(providerBroadcastId);
-  const numericSegmentId = Number(segmentId);
-  const pendingReleaseChanges =
-    draft.productUpdate?.changes.filter(
-      (change) => change.releaseStatus !== "shipped",
-    ) ?? [];
-  const productUpdateAudienceIsValid =
-    !draft.productUpdate || audienceKind === "wanderos_operators";
-  const canPrepare =
-    workspace.document.currentRevision > 0 &&
-    pendingReleaseChanges.length === 0 &&
-    productUpdateAudienceIsValid &&
-    Number.isInteger(numericBroadcastId) &&
-    numericBroadcastId > 0 &&
-    Number.isInteger(numericSegmentId) &&
-    numericSegmentId > 0;
-  const deliveryError =
-    prepareSend.error ?? approveSend.error ?? sendApproved.error;
 
   return (
     <div className="space-y-5">
@@ -195,11 +152,6 @@ function Editor({ workspace }: { workspace: Workspace }) {
           <h1 className="mt-2 text-2xl font-semibold tracking-tight">
             {workspace.content?.title || draft.subject || "Untitled email"}
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Markdown is the source of truth. The preview is a faithful React
-            Email projection, while recipient eligibility and delivery stay in
-            the product runtime.
-          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
@@ -254,12 +206,40 @@ function Editor({ workspace }: { workspace: Workspace }) {
                 sendDate={workspace.content?.plannedAt}
               />
             )}
-          {draft.digest && (
+          <EmailBlocksCard
+            // A saved, restored or generated revision replaces the body; the
+            // blocks re-read it.
+            key={workspace.document.currentRevision}
+            platformPostId={workspace.spot.id}
+            brandId={workspace.brand.id}
+            campaign={workspace.content?.title || draft.subject}
+            canAddHomes={workspace.brand.homeCount > 0}
+            fields={{
+              subject: draft.subject,
+              preheader: draft.preheader,
+              bodyMarkdown: draft.bodyMarkdown,
+              ctaLabel: draft.ctaLabel,
+              ctaUrl: draft.ctaUrl,
+              templateKey: draft.templateKey,
+              digest: draft.digest,
+            }}
+            select={previewSelect}
+            onOpenChange={setActivePick}
+            onChange={(change) => {
+              const next = { ...draft, ...change };
+              setDraft(next);
+              previewDraft(next);
+            }}
+          />
+          {/* Wander's issues match their homes to wander.com; a brand's own
+              homes are edited in their blocks above. */}
+          {draft.digest && workspace.brand.slug === "wander" && (
             <DigestImageBoard
               digest={draft.digest}
               intro={draft.bodyMarkdown}
               campaign={workspace.content?.title || draft.subject}
               brandId={workspace.brand.id}
+              wanderMarketplace={workspace.brand.slug === "wander"}
               onChange={(digest) => setDraft({ ...draft, digest })}
             />
           )}
@@ -454,246 +434,6 @@ function Editor({ workspace }: { workspace: Workspace }) {
             )}
           </section>
 
-          <section className="rounded-xl border bg-card p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <h2 className="font-semibold">Product handoff</h2>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Export approved editorial context for Claude Code in the
-                  product repo. Contacts, consent, credentials, and sending are
-                  intentionally excluded.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => void copyHandoff()}
-                className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-accent"
-              >
-                {copied ? (
-                  <Check className="size-4 text-emerald-500" />
-                ) : (
-                  <Clipboard className="size-4" />
-                )}
-                {copied ? "Copied" : "Copy implementation context"}
-              </button>
-            </div>
-            <div className="mt-3 grid grid-cols-1 gap-3 @xl:grid-cols-2">
-              <label>
-                <span className="mb-1 block text-xs font-medium">
-                  Target product repo
-                </span>
-                <input
-                  value={draft.handoffTargetRepo ?? ""}
-                  onChange={(event) =>
-                    setDraft({
-                      ...draft,
-                      handoffTargetRepo: event.target.value || null,
-                    })
-                  }
-                  className={controlClass}
-                  placeholder="wander-web"
-                />
-              </label>
-              <label>
-                <span className="mb-1 block text-xs font-medium">
-                  Email template key
-                </span>
-                <input
-                  value={draft.templateKey}
-                  onChange={(event) =>
-                    setDraft({ ...draft, templateKey: event.target.value })
-                  }
-                  className={controlClass}
-                  placeholder="os.marketing.operator.product-update"
-                />
-              </label>
-            </div>
-          </section>
-
-          <section className="rounded-xl border bg-card p-4">
-            <div className="flex items-center gap-2">
-              <MailCheck className="size-4" />
-              <h2 className="font-semibold">Customer.io delivery</h2>
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Growth freezes one saved revision and one provider-managed
-              segment. Customer.io remains responsible for live membership,
-              consent, suppressions, and the unsubscribe footer.
-            </p>
-
-            {draft.productUpdate &&
-              (pendingReleaseChanges.length > 0 ||
-                !productUpdateAudienceIsValid) && (
-                <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-800">
-                  {pendingReleaseChanges.length > 0
-                    ? `Delivery is locked until ${pendingReleaseChanges.length} merged change${pendingReleaseChanges.length === 1 ? " is" : "s are"} verified as shipped.`
-                    : "WanderOS product updates can only target the operator audience."}
-                </div>
-              )}
-
-            <div className="mt-3 grid grid-cols-1 gap-3 @xl:grid-cols-2">
-              <label>
-                <span className="mb-1 block text-xs font-medium">
-                  API-triggered broadcast ID
-                </span>
-                <input
-                  inputMode="numeric"
-                  value={providerBroadcastId}
-                  onChange={(event) =>
-                    setProviderBroadcastId(event.target.value)
-                  }
-                  className={controlClass}
-                  placeholder="Customer.io broadcast ID"
-                />
-              </label>
-              <label>
-                <span className="mb-1 block text-xs font-medium">
-                  Customer.io segment ID
-                </span>
-                <input
-                  inputMode="numeric"
-                  value={segmentId}
-                  onChange={(event) => setSegmentId(event.target.value)}
-                  className={controlClass}
-                  placeholder="Provider-owned segment"
-                />
-              </label>
-              <label>
-                <span className="mb-1 block text-xs font-medium">Audience</span>
-                <select
-                  value={audienceKind}
-                  onChange={(event) =>
-                    setAudienceKind(event.target.value as typeof audienceKind)
-                  }
-                  className={controlClass}
-                >
-                  <option value="wanderos_operators">WanderOS operators</option>
-                  <option value="guests">Operator guests</option>
-                  <option value="subscribers">General subscribers</option>
-                </select>
-              </label>
-            </div>
-
-            <button
-              type="button"
-              onClick={() =>
-                prepareSend.mutate({
-                  platformPostId: workspace.spot.id,
-                  providerBroadcastId: numericBroadcastId,
-                  audienceKind,
-                  segmentId: numericSegmentId,
-                })
-              }
-              disabled={!canPrepare || prepareSend.isPending}
-              className="mt-3 flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-accent disabled:opacity-50"
-            >
-              {prepareSend.isPending ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <ShieldCheck className="size-4" />
-              )}
-              Prepare revision {workspace.document.currentRevision}
-            </button>
-
-            {latestSend && (
-              <div className="mt-4 rounded-lg border bg-muted/50 p-3 text-sm">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <span className="font-medium">
-                      Revision {latestSend.revision} · {latestSend.status}
-                    </span>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {latestSend.audienceLabel} · CIO broadcast{" "}
-                      {latestSend.providerBroadcastId} · segment{" "}
-                      {latestSend.audienceReference}
-                    </p>
-                  </div>
-                  {(latestSend.status === "draft" ||
-                    latestSend.status === "failed") &&
-                    workspace.canDeliver && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          approveSend.mutate({
-                            messageSendId: latestSend.id,
-                          })
-                        }
-                        disabled={approveSend.isPending}
-                        className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
-                      >
-                        <Check className="size-3.5" /> Approve exact revision
-                      </button>
-                    )}
-                </div>
-
-                {latestSend.status === "approved" && workspace.canDeliver && (
-                  <div className="mt-3 flex flex-wrap items-end gap-2 border-t pt-3">
-                    <label className="min-w-44 flex-1">
-                      <span className="mb-1 block text-xs font-medium">
-                        Type SEND to confirm
-                      </span>
-                      <input
-                        value={sendConfirmation}
-                        onChange={(event) =>
-                          setSendConfirmation(event.target.value)
-                        }
-                        className={controlClass}
-                        autoComplete="off"
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        sendApproved.mutate({
-                          messageSendId: latestSend.id,
-                          confirmation: "SEND",
-                        })
-                      }
-                      disabled={
-                        sendConfirmation !== "SEND" || sendApproved.isPending
-                      }
-                      className="flex items-center gap-1.5 rounded-md bg-red-600 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
-                    >
-                      {sendApproved.isPending ? (
-                        <Loader2 className="size-3.5 animate-spin" />
-                      ) : (
-                        <Send className="size-3.5" />
-                      )}
-                      Send now
-                    </button>
-                  </div>
-                )}
-
-                {latestSend.sentAt && (
-                  <p className="mt-2 text-xs text-emerald-600">
-                    Sent {latestSend.sentAt.toLocaleString()}
-                    {latestSend.providerMessageId
-                      ? ` · provider delivery ${latestSend.providerMessageId}`
-                      : ""}
-                  </p>
-                )}
-                {latestSend.error && (
-                  <p className="mt-2 text-xs text-red-600">
-                    {latestSend.error}
-                  </p>
-                )}
-                {!workspace.canDeliver &&
-                  latestSend.status !== "sent" &&
-                  latestSend.status !== "sending" && (
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      An organization owner or admin must approve and send this
-                      revision.
-                    </p>
-                  )}
-              </div>
-            )}
-            {deliveryError && (
-              <p className="mt-2 text-sm text-red-600">
-                {deliveryError.message}
-              </p>
-            )}
-          </section>
-
           {workspace.versions.length > 0 && (
             <section className="rounded-xl border bg-card p-4">
               <h2 className="font-semibold">Revision history</h2>
@@ -739,16 +479,15 @@ function Editor({ workspace }: { workspace: Workspace }) {
         <div className="@5xl:sticky @5xl:top-4 @5xl:self-start">
           <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-slate-50 px-4 py-2.5 text-xs font-medium text-slate-600">
-              <span>Wander email preview</span>
-              {/* Liquid stays raw in the stored document; CIO expands it per
-                  recipient. These views simulate that expansion locally — the
-                  seed-segment test send in CIO remains the real check. */}
+              <span>Email preview</span>
+              {/* Per-guest fields stay as written in the stored document and
+                  are filled for each guest at send time. */}
               <div className="flex overflow-hidden rounded-md border border-slate-200">
                 {(
                   [
-                    ["template", "Template"],
-                    ["full", "As Jane (Austin)"],
-                    ["sparse", "No attributes"],
+                    ["template", "As written"],
+                    ["full", "Sample guest"],
+                    ["sparse", "No guest data"],
                   ] as const
                 ).map(([value, label]) => (
                   <button
@@ -779,7 +518,16 @@ function Editor({ workspace }: { workspace: Workspace }) {
               </div>
             )}
             {previewHtml ? (
-              <EmailPreviewFrame html={previewHtml} />
+              <EmailPreviewFrame
+                html={previewHtml}
+                active={activePick}
+                onPick={(pick) =>
+                  setPreviewSelect((current) => ({
+                    pick,
+                    nonce: (current?.nonce ?? 0) + 1,
+                  }))
+                }
+              />
             ) : (
               <div className="flex h-[560px] items-center justify-center text-sm text-slate-500">
                 {preview.isPending

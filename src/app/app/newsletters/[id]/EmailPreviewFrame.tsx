@@ -18,8 +18,43 @@ const DEVICES = {
 } as const;
 type Device = keyof typeof DEVICES;
 
+/**
+ * The email's own page colour, so the stage around a narrower frame reads as
+ * the same page instead of a second grey.
+ */
+function pageBackground(html: string) {
+  return (
+    /\.dark-body\s*\{[^}]*background-color:\s*([^;}]+)/.exec(html)?.[1] ??
+    /<body[^>]*background-color:\s*([^;"]+)/.exec(html)?.[1] ??
+    "#f7f7f7"
+  ).trim();
+}
+
+/**
+ * Preview-only: the frame scrolls without a scrollbar, and the editor's
+ * blocks and home groups show they can be clicked.
+ */
+const HIDE_SCROLLBAR =
+  "<style>html{scrollbar-width:none}html::-webkit-scrollbar{display:none}[data-block],[data-group]{cursor:pointer}[data-block]:hover,[data-group]:hover{outline:2px dashed rgba(59,130,246,.45);outline-offset:3px}.pv-active{outline:2px solid #3b82f6!important;outline-offset:3px}</style>";
+
+/** What a click in the preview landed on. */
+export type PreviewPick = { block?: number; group?: number };
+
+function previewDocument(html: string) {
+  return html.includes("</head>")
+    ? html.replace("</head>", `${HIDE_SCROLLBAR}</head>`)
+    : HIDE_SCROLLBAR + html;
+}
+
 /** The side panel is narrow, so it offers the two that matter there. */
 const PANEL_DEVICES: Device[] = ["phone", "desktop"];
+
+/**
+ * Desktop in the panel is the 600px card with a little of its page margin:
+ * the rest of a 1024px window is only margin, and scaling it all in would
+ * shrink the card to a thumbnail. Full screen keeps the real window width.
+ */
+const PANEL_DESKTOP_WIDTH = 680;
 
 function DeviceSwitch({
   devices,
@@ -71,11 +106,60 @@ function ScaledFrame({
   html,
   width,
   height,
+  onPick,
+  active,
 }: {
   html: string;
   width: number;
   height: number;
+  onPick?: (pick: PreviewPick) => void;
+  active?: PreviewPick | null;
 }) {
+  const frameRef = useRef<HTMLIFrameElement>(null);
+  const onPickRef = useRef(onPick);
+  onPickRef.current = onPick;
+
+  // The frame runs no scripts; the page listens on its document instead.
+  const wire = () => {
+    const doc = frameRef.current?.contentDocument;
+    if (!doc) return;
+    doc.addEventListener("click", (event) => {
+      const target = event.target as Element | null;
+      if (target?.closest("a")) event.preventDefault();
+      const block = target?.closest("[data-block]");
+      const group = target?.closest("[data-group]");
+      if (block) {
+        onPickRef.current?.({
+          block: Number(block.getAttribute("data-block")),
+        });
+      } else if (group) {
+        onPickRef.current?.({
+          group: Number(group.getAttribute("data-group")),
+        });
+      }
+    });
+    mark();
+  };
+  const mark = () => {
+    const doc = frameRef.current?.contentDocument;
+    if (!doc) return;
+    for (const node of Array.from(doc.querySelectorAll(".pv-active"))) {
+      node.classList.remove("pv-active");
+    }
+    const selector =
+      active?.block !== undefined
+        ? `[data-block="${active.block}"]`
+        : active?.group !== undefined
+          ? `[data-group="${active.group}"]`
+          : null;
+    const node = selector ? doc.querySelector(selector) : null;
+    if (node) {
+      node.classList.add("pv-active");
+      node.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  };
+  useEffect(mark, [active?.block, active?.group]);
+
   const boxRef = useRef<HTMLDivElement>(null);
   const [available, setAvailable] = useState(width);
 
@@ -90,16 +174,22 @@ function ScaledFrame({
   }, []);
 
   const scale = Math.min(1, available / width);
+  // The box keeps its height at any scale, so a scaled-down frame shows more
+  // of the email rather than a shorter strip of it.
   return (
-    <div ref={boxRef} className="w-full" style={{ height: height * scale }}>
+    <div ref={boxRef} className="w-full overflow-hidden" style={{ height }}>
       <iframe
-        srcDoc={html}
-        sandbox=""
+        ref={frameRef}
+        onLoad={wire}
+        srcDoc={previewDocument(html)}
+        // Same origin so the page can read clicks; still no scripts.
+        sandbox="allow-same-origin"
         title="Newsletter preview"
-        className="mx-auto block bg-white"
+        className="mx-auto block"
         style={{
+          background: pageBackground(html),
           width,
-          height,
+          height: height / scale,
           transform: scale < 1 ? `scale(${scale})` : undefined,
           transformOrigin: "top left",
         }}
@@ -108,7 +198,15 @@ function ScaledFrame({
   );
 }
 
-export function EmailPreviewFrame({ html }: { html: string }) {
+export function EmailPreviewFrame({
+  html,
+  onPick,
+  active,
+}: {
+  html: string;
+  onPick?: (pick: PreviewPick) => void;
+  active?: PreviewPick | null;
+}) {
   const [device, setDevice] = useState<Device>("phone");
   const [fullscreen, setFullscreen] = useState<Device | null>(null);
 
@@ -139,8 +237,16 @@ export function EmailPreviewFrame({ html }: { html: string }) {
           <Maximize2 className="size-3.5" />
         </button>
       </div>
-      <div className="bg-slate-100 py-3">
-        <ScaledFrame html={html} width={DEVICES[device].width} height={760} />
+      <div style={{ background: pageBackground(html) }}>
+        <ScaledFrame
+          html={html}
+          width={
+            device === "desktop" ? PANEL_DESKTOP_WIDTH : DEVICES[device].width
+          }
+          height={760}
+          onPick={onPick}
+          active={active}
+        />
       </div>
 
       {/* Portalled to the body: the app's page area is a CSS container, and a

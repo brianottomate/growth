@@ -44,39 +44,69 @@ export type DigestProperty = {
   href: string;
 };
 
+export type FlowItem =
+  | { kind: "html"; html: string }
+  | { kind: "group"; index: number };
+
+/** How a group of homes lays out: its first big and the rest compact by default. */
+export type DigestLayout = "feature" | "list" | "grid";
+
 export type DigestSection = {
   heading: string;
+  layout?: DigestLayout | null;
   featured: DigestProperty;
   more: DigestProperty[];
-  cta: { label: string; href: string };
+  cta?: { label: string; href: string };
 };
 
-export type ListingsDigestProps = {
-  previewText: string;
-  hero: { src: string; alt: string; href: string };
-  greeting: string;
-  /** Inline markdown subset: **bold**, [label](url). */
-  paragraphs: string[];
-  valueProps: { iconSrc: string; label: string }[];
-  primaryCta: { label: string; href: string };
-  secondaryCta: { label: string; href: string };
-  concierge: { avatarsSrc: string; note: string };
-  trending: { iconSrc: string; kicker: string; heading: string };
-  sections: DigestSection[];
-  help: {
+/**
+ * Everything around the homes that belongs to the sender rather than the
+ * issue. Each block is optional: a brand without a concierge line, value
+ * props or a tagline simply goes without that block.
+ */
+export type DigestChrome = {
+  /** Whose email this is: alt text and the footer's logo. */
+  brandName: string;
+  /** A logo above everything, for a sender without a branded hero banner. */
+  headerLogoSrc?: string;
+  valueProps?: { iconSrc: string; label: string }[];
+  primaryCta?: { label: string; href: string };
+  secondaryCta?: { label: string; href: string };
+  concierge?: { avatarsSrc?: string; note: string };
+  /** The icon beside the issue's theme line. */
+  trendingIconSrc?: string;
+  help?: {
     heading: string;
     text: string;
-    avatarsSrc: string;
-    textCta: { label: string; href: string };
-    callCta: { label: string; href: string };
+    avatarsSrc?: string;
+    textCta?: { label: string; href: string };
+    callCta?: { label: string; href: string };
   };
   footer: {
-    logoSrc: string;
-    tagline: string;
-    address: string;
-    /** Keep "{% unsubscribe_url %}" for Customer.io-executed sends. */
+    logoSrc?: string;
+    tagline?: string;
+    address?: string;
+    /** "{% unsubscribe_url %}" for Customer.io, the provider's placeholder otherwise. */
     unsubscribeUrl: string;
   };
+};
+
+export type ListingsDigestProps = DigestChrome & {
+  previewText: string;
+  hero?: { src: string; alt: string; href: string };
+  /** The subject, as the email's title. */
+  heading: string;
+  /** Inline markdown subset: **bold**, [label](url). */
+  paragraphs?: string[];
+  /**
+   * The body in reading order: sanitized copy and the home groups it places.
+   * When it places any, the button follows it; groups it leaves out follow
+   * the button.
+   */
+  flow?: FlowItem[];
+  /** The issue's theme line above the homes. */
+  trending?: { kicker: string; heading: string };
+  sections: DigestSection[];
 };
 
 const colors = {
@@ -122,6 +152,7 @@ const PHONE_CSS = `
   .wd-stack { display: block !important; width: 100% !important; padding-left: 0 !important; }
   .wd-stack-text { padding-top: 12px !important; }
   .wd-stack-img { width: 100% !important; height: auto !important; }
+  .wd-grid-cell { display: block !important; width: 100% !important; padding: 0 0 16px 0 !important; }
 }
 `;
 
@@ -243,21 +274,29 @@ function FeaturedCard({ property }: { property: DigestProperty }) {
   );
 }
 
-function CompactCard({ property }: { property: DigestProperty }) {
+function CompactCard({
+  property,
+  stack = true,
+}: {
+  property: DigestProperty;
+  /** Photo over text on a phone; a list keeps its rows side by side. */
+  stack?: boolean;
+}) {
+  const width = stack ? 180 : 120;
   return (
     <Section style={{ paddingTop: "16px" }}>
       <Row>
         <Column
-          className="wd-stack"
-          style={{ width: "180px", verticalAlign: "top" }}
+          className={stack ? "wd-stack" : undefined}
+          style={{ width: `${width}px`, verticalAlign: "top" }}
         >
           <Link href={property.href}>
             <Img
-              className="wd-stack-img"
+              className={stack ? "wd-stack-img" : undefined}
               src={property.image.src}
               alt={property.image.alt ?? property.title}
-              width={180}
-              height={120}
+              width={width}
+              height={stack ? 120 : 84}
               style={{
                 borderRadius: "12px",
                 objectFit: "cover",
@@ -266,8 +305,8 @@ function CompactCard({ property }: { property: DigestProperty }) {
           </Link>
         </Column>
         <Column
-          className="wd-stack wd-stack-text"
-          style={{ paddingLeft: "16px", verticalAlign: "top" }}
+          className={stack ? "wd-stack wd-stack-text" : undefined}
+          style={{ paddingLeft: stack ? "16px" : "12px", verticalAlign: "top" }}
         >
           <Kicker property={property} />
           <Link href={property.href} style={{ textDecoration: "none" }}>
@@ -294,6 +333,112 @@ function CompactCard({ property }: { property: DigestProperty }) {
   );
 }
 
+function GridCard({ property }: { property: DigestProperty }) {
+  return (
+    <>
+      <Link href={property.href}>
+        <Img
+          src={property.image.src}
+          alt={property.image.alt ?? property.title}
+          width={264}
+          style={{ width: "100%", borderRadius: "12px" }}
+        />
+      </Link>
+      <Kicker property={property} />
+      <Link href={property.href} style={{ textDecoration: "none" }}>
+        <Text
+          style={{
+            fontSize: "15px",
+            fontWeight: 700,
+            color: colors.ink,
+            margin: "4px 0 2px",
+          }}
+        >
+          <TitleLine property={property} />
+        </Text>
+      </Link>
+      <Text style={{ fontSize: "14px", color: colors.body, margin: 0 }}>
+        {property.priceLabel}
+      </Text>
+    </>
+  );
+}
+
+/** One group of homes, in its layout. `data-group` lets a preview find it. */
+function HomeGroup({
+  section,
+  index,
+}: {
+  section: DigestSection;
+  index: number;
+}) {
+  const homes = [section.featured, ...section.more];
+  const pairs = homes.reduce<DigestProperty[][]>(
+    (rows, home, i) =>
+      i % 2 ? (rows.at(-1)!.push(home), rows) : [...rows, [home]],
+    [],
+  );
+  return (
+    <Section data-group={index} style={{ paddingTop: "8px" }}>
+      {section.heading ? (
+        <Text
+          style={{
+            fontSize: "20px",
+            fontWeight: 700,
+            color: colors.ink,
+            margin: "12px 0 0",
+          }}
+        >
+          {section.heading}
+        </Text>
+      ) : null}
+      {section.layout === "feature" ? (
+        homes.map((home) => <FeaturedCard key={home.href} property={home} />)
+      ) : section.layout === "list" ? (
+        homes.map((home) => (
+          <CompactCard key={home.href} property={home} stack={false} />
+        ))
+      ) : section.layout === "grid" ? (
+        pairs.map((pair) => (
+          <Section key={pair[0]!.href} style={{ paddingTop: "16px" }}>
+            <Row>
+              {pair.map((home, i) => (
+                <Column
+                  key={home.href}
+                  className="wd-grid-cell"
+                  style={{
+                    width: "50%",
+                    verticalAlign: "top",
+                    paddingLeft: i ? "8px" : 0,
+                    paddingRight: i ? 0 : "8px",
+                  }}
+                >
+                  <GridCard property={home} />
+                </Column>
+              ))}
+              {pair.length === 1 ? <Column style={{ width: "50%" }} /> : null}
+            </Row>
+          </Section>
+        ))
+      ) : (
+        <>
+          <FeaturedCard property={section.featured} />
+          {section.more.map((home) => (
+            <CompactCard key={home.href} property={home} />
+          ))}
+        </>
+      )}
+      {section.cta && (
+        <Section style={{ paddingTop: "20px" }}>
+          <Link href={section.cta.href} style={pillButton("dark")}>
+            {section.cta.label} →
+          </Link>
+        </Section>
+      )}
+    </Section>
+  );
+}
+
 function Divider() {
   return (
     <Section style={{ paddingTop: "24px" }}>
@@ -303,6 +448,139 @@ function Divider() {
 }
 
 export default function ListingsDigest(props: ListingsDigestProps) {
+  const placed = new Set(
+    (props.flow ?? []).flatMap((item) =>
+      item.kind === "group" ? [item.index] : [],
+    ),
+  );
+  const ctaBlock = (
+    <>
+      {props.valueProps?.length ? (
+        <Section style={{ paddingTop: "4px" }}>
+          <Row>
+            {props.valueProps.map((valueProp) => (
+              <Column key={valueProp.label} align="center">
+                <Text
+                  style={{
+                    fontSize: "14px",
+                    fontWeight: 700,
+                    color: colors.ink,
+                    margin: 0,
+                  }}
+                >
+                  <Img
+                    src={valueProp.iconSrc}
+                    alt=""
+                    width={24}
+                    height={24}
+                    style={{
+                      display: "inline-block",
+                      verticalAlign: "middle",
+                      marginRight: "8px",
+                    }}
+                  />
+                  <span style={{ verticalAlign: "middle" }}>
+                    {valueProp.label}
+                  </span>
+                </Text>
+              </Column>
+            ))}
+          </Row>
+        </Section>
+      ) : null}
+
+      {props.primaryCta && (
+        <Section style={{ paddingTop: "24px" }}>
+          <Link href={props.primaryCta.href} style={pillButton("dark")}>
+            {props.primaryCta.label} →
+          </Link>
+        </Section>
+      )}
+      {props.secondaryCta && (
+        <Section style={{ paddingTop: "12px" }}>
+          <Link href={props.secondaryCta.href} style={pillButton("light")}>
+            {props.secondaryCta.label}
+          </Link>
+        </Section>
+      )}
+
+      {props.concierge && (
+        <Section style={{ paddingTop: "16px" }}>
+          <Row>
+            {props.concierge.avatarsSrc && (
+              <Column style={{ width: "80px" }}>
+                <Img
+                  src={props.concierge.avatarsSrc}
+                  alt={`${props.brandName} team`}
+                  width={72}
+                />
+              </Column>
+            )}
+            <Column
+              style={{
+                paddingLeft: props.concierge.avatarsSrc ? "8px" : 0,
+              }}
+            >
+              <Text
+                style={{ fontSize: "13px", color: colors.faint, margin: 0 }}
+              >
+                {props.concierge.note}
+              </Text>
+            </Column>
+          </Row>
+        </Section>
+      )}
+    </>
+  );
+  const homesBlock = (
+    <>
+      {props.trending && (
+        <>
+          <Divider />
+
+          <Section style={{ paddingTop: "20px" }}>
+            <Row>
+              {props.trendingIconSrc && (
+                <Column style={{ width: "42px", verticalAlign: "top" }}>
+                  <Img
+                    src={props.trendingIconSrc}
+                    alt=""
+                    width={30}
+                    height={30}
+                  />
+                </Column>
+              )}
+              <Column>
+                <Text style={{ ...kickerStyle, margin: "0 0 2px" }}>
+                  {props.trending.kicker}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: "20px",
+                    fontWeight: 700,
+                    color: colors.ink,
+                    margin: 0,
+                  }}
+                >
+                  {props.trending.heading}
+                </Text>
+              </Column>
+            </Row>
+          </Section>
+        </>
+      )}
+
+      {props.sections.map((section, index) =>
+        placed.has(index) ? null : (
+          <React.Fragment key={index}>
+            <Divider />
+            <HomeGroup section={section} index={index} />
+          </React.Fragment>
+        ),
+      )}
+    </>
+  );
+
   return (
     <Html lang="en">
       <Head>
@@ -331,219 +609,169 @@ export default function ListingsDigest(props: ListingsDigestProps) {
             padding: "24px",
           }}
         >
-          <Link href={props.hero.href}>
+          {props.headerLogoSrc && (
             <Img
-              src={props.hero.src}
-              alt={props.hero.alt}
-              width={552}
-              style={{ width: "100%", borderRadius: "12px" }}
+              src={props.headerLogoSrc}
+              alt={props.brandName}
+              height={32}
+              style={{ height: "32px", width: "auto", marginBottom: "20px" }}
             />
-          </Link>
+          )}
+          {props.hero && (
+            <Link href={props.hero.href}>
+              <Img
+                src={props.hero.src}
+                alt={props.hero.alt}
+                width={552}
+                style={{ width: "100%", borderRadius: "12px" }}
+              />
+            </Link>
+          )}
 
           <Section style={{ paddingTop: "20px" }}>
             <Text
               style={{
-                fontSize: "15px",
-                color: colors.ink,
-                margin: "0 0 12px",
-              }}
-            >
-              {props.greeting}
-            </Text>
-            {props.paragraphs.map((paragraph, i) => (
-              <Text
-                key={i}
-                style={{
-                  fontSize: "15px",
-                  lineHeight: "24px",
-                  color: colors.body,
-                  margin: "0 0 12px",
-                }}
-              >
-                {renderInline(paragraph)}
-              </Text>
-            ))}
-          </Section>
-
-          <Section style={{ paddingTop: "4px" }}>
-            <Row>
-              {props.valueProps.map((valueProp) => (
-                <Column key={valueProp.label} align="center">
-                  <Text
-                    style={{
-                      fontSize: "14px",
-                      fontWeight: 700,
-                      color: colors.ink,
-                      margin: 0,
-                    }}
-                  >
-                    <Img
-                      src={valueProp.iconSrc}
-                      alt=""
-                      width={24}
-                      height={24}
-                      style={{
-                        display: "inline-block",
-                        verticalAlign: "middle",
-                        marginRight: "8px",
-                      }}
-                    />
-                    <span style={{ verticalAlign: "middle" }}>
-                      {valueProp.label}
-                    </span>
-                  </Text>
-                </Column>
-              ))}
-            </Row>
-          </Section>
-
-          <Section style={{ paddingTop: "24px" }}>
-            <Link href={props.primaryCta.href} style={pillButton("dark")}>
-              {props.primaryCta.label} →
-            </Link>
-          </Section>
-          <Section style={{ paddingTop: "12px" }}>
-            <Link href={props.secondaryCta.href} style={pillButton("light")}>
-              {props.secondaryCta.label}
-            </Link>
-          </Section>
-
-          <Section style={{ paddingTop: "16px" }}>
-            <Row>
-              <Column style={{ width: "80px" }}>
-                <Img
-                  src={props.concierge.avatarsSrc}
-                  alt="Wander Concierge Team"
-                  width={72}
-                />
-              </Column>
-              <Column style={{ paddingLeft: "8px" }}>
-                <Text
-                  style={{ fontSize: "13px", color: colors.faint, margin: 0 }}
-                >
-                  {props.concierge.note}
-                </Text>
-              </Column>
-            </Row>
-          </Section>
-
-          <Divider />
-
-          <Section style={{ paddingTop: "20px" }}>
-            <Row>
-              <Column style={{ width: "42px", verticalAlign: "top" }}>
-                <Img
-                  src={props.trending.iconSrc}
-                  alt=""
-                  width={30}
-                  height={30}
-                />
-              </Column>
-              <Column>
-                <Text style={{ ...kickerStyle, margin: "0 0 2px" }}>
-                  {props.trending.kicker}
-                </Text>
-                <Text
-                  style={{
-                    fontSize: "20px",
-                    fontWeight: 700,
-                    color: colors.ink,
-                    margin: 0,
-                  }}
-                >
-                  {props.trending.heading}
-                </Text>
-              </Column>
-            </Row>
-          </Section>
-
-          {props.sections.map((section) => (
-            <React.Fragment key={section.heading}>
-              <Divider />
-              <Section style={{ paddingTop: "20px" }}>
-                <Text
-                  style={{
-                    fontSize: "20px",
-                    fontWeight: 700,
-                    color: colors.ink,
-                    margin: 0,
-                  }}
-                >
-                  {section.heading}
-                </Text>
-              </Section>
-              <FeaturedCard property={section.featured} />
-              {section.more.map((property) => (
-                <CompactCard key={property.href} property={property} />
-              ))}
-              <Section style={{ paddingTop: "20px" }}>
-                <Link href={section.cta.href} style={pillButton("dark")}>
-                  {section.cta.label} →
-                </Link>
-              </Section>
-            </React.Fragment>
-          ))}
-
-          <Divider />
-
-          <Section style={{ paddingTop: "20px" }}>
-            <Text
-              style={{
-                fontSize: "18px",
+                fontSize: "22px",
+                lineHeight: "28px",
                 fontWeight: 700,
                 color: colors.ink,
                 margin: "0 0 12px",
               }}
             >
-              {props.help.heading}
+              {props.heading}
             </Text>
-            <Row>
-              <Column style={{ width: "104px", verticalAlign: "top" }}>
-                <Img
-                  src={props.help.avatarsSrc}
-                  alt="Wander Concierge Team"
-                  width={96}
+            {props.flow?.map((item, i) =>
+              item.kind === "html" ? (
+                <div
+                  key={i}
+                  style={{
+                    fontSize: "15px",
+                    lineHeight: "24px",
+                    color: colors.body,
+                  }}
+                  dangerouslySetInnerHTML={{ __html: item.html }}
                 />
-              </Column>
-              <Column style={{ paddingLeft: "8px", verticalAlign: "top" }}>
+              ) : props.sections[item.index] ? (
+                <HomeGroup
+                  key={i}
+                  section={props.sections[item.index]!}
+                  index={item.index}
+                />
+              ) : null,
+            )}
+            {props.flow
+              ? null
+              : (props.paragraphs ?? []).map((paragraph, i) => (
+                  <Text
+                    key={i}
+                    style={{
+                      fontSize: "15px",
+                      lineHeight: "24px",
+                      color: colors.body,
+                      margin: "0 0 12px",
+                    }}
+                  >
+                    {renderInline(paragraph)}
+                  </Text>
+                ))}
+          </Section>
+
+          {ctaBlock}
+          {homesBlock}
+
+          {props.help && (
+            <>
+              <Divider />
+
+              <Section style={{ paddingTop: "20px" }}>
                 <Text
                   style={{
-                    fontSize: "14px",
-                    lineHeight: "22px",
-                    color: colors.body,
-                    margin: 0,
+                    fontSize: "18px",
+                    fontWeight: 700,
+                    color: colors.ink,
+                    margin: "0 0 12px",
                   }}
                 >
-                  {props.help.text}
+                  {props.help.heading}
                 </Text>
-              </Column>
-            </Row>
-            <Section style={{ paddingTop: "16px" }}>
-              <Link href={props.help.textCta.href} style={pillButton("dark")}>
-                {props.help.textCta.label}
-              </Link>
-              <Link href={props.help.callCta.href} style={pillButton("light")}>
-                {props.help.callCta.label}
-              </Link>
-            </Section>
-          </Section>
+                <Row>
+                  {props.help.avatarsSrc && (
+                    <Column style={{ width: "104px", verticalAlign: "top" }}>
+                      <Img
+                        src={props.help.avatarsSrc}
+                        alt={`${props.brandName} team`}
+                        width={96}
+                      />
+                    </Column>
+                  )}
+                  <Column
+                    style={{
+                      paddingLeft: props.help.avatarsSrc ? "8px" : 0,
+                      verticalAlign: "top",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: "14px",
+                        lineHeight: "22px",
+                        color: colors.body,
+                        margin: 0,
+                      }}
+                    >
+                      {props.help.text}
+                    </Text>
+                  </Column>
+                </Row>
+                <Section style={{ paddingTop: "16px" }}>
+                  {props.help.textCta && (
+                    <Link
+                      href={props.help.textCta.href}
+                      style={pillButton("dark")}
+                    >
+                      {props.help.textCta.label}
+                    </Link>
+                  )}
+                  {props.help.callCta && (
+                    <Link
+                      href={props.help.callCta.href}
+                      style={pillButton("light")}
+                    >
+                      {props.help.callCta.label}
+                    </Link>
+                  )}
+                </Section>
+              </Section>
+            </>
+          )}
 
           <Divider />
 
           <Section style={{ paddingTop: "24px" }}>
-            <Img src={props.footer.logoSrc} alt="Wander" width={120} />
-            <Text
-              style={{
-                fontSize: "13px",
-                color: colors.muted,
-                margin: "8px 0 16px",
-              }}
-            >
-              {props.footer.tagline}
-            </Text>
-            <Text style={{ fontSize: "11px", color: colors.faint, margin: 0 }}>
-              {props.footer.address}
-            </Text>
+            {props.footer.logoSrc && (
+              <Img
+                src={props.footer.logoSrc}
+                alt={props.brandName}
+                width={120}
+              />
+            )}
+            {props.footer.tagline && (
+              <Text
+                style={{
+                  fontSize: "13px",
+                  color: colors.muted,
+                  margin: "8px 0 16px",
+                }}
+              >
+                {props.footer.tagline}
+              </Text>
+            )}
+            {props.footer.address && (
+              <Text
+                style={{ fontSize: "11px", color: colors.faint, margin: 0 }}
+              >
+                {props.footer.address}
+              </Text>
+            )}
             <Text style={{ fontSize: "11px", margin: "4px 0 0" }}>
               <Link
                 href={props.footer.unsubscribeUrl}
@@ -567,18 +795,9 @@ const cioAsset = (id: string) =>
  * so the react-email preview matches the email Kyle actually sent.
  * Note: tier badges and the hero headline are baked into these images.
  */
-ListingsDigest.PreviewProps = {
-  previewText: "👀 Must-see prices for Labor Day and beyond...",
-  hero: {
-    src: cioAsset("01KZ1M6KDQNN9665KGD2GFBKX7.jpg"),
-    alt: "Labor day weekend vibes, great prices",
-    href: "https://www.wander.com",
-  },
-  greeting: "👋 Hi there,",
-  paragraphs: [
-    "**ICYMI, we lowered rates at every single [Wander](https://www.wander.com) last week.** Now is the perfect time to snag that end of summer trip for Labor Day weekend or plan ahead for even lower fall rates or lock down your holiday plans.",
-    "**Not sure where to go?** Your Personal Concierge is just a text or call away to help you with trip planning, questions or making a reservation.",
-  ],
+/** Sample chrome for the template's own preview (CIO newsletter 1551). */
+const SAMPLE_CHROME = {
+  brandName: "Wander",
   valueProps: [
     {
       iconSrc: cioAsset("01KYQRV2KKD3CA8BMAH0ZPGECA.png"),
@@ -605,8 +824,41 @@ ListingsDigest.PreviewProps = {
     avatarsSrc: cioAsset("01KYR02DY9B3C1X848ZJ2GRR6P.png"),
     note: "Responses in 3 mins • Available 24/7",
   },
+  help: {
+    heading: "Need help? We're here for you.",
+    text: "Your Personal Concierge is available to help you think through options and make your reservation.",
+    avatarsSrc: cioAsset("01KYR02DY9B3C1X848ZJ2GRR6P.png"),
+    textCta: {
+      label: "Text with your Concierge",
+      href: "sms:+14157993400?body=Hello!%20I'm%20interested%20in%20potentially%20booking%20a%20trip.%20Can%20you%20help%3F",
+    },
+    callCta: { label: "Call your Concierge", href: "tel:+14157993400" },
+  },
+  footer: {
+    logoSrc: cioAsset("01KXNRPZDGBB5VWW26X4VP4NBA.png"),
+    tagline: "Find your happy place ®",
+    address:
+      "Wander.com, Inc. · 200 Academy Drive, Suite 200 · Austin, TX 78704",
+    unsubscribeUrl: "{% unsubscribe_url %}",
+  },
+  trendingIconSrc: cioAsset("01KYQVY92DAZ950150HGJ8BX1Z.png"),
+} satisfies DigestChrome;
+
+ListingsDigest.PreviewProps = {
+  ...SAMPLE_CHROME,
+  previewText: "👀 Must-see prices for Labor Day and beyond...",
+  hero: {
+    src: cioAsset("01KZ1M6KDQNN9665KGD2GFBKX7.jpg"),
+    alt: "Labor day weekend vibes, great prices",
+    href: "https://www.wander.com",
+  },
+  heading: "Must-see prices for Labor Day and beyond",
+  paragraphs: [
+    "👋 Hi there,",
+    "**ICYMI, we lowered rates at every single [Wander](https://www.wander.com) last week.** Now is the perfect time to snag that end of summer trip for Labor Day weekend or plan ahead for even lower fall rates or lock down your holiday plans.",
+    "**Not sure where to go?** Your Personal Concierge is just a text or call away to help you with trip planning, questions or making a reservation.",
+  ],
   trending: {
-    iconSrc: cioAsset("01KYQVY92DAZ950150HGJ8BX1Z.png"),
     kicker: "Trending right now",
     heading: "Labor day destinations at lower rates",
   },
@@ -728,21 +980,4 @@ ListingsDigest.PreviewProps = {
       },
     },
   ],
-  help: {
-    heading: "Need help? We're here for you.",
-    text: "Your Personal Concierge is available to help you think through options and make your reservation.",
-    avatarsSrc: cioAsset("01KYR02DY9B3C1X848ZJ2GRR6P.png"),
-    textCta: {
-      label: "Text with your Concierge",
-      href: "sms:+14157993400?body=Hello!%20I'm%20interested%20in%20potentially%20booking%20a%20trip.%20Can%20you%20help%3F",
-    },
-    callCta: { label: "Call your Concierge", href: "tel:+14157993400" },
-  },
-  footer: {
-    logoSrc: cioAsset("01KXNRPZDGBB5VWW26X4VP4NBA.png"),
-    tagline: "Find your happy place ®",
-    address:
-      "Wander.com, Inc. · 200 Academy Drive, Suite 200 · Austin, TX 78704",
-    unsubscribeUrl: "{% unsubscribe_url %}",
-  },
 } satisfies ListingsDigestProps;

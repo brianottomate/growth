@@ -5,7 +5,12 @@ import {
 } from "@/lib/product-atlas";
 import { brandRelationshipEnum } from "@/server/db/brand-schema";
 import { currencyEnum } from "@/server/db/auth-schema";
-import { homesSchema, metaReportingConversionsSchema } from "./shared";
+import {
+  homesSchema,
+  brandEmailSenderSchema,
+  brandLegalIdentitySchema,
+  metaReportingConversionsSchema,
+} from "./shared";
 import { z } from "zod";
 
 import { brandMarketsSchema } from "@/lib/markets";
@@ -466,6 +471,8 @@ const brandSchema = z.strictObject({
   updatedAt: z.iso.datetime(),
   wanderOsCheckedAt: z.iso.datetime().nullable(),
   wanderOsWebsiteId: z.string().nullable(),
+  emailSender: brandEmailSenderSchema,
+  legalIdentity: brandLegalIdentitySchema,
   website: z.string().nullable(),
   websiteMeta: websiteMetaSchema.nullable(),
   zernioProfileId: z.string().nullable(),

@@ -21,6 +21,24 @@ import { z } from "zod";
 
 export const DIGEST_TEMPLATE_KEY = "listings-digest";
 
+/**
+ * Where an issue's home groups sit inside its body copy: `<!-- homes 2 -->`
+ * places the second group; a bare `<!-- homes -->` is the first. A group the
+ * copy doesn't place follows the main button.
+ */
+export const HOMES_MARKER = "<!-- homes -->";
+export const HOMES_MARKER_PATTERN = /<!--\s*homes(?:\s+(\d+))?\s*-->/g;
+
+export function homesMarker(groupIndex: number) {
+  return groupIndex === 0 ? HOMES_MARKER : `<!-- homes ${groupIndex + 1} -->`;
+}
+
+/** The group a marker places, from its number (0-based). */
+export function markerGroupIndex(marker: string) {
+  const match = /<!--\s*homes(?:\s+(\d+))?\s*-->/.exec(marker);
+  return match ? Math.max(0, Number(match[1] ?? 1) - 1) : null;
+}
+
 export const digestPropertySchema = z.object({
   /** "Wander Austin Grove" */
   name: z.string().trim().min(1).max(200),
@@ -83,8 +101,10 @@ export const digestPropertySchema = z.object({
 export type DigestProperty = z.infer<typeof digestPropertySchema>;
 
 export const digestSectionSchema = z.object({
-  /** "AUSTIN + HILL COUNTRY, TX" */
-  heading: z.string().trim().min(1).max(200),
+  /** "AUSTIN + HILL COUNTRY, TX"; empty puts the cards straight under the copy. */
+  heading: z.string().trim().max(200),
+  /** Feature: every home large. List: small photo beside text. Grid: two per row. */
+  layout: z.enum(["feature", "list", "grid"]).nullable().optional(),
   properties: z.array(digestPropertySchema).min(1).max(12),
   /**
    * The wander.com search for the section's place, for its "Explore" button:

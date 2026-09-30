@@ -2,7 +2,7 @@ import "server-only";
 
 import { anthropic } from "@ai-sdk/anthropic";
 import { generateText, Output } from "ai";
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -24,16 +24,19 @@ import {
   emailDocumentVersionTable,
   emailGenerationJobTable,
   campaignTable,
+  homeTable,
   messageSendTable,
   platformPostTable,
   seriesTable,
   type EmailDocumentSnapshot,
 } from "@/server/db/schema";
-import { renderDesignSystemNewsletter } from "@/server/email/design-system-newsletter-renderer";
+import { HOMES_MARKER } from "@/lib/listings-digest";
 import {
-  simulateLiquid,
-  type LiquidPersona,
-} from "@/server/email/liquid-preview";
+  leftoverTemplateSyntax,
+  SAMPLE_RECIPIENT,
+  unknownFields,
+} from "@/lib/email-personalization";
+import { renderDesignSystemNewsletter } from "@/server/email/design-system-newsletter-renderer";
 
 export const EMAIL_GENERATION_MODEL = "claude-sonnet-5";
 
@@ -179,7 +182,7 @@ export async function getEmailWorkspace(input: {
     where: eq(emailDocumentTable.platformPostId, spot.id),
   });
   if (!document) throw new Error("Email document has not been initialized.");
-  const [versions, latestJob, rawMessageSends] = await Promise.all([
+  const [versions, latestJob, rawMessageSends, [homes]] = await Promise.all([
     db.query.emailDocumentVersionTable.findMany({
       where: eq(emailDocumentVersionTable.emailDocumentId, document.id),
       orderBy: [desc(emailDocumentVersionTable.revision)],
@@ -209,7 +212,18 @@ export async function getEmailWorkspace(input: {
         createdAt: true,
       },
     }),
+    db
+      .select({ count: count() })
+      .from(homeTable)
+      .where(
+        and(
+          eq(homeTable.brandId, spot.brand.id),
+          eq(homeTable.source, "wanderos"),
+          isNull(homeTable.deletedAt),
+        ),
+      ),
   ]);
+  const homeCount = homes?.count ?? 0;
   return {
     document,
     versions,
@@ -251,6 +265,7 @@ export async function getEmailWorkspace(input: {
       id: spot.brand.id,
       name: spot.brand.name,
       slug: spot.brand.slug,
+      homeCount,
     },
   };
 }
@@ -540,6 +555,8 @@ export async function runEmailGenerationJob(jobId: string) {
         brandVoice ? `Brand voice:\n${brandVoice}` : null,
         channelVoice ? `Newsletter voice:\n${channelVoice}` : null,
         "Return an honest, useful draft in Markdown. Do not invent product facts, customer quotes, metrics, dates, or links. Preserve provided URLs exactly. Do not add unsubscribe language; the product sending runtime owns the compliance footer. Use one clear CTA at most.",
+        `The draft may contain markers like ${HOMES_MARKER} or <!-- homes 2 -->, each where a group of home cards appears. Keep every marker exactly once, in a sensible place, and do not list those homes in the text.`,
+        "Per-guest fields like {{first_name|there}} are filled per recipient; keep any the draft uses, written exactly as they are.",
         document.digest
           ? "This issue is a property digest: the homes render below your text from structured data, each with its photo, location, price and link. Write the subject, preheader and a short intro (a greeting and one or two paragraphs) that sets up the theme and the places. Do not list the homes, their prices or their links in the body, and leave the CTA empty; the digest carries both. Claim nothing about the homes, prices, savings, seasons or availability beyond what the prompt states: no rates rising, no limited-time offers, no urgency you were not given."
           : null,
@@ -626,30 +643,111 @@ export async function runEmailGenerationJob(jobId: string) {
   }
 }
 
+/**
+ * Rewrite one block of an email's body, on request: a paragraph, a list, a
+ * heading. The rest of the email is context only, so copy elsewhere (checked
+ * offers, dates, availability) is never touched.
+ */
+export async function rewriteEmailBlock(input: {
+  platformPostId: string;
+  organizationId: string;
+  /** The block's source, as it sits in the body. */
+  block: string;
+  format: "html" | "markdown";
+  instruction?: string;
+  /** The unsaved draft on screen, for context. */
+  subject: string;
+  bodyMarkdown: string;
+}) {
+  const spot = await requireOwnedEmailSpot(
+    input.platformPostId,
+    input.organizationId,
+  );
+  const brandVoice = spot.brand.brandFingerprint?.fingerprintText?.trim();
+  const { output } = await generateText({
+    model: anthropic(EMAIL_GENERATION_MODEL),
+    output: Output.object({
+      name: "EmailBlock",
+      schema: z.object({
+        block: z
+          .string()
+          .min(1)
+          .describe(
+            input.format === "html"
+              ? "The rewritten block as one HTML element of the same kind (a <p>, <ul> or heading), nothing around it."
+              : "The rewritten block as Markdown of the same kind (a paragraph, list or heading), nothing around it.",
+          ),
+      }),
+    }),
+    temperature: 0.7,
+    system: [
+      `You edit one block of a marketing email for ${spot.brand.name}.`,
+      brandVoice ? `Brand voice:\n${brandVoice}` : null,
+      "Rewrite only the block you are given. Keep every fact it states: offers, codes, dates, prices, home names and availability. Invent nothing. Keep every link and its URL exactly. Keep per-guest fields like {{first_name|there}} exactly as written. Do not add unsubscribe language.",
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
+    prompt: [
+      `Subject: ${input.subject || "(unset)"}`,
+      `The whole email body, for context only:\n${input.bodyMarkdown}`,
+      `The block to rewrite:\n${input.block}`,
+      input.instruction?.trim()
+        ? `What to change: ${input.instruction.trim()}`
+        : "Make it clearer and tighter in the brand's voice.",
+    ].join("\n\n"),
+  });
+  return { block: output.block.trim() };
+}
+
 export async function renderEmailPreview(input: {
   platformPostId: string;
   organizationId: string;
   userId: string;
   draft?: EmailDocumentDraft;
   /**
-   * "template" shows the raw liquid as stored (what CIO receives); the persona
-   * views simulate CIO's per-recipient expansion — "full" as a fully-attributed
-   * recipient, "sparse" as one CIO knows nothing about, which is what shakes
-   * out missing `| default:` fallbacks.
+   * "template" shows per-guest fields as written; "full" fills them for a
+   * sample guest, "sparse" for a guest Growth knows nothing about, which is
+   * what shows a missing fallback.
    */
-  viewAs?: "template" | LiquidPersona;
+  viewAs?: "template" | "full" | "sparse";
+  blockIds?: boolean;
 }) {
   const { document, spot } = await ensureEmailDocument(input);
   const draft = emailDocumentDraftSchema.parse(input.draft ?? document);
+  const sender = spot.brand.emailSender;
+  const recipient =
+    input.viewAs === "full"
+      ? SAMPLE_RECIPIENT
+      : input.viewAs === "sparse"
+        ? { email: SAMPLE_RECIPIENT.email }
+        : undefined;
   const rendered = await renderDesignSystemNewsletter({
     document: draft,
     brandName: spot.brand.name,
     logo: spot.brand.brandIdentity?.logo ?? spot.brand.logo,
+    sender,
+    legal: spot.brand.legalIdentity,
+    recipient,
+    blockIds: input.blockIds,
   });
-  if (!input.viewAs || input.viewAs === "template") {
-    return { html: rendered.html, warnings: [] as string[] };
-  }
-  return simulateLiquid(rendered.html, input.viewAs);
+  const copy = [draft.subject, draft.preheader ?? "", draft.bodyMarkdown].join(
+    "\n",
+  );
+  const unknown = [...new Set(unknownFields(copy))];
+  const warnings = [
+    !sender
+      ? `${spot.brand.name} has no email sender set, so the email shows only its name and logo.`
+      : !spot.brand.legalIdentity?.address
+        ? `${spot.brand.name} has no postal address in its footer.`
+        : null,
+    unknown.length
+      ? `Unknown ${unknown.length === 1 ? "field" : "fields"}: ${unknown.map((name) => `{{${name}}}`).join(", ")}.`
+      : null,
+    recipient && leftoverTemplateSyntax(rendered.html)
+      ? "Template syntax is left in the email and would show as text."
+      : null,
+  ].filter((warning): warning is string => Boolean(warning));
+  return { html: rendered.html, warnings };
 }
 
 export async function exportEmailHandoff(input: {
