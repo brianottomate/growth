@@ -65,13 +65,14 @@ it("never previews recovered but unapproved artwork", () => {
     );
   }
 });
-it("rejects unapproved and stale frozen assets in previews and publishing", () => {
+it("previews a draft live but never publishes it, and rejects stale frozen assets", () => {
   const content: AdCreativeContent = {
     ...copy,
     media: [{ type: "image", url: "https://example.com/feed.jpg" }],
     ideaStudio: { document },
   };
-  expect(metaPreviewMedia(content, "facebook-feed", "brand").issue).toContain(
+  expect(metaPreviewMedia(content, "facebook-feed", "brand").issue).toBeNull();
+  expect(metaPlacementMedia(content, "facebook-feed").issue).toContain(
     "Approve",
   );
   content.ideaStudio!.approval = {

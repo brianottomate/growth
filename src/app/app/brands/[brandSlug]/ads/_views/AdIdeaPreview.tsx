@@ -136,13 +136,11 @@ export function AdIdeaPreview({
       ) : null}
       {platform ? (
         <>
-          <p className="text-xs text-muted-foreground">
-            Platform controls are illustrative.
-          </p>
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] items-start gap-5">
-            {META_PLACEMENTS.filter(
-              (surface) =>
-                surface.kind === "feed" || surface.id === "facebook-story",
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,220px),1fr))] items-start gap-4">
+            {META_PLACEMENTS.filter((surface) =>
+              ["facebook-feed", "instagram-feed", "facebook-story"].includes(
+                surface.id,
+              ),
             ).map((surface) => {
               const label =
                 surface.kind === "feed" ? surface.label : "Stories / Reels";

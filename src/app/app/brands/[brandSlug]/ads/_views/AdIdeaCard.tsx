@@ -93,7 +93,7 @@ export function AdIdeaCard({
   const imagesSaved = Boolean(
     ad.content.ideaStudio && ideaImagesSaved(ad.content.ideaStudio),
   );
-  const [view, setView] = useState<"overview" | "details" | "platform">(() =>
+  const [view, setView] = useState<"overview" | "details">(() =>
     !approved && ideaDocumentFromAd(ad).cards.length === 0
       ? "details"
       : "overview",
@@ -917,18 +917,6 @@ export function AdIdeaCard({
               </dl>
             )}
           </div>
-          <div className="flex gap-1" aria-label="Ad view">
-            {(["details", "platform"] as const).map((item) => (
-              <Button
-                key={item}
-                size="sm"
-                variant={view === item ? "secondary" : "ghost"}
-                onClick={() => setView(item)}
-              >
-                {item === "platform" ? "Platform preview" : "Details"}
-              </Button>
-            ))}
-          </div>
           {locked && view === "details" && (
             <p className="text-sm text-muted-foreground">
               {pushed
@@ -947,11 +935,24 @@ export function AdIdeaCard({
               }}
               content={ad.content}
               home={home}
-              platform={view === "platform"}
             />
           )}
           {view === "details" && (
             <div className="space-y-5">
+              <div className="space-y-3 border-t pt-4">
+                <h5 className="text-xs font-medium">Meta preview</h5>
+                <AdIdeaPreview
+                  brandId={brandId}
+                  brandName={brandName}
+                  brandLogo={brandLogo}
+                  studio={{
+                    document: savedState.document,
+                    approval: ad.content.ideaStudio?.approval,
+                  }}
+                  content={ad.content}
+                  platform
+                />
+              </div>
               <div className="space-y-3 border-t pt-4">
                 <div className="space-y-2">
                   <h5 className="text-xs font-medium">Creative sizes</h5>

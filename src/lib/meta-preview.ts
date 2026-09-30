@@ -25,8 +25,8 @@ const PREVIEWED = new Set<MetaPlacement>([
 ]);
 /**
  * What a placement shows. An approved ad draws its saved images once the push
- * has frozen them, and the approved design live until then; the push itself
- * reads `metaPlacementMedia`, which never accepts a live render.
+ * has frozen them, and a draft or approved design live until then; the push
+ * itself reads `metaPlacementMedia`, which never accepts a live render.
  */
 export function metaPreviewMedia(
   content: AdCreativeContent,
@@ -35,7 +35,9 @@ export function metaPreviewMedia(
 ) {
   const resolved = metaPlacementMedia(content, id);
   const doc = content.ideaStudio?.document;
-  if (!("pending" in resolved) || !doc) return resolved;
+  const draft =
+    !content.ideaStudio?.approval && !content.metaImport?.issues.length;
+  if (!doc || !("pending" in resolved || draft)) return resolved;
   const base = doc.shapes.includes("portrait") ? "portrait" : doc.shapes[0]!;
   // Same rule as delivery: a carousel keeps its cards on every placement; a
   // single image needs its 9:16 export on Stories and Reels.
