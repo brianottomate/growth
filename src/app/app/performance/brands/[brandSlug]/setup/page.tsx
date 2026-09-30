@@ -179,10 +179,6 @@ export default async function PerformanceBrandHomesPage({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold">Brand and home setup</h2>
-        <RefreshHomes brandId={brand.id} />
-      </div>
       {inventory?.enrichmentError && (
         <p className="text-sm text-muted-foreground">
           {inventory.enrichmentError}
@@ -238,81 +234,86 @@ export default async function PerformanceBrandHomesPage({
           picked={pickedHomes}
         />
       ) : null}
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <SectionLabel>
-          Homes
-          {(feedRows.length || homes.length) > 0
-            ? ` · ${feedRows.length || homes.length}`
-            : ""}
-        </SectionLabel>
-        <ButtonLink
-          href={brandTabHref(slug, "catalog")}
-          size="sm"
-          variant="outline"
-        >
-          Continue to Catalog
-        </ButtonLink>
-      </div>
-      {feedRows.length > 0 ? (
-        <HomeRowsGrid
-          homes={feedRows.map((home) => ({
-            id: home.id,
-            externalId: home.externalId,
-            name: home.name,
-            url: home.url,
-            heroThumbUrl: heroThumb(home),
-            featured: home.featured,
-            facts: factsOf(home),
-          }))}
-          brandSlug={slug}
-          heroUrl={brand.featuredListingUrl}
-        />
-      ) : homes.length === 0 ? (
-        <AddHomesByHand
-          brandId={brand.id}
-          brandSlug={slug}
-          brandWebsite={brand.website}
-          homes={committed.map((home) => ({
-            id: home.id,
-            name: home.name,
-            facts: factsOf(home),
-          }))}
-        />
-      ) : (
-        <>
-          <HomesStrip
-            homes={withPhoto.map((home) => ({
+      <section className="space-y-3 rounded-xl border p-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <SectionLabel>
+            Homes
+            {(feedRows.length || homes.length) > 0
+              ? ` · ${feedRows.length || homes.length}`
+              : ""}
+          </SectionLabel>
+          <div className="flex items-center gap-2">
+            <RefreshHomes brandId={brand.id} />
+            <ButtonLink
+              href={brandTabHref(slug, "catalog")}
+              size="sm"
+              variant="outline"
+            >
+              Continue to Catalog
+            </ButtonLink>
+          </div>
+        </div>
+        {feedRows.length > 0 ? (
+          <HomeRowsGrid
+            homes={feedRows.map((home) => ({
               id: home.id,
+              externalId: home.externalId,
               name: home.name,
               url: home.url,
-              imageUrl: home.imageUrl!,
-              thumbUrl: home.thumbUrl ?? null,
-              city: home.city ?? null,
-              state: home.state ?? null,
-              bedrooms: home.bedrooms ?? null,
-              bathrooms: home.bathrooms ?? null,
-              guests: home.guests ?? null,
-              rating: home.rating ?? null,
-              facts: factsOf({
-                bedrooms: home.bedrooms ?? null,
-                guests: home.guests ?? null,
+              heroThumbUrl: heroThumb(home),
+              featured: home.featured,
+              facts: factsOf(home),
+            }))}
+            brandSlug={slug}
+            heroUrl={brand.featuredListingUrl}
+          />
+        ) : homes.length === 0 ? (
+          <AddHomesByHand
+            brandId={brand.id}
+            brandSlug={slug}
+            brandWebsite={brand.website}
+            homes={committed.map((home) => ({
+              id: home.id,
+              name: home.name,
+              facts: factsOf(home),
+            }))}
+          />
+        ) : (
+          <>
+            <HomesStrip
+              homes={withPhoto.map((home) => ({
+                id: home.id,
+                name: home.name,
+                url: home.url,
+                imageUrl: home.imageUrl!,
+                thumbUrl: home.thumbUrl ?? null,
                 city: home.city ?? null,
                 state: home.state ?? null,
-              }),
-            }))}
-            brandId={brand.id}
-            brandSlug={brand.slug}
-            featuredUrl={brand.featuredListingUrl}
-            picked={picked}
-          />
-          {homes.length > withPhoto.length ? (
-            <p className="text-[11px] text-muted-foreground">
-              {homes.length - withPhoto.length} more on their site have no photo
-              on the feed.
-            </p>
-          ) : null}
-        </>
-      )}
+                bedrooms: home.bedrooms ?? null,
+                bathrooms: home.bathrooms ?? null,
+                guests: home.guests ?? null,
+                rating: home.rating ?? null,
+                facts: factsOf({
+                  bedrooms: home.bedrooms ?? null,
+                  guests: home.guests ?? null,
+                  city: home.city ?? null,
+                  state: home.state ?? null,
+                }),
+              }))}
+              brandId={brand.id}
+              brandSlug={brand.slug}
+              featuredUrl={brand.featuredListingUrl}
+              picked={picked}
+            />
+            {homes.length > withPhoto.length ? (
+              <p className="text-[11px] text-muted-foreground">
+                {homes.length - withPhoto.length} more on their site have no
+                photo on the feed.
+              </p>
+            ) : null}
+          </>
+        )}
+      </section>
     </div>
   );
 }

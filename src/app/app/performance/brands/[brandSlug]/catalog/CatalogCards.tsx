@@ -1,7 +1,7 @@
 "use client";
 import { catalogAddressIssues } from "@/lib/catalog-addresses";
 import { useEffect, useRef, useState } from "react";
-import { parseAsStringLiteral, useQueryState } from "nuqs";
+import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
 import {
   Check,
   ExternalLink,
@@ -42,12 +42,14 @@ import {
   catalogCardPreviewUrl,
   catalogUnapproved,
   type CatalogCard,
+  type CatalogExport,
   type CatalogHome,
   type CatalogFormatId,
   DEFAULT_CATALOG_FORMAT,
 } from "@/lib/catalog-studio";
 import { safeHomeUrl } from "@/lib/ad-preview-links";
 import { sendAssistantIntent } from "@/lib/assistant-events";
+import { DeleteAlert } from "@/components/ui/alert-dialog";
 import { orpc, type RouterInputs } from "@/orpc/client";
 import { reviewInChat } from "../ReviewInChatButton";
 import { CatalogPreview } from "./CatalogPreview";
@@ -107,9 +109,14 @@ export function CatalogCards({
       "studio",
     ),
   );
+  /** A home to scroll to in Studio, set by the links on an export's images. */
+  const [focusHome, setFocusHome] = useQueryState("home", parseAsString);
   const [layout, setLayout] = useState<"grid" | "list">("list");
   const [details, setDetails] = useState<CatalogCard | null>(null);
   const [gridExports, setGridExports] = useState<string[]>([]);
+  const [deletingExport, setDeletingExport] = useState<CatalogExport | null>(
+    null,
+  );
   const [fresh, setFresh] = useState(false);
   const [library, setLibrary] = useState(false);
   /** A card whose photo is being swapped straight from its row, saved on pick. */
@@ -290,6 +297,21 @@ export function CatalogCards({
       : filter === "approved"
         ? approvedCards
         : (draft?.cards ?? []);
+  useEffect(() => {
+    if (view !== "studio" || !focusHome || !draft) return;
+    const index = visible.findIndex((card) => card.homeId === focusHome);
+    if (index < 0) {
+      if (filter !== "all") void setFilter("all");
+      return;
+    }
+    if (index >= limit) {
+      setLimit(index + 1);
+      return;
+    }
+    document
+      .getElementById(`home-${focusHome}`)
+      ?.scrollIntoView({ block: "start", behavior: "smooth" });
+  }, [view, focusHome, draft, visible, filter, limit, setFilter]);
   async function exportCatalog() {
     setBusy(true);
     const done = await act(
@@ -512,7 +534,8 @@ export function CatalogCards({
               {visible.slice(0, limit).map((card) => (
                 <div
                   key={card.homeId}
-                  className={`overflow-hidden rounded-xl border bg-card ${card.included ? "" : "opacity-50"}`}
+                  id={`home-${card.homeId}`}
+                  className={`scroll-mt-20 overflow-hidden rounded-xl border bg-card ${card.included ? "" : "opacity-50"} ${focusHome === card.homeId ? "ring-2 ring-ring" : ""}`}
                 >
                   <button
                     className="block w-full"
@@ -559,8 +582,9 @@ export function CatalogCards({
                 return (
                   <section
                     key={card.homeId}
+                    id={`home-${card.homeId}`}
                     aria-label={homeOf(card)?.name}
-                    className={`rounded-lg border p-4 ${card.included || editing ? "" : "opacity-50"}`}
+                    className={`scroll-mt-20 rounded-lg border p-4 ${card.included || editing ? "" : "opacity-50"} ${focusHome === card.homeId ? "ring-2 ring-ring" : ""}`}
                   >
                     <div className="grid grid-cols-1 items-start gap-5 @xl:grid-cols-[minmax(0,240px)_minmax(0,1fr)]">
                       <div className="mx-auto w-full max-w-xs overflow-hidden rounded-lg">
@@ -720,7 +744,6 @@ export function CatalogCards({
           brandName={brandName}
           homes={homes}
           draft={draft}
-          exports={query.data?.exports ?? []}
         />
       )}
       {view === "exports" && (
@@ -784,6 +807,13 @@ export function CatalogCards({
                         : "Show all"}
                     </button>
                   )}
+                  <button
+                    type="button"
+                    className="text-destructive underline"
+                    onClick={() => setDeletingExport(item)}
+                  >
+                    Delete
+                  </button>
                 </div>
               </div>
               {item.error && (
@@ -806,33 +836,57 @@ export function CatalogCards({
                 }
               >
                 {item.assets?.map((a) => (
-                  <a
+                  <div
                     key={a.assetId}
-                    href={a.url}
-                    target="_blank"
-                    rel="noreferrer"
                     className={
                       gridExports.includes(item.id)
                         ? "min-w-0"
                         : "w-32 shrink-0"
                     }
                   >
-                    <img
-                      src={a.url}
-                      alt={`${a.name} · ${a.format}`}
-                      loading="lazy"
-                      className="aspect-square w-full rounded bg-muted object-contain"
-                    />
-                    <p className="mt-1 text-xs">
+                    <a href={a.url} target="_blank" rel="noreferrer">
+                      <img
+                        src={a.url}
+                        alt={`${a.name} · ${a.format}`}
+                        loading="lazy"
+                        className="aspect-square w-full rounded bg-muted object-contain"
+                      />
+                    </a>
+                    <button
+                      type="button"
+                      title="Open this home in Studio"
+                      className="mt-1 text-left text-xs underline-offset-2 hover:underline"
+                      onClick={() => {
+                        void setFocusHome(a.homeId);
+                        void setView("studio");
+                      }}
+                    >
                       {a.name} · {a.format}
-                    </p>
-                  </a>
+                    </button>
+                  </div>
                 ))}
               </div>
             </article>
           ))}
         </div>
       )}
+      <DeleteAlert
+        open={deletingExport !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeletingExport(null);
+        }}
+        onConfirm={async () => {
+          const target = deletingExport;
+          if (!target) return;
+          await act(
+            () => orpc.catalog.deleteExport.call({ brandId, runId: target.id }),
+            "Unable to delete the export",
+          );
+          setDeletingExport(null);
+        }}
+        title="Delete this export?"
+        description={`This deletes the export, its media library folder and ${deletingExport?.assets?.length ?? 0} images for good. Other exports keep their own copies.`}
+      />
       <Dialog
         open={layout === "grid" && !!details}
         onOpenChange={(open) => {

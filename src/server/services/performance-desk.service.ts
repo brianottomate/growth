@@ -19,6 +19,7 @@ import {
 import {
   brandTable,
   campaignTable,
+  homeTable,
   performanceAccountTable,
   performanceCycleTable,
   platformCampaignTable,
@@ -77,6 +78,8 @@ export type DeskBrand = {
   /** This month's fee and media lines, from the newest cycle. Null before the first payment. */
   billing: BillingSummary | null;
   campaigns: DeskCampaign[];
+  /** Up to five featured homes, so a row is recognizable by its listings. */
+  featuredHomes: { id: string; name: string; photo: string | null }[];
   /** The furthest along any of this brand's campaigns is. */
   best: DeskCampaignState | null;
 };
@@ -170,7 +173,7 @@ export async function loadPerformanceDesk(
     };
   }
 
-  const [campaignRows, accounts] = await Promise.all([
+  const [campaignRows, accounts, homeRows] = await Promise.all([
     db.query.campaignTable.findMany({
       where: and(
         inArray(campaignTable.brandId, brandIds),
@@ -206,7 +209,22 @@ export async function loadPerformanceDesk(
       ),
       columns: { id: true, brandId: true, status: true, plan: true },
     }),
+    db.query.homeTable.findMany({
+      where: and(
+        inArray(homeTable.brandId, brandIds),
+        eq(homeTable.featured, true),
+      ),
+      columns: { id: true, brandId: true, name: true, heroSourceUrl: true },
+      orderBy: (home, { asc }) => [asc(home.name)],
+    }),
   ]);
+  const homesByBrand = new Map<string, DeskBrand["featuredHomes"]>();
+  for (const home of homeRows) {
+    const list = homesByBrand.get(home.brandId) ?? [];
+    if (list.length < 5)
+      list.push({ id: home.id, name: home.name, photo: home.heroSourceUrl });
+    homesByBrand.set(home.brandId, list);
+  }
   const cycleIds = campaignRows
     .map((campaign) => campaign.performanceCycleId)
     .filter((id): id is string => Boolean(id));
@@ -352,6 +370,7 @@ export async function loadPerformanceDesk(
           ? { id: account.id, status: account.status, plan: account.plan }
           : null,
         campaigns: own,
+        featuredHomes: homesByBrand.get(brand.id) ?? [],
         billing,
         best: own.reduce<DeskCampaignState | null>(
           (acc, campaign) =>

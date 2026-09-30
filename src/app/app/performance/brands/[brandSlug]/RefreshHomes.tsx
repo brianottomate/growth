@@ -14,6 +14,7 @@ export function RefreshHomes({ brandId }: { brandId: string }) {
     <div>
       <Button
         variant="outline"
+        size="sm"
         disabled={refresh.isPending}
         onClick={() => refresh.mutate({ brandId })}
       >

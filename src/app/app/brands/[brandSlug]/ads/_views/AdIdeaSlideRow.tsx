@@ -133,11 +133,11 @@ export function AdIdeaSlideRow({
           )}
         </div>
       </div>
-      <div className="grid grid-cols-1 items-start gap-5 @xl:grid-cols-[minmax(0,240px)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 items-start gap-5 @xl:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
         <div className="space-y-2">
-          <div className="flex justify-center rounded-lg bg-muted p-3">
+          <div className="flex justify-center">
             <div
-              className="relative w-full max-w-xs overflow-hidden rounded-md"
+              className="relative w-full max-w-xs overflow-hidden rounded-lg border bg-muted"
               style={{
                 aspectRatio: `${dimensions.width}/${dimensions.height}`,
               }}

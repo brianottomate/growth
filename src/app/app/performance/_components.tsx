@@ -229,6 +229,9 @@ export function CampaignRow({
     campaign.accountName && brand.relationship === "internal"
       ? `${campaign.accountName} · run from ${brand.name}`
       : brand.name;
+  const livePlatformIds = campaign.platforms
+    .filter((row) => row.status !== "draft")
+    .map((row) => row.id);
   return (
     <li className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1.5 px-4 py-3 @lg:flex">
       <StateDot state={campaign.state} />
@@ -252,23 +255,19 @@ export function CampaignRow({
             .join(" · ")}
         </span>
       </div>
-      {campaign.thumbs.length > 0 ? (
-        <span className="hidden shrink-0 gap-1 @3xl:flex">
-          {[...new Set(campaign.thumbs.map(thumbSrc))]
-            .slice(0, 4)
-            .map((src) => (
-              // oxlint-disable-next-line nextjs/no-img-element
-              <img
-                key={src}
-                src={src}
-                alt=""
-                loading="lazy"
-                className="size-9 rounded-md bg-muted object-cover"
-              />
-            ))}
-        </span>
-      ) : null}
-      <span className="col-span-2 flex items-center gap-1.5 text-muted-foreground @lg:col-span-1">
+      <span className="hidden w-40 shrink-0 justify-end gap-1 @3xl:flex">
+        {[...new Set(campaign.thumbs.map(thumbSrc))].slice(0, 4).map((src) => (
+          // oxlint-disable-next-line nextjs/no-img-element
+          <img
+            key={src}
+            src={src}
+            alt=""
+            loading="lazy"
+            className="size-9 rounded-md bg-muted object-cover"
+          />
+        ))}
+      </span>
+      <span className="col-span-2 flex items-center gap-1.5 text-muted-foreground @lg:col-span-1 @lg:w-20 @lg:shrink-0">
         {campaign.platforms.map((row) => (
           <span
             key={row.id}
@@ -287,15 +286,14 @@ export function CampaignRow({
       <span className="hidden w-36 shrink-0 text-right @lg:block">
         <SpendCell campaign={campaign} />
       </span>
-      {deletable && campaign.state === "draft" ? (
-        <span className="col-start-2 justify-self-end @lg:col-auto">
+      {deletable ? (
+        <span className="col-start-2 justify-self-end @lg:col-auto @lg:w-8 @lg:shrink-0">
           <DeleteCampaignButton
             campaignId={campaign.id}
             campaignName={campaign.name}
             brandSlug={brand.slug ?? brand.id}
-            livePlatformCampaigns={
-              campaign.platforms.filter((row) => row.status !== "draft").length
-            }
+            livePlatformCampaigns={livePlatformIds.length}
+            platformCampaignIds={livePlatformIds}
             compact
             afterDelete="refresh"
           />

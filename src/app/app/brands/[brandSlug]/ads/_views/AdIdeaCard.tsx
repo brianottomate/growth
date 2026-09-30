@@ -4,12 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { ideaImagesSaved, ideaSource } from "@/lib/ad-idea-studio";
 import { sendAssistantIntent } from "@/lib/assistant-events";
-import { Check, MessageSquare, Scaling } from "lucide-react";
-import { cn } from "@/components/ui/lib/utils";
 import {
-  metaPlacementFits,
-  type MetaPlacement,
-} from "@/lib/meta-placement-plan";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { MessageSquare, MoreHorizontal } from "lucide-react";
+import { cn } from "@/components/ui/lib/utils";
+import {} from "@/lib/meta-placement-plan";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
@@ -71,7 +74,6 @@ export function AdIdeaCard({
   brandId,
   brandName,
   brandLogo,
-  metaPlacements,
   deliveryState,
   home,
 }: {
@@ -80,7 +82,6 @@ export function AdIdeaCard({
   brandId: string;
   brandName: string;
   brandLogo: string | null;
-  metaPlacements: MetaPlacement[] | null;
   deliveryState?: string;
   home?: { name: string; url: string };
 }) {
@@ -718,14 +719,6 @@ export function AdIdeaCard({
             </span>
             {save.isPending && <span>· Saving…</span>}
             {crop.isPending && <span>· Choosing crop…</span>}
-            {metaPlacements ? (
-              <PlacementFits
-                fits={metaPlacementFits(metaPlacements, {
-                  carousel: !isStatic,
-                  hasStory: savedState.document.shapes.includes("story"),
-                })}
-              />
-            ) : null}
             {ad.content.metaImport && <span aria-hidden="true">·</span>}
             {ad.content.metaImport && (
               <Dialog>
@@ -817,14 +810,6 @@ export function AdIdeaCard({
           </Button>
           <Button
             size="sm"
-            variant="ghost"
-            aria-expanded={!collapsed}
-            onClick={() => setView(collapsed ? "details" : "overview")}
-          >
-            {collapsed ? "Expand" : "Collapse"}
-          </Button>
-          <Button
-            size="sm"
             variant={approved ? "outline" : "default"}
             disabled={busy || approval.isPending || editor !== null}
             onClick={() =>
@@ -849,10 +834,28 @@ export function AdIdeaCard({
                 ? "Reopen idea"
                 : "Approve"}
           </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              appearance="icon"
+              aria-label={`More for ${savedState.name}`}
+            >
+              <MoreHorizontal className="size-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40">
+              <DropdownMenuItem
+                variant="destructive"
+                disabled={busy}
+                onClick={() => setDeleteOpen(true)}
+              >
+                Delete ad…
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
       {collapsed && (
         <AdIdeaPreview
+          onExpand={() => setView("details")}
           brandId={brandId}
           brandName={brandName}
           brandLogo={brandLogo}
@@ -868,14 +871,24 @@ export function AdIdeaCard({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-medium">Ad copy</h4>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={approved || busy || editor !== null}
-                onClick={() => openEditor("copy")}
-              >
-                Edit copy
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={approved || busy || editor !== null}
+                  onClick={() => openEditor("copy")}
+                >
+                  Edit copy
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-expanded
+                  onClick={() => setView("overview")}
+                >
+                  Collapse
+                </Button>
+              </div>
             </div>
             {editor === "copy" ? (
               editorPanel
@@ -1068,21 +1081,11 @@ export function AdIdeaCard({
           )}
         </>
       )}
-      <div className="flex justify-end">
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={busy}
-          onClick={() => setDeleteOpen(true)}
-        >
-          Delete ad idea
-        </Button>
-      </div>
       <DeleteAlert
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         title={`Delete ${name}?`}
-        description="Deletes this ad idea and all its size variants. Uploaded images stay in the media library. This cannot be undone."
+        description="Deletes this ad and all its size variants. Uploaded images stay in the media library. This cannot be undone."
         onConfirm={() => remove.mutate({ adId: ad.id })}
         isLoading={remove.isPending}
       />
@@ -1270,48 +1273,5 @@ export function AdIdeaCard({
         }}
       />
     </article>
-  );
-}
-
-const PLACEMENT_KIND_LABELS = {
-  feed: "Feeds",
-  story: "Stories",
-  reel: "Reels",
-} as const;
-const PLACEMENT_FIT_NOTES = {
-  made: "Designed for this placement",
-  fitted: "Meta fits the feed cards into this placement",
-  missing: "No 9:16 artwork: this placement will not run it",
-} as const;
-
-/** Where the ad runs on Meta, at a glance: made for it, fitted, or missing. */
-function PlacementFits({
-  fits,
-}: {
-  fits: ReturnType<typeof metaPlacementFits>;
-}) {
-  return (
-    <span className="inline-flex flex-wrap items-center gap-1">
-      {fits.map(({ kind, fit }) => (
-        <span
-          key={kind}
-          title={PLACEMENT_FIT_NOTES[fit]}
-          className={cn(
-            "inline-flex items-center gap-1 rounded-full border px-2 py-0.5",
-            fit === "made" && "text-foreground",
-            fit === "missing" && "border-dashed line-through",
-          )}
-        >
-          {fit === "made" ? (
-            <Check aria-hidden="true" className="size-3" />
-          ) : fit === "fitted" ? (
-            <Scaling aria-hidden="true" className="size-3" />
-          ) : null}
-          {PLACEMENT_KIND_LABELS[kind]}
-          {fit === "fitted" ? " · fitted by Meta" : ""}
-          <span className="sr-only">: {PLACEMENT_FIT_NOTES[fit]}</span>
-        </span>
-      ))}
-    </span>
   );
 }

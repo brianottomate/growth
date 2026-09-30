@@ -596,6 +596,9 @@ export default async function BrandAdsPage({
                   livePlatformCampaigns={
                     initCampaigns.filter((row) => row.externalId).length
                   }
+                  platformCampaignIds={initCampaigns
+                    .filter((row) => row.externalId)
+                    .map((row) => row.id)}
                   compact
                   afterDelete="refresh"
                 />

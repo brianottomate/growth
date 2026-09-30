@@ -35,6 +35,7 @@ import {
   SectionLabel,
   tile,
 } from "../_components";
+import { ExpandableList } from "../ExpandableList";
 import { ReadinessChecklist } from "../ReadinessChecklist";
 import { StageChips } from "../StageChip";
 import { StartCampaignInChat } from "../StartCampaignInChat";
@@ -129,20 +130,20 @@ function ClientRow({
       : "no intake yet",
   ];
   return (
-    <article className={cn(panel, "p-5")}>
-      <div className="flex flex-wrap items-center gap-3">
+    <article className={cn(panel, "p-4 sm:p-5")}>
+      <div className="flex items-start gap-3">
         <BrandLogo brand={brand} className="size-10 text-[13px]" />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="min-w-0 flex-1 space-y-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <Link
               href={`/app/performance/brands/${brand.slug ?? brand.id}`}
-              className="text-[14.5px] font-semibold hover:underline"
+              className="text-[15px] font-semibold hover:underline"
             >
               {brand.name}
             </Link>
             <StageChips business={brand.business} delivery={brand.delivery} />
           </div>
-          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+          <p className="truncate text-xs text-muted-foreground">
             {brand.website ? (
               <a
                 href={brand.website}
@@ -158,7 +159,40 @@ function ClientRow({
           </p>
           {brand.billing ? <BillingLine billing={brand.billing} /> : null}
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
+        <BrandRowMenu
+          brandId={brand.id}
+          brandName={brand.name}
+          business={brand.business}
+          delivery={brand.delivery}
+          billing={brand.billing}
+        />
+      </div>
+
+      {brand.featuredHomes.length > 0 ? (
+        <ul className="mt-3 flex gap-2 overflow-x-auto pb-1">
+          {brand.featuredHomes.map((home) => (
+            <li key={home.id} className="w-24 shrink-0 sm:w-28">
+              <div className="aspect-[4/3] overflow-hidden rounded-lg border bg-muted">
+                {home.photo ? (
+                  // oxlint-disable-next-line nextjs/no-img-element
+                  <img
+                    src={home.photo}
+                    alt=""
+                    loading="lazy"
+                    className="size-full object-cover"
+                  />
+                ) : null}
+              </div>
+              <p className="mt-1 truncate text-[11px] text-muted-foreground">
+                {home.name}
+              </p>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {brand.pitchUrl || brand.intakeUrl ? (
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
           {brand.pitchUrl ? (
             <SendLink label="Pitch page" url={brand.pitchUrl} />
           ) : null}
@@ -174,15 +208,8 @@ function ClientRow({
               viewLabel="View submission"
             />
           ) : null}
-          <BrandRowMenu
-            brandId={brand.id}
-            brandName={brand.name}
-            business={brand.business}
-            delivery={brand.delivery}
-            billing={brand.billing}
-          />
         </div>
-      </div>
+      ) : null}
 
       {intake ? (
         <IntakeFacts intake={intake} plan={brand.account?.plan ?? null} />
@@ -221,7 +248,7 @@ function ClientRow({
           )}
         </div>
         {brand.campaigns.length > 0 ? (
-          <ul className="divide-y rounded-xl border">
+          <ExpandableList limit={3} noun="campaigns">
             {brand.campaigns.map((campaign) => (
               <CampaignRow
                 key={campaign.id}
@@ -229,7 +256,7 @@ function ClientRow({
                 campaign={campaign}
               />
             ))}
-          </ul>
+          </ExpandableList>
         ) : null}
       </div>
 

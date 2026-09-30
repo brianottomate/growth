@@ -1,7 +1,6 @@
 import type { AdContent } from "@/server/db/schema";
 import { ideaDocumentFromAd } from "@/lib/ad-idea-studio";
 import { isImportedMetaCatalog } from "@/lib/meta-import";
-import type { MetaPlacement } from "@/lib/meta-placement-plan";
 import { AdIdeaCard } from "./AdIdeaCard";
 
 // The list files every ad under its creative type, the way a shared drive
@@ -41,10 +40,12 @@ export function AdIdeasList({
   brandId,
   brandName,
   brandLogo,
-  metaPlacements,
   states,
   fallback,
+  actions,
 }: {
+  /** Add starter ideas, Add ad, Assets: they act on the list below them. */
+  actions?: React.ReactNode;
   homeOrder: string[];
   homeLinks: Record<string, { name: string; url: string }>;
   preparingHero: boolean;
@@ -52,8 +53,6 @@ export function AdIdeasList({
   brandId: string;
   brandName: string;
   brandLogo: string | null;
-  /** The Meta campaign's placements; null when the campaign skips Meta. */
-  metaPlacements: MetaPlacement[] | null;
   states: Record<string, string>;
   fallback: (id: string) => React.ReactNode;
   ads: {
@@ -111,7 +110,6 @@ export function AdIdeasList({
         brandId={brandId}
         brandName={brandName}
         brandLogo={brandLogo}
-        metaPlacements={metaPlacements}
         deliveryState={states[ad.id]}
         home={ad.homeId ? homeLinks[ad.homeId] : undefined}
         ad={{
@@ -127,9 +125,12 @@ export function AdIdeasList({
     );
   return (
     <section aria-labelledby="ad-ideas-heading" className="space-y-4">
-      <h2 id="ad-ideas-heading" className="text-sm font-semibold">
-        Ads <span className="text-muted-foreground">· {ideas.length}</span>
-      </h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="ad-ideas-heading" className="text-sm font-semibold">
+          Ads <span className="text-muted-foreground">· {ideas.length}</span>
+        </h2>
+        {actions}
+      </div>
       {preparingHero && (
         <div
           className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground"

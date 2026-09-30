@@ -98,7 +98,7 @@ export function PickedHomes({
   const campaignsHref = `/app/performance/brands/${brandSlug}/campaigns`;
 
   return (
-    <div className="space-y-3">
+    <section className="space-y-3 rounded-xl border p-4">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-baseline gap-2">
           <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
@@ -258,6 +258,6 @@ export function PickedHomes({
         description="This deletes the home from this brand. You can add it back from the grid any time."
         isLoading={remove.isPending}
       />
-    </div>
+    </section>
   );
 }

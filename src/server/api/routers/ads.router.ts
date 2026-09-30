@@ -45,6 +45,7 @@ import {
   listCampaignsAction,
   listAdsDestinations,
   deleteCampaignDraftAction,
+  deleteCampaignLeavingPlatformAction,
   deleteAudienceAction,
   editAdCardsAction,
   attachAdSetAction,
@@ -255,6 +256,9 @@ export const adsRouter = {
   deletePlatformCampaign: actionProcedure(deletePlatformCampaignAction),
 
   deleteDraftCampaign: actionProcedure(deleteCampaignDraftAction),
+  deleteCampaignLeavingPlatform: actionProcedure(
+    deleteCampaignLeavingPlatformAction,
+  ),
 
   deleteAudience: actionProcedure(deleteAudienceAction),
 

@@ -2,6 +2,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import type { AdCreativeContent } from "@/server/db/ads-schema";
 import { metaPreviewMedia } from "@/lib/meta-preview";
@@ -9,6 +10,7 @@ import { CompactAdMock } from "@/components/ad-mock";
 import { ctaLabel } from "@/components/social-mock";
 import { META_PLACEMENTS, type MetaPlacement } from "@/lib/meta-placement-plan";
 import {
+  IDEA_SHAPE_LABELS,
   ideaEditorPreviewUrl,
   ideaSource,
   type IdeaShape,
@@ -23,6 +25,7 @@ export function AdIdeaPreview({
   platform = false,
   content,
   home,
+  onExpand,
 }: {
   studio: IdeaStudio;
   brandId: string;
@@ -31,13 +34,19 @@ export function AdIdeaPreview({
   platform?: boolean;
   content?: AdCreativeContent;
   home?: { name: string; url: string };
+  /** Shown beside the size switcher; opens the ad's full editor. */
+  onExpand?: () => void;
 }) {
   const [cards, setCards] = useState<Partial<Record<MetaPlacement, number>>>(
     {},
   );
-  const shape = studio.document.shapes.includes("portrait")
-    ? "portrait"
-    : studio.document.shapes[0]!;
+  // The sizes that ship: what the checkboxes in the expanded ad select.
+  const sizes = studio.document.exportShapes?.length
+    ? studio.document.exportShapes
+    : studio.document.shapes;
+  const defaultShape = sizes.includes("portrait") ? "portrait" : sizes[0]!;
+  const [picked, setPicked] = useState<IdeaShape | null>(null);
+  const shape = picked && sizes.includes(picked) ? picked : defaultShape;
   const mediaFor = (size: IdeaShape) =>
     studio.document.cards.flatMap((slide, index) => {
       const url =
@@ -95,6 +104,36 @@ export function AdIdeaPreview({
           <span className="sr-only">(opens in a new tab)</span>
         </a>
       )}
+      {!platform && (sizes.length > 1 || onExpand) ? (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {sizes.length > 1 ? (
+            <div
+              role="group"
+              aria-label="Preview size"
+              className="flex w-fit flex-wrap rounded-lg border p-0.5"
+            >
+              {sizes.map((size) => (
+                <button
+                  key={size}
+                  type="button"
+                  aria-pressed={shape === size}
+                  onClick={() => setPicked(size)}
+                  className="rounded-md px-2.5 py-1 text-xs text-muted-foreground aria-pressed:bg-secondary aria-pressed:text-foreground"
+                >
+                  {IDEA_SHAPE_LABELS[size]}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <span />
+          )}
+          {onExpand ? (
+            <Button size="sm" variant="ghost" onClick={onExpand}>
+              Expand
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
       {platform ? (
         <>
           <p className="text-xs text-muted-foreground">
@@ -161,6 +200,28 @@ export function AdIdeaPreview({
         </>
       ) : (
         <>
+          <div className="max-w-2xl text-sm">
+            <div className="space-y-1">
+              <p
+                ref={descriptionRef}
+                id={descriptionId}
+                className={`whitespace-pre-wrap text-muted-foreground ${descriptionExpanded ? "" : "line-clamp-3"}`}
+              >
+                {copy.body || "Primary text not set"}
+              </p>
+              {(descriptionOverflows || descriptionExpanded) && (
+                <button
+                  type="button"
+                  aria-expanded={descriptionExpanded}
+                  aria-controls={descriptionId}
+                  className="text-xs underline underline-offset-4 hover:text-muted-foreground focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-ring"
+                  onClick={() => setDescriptionExpanded((current) => !current)}
+                >
+                  {descriptionExpanded ? "Show less" : "Show more"}
+                </button>
+              )}
+            </div>
+          </div>
           <div className="flex gap-3 overflow-x-auto pb-2">
             {media.map((item, index) => (
               <div key={index} className="w-52 shrink-0 space-y-2">
@@ -202,26 +263,6 @@ export function AdIdeaPreview({
               <p className="text-xs text-muted-foreground">
                 {copy.description?.trim() || "Description not set"}
               </p>
-            </div>
-            <div className="space-y-1">
-              <p
-                ref={descriptionRef}
-                id={descriptionId}
-                className={`whitespace-pre-wrap text-muted-foreground ${descriptionExpanded ? "" : "line-clamp-3"}`}
-              >
-                {copy.body || "Primary text not set"}
-              </p>
-              {(descriptionOverflows || descriptionExpanded) && (
-                <button
-                  type="button"
-                  aria-expanded={descriptionExpanded}
-                  aria-controls={descriptionId}
-                  className="text-xs underline underline-offset-4 hover:text-muted-foreground focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-ring"
-                  onClick={() => setDescriptionExpanded((current) => !current)}
-                >
-                  {descriptionExpanded ? "Show less" : "Show more"}
-                </button>
-              )}
             </div>
             <div className="flex min-w-0 items-center gap-3 border-t pt-3 text-xs">
               {cta && <Badge variant="secondary">{cta}</Badge>}

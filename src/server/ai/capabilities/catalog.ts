@@ -14,6 +14,7 @@ import {
 import {
   catalogBrand,
   catalogState,
+  deleteCatalogExport,
   renderCatalogExport,
   setCatalogApproval,
   setCatalogDefaultTemplate,
@@ -25,6 +26,7 @@ import { ingestBrandHomes } from "@/server/services/homes.service";
 import {
   catalogStateActionOutputSchema,
   catalogWriteStatusActionOutputSchema,
+  deleteCatalogExportActionOutputSchema,
   exportCatalogActionOutputSchema,
   newCatalogCopyActionOutputSchema,
   newCatalogPhotoActionOutputSchema,
@@ -193,4 +195,14 @@ export const exportCatalogAction = growthAction({
     after(() => renderCatalogExport({ ...run, fresh }, ctx.userId));
     return { runId: run.run.id };
   },
+});
+
+export const deleteCatalogExportAction = growthAction({
+  outputSchema: deleteCatalogExportActionOutputSchema,
+  description:
+    "Delete one catalog export for good: the run, its media library folder and every image in it. Other exports keep their own copies. Refused while the export is still rendering.",
+  inputSchema: brandInput.extend({ runId: z.string().min(1) }),
+  examples: [{ brandId: "brd_01", runId: "crun_01" }],
+  execute: ({ brandId, runId }, ctx) =>
+    deleteCatalogExport(ctx.userId, brandId, runId),
 });

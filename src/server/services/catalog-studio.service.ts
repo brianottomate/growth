@@ -41,7 +41,7 @@ import { brandHomeInventory } from "./home-inventory.service";
 import { ingestBrandHomes } from "./homes.service";
 import { brandWebsiteId } from "./wanderos-listings.service";
 import { freezeComposition } from "./composition.service";
-import { importRemoteImage } from "./media.service";
+import { deleteMedia, importRemoteImage } from "./media.service";
 
 const PROVIDER = "catalog-export";
 export async function catalogBrand(userId: string, brandId: string) {
@@ -939,4 +939,50 @@ async function finishedCatalogAsset(brandId: string, assetId: string) {
       "Choose ready finished artwork from this brand’s media library",
     );
   return asset;
+}
+
+/**
+ * Delete one export for good: its images, its library folder and the run.
+ * Hard, like the rest of the workspace: an export is a frozen copy and the
+ * next export draws or reuses from whatever is left. Each export owns its
+ * images (a reused card is a copy), so this never touches another export.
+ */
+export async function deleteCatalogExport(
+  userId: string,
+  brandId: string,
+  runId: string,
+) {
+  await catalogBrand(userId, brandId);
+  const run = await db.query.creativeRunTable.findFirst({
+    where: and(
+      eq(creativeRunTable.id, runId),
+      eq(creativeRunTable.brandId, brandId),
+      eq(creativeRunTable.provider, PROVIDER),
+    ),
+  });
+  if (!run) throw new Error("Export not found");
+  // A render that died mid-way never leaves `processing`, so only a recent one is live.
+  const live = run.status === "queued" || run.status === "processing";
+  if (live && Date.now() - run.createdAt.getTime() < 30 * 60 * 1000)
+    throw new Error("This export is still rendering.");
+
+  const output = run.providerOutput as {
+    folderId?: string;
+    assets?: { assetId: string }[];
+  } | null;
+  const ids = new Set((output?.assets ?? []).map((asset) => asset.assetId));
+  if (output?.folderId) {
+    const inFolder = await db.query.mediaAssetTable.findMany({
+      where: eq(mediaAssetTable.folderId, output.folderId),
+      columns: { id: true },
+    });
+    for (const asset of inFolder) ids.add(asset.id);
+  }
+  for (const id of ids) await deleteMedia(id);
+  if (output?.folderId)
+    await db
+      .delete(mediaFolderTable)
+      .where(eq(mediaFolderTable.id, output.folderId));
+  await db.delete(creativeRunTable).where(eq(creativeRunTable.id, run.id));
+  return { runId: run.id, images: ids.size };
 }

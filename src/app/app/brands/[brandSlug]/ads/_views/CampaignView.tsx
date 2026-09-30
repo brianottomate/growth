@@ -8,7 +8,6 @@ import { workspaceActor } from "@/server/workspace-actor";
 import { starterGenerationStatus } from "@/server/services/starter-ad-generation.service";
 import { listBrandHomes } from "@/server/services/homes.service";
 import { isImportedMetaCatalog } from "@/lib/meta-import";
-import { META_DEFAULT_PLACEMENTS } from "@/lib/meta-placement-plan";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
@@ -158,10 +157,6 @@ export async function CampaignView({
     a.platform.localeCompare(b.platform),
   );
   const plannedPlatforms = planned.map((row) => row.platform);
-  const metaPlan = planned.find((row) => row.platform === "meta_ads");
-  const metaPlacements = metaPlan
-    ? (metaPlan.settings?.meta?.placements ?? META_DEFAULT_PLACEMENTS)
-    : null;
   const pushed = planned.filter((row) => row.externalId);
   const anyPushed = pushed.length > 0;
   const anyLive = planned.some((row) => row.status === "live");
@@ -294,6 +289,8 @@ export async function CampaignView({
               campaignName={campaign.name}
               brandSlug={brandSlug}
               livePlatformCampaigns={pushed.length}
+              platformCampaignIds={pushed.map((row) => row.id)}
+              compact
             />
             <WorkInChatButton
               brandId={brand.id}
@@ -307,26 +304,28 @@ export async function CampaignView({
       </header>
 
       <section className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <AddStarterIdeasButton campaignId={campaign.id} />
-          <AddAdDialog
-            brandId={brand.id}
-            homes={homes}
-            campaignId={campaign.id}
-          />
-          <CampaignAssetsDrawer count={pool.length} brandId={brand.id}>
-            <CreativePool
-              campaignId={campaign.id}
-              brandId={brand.id}
-              pool={pool}
-              askAssistant={ask(
-                "photos",
-                `Fill the photo pool for “${campaign.name}”`,
-              )}
-            />
-          </CampaignAssetsDrawer>
-        </div>
         <AdIdeasList
+          actions={
+            <div className="flex flex-wrap items-center gap-2">
+              <AddStarterIdeasButton campaignId={campaign.id} />
+              <AddAdDialog
+                brandId={brand.id}
+                homes={homes}
+                campaignId={campaign.id}
+              />
+              <CampaignAssetsDrawer count={pool.length} brandId={brand.id}>
+                <CreativePool
+                  campaignId={campaign.id}
+                  brandId={brand.id}
+                  pool={pool}
+                  askAssistant={ask(
+                    "photos",
+                    `Fill the photo pool for “${campaign.name}”`,
+                  )}
+                />
+              </CampaignAssetsDrawer>
+            </div>
+          }
           preparingHero={
             generation?.source === "featured" &&
             ["queued", "processing"].includes(generation.status)
@@ -338,7 +337,6 @@ export async function CampaignView({
           brandId={brand.id}
           brandName={brandName}
           brandLogo={brand.logo}
-          metaPlacements={metaPlacements}
           states={states}
           fallback={(id) => (
             <ul>

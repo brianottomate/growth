@@ -32,6 +32,7 @@ export function DeleteCampaignButton({
   campaignName,
   brandSlug,
   livePlatformCampaigns,
+  platformCampaignIds = [],
   compact = false,
   afterDelete = "list",
   listPath,
@@ -40,6 +41,8 @@ export function DeleteCampaignButton({
   campaignName: string;
   brandSlug: string;
   livePlatformCampaigns: number;
+  /** The platform rows that are live, so "also delete on the platform" can remove them. */
+  platformCampaignIds?: string[];
   /** A ⋯ menu for a row in a list, with the delete inside it. */
   compact?: boolean;
   listPath?: string;
@@ -49,15 +52,28 @@ export function DeleteCampaignButton({
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
-  const remove = useMutation(
-    orpc.ads.deleteDraftCampaign.mutationOptions({
-      onSuccess: () => {
-        setOpen(false);
-        if (afterDelete === "list")
-          router.push(listPath ?? `/app/brands/${brandSlug}/ads`);
-        else router.refresh();
-      },
+  const onPlatform = livePlatformCampaigns > 0;
+  const finish = () => {
+    setOpen(false);
+    if (afterDelete === "list")
+      router.push(listPath ?? `/app/brands/${brandSlug}/ads`);
+    else router.refresh();
+  };
+  const removeEverywhere = useMutation({
+    mutationFn: async () => {
+      for (const platformCampaignId of platformCampaignIds)
+        await orpc.ads.deletePlatformCampaign.call({ platformCampaignId });
+      await orpc.ads.deleteDraftCampaign.call({ campaignId });
+    },
+    onSuccess: finish,
+  });
+  const removeHereOnly = useMutation(
+    orpc.ads.deleteCampaignLeavingPlatform.mutationOptions({
+      onSuccess: finish,
     }),
+  );
+  const remove = useMutation(
+    orpc.ads.deleteDraftCampaign.mutationOptions({ onSuccess: finish }),
   );
 
   return (
@@ -96,30 +112,64 @@ export function DeleteCampaignButton({
           <DialogHeader>
             <DialogTitle>Delete campaign?</DialogTitle>
             <DialogDescription>
-              {livePlatformCampaigns > 0
-                ? `This campaign has ${livePlatformCampaigns} campaign(s) on a platform. Delete those first — removing this would only stop growth describing them, not stop them running.`
+              {onPlatform
+                ? `This campaign is on a platform (${livePlatformCampaigns}). Deleting it there removes its ad sets, ads and reporting history and cannot be undone. Deleting it here only leaves it running and spending, with nothing in Growth describing it.`
                 : "Removes the draft and its ad sets and ads. Nothing exists on a platform yet, so nothing else is affected."}
             </DialogDescription>
           </DialogHeader>
           <p className="min-w-0 text-sm font-medium [overflow-wrap:anywhere]">
             {campaignName}
           </p>
-          {remove.error && (
-            <p className="text-xs text-red-300">{remove.error.message}</p>
+          {(remove.error ?? removeEverywhere.error ?? removeHereOnly.error) && (
+            <p className="text-xs text-red-300">
+              {
+                (remove.error ?? removeEverywhere.error ?? removeHereOnly.error)
+                  ?.message
+              }
+            </p>
           )}
           <DialogFooter>
             <Button size="sm" variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button
-              size="sm"
-              variant="destructive"
-              disabled={livePlatformCampaigns > 0 || remove.isPending}
-              loading={remove.isPending}
-              onClick={() => remove.mutate({ campaignId })}
-            >
-              Delete draft
-            </Button>
+            {onPlatform ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={
+                    removeHereOnly.isPending || removeEverywhere.isPending
+                  }
+                  loading={removeHereOnly.isPending}
+                  onClick={() => removeHereOnly.mutate({ campaignId })}
+                >
+                  Delete here only
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  disabled={
+                    platformCampaignIds.length === 0 ||
+                    removeHereOnly.isPending ||
+                    removeEverywhere.isPending
+                  }
+                  loading={removeEverywhere.isPending}
+                  onClick={() => removeEverywhere.mutate()}
+                >
+                  Delete here and on the platform
+                </Button>
+              </>
+            ) : (
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={remove.isPending}
+                loading={remove.isPending}
+                onClick={() => remove.mutate({ campaignId })}
+              >
+                Delete draft
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

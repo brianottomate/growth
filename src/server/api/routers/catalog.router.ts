@@ -6,6 +6,7 @@ import {
 import {
   catalogStateAction,
   catalogWriteStatusAction,
+  deleteCatalogExportAction,
   exportCatalogAction,
   newCatalogCopyAction,
   newCatalogPhotoAction,
@@ -28,6 +29,7 @@ export const catalogRouter = {
   setIncluded: actionProcedure(setCatalogIncludedAction),
   setDefaultTemplate: actionProcedure(setCatalogDefaultTemplateAction),
   exportCatalog: actionProcedure(exportCatalogAction),
+  deleteExport: actionProcedure(deleteCatalogExportAction),
   writeCards: actionProcedure(writeCatalogCardsAction),
   writeStatus: actionProcedure(catalogWriteStatusAction),
 };

@@ -324,6 +324,9 @@ export const growthActionPolicies = {
     setCatalogIncluded: write({ idempotent: true }),
     setCatalogDefaultTemplate: write({ idempotent: true }),
     exportCatalog: write({ consequence: "background-run" }),
+    // Real delete of the run, its library folder and its images. An export is
+    // a frozen copy that can be made again, so there is no trash.
+    deleteCatalogExport: write({ reversible: false }),
     editAdCards: write(),
     // Sets one field on local rows; the push is still the provider step.
     attachAdSet: write({ idempotent: true }),
@@ -363,6 +366,13 @@ export const growthActionPolicies = {
     // Draft deletes drop local rows and are refused once the thing exists on
     // a platform, so they cannot destroy anything a provider knows about.
     deleteCampaignDraft: write({ reversible: false }),
+    // The one delete that leaves platform campaigns spending, so the operator
+    // approves it and it stays off MCP.
+    deleteCampaignLeavingPlatform: write({
+      approval: "user",
+      reversible: false,
+      surfaces: APPROVAL_PRODUCT,
+    }),
     deleteAudience: write({ reversible: false }),
     deleteAdDraft: write({ reversible: false }),
     // Creates the campaign tree PAUSED, so approving the push does not start

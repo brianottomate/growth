@@ -1127,6 +1127,12 @@ export async function importPlatformAdCreative(input: {
 export async function deleteDraftCampaign(input: {
   organizationId: string;
   campaignId: string;
+  /**
+   * Delete the plan only and leave the platform campaigns running. They stay
+   * as synced rows with no plan, so nothing is hidden, but they keep
+   * spending: only an operator's explicit choice reaches this.
+   */
+  leaveOnPlatform?: boolean;
 }) {
   const { campaign } = await requireOwnedCampaign(
     input.campaignId,
@@ -1137,13 +1143,14 @@ export async function deleteDraftCampaign(input: {
     columns: { id: true, externalId: true, status: true },
   });
   const live = pushed.filter((row) => row.externalId);
-  if (live.length > 0) {
+  if (live.length > 0 && !input.leaveOnPlatform) {
     throw new Error(
       `This campaign has ${live.length} campaign(s) on a platform — delete those first, or they keep running without anything here describing them`,
     );
   }
-  // Draft platform rows die with the plan; audiences and ads cascade.
-  for (const row of pushed) {
+  // Draft platform rows die with the plan; audiences and ads cascade. Pushed
+  // rows outlive it (campaignId goes null) when the operator chose to leave them.
+  for (const row of pushed.filter((row) => !row.externalId)) {
     await db
       .delete(platformCampaignTable)
       .where(eq(platformCampaignTable.id, row.id));

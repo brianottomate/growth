@@ -158,6 +158,11 @@ export const setCatalogDefaultTemplateActionOutputSchema = z.strictObject({
   templateId: z.enum(CATALOG_TEMPLATES),
 });
 
+export const deleteCatalogExportActionOutputSchema = z.strictObject({
+  runId: z.string(),
+  images: z.number(),
+});
+
 export const exportCatalogActionOutputSchema = z.strictObject({
   runId: z.string(),
 });

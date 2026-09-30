@@ -1266,6 +1266,19 @@ export const deleteCampaignDraftAction = growthAction({
     deleteDraftCampaign({ ...input, organizationId: ctx.orgId }),
 });
 
+export const deleteCampaignLeavingPlatformAction = growthAction({
+  outputSchema: deleteCampaignDraftActionOutputSchema,
+  description:
+    "Delete a campaign's plan in Growth but LEAVE its platform campaigns on the ad account, where they keep running and spending with nothing here describing them. To remove them too, call adsWrite.deletePlatformCampaign for each first, then deleteCampaignDraft. Requires explicit operator approval.",
+  inputSchema: z.object({ campaignId: z.string().trim().min(1) }),
+  execute: async (input, ctx) =>
+    deleteDraftCampaign({
+      ...input,
+      leaveOnPlatform: true,
+      organizationId: ctx.orgId,
+    }),
+});
+
 export const deleteAudienceAction = growthAction({
   outputSchema: deleteAudienceActionOutputSchema,
   description:
