@@ -638,25 +638,8 @@ function Message({
   color: string;
   titleSize: number;
 }) {
-  const titleLines = wrapText(
-    clamp(spec.title, 120),
-    spec.formatId === "story"
-      ? 22
-      : spec.formatId === "portrait" || spec.formatId === "square"
-        ? 26
-        : spec.formatId === "wide"
-          ? 22
-          : 42,
-  );
-  const subtitleLines = wrapText(
-    clamp(spec.subtitle, 220),
-    spec.formatId === "story"
-      ? 44
-      : spec.formatId === "portrait" || spec.formatId === "square"
-        ? 52
-        : 76,
-  );
-
+  // Satori wraps by the face's real widths. Lines split ahead by character
+  // count get wrapped again when the face runs wide, stranding a word.
   return (
     <div style={{ display: "flex", flexDirection: "column", color }}>
       {spec.eyebrow ? (
@@ -676,20 +659,16 @@ function Message({
       <div
         style={{
           display: "flex",
-          flexDirection: "column",
           width: "100%",
           maxWidth: "100%",
           fontSize: titleSize,
           fontWeight: 760,
           lineHeight: 0.98,
           letterSpacing: "-0.045em",
+          textWrap: "balance",
         }}
       >
-        {titleLines.map((line) => (
-          <div key={line} style={{ display: "flex" }}>
-            {line}
-          </div>
-        ))}
+        {clamp(spec.title, 120)}
       </div>
       {spec.subtitle ? (
         <div
@@ -704,11 +683,7 @@ function Message({
             opacity: 0.78,
           }}
         >
-          {subtitleLines.map((line) => (
-            <div key={line} style={{ display: "flex" }}>
-              {line}
-            </div>
-          ))}
+          {clamp(spec.subtitle, 220)}
         </div>
       ) : null}
       {spec.cta ? (
@@ -886,10 +861,6 @@ export function renderComposition(
           : square
             ? 68
             : 72;
-    // Character budgets that keep satori from wrapping a line a second time
-    // at these sizes; the break then falls where the words say.
-    const perLine = story ? 18 : link ? 26 : video ? 24 : 20;
-    const headlineLines = wrapText(clamp(spec.title, 90), perLine);
     const button = spec.cta?.trim();
     content = (
       <div
@@ -988,17 +959,15 @@ export function renderComposition(
                 {...(video ? { markSize: 52, textSize: 36 } : {})}
               />
             </div>
-            {headlineLines.map((line, index) => (
-              <div
-                key={index}
-                style={{
-                  display: "flex",
-                  justifyContent: story ? "center" : "flex-start",
-                }}
-              >
-                {line}
-              </div>
-            ))}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: story ? "center" : "flex-start",
+                textWrap: "balance",
+              }}
+            >
+              {clamp(spec.title, 90)}
+            </div>
           </div>
           {button ? (
             story ? (

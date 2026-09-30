@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,8 +46,11 @@ export function AdIdeaSlideRow({
   editing,
   onEdit,
   frozenUrl,
+  photoPanel,
 }: {
   editing: boolean;
+  /** Shown in place of the slide's details while its photo is being changed. */
+  photoPanel?: ReactNode;
   frozenUrl?: string;
   onEdit: () => void;
   card: IdeaImage;
@@ -178,7 +181,9 @@ export function AdIdeaSlideRow({
           )}
         </div>
         <div className="min-w-0 space-y-3">
-          {!editing ? (
+          {photoPanel && !editing ? (
+            photoPanel
+          ) : !editing ? (
             <>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h5 className="text-sm font-medium">

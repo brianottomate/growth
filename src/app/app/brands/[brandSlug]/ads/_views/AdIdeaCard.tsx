@@ -24,6 +24,7 @@ import {
 import { DeleteAlert } from "@/components/ui/alert-dialog";
 import { AdIdeaPreview } from "./AdIdeaPreview";
 import { AdIdeaSlideRow } from "./AdIdeaSlideRow";
+import { SlidePhotoPicker } from "./SlidePhotoPicker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -141,9 +142,15 @@ export function AdIdeaCard({
   const [homePickerOpen, setHomePickerOpen] = useState(false);
   const [selectedHomeId, setSelectedHomeId] = useState(ad.homeId ?? "");
   const [photoSearch, setPhotoSearch] = useState("");
+  /** The slide whose photo is being changed from its row, saved on pick. */
+  const [swapping, setSwapping] = useState<string | null>(null);
   const homeGalleries = useQuery({
     ...orpc.ads.starterIdeaHomes.queryOptions({ input: { campaignId } }),
-    enabled: editor === "image" || editor === "pool" || homePickerOpen,
+    enabled:
+      editor === "image" ||
+      editor === "pool" ||
+      homePickerOpen ||
+      swapping !== null,
   });
   const homes = homeGalleries.data ?? [];
   const galleryHome = homes.find((home) => home.id === selectedHomeId);
@@ -159,7 +166,7 @@ export function AdIdeaCard({
       .find((photo) => sameIdeaSource(photo, source))?.label ??
     `Image ${index + 1}`;
   const [poolTarget, setPoolTarget] = useState<"slide" | "size">("slide");
-  const [picker, setPicker] = useState<"add" | "replace" | null>(null);
+  const [picker, setPicker] = useState<"add" | "replace" | "swap" | null>(null);
   const { uploadFiles, uploading, progress } = useMediaUpload(brandId);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const remove = useMutation(
@@ -219,6 +226,7 @@ export function AdIdeaCard({
     setSelectedId(id);
     setPoolTarget(kind === "image" ? "size" : "slide");
     setShowPool(kind === "pool");
+    setSwapping(null);
     if (kind !== "copy") setView("details");
     setEditor(kind);
   };
@@ -243,7 +251,9 @@ export function AdIdeaCard({
     (document.role === "hero_static" ? document.cards[0] : undefined);
   const isStatic = savedState.document.role === "hero_static";
   const limit = isStatic ? 1 : 10;
-  const busy = save.isPending || remove.isPending || uploading > 0;
+  const swapCrop = useMutation(orpc.ads.suggestCrop.mutationOptions());
+  const busy =
+    save.isPending || remove.isPending || swapCrop.isPending || uploading > 0;
   const updateCardById = (id: string, fn: (current: IdeaImage) => IdeaImage) =>
     edit((d) => ({
       ...d,
@@ -325,6 +335,31 @@ export function AdIdeaCard({
       attach([{ ...source, type: "image" }], "add");
     }
   };
+  // The catalog's switcher: the photo changes in every size and saves, with
+  // the AI's crop for the size on screen. Per-size images stay in Edit slide.
+  const swapPhoto = async (cardId: string, source: IdeaSource) => {
+    const imagePosition = await swapCrop
+      .mutateAsync({ url: source.url, formatId: shape })
+      .catch(() => null);
+    const d = savedState.document;
+    persist(
+      withIdeaPool(
+        {
+          ...d,
+          cards: d.cards.map((c) => {
+            if (c.id !== cardId) return c;
+            const { [shape]: _shown, ...sourceOverrides } =
+              c.sourceOverrides ?? {};
+            const next = { ...c, source, sourceOverrides };
+            return imagePosition
+              ? patchIdeaRecipe(next, shape, { imagePosition })
+              : next;
+          }),
+        },
+        [source],
+      ),
+    );
+  };
   const move = (id: string, direction: number) => {
     const d = savedState.document;
     const selected = d.cards.findIndex((c) => c.id === id);
@@ -354,9 +389,7 @@ export function AdIdeaCard({
       }
       onEdit={() => openEditor("slide", slide.id)}
       onChange={(fn) => updateCardById(slide.id, fn)}
-      onReplace={() =>
-        editing ? setPicker("replace") : openEditor("image", slide.id)
-      }
+      onReplace={() => (editing ? setPicker("replace") : setSwapping(slide.id))}
       onUpload={async (files) =>
         attach(await uploadFiles(files), "replace", slide.id, shape)
       }
@@ -371,6 +404,20 @@ export function AdIdeaCard({
         setPoolTarget("size");
         setShowPool(true);
       }}
+      photoPanel={
+        !editing && swapping === slide.id ? (
+          <SlidePhotoPicker
+            homes={homes}
+            loading={homeGalleries.isLoading}
+            initialHomeId={ad.homeId ?? null}
+            current={ideaSource(slide, shape)}
+            disabled={busy}
+            onPick={(source) => void swapPhoto(slide.id, source)}
+            onLibrary={() => setPicker("swap")}
+            onDone={() => setSwapping(null)}
+          />
+        ) : undefined
+      }
     />
   );
 
@@ -1207,6 +1254,17 @@ export function AdIdeaCard({
         }}
         existingAssetIds={[]}
         onPick={(item) => {
+          if (picker === "swap") {
+            if (item.type !== "image")
+              toast.error("Choose a still image for this ad idea");
+            else if (swapping)
+              void swapPhoto(swapping, {
+                url: item.url,
+                ...(item.assetId ? { assetId: item.assetId } : {}),
+              });
+            setPicker(null);
+            return;
+          }
           attach([item], picker ?? "add");
           setPicker(null);
         }}

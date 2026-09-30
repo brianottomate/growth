@@ -3180,9 +3180,7 @@ async function pushToMeta(args: PushArgs) {
   // cards there. A failure leaves the pushed ad as it was.
   const tallPlacements = placementPlan.filter((p) => !isFeedPlacement(p));
   const feedPlacements = placementPlan.filter(isFeedPlacement);
-  const placeCarouselCards = async (
-    ads: ReturnType<typeof setAdsFor>,
-  ) => {
+  const placeCarouselCards = async (ads: ReturnType<typeof setAdsFor>) => {
     if (!tallPlacements.length || !feedPlacements.length) return;
     for (const { planAd, externalId, media } of ads) {
       if (
@@ -3348,7 +3346,8 @@ async function pushToMeta(args: PushArgs) {
       ads: setAdsFor(set, usable),
     })),
   });
-  for (const { set } of perSet) await placeCarouselCards(setAdsFor(set, usable));
+  for (const { set } of perSet)
+    await placeCarouselCards(setAdsFor(set, usable));
 
   return {
     campaignId: campaign.id,
