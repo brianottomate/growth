@@ -397,12 +397,12 @@ export async function runStarterGeneration(runId: string, input: Input) {
       );
       await save(`${home.name} · Carousel`, document, home.id);
       // In the portfolio carousel each card is a different home, so it
-      // carries that home's own Meta headline and description.
+      // carries that home's name and facts, as the ad-set builder's cards do.
       heroCards.push({
         ...document.cards[0]!,
         id: `home-${home.id}`,
         copy: {
-          headline: output.copy.headline,
+          headline: home.name,
           description: output.copy.description,
         },
       });

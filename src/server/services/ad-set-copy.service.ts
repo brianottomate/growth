@@ -190,8 +190,8 @@ export function deterministicSetCopy(
 }
 
 /**
- * Copy for a whole set in one pass, so the homes do not repeat each other and
- * the portfolio caption can refer to what the individual ones already said.
+ * Copy for a whole set in one pass, so the homes read as one campaign and the
+ * portfolio caption can refer to what the individual ones already said.
  *
  * Falls back to copy built from the same facts rather than failing the build:
  * a set with plain words is worth more than no set.
@@ -240,7 +240,7 @@ export async function writeAdSetCopy(input: {
         META_DESCRIPTION,
         "cardTitle is drawn INTO the image by a renderer that cannot draw emoji and has little room: at most six words, no emoji, no punctuation at the end. Lead on the home's best amenity, not its name.",
         "",
-        "Vary the hooks across homes. Do not start every home the same way.",
+        "Homes may share a hook shape, the stay sentence and the closing line; only the bullets must be each home's own.",
         "No exclamation marks, no all-caps, no hashtags, no invented superlatives.",
         brandStorySection({
           brandName: input.brandName,
