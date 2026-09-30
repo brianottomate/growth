@@ -59,6 +59,7 @@ import type {
   IdeaSource,
 } from "@/lib/ad-idea-studio";
 import type { AdCreativeContent, MediaItem } from "@/server/db/schema";
+import { ApprovedStamp } from "@/components/approved-stamp";
 
 export type StudioAd = {
   id: string;
@@ -86,7 +87,12 @@ export function AdIdeaCard({
   home?: { name: string; url: string };
 }) {
   const router = useRouter();
-  const approved = Boolean(ad.content.ideaStudio?.approval);
+  const savedApproved = Boolean(ad.content.ideaStudio?.approval);
+  // Approve and Reopen show at once; the refresh confirms, an error undoes.
+  const [optimistic, setOptimistic] = useState<boolean | null>(null);
+  const [stamped, setStamped] = useState(false);
+  useEffect(() => setOptimistic(null), [savedApproved]);
+  const approved = optimistic ?? savedApproved;
   // Pushed is read-only: Meta runs the frozen images, so there is no reopen.
   const pushed = Boolean(deliveryState);
   const locked = approved || pushed;
@@ -113,12 +119,20 @@ export function AdIdeaCard({
   const collapsed = view === "overview";
   const approval = useMutation(
     orpc.ads.setAdStatus.mutationOptions({
-      onSuccess: () => {
-        toast.success(approved ? "Draft reopened." : "Ad approved");
+      onMutate: ({ status }) => {
+        setOptimistic(status === "approved");
+        setStamped(status === "approved");
         setView("overview");
+      },
+      onSuccess: (_, { status }) => {
+        toast.success(
+          status === "approved" ? "Ad approved" : "Draft reopened.",
+        );
         router.refresh();
       },
       onError: (error) => {
+        setOptimistic(null);
+        setStamped(false);
         toast.error(error.message);
         router.refresh();
       },
@@ -700,7 +714,15 @@ export function AdIdeaCard({
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1 space-y-1.5">
-          <h3 className="font-medium break-words">{savedState.name}</h3>
+          <div className="flex flex-wrap items-center gap-3">
+            <h3 className="font-medium break-words">{savedState.name}</h3>
+            {approved && (
+              <ApprovedStamp
+                at={ad.content.ideaStudio?.approval?.approvedAt ?? new Date()}
+                fresh={stamped}
+              />
+            )}
+          </div>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
             <span>
               {isStatic ? "Static" : "Carousel"} ·{" "}
@@ -829,11 +851,7 @@ export function AdIdeaCard({
                 })
               }
             >
-              {approval.isPending
-                ? "Working…"
-                : approved
-                  ? "Reopen idea"
-                  : "Approve"}
+              {approved ? "Reopen idea" : "Approve"}
             </Button>
           )}
           <DropdownMenu>

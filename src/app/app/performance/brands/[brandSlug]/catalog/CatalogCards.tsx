@@ -1,4 +1,5 @@
 "use client";
+import { ApprovedStamp } from "@/components/approved-stamp";
 import { catalogAddressIssues } from "@/lib/catalog-addresses";
 import { useEffect, useRef, useState } from "react";
 import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
@@ -132,6 +133,8 @@ export function CatalogCards({
   /** The catalog card accordion. */
   const [picker, setPicker] = useState(false);
   const [error, setError] = useState("");
+  /** Cards approved this session, so their stamp lands rather than sits. */
+  const [stamped, setStamped] = useState<Set<string>>(new Set());
   const draft = query.data?.draft;
   const format = query.data?.format ?? DEFAULT_CATALOG_FORMAT;
   const homes = query.data?.homes ?? [];
@@ -226,8 +229,27 @@ export function CatalogCards({
         "Unable to save the card",
       );
   };
-  /** Sign cards off as shown, or take it back; the server refuses stale ones. */
-  const approve = (cards: CatalogCard[], approved: boolean) =>
+  /**
+   * Sign cards off as shown, or take it back; the server refuses stale ones.
+   * The cards flip at once and flip back if the server says no.
+   */
+  const approve = (cards: CatalogCard[], approved: boolean) => {
+    const ids = new Set(cards.map((card) => card.homeId));
+    const previous = client.getQueryData(state.queryKey);
+    client.setQueryData(state.queryKey, (data) =>
+      data?.draft
+        ? {
+            ...data,
+            draft: {
+              ...data.draft,
+              cards: data.draft.cards.map((card) =>
+                ids.has(card.homeId) ? { ...card, approved } : card,
+              ),
+            },
+          }
+        : data,
+    );
+    setStamped(approved ? ids : new Set());
     void act(
       () =>
         orpc.catalog.setApproval.call({
@@ -239,7 +261,13 @@ export function CatalogCards({
           })),
         }),
       "Unable to update approval",
-    );
+    ).then((result) => {
+      if (result === null) {
+        client.setQueryData(state.queryKey, previous);
+        setStamped(new Set());
+      }
+    });
+  };
   // Every card still open for changes: included, not signed off, drawn by
   // us rather than supplied as finished artwork.
   const open = (draft?.cards ?? [])
@@ -535,8 +563,14 @@ export function CatalogCards({
                 <div
                   key={card.homeId}
                   id={`home-${card.homeId}`}
-                  className={`scroll-mt-20 overflow-hidden rounded-xl border bg-card ${card.included ? "" : "opacity-50"} ${focusHome === card.homeId ? "ring-2 ring-ring" : ""}`}
+                  className={`relative scroll-mt-20 overflow-hidden rounded-xl border bg-card ${card.included ? "" : "opacity-50"} ${focusHome === card.homeId ? "ring-2 ring-ring" : ""}`}
                 >
+                  {card.approved && (
+                    <ApprovedStamp
+                      fresh={stamped.has(card.homeId)}
+                      className="pointer-events-none absolute top-3 right-3 z-10 bg-card/85 backdrop-blur-sm"
+                    />
+                  )}
                   <button
                     className="block w-full"
                     disabled={locked(card)}

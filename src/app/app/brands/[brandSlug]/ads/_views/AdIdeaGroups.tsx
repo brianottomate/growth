@@ -2,6 +2,7 @@
 
 import { parseAsStringLiteral, useQueryState } from "nuqs";
 import { Button } from "@/components/ui/button";
+import { ApprovedStamp } from "@/components/approved-stamp";
 
 type Group = {
   id: string;
@@ -44,9 +45,26 @@ export function AdIdeaGroups({ groups }: { groups: Group[] }) {
           </Button>
         ))}
       </div>
-      {shown.length === 0 && (
-        <p className="text-sm text-muted-foreground">No ads here.</p>
-      )}
+      {shown.length === 0 &&
+        (filter === "review" ? (
+          <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed py-10">
+            <ApprovedStamp className="scale-150" />
+            <p className="pt-2 text-sm text-muted-foreground">
+              All {all.length} approved
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed py-10 text-sm text-muted-foreground">
+            <p>Nothing approved yet</p>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setFilter("review")}
+            >
+              Review {all.length - approved}
+            </Button>
+          </div>
+        ))}
       {shown.length > 0 && (
         <nav
           aria-label="Ad types"
