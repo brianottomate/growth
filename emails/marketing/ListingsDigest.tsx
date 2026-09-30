@@ -263,9 +263,11 @@ function FeaturedCard({ property }: { property: DigestProperty }) {
             <TitleLine property={property} />
           </Text>
         </Link>
-        <Text style={{ fontSize: "15px", color: colors.body, margin: 0 }}>
-          {property.priceLabel}
-        </Text>
+        {property.priceLabel ? (
+          <Text style={{ fontSize: "15px", color: colors.body, margin: 0 }}>
+            {property.priceLabel}
+          </Text>
+        ) : null}
         {property.savingsLabel ? (
           <SavingsPill label={property.savingsLabel} />
         ) : null}
@@ -321,9 +323,11 @@ function CompactCard({
               <TitleLine property={property} />
             </Text>
           </Link>
-          <Text style={{ fontSize: "14px", color: colors.body, margin: 0 }}>
-            {property.priceLabel}
-          </Text>
+          {property.priceLabel ? (
+            <Text style={{ fontSize: "14px", color: colors.body, margin: 0 }}>
+              {property.priceLabel}
+            </Text>
+          ) : null}
           {property.savingsLabel ? (
             <SavingsPill label={property.savingsLabel} small />
           ) : null}
@@ -357,9 +361,11 @@ function GridCard({ property }: { property: DigestProperty }) {
           <TitleLine property={property} />
         </Text>
       </Link>
-      <Text style={{ fontSize: "14px", color: colors.body, margin: 0 }}>
-        {property.priceLabel}
-      </Text>
+      {property.priceLabel ? (
+        <Text style={{ fontSize: "14px", color: colors.body, margin: 0 }}>
+          {property.priceLabel}
+        </Text>
+      ) : null}
     </>
   );
 }

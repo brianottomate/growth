@@ -251,6 +251,7 @@ async function renderNewsletter(input: NewsletterRenderInput) {
     flow,
     sections: (digest?.sections ?? []).map((section) => {
       const [featured, ...more] = section.properties;
+      const showPrices = section.showPrices !== false;
       const toCard = (
         property: (typeof section.properties)[number],
         featured: boolean,
@@ -270,22 +271,26 @@ async function renderNewsletter(input: NewsletterRenderInput) {
         title: property.name,
         // The price line the issue carries (the paste's, or the home's
         // cheapest stay on wander.com); else whatever rate the paste stated.
-        priceLabel: property.priceLabel?.trim()
-          ? property.priceLabel.trim()
-          : [
-              money(property.nightlyUsd)
-                ? `${money(property.nightlyUsd)}/night`
-                : null,
-              money(property.perPersonUsd)
-                ? `~${money(property.perPersonUsd)}/person`
-                : null,
-            ]
-              .filter(Boolean)
-              .join(" · "),
+        // A group can leave prices out.
+        priceLabel: !showPrices
+          ? ""
+          : property.priceLabel?.trim()
+            ? property.priceLabel.trim()
+            : [
+                money(property.nightlyUsd)
+                  ? `${money(property.nightlyUsd)}/night`
+                  : null,
+                money(property.perPersonUsd)
+                  ? `~${money(property.perPersonUsd)}/person`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" · "),
         // Only a wander.com match carries savings; a brand's own homes don't.
-        savingsLabel: property.savingsUsd
-          ? savingsLabel(property.savingsUsd, featured)
-          : undefined,
+        savingsLabel:
+          showPrices && property.savingsUsd
+            ? savingsLabel(property.savingsUsd, featured)
+            : undefined,
         // An empty src makes the browser refetch the whole page, and renders
         // as a broken card in the preview. A visible placeholder says "an
         // image goes here and nobody has chosen one yet", which is the true

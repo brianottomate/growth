@@ -105,6 +105,8 @@ export const digestSectionSchema = z.object({
   heading: z.string().trim().max(200),
   /** Feature: every home large. List: small photo beside text. Grid: two per row. */
   layout: z.enum(["feature", "list", "grid"]).nullable().optional(),
+  /** false hides the cards' price and savings lines; unset shows them. */
+  showPrices: z.boolean().nullable().optional(),
   properties: z.array(digestPropertySchema).min(1).max(12),
   /**
    * The wander.com search for the section's place, for its "Explore" button:

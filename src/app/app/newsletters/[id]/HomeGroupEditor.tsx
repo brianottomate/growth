@@ -115,6 +115,16 @@ export function HomeGroupEditor({
           </button>
         ))}
       </div>
+      <label className="flex items-center gap-2 text-xs">
+        <input
+          type="checkbox"
+          checked={section.showPrices !== false}
+          onChange={(event) =>
+            onChange({ ...section, showPrices: event.target.checked })
+          }
+        />
+        Show prices
+      </label>
 
       <ol className="space-y-1">
         {homes.map((home, index) => (
