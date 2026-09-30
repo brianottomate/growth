@@ -21,7 +21,6 @@ export function AddStarterIdeasButton({ campaignId }: { campaignId: string }) {
   const [open, setOpen] = useState(false);
   const [source, setSource] = useState<"blank" | "featured">("featured");
   const [generate, setGenerate] = useState(true);
-  const [stories, setStories] = useState(true);
   const [refreshing, startTransition] = useTransition();
   const homes = useQuery({
     ...orpc.ads.starterIdeaHomes.queryOptions({ input: { campaignId } }),
@@ -173,16 +172,6 @@ export function AddStarterIdeasButton({ campaignId }: { campaignId: string }) {
                 Write copy, choose photos and compose with AI
               </label>
               {generate && (
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={stories}
-                    onChange={(e) => setStories(e.target.checked)}
-                  />
-                  Include Stories layouts alongside Facebook and Instagram Feed
-                </label>
-              )}
-              {generate && (
                 <p className="text-xs text-muted-foreground">
                   Runs in the background and creates a fresh set of unapproved
                   drafts. Copy is shared within each home’s ads; layouts stay
@@ -247,7 +236,7 @@ export function AddStarterIdeasButton({ campaignId }: { campaignId: string }) {
                     intendedPlacements: [
                       "facebook-feed",
                       "instagram-feed",
-                      ...(source === "featured" && stories
+                      ...(source === "featured"
                         ? (["facebook-story", "instagram-story"] as const)
                         : []),
                     ],
