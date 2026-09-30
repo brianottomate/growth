@@ -866,6 +866,7 @@ export function AdIdeaCard({
             document: savedState.document,
             approval: ad.content.ideaStudio?.approval,
           }}
+          content={ad.content}
         />
       )}
       {!collapsed && (
@@ -924,35 +925,8 @@ export function AdIdeaCard({
                 : "Reopen the idea to edit. Approved exports remain fixed until you approve again."}
             </p>
           )}
-          {view !== "details" && (
-            <AdIdeaPreview
-              brandId={brandId}
-              brandName={brandName}
-              brandLogo={brandLogo}
-              studio={{
-                document: savedState.document,
-                approval: ad.content.ideaStudio?.approval,
-              }}
-              content={ad.content}
-              home={home}
-            />
-          )}
           {view === "details" && (
             <div className="space-y-5">
-              <div className="space-y-3 border-t pt-4">
-                <h5 className="text-xs font-medium">Meta preview</h5>
-                <AdIdeaPreview
-                  brandId={brandId}
-                  brandName={brandName}
-                  brandLogo={brandLogo}
-                  studio={{
-                    document: savedState.document,
-                    approval: ad.content.ideaStudio?.approval,
-                  }}
-                  content={ad.content}
-                  platform
-                />
-              </div>
               <div className="space-y-3 border-t pt-4">
                 <div className="space-y-2">
                   <h5 className="text-xs font-medium">Creative sizes</h5>
@@ -1080,6 +1054,20 @@ export function AdIdeaCard({
                   </>
                 )}
                 {(editor === "image" || editor === "pool") && editorPanel}
+              </div>
+              <div className="space-y-3 border-t pt-4">
+                <h5 className="text-xs font-medium">Meta preview</h5>
+                <AdIdeaPreview
+                  brandId={brandId}
+                  brandName={brandName}
+                  brandLogo={brandLogo}
+                  studio={{
+                    document: savedState.document,
+                    approval: ad.content.ideaStudio?.approval,
+                  }}
+                  content={ad.content}
+                  platform
+                />
               </div>
             </div>
           )}

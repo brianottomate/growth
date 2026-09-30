@@ -1,6 +1,11 @@
 "use client";
 import { useEffect, useId, useRef, useState } from "react";
-import { ExternalLink } from "lucide-react";
+import { ChevronRight, ExternalLink } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
@@ -68,6 +73,7 @@ export function AdIdeaPreview({
   const media = mediaFor(shape);
   const copy = studio.document.copyOverrides[shape] ?? studio.document.copy;
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  const [platformOpen, setPlatformOpen] = useState(false);
   const [descriptionOverflows, setDescriptionOverflows] = useState(false);
   const descriptionRef = useRef<HTMLParagraphElement>(null);
   const descriptionId = useId();
@@ -90,6 +96,69 @@ export function AdIdeaPreview({
     }
   })();
   const cta = copy.callToAction ? ctaLabel(copy.callToAction) : null;
+  const platformPreview = () => (
+    <>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,220px),1fr))] items-start gap-4">
+        {META_PLACEMENTS.filter((surface) =>
+          ["facebook-feed", "instagram-feed", "facebook-story"].includes(
+            surface.id,
+          ),
+        ).map((surface) => {
+          const label =
+            surface.kind === "feed" ? surface.label : "Stories / Reels";
+          const size = surface.kind !== "feed" ? "story" : shape;
+          const resolved = content
+            ? metaPreviewMedia(content, surface.id, brandId)
+            : {
+                media: [],
+                issue: "Approve and save this idea before previewing.",
+              };
+          const surfaceMedia = resolved.media;
+          const surfaceCopy = content ?? studio.document.copy;
+          return (
+            <section
+              key={surface.id}
+              aria-label={label}
+              className="min-w-0 space-y-3"
+            >
+              <h4 className="text-sm font-medium">{label}</h4>
+              {surfaceMedia.length ? (
+                <CompactAdMock
+                  preserveArtwork
+                  surface={surface.surface}
+                  publisher={surface.publisher}
+                  verticalKind="story"
+                  crop={size}
+                  brandName={brandName}
+                  brandLogo={brandLogo}
+                  body={surfaceCopy.body}
+                  headline={surfaceCopy.headline}
+                  description={surfaceCopy.description ?? null}
+                  link={surfaceCopy.linkUrl ?? null}
+                  callToAction={surfaceCopy.callToAction ?? null}
+                  media={surfaceMedia}
+                  card={Math.min(
+                    cards[surface.id] ?? 0,
+                    Math.max(0, surfaceMedia.length - 1),
+                  )}
+                  onCard={(next) =>
+                    setCards((current) => ({
+                      ...current,
+                      [surface.id]: next,
+                    }))
+                  }
+                />
+              ) : (
+                <p className="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">
+                  {resolved.issue}
+                </p>
+              )}
+            </section>
+          );
+        })}
+      </div>
+    </>
+  );
   return (
     <div className="space-y-4">
       {home && (
@@ -135,67 +204,7 @@ export function AdIdeaPreview({
         </div>
       ) : null}
       {platform ? (
-        <>
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,220px),1fr))] items-start gap-4">
-            {META_PLACEMENTS.filter((surface) =>
-              ["facebook-feed", "instagram-feed", "facebook-story"].includes(
-                surface.id,
-              ),
-            ).map((surface) => {
-              const label =
-                surface.kind === "feed" ? surface.label : "Stories / Reels";
-              const size = surface.kind !== "feed" ? "story" : shape;
-              const resolved = content
-                ? metaPreviewMedia(content, surface.id, brandId)
-                : {
-                    media: [],
-                    issue: "Approve and save this idea before previewing.",
-                  };
-              const surfaceMedia = resolved.media;
-              const surfaceCopy = content ?? studio.document.copy;
-              return (
-                <section
-                  key={surface.id}
-                  aria-label={label}
-                  className="min-w-0 space-y-3"
-                >
-                  <h4 className="text-sm font-medium">{label}</h4>
-                  {surfaceMedia.length ? (
-                    <CompactAdMock
-                      preserveArtwork
-                      surface={surface.surface}
-                      publisher={surface.publisher}
-                      verticalKind="story"
-                      crop={size}
-                      brandName={brandName}
-                      brandLogo={brandLogo}
-                      body={surfaceCopy.body}
-                      headline={surfaceCopy.headline}
-                      description={surfaceCopy.description ?? null}
-                      link={surfaceCopy.linkUrl ?? null}
-                      callToAction={surfaceCopy.callToAction ?? null}
-                      media={surfaceMedia}
-                      card={Math.min(
-                        cards[surface.id] ?? 0,
-                        Math.max(0, surfaceMedia.length - 1),
-                      )}
-                      onCard={(next) =>
-                        setCards((current) => ({
-                          ...current,
-                          [surface.id]: next,
-                        }))
-                      }
-                    />
-                  ) : (
-                    <p className="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">
-                      {resolved.issue}
-                    </p>
-                  )}
-                </section>
-              );
-            })}
-          </div>
-        </>
+        platformPreview()
       ) : (
         <>
           <div className="max-w-2xl text-sm">
@@ -287,6 +296,22 @@ export function AdIdeaPreview({
                 </span>
               )}
             </div>
+          </div>
+          <div className="border-t pt-2">
+            <Collapsible open={platformOpen} onOpenChange={setPlatformOpen}>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  <ChevronRight
+                    aria-hidden="true"
+                    className={`size-3.5 transition-transform ${platformOpen ? "rotate-90" : ""}`}
+                  />
+                  Meta preview
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="pt-3">{platformPreview()}</div>
+              </CollapsibleContent>
+            </Collapsible>
           </div>
         </>
       )}
