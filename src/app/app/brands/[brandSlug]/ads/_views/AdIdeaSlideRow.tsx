@@ -48,7 +48,10 @@ export function AdIdeaSlideRow({
   onEdit,
   frozenUrl,
   photoPanel,
+  adCopy,
 }: {
+  /** The ad's own Meta copy, which a carousel card inherits where blank. */
+  adCopy: { headline: string; description?: string };
   editing: boolean;
   /** Shown in place of the slide's details while its photo is being changed. */
   photoPanel?: ReactNode;
@@ -193,13 +196,15 @@ export function AdIdeaSlideRow({
           ) : !editing ? (
             <>
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h5 className="text-sm font-medium">
+                <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                   {card.mode === "supplied"
                     ? "Artwork"
-                    : (COMPOSITION_TEMPLATES.find(
-                        (t) => t.id === recipe.templateId,
-                      )?.label ?? "Composition")}
-                </h5>
+                    : `Composed · ${
+                        COMPOSITION_TEMPLATES.find(
+                          (t) => t.id === recipe.templateId,
+                        )?.label ?? recipe.templateId
+                      }`}
+                </span>
                 <div className="flex flex-wrap gap-2">
                   <Button size="sm" variant="outline" onClick={onReplace}>
                     {awaitingArtwork ? "Choose image" : "Change image"}
@@ -234,10 +239,26 @@ export function AdIdeaSlideRow({
                       </div>
                     ))}
                 </dl>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Artwork used as-is, with no added text or logo.
-                </p>
+              ) : null}
+              {!isStatic && (
+                <dl className="space-y-3 text-sm">
+                  {(["headline", "description"] as const).map((key) => {
+                    const own = card.copy?.[key]?.trim();
+                    return (
+                      <div key={key}>
+                        <dt className="text-xs text-muted-foreground">
+                          {key === "headline"
+                            ? "Meta headline"
+                            : "Meta description"}
+                          {own ? "" : " · from the ad"}
+                        </dt>
+                        <dd className="break-words">
+                          {own || adCopy[key] || "Not set"}
+                        </dd>
+                      </div>
+                    );
+                  })}
+                </dl>
               )}
               <p className="text-xs text-muted-foreground">
                 {IDEA_SHAPE_LABELS[shape]} · Crop: {recipe.imagePosition}

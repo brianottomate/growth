@@ -373,6 +373,7 @@ export function AdIdeaCard({
     <AdIdeaSlideRow
       key={slide.id}
       card={slide}
+      adCopy={document.copy}
       brandId={brandId}
       name={savedState.name}
       shape={shape}
