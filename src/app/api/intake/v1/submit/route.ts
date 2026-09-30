@@ -1,7 +1,8 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { after, NextResponse, type NextRequest } from "next/server";
 
 import { requireGatewayAuth } from "@/server/services/hubspot-gateway.service";
 import { PerformanceError } from "@/server/services/performance.service";
+import { notifyPerformanceIntakeSubmission } from "@/server/services/performance-intake-notification.service";
 import {
   submitIntakeSchema,
   submitPerformanceIntake,
@@ -28,6 +29,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const { intakeId } = await submitPerformanceIntake(parsed.data);
+    after(() => notifyPerformanceIntakeSubmission(intakeId));
     return NextResponse.json({ ok: true, intakeId });
   } catch (error) {
     if (error instanceof PerformanceError) {
