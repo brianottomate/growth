@@ -8,6 +8,7 @@ import {
   genericOAuth,
   jwt,
   username,
+  oAuthProxy,
   organization,
 } from "better-auth/plugins";
 import { nextCookies } from "better-auth/next-js";
@@ -350,6 +351,10 @@ export const auth = betterAuth({
     // Preserve bearer-session support for the app's server API while MCP
     // clients use OAuth access tokens below.
     bearer(),
+    // Preview deployments have no Google redirect URI of their own. The proxy
+    // sends Google through the production callback and hands the session back.
+    // Both sides need the same BETTER_AUTH_SECRET.
+    oAuthProxy({ productionURL: "https://growth-red.vercel.app" }),
     /**
      * Google Drive as its own linked account — deliberately NOT extra scopes on
      * the Google sign-in provider above.
