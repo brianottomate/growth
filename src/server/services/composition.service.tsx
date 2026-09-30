@@ -1794,9 +1794,9 @@ export function renderComposition(
             left: 0,
             right: 0,
             top: 0,
-            height: "58%",
+            height: centred ? "66%" : "58%",
             background: centred
-              ? `linear-gradient(180deg, ${scrim(0.58)} 0%, ${scrim(0.42)} 50%, ${scrim(0)} 100%)`
+              ? `linear-gradient(180deg, ${scrim(0.74)} 0%, ${scrim(0.62)} 40%, ${scrim(0.3)} 75%, ${scrim(0)} 100%)`
               : "linear-gradient(180deg, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.35) 55%, rgba(0,0,0,0) 100%)",
           }}
         />
@@ -1871,7 +1871,7 @@ export function renderComposition(
             </div>
           ) : null}
         </div>
-        {spec.cta ? (
+        {spec.cta && !centred ? (
           <div
             style={{
               display: "flex",
@@ -1881,35 +1881,22 @@ export function renderComposition(
               // Meta lays its CTA sticker and the Reels caption over the
               // bottom third of a story, so the line sits above it.
               bottom: story ? 680 : pad,
-              justifyContent: centred ? "center" : "flex-start",
+              justifyContent: "flex-start",
             }}
           >
-            {centred ? (
-              <div
-                style={{
-                  display: "flex",
-                  color: "#ffffff",
-                  fontSize: story ? 48 : video ? 42 : 28,
-                  fontWeight: 600,
-                }}
-              >
-                {clamp(spec.cta, 60)}
-              </div>
-            ) : (
-              <div
-                style={{
-                  display: "flex",
-                  padding: "22px 40px",
-                  borderRadius: 999,
-                  background: "#ffffff",
-                  color: "#111111",
-                  fontSize: 26,
-                  fontWeight: 700,
-                }}
-              >
-                {clamp(spec.cta, 60)}
-              </div>
-            )}
+            <div
+              style={{
+                display: "flex",
+                padding: "22px 40px",
+                borderRadius: 999,
+                background: "#ffffff",
+                color: "#111111",
+                fontSize: 26,
+                fontWeight: 700,
+              }}
+            >
+              {clamp(spec.cta, 60)}
+            </div>
           </div>
         ) : null}
       </div>

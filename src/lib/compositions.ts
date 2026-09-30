@@ -127,10 +127,10 @@ export const COMPOSITION_TEMPLATES = [
   },
   {
     id: "tall-statement",
-    version: 5,
+    version: 6,
     label: "Tall · statement",
     description:
-      "Logo and a centred headline high on the photo, a quiet call to action at the base. Stories and Reels.",
+      "Logo and a centred headline high on the photo under a dark top scrim, nothing at the base. Stories and Reels.",
   },
   {
     id: "tall-welcome",
@@ -317,7 +317,7 @@ export const CAMPAIGN_COPY_INTENTS = {
   },
   "tall-statement": {
     intent:
-      "The opener or the closing card in Stories and Reels: the same headline role as the feed opener and close, centred high on a 9:16 photo above the fixed button, with no supporting line.",
+      "The opener or the closing card in Stories and Reels: the same headline role as the feed opener and close, centred high on a 9:16 photo, with no supporting line and no button.",
     headlineChars: 48,
     subtitleChars: 0,
   },
@@ -411,11 +411,7 @@ export const COMPOSITION_FIELDS: Record<
     { key: "rating", label: "Stars" },
   ],
   // Centred, so the layout skips the supporting line.
-  "tall-statement": [
-    mark,
-    { key: "title", label: "Headline" },
-    { key: "cta", label: "Call to action", hint: "Optional" },
-  ],
+  "tall-statement": [mark, { key: "title", label: "Headline" }],
   "tall-welcome": [
     mark,
     { key: "title", label: "Headline" },
