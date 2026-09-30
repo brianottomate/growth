@@ -113,15 +113,15 @@ export function AdIdeaPreview({
               className="flex w-fit flex-wrap rounded-lg border p-0.5"
             >
               {sizes.map((size) => (
-                <button
+                <Button
                   key={size}
-                  type="button"
+                  size="sm"
+                  variant={shape === size ? "secondary" : "ghost"}
                   aria-pressed={shape === size}
                   onClick={() => setPicked(size)}
-                  className="rounded-md px-2.5 py-1 text-xs text-muted-foreground aria-pressed:bg-secondary aria-pressed:text-foreground"
                 >
                   {IDEA_SHAPE_LABELS[size]}
-                </button>
+                </Button>
               ))}
             </div>
           ) : (
