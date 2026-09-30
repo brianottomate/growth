@@ -222,49 +222,48 @@ export function AdIdeaPreview({
               )}
             </div>
           </div>
+          {/* Each card as Meta draws it: the image, then its headline and
+              description with the button beside them. A blank card shows the
+              ad's own words, as Meta does. */}
           <div className="flex gap-3 overflow-x-auto pb-2">
-            {media.map((item, index) => (
-              <div key={index} className="w-52 shrink-0 space-y-2">
-                <a
-                  href={item.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label={`Open slide ${index + 1} at full size`}
-                >
-                  <Image
-                    src={item.url}
-                    alt={`Slide ${index + 1}`}
-                    width={300}
-                    height={375}
-                    unoptimized
-                    className="h-auto w-full rounded-lg"
-                  />
-                </a>
-                {(item.headline || item.description) && (
-                  <div className="space-y-0.5 text-xs">
-                    {item.headline && (
-                      <p className="font-medium">{item.headline}</p>
-                    )}
-                    {item.description && (
-                      <p className="text-muted-foreground">
-                        {item.description}
-                      </p>
-                    )}
+            {media.map((item, index) => {
+              const headline = item.headline || copy.headline;
+              const description =
+                item.description || copy.description?.trim() || "";
+              return (
+                <div key={index} className="w-52 shrink-0">
+                  <a
+                    href={item.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Open slide ${index + 1} at full size`}
+                  >
+                    <Image
+                      src={item.url}
+                      alt={`Slide ${index + 1}`}
+                      width={300}
+                      height={375}
+                      unoptimized
+                      className="h-auto w-full rounded-t-lg"
+                    />
+                  </a>
+                  <div className="rounded-b-lg border border-t-0 bg-card px-2.5 py-2 text-xs">
+                    <p
+                      className={`truncate font-medium ${headline ? "" : "text-muted-foreground"}`}
+                      title={headline}
+                    >
+                      {headline || "Headline not set"}
+                    </p>
+                    <p className="line-clamp-2 text-muted-foreground">
+                      {description || "Description not set"}
+                    </p>
                   </div>
-                )}
-              </div>
-            ))}
+                </div>
+              );
+            })}
           </div>
-          <div className="max-w-2xl space-y-2 text-sm">
-            <div>
-              <p className="font-medium">
-                {copy.headline || "Headline not set"}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {copy.description?.trim() || "Description not set"}
-              </p>
-            </div>
-            <div className="flex min-w-0 items-center gap-3 border-t pt-3 text-xs">
+          <div className="max-w-2xl text-sm">
+            <div className="flex min-w-0 items-center gap-3 text-xs">
               {cta && <Badge variant="secondary">{cta}</Badge>}
               {destination ? (
                 <a
