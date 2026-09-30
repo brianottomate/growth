@@ -13,6 +13,7 @@ import {
   compositionSpecSchema,
   getCompositionFormat,
   getCompositionIdentity,
+  STORY_SAFE_ZONE,
 } from "@/lib/compositions";
 import { R2 } from "@/server/clients/r2.client";
 import { db } from "@/server/db";
@@ -816,20 +817,28 @@ export function renderComposition(
   const portrait = format.height > format.width;
   const square = format.height === format.width;
   const padding = portrait ? 68 : 58;
-  // Keep Story artwork clear of the account header and native booking controls.
+  // Keep Story artwork out of the bands Meta lays its header and call to
+  // action over.
   const overlayInsets =
     spec.formatId === "story"
       ? {
-          paddingTop: 270,
-          paddingBottom: 420,
+          paddingTop: Math.round(format.height * STORY_SAFE_ZONE.top),
+          paddingBottom: Math.round(format.height * STORY_SAFE_ZONE.bottom),
           paddingLeft: 96,
           paddingRight: 96,
         }
       : { padding };
   // A 16:9 ad is 1920 wide but shows at feed width like a 1080 card, so its
-  // type is set about 1.4x larger to read the same.
+  // type is set about 1.4x larger to read the same. A 1.91:1 link card is
+  // only 630 tall, so its type steps down.
   const video = spec.formatId === "wide";
-  const titleSize = portrait ? 78 : video ? 96 : 68;
+  const titleSize = portrait
+    ? 78
+    : video
+      ? 96
+      : spec.formatId === "landscape"
+        ? 54
+        : 68;
   // A focal point pans the cover crop so that point of the photo lands at the
   // same fraction of the canvas, which keeps it in frame whatever the ratio.
   const imagePosition = spec.focal
@@ -1042,7 +1051,12 @@ export function renderComposition(
             left: 0,
             width: "100%",
             height: "100%",
-            background: `linear-gradient(180deg, ${scrim(0.2)} 0%, ${scrim(0)} 18%, ${scrim(0)} 48%, ${scrim(0.46)} 74%, ${scrim(0.78)} 100%)`,
+            // On a Story the headline ends above Meta's bottom band, so
+            // the shade rises to meet it.
+            background:
+              spec.formatId === "story"
+                ? `linear-gradient(180deg, ${scrim(0.2)} 0%, ${scrim(0)} 14%, ${scrim(0)} 34%, ${scrim(0.5)} 56%, ${scrim(0.62)} 68%, ${scrim(0.7)} 100%)`
+                : `linear-gradient(180deg, ${scrim(0.2)} 0%, ${scrim(0)} 18%, ${scrim(0)} 48%, ${scrim(0.46)} 74%, ${scrim(0.78)} 100%)`,
           }}
         />
         <div

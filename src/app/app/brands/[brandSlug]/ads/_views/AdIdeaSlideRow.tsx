@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dropzone } from "@/components/ui/dropzone";
+import { StorySafeZone } from "./StorySafeZone";
 import {
   Select,
   SelectContent,
@@ -169,6 +170,12 @@ export function AdIdeaSlideRow({
                   className="object-contain"
                   onError={() => setPreviewFailed(true)}
                 />
+              ) : null}
+              {shape === "story" &&
+              previewUrl &&
+              !previewFailed &&
+              !awaitingArtwork ? (
+                <StorySafeZone />
               ) : null}
             </div>
           </div>

@@ -47,6 +47,13 @@ export const COMPOSITION_FORMATS = [
   },
 ] as const;
 
+/**
+ * What Meta covers on a 9:16 Stories or Reels ad, as fractions of the canvas:
+ * the profile header above, the caption and call to action below. Meta's
+ * guide asks for these bands to stay free of text and logos.
+ */
+export const STORY_SAFE_ZONE = { top: 0.14, bottom: 0.35, side: 0.06 } as const;
+
 export const COMPOSITION_TEMPLATES = [
   {
     id: "photo-only",
