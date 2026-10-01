@@ -124,7 +124,9 @@ export async function suggestCampaignAudiences(input: {
   campaignId: string;
   count?: number;
 }) {
-  const count = Math.min(Math.max(input.count ?? 4, 1), 5);
+  // One at a time by default: each run sees what the campaign already has
+  // and proposes the next audience, so clicking again adds a different one.
+  const count = Math.min(Math.max(input.count ?? 1, 1), 5);
   const { campaign, brand: owned } = await requireOwnedCampaign(
     input.campaignId,
     input.organizationId,
@@ -134,6 +136,17 @@ export async function suggestCampaignAudiences(input: {
     columns: { id: true, name: true, story: true, markets: true },
   });
   if (!brand) throw new Error("Brand not found");
+  const current = await db.query.audienceTable.findMany({
+    where: eq(audienceTable.campaignId, campaign.id),
+    columns: { name: true, ageMin: true, ageMax: true, geography: true },
+  });
+  const coveredStates = new Set(
+    current.flatMap((row) =>
+      (row.geography?.states ?? [])
+        .map((state) => usStateCode(state))
+        .filter((state): state is string => Boolean(state)),
+    ),
+  );
   const homes = await db.query.homeTable.findMany({
     where: and(eq(homeTable.brandId, brand.id), isNull(homeTable.deletedAt)),
     columns: { externalId: true, source: true, city: true, state: true },
@@ -204,7 +217,15 @@ export async function suggestCampaignAudiences(input: {
         campaignNames.get(plan.campaignId) ?? plan.campaignId,
       );
   }
-  const offerable = assets.filter((asset) => !inUse.has(asset.id));
+  // Assets this campaign already targets are covered, not offered again.
+  const offerable = assets.filter(
+    (asset) =>
+      !inUse.has(asset.id) &&
+      !linkedPlans.some(
+        (plan) =>
+          plan.id === asset.audienceId && plan.campaignId === campaign.id,
+      ),
+  );
 
   const feeders = [...markets.values()].flatMap((market) =>
     (market.feederCities ?? []).map((place) => ({
@@ -238,6 +259,11 @@ export async function suggestCampaignAudiences(input: {
       feederCities: feeders.filter((f) => f.state === state).map((f) => f.city),
     })),
     bookingWindow: window,
+    alreadyInThisCampaign: current.map((row) => ({
+      name: row.name,
+      states: row.geography?.states ?? [],
+      ages: [row.ageMin, row.ageMax],
+    })),
     existingAudiences: offerable.map((asset) => ({
       id: asset.id,
       name: asset.name,
@@ -255,18 +281,21 @@ export async function suggestCampaignAudiences(input: {
 
   const empty = !feeders.length && !offerable.length;
   const fallback = (): AudienceSuggestion[] =>
-    homeStates.slice(0, 1).map((state) => ({
-      name: `${usStateName(state) ?? state} drive-in · 25-64`,
-      kind: "geo",
-      cities: [],
-      states: [state],
-      countries: ["US"],
-      regions: [usStateName(state) ?? state],
-      ageMin: 25,
-      ageMax: 64,
-      platformAudienceId: null,
-      why: "No market, no session data and no synced audiences yet: the homes' own state.",
-    }));
+    homeStates
+      .filter((state) => !coveredStates.has(state))
+      .slice(0, 1)
+      .map((state) => ({
+        name: `${usStateName(state) ?? state} drive-in · 25-64`,
+        kind: "geo",
+        cities: [],
+        states: [state],
+        countries: ["US"],
+        regions: [usStateName(state) ?? state],
+        ageMin: 25,
+        ageMax: 64,
+        platformAudienceId: null,
+        why: "No market, no session data and no synced audiences yet: the homes' own state.",
+      }));
 
   let suggestions: AudienceSuggestion[];
   if (empty) {
@@ -291,6 +320,14 @@ export async function suggestCampaignAudiences(input: {
           .map((state) => usStateCode(state))
           .filter((state): state is string => Boolean(state)),
       }))
+      .map((s) =>
+        s.kind === "geo"
+          ? {
+              ...s,
+              states: s.states.filter((state) => !coveredStates.has(state)),
+            }
+          : s,
+      )
       .filter((s) =>
         s.kind === "geo"
           ? s.states.length > 0

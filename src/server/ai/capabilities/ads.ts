@@ -1596,7 +1596,7 @@ export const setHomeHeroAction = growthAction({
 export const suggestCampaignAudiencesAction = growthAction({
   outputSchema: suggestCampaignAudiencesActionOutputSchema,
   description:
-    "Propose 1 to 5 audiences for a Performance client's campaign from the evidence: the brand's market (feeder cities), what its direct bookings say about the booking window, and the audiences already synced in its ad account. Each suggestion says why; add the ones the operator wants with addAudience (geo: cities, states, countries, ages; lookalike or retargeting: the platformAudienceId names the asset). Nothing is saved or pushed. Guest-origin data is not available for WanderOS sites, so geo suggestions rest on the market on Setup.",
+    "Propose the next audience for a Performance client's campaign (one by default, up to 5 with count), skipping what the campaign already targets, from the evidence: the brand's market (feeder cities), what its direct bookings say about the booking window, and the audiences already synced in its ad account. Each suggestion says why; add the ones the operator wants with addAudience (geo: cities, states, countries, ages; lookalike or retargeting: the platformAudienceId names the asset). Nothing is saved or pushed. Guest-origin data is not available for WanderOS sites, so geo suggestions rest on the market on Setup.",
   inputSchema: z.object({
     campaignId: z.string().min(1),
     count: z.number().int().min(1).max(5).optional(),

@@ -41,11 +41,13 @@ export function SuggestAudiencesButton({ campaignId }: { campaignId: string }) {
             audienceId: audience.id,
           });
       }
-      toast.success(
-        suggestions.length === 1
-          ? `Added ${suggestions[0]!.name}`
-          : `Added ${suggestions.length} audiences`,
-      );
+      if (!suggestions.length) toast.info("No new audience to suggest");
+      else
+        toast.success(
+          suggestions.length === 1
+            ? `Added ${suggestions[0]!.name}`
+            : `Added ${suggestions.length} audiences`,
+        );
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
     }

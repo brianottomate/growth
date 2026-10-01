@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { Pencil, Plus, Trash2, Users } from "lucide-react";
+import { MessageSquare, Pencil, Trash2, Users } from "lucide-react";
 
 import { AudienceMap } from "@/components/audience-map";
 import { GeographyChips } from "@/components/geography-chips";
@@ -51,8 +51,8 @@ export function Audiences({
   metaTargets?: Record<string, { name: string; via: "audience" | "persona" }>;
 }) {
   const router = useRouter();
-  // Adding works like editing: the chat asks who to reach and writes it.
-  const addInChat = () =>
+  // A chat on this campaign's audiences; Suggest is the one-click add.
+  const audienceChat = () =>
     sendAssistantIntent({
       type: "work_ad_campaign",
       brandId,
@@ -60,7 +60,7 @@ export function Audiences({
       campaignId,
       campaignName,
       focus: "audiences",
-      visibleText: `Add an audience to “${campaignName}”. Ask me who to reach: ages and places.`,
+      visibleText: `Help me with the audiences for “${campaignName}”. Read what it targets now and ask what I would like to add or change.`,
     });
   const remove = useMutation(
     orpc.ads.deleteAudience.mutationOptions({
@@ -79,9 +79,9 @@ export function Audiences({
       >
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           <SuggestAudiencesButton campaignId={campaignId} />
-          <Button size="sm" variant="outline" onClick={addInChat}>
-            <Plus className="size-3.5" />
-            Add audience
+          <Button size="sm" variant="outline" onClick={audienceChat}>
+            <MessageSquare className="size-3.5" />
+            Start new chat
           </Button>
         </div>
       </div>
@@ -95,9 +95,9 @@ export function Audiences({
           actions={
             <>
               <SuggestAudiencesButton campaignId={campaignId} />
-              <Button size="sm" variant="outline" onClick={addInChat}>
-                <Plus className="size-3.5" />
-                Add audience
+              <Button size="sm" variant="outline" onClick={audienceChat}>
+                <MessageSquare className="size-3.5" />
+                Start new chat
               </Button>
             </>
           }
