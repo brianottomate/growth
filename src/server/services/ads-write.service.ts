@@ -168,7 +168,11 @@ function connectionAvailable(account: ZernioAccount): boolean {
   );
 }
 
-async function resolveOwnedBrand(organizationId: string, brandSlug: string) {
+/** The owned brand plus its own Zernio profile, before any ads-connection borrowing. */
+async function resolveOwnedBrandConnections(
+  organizationId: string,
+  brandSlug: string,
+) {
   const brand = await db.query.brandTable.findFirst({
     where: and(
       eq(brandTable.organizationId, organizationId),
@@ -186,13 +190,18 @@ async function resolveOwnedBrand(organizationId: string, brandSlug: string) {
     },
   });
   if (!brand) throw new Error(`Owned brand not found: ${brandSlug}`);
+  const ownZernioProfileId = brand.zernioProfileId;
   brand.zernioProfileId = await adsConnectionProfile(brand);
   if (!brand.zernioProfileId) {
     throw new Error(
       `${brand.name} needs its own Zernio connection or an explicitly shared ads connection.`,
     );
   }
-  return brand;
+  return { brand, ownZernioProfileId };
+}
+
+async function resolveOwnedBrand(organizationId: string, brandSlug: string) {
+  return (await resolveOwnedBrandConnections(organizationId, brandSlug)).brand;
 }
 
 /**
@@ -245,21 +254,38 @@ function matchingConnections(
   );
 }
 
+/**
+ * A brand borrowing another brand's ads connection still uses its own profile
+ * for any platform it has connected itself (Chalets: Meta borrowed, Google own).
+ */
+function brandConnections(
+  accounts: ZernioAccount[],
+  brand: { zernioProfileId: string | null },
+  ownZernioProfileId: string | null,
+  platform: ZernioAdPlatform,
+) {
+  const own = ownZernioProfileId
+    ? matchingConnections(accounts, ownZernioProfileId, platform)
+    : [];
+  return own.length
+    ? own
+    : matchingConnections(accounts, brand.zernioProfileId!, platform);
+}
+
 export async function listAdsWriteDestinations(input: {
   organizationId: string;
   brandSlug: string;
   platform: ZernioAdPlatform;
 }) {
-  const brand = await resolveOwnedBrand(input.organizationId, input.brandSlug);
+  const { brand, ownZernioProfileId } = await resolveOwnedBrandConnections(
+    input.organizationId,
+    input.brandSlug,
+  );
   const [accounts, allowed] = await Promise.all([
     listZernioAccounts(),
     allowedAccountsForBrand(brand.id, input.platform),
   ]);
-  const connections = matchingConnections(
-    accounts,
-    brand.zernioProfileId!,
-    input.platform,
-  );
+  const connections = brandConnections(accounts, brand, ownZernioProfileId, input.platform);
 
   const destinationResults = await Promise.allSettled(
     connections.map(async (connection) => {
@@ -371,16 +397,15 @@ async function requireAdDestination(input: {
   connectionAccountId: string;
   adAccountId: string;
 }): Promise<AdDestination> {
-  const brand = await resolveOwnedBrand(input.organizationId, input.brandSlug);
+  const { brand, ownZernioProfileId } = await resolveOwnedBrandConnections(
+    input.organizationId,
+    input.brandSlug,
+  );
   const [accounts, allowed] = await Promise.all([
     listZernioAccounts(),
     allowedAccountsForBrand(brand.id, input.platform),
   ]);
-  const connection = matchingConnections(
-    accounts,
-    brand.zernioProfileId!,
-    input.platform,
-  ).find(
+  const connection = brandConnections(accounts, brand, ownZernioProfileId, input.platform).find(
     (candidate) => zernioAccountId(candidate) === input.connectionAccountId,
   );
   if (!connection) {
@@ -389,11 +414,7 @@ async function requireAdDestination(input: {
     // operator hunting a health problem when the real answer was that they
     // had passed a social Page connection, or one from another platform's
     // destination list, and a valid id was sitting right there.
-    const usable = matchingConnections(
-      accounts,
-      brand.zernioProfileId!,
-      input.platform,
-    )
+    const usable = brandConnections(accounts, brand, ownZernioProfileId, input.platform)
       .map((candidate) => zernioAccountId(candidate))
       .filter((id): id is string => Boolean(id));
     throw new Error(

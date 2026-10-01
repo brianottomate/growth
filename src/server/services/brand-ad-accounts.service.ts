@@ -97,7 +97,10 @@ export async function listBrandAdAccounts(
   if (discover && isZernioConfigured) {
     const connections = (await listZernioAccounts()).filter(
       (account) =>
-        (!profileId || zernioAccountProfileId(account) === profileId) &&
+        (!profileId ||
+          [profileId, brand.zernioProfileId].includes(
+            zernioAccountProfileId(account),
+          )) &&
         CONNECTION_PLATFORMS[account.platform?.toLowerCase() ?? ""],
     );
     const results = await Promise.allSettled(
