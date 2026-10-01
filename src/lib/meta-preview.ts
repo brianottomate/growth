@@ -53,12 +53,13 @@ export function metaPreviewMedia(
       issue: null,
     };
   const doc = content.ideaStudio?.document;
-  // Facebook gets a carousel's square cards (its desktop feed crops to
-  // square), the same swap; once frozen, the saved square renders.
+  // Facebook gets the square cards (its desktop feed, marketplace and right
+  // column show square), the same swap the push makes after creating the
+  // ad; once frozen, the saved square renders.
   const squareOnFacebook =
     !vertical &&
     META_PLACEMENTS.find((p) => p.id === id)?.publisher === "facebook" &&
-    (doc?.cards.length ?? 0) > 1;
+    (doc?.cards.length ?? 0) > 0;
   const squares = content.ideaStudio?.approval?.renders.square;
   if (
     squareOnFacebook &&

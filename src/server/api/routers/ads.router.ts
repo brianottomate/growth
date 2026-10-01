@@ -121,7 +121,7 @@ export const adsRouter = {
     .input(
       z.object({
         campaignId: z.string().min(1),
-        source: z.enum(["blank", "featured"]).default("blank"),
+        source: z.enum(["blank", "featured", "shells"]).default("blank"),
         homeIds: z.array(z.string().min(1)).min(1).max(10).optional(),
       }),
     )

@@ -35,7 +35,11 @@ import {
   requireAdPlatformSpec,
   type PlannableAdPlatform,
 } from "@/lib/ad-platforms";
-import { starterAdIdeas, featuredStarterAdIdeas } from "@/lib/starter-ad-ideas";
+import {
+  featuredStarterAdIdeas,
+  shellStarterAdIdeas,
+  starterAdIdeas,
+} from "@/lib/starter-ad-ideas";
 import { listBrandHomes } from "./homes.service";
 import { listWanderOsListingPhotos } from "@/server/clients/wanderos-site.client";
 import { brandListings, brandWebsiteId } from "./wanderos-listings.service";
@@ -595,7 +599,12 @@ export async function adIdeaHomePhotos(input: {
 export async function addStarterAdIdeas(input: {
   organizationId: string;
   campaignId: string;
-  source?: "blank" | "featured";
+  /**
+   * blank: unbound placeholders. featured: the featured homes, filled with
+   * their listing photos. shells: the featured homes as empty ads sized for
+   * a Zernio push with nothing to fix afterwards (`ZERNIO_NATIVE_SHAPES`).
+   */
+  source?: "blank" | "featured" | "shells";
   homeIds?: string[];
 }) {
   const { campaign, brand } = await requireOwnedCampaign(
@@ -608,45 +617,60 @@ export async function addStarterAdIdeas(input: {
     where: eq(adTable.campaignId, campaign.id),
     columns: { businessKey: true },
   });
-  const prefix = `${campaign.id}:${source === "blank" ? "starter-v1" : "featured-starter-v1"}:`;
-  const otherPrefix = `${campaign.id}:${source === "blank" ? "featured-starter-v1" : "starter-v1"}:`;
-  if (existing.some((ad) => ad.businessKey?.startsWith(otherPrefix)))
+  const keyFor = {
+    blank: "starter-v1",
+    featured: "featured-starter-v1",
+    shells: "shells-starter-v1",
+  } as const;
+  const prefix = `${campaign.id}:${keyFor[source]}:`;
+  const otherPrefixes = Object.values(keyFor)
+    .filter((key) => key !== keyFor[source])
+    .map((key) => `${campaign.id}:${key}:`);
+  if (
+    existing.some((ad) =>
+      otherPrefixes.some((other) => ad.businessKey?.startsWith(other)),
+    )
+  )
     throw new Error(
       "This campaign already has a different starter set. Use a new campaign or delete the existing starter ideas first.",
     );
-  const available = source === "featured" ? await starterIdeaHomes(input) : [];
+  const byHome = source !== "blank";
+  const available = byHome ? await starterIdeaHomes(input) : [];
   const homes = input.homeIds
     ? available.filter((h) => input.homeIds!.includes(h.id))
     : available;
   if (
-    source === "featured" &&
+    byHome &&
     (!homes.length ||
       homes.length > 10 ||
       (input.homeIds && homes.length !== new Set(input.homeIds).size))
   )
     throw new Error("Choose between 1 and 10 of this brand's featured homes.");
-  if (homes.some((h) => !h.photos.length))
+  if (source === "featured" && homes.some((h) => !h.photos.length))
     throw new Error(
       "A selected home has no source photo. Add a photo in Homes or start blank.",
     );
   const ideas =
-    source === "featured" ? featuredStarterAdIdeas(homes) : starterAdIdeas();
-  if (source === "featured" && brand.website) {
+    source === "featured"
+      ? featuredStarterAdIdeas(homes)
+      : source === "shells"
+        ? shellStarterAdIdeas(homes)
+        : starterAdIdeas();
+  if (byHome && brand.website) {
     ideas[0]!.content.linkUrl = brand.website;
     if (ideas[0]!.content.ideaStudio)
       ideas[0]!.content.ideaStudio.document.copy.linkUrl = brand.website;
   }
   let created = 0;
   for (const idea of ideas) {
-    const projected =
-      source === "featured"
-        ? projectIdea(
-            brand.id,
-            idea.content,
-            { document: ideaDocumentFromAd(idea) },
-            null,
-          )
-        : { content: idea.content };
+    const projected = byHome
+      ? projectIdea(
+          brand.id,
+          idea.content,
+          { document: ideaDocumentFromAd(idea) },
+          null,
+        )
+      : { content: idea.content };
 
     const rows = await db
       .insert(adTable)

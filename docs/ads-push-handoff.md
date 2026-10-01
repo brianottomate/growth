@@ -175,3 +175,69 @@ pins one by hand. Existing ad sets cannot be rewritten at all: Meta refuses any
 change to pixel, conversion event, custom conversion or optimisation goal on a
 published ad set (subcode 3260011), so a mis-scoped ad set is replaced by a new
 one and paused. The scoping has to be right at push time.
+
+## Meta placements: one image per placement shape (2026-09-30)
+
+Our ads are designed artwork: headline at the top, a pill at the bottom. Meta
+shows each placement at its own shape and crops what does not fit, so an ad
+sized for one shape loses its text in another. Rule since the Chalets redo:
+**no placement gets a crop of an image made for another shape.**
+
+| Meta placements | Shape shown | What the push sends |
+| --- | --- | --- |
+| Facebook feed, marketplace, right column, profile feed, notifications | 4:5 on mobile feed, **square** on desktop feed, marketplace and right column | the **1:1** export |
+| Instagram feed, explore, profile feed (mobile only) | 4:5 | the 4:5 export |
+| Stories and Reels, both apps | 9:16 | the 9:16 export |
+
+Meta's placement rules (`asset_customization_rules.customization_spec`) split
+by app and position but **not by device**, so "square on desktop only" is not
+expressible: all of Facebook gets the square.
+
+**How each format gets there**
+
+- **Statics** go out in one Zernio call with `placementAssets`: the 4:5 as the
+  default, a rule pinning the 9:16 to stories and reels, a rule pinning the
+  1:1 to Facebook's feed placements. Nothing runs after the push.
+  `metaPlacementAssetsFor` in `ads-write.service.ts`.
+- **Carousels** go out as Zernio `carouselCards`, one set of cards, which
+  Zernio will not combine with `placementAssets`. When the carousel has other
+  sizes than its feed cards, the push rebuilds its creative on the Graph API
+  with one card set per group (square on Facebook, 4:5 on Instagram, 9:16 in
+  stories and reels) and swaps it onto the same ad
+  (`setMetaCarouselPlacementCards`, called from `placeCarouselCards`). A
+  square-only carousel with no 9:16 needs nothing and makes no calls.
+- **Starter shells.** "Add starter ad ideas → Empty shells" creates empty ads
+  per featured home sized by `ZERNIO_NATIVE_SHAPES` (statics 4:5 + 1:1 + 9:16,
+  carousels 1:1): the sizes a push can deliver with nothing to fix after.
+  Zernio's docs give no ratio advice, so these follow the shape of its API
+  and Meta's specs as of 2026-09-30; revisit when Zernio adds per-placement
+  carousels or ratio guidance.
+
+**Facebook video feeds** is gone from `META_PLACEMENTS`: Meta's API refuses it
+(code 100, subcode 2490562), so "all placements" is 14.
+
+**Rate limits.** Our app is on Meta's *development* access tier for the
+Marketing API (`ads_api_access_tier` in the `X-Business-Use-Case-Usage`
+header): a score of 60 per ad account, reads 1 point, writes 3, regained over
+300 s, with a 300 s block when exceeded (code 17, subcode 2446079). Each
+carousel swap uploads every card image per set, so a campaign of 9 carousels
+hit the limit on 2026-09-30 and 3 swaps failed with a push warning; they were
+re-run by script once it cleared. Standard access (9,000 points, 60 s block)
+is requested in the Meta app dashboard by an app admin. Until then, big
+carousel campaigns can need a re-run of `setMetaCarouselPlacementCards` for
+the ads the push warned about.
+
+**Checking a push before and after**
+
+- Before: a validate-only push (`pushDraftToPlatform` with
+  `validateOnly: true`) makes Meta check every node and creates nothing. It
+  caught the video feeds refusal. It cannot check the carousel swap, which
+  only runs after a real push.
+- After: read the ads' `creative{asset_feed_spec}` for their rules, and Meta's
+  own renders with `GET /{ad_id}/previews?ad_format=DESKTOP_FEED_STANDARD`
+  (also `MOBILE_FEED_STANDARD`, `MARKETPLACE_MOBILE`, `INSTAGRAM_STANDARD`,
+  `INSTAGRAM_STORY`). Previews can lag a creative swap by a minute. Ads
+  Manager's hover thumbnails zoom and are not what runs; the full ad preview
+  is.
+- Zernio sometimes creates the first ad of an ad set ACTIVE although the push
+  asked for paused. Check every ad is paused after a push.

@@ -2153,9 +2153,14 @@ function isVideoContent(content: AdCreativeContent) {
  * platform rejection after approval.
  */
 /**
- * One ad, two files: the baseline for every placement, the 9:16 pinned to
- * stories and reels. Meta's asset customization, which is how Brooke builds
- * it by hand. A carousel's cards are the carousel's, so singles only.
+ * One ad, up to three files, sent with the push through Zernio's
+ * `placementAssets` (a default plus rules that pin files to placements):
+ * the baseline for every placement, the 9:16 pinned to stories and reels,
+ * and for an image the 1:1 pinned to Facebook's feed placements, where
+ * marketplace, the right column and the desktop feed show it square. Meta's
+ * asset customization, which is how Brooke builds it by hand. A carousel's
+ * cards are the carousel's (Zernio will not combine the two), so singles
+ * only; carousels get theirs after the push. See `ZERNIO_NATIVE_SHAPES`.
  */
 export function metaPlacementAssetsFor(
   content: AdCreativeContent,
@@ -2163,11 +2168,36 @@ export function metaPlacementAssetsFor(
 ): ZernioPlacementAssets | undefined {
   const card = content.media[0];
   if (!card || content.media.length !== 1) return undefined;
-  if (!card.story || !placementPlan.some((p) => !isFeedPlacement(p)))
-    return undefined;
-  const placements = metaProviderPlacements(
-    placementPlan.filter((p) => !isFeedPlacement(p)),
+  const tallPlan = placementPlan.filter((p) => !isFeedPlacement(p));
+  const facebookFeed = placementPlan.filter(
+    (p) =>
+      isFeedPlacement(p) &&
+      META_PLACEMENTS.find((row) => row.id === p)?.publisher === "facebook",
   );
+  const square = content.ideaStudio?.approval?.renders.square?.[0]?.url;
+  if (card.type === "image" && (card.story || square)) {
+    const rules = [
+      ...(card.story && tallPlan.length
+        ? [
+            {
+              imageUrl: card.story.url,
+              placements: metaProviderPlacements(tallPlan),
+            },
+          ]
+        : []),
+      ...(square && square !== card.url && facebookFeed.length
+        ? [
+            {
+              imageUrl: square,
+              placements: metaProviderPlacements(facebookFeed),
+            },
+          ]
+        : []),
+    ];
+    return rules.length ? { defaultImageUrl: card.url, rules } : undefined;
+  }
+  if (!card.story || !tallPlan.length) return undefined;
+  const placements = metaProviderPlacements(tallPlan);
   // Zernio takes an all-image or all-video block, never mixed.
   if (card.type === "video") {
     if (card.story.type !== "video") return undefined;
@@ -2183,10 +2213,7 @@ export function metaPlacementAssetsFor(
       ],
     };
   }
-  return {
-    defaultImageUrl: card.url,
-    rules: [{ imageUrl: card.story.url, placements }],
-  };
+  return undefined;
 }
 
 export function videoPayloadFor(adName: string, content: AdCreativeContent) {
@@ -3207,13 +3234,19 @@ async function pushToMeta(args: PushArgs) {
         media.some((card) => card.type === "video")
       )
         continue;
+      const feed = media.map((card) => card.url);
       const square = facebookFeed.length ? await squareCards(planAd.id) : null;
-      const usable = square?.length === media.length ? square : null;
-      if (facebookFeed.length && !usable)
+      // Square cards that already are the feed cards (a square-only
+      // carousel) need no swap on Facebook.
+      const usable =
+        square?.length === media.length &&
+        square.some((url, i) => url !== feed[i])
+          ? square
+          : null;
+      if (facebookFeed.length && !usable && square?.length !== media.length)
         warnings.push(
           `${planAd.name}: no square cards, so Facebook's desktop feed crops this carousel. Export the Square size and push again.`,
         );
-      const feed = media.map((card) => card.url);
       const tall = media.every((card) => card.story?.url)
         ? media.map((card) => card.story!.url)
         : null;

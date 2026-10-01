@@ -691,6 +691,58 @@ describe("withMetaAttribution", () => {
 
 describe("metaPlacementAssetsFor", () => {
   const plan = ["facebook-feed", "instagram-feed", "instagram-reel"] as const;
+  it("pins an image's square to Facebook and its 9:16 to Reels, Instagram feed keeps the default", () => {
+    const assets = metaPlacementAssetsFor(
+      {
+        format: "static",
+        headline: "Falls",
+        body: "A hidden chalet",
+        media: [
+          {
+            type: "image",
+            url: "https://r2.test/portrait.png",
+            story: {
+              type: "image",
+              url: "https://r2.test/story.png",
+              via: "upload",
+            },
+          },
+        ],
+        ideaStudio: {
+          document: {} as never,
+          approval: {
+            approvedAt: "now",
+            approvedBy: "u",
+            sourceVersion: "v",
+            renders: {
+              square: [{ assetId: "a", url: "https://r2.test/square.png" }],
+            },
+          },
+        },
+      },
+      [...plan],
+    );
+    expect(assets).toEqual({
+      defaultImageUrl: "https://r2.test/portrait.png",
+      rules: [
+        {
+          imageUrl: "https://r2.test/story.png",
+          placements: {
+            publisherPlatforms: ["instagram"],
+            instagramPositions: ["reels"],
+          },
+        },
+        {
+          imageUrl: "https://r2.test/square.png",
+          placements: {
+            publisherPlatforms: ["facebook"],
+            facebookPositions: ["feed"],
+          },
+        },
+      ],
+    });
+  });
+
   it("pins a video ad's 9:16 cut to Reels in an all-video block", () => {
     const assets = metaPlacementAssetsFor(
       {

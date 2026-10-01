@@ -2,6 +2,7 @@ import {
   IDEA_SHAPES,
   ideaDocumentFromAd,
   withIdeaPool,
+  type IdeaShape,
 } from "./ad-idea-studio";
 import type { AdCreativeContent } from "@/server/db/ads-schema";
 
@@ -100,6 +101,77 @@ export function featuredStarterAdIdeas(homes: StarterHome[]) {
   for (const idea of ideas) {
     const document = ideaDocumentFromAd(idea);
     document.exportShapes = [...IDEA_SHAPES];
+    idea.content.ideaStudio = { document };
+  }
+  return ideas;
+}
+
+/**
+ * The sizes each format needs to run on Meta through Zernio with nothing to
+ * fix after the push. Zernio's docs give no ratio advice, so this follows
+ * the shape of its API (checked 2026-09-30, docs.zernio.com/platforms/
+ * meta-ads/creatives) and Meta's specs; revisit both when Zernio changes:
+ *
+ * - A static goes out as one ad with `placementAssets`: a default image plus
+ *   rules that pin other images to placements. 4:5 is the default (feeds),
+ *   1:1 is pinned to Facebook's feed placements (marketplace, the right
+ *   column and the desktop feed show a single image square), 9:16 to
+ *   stories and reels.
+ * - A carousel goes out as `carouselCards`: one set of cards, which Zernio
+ *   will not combine with `placementAssets`. Meta crops carousel cards to
+ *   square in many placements, so square cards are the only set that shows
+ *   whole everywhere. A carousel given 4:5 and 9:16 sizes is still pushed,
+ *   but then Growth swaps its cards per placement on the Graph API after the
+ *   push (`setMetaCarouselPlacementCards`), which costs extra Meta calls.
+ */
+export const ZERNIO_NATIVE_SHAPES = {
+  static: ["portrait", "square", "story"],
+  carousel: ["square"],
+} as const satisfies Record<"static" | "carousel", readonly IdeaShape[]>;
+
+/**
+ * Empty, Zernio-native shells for the featured homes: a static and a
+ * carousel per home plus a hero carousel, each bound to its home and sized
+ * by `ZERNIO_NATIVE_SHAPES`, with no images yet. For a client who sends
+ * finished artwork: the shells say which sizes to supply.
+ */
+export function shellStarterAdIdeas(homes: StarterHome[]) {
+  const ideas: {
+    key: string;
+    name: string;
+    homeId?: string;
+    content: AdCreativeContent;
+  }[] = [
+    {
+      key: "hero-carousel",
+      name: "Hero carousel",
+      content: { format: "carousel", headline: "", body: "", media: [] },
+    },
+  ];
+  for (const format of ["static", "carousel"] as const)
+    for (const home of homes)
+      ideas.push({
+        key: `${home.id}-${format}`,
+        homeId: home.id,
+        name: `${home.name} · ${format === "static" ? "Static" : "Carousel"}`,
+        content: {
+          format,
+          propertyName: home.name,
+          headline: "",
+          body: "",
+          linkUrl: home.url,
+          callToAction: "BOOK_NOW",
+          media: [],
+        },
+      });
+  for (const idea of ideas) {
+    const document = ideaDocumentFromAd(idea);
+    const shapes =
+      ZERNIO_NATIVE_SHAPES[
+        idea.content.format === "static" ? "static" : "carousel"
+      ];
+    document.shapes = [...shapes];
+    document.exportShapes = [...shapes];
     idea.content.ideaStudio = { document };
   }
   return ideas;

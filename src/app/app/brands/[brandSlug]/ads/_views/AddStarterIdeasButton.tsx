@@ -19,7 +19,9 @@ import { orpc } from "@/orpc/client";
 export function AddStarterIdeasButton({ campaignId }: { campaignId: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [source, setSource] = useState<"blank" | "featured">("featured");
+  const [source, setSource] = useState<"blank" | "featured" | "shells">(
+    "featured",
+  );
   const [generate, setGenerate] = useState(true);
   const [refreshing, startTransition] = useTransition();
   const homes = useQuery({
@@ -69,13 +71,15 @@ export function AddStarterIdeasButton({ campaignId }: { campaignId: string }) {
     }),
   );
   const pending = add.isPending || generation.isPending;
+  // Shells carry no images, so only the featured fill needs photos.
+  const ai = generate && source !== "shells";
   const unavailable =
-    source === "featured" &&
+    source !== "blank" &&
     (homes.isPending ||
       homes.isError ||
       !available.length ||
       available.length > 10 ||
-      available.some((home) => !home.photos.length));
+      (source === "featured" && available.some((home) => !home.photos.length)));
   return (
     <>
       <Button
@@ -139,6 +143,13 @@ export function AddStarterIdeasButton({ campaignId }: { campaignId: string }) {
             >
               Start blank
             </Button>
+            <Button
+              variant={source === "shells" ? "secondary" : "outline"}
+              disabled={pending}
+              onClick={() => setSource("shells")}
+            >
+              Empty shells
+            </Button>
           </div>
           {source === "blank" ? (
             <div className="space-y-3">
@@ -158,20 +169,30 @@ export function AddStarterIdeasButton({ campaignId }: { campaignId: string }) {
             </div>
           ) : (
             <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Uses the featured WanderOS homes selected on the Homes page.
-                Generate copy and layouts from real photos and listing details,
-                ready to refine in the ad studio.
-              </p>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={generate}
-                  onChange={(e) => setGenerate(e.target.checked)}
-                />
-                Write copy, choose photos and compose with AI
-              </label>
-              {generate && (
+              {source === "shells" ? (
+                <p className="text-sm text-muted-foreground">
+                  Empty ads for the featured homes, sized to push through Zernio
+                  with nothing to fix afterwards: statics in 4:5, 1:1 and 9:16,
+                  carousels in 1:1. Add the artwork.
+                </p>
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    Uses the featured WanderOS homes selected on the Homes page.
+                    Generate copy and layouts from real photos and listing
+                    details, ready to refine in the ad studio.
+                  </p>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={generate}
+                      onChange={(e) => setGenerate(e.target.checked)}
+                    />
+                    Write copy, choose photos and compose with AI
+                  </label>
+                </>
+              )}
+              {ai && (
                 <p className="text-xs text-muted-foreground">
                   Runs in the background and creates a fresh set of unapproved
                   drafts. Copy is shared within each home’s ads; layouts stay
@@ -227,7 +248,7 @@ export function AddStarterIdeasButton({ campaignId }: { campaignId: string }) {
               disabled={pending || unavailable}
               loading={pending}
               onClick={() => {
-                if (generate) {
+                if (ai) {
                   generation.mutate({
                     campaignId,
                     source: source === "blank" ? "brand" : "featured",
@@ -246,13 +267,13 @@ export function AddStarterIdeasButton({ campaignId }: { campaignId: string }) {
                 add.mutate({
                   campaignId,
                   source,
-                  ...(source === "featured"
+                  ...(source !== "blank"
                     ? { homeIds: available.map((h) => h.id) }
                     : {}),
                 });
               }}
             >
-              {generate ? "Generate ideas" : "Create ideas"}
+              {ai ? "Generate ideas" : "Create ideas"}
             </Button>
           </DialogFooter>
         </DialogContent>
