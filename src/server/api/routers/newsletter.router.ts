@@ -1,3 +1,7 @@
+import {
+  emailHeaderFormatIdSchema,
+  emailHeaderTemplateIdSchema,
+} from "@/lib/email-header-compositions";
 import { z } from "zod";
 import { ORPCError } from "@orpc/server";
 import { eq } from "drizzle-orm";
@@ -203,6 +207,8 @@ export const newsletterRouter = {
       z.object({
         brandId: z.string().min(1),
         sourceUrl: z.string().url(),
+        templateId: emailHeaderTemplateIdSchema.optional(),
+        formatId: emailHeaderFormatIdSchema.optional(),
         eyebrow: z.string().trim().max(60).optional(),
         title: z.string().trim().min(1).max(90),
         detail: z.string().trim().max(90).optional(),

@@ -1,4 +1,10 @@
 import {
+  emailHeaderTemplateId,
+  emailHeaderFormatIdSchema,
+  type EmailHeaderFormatId,
+  type EmailHeaderTemplateId,
+} from "@/lib/email-header-compositions";
+import {
   HOMES_MARKER_PATTERN,
   homesMarker,
   markerGroupIndex,
@@ -176,6 +182,10 @@ export function blockSummary(block: EmailBlock, html: boolean) {
 /** A header card's settings, kept on its image so the card can be redone. */
 export type HeaderCard = {
   source: string;
+  /** Absent on older cards, which use the original email-header layout. */
+  templateId?: EmailHeaderTemplateId;
+  /** No format means the untouched original photo (or legacy default banner). */
+  formatId?: EmailHeaderFormatId;
   eyebrow: string;
   title: string;
   detail: string;
@@ -203,6 +213,18 @@ export function blockImage(
       ? {
           card: {
             source,
+            templateId: emailHeaderTemplateId(
+              img.getAttribute("data-card-template"),
+            ),
+            ...(emailHeaderFormatIdSchema.safeParse(
+              img.getAttribute("data-card-format"),
+            ).success
+              ? {
+                  formatId: emailHeaderFormatIdSchema.parse(
+                    img.getAttribute("data-card-format"),
+                  ),
+                }
+              : {}),
             eyebrow: img.getAttribute("data-card-eyebrow") ?? "",
             title: img.getAttribute("data-card-title") ?? "",
             detail: img.getAttribute("data-card-detail") ?? "",
@@ -222,7 +244,7 @@ export function imageSource(
   const escape = (value: string) =>
     value.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
   const attrs = card
-    ? ` data-card-source="${escape(card.source)}" data-card-eyebrow="${escape(card.eyebrow)}" data-card-title="${escape(card.title)}" data-card-detail="${escape(card.detail)}"`
+    ? ` data-card-source="${escape(card.source)}" data-card-template="${card.templateId ?? "email-header"}"${card.formatId ? ` data-card-format="${card.formatId}"` : ""} data-card-eyebrow="${escape(card.eyebrow)}" data-card-title="${escape(card.title)}" data-card-detail="${escape(card.detail)}"`
     : "";
   return `<p><img src="${escape(src)}" alt="${escape(alt)}"${attrs}></p>`;
 }

@@ -1,3 +1,4 @@
+import { emailCopyGuidance } from "@/lib/brand-email-style";
 import "server-only";
 
 import { anthropic } from "@ai-sdk/anthropic";
@@ -573,6 +574,10 @@ export async function runEmailGenerationJob(jobId: string) {
           ? "This is a one-off email blast. It must feel timely and complete without pretending to be a recurring newsletter issue."
           : "This is an issue in a recurring editorial newsletter. It should feel like one installment in an ongoing reader relationship.",
         brandVoice ? `Brand voice:\n${brandVoice}` : null,
+        emailCopyGuidance(spot.brand),
+        spot.brand.story?.trim()
+          ? `Brand story:\n${spot.brand.story.trim()}`
+          : null,
         channelVoice ? `Newsletter voice:\n${channelVoice}` : null,
         "Return an honest, useful draft in Markdown. Do not invent product facts, customer quotes, metrics, dates, or links. Preserve provided URLs exactly. Do not add unsubscribe language; the product sending runtime owns the compliance footer. Use one clear CTA at most.",
         `The draft may contain markers like ${HOMES_MARKER} or <!-- homes 2 -->, each where a group of home cards appears. Keep every marker exactly once, in a sensible place, and do not list those homes in the text.`,
@@ -705,6 +710,7 @@ export async function rewriteEmailBlock(input: {
     system: [
       `You edit one block of a marketing email for ${spot.brand.name}.`,
       brandVoice ? `Brand voice:\n${brandVoice}` : null,
+      emailCopyGuidance(spot.brand),
       "Rewrite only the block you are given. Keep every fact it states: offers, codes, dates, prices, home names and availability. Invent nothing. Keep every link and its URL exactly. Keep per-guest fields like {{first_name|there}} exactly as written. Do not add unsubscribe language.",
     ]
       .filter(Boolean)

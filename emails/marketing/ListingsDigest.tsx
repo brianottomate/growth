@@ -1,4 +1,5 @@
 import * as React from "react";
+import type { BrandEmailTheme } from "../../src/lib/brand-email-style";
 import {
   Body,
   Column,
@@ -67,6 +68,7 @@ export type DigestSection = {
  * props or a tagline simply goes without that block.
  */
 export type DigestChrome = {
+  theme?: BrandEmailTheme | null;
   /** Whose email this is: alt text and the footer's logo. */
   brandName: string;
   /** A logo above everything, for a sender without a branded hero banner. */
@@ -112,15 +114,15 @@ export type ListingsDigestProps = DigestChrome & {
 };
 
 const colors = {
-  page: "#f5f4f0",
-  card: "#fffffe",
+  page: "#f7f7f7",
+  card: "#ffffff",
   ink: "#1a1a1a",
   body: "#3a3a3a",
   muted: "#5f5f5f",
   faint: "#a3a3a3",
   savingsText: "#306530",
   savingsBg: "#edf0ec",
-  buttonSecondaryBg: "#e9e8e3",
+  buttonSecondaryBg: "#eeeeee",
   divider: "#ececea",
 };
 
@@ -158,10 +160,17 @@ const PHONE_CSS = `
 }
 `;
 
-const pillButton = (variant: "dark" | "light"): React.CSSProperties => ({
+const pillButton = (
+  variant: "dark" | "light",
+  theme?: BrandEmailTheme | null,
+): React.CSSProperties => ({
   display: "inline-block",
-  backgroundColor: variant === "dark" ? colors.ink : colors.buttonSecondaryBg,
-  color: variant === "dark" ? "#ffffff" : colors.ink,
+  backgroundColor:
+    variant === "dark"
+      ? (theme?.accentColor ?? colors.ink)
+      : colors.buttonSecondaryBg,
+  color:
+    variant === "dark" ? (theme?.accentTextColor ?? "#ffffff") : colors.ink,
   fontSize: "15px",
   fontWeight: 600,
   textDecoration: "none",
@@ -394,9 +403,11 @@ function GridCard({ property }: { property: DigestProperty }) {
 function HomeGroup({
   section,
   index,
+  theme,
 }: {
   section: DigestSection;
   index: number;
+  theme?: BrandEmailTheme | null;
 }) {
   const homes = [section.featured, ...section.more];
   const pairs = homes.reduce<DigestProperty[][]>(
@@ -461,7 +472,7 @@ function HomeGroup({
       )}
       {section.cta && (
         <Section style={{ paddingTop: "20px" }}>
-          <Link href={section.cta.href} style={pillButton("dark")}>
+          <Link href={section.cta.href} style={pillButton("dark", theme)}>
             {section.cta.label} →
           </Link>
         </Section>
@@ -522,14 +533,20 @@ export default function ListingsDigest(props: ListingsDigestProps) {
 
       {props.primaryCta && (
         <Section style={{ paddingTop: "24px" }}>
-          <Link href={props.primaryCta.href} style={pillButton("dark")}>
+          <Link
+            href={props.primaryCta.href}
+            style={pillButton("dark", props.theme)}
+          >
             {props.primaryCta.label} →
           </Link>
         </Section>
       )}
       {props.secondaryCta && (
         <Section style={{ paddingTop: "12px" }}>
-          <Link href={props.secondaryCta.href} style={pillButton("light")}>
+          <Link
+            href={props.secondaryCta.href}
+            style={pillButton("light", props.theme)}
+          >
             {props.secondaryCta.label}
           </Link>
         </Section>
@@ -605,7 +622,7 @@ export default function ListingsDigest(props: ListingsDigestProps) {
         placed.has(index) ? null : (
           <React.Fragment key={index}>
             <Divider />
-            <HomeGroup section={section} index={index} />
+            <HomeGroup section={section} index={index} theme={props.theme} />
           </React.Fragment>
         ),
       )}
@@ -625,7 +642,7 @@ export default function ListingsDigest(props: ListingsDigestProps) {
       <Body
         className="wd-body"
         style={{
-          backgroundColor: colors.page,
+          backgroundColor: props.theme?.backgroundColor ?? colors.page,
           fontFamily: fontStack,
           margin: 0,
           padding: "24px 12px",
@@ -636,7 +653,8 @@ export default function ListingsDigest(props: ListingsDigestProps) {
           style={{
             maxWidth: "600px",
             backgroundColor: colors.card,
-            borderRadius: "16px",
+            borderRadius: "12px",
+            border: `1px solid ${colors.divider}`,
             padding: "24px",
           }}
         >
@@ -687,6 +705,7 @@ export default function ListingsDigest(props: ListingsDigestProps) {
                   key={i}
                   section={props.sections[item.index]!}
                   index={item.index}
+                  theme={props.theme}
                 />
               ) : null,
             )}
@@ -757,7 +776,7 @@ export default function ListingsDigest(props: ListingsDigestProps) {
                   {props.help.textCta && (
                     <Link
                       href={props.help.textCta.href}
-                      style={pillButton("dark")}
+                      style={pillButton("dark", props.theme)}
                     >
                       {props.help.textCta.label}
                     </Link>
@@ -765,7 +784,7 @@ export default function ListingsDigest(props: ListingsDigestProps) {
                   {props.help.callCta && (
                     <Link
                       href={props.help.callCta.href}
-                      style={pillButton("light")}
+                      style={pillButton("light", props.theme)}
                     >
                       {props.help.callCta.label}
                     </Link>

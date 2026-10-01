@@ -139,7 +139,7 @@
     "@tiptap/starter-kit": "^3.31.3",
     "@vercel/analytics": "^2.0.1",
     "@vercel/functions": "^3.9.5",
-    "@wandercom/design-system-emails": "^0.6.19",
+    "@wandercom/design-system-emails": "^0.6.56",
     "@wandercom/design-system-fonts": "^0.6.19",
     "@wandercom/design-system-shared": "^0.6.19",
     "@wandercom/design-system-tokens": "^0.6.19",

@@ -1,3 +1,4 @@
+import { emailCopyGuidance } from "@/lib/brand-email-style";
 import "server-only";
 
 import { anthropic } from "@ai-sdk/anthropic";
@@ -23,6 +24,7 @@ import { brandTable, homeTable } from "@/server/db/schema";
 
 import {
   createEmailSlot,
+  ensureEmailDocument,
   EMAIL_GENERATION_MODEL,
   saveEmailDocument,
 } from "./email-document.service";
@@ -171,6 +173,16 @@ export async function draftNewsletterFromTemplate(
     ),
   });
   if (!brand) throw new Error("Brand not found in this workspace.");
+  const existing = input.platformPostId
+    ? await ensureEmailDocument({
+        platformPostId: input.platformPostId,
+        organizationId: input.organizationId,
+        userId: input.userId,
+      })
+    : null;
+  if (existing && existing.spot.brandId !== brand.id) {
+    throw new Error("The email slot belongs to a different brand.");
+  }
 
   const rows = await db.query.homeTable.findMany({
     where: and(
@@ -258,7 +270,8 @@ export async function draftNewsletterFromTemplate(
     photos: shortlist.map((home) => ({ url: home.thumb })),
   });
   const markets = brand.markets?.markets ?? [];
-  const sendDate = input.plannedAt ? new Date(input.plannedAt) : new Date();
+  const plannedAt = input.plannedAt ?? existing?.spot.contentPost?.plannedAt;
+  const sendDate = plannedAt ? new Date(plannedAt) : new Date();
 
   const system = [
     `You write one marketing email for ${brand.name}, a vacation rental brand, to its past guests.`,
@@ -266,9 +279,13 @@ export async function draftNewsletterFromTemplate(
       ? `Brand voice:\n${brand.brandFingerprint.fingerprintText.trim()}`
       : null,
     brand.story?.trim() ? `Brand story:\n${brand.story.trim()}` : null,
+    emailCopyGuidance(brand),
     input.template === "season-ahead"
       ? `Template "Season ahead": a getaway for one season or occasion. Pick ${count} homes; the first is featured large, the rest follow as a list. Write groupTitles for 2 groups (the featured home, then the rest).`
       : `Template "Home collection": ${count} homes that share one thing guests want, shown as a grid. Every pick must visibly or factually have it. Write groupTitles for 1 group.`,
+    input.brief
+      ? `Operator brief (honor exclusions and copy/visual direction, but verify claims against the catalog):\n${input.brief}`
+      : null,
     "Pick homes by number from the contact sheet, using the photo and the facts listed for that number. Each note says what that home offers for this email, in plain words, from what you can see or what its facts say.",
     "Name amenities exactly as the facts list them, at most two per note. Never call one private, own, exclusive or not shared unless the facts say so (a Community Pool is shared). Never say when an amenity is open, heated or usable in a season.",
     "Do not generalize: no every, all, always or still about the homes or the brand. Do not mention returning guests, reviews or popularity.",
@@ -431,7 +448,7 @@ export async function draftNewsletterFromTemplate(
   const body = [
     header
       ? `<p><img src="${attr(header.url)}" alt="${attr(output.header.title)}" data-card-source="${attr(lead.headerPhoto)}" data-card-eyebrow="${attr(output.header.eyebrow)}" data-card-title="${attr(output.header.title)}" data-card-detail="${attr(output.header.detail)}"></p>`
-      : null,
+      : `<p><img src="${attr(lead.headerPhoto)}" alt="${attr(lead.name)}"></p>`,
     ...output.intro.map(paragraph),
     homesMarker(0),
     output.middle.trim() ? paragraph(output.middle) : null,
@@ -453,16 +470,21 @@ export async function draftNewsletterFromTemplate(
   };
   const siteUrl = brand.emailSender?.siteUrl ?? brand.website;
 
-  const slot = await createEmailSlot({
-    organizationId: input.organizationId,
-    userId: input.userId,
-    brandId: brand.id,
-    title: output.subject || template.label,
-    format: "newsletter.blast",
-    hook: input.angle?.trim() || undefined,
-    purpose: input.offer?.trim() || undefined,
-    plannedAt: input.plannedAt,
-  });
+  const slot = existing
+    ? {
+        platformPostId: existing.spot.id,
+        url: `/app/newsletters/${existing.spot.id}`,
+      }
+    : await createEmailSlot({
+        organizationId: input.organizationId,
+        userId: input.userId,
+        brandId: brand.id,
+        title: output.subject || template.label,
+        format: "newsletter.blast",
+        hook: input.angle?.trim() || undefined,
+        purpose: input.offer?.trim() || undefined,
+        plannedAt: input.plannedAt,
+      });
   await saveEmailDocument({
     platformPostId: slot.platformPostId,
     organizationId: input.organizationId,
@@ -476,6 +498,7 @@ export async function draftNewsletterFromTemplate(
       templateKey: DIGEST_TEMPLATE_KEY,
       digest,
     },
+    expectedRevision: existing?.document.currentRevision,
     note: `Drafted from the ${template.label} template`,
   });
 

@@ -1,3 +1,4 @@
+import type { BrandEmailTheme } from "@/lib/brand-email-style";
 import type { BrandingProfile } from "@mendable/firecrawl-js";
 import type { PerformanceChecklist } from "@/lib/performance-checklist";
 import { relations, sql } from "drizzle-orm";
@@ -194,6 +195,10 @@ export type BrandLegalIdentity = {
  * shows. Every block is optional; the email omits what a brand has not set.
  */
 export type BrandEmailSender = {
+  /** Brand-specific email colors; omitted values use a neutral frame. */
+  theme?: BrandEmailTheme | null;
+  /** Email-specific voice, preferred language and claims to avoid. */
+  copyGuide?: string | null;
   fromName: string;
   fromEmail?: string | null;
   replyTo?: string | null;

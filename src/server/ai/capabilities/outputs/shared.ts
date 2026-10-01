@@ -1,3 +1,4 @@
+import { brandEmailThemeSchema } from "@/lib/brand-email-style";
 import { contentStatusEnum } from "@/server/db/content-schema";
 import { channelPlatformEnum } from "@/server/db/channel-schema";
 import { z } from "zod";
@@ -146,6 +147,8 @@ export const brandLegalIdentitySchema = z
 /** Brand emailSender. */
 export const brandEmailSenderSchema = z
   .strictObject({
+    theme: brandEmailThemeSchema.nullable().optional(),
+    copyGuide: z.string().max(4000).nullable().optional(),
     fromName: z.string(),
     fromEmail: z.string().nullable().optional(),
     replyTo: z.string().nullable().optional(),

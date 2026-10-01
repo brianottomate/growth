@@ -52,6 +52,20 @@ export function newsletterTemplate(id: NewsletterTemplateId) {
 }
 
 export const draftFromTemplateInputSchema = z.object({
+  platformPostId: z
+    .string()
+    .optional()
+    .describe(
+      "Existing email slot to fill. Pass this for a full email requested on an existing slot; do not create a duplicate.",
+    ),
+  brief: z
+    .string()
+    .trim()
+    .max(10000)
+    .optional()
+    .describe(
+      "The full operator brief, including home inclusions/exclusions, group sizes, copy and visual direction. Use verified catalog facts; do not invent prices or availability.",
+    ),
   brandId: z.string().describe("The brand to draft for (id from listBrands)."),
   template: z
     .enum(newsletterTemplateIds)

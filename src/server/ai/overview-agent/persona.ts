@@ -39,6 +39,8 @@ Deletion in this workspace is real and permanent, and there is no trash to resto
 # Audiences, email, lifecycle, and ads
 - personaRead/Write changes reusable audience personas. adsWrite.addAudience/updateAudience edits campaign audience intent. Demographics are messaging context, not automatically permitted targeting.
 - emailWrite creates or revises drafts and never resolves recipients or sends email.
+- For a full property email, use emailWrite.draftFromTemplate with the existing platformPostId and the full brief. It selects catalog homes, renders a header and adds a booking CTA. generateDraft only writes/refines copy and preserves existing assets. Never treat an empty home marker as a catalog or report a complete email without checking homes, hero and CTA through emailRead.get.
+- Email prose should be short: under 100 words outside property cards, one short opening, at most one short closing, and one brief factual sentence per home. No em dashes or en dashes as sentence punctuation. Avoid repeating the subject, amenity lists, filler, unsupported private-pool claims, urgency, seasonal availability or pricing. A job being queued is not completion.
 - Lifecycle programs are intent; mirrored Customer.io, Outreach, HubSpot, and Resend campaigns are delivery reality. Linking or classifying a mirror does not edit provider state.
 - For paid media, read scope before ranked results. Standard campaign creation uses draftCampaign, planPlatform, setPlatformDraft, then approval-gated push. Set google.images for separate landscape and square display crops. createSpecializedMetaDraft covers only lead generation, lead conversion, app promotion and catalog sales, which the draft compiler does not support. Delivery metrics are not revenue attribution.
 

@@ -1,3 +1,4 @@
+import { brandEmailThemeSchema } from "@/lib/brand-email-style";
 import type { BrandingProfile } from "@mendable/firecrawl-js";
 import { z } from "zod";
 import { brandMarketsSchema } from "@/lib/markets";
@@ -6,7 +7,7 @@ import {
   setBrandMarkets,
 } from "@/server/services/brand-markets.service";
 import { waitUntil } from "@vercel/functions";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
 
 import {
@@ -425,6 +426,12 @@ export const brandRouter = {
     .input(
       z.object({
         id: z.string(),
+        emailStyle: z
+          .strictObject({
+            theme: brandEmailThemeSchema,
+            copyGuide: z.string().trim().max(4000).nullable(),
+          })
+          .optional(),
         name: z.string().trim().min(1).max(200).optional(),
         tagline: z.string().trim().max(300).optional(),
         description: z.string().trim().max(5000).optional(),
@@ -446,6 +453,10 @@ export const brandRouter = {
       const [updated] = await ctx.db
         .update(brandTable)
         .set({
+          ...(input.emailStyle !== undefined && {
+            // Patch only style keys, preserving sender identity/contact settings.
+            emailSender: sql`jsonb_build_object('fromName', ${brandTable.name}) || coalesce(${brandTable.emailSender}, '{}'::jsonb) || ${JSON.stringify(input.emailStyle)}::jsonb`,
+          }),
           ...(input.name !== undefined && { name: input.name }),
           ...(input.tagline !== undefined && {
             tagline: input.tagline || null,

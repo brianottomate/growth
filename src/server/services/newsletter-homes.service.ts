@@ -1,5 +1,10 @@
 import "server-only";
 
+import type {
+  EmailHeaderFormatId,
+  EmailHeaderTemplateId,
+} from "@/lib/email-header-compositions";
+
 import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 
 import {
@@ -551,6 +556,8 @@ export async function renderEmailHeaderCard(input: {
   orgId: string;
   userId: string;
   sourceUrl: string;
+  templateId?: EmailHeaderTemplateId;
+  formatId?: EmailHeaderFormatId;
   eyebrow?: string;
   title: string;
   detail?: string;
@@ -566,8 +573,8 @@ export async function renderEmailHeaderCard(input: {
     }));
   const spec = {
     brandId: brand.id,
-    templateId: "email-header" as const,
-    formatId: "banner" as const,
+    templateId: input.templateId ?? "email-header",
+    formatId: input.formatId ?? "banner",
     sourceMediaAssetId: source.id,
     title: input.title,
     eyebrow: input.eyebrow || undefined,

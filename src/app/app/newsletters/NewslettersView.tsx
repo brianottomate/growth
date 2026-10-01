@@ -1,3 +1,4 @@
+import { BrandEmailStyle } from "./BrandEmailStyle";
 import Link from "next/link";
 import { and, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 
@@ -61,6 +62,12 @@ export async function NewslettersView({
   view: "list" | "wall" | "read";
 }) {
   const selectedBrand = brand;
+  const emailIdentity = brand
+    ? await db.query.brandTable.findFirst({
+        where: eq(brandTable.id, brand.id),
+        columns: { emailSender: true },
+      })
+    : null;
   const brandIds = brand ? [brand.id] : brands.map((row) => row.id);
   const newsletterHref = (input?: {
     kind?: string;
@@ -305,7 +312,15 @@ export async function NewslettersView({
             brandName={selectedBrand?.name}
           />
           {selectedBrand ? (
-            <NewsletterTemplateStart brandId={selectedBrand.id} />
+            <>
+              <NewsletterTemplateStart brandId={selectedBrand.id} />
+              <BrandEmailStyle
+                brandId={selectedBrand.id}
+                brandName={selectedBrand.name}
+                theme={emailIdentity?.emailSender?.theme}
+                copyGuide={emailIdentity?.emailSender?.copyGuide}
+              />
+            </>
           ) : null}
           {selectedBrand ? null : (
             <BrandPagePicker
@@ -333,7 +348,7 @@ export async function NewslettersView({
           {
             name: "Sequence",
             description:
-              "A series of emails sent over time around a guest’s journey.",
+              "Plan a guest’s email journey in Lifecycle and review the sequences already running. Sending from Email is coming soon.",
           },
         ].map((type) => (
           <section
@@ -343,12 +358,22 @@ export async function NewslettersView({
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="font-semibold">{type.name}</h2>
               <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                Coming soon
+                {type.name === "Sequence"
+                  ? "Sending coming soon"
+                  : "Coming soon"}
               </span>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
               {type.description}
             </p>
+            {type.name === "Sequence" && (
+              <Link
+                href="/app/lifecycle"
+                className="mt-3 inline-block text-sm font-medium underline underline-offset-4"
+              >
+                Open Lifecycle
+              </Link>
+            )}
           </section>
         ))}
       </div>

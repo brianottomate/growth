@@ -131,6 +131,7 @@ function newsletterChrome(input: NewsletterRenderInput): DigestChrome {
   const phone = contact?.phone.replace(/[^+\d]/g, "");
   return {
     brandName: input.brandName,
+    theme: sender?.theme,
     headerLogoSrc: logo ?? undefined,
     valueProps: sender?.valueProps?.map((prop) => ({
       iconSrc: prop.iconUrl,

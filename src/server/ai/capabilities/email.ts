@@ -100,7 +100,7 @@ export const createEmailSlot = growthAction({
 export const draftEmailFromTemplate = growthAction({
   outputSchema: draftEmailFromTemplateOutputSchema,
   description:
-    "Draft a complete one-off blast for a brand from a template: picks the brand's own homes from their photos and booking evidence, writes the copy around them, renders a header card, and saves the draft on the content calendar. Templates: season-ahead (a getaway for an upcoming season or occasion: one featured home, a paragraph on the place, three more) and home-collection (four homes sharing one trait guests want, in a grid). Use when the operator wants a ready draft rather than an empty slot. Pass an offer only if the operator gave one. Nothing is sent.",
+    "Draft a complete one-off blast for a brand from a template: picks the brand's own homes from their photos and booking evidence, writes the copy around them, renders a header card, and saves the draft on the content calendar. Templates: season-ahead (a getaway for an upcoming season or occasion: one featured home, a paragraph on the place, three more) and home-collection (four homes sharing one trait guests want, in a grid). Use for a complete property email, including homes, hero and booking CTA. When filling an existing slot, pass platformPostId and the full brief so it updates that slot rather than creating another. Honor home exclusions and use concise copy without em dashes. Pass an offer only if the operator gave one. Nothing is sent.",
   inputSchema: draftFromTemplateInputSchema,
   execute: async (input, ctx) => {
     const result = await draftNewsletterFromTemplate({
@@ -480,7 +480,7 @@ export const createProductUpdateDraft = growthAction({
 export const generateEmailDraft = growthAction({
   outputSchema: generateEmailDraftOutputSchema,
   description:
-    "Start one deliberate AI draft or refinement job for the selected newsletter issue or blast. Never use this to batch-write a bank of slots. The job uses the slot brief, brand voice, current draft, and optional refinement instruction.",
+    "Start a COPY-ONLY draft or refinement job for the selected newsletter issue or blast. This preserves existing homes and images but DOES NOT select homes, render a hero or build a catalog. For a full property email that needs homes or a hero, use draftFromTemplate with the existing platformPostId and full brief instead. Never use this to batch-write a bank of slots. The job uses the slot brief, brand voice, current draft, and optional refinement instruction.",
   inputSchema: z.object({
     platformPostId: z.string(),
     brief: z.string().trim().max(10_000).optional(),
