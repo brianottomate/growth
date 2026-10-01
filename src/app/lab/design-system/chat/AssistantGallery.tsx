@@ -226,7 +226,7 @@ export function AssistantGallery({ catalog }: { catalog: CatalogEntry[] }) {
   return (
     <main
       className="@container mx-auto max-w-7xl px-4 py-8 sm:px-8"
-      onClick={(event) => {
+      onClickCapture={(event) => {
         if (!(event.target instanceof Element)) return;
         const href = event.target.closest("a[href]")?.getAttribute("href");
         if (href?.includes("fixture-")) {
