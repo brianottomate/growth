@@ -56,6 +56,8 @@ export const CHECKLIST_SECTIONS: {
         label: "Facebook / Meta connection",
         kind: "status",
       },
+      { key: "googleAdsAccount", label: "Google Ads account", kind: "status" },
+      { key: "googleBilling", label: "Google billing", kind: "status" },
       { key: "catalogCreative", label: "Catalog ad creative", kind: "status" },
       {
         key: "carouselCreative",

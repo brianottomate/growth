@@ -5,6 +5,7 @@ import { and, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import {
+  adAccountTable,
   audienceTable,
   brandTable,
   personaTable,
@@ -15,6 +16,7 @@ import {
   platformCampaignTable,
   channelTable,
   campaignTable,
+  conversionMappingTable,
   memberTable,
 } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
@@ -28,6 +30,7 @@ import { ImportMetaCampaignButton } from "./ImportMetaCampaignButton";
 import { NewCampaignButton } from "./NewCampaignButton";
 import { DeleteCampaignButton } from "./_views/DeleteCampaignButton";
 import { DefinePersonasButton } from "./DefinePersonasButton";
+import { GoogleAdsAccount } from "./GoogleAdsAccount";
 import { ReportingConversion } from "./ReportingConversion";
 import { normalizeDomain } from "@/server/services/hubspot-contact-mirror";
 
@@ -269,6 +272,22 @@ export default async function BrandAdsPage({
   const campaigns = await db.query.campaignTable.findMany({
     where: eq(campaignTable.brandId, brand.id),
   });
+  const googleAccount =
+    brand.relationship === "client"
+      ? await db.query.adAccountTable.findFirst({
+          where: and(
+            eq(adAccountTable.brandId, brand.id),
+            eq(adAccountTable.platform, "google"),
+            eq(adAccountTable.isShared, false),
+            eq(adAccountTable.isAllowed, true),
+          ),
+        })
+      : undefined;
+  const googleConversion = googleAccount
+    ? await db.query.conversionMappingTable.findFirst({
+        where: eq(conversionMappingTable.adAccountId, googleAccount.id),
+      })
+    : undefined;
   const [planAudiences, personas, platformAudiences, platformAds] =
     await Promise.all([
       db.query.audienceTable.findMany({
@@ -462,6 +481,21 @@ export default async function BrandAdsPage({
                 }
                 host={normalizeDomain(brand.website)}
               />
+              <div className="mt-2">
+                <GoogleAdsAccount
+                  brandSlug={brand.slug}
+                  brandName={brand.name}
+                  account={
+                    googleAccount
+                      ? {
+                          customerId: googleAccount.externalId,
+                          conversionLabel:
+                            googleConversion?.externalConversionId ?? null,
+                        }
+                      : null
+                  }
+                />
+              </div>
             </div>
           )}
         </div>

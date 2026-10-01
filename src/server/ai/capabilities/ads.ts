@@ -30,6 +30,7 @@ import {
   pushDraftActionOutputSchema,
   setDeliveryActionOutputSchema,
   deletePlatformCampaignActionOutputSchema,
+  createGoogleAdsAccountActionOutputSchema,
   createReportingConversionActionOutputSchema,
   buildAdSetActionOutputSchema,
   addAdShellActionOutputSchema,
@@ -100,6 +101,7 @@ import {
   setCampaignDelivery,
   syncBrandPlatformAudiences,
 } from "@/server/services/ads-write.service";
+import { ensureBrandGoogleAdsAccount } from "@/server/services/google-ads-accounts.service";
 import {
   adIdeaHomePhotos,
   addAudience,
@@ -868,6 +870,17 @@ export const createReportingConversionAction = growthAction({
   }),
   execute: async (input, ctx) =>
     ensureBrandReportingConversion(input, { organizationId: ctx.orgId }),
+});
+
+export const createGoogleAdsAccountAction = growthAction({
+  outputSchema: createGoogleAdsAccountActionOutputSchema,
+  description:
+    "Create (or reuse) a Performance client's own Google Ads account under Wander's manager account, plus its one booking conversion. Currency (USD) and time zone (Eastern) cannot be changed afterwards. Run it once per client when asked; billing and the Zernio connection are set up by a person afterwards.",
+  inputSchema: z.object({
+    brandSlug: z.string().trim().min(1),
+  }),
+  execute: async (input, ctx) =>
+    ensureBrandGoogleAdsAccount(input, { organizationId: ctx.orgId }),
 });
 
 export const listCampaignsAction = growthAction({

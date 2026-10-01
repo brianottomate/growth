@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 import { env } from "@/env";
 import { googleAdsClient } from "@/server/clients/google-ads.client";
@@ -14,9 +14,15 @@ import { conversionMappingTable } from "@/server/db/conversions-schema";
 const CURRENCY = "USD";
 const TIME_ZONE = "America/New_York";
 
-async function brandBySlug(slug: string) {
+async function brandBySlug(slug: string, organizationId?: string) {
   const brand = await db.query.brandTable.findFirst({
-    where: eq(brandTable.slug, slug),
+    where: and(
+      eq(brandTable.slug, slug),
+      isNull(brandTable.deletedAt),
+      organizationId
+        ? eq(brandTable.organizationId, organizationId)
+        : undefined,
+    ),
   });
   if (!brand) throw new Error(`No brand with slug ${slug}`);
   return brand;
@@ -47,9 +53,10 @@ async function ownGoogleAccount(brandId: string) {
  */
 export async function createBrandGoogleAdsAccount(input: {
   brandSlug: string;
+  organizationId?: string;
   validateOnly?: boolean;
 }) {
-  const brand = await brandBySlug(input.brandSlug);
+  const brand = await brandBySlug(input.brandSlug, input.organizationId);
   const existing = await ownGoogleAccount(brand.id);
   if (existing) return { created: false as const, account: existing };
 
@@ -109,9 +116,10 @@ type ConversionActionRow = {
  */
 export async function createBrandGoogleBookingConversion(input: {
   brandSlug: string;
+  organizationId?: string;
   validateOnly?: boolean;
 }) {
-  const brand = await brandBySlug(input.brandSlug);
+  const brand = await brandBySlug(input.brandSlug, input.organizationId);
   const account = await ownGoogleAccount(brand.id);
   if (!account) throw new Error(`${brand.name} has no Google Ads account yet`);
   if (!account.isAllowed)
@@ -178,4 +186,32 @@ export async function createBrandGoogleBookingConversion(input: {
     })
     .returning();
   return { created: true as const, conversion: conversion! };
+}
+
+/**
+ * The brand's own Google Ads account and its booking conversion, made on
+ * demand from the brand's Ads page, once. Both steps reuse what exists, so a
+ * run that stopped halfway continues instead of duplicating.
+ */
+export async function ensureBrandGoogleAdsAccount(
+  input: { brandSlug: string },
+  context: { organizationId: string },
+) {
+  const brand = await brandBySlug(input.brandSlug, context.organizationId);
+  if (brand.relationship !== "client") {
+    throw new Error("Google Ads accounts are for Performance clients.");
+  }
+  const scope = {
+    brandSlug: input.brandSlug,
+    organizationId: context.organizationId,
+  };
+  const { created, account } = await createBrandGoogleAdsAccount(scope);
+  if (!account) throw new Error("Google returned no account");
+  const { conversion } = await createBrandGoogleBookingConversion(scope);
+  return {
+    customerId: account.externalId,
+    name: account.name,
+    accountCreated: created,
+    conversionLabel: conversion?.externalConversionId ?? null,
+  };
 }

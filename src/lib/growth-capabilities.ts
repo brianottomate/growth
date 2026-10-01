@@ -183,6 +183,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "pullPlatformAudiences",
     "linkAudience",
     "createReportingConversion",
+    "createGoogleAdsAccount",
     "importCreative",
     "deleteCampaignDraft",
     "deleteCampaignLeavingPlatform",

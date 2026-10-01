@@ -36,6 +36,7 @@ import {
   addAudienceAction,
   suggestCampaignAudiencesAction,
   linkAudienceAction,
+  createGoogleAdsAccountAction,
   createReportingConversionAction,
   setPlatformDraftAction,
   setCreativePoolAction,
@@ -257,6 +258,7 @@ export const adsRouter = {
   suggestCampaignAudiences: actionProcedure(suggestCampaignAudiencesAction),
   linkAudience: actionProcedure(linkAudienceAction),
   createReportingConversion: actionProcedure(createReportingConversionAction),
+  createGoogleAdsAccount: actionProcedure(createGoogleAdsAccountAction),
 
   importAdCreative: actionProcedure(importCreativeAction),
 

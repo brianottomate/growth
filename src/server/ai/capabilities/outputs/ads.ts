@@ -984,6 +984,13 @@ export const createReportingConversionActionOutputSchema = z.strictObject({
   reused: z.boolean(),
 });
 
+export const createGoogleAdsAccountActionOutputSchema = z.strictObject({
+  customerId: z.string(),
+  name: z.string().nullable(),
+  accountCreated: z.boolean(),
+  conversionLabel: z.string().nullable(),
+});
+
 export const listCampaignsActionOutputSchema = z.array(
   z.strictObject({
     id: z.string(),

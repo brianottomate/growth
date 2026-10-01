@@ -366,6 +366,15 @@ export const growthActionPolicies = {
       idempotent: true,
       surfaces: APPROVAL_PRODUCT,
     }),
+    // Makes a Google Ads account under the manager and a conversion on it.
+    // Currency and time zone are permanent, so the operator approves it.
+    createGoogleAdsAccount: write({
+      consequence: "provider-write",
+      approval: "user",
+      idempotent: true,
+      reversible: false,
+      surfaces: APPROVAL_PRODUCT,
+    }),
     // Downloads from the platform CDN into R2; dedupes by source url.
     importCreative: write({ idempotent: true, reversible: true }),
     // Draft deletes drop local rows and are refused once the thing exists on
