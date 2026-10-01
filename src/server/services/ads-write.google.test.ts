@@ -1,6 +1,9 @@
 import { describe, expect, it } from "bun:test";
 
-import { planGoogleCompile } from "@/server/services/ads-write.service";
+import {
+  planGoogleCompile,
+  zernioKeywords,
+} from "@/server/services/ads-write.service";
 import { parseSearchTerm } from "@/lib/search-terms";
 import type { Ad, PlanAudience } from "@/server/db/ads-schema";
 
@@ -41,6 +44,22 @@ describe("parseSearchTerm", () => {
     });
     expect(parseSearchTerm('"cabin rental"')?.match).toBe("phrase");
     expect(parseSearchTerm("cabins")?.match).toBe("broad");
+  });
+});
+
+describe("Zernio keyword request contract", () => {
+  it("preserves exact and phrase intent using the API's lowercase match types", () => {
+    expect(
+      zernioKeywords([
+        { text: "chalets hocking hills", match: "exact" },
+        { text: "hocking hills cabin rental", match: "phrase" },
+        { text: "cabins", match: "broad" },
+      ]),
+    ).toEqual([
+      { text: "chalets hocking hills", matchType: "exact" },
+      { text: "hocking hills cabin rental", matchType: "phrase" },
+      { text: "cabins", matchType: "broad" },
+    ]);
   });
 });
 

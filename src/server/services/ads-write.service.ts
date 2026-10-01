@@ -2662,11 +2662,13 @@ function rsaIssue(headlines: string[], descriptions: string[]) {
   return null;
 }
 
-function zernioKeywords(terms: SearchTerm[]): ZernioKeyword[] | undefined {
+export function zernioKeywords(
+  terms: SearchTerm[],
+): ZernioKeyword[] | undefined {
   if (terms.length === 0) return undefined;
   return terms.map(({ text, match }) => ({
     text,
-    matchType: match.toUpperCase() as "BROAD" | "PHRASE" | "EXACT",
+    matchType: match,
   }));
 }
 

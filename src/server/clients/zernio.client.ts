@@ -1344,7 +1344,7 @@ export async function createZernioAdCampaign(
  */
 export type ZernioKeyword =
   | string
-  | { text: string; matchType: "BROAD" | "PHRASE" | "EXACT" };
+  | { text: string; matchType: "broad" | "phrase" | "exact" };
 
 export type ZernioAdWriteResponse = {
   ad?: ZernioAd;
