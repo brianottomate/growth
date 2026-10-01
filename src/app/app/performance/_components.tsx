@@ -239,11 +239,11 @@ export function CampaignRow({
         <Link
           href={campaignHref(brand, campaign)}
           title={campaign.name}
-          className="block truncate text-[13px] font-semibold hover:underline"
+          className="block text-[13px] font-semibold [overflow-wrap:anywhere] hover:underline @lg:truncate"
         >
           {campaign.name}
         </Link>
-        <span className="block truncate text-[11px] text-muted-foreground">
+        <span className="block text-[11px] text-muted-foreground @lg:truncate">
           {[
             showBrand ? client : null,
             `Created ${createdOn(campaign.createdAt)}`,

@@ -412,26 +412,33 @@ export default async function SeriesDetailPage({
             seriesName={series.name}
           />
         </div>
-        <div className="mt-4 grid grid-cols-1 gap-2 @xl:grid-cols-2 @4xl:grid-cols-3">
-          {planningChecks.map((check) => (
-            <div
-              key={check.label}
-              className="flex items-start gap-2 rounded-lg border bg-background px-3 py-2"
-            >
-              {check.complete ? (
-                <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-400" />
-              ) : (
-                <CircleDashed className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-              )}
-              <div className="min-w-0">
-                <p className="text-xs font-medium">{check.label}</p>
-                <p className="mt-0.5 text-[10px] leading-relaxed text-muted-foreground">
-                  {check.detail}
-                </p>
+        <details className="mt-3 border-t">
+          <summary className="min-h-11 cursor-pointer py-3 text-xs font-medium">
+            View planning checks ·{" "}
+            {planningChecks.filter((check) => check.complete).length}/
+            {planningChecks.length} complete
+          </summary>
+          <div className="grid grid-cols-1 gap-2 @xl:grid-cols-2 @4xl:grid-cols-3">
+            {planningChecks.map((check) => (
+              <div
+                key={check.label}
+                className="flex items-start gap-2 rounded-lg border bg-background px-3 py-2"
+              >
+                {check.complete ? (
+                  <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-400" />
+                ) : (
+                  <CircleDashed className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+                )}
+                <div className="min-w-0">
+                  <p className="text-xs font-medium">{check.label}</p>
+                  <p className="mt-0.5 text-[10px] leading-relaxed text-muted-foreground">
+                    {check.detail}
+                  </p>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </details>
       </section>
 
       <SeriesProductionBoard

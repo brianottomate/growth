@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
@@ -9,6 +9,7 @@ import {
   DndContext,
   DragOverlay,
   PointerSensor,
+  KeyboardSensor,
   useDraggable,
   useDroppable,
   useSensor,
@@ -32,6 +33,7 @@ import {
 } from "@/components/ui/tooltip";
 import {
   CalendarPlus,
+  GripVertical,
   Image as ImageIcon,
   MessageSquare,
   Plus,
@@ -415,6 +417,7 @@ export function ContentBoard({
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor),
   );
 
   const onDragStart = (e: DragStartEvent) => {
@@ -632,6 +635,7 @@ export function ContentBoard({
           sensors={sensors}
           onDragStart={onDragStart}
           onDragEnd={onDragEnd}
+          onDragCancel={() => setActiveCard(null)}
         >
           {/* Full-bleed, viewport-height board: the cqw negative margin escapes
               the page's centered max-w-5xl (the app layout's scroll div is the
@@ -1684,9 +1688,10 @@ function DraggableCard({
   onOpen: (id: string) => void;
   assign: Assign;
 }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: card.id,
-  });
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, isDragging } =
+    useDraggable({
+      id: card.id,
+    });
   // Hover + Space self-toggles the idea owner (Trello-style).
   const hover = useSelfAssignHotkey({
     ownerId: card.owner?.id ?? null,
@@ -1696,13 +1701,27 @@ function DraggableCard({
   return (
     <div
       ref={setNodeRef}
-      {...listeners}
-      {...attributes}
       {...hover}
       onClick={() => onOpen(card.id)}
-      className={cn("cursor-grab touch-none", isDragging && "opacity-40")}
+      className={cn("cursor-pointer touch-auto", isDragging && "opacity-40")}
     >
-      <ContentCardBody card={card} assign={assign} />
+      <ContentCardBody
+        card={card}
+        assign={assign}
+        dragHandle={
+          <button
+            type="button"
+            ref={setActivatorNodeRef}
+            {...listeners}
+            {...attributes}
+            aria-label={`Move ${card.title ?? "Untitled"} between stages`}
+            onClick={(event) => event.stopPropagation()}
+            className="grid size-11 shrink-0 cursor-grab touch-none place-items-center rounded-md text-muted-foreground hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring @xl:size-7"
+          >
+            <GripVertical className="size-4" />
+          </button>
+        }
+      />
     </div>
   );
 }
@@ -1711,10 +1730,12 @@ function ContentCardBody({
   card,
   dragging,
   assign,
+  dragHandle,
 }: {
   card: Card;
   dragging?: boolean;
   assign?: Assign;
+  dragHandle?: ReactNode;
 }) {
   const pillar = card.pillar ? PILLAR_BY_SLUG[card.pillar] : null;
   const reach =
@@ -1743,7 +1764,8 @@ function ContentCardBody({
         />
       )}
       <div className="flex items-start gap-2">
-        <span className="line-clamp-2 flex-1 text-sm font-medium">
+        {dragHandle}
+        <span className="line-clamp-2 min-w-0 flex-1 text-sm font-medium">
           {card.title ?? "Untitled"}
         </span>
         {card.origin === "ai" && (

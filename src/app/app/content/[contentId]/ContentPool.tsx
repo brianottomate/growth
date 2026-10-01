@@ -136,22 +136,24 @@ export function ContentPool({
           );
         })}
       </div>
-      <div className="mt-3 flex items-stretch gap-2">
-        <ImageBatchImporter
-          brandId={brandId}
-          existingCount={directMedia.length}
-          onImported={addToPool}
-        />
+      <div className="mt-3 grid grid-cols-3 items-stretch gap-2 @3xl:flex">
+        <div className="col-span-3 min-w-0 @3xl:flex-1">
+          <ImageBatchImporter
+            brandId={brandId}
+            existingCount={directMedia.length}
+            onImported={addToPool}
+          />
+        </div>
         <button
           onClick={() => setDriveOpen(true)}
-          className="flex w-24 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border text-xs text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
+          className="flex min-h-20 min-w-0 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border text-xs text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground @3xl:w-24 @3xl:shrink-0"
         >
           <HardDrive className="size-5" />
           Drive
         </button>
         <button
           onClick={() => setPickerOpen(true)}
-          className="flex w-24 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border text-xs text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
+          className="flex min-h-20 min-w-0 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border text-xs text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground @3xl:w-24 @3xl:shrink-0"
         >
           <Images className="size-5" />
           Library
@@ -167,7 +169,7 @@ export function ContentPool({
               visibleText: `Suggest media for “${contentTitle}” from the library, our archives, or a strong AI image prompt`,
             })
           }
-          className="flex w-28 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border text-xs text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
+          className="flex min-h-20 min-w-0 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border text-xs text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground @3xl:w-28 @3xl:shrink-0"
         >
           <Sparkles className="size-5" />
           Suggest media

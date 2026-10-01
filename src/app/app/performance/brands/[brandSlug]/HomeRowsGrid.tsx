@@ -72,8 +72,9 @@ export function HomeRowsGrid({
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
+            aria-label="Search homes"
             placeholder={`Search ${homes.length} homes`}
-            className="h-8 w-full max-w-72 rounded-full border bg-muted/40 pr-3 pl-8 text-xs outline-none focus:ring-2 focus:ring-ring"
+            className="h-11 w-full max-w-72 rounded-full border bg-muted/40 pr-3 pl-8 text-base outline-none focus:ring-2 focus:ring-ring @xl:h-8 @xl:text-xs"
           />
         </label>
         {featuredCount > SUGGESTED_MAX ? (
@@ -153,7 +154,7 @@ export function HomeRowsGrid({
                 }
                 title={home.featured ? "Featured" : "Feature this home"}
                 className={cn(
-                  "absolute top-1.5 left-1.5 grid size-7 place-items-center rounded-full border text-white transition disabled:opacity-40",
+                  "absolute top-1.5 left-1.5 grid size-11 place-items-center rounded-full border text-white transition disabled:opacity-40 @xl:size-7",
                   home.featured
                     ? "border-white/70 bg-black/70 opacity-100"
                     : "border-white/50 bg-black/50 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100",

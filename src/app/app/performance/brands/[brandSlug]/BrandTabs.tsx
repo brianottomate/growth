@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 
 import { cn } from "@/components/ui/lib/utils";
@@ -21,9 +22,22 @@ const TABS = [
  */
 export function BrandTabs({ slug }: { slug: string }) {
   const pathname = usePathname();
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const nav = navRef.current;
+    const active = nav?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!nav || !active) return;
+    // Scroll this strip only; scrollIntoView also moves the page vertically.
+    const strip = nav.getBoundingClientRect();
+    const tab = active.getBoundingClientRect();
+    if (tab.left < strip.left || tab.right > strip.right) {
+      nav.scrollLeft += tab.left - strip.left - (strip.width - tab.width) / 2;
+    }
+  }, [pathname]);
   const base = `/app/performance/brands/${slug}`;
   return (
     <nav
+      ref={navRef}
       aria-label="Client"
       className="-mx-1 flex scrollbar-thin gap-1 overflow-x-auto overflow-y-hidden border-b px-1 whitespace-nowrap"
     >
@@ -40,7 +54,7 @@ export function BrandTabs({ slug }: { slug: string }) {
             href={href}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "-mb-px border-b-2 px-3 py-2 text-sm transition-colors",
+              "-mb-px inline-flex min-h-11 shrink-0 items-center border-b-2 px-3 py-2 text-sm transition-colors",
               active
                 ? "border-foreground font-medium text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground",

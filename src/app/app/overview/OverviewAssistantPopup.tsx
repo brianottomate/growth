@@ -85,6 +85,34 @@ export function OverviewAssistantPopup({
   } | null>(null);
   const queryClient = useQueryClient();
   const desktop = useMediaQuery("(min-width: 1024px)");
+  const [mobileViewport, setMobileViewport] = useState<{
+    top: number;
+    height: number;
+    keyboardOpen: boolean;
+  } | null>(null);
+
+  // Mobile keyboards resize the visual viewport, not necessarily the layout
+  // viewport. Keep both the composer and close control in the visible area.
+  useEffect(() => {
+    if (desktop || !open) return;
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const update = () => {
+      setMobileViewport({
+        top: viewport.offsetTop,
+        height: viewport.height,
+        keyboardOpen: window.innerHeight - viewport.height > 150,
+      });
+    };
+    update();
+    viewport.addEventListener("resize", update);
+    viewport.addEventListener("scroll", update);
+    return () => {
+      viewport.removeEventListener("resize", update);
+      viewport.removeEventListener("scroll", update);
+    };
+  }, [desktop, open]);
+
   const nextMode = pathname === "/app/next";
   const pageQuery = useQuery(
     orpc.creativeWork.pageContext.queryOptions({ input: { path: pathname } }),
@@ -269,14 +297,21 @@ export function OverviewAssistantPopup({
       <aside
         aria-label="Growth assistant"
         aria-hidden={!open}
+        inert={!open}
+        data-keyboard-open={!desktop && mobileViewport?.keyboardOpen}
+        style={
+          !desktop && open && mobileViewport
+            ? { top: mobileViewport.top, height: mobileViewport.height }
+            : undefined
+        }
         className={cn(
-          "fixed inset-x-2 top-[38svh] bottom-2 z-50 flex flex-col overflow-hidden rounded-2xl border bg-background shadow-2xl transition-[width,opacity,transform] duration-200 lg:static lg:inset-auto lg:z-auto lg:h-svh lg:shrink-0 lg:rounded-none lg:border-y-0 lg:border-r-0 lg:shadow-none",
+          "group/assistant fixed inset-x-0 top-0 z-50 flex h-dvh flex-col overflow-hidden border bg-background pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] shadow-2xl transition-[width,opacity,transform] duration-200 lg:static lg:inset-auto lg:z-auto lg:h-svh lg:shrink-0 lg:rounded-none lg:border-y-0 lg:border-r-0 lg:p-0 lg:shadow-none",
           open
             ? "translate-y-0 opacity-100 lg:w-[400px] xl:w-[472px]"
             : "pointer-events-none invisible translate-y-2 opacity-0 lg:visible lg:w-0 lg:translate-y-0 lg:border-l-0",
         )}
       >
-        <header className="flex h-12 shrink-0 items-center gap-3 border-b px-3">
+        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-3 lg:h-12 lg:gap-3">
           <span className="grid size-7 grid-cols-1 place-items-center rounded-lg bg-primary/10 text-primary">
             <Sparkles className="size-3.5" />
           </span>
@@ -286,7 +321,7 @@ export function OverviewAssistantPopup({
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className="flex max-w-full items-center gap-1 rounded-md px-1 py-0.5 text-left text-sm font-semibold outline-none hover:bg-accent"
+                    className="flex min-h-11 max-w-full items-center gap-1 rounded-md px-1 py-0.5 text-left text-sm font-semibold outline-none hover:bg-accent lg:min-h-0"
                     aria-label="Choose assistant session"
                   >
                     <span className="truncate">
@@ -357,7 +392,7 @@ export function OverviewAssistantPopup({
             type="button"
             variant="ghost"
             size="icon"
-            className="size-8"
+            className="size-11 lg:size-8"
             onClick={() =>
               createThread.mutate({
                 brandId: activeBrand?.id,
@@ -381,7 +416,7 @@ export function OverviewAssistantPopup({
             type="button"
             variant="ghost"
             size="icon"
-            className="size-8"
+            className="size-11 lg:size-8"
             onClick={() => setVisible(false)}
             aria-label="Collapse assistant"
           >
@@ -402,7 +437,7 @@ export function OverviewAssistantPopup({
                 asChild
                 variant="outline"
                 size="xs"
-                className="min-w-0 flex-1 overflow-hidden"
+                className="h-11 min-w-0 flex-1 overflow-hidden lg:h-7"
               >
                 <Link
                   href={
@@ -425,7 +460,7 @@ export function OverviewAssistantPopup({
               <Button
                 variant="ghost"
                 size="icon"
-                className="size-7"
+                className="size-11 lg:size-7"
                 aria-label="Clear conversation target"
                 onClick={() => {
                   if (!activeThreadId) return;
@@ -451,7 +486,7 @@ export function OverviewAssistantPopup({
               <Button
                 variant="ghost"
                 size="sm"
-                className="ml-auto"
+                className="ml-auto h-11 lg:h-8"
                 aria-label="Change conversation focus"
               >
                 Change <ChevronDown className="size-3" />

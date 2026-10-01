@@ -1132,7 +1132,7 @@ export function OverviewChat({
         )}
       </div>
 
-      <div className="mx-auto w-full border-t px-3 pb-3">
+      <div className="mx-auto w-full shrink-0 border-t px-3 pb-3">
         <form className="mt-3" onSubmit={submit}>
           <div
             className={cn(
@@ -1202,16 +1202,18 @@ export function OverviewChat({
                 </span>
               </div>
             )}
-            <ChatNextOptions
-              messages={messages}
-              disabled={busy || queue.saving}
-              choose={(option) => {
-                if (option.kind === "detail") {
-                  setInput(option.text);
-                  textareaRef.current?.focus();
-                } else send(option.text);
-              }}
-            />
+            <div className="group-data-[keyboard-open=true]/assistant:hidden">
+              <ChatNextOptions
+                messages={messages}
+                disabled={busy || queue.saving}
+                choose={(option) => {
+                  if (option.kind === "detail") {
+                    setInput(option.text);
+                    textareaRef.current?.focus();
+                  } else send(option.text);
+                }}
+              />
+            </div>
             <ChatQueue state={queue.state} control={queue.control} />
             <Textarea
               ref={textareaRef}
@@ -1236,6 +1238,7 @@ export function OverviewChat({
               rows={1}
               autoFocus={desktop && active}
               appearance="composer"
+              textSize="composer"
               className="max-h-40 min-h-9 w-full resize-none"
             />
             <div className="mt-1 flex items-center justify-between">
@@ -1254,6 +1257,7 @@ export function OverviewChat({
                 tone="muted"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={pendingAttachments.length >= MAX_CHAT_ATTACHMENTS}
+                className="size-11 lg:size-9"
                 aria-label="Attach images or videos"
               >
                 <Paperclip className="h-4 w-4" />
@@ -1286,6 +1290,7 @@ export function OverviewChat({
                     size="icon"
                     variant="outline"
                     onClick={() => void queue.control("stop")}
+                    className="size-11 lg:size-9"
                     aria-label="Stop generating"
                   >
                     <Square className="h-3.5 w-3.5" />
@@ -1295,6 +1300,7 @@ export function OverviewChat({
                   type="submit"
                   size={busy ? "sm" : "icon"}
                   disabled={!canSend}
+                  className={busy ? "h-11 lg:h-8" : "size-11 lg:size-9"}
                   aria-label={busy ? "Queue message" : "Send"}
                 >
                   {busy ? "Queue" : <ArrowUp className="h-4 w-4" />}

@@ -45,27 +45,32 @@ export function ContentAssistantActions({
           <MessageSquare className="size-3.5" /> Work in chat
         </Button>
       </div>
-      <div className="mt-3 grid grid-cols-1 gap-2 @xl:grid-cols-3">
-        {readiness.checks.map((check) => (
-          <div
-            key={check.id}
-            className="flex items-start gap-2 rounded-lg border bg-background px-2.5 py-2"
-            title={check.detail}
-          >
-            {check.complete ? (
-              <Check className="mt-0.5 size-3.5 shrink-0 text-emerald-500" />
-            ) : (
-              <Circle className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-            )}
-            <span className="min-w-0">
-              <span className="block text-xs font-medium">{check.label}</span>
-              <span className="block truncate text-[10px] text-muted-foreground">
-                {check.detail}
+      <details className="mt-3 border-t">
+        <summary className="min-h-11 cursor-pointer py-3 text-xs font-medium">
+          View readiness checks
+        </summary>
+        <div className="grid grid-cols-1 gap-2 @xl:grid-cols-3">
+          {readiness.checks.map((check) => (
+            <div
+              key={check.id}
+              className="flex items-start gap-2 rounded-lg border bg-background px-2.5 py-2"
+              title={check.detail}
+            >
+              {check.complete ? (
+                <Check className="mt-0.5 size-3.5 shrink-0 text-emerald-500" />
+              ) : (
+                <Circle className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+              )}
+              <span className="min-w-0">
+                <span className="block text-xs font-medium">{check.label}</span>
+                <span className="block text-[10px] [overflow-wrap:anywhere] text-muted-foreground">
+                  {check.detail}
+                </span>
               </span>
-            </span>
-          </div>
-        ))}
-      </div>
+            </div>
+          ))}
+        </div>
+      </details>
     </section>
   );
 }

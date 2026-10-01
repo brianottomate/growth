@@ -219,7 +219,7 @@ export function SpotCard({
       id={`platform-post-${spot.id}`}
       className="scroll-mt-6 rounded-2xl border bg-card p-4 shadow-sm"
     >
-      <div className="flex items-start gap-3">
+      <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3 @xl:flex">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted">
           <ChannelLogo
             platform={
@@ -300,7 +300,7 @@ export function SpotCard({
                     }
                     disabled={deliveredCount > 0}
                     aria-label="Scheduled date and time"
-                    className="rounded-md border border-border bg-background px-1.5 py-0.5 text-[11px] text-muted-foreground disabled:opacity-50"
+                    className="min-h-11 max-w-full min-w-0 rounded-md border border-border bg-background px-1.5 py-0.5 text-base text-muted-foreground disabled:opacity-50 @xl:min-h-0 @xl:text-[11px]"
                   />
                 ) : (
                   <DatePicker
@@ -398,7 +398,7 @@ export function SpotCard({
           </div>
         </div>
 
-        <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+        <div className="col-span-2 flex min-w-0 flex-wrap items-center gap-1.5 @xl:ml-auto @xl:shrink-0 @xl:justify-end">
           {owned && !isEmail && (
             <>
               <button
@@ -453,7 +453,7 @@ export function SpotCard({
               onClick={() => removeSpot.mutate({ platformPostId: spot.id })}
               disabled={removeSpot.isPending}
               aria-label="Remove channel"
-              className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
+              className="grid size-11 place-items-center rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
             >
               <X className="size-3.5" />
             </button>

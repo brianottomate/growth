@@ -101,6 +101,7 @@ export function SeriesProductionBoard({
                 <Button
                   key={stage}
                   size="sm"
+                  className="h-11 @xl:h-8"
                   variant={filter === stage ? "secondary" : "ghost"}
                   aria-pressed={filter === stage}
                   onClick={() => void setFilter(stage)}
@@ -118,7 +119,7 @@ export function SeriesProductionBoard({
               ),
             )}
             <Input
-              className="w-full @xl:ml-auto @xl:w-60"
+              className="h-11 w-full @xl:ml-auto @xl:h-9 @xl:w-60"
               aria-label="Search installments"
               placeholder="Search installments"
               value={search}
@@ -169,7 +170,7 @@ function Installment({ post, brandName }: { post: Post; brandName: string }) {
         </span>
         <span>{post.status.replaceAll("_", " ")}</span>
       </div>
-      <h3 className="font-medium">
+      <h3 className="font-medium [overflow-wrap:anywhere]">
         <Link href={`/app/content/${post.id}`} className="hover:underline">
           {post.title ?? "Untitled"}
         </Link>
@@ -225,7 +226,7 @@ function Installment({ post, brandName }: { post: Post; brandName: string }) {
           </Button>
         </div>
       )}
-      <p className="line-clamp-5 text-sm whitespace-pre-wrap">
+      <p className="line-clamp-5 text-sm [overflow-wrap:anywhere] whitespace-pre-wrap">
         {spot?.text || post.hook || "Copy has not been added."}
       </p>
       <div className="flex flex-wrap gap-2">

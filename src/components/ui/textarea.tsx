@@ -5,7 +5,11 @@ import { cn } from "./index";
 
 const textareaStyleVariants = cva("", {
   variants: {
-    textSize: { xs: "text-xs md:text-xs", sm: "text-sm md:text-sm" },
+    textSize: {
+      xs: "text-xs md:text-xs",
+      sm: "text-sm md:text-sm",
+      composer: "text-base md:text-base lg:text-sm",
+    },
     monospace: { true: "font-mono" },
     appearance: {
       composer:

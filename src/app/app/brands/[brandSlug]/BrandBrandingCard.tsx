@@ -35,8 +35,8 @@ export function BrandBrandingCard({
 
   return (
     <section className="space-y-3 rounded-xl border p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
+      <div className="flex flex-col items-start justify-between gap-3 @lg:flex-row">
+        <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
           <h2 className="text-base font-semibold">Branding</h2>
           <p className="mt-0.5 text-sm text-muted-foreground">
             {identity?.extractedAt

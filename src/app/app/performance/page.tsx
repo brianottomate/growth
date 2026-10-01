@@ -129,7 +129,7 @@ export default async function PerformanceDashboardPage() {
   return (
     <div className="space-y-7">
       <div>
-        <div className="grid grid-cols-1 gap-3 @xl:grid-cols-3">
+        <div className="grid grid-cols-3 gap-2 @xl:gap-3">
           <Figure
             href="/app/performance/campaigns"
             label="Live campaigns"
@@ -169,7 +169,7 @@ export default async function PerformanceDashboardPage() {
               Open <ArrowRight className="size-3" />
             </Link>
           </div>
-          <TrackerTable rows={tracker} />
+          <TrackerTable rows={tracker} mobileCollapsed />
         </section>
       )}
 
@@ -349,7 +349,10 @@ function Figure({
 }) {
   const body = (
     <>
-      <SectionLabel tone={tone} className="text-[10.5px] tracking-[0.07em]">
+      <SectionLabel
+        tone={tone}
+        className="min-h-8 text-[10.5px] tracking-[0.07em] @xl:min-h-0"
+      >
         {label}
       </SectionLabel>
       <p className="mt-1.5 text-2xl font-semibold tracking-tight tabular-nums">
@@ -368,7 +371,7 @@ function Figure({
     </>
   );
   const frame = cn(
-    "block rounded-2xl border p-4 text-left",
+    "block min-w-0 rounded-2xl border p-2.5 text-left @xl:p-4",
     tone === "amber" ? "border-amber-500/35 bg-card" : "bg-card",
     href && "transition-colors hover:border-foreground/25",
   );

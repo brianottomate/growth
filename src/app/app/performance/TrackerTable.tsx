@@ -36,106 +36,207 @@ const usd = (dollars: number) =>
   }).format(dollars);
 
 /** Micaela's tracker sheet, filled from the app: one client per row. */
-export function TrackerTable({ rows }: { rows: TrackerRow[] }) {
-  return (
-    <div className="overflow-x-auto rounded-xl border bg-card">
-      <table className="w-full min-w-max border-collapse text-xs">
-        <thead>
-          <tr className="border-b bg-muted/40 text-left text-[11px] text-muted-foreground">
-            {COLUMNS.map((label, index) => (
-              <th
-                key={label}
-                scope="col"
-                className={cn(
-                  "px-3 py-2 font-medium whitespace-nowrap",
-                  index === 0 && "sticky left-0 z-10 bg-card",
+export function TrackerTable({
+  rows,
+  mobileCollapsed = false,
+}: {
+  rows: TrackerRow[];
+  mobileCollapsed?: boolean;
+}) {
+  const cards = (
+    <div className="space-y-3">
+      {rows.map((row) => {
+        const fields = trackerFields(row);
+        const summary = new Set([
+          "Paid fee per month",
+          "Agreed ad spend per month",
+          "Ads live",
+        ]);
+        return (
+          <article key={row.brandId} className="rounded-xl border bg-card p-4">
+            <header className="flex items-start justify-between gap-3">
+              <h3 className="min-w-0 text-sm font-semibold [overflow-wrap:anywhere]">
+                {row.slug ? (
+                  <Link
+                    className="inline-flex min-h-11 items-center hover:underline"
+                    href={`/app/performance/brands/${row.slug}/settings`}
+                  >
+                    {row.name}
+                  </Link>
+                ) : (
+                  row.name
                 )}
-              >
-                {label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.brandId} className="border-b last:border-0">
-              <th
-                scope="row"
-                className="sticky left-0 z-10 bg-card px-3 py-2 text-left font-medium whitespace-nowrap"
-              >
-                <span className="flex items-center justify-between gap-3">
-                  {row.slug ? (
-                    <Link
-                      href={`/app/performance/brands/${row.slug}/settings`}
-                      className="hover:underline"
-                    >
-                      {row.name}
-                    </Link>
-                  ) : (
-                    row.name
-                  )}
-                  <TrackerChatButton
-                    brandId={row.brandId}
-                    brandName={row.name}
-                    row={chatSnapshot(row)}
-                  />
-                </span>
-              </th>
-              <Cell>{row.fee != null ? usd(row.fee) : null}</Cell>
-              <Cell>{trackerDate(row.effectiveDate)}</Cell>
-              <Cell>{row.terms}</Cell>
-              <Cell>{trackerDate(row.endDate)}</Cell>
-              <Cell>{row.siteLive}</Cell>
-              <Cell>
-                {row.agreedAdSpend != null ? usd(row.agreedAdSpend) : null}
-              </Cell>
-              <Cell>{row.spent > 0 ? usd(row.spent) : null}</Cell>
-              <Cell>
-                {row.onboardingLink ? (
-                  <Out href={row.onboardingLink}>Intake form</Out>
-                ) : null}
-              </Cell>
-              <Cell>
-                {row.fb === "verified"
-                  ? "Yes"
-                  : row.fb === "claimed"
-                    ? "Claimed"
-                    : null}
-              </Cell>
-              <Cell>
-                {row.creative.length ? (
-                  <span className="flex gap-2">
-                    {row.creative.map((item) => (
-                      <Out key={item.label} href={item.url}>
-                        {row.creative.length === 1 ? "Folder" : item.label}
-                      </Out>
-                    ))}
-                  </span>
-                ) : null}
-              </Cell>
-              <Cell>
-                {row.adCopiesUrl ? <Out href={row.adCopiesUrl}>Doc</Out> : null}
-              </Cell>
-              <Cell>
-                {row.adsLive === "live"
-                  ? "Yes"
-                  : row.adsLive === "paused"
-                    ? "Built, paused"
-                    : row.adsLive === "draft"
-                      ? "Drafted"
-                      : null}
-              </Cell>
-              <Cell>{row.cpb != null ? usd(row.cpb) : null}</Cell>
-              <Cell>{row.newsletter}</Cell>
-              <Cell>{row.influencer}</Cell>
-              <Cell>{row.socialMediaPosts}</Cell>
-              <Cell>{row.bookings != null ? String(row.bookings) : null}</Cell>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+              </h3>
+              <TrackerChatButton
+                brandId={row.brandId}
+                brandName={row.name}
+                row={chatSnapshot(row)}
+              />
+            </header>
+            <dl className="mt-3 space-y-3">
+              {fields
+                .filter(([label]) => summary.has(label))
+                .map(([label, value]) => (
+                  <TrackerField key={label} label={label} value={value} />
+                ))}
+            </dl>
+            <details className="mt-3 border-t">
+              <summary className="min-h-11 cursor-pointer py-3 text-sm font-medium">
+                All tracker details
+              </summary>
+              <dl className="space-y-3 pb-1">
+                {fields
+                  .filter(([label]) => !summary.has(label))
+                  .map(([label, value]) => (
+                    <TrackerField key={label} label={label} value={value} />
+                  ))}
+              </dl>
+            </details>
+          </article>
+        );
+      })}
     </div>
   );
+  return (
+    <>
+      <div className="@3xl:hidden">
+        {mobileCollapsed ? (
+          <details className="rounded-xl border bg-card p-3">
+            <summary className="min-h-11 cursor-pointer py-3 text-sm font-medium">
+              View client tracker · {rows.length} clients
+            </summary>
+            {cards}
+          </details>
+        ) : (
+          cards
+        )}
+      </div>
+      <div className="hidden overflow-x-auto rounded-xl border bg-card @3xl:block">
+        <table className="w-full min-w-max border-collapse text-xs">
+          <thead>
+            <tr className="border-b bg-muted/40 text-left text-[11px] text-muted-foreground">
+              {COLUMNS.map((label, index) => (
+                <th
+                  key={label}
+                  scope="col"
+                  className={cn(
+                    "px-3 py-2 font-medium whitespace-nowrap",
+                    index === 0 && "sticky left-0 z-10 bg-card",
+                  )}
+                >
+                  {label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.brandId} className="border-b last:border-0">
+                <th
+                  scope="row"
+                  className="sticky left-0 z-10 bg-card px-3 py-2 text-left font-medium whitespace-nowrap"
+                >
+                  <span className="flex items-center justify-between gap-3">
+                    {row.slug ? (
+                      <Link
+                        href={`/app/performance/brands/${row.slug}/settings`}
+                        className="hover:underline"
+                      >
+                        {row.name}
+                      </Link>
+                    ) : (
+                      row.name
+                    )}
+                    <TrackerChatButton
+                      brandId={row.brandId}
+                      brandName={row.name}
+                      row={chatSnapshot(row)}
+                    />
+                  </span>
+                </th>
+                {trackerFields(row).map(([label, value]) => (
+                  <Cell key={label}>{value}</Cell>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
+function TrackerField({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start gap-3 text-sm">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 [overflow-wrap:anywhere]">{value ?? "—"}</dd>
+    </div>
+  );
+}
+
+// Both layouts use the same values, so switching widths cannot hide a field
+// or report a different delivery/billing state.
+function trackerFields(row: TrackerRow): [string, ReactNode][] {
+  return [
+    ["Paid fee per month", row.fee != null ? usd(row.fee) : null],
+    ["Effective date", trackerDate(row.effectiveDate)],
+    ["Terms", row.terms],
+    ["End date", trackerDate(row.endDate)],
+    ["WanderOS site live", row.siteLive],
+    [
+      "Agreed ad spend per month",
+      row.agreedAdSpend != null ? usd(row.agreedAdSpend) : null,
+    ],
+    ["Billed ad spend", row.spent > 0 ? usd(row.spent) : null],
+    [
+      "Onboarding link",
+      row.onboardingLink ? (
+        <Out key="onboarding" href={row.onboardingLink}>
+          Intake form
+        </Out>
+      ) : null,
+    ],
+    [
+      "FB connection",
+      row.fb === "verified" ? "Yes" : row.fb === "claimed" ? "Claimed" : null,
+    ],
+    [
+      "Ad creative",
+      row.creative.length ? (
+        <span key="creative" className="flex flex-wrap gap-2">
+          {row.creative.map((item) => (
+            <Out key={item.label} href={item.url}>
+              {row.creative.length === 1 ? "Folder" : item.label}
+            </Out>
+          ))}
+        </span>
+      ) : null,
+    ],
+    [
+      "Ad copies",
+      row.adCopiesUrl ? (
+        <Out key="copies" href={row.adCopiesUrl}>
+          Doc
+        </Out>
+      ) : null,
+    ],
+    [
+      "Ads live",
+      row.adsLive === "live"
+        ? "Yes"
+        : row.adsLive === "paused"
+          ? "Built, paused"
+          : row.adsLive === "draft"
+            ? "Drafted"
+            : null,
+    ],
+    ["CPB", row.cpb != null ? usd(row.cpb) : null],
+    ["Wander newsletter", row.newsletter],
+    ["Influencer", row.influencer],
+    ["Social media posts", row.socialMediaPosts],
+    ["Bookings", row.bookings != null ? String(row.bookings) : null],
+  ];
 }
 
 function Cell({ children }: { children: ReactNode }) {

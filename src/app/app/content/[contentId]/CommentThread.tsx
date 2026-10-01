@@ -93,8 +93,9 @@ export function CommentThread({
             if ((e.metaKey || e.ctrlKey) && e.key === "Enter") submit();
           }}
           rows={2}
+          aria-label="Add a comment"
           placeholder="Add a comment… (⌘↵ to post)"
-          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+          className="w-full rounded-md border border-border bg-background px-3 py-2 text-base @xl:text-sm"
         />
         <div className="flex justify-end">
           <button

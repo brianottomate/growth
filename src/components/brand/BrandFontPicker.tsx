@@ -95,7 +95,7 @@ function FontField({
   }, [catalog.data, search]);
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex min-w-0 items-center gap-2">
       <span className="w-14 shrink-0 text-muted-foreground">{label}</span>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
@@ -104,8 +104,9 @@ function FontField({
             size="sm"
             role="combobox"
             aria-expanded={open}
+            aria-label={`Choose ${label.toLowerCase()} font`}
             disabled={disabled}
-            className="h-8 w-64 justify-between"
+            className="h-11 max-w-64 min-w-0 flex-1 justify-between @xl:h-8"
           >
             {value ? (
               <FontSample family={value} />
@@ -115,7 +116,10 @@ function FontField({
             <ChevronsUpDown className="size-3.5 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-72 p-0" align="start">
+        <PopoverContent
+          className="w-72 max-w-[calc(100vw-2rem)] p-0"
+          align="start"
+        >
           <Command shouldFilter={false}>
             <CommandInput
               placeholder="Search Google Fonts"

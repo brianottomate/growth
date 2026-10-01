@@ -30,7 +30,7 @@ export function CampaignGroups({
       onClick={() => setPicked(id)}
       aria-pressed={picked === id}
       className={cn(
-        "rounded-full border px-3.5 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors",
+        "min-h-11 rounded-full border px-3.5 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors @lg:min-h-0",
         picked === id
           ? "border-foreground bg-foreground text-background"
           : "border-border/80 text-muted-foreground hover:text-foreground",
