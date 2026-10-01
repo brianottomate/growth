@@ -197,6 +197,7 @@ export function AssistantGallery({ catalog }: { catalog: CatalogEntry[] }) {
                 : {
                     ...item,
                     status: action === "retry" ? "queued" : item.status,
+                    error: action === "retry" ? null : item.error,
                     payload:
                       action === "edit" && text
                         ? {
@@ -223,7 +224,17 @@ export function AssistantGallery({ catalog }: { catalog: CatalogEntry[] }) {
       </main>
     );
   return (
-    <main className="@container mx-auto max-w-7xl px-4 py-8 sm:px-8">
+    <main
+      className="@container mx-auto max-w-7xl px-4 py-8 sm:px-8"
+      onClick={(event) => {
+        if (!(event.target instanceof Element)) return;
+        const href = event.target.closest("a[href]")?.getAttribute("href");
+        if (href?.includes("fixture-")) {
+          event.preventDefault();
+          announce(`Demo destination: ${href}`);
+        }
+      }}
+    >
       <header className="space-y-6 pb-8">
         <div className="flex items-center justify-between">
           <Link
@@ -324,7 +335,7 @@ export function AssistantGallery({ catalog }: { catalog: CatalogEntry[] }) {
         {notice}
       </div>
       <div
-        className="mx-auto w-full"
+        className="@container mx-auto w-full"
         style={{
           maxWidth:
             width === "dock" ? 420 : width === "phone" ? 360 : undefined,
@@ -458,7 +469,7 @@ export function AssistantGallery({ catalog }: { catalog: CatalogEntry[] }) {
         <Section
           id="results"
           title="Generated result cards"
-          note="Fixture-backed examples of the actual Growth cards. Result buttons report their proposed prompt above. Links to existing workspace pages open those pages."
+          note="Fixture-backed examples of the actual Growth cards. Result buttons report their proposed prompt above. Fixture detail links report their destination above. Workspace links open the product."
         >
           <div className="flex flex-wrap gap-2" aria-label="Result categories">
             {["All", ...new Set(specimens.map((s) => s.category))].map((c) => (

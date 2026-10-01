@@ -303,10 +303,21 @@ export const specimens: Specimen[] = [
     capability: "productAtlasRead",
     action: "get",
     data: {
+      id: "fixture-product",
       name: "Weekend discovery",
       description: "Help guests find their next coastal stay.",
-      status: "active",
-      url: "/app/product-atlas",
+      lifecycleStatus: "active",
+      atlas: {
+        jobs: [],
+        journeys: [],
+        stories: [],
+        surfaces: [],
+        views: [],
+        storyViewLinks: [],
+        implementationRefs: [],
+        observations: [],
+      },
+      storefronts: [],
     },
   },
   {
@@ -509,10 +520,23 @@ specimens.push(
     capability: "storefrontRead",
     action: "get",
     data: {
-      name: "Coastal Retreats",
-      status: "current",
-      description: "A destination page for weekend discovery.",
-      url: "/app/apps",
+      id: "fixture-storefront",
+      productId: "fixture-product",
+      surface: "chatgpt_connector",
+      listingStatus: "live",
+      freshnessStatus: "up_to_date",
+      content: {
+        positioning: {
+          audience: "Guests planning a coastal weekend",
+          valueProposition: "Find your next stay",
+          category: "Travel",
+          keyMessages: [],
+        },
+        copy: {
+          displayName: "Coastal Retreats",
+          shortDescription: "Find your next coastal stay",
+        },
+      },
     },
   },
 );

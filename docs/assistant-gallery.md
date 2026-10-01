@@ -7,7 +7,8 @@ The gallery renders synthetic results through the same `renderToolPart`
 function used by `OverviewChat`. It covers conversation anatomy, pending and
 interrupted tools, errors, approval requests and superseded approvals, result
 cards, suggested next steps, and the durable input queue. Demo callbacks update
-local state. Workspace links open the existing product pages.
+local state. Fixture detail links report their destination on the page.
+Workspace links open the existing product pages.
 
 The tool inventory is generated on the server from
 `GROWTH_CAPABILITY_ACTIONS` and `policyForGrowthTool`. It shows each advertised
