@@ -17,6 +17,8 @@ import {
 import { SectionLabel } from "../../../_components";
 import { BrandStoryCard } from "../BrandStoryCard";
 import { MarketsCard } from "../MarketsCard";
+import { PersonaAudiences } from "../PersonaAudiences";
+import { loadPersonaAudiences } from "@/server/services/persona-audience.service";
 import { HeroCard } from "../HeroCard";
 import { HomeRowsGrid } from "../HomeRowsGrid";
 import { HomesStrip } from "../HomesStrip";
@@ -47,9 +49,10 @@ export default async function PerformanceBrandHomesPage({
     return <div className="text-muted-foreground">No organization found.</div>;
   if (!brand) notFound();
 
-  const [rows, committed] = await Promise.all([
+  const [rows, committed, audiences] = await Promise.all([
     listAllBrandHomes(brand.id),
     listBrandHomes(brand.id),
+    loadPersonaAudiences(brand.id),
   ]);
   // Ingested brands work from their rows. The live feed is read only for a
   // brand not ingested yet, which still browses it through `HomesStrip`.
@@ -206,6 +209,19 @@ export default async function PerformanceBrandHomesPage({
         markets={brand.markets ?? null}
         towns={townCounts}
       />
+      <section className="rounded-xl border p-4">
+        <PersonaAudiences
+          brand={{ id: brand.id, slug, name: brand.name }}
+          personas={audiences.personas.map(({ persona, targets }) => ({
+            id: persona.id,
+            name: persona.name,
+            description: persona.description,
+            countries: persona.demandGeography?.countries ?? [],
+            targets,
+          }))}
+          unassigned={audiences.unassigned}
+        />
+      </section>
       <HeroCard
         brandId={brand.id}
         hero={
