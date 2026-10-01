@@ -299,7 +299,7 @@ function CompactCard({
   stack = true,
 }: {
   property: DigestProperty;
-  /** Photo over text on a phone; a list keeps its rows side by side. */
+  /** Bigger photo on desktop; every card stacks photo over text on a phone. */
   stack?: boolean;
 }) {
   const width = stack ? 180 : 120;
@@ -307,12 +307,12 @@ function CompactCard({
     <Section style={{ paddingTop: "16px" }}>
       <Row>
         <Column
-          className={stack ? "wd-stack" : undefined}
+          className="wd-stack"
           style={{ width: `${width}px`, verticalAlign: "top" }}
         >
           <Link href={property.href}>
             <Img
-              className={stack ? "wd-stack-img" : undefined}
+              className="wd-stack-img"
               src={property.image.src}
               alt={property.image.alt ?? property.title}
               width={width}
@@ -325,7 +325,7 @@ function CompactCard({
           </Link>
         </Column>
         <Column
-          className={stack ? "wd-stack wd-stack-text" : undefined}
+          className="wd-stack wd-stack-text"
           style={{ paddingLeft: stack ? "16px" : "12px", verticalAlign: "top" }}
         >
           <Kicker property={property} />
