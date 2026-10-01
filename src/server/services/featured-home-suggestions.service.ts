@@ -63,7 +63,7 @@ type Row = {
  * WanderOS listing id, which is our `home.externalId`, so the brand's own
  * homes are the filter and no organization id is needed.
  */
-async function evidenceFor(listingIds: string[]) {
+export async function evidenceFor(listingIds: string[]) {
   return executeQuery<Row>(
     `
     WITH direct AS (

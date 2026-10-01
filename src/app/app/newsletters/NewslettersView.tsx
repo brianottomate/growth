@@ -14,7 +14,6 @@ import {
   type NewsletterKind,
 } from "@/lib/newsletter-kind";
 import { inspirationAddress } from "@/lib/inbound-email";
-import { CopyableField } from "@/components/ui/copyable-field";
 import {
   CoverWall,
   DocumentReader,
@@ -27,6 +26,7 @@ import {
   type CompetitorNewsletterRow,
 } from "./CompetitorNewsletters";
 import { NewsletterChatStart } from "./NewsletterChatStart";
+import { NewsletterTemplateStart } from "./NewsletterTemplateStart";
 
 const fmt = (n: number) =>
   n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}K` : `${n}`;
@@ -300,23 +300,15 @@ export async function NewslettersView({
             {avgOpen != null ? `${Math.round(avgOpen * 100)}%` : "—"} avg open ·
             delivery history
           </p>
-          {selectedBrand ? (
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <span>Subscribe with</span>
-              <div className="w-full max-w-lg">
-                <CopyableField
-                  value={inspirationAddress(selectedBrand.id)}
-                  successMessage="Address copied"
-                />
-              </div>
-            </div>
-          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <NewsletterChatStart
             brandId={selectedBrand?.id}
             brandName={selectedBrand?.name}
           />
+          {selectedBrand ? (
+            <NewsletterTemplateStart brandId={selectedBrand.id} />
+          ) : null}
           {selectedBrand ? null : (
             <BrandPagePicker
               brands={brands.flatMap((row) =>
@@ -427,11 +419,6 @@ export async function NewslettersView({
         })}
       </div>
 
-      <p className="mt-3 text-xs text-muted-foreground">
-        Topics (General · Destinations · Location Recommendations) — coming
-        soon, from Customer.io subscription topics.
-      </p>
-
       {/* view toggle */}
       <div className="mt-4 flex flex-wrap items-center gap-2 border-t pt-4">
         {(["list", "wall", "read"] as const).map((v) => (
@@ -520,7 +507,17 @@ export async function NewslettersView({
         </p>
       )}
 
-      <CompetitorNewsletters rows={competitorRows} />
+      <CompetitorNewsletters
+        rows={competitorRows}
+        own={
+          selectedBrand
+            ? {
+                name: selectedBrand.name,
+                address: inspirationAddress(selectedBrand.id),
+              }
+            : null
+        }
+      />
     </div>
   );
 }

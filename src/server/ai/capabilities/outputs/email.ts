@@ -3,6 +3,8 @@ import { messageSendStatusEnum } from "@/server/db/email-document-schema";
 import { contentStatusEnum } from "@/server/db/content-schema";
 import { z } from "zod";
 
+import { newsletterTemplateIds } from "@/lib/newsletter-templates";
+
 /** Wire results for this capability. Dates are ISO strings after JSON normalization. */
 const propertyItemSchema = z.strictObject({
   city: z.string().nullable().optional(),
@@ -218,6 +220,17 @@ export const createProductUpdateDraftOutputSchema = z.strictObject({
   emailDocumentId: z.string(),
   platformPostId: z.string(),
   revision: z.number(),
+  url: z.string(),
+});
+
+export const draftEmailFromTemplateOutputSchema = z.strictObject({
+  headerCard: z.boolean(),
+  homes: z.array(z.string()),
+  next: z.string(),
+  ok: z.literal(true),
+  platformPostId: z.string(),
+  subject: z.string(),
+  template: z.enum(newsletterTemplateIds),
   url: z.string(),
 });
 

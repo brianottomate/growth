@@ -2,6 +2,7 @@ import {
   getEmailDraftOutputSchema,
   createEmailSlotOutputSchema,
   createDigestFromRowOutputSchema,
+  draftEmailFromTemplateOutputSchema,
   setDigestImageOutputSchema,
   updateEmailDraftOutputSchema,
   createProductUpdateDraftOutputSchema,
@@ -20,6 +21,8 @@ import {
   productUpdateEmailDraftSchema,
 } from "@/lib/email-document";
 import { DIGEST_TEMPLATE_KEY } from "@/lib/listings-digest";
+import { draftFromTemplateInputSchema } from "@/lib/newsletter-templates";
+import { draftNewsletterFromTemplate } from "@/server/services/newsletter-template.service";
 import { db } from "@/server/db";
 import { brandTable, memberTable } from "@/server/db/schema";
 import { extractDigest } from "@/server/services/digest-extract.service";
@@ -92,6 +95,25 @@ export const createEmailSlot = growthAction({
       organizationId: ctx.orgId,
       userId: ctx.userId,
     }),
+});
+
+export const draftEmailFromTemplate = growthAction({
+  outputSchema: draftEmailFromTemplateOutputSchema,
+  description:
+    "Draft a complete one-off blast for a brand from a template: picks the brand's own homes from their photos and booking evidence, writes the copy around them, renders a header card, and saves the draft on the content calendar. Templates: season-ahead (a getaway for an upcoming season or occasion: one featured home, a paragraph on the place, three more) and home-collection (four homes sharing one trait guests want, in a grid). Use when the operator wants a ready draft rather than an empty slot. Pass an offer only if the operator gave one. Nothing is sent.",
+  inputSchema: draftFromTemplateInputSchema,
+  execute: async (input, ctx) => {
+    const result = await draftNewsletterFromTemplate({
+      ...input,
+      organizationId: ctx.orgId,
+      userId: ctx.userId,
+    });
+    return {
+      ok: true as const,
+      ...result,
+      next: "Share the url. The operator reviews it in the block editor, where each block and home can be changed or rewritten.",
+    };
+  },
 });
 
 export const createDigestFromRow = growthAction({
@@ -515,6 +537,7 @@ export const EMAIL_TOOLS = {
   getEmailDraft,
   createEmailSlot,
   createDigestFromRow,
+  draftEmailFromTemplate,
   setDigestImage,
   createProductUpdateDraft,
   updateEmailDraft,

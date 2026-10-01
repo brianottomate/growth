@@ -39,8 +39,11 @@ const fmtDate = (iso: string) =>
  */
 export function CompetitorNewsletters({
   rows,
+  own,
 }: {
   rows: CompetitorNewsletterRow[];
+  /** The page's brand: subscribed to its own newsletter, issues land above as its sent issues. */
+  own?: { name: string; address: string } | null;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
@@ -82,13 +85,29 @@ export function CompetitorNewsletters({
   return (
     <section className="mt-10 border-t pt-6">
       <h2 className="flex items-center gap-2 text-sm font-semibold">
-        <Mail className="size-4" /> Competitor newsletters
+        <Mail className="size-4" /> Newsletter capture
       </h2>
       <p className="mt-1 text-xs text-muted-foreground">
-        Subscribe to a tracked competitor&apos;s newsletter with its capture
-        address; forwarded issues land here as inspiration. Confirm the double
-        opt-in once from the Resend inbox.
+        Subscribe with a capture address and forwarded issues land here. Confirm
+        the double opt-in once from the Resend inbox.
       </p>
+
+      {own ? (
+        <div className="mt-4 rounded-xl border p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-sm font-medium">{own.name}</div>
+              <div className="text-xs text-muted-foreground">
+                Its own newsletter, as sent issues
+              </div>
+            </div>
+            <CopyButton text={own.address} label="Copy address" />
+          </div>
+          <code className="mt-2.5 block w-full truncate rounded-md bg-muted px-2 py-1 font-mono text-xs text-muted-foreground">
+            {own.address}
+          </code>
+        </div>
+      ) : null}
 
       {rows.length === 0 ? (
         <p className="mt-4 text-sm text-muted-foreground">

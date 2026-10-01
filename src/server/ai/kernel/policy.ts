@@ -243,6 +243,7 @@ export const growthActionPolicies = {
   emailWrite: {
     createSlot: write(),
     createDigestFromRow: write(),
+    draftFromTemplate: write({ consequence: "model-write" }),
     setDigestImage: write({ idempotent: true }),
     createProductUpdate: write(),
     updateDraft: write({ idempotent: true }),

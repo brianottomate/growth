@@ -403,6 +403,7 @@ export const emailWrite = growthDomainTool({
   actions: {
     createSlot: EMAIL_TOOLS.createEmailSlot,
     createDigestFromRow: EMAIL_TOOLS.createDigestFromRow,
+    draftFromTemplate: EMAIL_TOOLS.draftEmailFromTemplate,
     setDigestImage: EMAIL_TOOLS.setDigestImage,
     createProductUpdate: EMAIL_TOOLS.createProductUpdateDraft,
     updateDraft: EMAIL_TOOLS.updateEmailDraft,

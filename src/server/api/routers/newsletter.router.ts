@@ -38,7 +38,9 @@ import {
   matchDigestHomes,
   setDigestHomeHero,
 } from "@/server/services/newsletter-homes.service";
+import { newsletterTemplateOptions } from "@/server/services/newsletter-template.service";
 import {
+  draftEmailFromTemplate as draftEmailFromTemplateAction,
   generateEmailDraft as generateEmailDraftAction,
   getEmailDraft as getEmailDraftAction,
   updateEmailDraft as updateEmailDraftAction,
@@ -81,6 +83,15 @@ export const newsletterRouter = {
   workspace: actionProcedure(getEmailDraftAction),
 
   generateDraft: actionProcedure(generateEmailDraftAction),
+
+  draftFromTemplate: actionProcedure(draftEmailFromTemplateAction),
+
+  templateOptions: protectedProcedure
+    .input(z.object({ brandId: z.string().min(1) }))
+    .handler(async ({ context: ctx, input }) => {
+      const orgId = await organizationIdForUser(ctx.db, ctx.session.user.id);
+      return newsletterTemplateOptions({ ...input, orgId });
+    }),
 
   saveDocument: actionProcedure(updateEmailDraftAction),
 
