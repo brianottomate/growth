@@ -698,3 +698,16 @@ export function compositionPreviewFromParams(params: URLSearchParams) {
     }),
   };
 }
+
+/**
+ * A preview URL for an `<img>` drawn `width` CSS px wide: the route scales
+ * its 1080px render down to fit, at 2x. Display only; a stored or frozen
+ * recipe keeps the bare URL. Any other URL is returned as is.
+ */
+export function previewAtWidth<T extends string | null | undefined>(
+  url: T,
+  width: number,
+): T {
+  if (!url?.startsWith("/api/compositions/preview?")) return url;
+  return `${url}&w=${Math.round(width * 2)}` as T;
+}

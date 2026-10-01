@@ -19,6 +19,7 @@ import {
 import {
   CATALOG_COPY_INTENTS,
   COMPOSITION_TEMPLATES,
+  previewAtWidth,
 } from "@/lib/compositions";
 import { orpc } from "@/orpc/client";
 
@@ -57,7 +58,10 @@ export function CatalogTemplateSummary({
   const { card, format, current } = useTemplatePreview(brandId, heroHomeId);
   const guide = CATALOG_COPY_INTENTS[current];
   const src = card
-    ? catalogCardPreviewUrl(brandId, asTemplate(card, current), format)
+    ? previewAtWidth(
+        catalogCardPreviewUrl(brandId, asTemplate(card, current), format),
+        48,
+      )
     : null;
   return (
     <span className="flex min-w-0 items-center gap-3">
@@ -122,10 +126,13 @@ export function CatalogTemplateCard({
         {CATALOG_TEMPLATES.map((templateId) => {
           const label = templateLabel(templateId);
           const guide = CATALOG_COPY_INTENTS[templateId];
-          const src = catalogCardPreviewUrl(
-            brandId,
-            asTemplate(card, templateId),
-            format,
+          const src = previewAtWidth(
+            catalogCardPreviewUrl(
+              brandId,
+              asTemplate(card, templateId),
+              format,
+            ),
+            240,
           );
           const chosen = current === templateId;
           return (

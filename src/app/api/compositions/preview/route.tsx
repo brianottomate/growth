@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import sharp from "sharp";
 
 import { compositionPreviewFromParams } from "@/lib/compositions";
 import { getSession } from "@/server/better-auth/server";
@@ -51,10 +52,27 @@ export async function GET(request: NextRequest) {
       (await googleFontCatalog()).some((font) => font.family === fontParam)
         ? fontParam
         : null;
-    return renderComposition(
+    const image = renderComposition(
       parsed.data,
       await loadCompositionSource(context, { fontFamily }),
     );
+    // The URL is the whole recipe, so a reload reuses the render. Brand-level
+    // changes (mark, fonts) show within the hour.
+    const headers = { "Cache-Control": "private, max-age=3600" };
+    const width = Number(params.get("w"));
+    if (!width) {
+      return new Response(image.body, {
+        headers: { ...headers, "Content-Type": "image/png" },
+      });
+    }
+    // A thumbnail: the full PNG of a photo runs to megabytes.
+    const webp = await sharp(Buffer.from(await image.arrayBuffer()))
+      .resize({ width: Math.min(Math.max(width, 64), 1080) })
+      .webp({ quality: 80 })
+      .toBuffer();
+    return new Response(new Uint8Array(webp), {
+      headers: { ...headers, "Content-Type": "image/webp" },
+    });
   } catch (error) {
     if (error instanceof CompositionAccessError) {
       return NextResponse.json(

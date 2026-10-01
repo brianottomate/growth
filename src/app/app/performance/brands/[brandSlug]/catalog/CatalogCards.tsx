@@ -35,6 +35,7 @@ import {
   COMPOSITION_FORMATS,
   COMPOSITION_IMAGE_POSITIONS,
   COMPOSITION_TEMPLATES,
+  previewAtWidth,
 } from "@/lib/compositions";
 import {
   CATALOG_WRITE_PASSES,
@@ -1094,7 +1095,7 @@ function CardPreview({
 }) {
   const src =
     card.mode === "finished" || card.title.trim()
-      ? preview(brandId, card, format)
+      ? previewAtWidth(preview(brandId, card, format), 240)
       : undefined;
   const empty = card.mode === "finished" ? "Choose artwork" : "Add a headline";
   return (

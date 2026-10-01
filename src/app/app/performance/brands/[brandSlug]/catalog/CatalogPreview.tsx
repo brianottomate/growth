@@ -9,6 +9,7 @@ import {
   type CatalogDraft,
   type CatalogHome,
 } from "@/lib/catalog-studio";
+import { previewAtWidth } from "@/lib/compositions";
 
 type PreviewCard = {
   key: string;
@@ -43,7 +44,9 @@ export function CatalogPreview({
     .filter((c) => c.included)
     .map((card) => ({
       key: card.homeId,
-      image: catalogCardPreviewUrl(brandId, card) ?? card.imageUrl,
+      image:
+        previewAtWidth(catalogCardPreviewUrl(brandId, card), 300) ??
+        card.imageUrl,
       home: byId.get(card.homeId),
       name: byId.get(card.homeId)?.name ?? card.homeId,
     }));

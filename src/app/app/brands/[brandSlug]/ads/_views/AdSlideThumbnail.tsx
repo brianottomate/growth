@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { cn } from "@/components/ui/lib/utils";
-import { getCompositionFormat } from "@/lib/compositions";
+import { getCompositionFormat, previewAtWidth } from "@/lib/compositions";
 import { ideaEditorPreviewUrl, IDEA_SHAPE_LABELS } from "@/lib/ad-idea-studio";
 import type { IdeaImage, IdeaShape } from "@/lib/ad-idea-studio";
 
@@ -22,7 +22,10 @@ export function AdSlideThumbnail({
   selected: boolean;
   onSelect: () => void;
 }) {
-  const nextUrl = ideaEditorPreviewUrl(brandId, card, shape);
+  const nextUrl = previewAtWidth(
+    ideaEditorPreviewUrl(brandId, card, shape),
+    96,
+  );
   const [url, setUrl] = useState(nextUrl);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
