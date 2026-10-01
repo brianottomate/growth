@@ -101,7 +101,7 @@ it("labels automatic source settings without pretending manual selection or obse
   expect(importedPlacementLabel([])).not.toContain("Automatic");
 });
 
-it("previews the same ordered carousel cards that ship, not alternate Story exports", () => {
+it("previews a carousel's feed cards in feeds and its 9:16 cards in Stories, as the push delivers them", () => {
   const content: AdCreativeContent = {
     ...copy,
     media: ["first", "second"].map((name) => ({
@@ -114,18 +114,13 @@ it("previews the same ordered carousel cards that ship, not alternate Story expo
       },
     })),
   };
-  for (const placement of [
-    "facebook-feed",
-    "instagram-story",
-    "facebook-story",
-  ] as const) {
-    expect(metaPreviewMedia(content, placement, "brand").media).toEqual(
-      metaPlacementMedia(content, placement).media,
-    );
-    expect(metaPreviewMedia(content, placement, "brand").media).toEqual(
-      content.media,
-    );
-  }
+  expect(metaPreviewMedia(content, "facebook-feed", "brand").media).toEqual(
+    content.media,
+  );
+  for (const placement of ["instagram-story", "facebook-story"] as const)
+    expect(
+      metaPreviewMedia(content, placement, "brand").media.map((m) => m.url),
+    ).toEqual(content.media.map((m) => m.story!.url));
 });
 it("previews an approval waiting for its push live, while publishing still refuses it", () => {
   const content: AdCreativeContent = {

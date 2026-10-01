@@ -34,17 +34,34 @@ export function metaPreviewMedia(
   brandId: string,
 ) {
   const resolved = metaPlacementMedia(content, id);
+  const vertical = !isFeedPlacement(id);
+  // After the push a carousel whose every card has a 9:16 image shows those
+  // cards in Stories and Reels (the placement swap that follows the push), so
+  // the preview shows them too rather than the feed cards letterboxed.
+  if (
+    vertical &&
+    !resolved.issue &&
+    content.media.length > 1 &&
+    content.media.every((card) => card.type === "image" && card.story?.url)
+  )
+    return {
+      media: content.media.map((card) => ({
+        ...card.story!,
+        type: "image" as const,
+      })),
+      issue: null,
+    };
   const doc = content.ideaStudio?.document;
   const draft =
     !content.ideaStudio?.approval && !content.metaImport?.issues.length;
   if (!doc || !("pending" in resolved || draft)) return resolved;
   const base = doc.shapes.includes("portrait") ? "portrait" : doc.shapes[0]!;
-  // Same rule as delivery: a carousel keeps its cards on every placement; a
-  // single image needs its 9:16 export on Stories and Reels.
+  // As delivered: Stories and Reels get the 9:16 cards when the idea has
+  // them; a carousel without them keeps its feed cards, a static needs one.
   const single = doc.cards.length === 1;
-  if (!isFeedPlacement(id) && single && !doc.shapes.includes("story"))
+  if (vertical && single && !doc.shapes.includes("story"))
     return { media: [], issue: "Prepare and approve a vertical (9:16) image." };
-  const shape = !isFeedPlacement(id) && single ? "story" : base;
+  const shape = vertical && doc.shapes.includes("story") ? "story" : base;
   return {
     media: doc.cards.flatMap((card) => {
       const url = ideaPreviewUrl(brandId, card, shape);

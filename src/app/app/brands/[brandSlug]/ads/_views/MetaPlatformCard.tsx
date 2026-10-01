@@ -1003,13 +1003,14 @@ function ProjectionSummary({
         vertical,
       });
   }
+  // An approved idea's media stays empty until the push saves its images.
+  const slides =
+    content.ideaStudio?.document.cards.length ?? content.media.length;
   return (
     <span className="block space-y-3">
       <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
         <span>
-          {content.media.length > 1
-            ? `Carousel · ${content.media.length} slides`
-            : "Single image"}
+          {slides > 1 ? `Carousel · ${slides} slides` : "Single image"}
         </span>
         {[...new Set(views.map((view) => view.publisher))].map((publisher) => (
           <ChannelLogo
