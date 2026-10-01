@@ -4,6 +4,7 @@ import { resolveMetaSchedule, metaScheduleIssue } from "@/lib/meta-schedule";
 import { adsConnectionProfile } from "./ads-connection-profile";
 import {
   META_DEFAULT_PLACEMENTS,
+  META_PLACEMENTS,
   isFeedPlacement,
   metaPlacementPlanSchema,
   metaPlacementMedia,
@@ -3175,30 +3176,88 @@ async function pushToMeta(args: PushArgs) {
     return [...fromOpening, ...fromAttach];
   };
 
-  // Zernio sends one set of carousel cards, which stories and reels
-  // letterbox. Swap each pushed carousel onto a creative that pins its 9:16
-  // cards there. A failure leaves the pushed ad as it was.
+  // Zernio sends one set of carousel cards. Swap each pushed carousel onto a
+  // creative with a set per placement group: square on Facebook, whose
+  // desktop feed crops carousel cards to square; the feed cards on
+  // Instagram; 9:16 in stories and reels. A failure leaves the pushed ad as
+  // it was and says so.
   const tallPlacements = placementPlan.filter((p) => !isFeedPlacement(p));
   const feedPlacements = placementPlan.filter(isFeedPlacement);
+  const onFacebook = (p: MetaPlacement) =>
+    META_PLACEMENTS.find((row) => row.id === p)?.publisher === "facebook";
+  const facebookFeed = feedPlacements.filter(onFacebook);
+  const otherFeed = feedPlacements.filter((p) => !onFacebook(p));
+  // The push freezes approved ideas first, so their square renders exist.
+  const squareCards = async (adId: string) => {
+    const row = await db.query.adTable.findFirst({
+      where: eq(adTable.id, adId),
+      columns: { content: true },
+    });
+    const square =
+      row && "media" in row.content
+        ? row.content.ideaStudio?.approval?.renders.square
+        : undefined;
+    return square?.length ? square.map((render) => render.url) : null;
+  };
   const placeCarouselCards = async (ads: ReturnType<typeof setAdsFor>) => {
-    if (!tallPlacements.length || !feedPlacements.length) return;
     for (const { planAd, externalId, media } of ads) {
       if (
         !externalId ||
         media.length < 2 ||
-        media.some((card) => card.type === "video" || !card.story?.url)
+        media.some((card) => card.type === "video")
       )
         continue;
+      const square = facebookFeed.length ? await squareCards(planAd.id) : null;
+      const usable = square?.length === media.length ? square : null;
+      if (facebookFeed.length && !usable)
+        warnings.push(
+          `${planAd.name}: no square cards, so Facebook's desktop feed crops this carousel. Export the Square size and push again.`,
+        );
+      const feed = media.map((card) => card.url);
+      const tall = media.every((card) => card.story?.url)
+        ? media.map((card) => card.story!.url)
+        : null;
+      const sets = [
+        ...(usable
+          ? [
+              {
+                imageUrls: usable,
+                positions: metaProviderPlacements(facebookFeed),
+              },
+              ...(otherFeed.length
+                ? [
+                    {
+                      imageUrls: feed,
+                      positions: metaProviderPlacements(otherFeed),
+                    },
+                  ]
+                : []),
+            ]
+          : feedPlacements.length
+            ? [
+                {
+                  imageUrls: feed,
+                  positions: metaProviderPlacements(feedPlacements),
+                },
+              ]
+            : []),
+        ...(tall && tallPlacements.length
+          ? [
+              {
+                imageUrls: tall,
+                positions: metaProviderPlacements(tallPlacements),
+              },
+            ]
+          : []),
+      ];
+      if (sets.length < 2) continue;
       await setMetaCarouselPlacementCards({
         adAccountId: destination.adAccount.id,
         adId: externalId,
-        feedImageUrls: media.map((card) => card.url),
-        tallImageUrls: media.map((card) => card.story!.url),
-        feedPositions: metaProviderPlacements(feedPlacements),
-        tallPositions: metaProviderPlacements(tallPlacements),
+        sets,
       }).catch((error: unknown) => {
         warnings.push(
-          `${planAd.name}: 9:16 carousel cards not applied, stories show the feed cards (${
+          `${planAd.name}: per-placement carousel cards not applied, every placement shows the feed cards (${
             error instanceof Error ? error.message : String(error)
           })`,
         );

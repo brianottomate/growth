@@ -472,21 +472,23 @@ async function uploadMetaAdImage(adAccountId: string, imageUrl: string) {
 }
 
 /**
- * Give a pushed carousel ad its 9:16 cards in stories and reels. Zernio can
- * only send one set of cards, which Meta letterboxes there. Meta's placement
- * asset customization can pin a second set of cards per placement, the same
- * as "Edit placement" in Ads Manager, so the ad's creative is rebuilt on the
- * Graph API from the pushed one and swapped in. Same ad, same ad set.
+ * Give a pushed carousel ad a set of cards per group of placements: square on
+ * Facebook (whose desktop feed crops carousel cards to square), 4:5 on
+ * Instagram, 9:16 in stories and reels. Zernio can only send one set of
+ * cards. Meta's placement asset customization pins a set per placement, the
+ * same as "Edit placement" in Ads Manager, so the ad's creative is rebuilt on
+ * the Graph API from the pushed one and swapped in. Same ad, same ad set.
+ * Rules cannot split by device, so the square set covers all of Facebook.
  * https://developers.facebook.com/docs/marketing-api/dynamic-creative/placement-asset-customization/
  */
 export async function setMetaCarouselPlacementCards(input: {
   adAccountId: string;
   adId: string;
-  feedImageUrls: string[];
-  tallImageUrls: string[];
-  feedPositions: MetaPositions;
-  tallPositions: MetaPositions;
+  /** In priority order; Meta needs two or more. */
+  sets: { imageUrls: string[]; positions: MetaPositions }[];
 }) {
+  if (input.sets.length < 2)
+    throw new Error("Placement cards need two or more sets");
   const { creative } = await metaRead<{
     creative: {
       object_story_spec: {
@@ -511,17 +513,15 @@ export async function setMetaCarouselPlacementCards(input: {
   );
   const story = creative.object_story_spec;
   const cards = story.link_data.child_attachments;
-  if (
-    cards.length !== input.feedImageUrls.length ||
-    cards.length !== input.tallImageUrls.length
-  )
+  if (input.sets.some((set) => set.imageUrls.length !== cards.length))
     throw new Error("Card count differs from the pushed carousel");
 
-  const feedHashes = await Promise.all(
-    input.feedImageUrls.map((url) => uploadMetaAdImage(input.adAccountId, url)),
-  );
-  const tallHashes = await Promise.all(
-    input.tallImageUrls.map((url) => uploadMetaAdImage(input.adAccountId, url)),
+  const hashes = await Promise.all(
+    input.sets.map((set) =>
+      Promise.all(
+        set.imageUrls.map((url) => uploadMetaAdImage(input.adAccountId, url)),
+      ),
+    ),
   );
   // Meta refuses duplicate asset values, so equal texts share one entry.
   const unique = (values: string[]) => [...new Set(values)];
@@ -530,9 +530,9 @@ export async function setMetaCarouselPlacementCards(input: {
     cards.flatMap((card) => (card.description ? [card.description] : [])),
   );
   const links = unique(cards.map((card) => card.link));
-  const childAttachments = (side: "feed" | "tall") =>
+  const childAttachments = (set: number) =>
     cards.map((card, i) => ({
-      image_label: { name: `${side}_${i}` },
+      image_label: { name: `set${set}_${i}` },
       title_label: { name: `title_${titles.indexOf(card.name)}` },
       ...(card.description
         ? {
@@ -567,16 +567,12 @@ export async function setMetaCarouselPlacementCards(input: {
         ? { degrees_of_freedom_spec: creative.degrees_of_freedom_spec }
         : {}),
       asset_feed_spec: {
-        images: [
-          ...feedHashes.map((hash, i) => ({
+        images: hashes.flatMap((set, s) =>
+          set.map((hash, i) => ({
             hash,
-            adlabels: [{ name: `feed_${i}` }],
+            adlabels: [{ name: `set${s}_${i}` }],
           })),
-          ...tallHashes.map((hash, i) => ({
-            hash,
-            adlabels: [{ name: `tall_${i}` }],
-          })),
-        ],
+        ),
         titles: titles.map((text, i) => ({
           text,
           adlabels: [{ name: `title_${i}` }],
@@ -597,30 +593,16 @@ export async function setMetaCarouselPlacementCards(input: {
         call_to_action_types: [story.link_data.call_to_action.type],
         ad_formats: ["CAROUSEL"],
         optimization_type: "PLACEMENT",
-        carousels: [
-          {
-            adlabels: [{ name: "carousel_feed" }],
-            child_attachments: childAttachments("feed"),
-            multi_share_end_card: false,
-          },
-          {
-            adlabels: [{ name: "carousel_tall" }],
-            child_attachments: childAttachments("tall"),
-            multi_share_end_card: false,
-          },
-        ],
-        asset_customization_rules: [
-          {
-            customization_spec: spec(input.feedPositions),
-            carousel_label: { name: "carousel_feed" },
-            priority: 1,
-          },
-          {
-            customization_spec: spec(input.tallPositions),
-            carousel_label: { name: "carousel_tall" },
-            priority: 2,
-          },
-        ],
+        carousels: input.sets.map((_, s) => ({
+          adlabels: [{ name: `carousel_${s}` }],
+          child_attachments: childAttachments(s),
+          multi_share_end_card: false,
+        })),
+        asset_customization_rules: input.sets.map((set, s) => ({
+          customization_spec: spec(set.positions),
+          carousel_label: { name: `carousel_${s}` },
+          priority: s + 1,
+        })),
       },
     },
   );

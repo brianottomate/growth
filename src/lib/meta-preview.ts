@@ -1,6 +1,7 @@
 import type { AdCreativeContent } from "@/server/db/ads-schema";
 import { ideaPreviewUrl } from "./ad-idea-studio";
 import {
+  META_PLACEMENTS,
   isFeedPlacement,
   metaPlacementMedia,
   type MetaPlacement,
@@ -52,6 +53,27 @@ export function metaPreviewMedia(
       issue: null,
     };
   const doc = content.ideaStudio?.document;
+  // Facebook gets a carousel's square cards (its desktop feed crops to
+  // square), the same swap; once frozen, the saved square renders.
+  const squareOnFacebook =
+    !vertical &&
+    META_PLACEMENTS.find((p) => p.id === id)?.publisher === "facebook" &&
+    (doc?.cards.length ?? 0) > 1;
+  const squares = content.ideaStudio?.approval?.renders.square;
+  if (
+    squareOnFacebook &&
+    !resolved.issue &&
+    !("pending" in resolved) &&
+    squares?.length === doc!.cards.length
+  )
+    return {
+      media: squares.map((render) => ({
+        type: "image" as const,
+        url: render.url,
+      })),
+      issue: null,
+      crop: "square" as const,
+    };
   const draft =
     !content.ideaStudio?.approval && !content.metaImport?.issues.length;
   if (!doc || !("pending" in resolved || draft)) return resolved;
@@ -61,13 +83,19 @@ export function metaPreviewMedia(
   const single = doc.cards.length === 1;
   if (vertical && single && !doc.shapes.includes("story"))
     return { media: [], issue: "Prepare and approve a vertical (9:16) image." };
-  const shape = vertical && doc.shapes.includes("story") ? "story" : base;
+  const shape =
+    vertical && doc.shapes.includes("story")
+      ? "story"
+      : squareOnFacebook && doc.shapes.includes("square")
+        ? "square"
+        : base;
   return {
     media: doc.cards.flatMap((card) => {
       const url = ideaPreviewUrl(brandId, card, shape);
       return url ? [{ type: "image" as const, url }] : [];
     }),
     issue: null,
+    ...(shape === "square" ? { crop: "square" as const } : {}),
   };
 }
 export function importedPlacementLabel(adSets: Record<string, unknown>[]) {

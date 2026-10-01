@@ -1254,9 +1254,10 @@ function ProjectedAd({
                   verticalKind={view.kind === "reel" ? "reel" : "story"}
                   surface={view.surface}
                   crop={
-                    content.ideaStudio?.document.shapes.includes("portrait")
+                    ("crop" in resolved ? resolved.crop : undefined) ??
+                    (content.ideaStudio?.document.shapes.includes("portrait")
                       ? "portrait"
-                      : (content.ideaStudio?.document.shapes[0] ?? "portrait")
+                      : (content.ideaStudio?.document.shapes[0] ?? "portrait"))
                   }
                   brandName={brandName}
                   brandLogo={brandLogo}

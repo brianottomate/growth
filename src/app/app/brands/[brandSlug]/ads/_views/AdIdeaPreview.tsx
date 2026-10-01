@@ -128,7 +128,9 @@ export function AdIdeaPreview({
                   surface={surface.surface}
                   publisher={surface.publisher}
                   verticalKind="story"
-                  crop={size}
+                  crop={
+                    ("crop" in resolved ? resolved.crop : undefined) ?? size
+                  }
                   brandName={brandName}
                   brandLogo={brandLogo}
                   body={surfaceCopy.body}
