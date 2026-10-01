@@ -589,7 +589,11 @@ export async function setMetaCarouselPlacementCards(input: {
           website_url,
           adlabels: [{ name: `link_${i}` }],
         })),
-        bodies: [{ text: story.link_data.message }],
+        // Labelled and named by every rule: an unlabelled body is dropped by
+        // the placements the rules cover, so the post showed no text.
+        bodies: [
+          { text: story.link_data.message, adlabels: [{ name: "body_0" }] },
+        ],
         call_to_action_types: [story.link_data.call_to_action.type],
         ad_formats: ["CAROUSEL"],
         optimization_type: "PLACEMENT",
@@ -601,6 +605,7 @@ export async function setMetaCarouselPlacementCards(input: {
         asset_customization_rules: input.sets.map((set, s) => ({
           customization_spec: spec(set.positions),
           carousel_label: { name: `carousel_${s}` },
+          body_label: { name: "body_0" },
           priority: s + 1,
         })),
       },

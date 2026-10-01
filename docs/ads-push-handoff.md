@@ -206,6 +206,12 @@ expressible: all of Facebook gets the square.
   stories and reels) and swaps it onto the same ad
   (`setMetaCarouselPlacementCards`, called from `placeCarouselCards`). A
   square-only carousel with no 9:16 needs nothing and makes no calls.
+  Every text in that creative (primary text, titles, descriptions, links)
+  must be labelled and named by each rule (`body_label`, `title_label`, ...):
+  an unlabelled body is dropped in the placements the rules cover, so the post
+  showed no text on Facebook and Instagram until 2026-10-01. Check a swapped
+  ad by opening Meta's own preview, not just reading the rules back: the text
+  is drawn in the browser, so curl on a desktop preview cannot see it.
 - **Starter shells.** "Add starter ad ideas → Empty shells" creates empty ads
   per featured home sized by `ZERNIO_NATIVE_SHAPES` (statics 4:5 + 1:1 + 9:16,
   carousels 1:1): the sizes a push can deliver with nothing to fix after.
