@@ -1,3 +1,4 @@
+import { homeGroupsRouter } from "@/server/api/routers/homeGroups.router";
 import { userRouter } from "@/server/api/routers/user.router";
 import { adsRouter } from "@/server/api/routers/ads.router";
 import { affiliateRouter } from "@/server/api/routers/affiliate.router";
@@ -47,6 +48,7 @@ import { zernioRouter } from "@/server/api/routers/zernio.router";
  * All routers added in /api/routers should be manually added here.
  */
 export const appRouter = {
+  homeGroups: homeGroupsRouter,
   launch: launchRouter,
   user: userRouter,
   ads: adsRouter,

@@ -34,7 +34,8 @@ import { campaignCopyRules } from "@/server/ai/prompts/campaign-copy";
 import { runCopyRequest, type CopyRequest } from "@/server/ai/copy-request";
 import { requireOwnedCampaign, starterIdeaHomes } from "./ads-draft.service";
 import { brandListings, brandWebsiteId } from "./wanderos-listings.service";
-import { listBrandHomes } from "./homes.service";
+import { listAllBrandHomes } from "./homes.service";
+import { resolveBookingTarget } from "./home-groups.service";
 import { fetchPublicImage } from "./media.service";
 
 const MODEL = "claude-sonnet-5";
@@ -49,16 +50,14 @@ export async function startStarterGeneration(input: Input) {
     input.organizationId,
   );
   if (campaign.deletedAt) throw new Error("Campaign not found");
-  const homes = await listBrandHomes(brand.id);
+  const homes = await listAllBrandHomes(brand.id);
   if (input.source !== "brand" && !input.homeIds.length)
-    throw new Error("Choose at least one featured home");
+    throw new Error("Choose at least one home");
   if (
     new Set(input.homeIds).size !== input.homeIds.length ||
-    input.homeIds.some(
-      (id) => !homes.some((h) => h.id === id && h.source === "wanderos"),
-    )
+    input.homeIds.some((id) => !homes.some((h) => h.id === id))
   )
-    throw new Error("Choose this brand's featured homes");
+    throw new Error("Choose this brand's homes");
   const [run] = await db
     .insert(creativeRunTable)
     .values({
@@ -232,6 +231,12 @@ export async function runStarterGeneration(runId: string, input: Input) {
       input.campaignId,
       input.organizationId,
     );
+    const booking = campaign.bookingTargetId
+      ? await resolveBookingTarget(
+          campaign.bookingTargetId,
+          input.organizationId,
+        )
+      : null;
     if (input.source === "brand") {
       await progress("Writing brand concepts and ad copy");
       const fullBrand = await db.query.brandTable.findFirst({
@@ -254,7 +259,7 @@ export async function runStarterGeneration(runId: string, input: Input) {
           body: idea.body,
           description: idea.description,
           media: [],
-          linkUrl: brand.website ?? "",
+          linkUrl: booking?.url ?? brand.website ?? "",
           callToAction: "BOOK_NOW",
         };
         const document = ideaDocumentFromAd({ name: idea.name, content });
@@ -267,6 +272,7 @@ export async function runStarterGeneration(runId: string, input: Input) {
           type: "creative",
           status: "drawn",
           businessKey: `${runId}:${created}`,
+          bookingTargetId: booking?.target.id ?? null,
           content: { ...content, ideaStudio: { document } },
         });
         created++;
@@ -288,9 +294,9 @@ export async function runStarterGeneration(runId: string, input: Input) {
     }
     const [available, listings, homes, websiteId, fullBrand] =
       await Promise.all([
-        starterIdeaHomes(input),
+        starterIdeaHomes({ ...input, allHomes: true }),
         brandListings(brand),
-        listBrandHomes(brand.id),
+        listAllBrandHomes(brand.id),
         brandWebsiteId(brand.id),
         db.query.brandTable.findFirst({ where: eq(brandTable.id, brand.id) }),
       ]);
@@ -309,6 +315,7 @@ export async function runStarterGeneration(runId: string, input: Input) {
       document: IdeaDocument,
       homeId?: string,
     ) => {
+      if (booking) document.copy.linkUrl = booking.url;
       await db.insert(adTable).values({
         brandId: brand.id,
         campaignId: campaign.id,
@@ -317,6 +324,7 @@ export async function runStarterGeneration(runId: string, input: Input) {
         status: "drawn",
         homeId: homeId ?? null,
         businessKey: `${runId}:${created}`,
+        bookingTargetId: booking?.target.id ?? null,
         ...projectIdea(
           brand.id,
           {

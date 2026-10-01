@@ -1,12 +1,18 @@
 import "server-only";
 
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { anthropic } from "@ai-sdk/anthropic";
 import { generateText, Output } from "ai";
 import { z } from "zod";
 
 import { db } from "@/server/db";
-import { brandTable, homeMediaTable, homeTable } from "@/server/db/schema";
+import {
+  brandTable,
+  homeMediaTable,
+  homeTable,
+  homeGroupTable,
+  homeGroupMemberTable,
+} from "@/server/db/schema";
 import type { HomeMediaRole, HomeSource } from "@/server/db/home-schema";
 import {
   fetchWanderOsListingDetail,
@@ -456,10 +462,28 @@ export async function listAllBrandHomes(brandId: string) {
 
 /** Every featured home for a brand, newest picks last, for the setup grid. */
 export async function listBrandHomes(brandId: string): Promise<BrandHome[]> {
+  const members = await db
+    .select({ homeId: homeGroupMemberTable.homeId })
+    .from(homeGroupMemberTable)
+    .innerJoin(
+      homeGroupTable,
+      eq(homeGroupTable.id, homeGroupMemberTable.groupId),
+    )
+    .where(
+      and(
+        eq(homeGroupTable.brandId, brandId),
+        eq(homeGroupTable.kind, "featured"),
+      ),
+    )
+    .orderBy(asc(homeGroupMemberTable.sortOrder));
+  if (!members.length) return [];
   const rows = await db.query.homeTable.findMany({
     where: and(
       eq(homeTable.brandId, brandId),
-      eq(homeTable.featured, true),
+      inArray(
+        homeTable.id,
+        members.map((member) => member.homeId),
+      ),
       isNull(homeTable.deletedAt),
     ),
     orderBy: (home, { asc: a }) => [a(home.sortOrder), a(home.createdAt)],
@@ -481,7 +505,9 @@ export async function listBrandHomes(brandId: string): Promise<BrandHome[]> {
       galleryCache: true,
     },
   });
-  return rows;
+  return members.flatMap((member) =>
+    rows.filter((row) => row.id === member.homeId),
+  );
 }
 
 /**

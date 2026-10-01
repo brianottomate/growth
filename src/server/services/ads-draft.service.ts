@@ -1,3 +1,4 @@
+import { listHomesInGroup, resolveBookingTarget } from "./home-groups.service";
 import { resolveMetaSchedule, metaScheduleIssue } from "@/lib/meta-schedule";
 import "server-only";
 import { assertAdNotPushed } from "./ad-approval.service";
@@ -40,7 +41,7 @@ import {
   shellStarterAdIdeas,
   starterAdIdeas,
 } from "@/lib/starter-ad-ideas";
-import { listBrandHomes } from "./homes.service";
+import { listBrandHomes, listAllBrandHomes } from "./homes.service";
 import { listWanderOsListingPhotos } from "@/server/clients/wanderos-site.client";
 import { brandListings, brandWebsiteId } from "./wanderos-listings.service";
 import { ideaDocumentFromAd, projectIdea } from "@/lib/ad-idea-studio";
@@ -496,6 +497,8 @@ export async function starterIdeaHomes(input: {
   /** The campaign's brand, or a brand directly for the studio. */
   campaignId?: string;
   brandId?: string;
+  groupId?: string;
+  allHomes?: boolean;
 }) {
   const brand = input.campaignId
     ? (await requireOwnedCampaign(input.campaignId, input.organizationId)).brand
@@ -504,11 +507,17 @@ export async function starterIdeaHomes(input: {
         brandId: input.brandId,
       });
   const [homes, listings] = await Promise.all([
-    listBrandHomes(brand.id),
+    input.allHomes
+      ? listAllBrandHomes(brand.id)
+      : input.groupId
+        ? listHomesInGroup(brand.id, input.groupId, input.organizationId)
+        : listBrandHomes(brand.id),
     brandListings(brand),
   ]);
-  const featured = homes.filter((home) => home.source === "wanderos");
-  const websiteId = featured.some((home) => !home.galleryCache?.length)
+  const featured = homes;
+  const websiteId = featured.some(
+    (home) => home.source === "wanderos" && !home.galleryCache?.length,
+  )
     ? await brandWebsiteId(brand.id)
     : null;
   const selected = await Promise.all(
@@ -516,7 +525,7 @@ export async function starterIdeaHomes(input: {
       const listing = listings.find((l) => l.id === home.externalId);
       const gallery = home.galleryCache?.length
         ? home.galleryCache
-        : websiteId
+        : websiteId && home.source === "wanderos"
           ? await listWanderOsListingPhotos({
               websiteId,
               propertyId: home.externalId,
@@ -599,6 +608,7 @@ export async function adIdeaHomePhotos(input: {
   const homes = await starterIdeaHomes({
     organizationId: input.organizationId,
     campaignId: ad.campaignId,
+    allHomes: true,
   });
   return homes.find((home) => home.id === ad.homeId) ?? null;
 }
@@ -643,7 +653,9 @@ export async function addStarterAdIdeas(input: {
       "This campaign already has a different starter set. Use a new campaign or delete the existing starter ideas first.",
     );
   const byHome = source !== "blank";
-  const available = byHome ? await starterIdeaHomes(input) : [];
+  const available = byHome
+    ? await starterIdeaHomes({ ...input, allHomes: Boolean(input.homeIds) })
+    : [];
   const homes = input.homeIds
     ? available.filter((h) => input.homeIds!.includes(h.id))
     : available;
@@ -670,8 +682,16 @@ export async function addStarterAdIdeas(input: {
     if (ideas[0]!.content.ideaStudio)
       ideas[0]!.content.ideaStudio.document.copy.linkUrl = brand.website;
   }
+  const booking = campaign.bookingTargetId
+    ? await resolveBookingTarget(campaign.bookingTargetId, input.organizationId)
+    : null;
   let created = 0;
   for (const idea of ideas) {
+    if (booking) {
+      idea.content.linkUrl = booking.url;
+      if (idea.content.ideaStudio)
+        idea.content.ideaStudio.document.copy.linkUrl = booking.url;
+    }
     const projected = byHome
       ? projectIdea(
           brand.id,
@@ -692,6 +712,7 @@ export async function addStarterAdIdeas(input: {
         ...projected,
         homeId: "homeId" in idea ? (idea.homeId as string) : null,
         businessKey: `${prefix}${idea.key}`,
+        bookingTargetId: booking?.target.id ?? null,
       })
       .onConflictDoNothing()
       .returning({ id: adTable.id });

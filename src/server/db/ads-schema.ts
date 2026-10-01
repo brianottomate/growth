@@ -9,6 +9,7 @@ import type { AdFormat } from "@/lib/performance-ads";
 import type { AdPushGoal } from "@/lib/ad-platforms";
 
 import type { MediaItem } from "./content-schema";
+import { bookingTargetTable } from "./home-group-schema";
 import { homeTable } from "./home-schema";
 import { launchTable } from "./launch-schema";
 import { performanceCycleTable } from "./performance-schema";
@@ -175,6 +176,8 @@ export type AdPlacements = Record<string, AdPlacementCell>;
  * sends both as one ad through Meta's placement asset customization.
  */
 export type AdCard = MediaItem & {
+  landingUrl?: string;
+  bookingTargetId?: string;
   story?: AdPlacementVariant;
   /** Carousel card's own Meta headline and description; blank uses the ad's. */
   headline?: string;
@@ -361,6 +364,9 @@ export const campaignTable = pgTable(
     // Goal intent as a slug for now (e.g. "supply", "saas", "brand").
     goal: t.text(),
     landingUrl: t.text(),
+    bookingTargetId: t
+      .text()
+      .references(() => bookingTargetTable.id, { onDelete: "set null" }),
     description: t.text(),
     color: t.text(), // UI accent (hex), used for feed bands
 
@@ -530,6 +536,9 @@ export const adTable = pgTable(
 
     /** The home this ad is about, when it is about one. */
     homeId: t.text().references(() => homeTable.id, { onDelete: "set null" }),
+    bookingTargetId: t
+      .text()
+      .references(() => bookingTargetTable.id, { onDelete: "set null" }),
 
     name: t.text().notNull(),
     type: adTypeEnum().default("creative").notNull(),

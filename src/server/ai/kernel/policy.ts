@@ -130,6 +130,8 @@ export const growthActionPolicies = {
     sponsoredAbandonment: read(),
     clientCampaignContext: read(),
     featuredHomes: read(),
+    homeGroups: read(),
+    bookingTargets: read(),
     // BigQuery reads plus one look at the shortlist's hero photos.
     suggestFeaturedHomes: read("model-read"),
     // Renders cards onto sheets and asks one model call; writes nothing.
@@ -141,6 +143,12 @@ export const growthActionPolicies = {
   // rows with a cycle id (undo = attach with cycleId null); nothing here
   // touches a provider or spends.
   performanceWrite: {
+    saveHomeGroup: write(),
+    changeHomeGroupHomes: write({ idempotent: true }),
+    deleteHomeGroup: write(),
+    saveBookingTarget: write(),
+    attachBookingTarget: write({ idempotent: true }),
+    setWanderOsEnabled: write({ idempotent: true }),
     createAccount: write(),
     updateAccount: write({ idempotent: true }),
     addProperty: write(),

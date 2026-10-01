@@ -57,6 +57,7 @@ const homesRunSchema = z.strictObject({
 });
 
 const campaignSchema = z.strictObject({
+  bookingTargetId: z.string().nullable(),
   brandId: z.string(),
   budget: z.number().nullable(),
   color: z.string().nullable(),
@@ -270,6 +271,14 @@ const sourceOverridesSchema = z.strictObject({
 });
 
 const cardItemSchema = z.strictObject({
+  copy: z
+    .strictObject({
+      headline: z.string().optional(),
+      description: z.string().optional(),
+      landingUrl: z.string().optional(),
+      bookingTargetId: z.string().optional(),
+    })
+    .optional(),
   id: z.string(),
   mode: z.enum(["supplied", "compose"]),
   overrides: overridesSchema,
@@ -356,6 +365,10 @@ const ideaStudioSchema = z.strictObject({
 });
 
 const storySchema = z.strictObject({
+  headline: z.string().optional(),
+  description: z.string().optional(),
+  landingUrl: z.string().optional(),
+  bookingTargetId: z.string().optional(),
   assetId: z.string().optional(),
   derivedFrom: z.string().optional(),
   height: z.number().optional(),
@@ -367,6 +380,10 @@ const storySchema = z.strictObject({
 });
 
 const mediaItemSchema = z.strictObject({
+  headline: z.string().optional(),
+  description: z.string().optional(),
+  landingUrl: z.string().optional(),
+  bookingTargetId: z.string().optional(),
   assetId: z.string().optional(),
   derivedFrom: z.string().optional(),
   height: z.number().optional(),
@@ -421,6 +438,7 @@ const placementsValueSchema = z.strictObject({
 const placementsSchema = z.record(z.string(), placementsValueSchema);
 
 const draftAdSchema = z.strictObject({
+  bookingTargetId: z.string().nullable(),
   brandId: z.string(),
   businessKey: z.string().nullable(),
   campaignId: z.string().nullable(),
@@ -787,6 +805,7 @@ export const openCampaignActionOutputSchema = z.strictObject({
   ads: z.array(
     z.strictObject({
       brandId: z.string(),
+      bookingTargetId: z.string().nullable(),
       businessKey: z.string().nullable(),
       campaignId: z.string().nullable(),
       content: z.union([
@@ -878,6 +897,7 @@ export const openCampaignActionOutputSchema = z.strictObject({
           bidStrategy: z.string().nullable(),
           body: z.string().nullable(),
           brandId: z.string(),
+          bookingTargetId: z.string().nullable(),
           businessKey: z.string().nullable(),
           channelId: z.string().nullable(),
           copy: z

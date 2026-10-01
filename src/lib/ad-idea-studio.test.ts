@@ -294,3 +294,39 @@ describe("saved approval images", () => {
     expect(ideaImagesSaved({ document: draft() })).toBe(false);
   });
 });
+
+test("card booking links survive saving, approval and every placement projection", () => {
+  const document = draft();
+  document.cards[0]!.copy = {
+    headline: "Explore this home",
+    landingUrl:
+      "https://www.chaletshh.com/s?unitIds=123&checkin=2026-11-15&checkout=2026-11-21",
+    bookingTargetId: "btarget_pilot",
+  };
+  for (const approval of [
+    undefined,
+    {
+      approvedAt: "2026-10-01T00:00:00Z",
+      approvedBy: "user",
+      sourceVersion: "v1",
+      renders: {
+        portrait: [{ assetId: "feed", url: "https://example.com/feed.png" }],
+        story: [{ assetId: "story", url: "https://example.com/story.png" }],
+      },
+    },
+  ]) {
+    const projected = projectIdea(
+      "brand-one",
+      content,
+      { document, approval },
+      null,
+    );
+    expect(projected.content.media[0]).toMatchObject(document.cards[0]!.copy);
+    for (const placement of Object.values(projected.placements))
+      expect(placement?.cards?.[0]).toMatchObject(document.cards[0]!.copy);
+    expect(
+      ideaDocumentFromAd({ name: "Pilot", content: projected.content })
+        .cards[0]!.copy,
+    ).toEqual(document.cards[0]!.copy);
+  }
+});

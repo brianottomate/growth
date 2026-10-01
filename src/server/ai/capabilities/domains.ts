@@ -1,3 +1,13 @@
+import {
+  attachBookingTargetAction,
+  bookingTargetsAction,
+  changeHomeGroupHomesAction,
+  deleteHomeGroupAction,
+  homeGroupsAction,
+  saveBookingTargetAction,
+  saveHomeGroupAction,
+  setWanderOsEnabledAction,
+} from "./home-groups";
 import "server-only";
 
 import {
@@ -288,6 +298,8 @@ export const performanceRead = growthDomainTool({
     sponsoredAbandonment: listSponsoredAbandonmentAction,
     clientCampaignContext: clientCampaignContextAction,
     featuredHomes: featuredHomesAction,
+    homeGroups: homeGroupsAction,
+    bookingTargets: bookingTargetsAction,
     suggestFeaturedHomes: suggestFeaturedHomesAction,
     reviewPortfolio: reviewPortfolioAction,
     intakes: listIntakesAction,
@@ -312,6 +324,12 @@ export const performanceWrite = growthDomainTool({
     applyIntake: applyIntakeAction,
     verifyIntakeAccess: verifyIntakeAccessAction,
     updateHome: updateHomeAction,
+    saveHomeGroup: saveHomeGroupAction,
+    changeHomeGroupHomes: changeHomeGroupHomesAction,
+    deleteHomeGroup: deleteHomeGroupAction,
+    saveBookingTarget: saveBookingTargetAction,
+    attachBookingTarget: attachBookingTargetAction,
+    setWanderOsEnabled: setWanderOsEnabledAction,
   },
 });
 

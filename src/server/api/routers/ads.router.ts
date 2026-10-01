@@ -104,6 +104,7 @@ export const adsRouter = {
         .object({
           campaignId: z.string().min(1).optional(),
           brandId: z.string().min(1).optional(),
+          groupId: z.string().min(1).optional(),
         })
         .refine((value) => value.campaignId || value.brandId, {
           message: "campaignId or brandId is required",

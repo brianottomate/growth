@@ -47,6 +47,8 @@ export const ideaCopySchema = z.object({
 });
 /** One carousel card's own words on Meta; blank falls back to the ad's. */
 export const ideaCardCopySchema = z.object({
+  landingUrl: z.string().url().optional(),
+  bookingTargetId: z.string().optional(),
   headline: z.string().max(300).optional(),
   description: z.string().max(120).optional(),
 });
@@ -330,10 +332,16 @@ export const IDEA_PLACEMENT_KEYS: Record<IdeaShape, string[]> = {
   wide: ["meta_ads:landscape"],
 };
 /** A card's own Meta copy, trimmed; blank fields are left for the ad's. */
-function cardCopy(card: IdeaImage): Pick<AdCard, "headline" | "description"> {
+function cardCopy(
+  card: IdeaImage,
+): Pick<AdCard, "headline" | "description" | "landingUrl" | "bookingTargetId"> {
   const headline = card.copy?.headline?.trim();
   const description = card.copy?.description?.trim();
   return {
+    ...(card.copy?.landingUrl ? { landingUrl: card.copy.landingUrl } : {}),
+    ...(card.copy?.bookingTargetId
+      ? { bookingTargetId: card.copy.bookingTargetId }
+      : {}),
     ...(headline ? { headline } : {}),
     ...(description ? { description } : {}),
   };
@@ -356,7 +364,12 @@ export function projectIdea(
         frozen?.url ??
         (studio.approval ? null : ideaPreviewUrl(brandId, card, shape));
       return url
-        ? { type: "image", url, ...(frozen ? { assetId: frozen.assetId } : {}) }
+        ? {
+            type: "image",
+            url,
+            ...cardCopy(card),
+            ...(frozen ? { assetId: frozen.assetId } : {}),
+          }
         : null;
     });
   for (const shape of doc.shapes) {

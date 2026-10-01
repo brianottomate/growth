@@ -12,6 +12,7 @@ function campaign(overrides: Partial<Campaign> = {}): Campaign {
     slug: "supply-push-q3",
     goal: "supply",
     landingUrl: null,
+    bookingTargetId: null,
     description: null,
     color: null,
     status: "active",

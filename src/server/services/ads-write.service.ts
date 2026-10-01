@@ -1849,7 +1849,7 @@ export async function previewDraftAd(
           link,
           message: content.body,
           child_attachments: content.media.slice(0, 10).map((item) => ({
-            link,
+            link: item.landingUrl ?? link,
             picture: item.url,
             name: item.headline ?? content.headline,
             ...((item.description ?? content.description)
@@ -1859,7 +1859,7 @@ export async function previewDraftAd(
               ? {
                   call_to_action: {
                     type: metaCallToActionType(content.callToAction),
-                    value: { link },
+                    value: { link: item.landingUrl ?? link },
                   },
                 }
               : {}),
@@ -3173,7 +3173,7 @@ async function pushToMeta(args: PushArgs) {
         item.headline ??
         (index === 0 ? content.headline : (content.headline ?? campaign.name)),
       description: item.description ?? content.description,
-      linkUrl: content.linkUrl ?? linkUrl,
+      linkUrl: item.landingUrl ?? content.linkUrl ?? linkUrl,
       callToAction: metaCallToAction(content),
     }));
 
@@ -3653,7 +3653,7 @@ async function pushToLinkedIn(args: PushArgs) {
                   .map((item, index) => ({
                     imageUrl: item.url,
                     headline: index === 0 ? content.headline : undefined,
-                    landingUrl: content.linkUrl ?? linkUrl,
+                    landingUrl: item.landingUrl ?? content.linkUrl ?? linkUrl,
                   })),
               },
             },

@@ -1,3 +1,4 @@
+import { BookingTargetPicker } from "./BookingTargetPicker";
 import { WorkspaceBreadcrumbs } from "@/components/workspace-breadcrumbs";
 import {
   campaignListPath,
@@ -222,6 +223,12 @@ export async function CampaignView({
             ]}
           />
         )}
+        <BookingTargetPicker
+          brandId={brand.id}
+          brandSlug={brandSlug}
+          campaignId={campaign.id}
+          targetId={campaign.bookingTargetId}
+        />
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-start gap-2.5">
@@ -308,7 +315,10 @@ export async function CampaignView({
         <AdIdeasList
           actions={
             <div className="flex flex-wrap items-center gap-2">
-              <AddStarterIdeasButton campaignId={campaign.id} />
+              <AddStarterIdeasButton
+                campaignId={campaign.id}
+                brandId={brand.id}
+              />
               {plannedPlatforms.includes("google_ads") && (
                 <WriteSearchAdsButton campaignId={campaign.id} />
               )}

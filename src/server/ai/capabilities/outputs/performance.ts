@@ -786,6 +786,7 @@ export const previewIntakeApplyActionOutputSchema = z.strictObject({
         updatedAt: z.iso.datetime(),
         wanderOsCheckedAt: z.iso.datetime().nullable(),
         wanderOsWebsiteId: z.string().nullable(),
+        wanderOsEnabled: z.boolean(),
         emailSender: brandEmailSenderSchema,
         legalIdentity: brandLegalIdentitySchema,
         website: z.string().nullable(),

@@ -33,11 +33,13 @@ export async function brandWebsiteId(brandId: string): Promise<string | null> {
       id: true,
       website: true,
       wanderOsWebsiteId: true,
+      wanderOsEnabled: true,
       wanderOsCheckedAt: true,
     },
   });
   if (!brand?.website) return null;
-  if (brand.wanderOsWebsiteId) return brand.wanderOsWebsiteId;
+  if (brand.wanderOsWebsiteId)
+    return brand.wanderOsEnabled ? brand.wanderOsWebsiteId : null;
   // Looked before and found nothing. Asking again is a decision someone makes.
   if (brand.wanderOsCheckedAt) return null;
   return discoverAndRemember(brand.id, brand.website);
@@ -50,7 +52,11 @@ async function discoverAndRemember(
   const discovered = await wanderOsWebsiteId(website);
   await db
     .update(brandTable)
-    .set({ wanderOsWebsiteId: discovered, wanderOsCheckedAt: new Date() })
+    .set({
+      wanderOsWebsiteId: discovered,
+      wanderOsEnabled: Boolean(discovered),
+      wanderOsCheckedAt: new Date(),
+    })
     .where(eq(brandTable.id, brandId));
   return discovered;
 }
@@ -60,6 +66,7 @@ export type BrandWebsiteState = {
   website: string | null;
   websiteId: string | null;
   checkedAt: Date | null;
+  enabled: boolean;
 };
 
 export async function brandWebsiteState(
@@ -70,6 +77,7 @@ export async function brandWebsiteState(
     columns: {
       website: true,
       wanderOsWebsiteId: true,
+      wanderOsEnabled: true,
       wanderOsCheckedAt: true,
     },
   });
@@ -77,6 +85,7 @@ export async function brandWebsiteState(
     website: brand?.website ?? null,
     websiteId: brand?.wanderOsWebsiteId ?? null,
     checkedAt: brand?.wanderOsCheckedAt ?? null,
+    enabled: brand?.wanderOsEnabled ?? false,
   };
 }
 
@@ -111,7 +120,11 @@ export async function setBrandWebsiteId(input: {
   }
   await db
     .update(brandTable)
-    .set({ wanderOsWebsiteId: value, wanderOsCheckedAt: new Date() })
+    .set({
+      wanderOsWebsiteId: value,
+      wanderOsEnabled: Boolean(value),
+      wanderOsCheckedAt: new Date(),
+    })
     .where(eq(brandTable.id, input.brandId));
   return brandWebsiteState(input.brandId);
 }

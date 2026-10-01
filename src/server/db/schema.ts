@@ -32,3 +32,5 @@ export * from "./home-schema";
 export * from "./media-schema";
 export * from "./pregen-native-schema";
 export * from "./website-schema";
+
+export * from "./home-group-schema";

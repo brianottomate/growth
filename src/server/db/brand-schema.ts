@@ -414,6 +414,8 @@ export const brandTable = pgTable(
      * remembering just as much as a hit.
      */
     wanderOsWebsiteId: t.text(),
+    /** Operator-controlled connection capability; groups work without it. */
+    wanderOsEnabled: t.boolean().default(false).notNull(),
     /** Applied with scripts/apply-brand-email-sender.ts. */
     emailSender: t.jsonb().$type<BrandEmailSender>(),
     /** Applied with scripts/apply-brand-email-sender.ts. */

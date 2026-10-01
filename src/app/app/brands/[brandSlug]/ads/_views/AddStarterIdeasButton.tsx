@@ -4,6 +4,14 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -16,16 +24,29 @@ import {
 import { toast } from "@/components/ui/toast";
 import { orpc } from "@/orpc/client";
 
-export function AddStarterIdeasButton({ campaignId }: { campaignId: string }) {
+export function AddStarterIdeasButton({
+  campaignId,
+  brandId,
+}: {
+  campaignId: string;
+  brandId: string;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [source, setSource] = useState<"blank" | "featured" | "shells">(
     "featured",
   );
+  const [groupId, setGroupId] = useState("featured");
+  const groups = useQuery({
+    ...orpc.homeGroups.context.queryOptions({ input: { brandId } }),
+    enabled: open,
+  });
   const [generate, setGenerate] = useState(true);
   const [refreshing, startTransition] = useTransition();
   const homes = useQuery({
-    ...orpc.ads.starterIdeaHomes.queryOptions({ input: { campaignId } }),
+    ...orpc.ads.starterIdeaHomes.queryOptions({
+      input: { campaignId, ...(groupId === "featured" ? {} : { groupId }) },
+    }),
     enabled: open,
   });
   const available = homes.data ?? [];
@@ -199,6 +220,24 @@ export function AddStarterIdeasButton({ campaignId }: { campaignId: string }) {
                   editable.
                 </p>
               )}
+              <div className="space-y-2">
+                <Label htmlFor="starter-home-group">Home group</Label>
+                <Select value={groupId} onValueChange={setGroupId}>
+                  <SelectTrigger id="starter-home-group">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="featured">Featured homes</SelectItem>
+                    {groups.data?.groups
+                      .filter((g) => g.kind === "custom")
+                      .map((g) => (
+                        <SelectItem key={g.id} value={g.id}>
+                          {g.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
               {homes.isPending ? (
                 <p className="text-sm">Loading featured homes…</p>
               ) : homes.isError ? (
@@ -212,7 +251,7 @@ export function AddStarterIdeasButton({ campaignId }: { campaignId: string }) {
                 <p className="text-sm">
                   {source === "shells"
                     ? "No featured homes: 7 empty ads, a hero carousel plus three statics and three carousels."
-                    : "No featured WanderOS homes yet. Choose homes on the Homes page, or start blank."}
+                    : "No homes in this group yet. Choose homes on the Homes page, or start blank."}
                 </p>
               ) : (
                 <>

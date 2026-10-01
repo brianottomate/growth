@@ -5,6 +5,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { orpc } from "@/orpc/client";
 
@@ -43,6 +45,11 @@ export function WanderOsSiteCard({ brandId }: { brandId: string }) {
     }),
   );
 
+  const toggle = useMutation(
+    orpc.homeGroups.setWanderOsEnabled.mutationOptions({
+      onSuccess: invalidate,
+    }),
+  );
   const data = state.data;
   const checked = data?.checkedAt ? new Date(data.checkedAt) : null;
 
@@ -58,6 +65,20 @@ export function WanderOsSiteCard({ brandId }: { brandId: string }) {
       </div>
 
       <div className="rounded-xl border border-border p-4">
+        <div className="mb-4 flex items-center gap-3">
+          <Switch
+            id="wanderos-enabled"
+            checked={data?.enabled ?? false}
+            disabled={state.isPending || toggle.isPending}
+            onCheckedChange={(enabled) => toggle.mutate({ brandId, enabled })}
+          />
+          <Label htmlFor="wanderos-enabled">WanderOS integration enabled</Label>
+        </div>
+        {toggle.error && (
+          <p role="alert" className="text-sm">
+            {toggle.error.message}
+          </p>
+        )}
         {!data?.website ? (
           <p className="text-sm text-muted-foreground">
             No website on this brand yet.

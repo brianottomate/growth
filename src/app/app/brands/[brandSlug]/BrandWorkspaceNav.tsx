@@ -10,6 +10,7 @@ const tabs = [
   ["newsletters", "Newsletters"],
   ["previews", "Organic previews"],
   ["ads", "Paid campaigns"],
+  ["homes", "Homes & targets"],
   ["setup", "Connections"],
 ] as const;
 export function BrandWorkspaceNav({
