@@ -425,27 +425,32 @@ function HomeGroup({
           <CompactCard key={home.href} property={home} stack={false} />
         ))
       ) : section.layout === "grid" ? (
-        pairs.map((pair) => (
-          <Section key={pair[0]!.href} style={{ paddingTop: "16px" }}>
-            <Row>
-              {pair.map((home, i) => (
-                <Column
-                  key={home.href}
-                  className="wd-grid-cell"
-                  style={{
-                    width: "50%",
-                    verticalAlign: "top",
-                    paddingLeft: i ? "8px" : 0,
-                    paddingRight: i ? 0 : "8px",
-                  }}
-                >
-                  <GridCard property={home} />
-                </Column>
-              ))}
-              {pair.length === 1 ? <Column style={{ width: "50%" }} /> : null}
-            </Row>
-          </Section>
-        ))
+        // Two portrait cards to a row; an odd last home runs the full width
+        // as a landscape card rather than half a row beside a gap.
+        pairs.map((pair) =>
+          pair.length === 1 ? (
+            <FeaturedCard key={pair[0]!.href} property={pair[0]!} />
+          ) : (
+            <Section key={pair[0]!.href} style={{ paddingTop: "16px" }}>
+              <Row>
+                {pair.map((home, i) => (
+                  <Column
+                    key={home.href}
+                    className="wd-grid-cell"
+                    style={{
+                      width: "50%",
+                      verticalAlign: "top",
+                      paddingLeft: i ? "8px" : 0,
+                      paddingRight: i ? 0 : "8px",
+                    }}
+                  >
+                    <GridCard property={home} />
+                  </Column>
+                ))}
+              </Row>
+            </Section>
+          ),
+        )
       ) : (
         <>
           <FeaturedCard property={section.featured} />
