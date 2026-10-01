@@ -143,7 +143,12 @@ export function MetaPlatformCard({
       ad.type === "creative" &&
       "media" in ad.content &&
       !isImportedMetaCatalog(ad.content) &&
-      Boolean(ad.content.media[0]?.url),
+      // An approved idea has no media until the push saves its images.
+      (Boolean(ad.content.media[0]?.url) ||
+        Boolean(
+          ad.content.ideaStudio?.approval &&
+          ad.content.ideaStudio.document.cards.length,
+        )),
   );
   const sets = audiences.length
     ? audiences
