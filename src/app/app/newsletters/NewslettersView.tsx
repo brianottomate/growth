@@ -14,6 +14,7 @@ import {
   type NewsletterKind,
 } from "@/lib/newsletter-kind";
 import { inspirationAddress } from "@/lib/inbound-email";
+import { CopyableField } from "@/components/ui/copyable-field";
 import {
   CoverWall,
   DocumentReader,
@@ -299,6 +300,17 @@ export async function NewslettersView({
             {avgOpen != null ? `${Math.round(avgOpen * 100)}%` : "—"} avg open ·
             delivery history
           </p>
+          {selectedBrand ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <span>Subscribe with</span>
+              <div className="w-full max-w-lg">
+                <CopyableField
+                  value={inspirationAddress(selectedBrand.id)}
+                  successMessage="Address copied"
+                />
+              </div>
+            </div>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <NewsletterChatStart
