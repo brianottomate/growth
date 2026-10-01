@@ -28,10 +28,10 @@ import { money } from "./format";
 
 /**
  * Compile the plan onto one platform, PAUSED. Budget, dates and settings come
- * from the platform draft. With the setup saved (ad account, Page, goal) the
- * button pushes straight away: the click is the approval, and spend starts
- * only when the delivery switch is flipped afterwards. Without it, a dialog
- * asks for the destination and the goal.
+ * from the platform draft. With the setup saved (ad account, Page, goal) a
+ * short confirmation says what will be created, since a pushed ad is locked;
+ * spend starts only when the delivery switch is flipped afterwards. Without
+ * the setup, a dialog asks for the destination and the goal.
  */
 export function PushToPlatform({
   campaignId,
@@ -106,31 +106,65 @@ export function PushToPlatform({
   );
 
   const canPush = Boolean(chosen) && budget != null && !push.isPending;
+  const setSummary =
+    audienceCount === 0
+      ? "1 broad ad set"
+      : `${audienceCount} ad set${audienceCount === 1 ? "" : "s"}`;
+  const budgetSummary =
+    budget != null
+      ? `${money(budget)}${budgetType === "lifetime" ? " lifetime" : "/day"}`
+      : "no budget";
   if (configuration) {
     return (
       <div className="flex flex-col items-end gap-1">
-        <Button
-          size="sm"
-          disabled={!canPush}
-          loading={push.isPending}
-          title={
-            budget == null
-              ? `Set the budget on the ${platformName} draft first`
-              : undefined
-          }
-          onClick={() =>
-            push.mutate({
-              campaignId,
-              platform,
-              connectionAccountId: configuration.connectionAccountId,
-              adAccountId: configuration.adAccountId,
-              goal,
-            })
-          }
-        >
-          <UploadCloud className="size-3.5" />
-          {push.isPending ? "Pushing…" : `Push to ${platformName}`}
-        </Button>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild>
+            <Button
+              size="sm"
+              disabled={!canPush}
+              loading={push.isPending}
+              title={
+                budget == null
+                  ? `Set the budget on the ${platformName} draft first`
+                  : undefined
+              }
+            >
+              <UploadCloud className="size-3.5" />
+              {push.isPending ? "Pushing…" : `Push to ${platformName}`}
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Push to {platformName}?</DialogTitle>
+              <DialogDescription>
+                {setSummary} × {draftAdCount} ad
+                {draftAdCount === 1 ? "" : "s"} at {budgetSummary} on{" "}
+                {configuration.label}, all paused. Pushed ads are locked: to
+                change one, make a new campaign.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                loading={push.isPending}
+                disabled={!canPush}
+                onClick={() =>
+                  push.mutate({
+                    campaignId,
+                    platform,
+                    connectionAccountId: configuration.connectionAccountId,
+                    adAccountId: configuration.adAccountId,
+                    goal,
+                  })
+                }
+              >
+                Push
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
         {push.error && (
           <p
             role="alert"
@@ -143,11 +177,6 @@ export function PushToPlatform({
       </div>
     );
   }
-
-  const setSummary =
-    audienceCount === 0
-      ? "1 broad ad set"
-      : `${audienceCount} ad set${audienceCount === 1 ? "" : "s"}`;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -162,11 +191,8 @@ export function PushToPlatform({
           <DialogTitle>Push this plan to {platformName}?</DialogTitle>
           <DialogDescription>
             Compiles {setSummary} × {draftAdCount} ad
-            {draftAdCount === 1 ? "" : "s"} at{" "}
-            {budget != null
-              ? `${money(budget)}${budgetType === "lifetime" ? " lifetime" : "/day"}`
-              : "no budget"}
-            , all paused. Nothing spends until you launch.
+            {draftAdCount === 1 ? "" : "s"} at {budgetSummary}, all paused.
+            Nothing spends until you launch.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
