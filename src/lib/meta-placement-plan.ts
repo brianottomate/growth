@@ -136,6 +136,23 @@ export const metaPlacementPlanSchema = z
   .min(1)
   .max(META_PLACEMENTS.length)
   .refine((p) => new Set(p).size === p.length, "Choose each placement once");
+/**
+ * Feed placements that show a single card square, so a 4:5 loses its top and
+ * bottom: all of Facebook's (desktop feed, marketplace, right column, profile
+ * feed, notifications) and Instagram's profile feed and Explore. Instagram's
+ * main feed shows the 4:5 whole. Rules cannot split by device, so the square
+ * covers a placement everywhere it runs.
+ */
+const INSTAGRAM_SQUARE = new Set<MetaPlacement>([
+  "instagram-explore",
+  "instagram-explore-home",
+  "instagram-profile-feed",
+]);
+export function showsSquare(id: MetaPlacement) {
+  const row = META_PLACEMENTS.find((p) => p.id === id);
+  if (row?.kind !== "feed") return false;
+  return row.publisher === "facebook" || INSTAGRAM_SQUARE.has(id);
+}
 /** Feed-shaped placements take the baseline card; the rest need a 9:16. */
 export function isFeedPlacement(id: MetaPlacement) {
   return META_PLACEMENTS.find((p) => p.id === id)?.kind === "feed";

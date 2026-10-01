@@ -6,6 +6,7 @@ import {
   META_DEFAULT_PLACEMENTS,
   META_PLACEMENTS,
   isFeedPlacement,
+  showsSquare,
   metaPlacementPlanSchema,
   metaPlacementMedia,
   metaProviderPlacements,
@@ -2169,11 +2170,7 @@ export function metaPlacementAssetsFor(
   const card = content.media[0];
   if (!card || content.media.length !== 1) return undefined;
   const tallPlan = placementPlan.filter((p) => !isFeedPlacement(p));
-  const facebookFeed = placementPlan.filter(
-    (p) =>
-      isFeedPlacement(p) &&
-      META_PLACEMENTS.find((row) => row.id === p)?.publisher === "facebook",
-  );
+  const facebookFeed = placementPlan.filter(showsSquare);
   const square = content.ideaStudio?.approval?.renders.square?.[0]?.url;
   if (card.type === "image" && (card.story || square)) {
     const rules = [
@@ -3210,10 +3207,10 @@ async function pushToMeta(args: PushArgs) {
   // it was and says so.
   const tallPlacements = placementPlan.filter((p) => !isFeedPlacement(p));
   const feedPlacements = placementPlan.filter(isFeedPlacement);
-  const onFacebook = (p: MetaPlacement) =>
-    META_PLACEMENTS.find((row) => row.id === p)?.publisher === "facebook";
-  const facebookFeed = feedPlacements.filter(onFacebook);
-  const otherFeed = feedPlacements.filter((p) => !onFacebook(p));
+  // Square wherever a single card shows square (all of Facebook's feeds,
+  // Instagram's profile feed and Explore); 4:5 on Instagram's main feed.
+  const facebookFeed = feedPlacements.filter(showsSquare);
+  const otherFeed = feedPlacements.filter((p) => !showsSquare(p));
   // The push freezes approved ideas first, so their square renders exist.
   const squareCards = async (adId: string) => {
     const row = await db.query.adTable.findFirst({

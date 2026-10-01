@@ -1,8 +1,8 @@
 import type { AdCreativeContent } from "@/server/db/ads-schema";
 import { ideaPreviewUrl } from "./ad-idea-studio";
 import {
-  META_PLACEMENTS,
   isFeedPlacement,
+  showsSquare,
   metaPlacementMedia,
   type MetaPlacement,
 } from "./meta-placement-plan";
@@ -12,9 +12,9 @@ export function metaPreviewPlacements(
   _content: AdCreativeContent,
   planned: MetaPlacement[],
 ) {
-  // Profile feeds and Explore home draw the same frame as the feed or reel
+  // Facebook's profile feed and Explore home draw the same frame as the feed
   // beside them; Marketplace, the right column, notifications and Explore
-  // each have their own frame and show the square image.
+  // have their own frame, and Instagram's profile feed shows the square.
   return planned.filter((id) => PREVIEWED.has(id));
 }
 const PREVIEWED = new Set<MetaPlacement>([
@@ -28,6 +28,7 @@ const PREVIEWED = new Set<MetaPlacement>([
   "facebook-right-column",
   "facebook-notification",
   "instagram-explore",
+  "instagram-profile-feed",
 ]);
 /**
  * What a placement shows. An approved ad draws its saved images once the push
@@ -58,13 +59,10 @@ export function metaPreviewMedia(
       issue: null,
     };
   const doc = content.ideaStudio?.document;
-  // Facebook gets the square cards (its desktop feed, marketplace and right
-  // column show square), the same swap the push makes after creating the
-  // ad; once frozen, the saved square renders.
-  const squareOnFacebook =
-    !vertical &&
-    META_PLACEMENTS.find((p) => p.id === id)?.publisher === "facebook" &&
-    (doc?.cards.length ?? 0) > 0;
+  // Placements that show a card square (Facebook's feeds, Instagram's
+  // profile feed and Explore) get the square cards, the same swap the push
+  // makes; once frozen, the saved square renders.
+  const squareOnFacebook = showsSquare(id) && (doc?.cards.length ?? 0) > 0;
   const squares = content.ideaStudio?.approval?.renders.square;
   if (
     squareOnFacebook &&

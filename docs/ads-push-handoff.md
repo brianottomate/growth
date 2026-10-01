@@ -186,7 +186,8 @@ sized for one shape loses its text in another. Rule since the Chalets redo:
 | Meta placements | Shape shown | What the push sends |
 | --- | --- | --- |
 | Facebook feed, marketplace, right column, profile feed, notifications | 4:5 on mobile feed, **square** on desktop feed, marketplace and right column | the **1:1** export |
-| Instagram feed, explore, profile feed (mobile only) | 4:5 | the 4:5 export |
+| Instagram profile feed, Explore, Explore home | **square** (the profile feed crops a 4:5 to square, seen live 2026-10-01) | the **1:1** export |
+| Instagram feed | 4:5 | the 4:5 export |
 | Stories and Reels, both apps | 9:16 | the 9:16 export |
 
 Meta's placement rules (`asset_customization_rules.customization_spec`) split
