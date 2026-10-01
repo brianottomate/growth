@@ -220,8 +220,15 @@ the push. `createMetaPlacementCreative` in `meta.client.ts`, called through
   ad, and since 2026-10-01 every creative Zernio builds fails Meta with
   "Reconnect your WhatsApp number to your Facebook Page" (code 100, subcode
   2446880), on every brand, while an ad with a creative we built validates.
-- **Videos** still go through Zernio (`placementAssets`, the multi-creative
-  shape for plain videos).
+- **One push path.** The campaign shell first (it holds the budget under
+  CBO; under ABO each ad set brings its own), then one ad set per plan
+  audience opened with its first ad, then one attach per remaining ad. The
+  multi-creative (`creatives[]`) opening and the single-create shortcut are
+  gone. Idempotency keys are the draft, its edit time, the audience and the
+  plan ad, so a retried push replays instead of duplicating; a failed push
+  deletes the shell and touches the draft, so the next try starts fresh.
+- **Videos** still go through Zernio (`placementAssets`), one ad per call
+  like everything else.
 - **Images go up in one request per ad** (multipart `adimages`), and a
   throttled call waits out Meta's own estimate once, up to five minutes.
 - **Starter shells.** "Add starter ad ideas → Empty shells" creates empty ads
@@ -267,9 +274,11 @@ renders (below) are the reference.
 **Checking a push before and after**
 
 - Before: a validate-only push (`pushDraftToPlatform` with
-  `validateOnly: true`) makes Meta check every node and creates nothing. It
-  caught the video feeds refusal. It builds the opening ad's creative on Meta
-  to validate it (a creative, not an ad).
+  `validateOnly: true`) makes Meta check the first ad set and its first ad as
+  one standalone create, and creates nothing. Zernio refuses validate-only on
+  attaches, so the remaining ads are not checked. It caught the video feeds
+  refusal. It builds the opening ad's creative on Meta to validate it (a
+  creative, not an ad).
 - After: read the ads' `creative{asset_feed_spec}` for their rules, and Meta's
   own renders with `GET /{ad_id}/previews?ad_format=DESKTOP_FEED_STANDARD`
   (also `MOBILE_FEED_STANDARD`, `MARKETPLACE_MOBILE`, `INSTAGRAM_STANDARD`,
@@ -277,4 +286,5 @@ renders (below) are the reference.
   Manager's hover thumbnails zoom and are not what runs; the full ad preview
   is.
 - Zernio sometimes creates the first ad of an ad set ACTIVE although the push
-  asked for paused. Check every ad is paused after a push.
+  asked for paused. The push warns when a response says ACTIVE, but the
+  response is not always right: check every ad is paused after a push.

@@ -2,14 +2,12 @@ import { describe, expect, it } from "bun:test";
 
 import {
   assertMetaAdPayload,
-  metaRequiresCampaignShell,
   estimateMonthlyKeywordCost,
   extractPreviewFrames,
   metaPageIdFromConnection,
   connectionRunsAsBrandPage,
   googlePauseOutcome,
   googleDisplayImages,
-  matchResponseAdsToPlan,
   metaPromotedObjectFor,
   tagMetaAdUtms,
   videoPayloadFor,
@@ -375,65 +373,6 @@ describe("googlePauseOutcome", () => {
 });
 
 /**
- * The response-to-plan mapping is where a compile records lineage. Its
- * failure mode is stamping one externalId on several rows, which the unique
- * index rejects AFTER the campaign already exists on the platform.
- */
-describe("matchResponseAdsToPlan", () => {
-  const plan = (id: string, name: string) => ({ id, name });
-
-  it("matches by exact name, out of order", () => {
-    const out = matchResponseAdsToPlan(
-      [
-        { name: "B", platformAdId: "ext-b" },
-        { name: "A", platformAdId: "ext-a" },
-      ],
-      [plan("ad_1", "A"), plan("ad_2", "B")],
-    );
-    expect(out.get("ad_1")).toBe("ext-a");
-    expect(out.get("ad_2")).toBe("ext-b");
-  });
-
-  it("never assigns the same response ad twice", () => {
-    const out = matchResponseAdsToPlan(
-      [{ name: "A", platformAdId: "ext-a" }],
-      [plan("ad_1", "A"), plan("ad_2", "A")],
-    );
-    expect(out.get("ad_1")).toBe("ext-a");
-    expect(out.get("ad_2")).toBeNull();
-  });
-
-  it("single-to-single pairs even when names differ", () => {
-    const out = matchResponseAdsToPlan(
-      [{ name: "Meta renamed it", id: "ext-x" }],
-      [plan("ad_1", "Our name")],
-    );
-    expect(out.get("ad_1")).toBe("ext-x");
-  });
-
-  it("one response and several plan ads does NOT fan the id out", () => {
-    const out = matchResponseAdsToPlan(
-      [{ name: "only", platformAdId: "ext-1" }],
-      [plan("ad_1", "first"), plan("ad_2", "second")],
-    );
-    expect(out.get("ad_1")).toBeNull();
-    expect(out.get("ad_2")).toBeNull();
-  });
-
-  it("unmatched plan ads map to null, not to a guess", () => {
-    const out = matchResponseAdsToPlan(
-      [
-        { name: "A", platformAdId: "ext-a" },
-        { name: "Z", platformAdId: "ext-z" },
-      ],
-      [plan("ad_1", "A"), plan("ad_2", "B")],
-    );
-    expect(out.get("ad_1")).toBe("ext-a");
-    expect(out.get("ad_2")).toBeNull();
-  });
-});
-
-/**
  * Meta's preview response shape is the part most likely to drift, so the
  * extractor is pure and shape-agnostic: any string carrying an iframe counts.
  */
@@ -625,13 +564,6 @@ it("attaches a carousel to a conversion ad set without resending its pixel and b
       account,
     ),
   ).not.toThrow();
-});
-
-it("keeps campaign budgets on the campaign with any audience count", () => {
-  for (const count of [0, 1, 2])
-    expect(metaRequiresCampaignShell(count, true)).toBe(true);
-  expect(metaRequiresCampaignShell(1, false)).toBe(false);
-  expect(metaRequiresCampaignShell(2, false)).toBe(true);
 });
 
 describe("Google draft display crops", () => {

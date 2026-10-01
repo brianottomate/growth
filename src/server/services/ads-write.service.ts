@@ -2100,48 +2100,6 @@ async function compileAudienceTargeting(input: {
 
 // ---- DRAFT → PLATFORM --------------------------------------------------
 
-/**
- * Map the ads a create call returned back to the plan ads it was sent.
- *
- * Match by exact name, never reusing a response ad; fall back to pairing only
- * when both sides have exactly one. The fallback must not fire per-ad: with
- * one response and several plan ads, assigning that response to each of them
- * would stamp the same externalId on every row — which the unique index then
- * rejects AFTER the campaign already exists on the platform.
- */
-export function matchResponseAdsToPlan(
-  responseAds: Array<{
-    name?: string;
-    platformAdId?: unknown;
-    id?: string;
-    _id?: string;
-  }>,
-  planAds: Array<{ id: string; name: string }>,
-): Map<string, string | null> {
-  const used = new Set<number>();
-  const externalIdOf = (row: (typeof responseAds)[number]) =>
-    (typeof row.platformAdId === "string" ? row.platformAdId : null) ??
-    row.id ??
-    row._id ??
-    null;
-  const out = new Map<string, string | null>();
-  for (const plan of planAds) {
-    const index = responseAds.findIndex(
-      (row, i) => !used.has(i) && row.name === plan.name,
-    );
-    const fallback =
-      planAds.length === 1 && responseAds.length === 1 && !used.has(0) ? 0 : -1;
-    const chosen = index >= 0 ? index : fallback;
-    if (chosen >= 0) {
-      used.add(chosen);
-      out.set(plan.id, externalIdOf(responseAds[chosen]!));
-    } else {
-      out.set(plan.id, null);
-    }
-  }
-  return out;
-}
-
 /** The plan's creative-type ads, shaped for Meta payload builders. */
 function creativeAds(ads: Ad[]) {
   return ads.flatMap((ad) => {
@@ -3047,17 +3005,11 @@ export async function ensureBrandReportingConversion(
 
 // ---- META COMPILE ------------------------------------------------------
 //
-// Each plan audience becomes an ad set; every creative ad runs under every
-// ad set. One audience (or none) is a single create; several use the
-// shell-then-attach shape with rollback so nothing is left half-built.
-/** A campaign budget must belong to an explicit shell, even for one audience. */
-export function metaRequiresCampaignShell(
-  audienceCount: number,
-  useCbo: boolean,
-) {
-  return useCbo || audienceCount > 1;
-}
-
+// One path for every Meta push: the campaign shell first (it owns the budget
+// under CBO), then one ad set per plan audience, opened with its first ad,
+// then one attach per remaining ad. Every image ad goes as a creative Growth
+// built, so Zernio only creates the campaign, the ad sets and the ads. Any
+// failure deletes the shell so nothing is left half-built.
 async function pushToMeta(args: PushArgs) {
   const {
     input,
@@ -3189,21 +3141,6 @@ async function pushToMeta(args: PushArgs) {
       callToAction: metaCallToAction(content),
     }));
 
-  const creativesFor = (subset: typeof usable) =>
-    subset.map(({ ad, content }) => ({
-      name: adNameFor(ad, content),
-      // Every creative carries its own headline and body in the
-      // multi-creative shape; Meta does not fall back per creative.
-      headline: content.headline,
-      body: content.body,
-      description: content.description,
-      ...(isVideoContent(content)
-        ? { video: videoPayloadFor(ad.name, content) }
-        : { imageUrl: content.media[0]!.url }),
-      linkUrl: content.linkUrl ?? linkUrl,
-      callToAction: metaCallToAction(content),
-    }));
-
   /**
    * One ad, two files: the baseline for every placement, the 9:16 pinned to
    * stories and reels. Meta's asset customization, which is how Brooke builds
@@ -3216,25 +3153,6 @@ async function pushToMeta(args: PushArgs) {
     isVideoContent(content)
       ? { video: videoPayloadFor(ad.name, content) }
       : { imageUrl: content.media[0]!.url };
-
-  /**
-   * How a set's ads split across Meta's create shapes. An image ad goes as
-   * the creative we built for it, one call per ad: the opening call creates
-   * the campaign and ad set with the first, the rest attach. Plain videos
-   * still open together in the multi-creative shape, which carries no
-   * creative of ours.
-   */
-  const splitForPush = (subset: typeof usable) => {
-    const plain = subset.filter(
-      ({ content }) => isVideoContent(content) && !placementAssetsFor(content),
-    );
-    if (plain.length > 0)
-      return {
-        opening: plain,
-        trailing: subset.filter((row) => !plain.includes(row)),
-      };
-    return { opening: subset.slice(0, 1), trailing: subset.slice(1) };
-  };
 
   // An image ad gets a set of images per placement group: square wherever
   // Meta shows a single image square (all of Facebook's feeds, Instagram's
@@ -3339,258 +3257,162 @@ async function pushToMeta(args: PushArgs) {
         }
       : { existingCreativeId: await creativeFor(ad, content) };
 
-  /** One ad set as the API sees it. */
-  const adSetPayload = (setArgs: {
-    audience: PlanAudience | null;
-    spec: ZernioAdTargeting | undefined;
-    existingCampaignId?: string;
-    validateOnly: boolean;
-  }): CreateZernioStandaloneAdInput => ({
-    accountId: input.connectionAccountId,
-    adAccountId: destination.adAccount.id,
-    ...(setArgs.existingCampaignId
-      ? { existingCampaignId: setArgs.existingCampaignId }
-      : { campaignName: metaCampaignName }),
-    name: setArgs.existingCampaignId
-      ? adSetNameFor(setArgs.audience)
-      : metaCampaignName,
-    adSetName: adSetNameFor(setArgs.audience),
-    goal: input.goal,
-    // Under CBO the campaign owns the money; an ad set that also sends a
-    // budget is fighting the thing that makes CBO worth using.
-    ...(useCbo && setArgs.existingCampaignId
-      ? {}
-      : { budgetAmount, budgetType }),
-    headline: usable[0]!.content.headline,
-    body: usable[0]!.content.body,
-    linkUrl,
-    callToAction: metaCallToAction(usable[0]!.content),
-    creatives: creativesFor(usable),
-    targeting: setArgs.spec,
-    placements: metaProviderPlacements(placementPlan),
-    startDate,
-    endDate,
-    promotedObject,
-    ...metaDraftProviderControls(setArgs.validateOnly),
+  const pageId =
+    destination.brand.metaPageId ??
+    metaPageIdFromConnection(destination.connection.platformUserId);
+  // Keyed on the plan, not the request: a retried push replays what it
+  // already made instead of making it twice. A failed push touches the
+  // draft (retireShellKey), so the next attempt starts on fresh keys.
+  const planKey = (...parts: string[]) =>
+    `push:${draft.id}:${draft.updatedAt.getTime()}:${parts.join(":")}`;
+
+  /** One ad's words and media, as both the opening and an attach send them. */
+  const adFields = async (ad: Ad, content: AdCreativeContent) => ({
+    adName: adNameFor(ad, content),
+    headline: content.headline,
+    body: content.body,
+    description: content.description,
+    linkUrl: content.linkUrl ?? linkUrl,
+    callToAction: metaCallToAction(content),
+    ...(await mediaFor(ad, content)),
   });
 
-  /**
-   * Create one ad set and everything inside it. Meta's create takes ONE
-   * creative shape per call: N statics via creatives[], or one carousel via
-   * carouselCards — a mix needs the attach shape for the leftovers, and a
-   * failed attach rolls the campaign back rather than stranding it.
-   */
-  const createAdSetWithAds = async (setArgs: {
+  type CreatedSet = {
+    result: ZernioAdWriteResponse;
+    attached: Array<{ planAd: Ad; result: ZernioAdWriteResponse }>;
+  };
+
+  /** An ad set opened with the first ad, then every other ad attached. */
+  const createAdSet = async (setArgs: {
     audience: PlanAudience | null;
     spec: ZernioAdTargeting | undefined;
     existingCampaignId?: string;
     validateOnly: boolean;
-    keyScope: string;
-  }) => {
-    const { opening, trailing } = splitForPush(usable);
-    const lead = opening[0]!;
+  }): Promise<CreatedSet> => {
+    const [lead, ...rest] = usable;
+    const audienceKey = setArgs.audience?.id ?? "broad";
     const payload: CreateZernioStandaloneAdInput = {
-      ...adSetPayload(setArgs),
-      ...(opening.length > 1 ||
-      (isVideoContent(lead.content) && !placementAssetsFor(lead.content))
-        ? { creatives: creativesFor(opening) }
-        : {
-            // A single-creative opening: the set's words are this ad's words.
-            creatives: undefined,
-            adName: adNameFor(lead.ad, lead.content),
-            headline: lead.content.headline,
-            body: lead.content.body,
-            description: lead.content.description,
-            linkUrl: lead.content.linkUrl ?? linkUrl,
-            callToAction: metaCallToAction(lead.content),
-            ...(await mediaFor(lead.ad, lead.content)),
-          }),
+      accountId: input.connectionAccountId,
+      adAccountId: destination.adAccount.id,
+      ...(setArgs.existingCampaignId
+        ? { existingCampaignId: setArgs.existingCampaignId }
+        : { campaignName: metaCampaignName }),
+      name: setArgs.existingCampaignId
+        ? adSetNameFor(setArgs.audience)
+        : metaCampaignName,
+      adSetName: adSetNameFor(setArgs.audience),
+      goal: input.goal,
+      // Under CBO the campaign owns the money; an ad set that also sends a
+      // budget is fighting the thing that makes CBO worth using.
+      ...(useCbo && setArgs.existingCampaignId
+        ? {}
+        : { budgetAmount, budgetType }),
+      ...(await adFields(lead!.ad, lead!.content)),
+      targeting: setArgs.spec,
+      placements: metaProviderPlacements(placementPlan),
+      startDate,
+      endDate,
+      promotedObject,
+      ...metaDraftProviderControls(setArgs.validateOnly),
     };
     const result = await createMetaAd(payload, {
-      pageId:
-        destination.brand.metaPageId ??
-        metaPageIdFromConnection(destination.connection.platformUserId),
+      pageId,
       idempotencyKey: idempotencyKey(
         context,
-        `push-adset:${setArgs.keyScope}`,
+        "push-adset",
         payload,
+        planKey(audienceKey, "open", lead!.ad.id),
       ),
       adAccount: destination.adAccount,
     });
-
     if (setArgs.validateOnly || result.validateOnly) {
-      return {
-        result,
-        attached: [] as Array<{ planAd: Ad; result: ZernioAdWriteResponse }>,
-      };
+      return { result, attached: [] };
     }
-
-    const rollbackCampaignId = setArgs.existingCampaignId
-      ? null
-      : writtenCampaignId(result);
-    const attached: Array<{ planAd: Ad; result: ZernioAdWriteResponse }> = [];
-    try {
-      for (const { ad, content } of trailing) {
-        const attachPayload: CreateZernioStandaloneAdInput = {
-          accountId: input.connectionAccountId,
-          adAccountId: destination.adAccount.id,
-          adSetId: writtenAdSetId(result)!,
-          name: adNameFor(ad, content),
-          goal: input.goal,
-          headline: content.headline,
-          body: content.body,
-          description: content.description,
-          linkUrl: content.linkUrl ?? linkUrl,
-          callToAction: metaCallToAction(content),
-          ...(await mediaFor(ad, content)),
-          ...metaDraftProviderControls(false),
-        };
-        attached.push({
-          planAd: ad,
-          result: await createMetaAd(attachPayload, {
-            pageId:
-              destination.brand.metaPageId ??
-              metaPageIdFromConnection(destination.connection.platformUserId),
-            idempotencyKey: idempotencyKey(
-              context,
-              `push-attach:${setArgs.keyScope}:${ad.id}`,
-              attachPayload,
-            ),
-            adAccount: destination.adAccount,
-          }),
-        });
-      }
-    } catch (error) {
-      if (rollbackCampaignId) {
-        await deleteZernioCampaign({
-          campaignId: rollbackCampaignId,
-          accountId: input.connectionAccountId,
-        }).catch((cleanupError) => {
-          console.error(
-            "attach rollback failed",
-            rollbackCampaignId,
-            cleanupError,
-          );
-        });
-      }
+    const adSetId = writtenAdSetId(result);
+    if (!adSetId && rest.length > 0) {
       throw new Error(
-        `Push failed while attaching ad ${attached.length + 1} of ${trailing.length}${
-          rollbackCampaignId
-            ? " — the campaign was removed from Meta so nothing is half-built"
-            : ""
-        }. ${error instanceof Error ? error.message : String(error)}`,
+        "Zernio returned no ad set id to attach the other ads to",
       );
+    }
+    const attached: CreatedSet["attached"] = [];
+    for (const { ad, content } of rest) {
+      const attach: CreateZernioStandaloneAdInput = {
+        accountId: input.connectionAccountId,
+        adAccountId: destination.adAccount.id,
+        adSetId: adSetId!,
+        name: adNameFor(ad, content),
+        goal: input.goal,
+        ...(await adFields(ad, content)),
+        ...metaDraftProviderControls(false),
+      };
+      attached.push({
+        planAd: ad,
+        result: await createMetaAd(attach, {
+          pageId,
+          idempotencyKey: idempotencyKey(
+            context,
+            "push-attach",
+            attach,
+            planKey(audienceKey, ad.id),
+          ),
+          adAccount: destination.adAccount,
+        }),
+      });
     }
     return { result, attached };
   };
 
-  /**
-   * Map Meta's returned ads back to plan ads for lineage. The opening call
-   * carries the statics (or the lone leading carousel); the attach results
-   * are exact per plan ad. The two sets are disjoint by construction.
-   */
-  const setAdsFor = (
-    set: {
-      result: ZernioAdWriteResponse;
-      attached: Array<{ planAd: Ad; result: ZernioAdWriteResponse }>;
-    },
-    subset: typeof usable,
-  ) => {
-    const { opening } = splitForPush(subset);
-    const responseAds =
-      set.result.ads ?? (set.result.ad ? [set.result.ad] : []);
-    const byPlanId = matchResponseAdsToPlan(
-      responseAds,
-      opening.map(({ ad }) => ({ id: ad.id, name: ad.name })),
+  const externalAdId = (result: ZernioAdWriteResponse) => {
+    const row = result.ad ?? result.ads?.[0];
+    return (
+      (typeof row?.platformAdId === "string" ? row.platformAdId : null) ??
+      row?.id ??
+      row?._id ??
+      null
     );
-    const fromOpening = opening.map(({ ad, content }) => ({
-      planAd: ad,
-      externalId: byPlanId.get(ad.id) ?? null,
-      headline: content.headline,
-      body: content.body,
-      linkUrl: content.linkUrl ?? linkUrl,
-      media: content.media,
-    }));
-    const fromAttach = set.attached.map(({ planAd, result }) => {
-      const row = result.ad ?? result.ads?.[0];
-      const content = planAd.content as AdCreativeContent;
-      return {
-        planAd,
-        externalId:
-          (typeof row?.platformAdId === "string" ? row.platformAdId : null) ??
-          row?.id ??
-          row?._id ??
-          null,
-        headline: content.headline,
-        body: content.body,
-        linkUrl: content.linkUrl ?? linkUrl,
-        media: content.media,
-      };
-    });
-    return [...fromOpening, ...fromAttach];
   };
+  /** Plan lineage: the opening made the first ad, each attach one more. */
+  const setAdsFor = (set: CreatedSet) =>
+    [{ planAd: usable[0]!.ad, result: set.result }, ...set.attached].map(
+      ({ planAd, result }) => {
+        const content = planAd.content as AdCreativeContent;
+        return {
+          planAd,
+          externalId: externalAdId(result),
+          headline: content.headline,
+          body: content.body,
+          linkUrl: content.linkUrl ?? linkUrl,
+          media: content.media,
+        };
+      },
+    );
 
-  // ---- one (or no) audience: a single create --------------------------
-  if (
-    compiled.length <= 1 &&
-    (!metaRequiresCampaignShell(compiled.length, useCbo) || input.validateOnly)
-  ) {
-    const only = compiled[0] ?? null;
-    const set = await createAdSetWithAds({
-      audience: only?.audience ?? null,
-      spec: only?.spec,
-      validateOnly: input.validateOnly ?? false,
-      keyScope: `push:${campaign.id}:meta`,
-    });
-    if (input.validateOnly || set.result.validateOnly) {
-      return {
-        campaignId: campaign.id,
-        platform: "meta_ads" as const,
-        validateOnly: true,
-        adsCreated: 0,
-        warnings,
-        provider: set.result,
-      };
+  const sets = compiled.length
+    ? compiled
+    : [{ audience: null as PlanAudience | null, spec: undefined }];
+
+  // ---- dry run: Meta validates the first ad set as a standalone create --
+  if (input.validateOnly) {
+    if (sets.length > 1 || useCbo) {
+      warnings.push(
+        "The dry run checks the first ad set and its first ad as one standalone create; the push itself builds the campaign first",
+      );
     }
-    await recordCompiledCampaign({
-      adAccountId: destination.adAccount.id,
-      draft,
-      campaign,
-      status: "paused",
-      budgetAmount,
-      budgetType,
-      externalCampaignId: writtenCampaignId(set.result),
-      heroThumbnailUrl: usable[0]!.content.media[0]?.url ?? null,
-      sets: [
-        {
-          audience: only?.audience ?? null,
-          name: only?.audience.name ?? campaign.name,
-          externalId: writtenAdSetId(set.result),
-          targetingSpec: only?.spec ?? null,
-          budget: budgetAmount,
-          budgetType,
-          ads: setAdsFor(set, usable),
-        },
-      ],
+    const set = await createAdSet({
+      audience: sets[0]!.audience,
+      spec: sets[0]!.spec,
+      validateOnly: true,
     });
     return {
       campaignId: campaign.id,
       platform: "meta_ads" as const,
-      validateOnly: false,
-      platformCampaignRowId: draft.id,
-      adSetsCreated: 1,
-      adsCreated: usable.length,
-      path: `/app/brands/${brand.slug}/ads/platform/${draft.id}`,
+      validateOnly: true,
+      adsCreated: 0,
       warnings,
+      provider: set.result,
     };
   }
 
-  // CBO needs an explicit budget-owning shell, even with one audience.
-  if (input.validateOnly) {
-    throw new Error(
-      "Dry run covers single-audience pushes only; Meta has no dry run for the two-step shape",
-    );
-  }
   const shell = await createZernioAdCampaign(
     {
       accountId: input.connectionAccountId,
@@ -3618,35 +3440,53 @@ async function pushToMeta(args: PushArgs) {
     null;
   if (!shellId) throw new Error("Zernio returned no campaign id for the shell");
 
-  const perSet = [];
-  // If any audience fails, the shell is a campaign with no ads: invisible to
-  // the tree and impossible to clean up by hand. Delete it rather than
-  // stranding it, and surface which audience failed.
+  const perSet: Array<{
+    audience: PlanAudience | null;
+    spec: ZernioAdTargeting | undefined;
+    set: CreatedSet;
+  }> = [];
+  // If any ad set or ad fails, the shell is a campaign nobody finished:
+  // delete it rather than stranding it, and say where it stopped.
   try {
-    for (const { audience, spec } of compiled.length
-      ? compiled
-      : [{ audience: null, spec: undefined }]) {
-      const set = await createAdSetWithAds({
+    for (const { audience, spec } of sets) {
+      const set = await createAdSet({
         audience,
         spec,
         existingCampaignId: shellId,
         validateOnly: false,
-        keyScope: `push:${campaign.id}:${audience?.id ?? "broad"}`,
       });
       perSet.push({ audience, spec, set });
     }
   } catch (error) {
-    await deleteZernioCampaign({
+    const cleanedUp = await deleteZernioCampaign({
       campaignId: shellId,
       accountId: input.connectionAccountId,
-    }).catch((cleanupError) => {
-      console.error("push rollback failed", shellId, cleanupError);
-    });
+    })
+      .then(() => true)
+      .catch((cleanupError) => {
+        console.error("push rollback failed", shellId, cleanupError);
+        return false;
+      });
     await retireShellKey(draft.id);
     throw new Error(
-      `Push failed after ${perSet.length} of ${compiled.length} audiences — the campaign was removed from Meta so nothing is half-built. ${
-        error instanceof Error ? error.message : String(error)
-      }`,
+      `Push failed after ${perSet.length} of ${sets.length} ad sets — ${
+        cleanedUp
+          ? "the campaign was removed from Meta so nothing is half-built"
+          : `removing campaign ${shellId} from Meta also failed, delete it in Ads Manager`
+      }. ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
+  // Zernio has been seen leaving the opening ad ACTIVE despite PAUSED.
+  const active = perSet.flatMap(({ set }) =>
+    [set.result, ...set.attached.map(({ result }) => result)].filter(
+      (result) =>
+        (result.ad ?? result.ads?.[0])?.status?.toUpperCase() === "ACTIVE",
+    ),
+  );
+  if (active.length > 0) {
+    warnings.push(
+      `${active.length} ad(s) came back ACTIVE; pause them in Ads Manager before the campaign is switched on`,
     );
   }
 
@@ -3666,7 +3506,7 @@ async function pushToMeta(args: PushArgs) {
       targetingSpec: spec ?? null,
       budget: useCbo ? null : budgetAmount,
       budgetType,
-      ads: setAdsFor(set, usable),
+      ads: setAdsFor(set),
     })),
   });
 
