@@ -289,9 +289,7 @@ export async function NewslettersView({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
-            {selectedBrand
-              ? `${selectedBrand.name} newsletters`
-              : "Newsletters"}
+            {selectedBrand ? `${selectedBrand.name} email` : "Email"}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {ownedEmails.filter((email) => email.status !== "published").length}{" "}
@@ -319,13 +317,48 @@ export async function NewslettersView({
         </div>
       </div>
 
+      <div className="mt-6 grid grid-cols-1 gap-3 @3xl:grid-cols-3">
+        <section className="rounded-xl border bg-card p-4">
+          <h2 className="font-semibold">Blast</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            A one-time email for an offer, announcement or collection of homes.
+          </p>
+        </section>
+        {[
+          {
+            name: "Newsletter",
+            description:
+              "Recurring emails that keep guests connected to your brand.",
+          },
+          {
+            name: "Sequence",
+            description:
+              "A series of emails sent over time around a guest’s journey.",
+          },
+        ].map((type) => (
+          <section
+            key={type.name}
+            className="rounded-xl border bg-muted/20 p-4"
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="font-semibold">{type.name}</h2>
+              <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                Coming soon
+              </span>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {type.description}
+            </p>
+          </section>
+        ))}
+      </div>
+
       {emailBuckets.length > 0 && (
         <section className="mt-6 rounded-2xl border p-4">
           <div>
-            <h2 className="font-semibold">Editorial pipeline</h2>
+            <h2 className="font-semibold">Blast pipeline</h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Broadcasts and blasts share the same authoring workspace. Only
-              recurring broadcasts count toward newsletter cadence.
+              Plan, draft and review one-time emails before sending.
             </p>
           </div>
           <div className="mt-4 grid grid-cols-1 gap-4 @4xl:grid-cols-3">

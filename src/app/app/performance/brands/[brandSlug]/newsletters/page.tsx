@@ -5,7 +5,7 @@ import { NewslettersView } from "@/app/app/newsletters/NewslettersView";
 
 import { loadPerformanceBrand } from "../_data";
 
-export const metadata: Metadata = { title: "Newsletter · Wander Performance" };
+export const metadata: Metadata = { title: "Email · Wander Performance" };
 export const dynamic = "force-dynamic";
 
 export default async function PerformanceBrandNewslettersPage({
