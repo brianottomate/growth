@@ -37,6 +37,11 @@ const PAGES: { name: string; href: string; note?: string }[] = [
     note: "live persisted runs: source capture, renderer, evaluation receipts",
   },
   {
+    name: "Copy lab",
+    href: "/lab/copy",
+    note: "brand + home fixtures through the production copy calls, variants side by side",
+  },
+  {
     name: "Blog golden run",
     href: "/lab/blog-workbench",
     note: "SEO brief → grounding → Opus article → receipts, fixture-backed",

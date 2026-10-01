@@ -6,10 +6,9 @@ import {
   META_HEADLINE,
   META_HOME_CAPTION,
 } from "@/server/ai/prompts";
+import { runCopyRequest, type CopyRequest } from "@/server/ai/copy-request";
 import { contactSheet } from "./starter-ad-generation.service";
 
-import { anthropic } from "@ai-sdk/anthropic";
-import { Output, generateText } from "ai";
 import { z } from "zod";
 
 import {
@@ -189,19 +188,17 @@ export function deterministicSetCopy(
   };
 }
 
-/**
- * Copy for a whole set in one pass, so the homes read as one campaign and the
- * portfolio caption can refer to what the individual ones already said.
- *
- * Falls back to copy built from the same facts rather than failing the build:
- * a set with plain words is worth more than no set.
- */
-export async function writeAdSetCopy(input: {
+type AdSetCopyInput = {
   brandName: string;
   /** The brand story every creative prompt for the brand reads. */
   brandStory: string | null;
   homes: CopyHome[];
-}): Promise<AdSetCopy> {
+};
+
+/** The call that writes a set's copy, as data: the copy lab runs it too. */
+export async function adSetCopyRequest(
+  input: AdSetCopyInput,
+): Promise<CopyRequest<AdSetCopy>> {
   if (input.homes.length === 0) {
     throw new Error("An ad set needs at least one home");
   }
@@ -220,87 +217,95 @@ export async function writeAdSetCopy(input: {
           photos: input.homes.map((home) => ({ url: home.heroUrl! })),
         }).catch(() => null)
       : null;
-
-  try {
-    const { output } = await generateText({
-      model: anthropic(MODEL),
-      output: Output.object({ schema: SetCopySchema }),
-      system: [
-        "You write paid-social ad copy for a vacation-rental manager.",
-        "Use ONLY the facts given for each home. Never invent an amenity, a rating, a distance, a price or availability. If a home has no hot tub listed, it has no hot tub. Never call an amenity private unless the facts say so.",
-        "",
-        "Every home's primaryText:",
-        META_HOME_CAPTION,
-        "",
-        "The portfolio and catalog captions:",
-        META_COLLECTION_CAPTION,
-        "A portfolio or catalog bullet may only claim what most of the homes have.",
-        "",
-        META_HEADLINE,
-        META_DESCRIPTION,
-        "cardTitle is drawn INTO the image by a renderer that cannot draw emoji and has little room: at most six words, no emoji, no punctuation at the end. Lead on the home's best amenity, not its name.",
-        "",
-        "Homes may share a hook shape, the stay sentence and the closing line; only the bullets must be each home's own.",
-        "No exclamation marks, no all-caps, no hashtags, no invented superlatives.",
-        brandStorySection({
-          brandName: input.brandName,
-          story: input.brandStory,
-        }),
-      ].join("\n"),
-      messages: [
-        {
-          role: "user",
-          content: [
-            ...(heroes
-              ? [
-                  {
-                    type: "file" as const,
-                    data: heroes.image,
-                    mediaType: "image/jpeg" as const,
-                  },
-                  {
-                    type: "text" as const,
-                    text: "Each home's hero photo is on the numbered sheet, in the order below. The cardTitle is drawn onto that photo, so it must be true of what the photo shows.",
-                  },
-                ]
-              : []),
+  return {
+    model: MODEL,
+    schema: SetCopySchema,
+    system: [
+      "You write paid-social ad copy for a vacation-rental manager.",
+      "Use ONLY the facts given for each home. Never invent an amenity, a rating, a distance, a price or availability. If a home has no hot tub listed, it has no hot tub. Never call an amenity private unless the facts say so.",
+      "",
+      "Every home's primaryText:",
+      META_HOME_CAPTION,
+      "",
+      "The portfolio and catalog captions:",
+      META_COLLECTION_CAPTION,
+      "A portfolio or catalog bullet may only claim what most of the homes have.",
+      "",
+      META_HEADLINE,
+      META_DESCRIPTION,
+      "cardTitle is drawn INTO the image by a renderer that cannot draw emoji and has little room: at most six words, no emoji, no punctuation at the end. Lead on the home's best amenity, not its name.",
+      "",
+      "Homes may share a hook shape, the stay sentence and the closing line; only the bullets must be each home's own.",
+      "No exclamation marks, no all-caps, no hashtags, no invented superlatives.",
+      brandStorySection({
+        brandName: input.brandName,
+        story: input.brandStory,
+      }),
+    ].join("\n"),
+    content: [
+      ...(heroes
+        ? [
+            {
+              type: "file" as const,
+              data: heroes.image,
+              mediaType: "image/jpeg" as const,
+            },
             {
               type: "text" as const,
-              text: [
-                `Property manager: ${input.brandName}`,
-                where ? `Where: ${where}` : null,
-                "",
-                "Homes, in order. Return one copy object per home in this same order:",
-                ...input.homes.map((home, index) =>
-                  [
-                    `${index + 1}. ${home.name}`,
-                    `   where: ${home.place || "unstated"}`,
-                    `   facts: ${facts(home) || "unstated"}`,
-                    home.nightlyFrom
-                      ? `   from: $${home.nightlyFrom} a night`
-                      : null,
-                    `   amenities: ${home.amenities.length ? home.amenities.join(", ") : "none listed"}`,
-                    home.description
-                      ? `   their description: ${home.description.slice(0, 700)}`
-                      : null,
-                  ]
-                    .filter(Boolean)
-                    .join("\n"),
-                ),
-                "",
-                "Then write the portfolio caption, for a carousel of all of these homes in order, and the catalog caption, for an ad where the platform picks which of these homes each viewer sees. Both should read as the manager's whole offer rather than one home.",
-              ]
-                .filter((line) => line !== null)
-                .join("\n"),
+              text: "Each home's hero photo is on the numbered sheet, in the order below. The cardTitle is drawn onto that photo, so it must be true of what the photo shows.",
             },
-          ],
-        },
-      ],
-    });
-    if (output?.homes.length !== input.homes.length) {
-      return deterministicSetCopy(input.homes, input.brandName);
-    }
-    return output;
+          ]
+        : []),
+      {
+        type: "text" as const,
+        text: [
+          `Property manager: ${input.brandName}`,
+          where ? `Where: ${where}` : null,
+          "",
+          "Homes, in order. Return one copy object per home in this same order:",
+          ...input.homes.map((home, index) =>
+            [
+              `${index + 1}. ${home.name}`,
+              `   where: ${home.place || "unstated"}`,
+              `   facts: ${facts(home) || "unstated"}`,
+              home.nightlyFrom ? `   from: $${home.nightlyFrom} a night` : null,
+              `   amenities: ${home.amenities.length ? home.amenities.join(", ") : "none listed"}`,
+              home.description
+                ? `   their description: ${home.description.slice(0, 700)}`
+                : null,
+            ]
+              .filter(Boolean)
+              .join("\n"),
+          ),
+          "",
+          "Then write the portfolio caption, for a carousel of all of these homes in order, and the catalog caption, for an ad where the platform picks which of these homes each viewer sees. Both should read as the manager's whole offer rather than one home.",
+        ]
+          .filter((line) => line !== null)
+          .join("\n"),
+      },
+    ],
+    problem: (output) =>
+      output.homes.length === input.homes.length
+        ? null
+        : `It has ${output.homes.length} home copies for ${input.homes.length} homes.`,
+    attempts: 1,
+  };
+}
+
+/**
+ * Copy for a whole set in one pass, so the homes read as one campaign and the
+ * portfolio caption can refer to what the individual ones already said.
+ *
+ * Falls back to copy built from the same facts rather than failing the build:
+ * a set with plain words is worth more than no set.
+ */
+export async function writeAdSetCopy(
+  input: AdSetCopyInput,
+): Promise<AdSetCopy> {
+  const request = await adSetCopyRequest(input);
+  try {
+    const { output } = await runCopyRequest(request);
+    return output ?? deterministicSetCopy(input.homes, input.brandName);
   } catch (error) {
     console.error("ad set copy failed", error);
     return deterministicSetCopy(input.homes, input.brandName);
