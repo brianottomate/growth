@@ -145,9 +145,57 @@ export function ideaDocumentFromAd(ad: {
       : /hero carousel/i.test(ad.name)
         ? "hero_carousel"
         : "home_carousel";
+  const cards: IdeaImage[] = c.media.map((media, index) => {
+    const recipe = defaultIdeaRecipe(role);
+    let source = { url: media.url, assetId: media.assetId };
+    let mode: IdeaImage["mode"] = "supplied";
+    const url = new URL(media.url, "http://local");
+    if (url.pathname === "/api/compositions/preview") {
+      const p = url.searchParams;
+      const template = compositionTemplateIdSchema.safeParse(
+        p.get("templateId"),
+      );
+      if (template.success) recipe.templateId = template.data;
+      for (const key of ["title", "subtitle", "eyebrow", "cta"] as const)
+        recipe[key] = p.get(key) ?? "";
+      recipe.showLogo = p.get("mark") !== "none";
+      const position = compositionImagePositionSchema.safeParse(
+        p.get("imagePosition"),
+      );
+      if (position.success) recipe.imagePosition = position.data;
+      source = {
+        url: p.get("sourceUrl") ?? media.url,
+        assetId: p.get("sourceMediaAssetId") ?? undefined,
+      };
+      mode = c.photoOnly ? "supplied" : "compose";
+    }
+    const copy =
+      media.headline || media.description
+        ? { headline: media.headline, description: media.description }
+        : undefined;
+    return {
+      id: `card-${index}`,
+      source,
+      recipe,
+      mode,
+      overrides: {},
+      ...(copy ? { copy } : {}),
+    };
+  });
+  // A composed card renders at any size, so an idea made of them gets every
+  // size the platforms ask for. Finished artwork gets its 9:16 when every
+  // card carries one, and only its 4:5 otherwise.
+  const composed =
+    cards.length > 0 && cards.every((card) => card.mode === "compose");
+  const stories = c.media.every((media) => media.story?.url);
+  const shapes: IdeaShape[] = composed
+    ? ["portrait", "square", "story"]
+    : cards.length > 0 && stories
+      ? ["portrait", "story"]
+      : ["portrait"];
   return withIdeaPool({
     role,
-    shapes: ["portrait"],
+    shapes,
     copy: {
       headline: c.headline ?? "",
       body: c.body ?? "",
@@ -156,43 +204,18 @@ export function ideaDocumentFromAd(ad: {
       callToAction: c.callToAction ?? "BOOK_NOW",
     },
     copyOverrides: {},
-    cards: c.media.map((media, index) => {
-      const recipe = defaultIdeaRecipe(role);
-      let source = { url: media.url, assetId: media.assetId };
-      let mode: IdeaImage["mode"] = "supplied";
-      const url = new URL(media.url, "http://local");
-      if (url.pathname === "/api/compositions/preview") {
-        const p = url.searchParams;
-        const template = compositionTemplateIdSchema.safeParse(
-          p.get("templateId"),
-        );
-        if (template.success) recipe.templateId = template.data;
-        for (const key of ["title", "subtitle", "eyebrow", "cta"] as const)
-          recipe[key] = p.get(key) ?? "";
-        recipe.showLogo = p.get("mark") !== "none";
-        const position = compositionImagePositionSchema.safeParse(
-          p.get("imagePosition"),
-        );
-        if (position.success) recipe.imagePosition = position.data;
-        source = {
-          url: p.get("sourceUrl") ?? media.url,
-          assetId: p.get("sourceMediaAssetId") ?? undefined,
-        };
-        mode = c.photoOnly ? "supplied" : "compose";
-      }
-      const copy =
-        media.headline || media.description
-          ? { headline: media.headline, description: media.description }
-          : undefined;
-      return {
-        id: `card-${index}`,
-        source,
-        recipe,
-        mode,
-        overrides: {},
-        ...(copy ? { copy } : {}),
-      };
-    }),
+    cards:
+      !composed && stories
+        ? cards.map((card, index) => ({
+            ...card,
+            sourceOverrides: {
+              story: {
+                url: c.media[index]!.story!.url,
+                assetId: c.media[index]!.story!.assetId,
+              },
+            },
+          }))
+        : cards,
   });
 }
 export type IdeaSource = z.infer<typeof ideaSourceSchema>;

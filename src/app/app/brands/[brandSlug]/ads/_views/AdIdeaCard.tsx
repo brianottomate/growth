@@ -77,9 +77,16 @@ export function AdIdeaCard({
   brandLogo,
   deliveryState,
   home,
+  studio = false,
 }: {
   ad: StudioAd;
-  campaignId: string;
+  /** The campaign it sits in; absent in the studio, where ideas have none. */
+  campaignId?: string;
+  /**
+   * In the studio, Approve is Freeze: the images for every included size are
+   * saved on the spot, so the idea leaves ready for any campaign.
+   */
+  studio?: boolean;
   brandId: string;
   brandName: string;
   brandLogo: string | null;
@@ -117,6 +124,25 @@ export function AdIdeaCard({
     return () => window.removeEventListener("prepare-ad-creative", prepare);
   }, [ad.id]);
   const collapsed = view === "overview";
+  const freeze = useMutation(
+    orpc.ads.freezeIdea.mutationOptions({
+      onMutate: () => {
+        setOptimistic(true);
+        setStamped(true);
+        setView("overview");
+      },
+      onSuccess: () => {
+        toast.success("Frozen · images saved");
+        router.refresh();
+      },
+      onError: (error) => {
+        setOptimistic(null);
+        setStamped(false);
+        toast.error(error.message);
+        router.refresh();
+      },
+    }),
+  );
   const approval = useMutation(
     orpc.ads.setAdStatus.mutationOptions({
       onMutate: ({ status }) => {
@@ -159,7 +185,9 @@ export function AdIdeaCard({
   /** The slide whose photo is being changed from its row, saved on pick. */
   const [swapping, setSwapping] = useState<string | null>(null);
   const homeGalleries = useQuery({
-    ...orpc.ads.starterIdeaHomes.queryOptions({ input: { campaignId } }),
+    ...orpc.ads.starterIdeaHomes.queryOptions({
+      input: campaignId ? { campaignId } : { brandId },
+    }),
     enabled:
       editor === "image" ||
       editor === "pool" ||
@@ -732,8 +760,12 @@ export function AdIdeaCard({
             <span>
               {approved
                 ? imagesSaved
-                  ? "Approved · images saved"
-                  : "Approved"
+                  ? studio
+                    ? "Frozen · images saved"
+                    : "Approved · images saved"
+                  : studio
+                    ? "Approved · images not saved"
+                    : "Approved"
                 : ad.content.metaImport
                   ? "Needs local review"
                   : "Draft idea"}
@@ -810,27 +842,51 @@ export function AdIdeaCard({
           </div>
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={busy || editor !== null}
-            onClick={() =>
-              sendAssistantIntent({
-                type: "work_ad_campaign",
-                newThread: true,
-                brandId,
-                brandName,
-                campaignId,
-                campaignName: "this ad's campaign",
-                adId: ad.id,
-                focus: "ads",
-                visibleText: `Work on “${savedState.name}”. Inspect its existing carousel photos, use the brand and house facts, write shared ad copy, and compose each slide for its intended sizes. Keep the selected images and slide order, and save the result for review.`,
-              })
-            }
-          >
-            <MessageSquare className="size-3.5" /> Start new chat
-          </Button>
-          {!pushed && (
+          {campaignId && (
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={busy || editor !== null}
+              onClick={() =>
+                sendAssistantIntent({
+                  type: "work_ad_campaign",
+                  newThread: true,
+                  brandId,
+                  brandName,
+                  campaignId,
+                  campaignName: "this ad's campaign",
+                  adId: ad.id,
+                  focus: "ads",
+                  visibleText: `Work on “${savedState.name}”. Inspect its existing carousel photos, use the brand and house facts, write shared ad copy, and compose each slide for its intended sizes. Keep the selected images and slide order, and save the result for review.`,
+                })
+              }
+            >
+              <MessageSquare className="size-3.5" /> Start new chat
+            </Button>
+          )}
+          {studio && !pushed && (!approved || !imagesSaved) && (
+            <Button
+              size="sm"
+              disabled={busy || freeze.isPending || editor !== null}
+              onClick={() =>
+                freeze.mutate({
+                  adId: ad.id,
+                  expectedUpdatedAt: savedState.version,
+                  exportShapes: [
+                    ...(savedState.document.exportShapes ??
+                      savedState.document.shapes),
+                  ],
+                })
+              }
+            >
+              {freeze.isPending
+                ? "Saving images…"
+                : approved
+                  ? "Save images"
+                  : "Freeze"}
+            </Button>
+          )}
+          {!pushed && (!studio || approved) && (
             <Button
               size="sm"
               variant={approved ? "outline" : "default"}
@@ -1074,7 +1130,9 @@ export function AdIdeaCard({
                 {(editor === "image" || editor === "pool") && editorPanel}
               </div>
               <div className="space-y-3 border-t pt-4">
-                <h5 className="text-xs font-medium">Meta preview</h5>
+                <h5 className="text-xs font-medium">
+                  {studio ? "Preview" : "Meta preview"}
+                </h5>
                 <AdIdeaPreview
                   brandId={brandId}
                   brandName={brandName}

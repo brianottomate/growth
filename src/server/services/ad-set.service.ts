@@ -1,5 +1,9 @@
 import { projectIdea, type IdeaShape } from "@/lib/ad-idea-studio";
-import { assertAdNotPushed, transitionAdApproval } from "./ad-approval.service";
+import {
+  assertAdNotPushed,
+  freezeApprovedAd,
+  transitionAdApproval,
+} from "./ad-approval.service";
 import "server-only";
 
 import { and, eq, inArray, isNull } from "drizzle-orm";
@@ -1355,13 +1359,24 @@ export async function attachAdSet(input: {
     columns: { id: true, name: true },
   });
   if (!campaign) throw new AdSetError(404, "Campaign not found on this brand");
-  const drafts = await db.query.adTable.findMany({
-    where: and(eq(adTable.brandId, brand.id), isNull(adTable.campaignId)),
-    columns: { id: true, status: true, content: true, name: true },
-  });
-  const wanted = input.adIds?.length
-    ? drafts.filter((ad) => input.adIds!.includes(ad.id))
-    : drafts.filter((ad) => ad.status === "approved");
+  const draftsQuery = () =>
+    db.query.adTable.findMany({
+      where: and(eq(adTable.brandId, brand.id), isNull(adTable.campaignId)),
+      columns: { id: true, status: true, content: true, name: true },
+    });
+  const pick = (rows: Awaited<ReturnType<typeof draftsQuery>>) =>
+    input.adIds?.length
+      ? rows.filter((ad) => input.adIds!.includes(ad.id))
+      : rows.filter((ad) => ad.status === "approved");
+  // An idea approved before the studio froze on approval has no images yet;
+  // save them now so it arrives with its media.
+  let drafts = await draftsQuery();
+  let frozeAny = false;
+  for (const ad of pick(drafts)) {
+    if (await freezeApprovedAd(ad.id)) frozeAny = true;
+  }
+  if (frozeAny) drafts = await draftsQuery();
+  const wanted = pick(drafts);
   if (wanted.length === 0) {
     throw new AdSetError(
       422,

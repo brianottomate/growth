@@ -81,6 +81,7 @@ async function requireOwnedBrand(input: {
       slug: true,
       organizationId: true,
       relationship: true,
+      website: true,
     },
   });
   if (brand?.organizationId !== input.organizationId) {
@@ -492,12 +493,16 @@ export async function updateAudience(input: {
 /** Read the same committed set shown on the brand's Homes page. */
 export async function starterIdeaHomes(input: {
   organizationId: string;
-  campaignId: string;
+  /** The campaign's brand, or a brand directly for the studio. */
+  campaignId?: string;
+  brandId?: string;
 }) {
-  const { brand } = await requireOwnedCampaign(
-    input.campaignId,
-    input.organizationId,
-  );
+  const brand = input.campaignId
+    ? (await requireOwnedCampaign(input.campaignId, input.organizationId)).brand
+    : await requireOwnedBrand({
+        organizationId: input.organizationId,
+        brandId: input.brandId,
+      });
   const [homes, listings] = await Promise.all([
     listBrandHomes(brand.id),
     brandListings(brand),

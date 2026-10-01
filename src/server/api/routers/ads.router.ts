@@ -8,6 +8,8 @@ import {
   starterGenerationStatus,
 } from "@/server/services/starter-ad-generation.service";
 import { z } from "zod";
+import { ideaShapeSchema } from "@/lib/ad-idea-studio";
+import { freezeIdea } from "@/server/services/ad-approval.service";
 import { channelPlatformEnum } from "@/server/db/channel-schema";
 
 import {
@@ -96,11 +98,36 @@ export const adsRouter = {
     .handler(async ({ input }) => suggestImagePosition(input)),
 
   starterIdeaHomes: workspaceProcedure
-    .input(z.object({ campaignId: z.string().min(1) }))
+    .input(
+      z
+        .object({
+          campaignId: z.string().min(1).optional(),
+          brandId: z.string().min(1).optional(),
+        })
+        .refine((value) => value.campaignId || value.brandId, {
+          message: "campaignId or brandId is required",
+        }),
+    )
     .handler(async ({ context: ctx, input }) =>
       starterIdeaHomes({
         ...input,
         organizationId: ctx.workspace.orgId,
+      }),
+    ),
+  /** The studio's Freeze: approve and save every size's images now. */
+  freezeIdea: workspaceProcedure
+    .input(
+      z.object({
+        adId: z.string().min(1),
+        expectedUpdatedAt: z.string().datetime(),
+        exportShapes: z.array(ideaShapeSchema).max(4).optional(),
+      }),
+    )
+    .handler(async ({ context: ctx, input }) =>
+      freezeIdea({
+        ...input,
+        orgId: ctx.workspace.orgId,
+        userId: ctx.session.user.id,
       }),
     ),
   generateStarterIdeas: workspaceProcedure

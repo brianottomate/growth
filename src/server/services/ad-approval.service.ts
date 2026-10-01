@@ -178,6 +178,50 @@ export async function freezeApprovedAd(adId: string): Promise<boolean> {
 }
 
 /**
+ * The studio's Freeze: approve the idea and save every included size's
+ * images now, not at push. A frozen idea is read-only and ready for any
+ * campaign; reopening it is how it changes. If saving the images fails, a
+ * newly approved idea goes back to draft rather than sit approved with
+ * nothing to show. An idea approved before Freeze existed just gets its images.
+ */
+export async function freezeIdea(input: {
+  adId: string;
+  orgId: string;
+  userId: string;
+  expectedUpdatedAt: string;
+  exportShapes?: IdeaShape[];
+}) {
+  const before = await db.query.adTable.findFirst({
+    where: eq(adTable.id, input.adId),
+    columns: { content: true },
+  });
+  const wasApproved = Boolean(
+    before && "media" in before.content && before.content.ideaStudio?.approval,
+  );
+  await transitionAdApproval({ ...input, status: "approved" });
+  try {
+    await freezeApprovedAd(input.adId);
+  } catch (error) {
+    if (!wasApproved) {
+      const ad = await db.query.adTable.findFirst({
+        where: eq(adTable.id, input.adId),
+        columns: { updatedAt: true },
+      });
+      if (ad)
+        await transitionAdApproval({
+          ...input,
+          expectedUpdatedAt: ad.updatedAt.toISOString(),
+          status: "drawn",
+        }).catch((reopenError: unknown) =>
+          console.error("freeze rollback failed", input.adId, reopenError),
+        );
+    }
+    throw error;
+  }
+  return { adId: input.adId, status: "approved" as const };
+}
+
+/**
  * A pushed ad is read-only: its images are frozen and Meta runs them. To change
  * one, build a new ad or campaign and push that.
  */

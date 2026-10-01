@@ -12,7 +12,7 @@ const TABS = [
   { label: "Campaigns", tab: "campaigns" },
   { label: "Newsletter", tab: "newsletters" },
   { label: "Settings", tab: "settings" },
-  { label: "Unassigned creatives", tab: "ads" },
+  { label: "Ad studio", tab: "ads" },
 ] as const;
 
 /**

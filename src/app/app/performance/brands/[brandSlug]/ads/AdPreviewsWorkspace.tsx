@@ -26,7 +26,7 @@ import { orpc } from "@/orpc/client";
 import { HomePicker } from "../HomePicker";
 import { AddAdDialog } from "./AddAdDialog";
 import { CreativeDrop } from "./CreativeDrop";
-import { PlacementMatrix, type MatrixHome } from "./matrix/PlacementMatrix";
+import { StudioIdeas, type StudioIdea } from "./StudioIdeas";
 
 export type WorkspaceHome = HotelFeedHome & {
   imageUrl: string;
@@ -42,13 +42,13 @@ const panel = "bg-card overflow-hidden rounded-2xl border";
 const DEFAULT_COUNT = 5;
 
 /**
- * The brand's ad wall and the two ways onto it.
+ * The brand's ad studio: ideas with no campaign and no platform.
  *
- * Build draws the whole set, from the homes picked here or from a count when
- * none are, and the homes it chose become the pick. Add and Drop put single
- * ads on the wall by hand, filled by upload. Either way the ads are real rows
- * against the brand with no campaign, reviewed and adjusted here, and sent
- * to a campaign once approved.
+ * Build draws a set, from the homes picked here or from a count when none
+ * are. Add and Drop put single ideas here by hand. Each idea is composed and
+ * worded in the idea editor and frozen when done, which saves its images for
+ * every size it includes; frozen ideas go to a campaign, where each platform
+ * takes the sizes it needs.
  */
 export function AdPreviewsWorkspace({
   brandId,
@@ -58,7 +58,7 @@ export function AdPreviewsWorkspace({
   homes,
   withoutPhoto,
   initialPicked,
-  matrixHomes,
+  ideas,
   campaigns,
   hasSite,
   website,
@@ -72,7 +72,7 @@ export function AdPreviewsWorkspace({
   homes: WorkspaceHome[];
   withoutPhoto: number;
   initialPicked: string[];
-  matrixHomes: MatrixHome[];
+  ideas: StudioIdea[];
   /** Campaigns nothing has been pushed for yet, which can still take ads. */
   campaigns: { id: string; name: string }[];
   hasSite: boolean;
@@ -159,7 +159,7 @@ export function AdPreviewsWorkspace({
     commit([...picked, id]);
   };
 
-  const allAds = matrixHomes.flatMap((home) => home.ads);
+  const allAds = ideas;
   const approved = allAds.filter((ad) => ad.status === "approved").length;
   const drafted = allAds.length > 0;
   const unapproved = allAds.length - approved;
@@ -348,7 +348,7 @@ export function AdPreviewsWorkspace({
                     shape="round"
                     density="editorial"
                   >
-                    Attach {approved} approved
+                    Add {approved} frozen to campaign
                   </Button>
                 </div>
               ) : (
@@ -356,7 +356,7 @@ export function AdPreviewsWorkspace({
                   href={`/app/brands/${brandSlug}/ads`}
                   className="text-[11.5px] text-sky-300 hover:underline"
                 >
-                  New campaign for the {approved} approved
+                  New campaign for the {approved} frozen
                 </Link>
               )
             ) : null}
@@ -365,19 +365,15 @@ export function AdPreviewsWorkspace({
         <CreativeDrop brandId={brandId} homes={homes} />
       </section>
 
-      {/* 3 · The matrix: every home, every ad, every placement. */}
+      {/* 3 · Every idea, by home. */}
       {drafted ? (
-        // Break out of the centered column so all placements have room; the
-        // app layout's scroll div is the @container this measures against.
-        <div className="mx-[calc(((100cqw-min(100cqw,64rem))/2+1rem)*-1)] px-4 @xl:mx-[calc(((100cqw-min(100cqw,64rem))/2+2rem)*-1)] @xl:px-8">
-          <PlacementMatrix
-            homes={matrixHomes}
-            brandId={brandId}
-            brandName={brandName}
-            brandLogo={brandLogo}
-            focusKey={focusHomeId}
-          />
-        </div>
+        <StudioIdeas
+          ideas={ideas}
+          brandId={brandId}
+          brandName={brandName}
+          brandLogo={brandLogo}
+          focusHomeId={focusHomeId}
+        />
       ) : (
         <p
           className={cn(
@@ -386,8 +382,8 @@ export function AdPreviewsWorkspace({
           )}
         >
           {hasSite
-            ? "No unassigned creatives. Ads attached to a campaign live in Campaigns. Build a set, add an ad, or drop finished creatives here."
-            : "No unassigned creatives. View Campaigns for assigned ads, or add an ad here."}
+            ? "No ideas yet. Build a set, add an ad, or drop finished creatives."
+            : "No ideas yet. Add an ad or drop finished creatives."}
         </p>
       )}
     </div>

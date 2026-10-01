@@ -11,18 +11,18 @@ import { MAX_SET_HOMES } from "@/lib/performance-ads";
 
 import { AdPreviewsWorkspace, type WorkspaceHome } from "./AdPreviewsWorkspace";
 import { ReviewInChatButton } from "../ReviewInChatButton";
-import { toMatrixHomes } from "./matrix/build";
+import type { StudioIdea } from "./StudioIdeas";
 
 export const metadata: Metadata = {
-  title: "Unassigned creatives · Wander Performance",
+  title: "Ad studio · Wander Performance",
 };
 export const dynamic = "force-dynamic";
 
 /**
- * The client's ad wall: every drafted ad, filed under the home it is about.
- * Catalog ads have their own tab. A set can be
- * drawn from a pick of homes (carried in `?homes=` so a link opens on it) or
- * from a count, and any ad can be made by hand and filled by upload.
+ * The client's ad studio: every idea with no campaign yet, filed under the
+ * home it is about. A set can be drawn from a pick of homes (carried in
+ * `?homes=` so a link opens on it) or from a count, and any idea can be made
+ * by hand and filled by upload.
  */
 export default async function PerformanceBrandAdsPage({
   params,
@@ -44,9 +44,27 @@ export default async function PerformanceBrandAdsPage({
     brandAvatarUrl(brand),
     listAdSet({ brandId: brand.id, orgId: org.id }),
   ]);
-  // Every home a group, every ad its placement matrix. The reviewer reads and
-  // decides here; the same assembly feeds the full-width matrix route.
-  const matrixHomes = toMatrixHomes(drafted);
+  const ideas: StudioIdea[] = drafted.flatMap((ad) =>
+    "media" in ad.content
+      ? [
+          {
+            id: ad.id,
+            name: ad.name,
+            content: ad.content,
+            status: ad.status,
+            updatedAt: ad.updatedAt.toISOString(),
+            homeId: ad.homeId,
+            home: ad.home
+              ? {
+                  name: ad.home.name,
+                  url: ad.home.url,
+                  externalId: ad.home.externalId,
+                }
+              : null,
+          },
+        ]
+      : [],
+  );
   const homes: WorkspaceHome[] = listings
     .filter((home) => home.imageUrl)
     .map((home) => ({
@@ -110,9 +128,7 @@ export default async function PerformanceBrandAdsPage({
   return (
     <>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-lg font-semibold">
-          Unassigned creatives · {drafted.length}
-        </h1>
+        <h1 className="text-lg font-semibold">Ad studio · {ideas.length}</h1>
         <div className="flex items-center gap-3">
           {drafted.length > 0 ? (
             <ReviewInChatButton
@@ -137,7 +153,7 @@ export default async function PerformanceBrandAdsPage({
         homes={homes}
         withoutPhoto={withoutPhoto}
         initialPicked={initialPicked}
-        matrixHomes={matrixHomes}
+        ideas={ideas}
         campaigns={campaigns}
         hasSite={listings.length > 0}
         website={brand.website}
