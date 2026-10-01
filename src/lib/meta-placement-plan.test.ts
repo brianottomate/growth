@@ -54,7 +54,6 @@ describe("Meta placement delivery", () => {
         "story",
         "facebook_reels",
         "marketplace",
-        "video_feeds",
         "right_hand_column",
         "profile_feed",
         "notification",

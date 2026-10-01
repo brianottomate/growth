@@ -59,14 +59,6 @@ export const META_PLACEMENTS = [
     kind: "feed",
   },
   {
-    id: "facebook-video-feeds",
-    label: "Facebook Video Feeds",
-    publisher: "facebook",
-    position: "video_feeds",
-    surface: "facebook",
-    kind: "feed",
-  },
-  {
     id: "facebook-right-column",
     label: "Facebook Right Column",
     publisher: "facebook",
