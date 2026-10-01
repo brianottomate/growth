@@ -982,13 +982,20 @@ function ProjectionSummary({
       media: ReturnType<typeof metaPreviewMedia>["media"];
       labels: Set<string>;
       vertical: boolean;
+      square: boolean;
     }
   >();
   const issues = new Set<string>();
   for (const view of views) {
     const resolved = metaPreviewMedia(content, view.id, ad.brandId);
     const vertical = view.kind !== "feed";
-    const label = vertical ? "Vertical" : "Feed";
+    // Facebook and Instagram feeds can get different cards (square on
+    // Facebook), so a feed group says which one it is.
+    const label = vertical
+      ? "Stories & Reels"
+      : view.publisher === "facebook"
+        ? "Facebook feed"
+        : "Instagram feed";
     if (resolved.issue) {
       issues.add(`${label}: ${resolved.issue}`);
       continue;
@@ -1001,6 +1008,7 @@ function ProjectionSummary({
         media: resolved.media,
         labels: new Set([label]),
         vertical,
+        square: "crop" in resolved && resolved.crop === "square",
       });
   }
   // An approved idea's media stays empty until the push saves its images.
@@ -1034,7 +1042,7 @@ function ProjectionSummary({
                 {group.media.map((item, index) => (
                   <span
                     key={`${index}:${item.url}`}
-                    className={`relative block h-[144px] shrink-0 overflow-hidden rounded-md bg-muted ${group.vertical ? "w-[81px]" : "w-[115px]"}`}
+                    className={`relative block h-[144px] shrink-0 overflow-hidden rounded-md bg-muted ${group.vertical ? "w-[81px]" : group.square ? "w-[144px]" : "w-[115px]"}`}
                   >
                     {item.type === "video" ? (
                       <span className="flex size-full items-center justify-center text-xs">
