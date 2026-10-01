@@ -108,13 +108,14 @@ export function CopyWorkbench(props: {
     if (!loaded) return;
     // The prompts are large and come back with every run: keep the outputs.
     const done = Object.entries(cells)
-      .filter(([, cell]) => cell.status === "done")
+      .flatMap(([key, cell]) =>
+        cell.status === "done" ? [[key, cell] as const] : [],
+      )
+      .sort(([, a], [, b]) => a.at.localeCompare(b.at))
       .slice(-KEEP_CELLS)
       .map(([key, cell]) => [
         key,
-        cell.status === "done"
-          ? { ...cell, result: { ...cell.result, system: "", baseSystem: "" } }
-          : cell,
+        { ...cell, result: { ...cell.result, system: "", baseSystem: "" } },
       ]);
     save("cells", Object.fromEntries(done));
   }, [cells, loaded]);
@@ -140,7 +141,7 @@ export function CopyWorkbench(props: {
   );
   const production = Object.entries(cells)
     .flatMap(([key, cell]) =>
-      key.startsWith(`${surface}|`) &&
+      key.startsWith(`${surface}|${brandId}|`) &&
       cell.status === "done" &&
       cell.result.baseSystem
         ? [cell.result.baseSystem]
@@ -176,6 +177,7 @@ export function CopyWorkbench(props: {
 
   async function run(variant: Variant) {
     const key = `${selection}|${variant.id}`;
+    if (cells[key]?.status === "running") return;
     setCells((c) => ({ ...c, [key]: { status: "running" } }));
     const { id: _id, ...body } = variant;
     try {
@@ -258,6 +260,7 @@ export function CopyWorkbench(props: {
               key={s.id}
               size="sm"
               variant={s.id === surface ? "default" : "outline"}
+              aria-pressed={s.id === surface}
               onClick={() => setSurface(s.id)}
               title={s.note}
             >
@@ -271,6 +274,7 @@ export function CopyWorkbench(props: {
               key={b.id}
               size="xs"
               variant={b.id === brandId ? "secondary" : "ghost"}
+              aria-pressed={b.id === brandId}
               onClick={() => chooseBrand(b.id)}
             >
               {b.name}
@@ -289,6 +293,7 @@ export function CopyWorkbench(props: {
                   key={home.id}
                   type="button"
                   onClick={() => toggleHome(home.id)}
+                  aria-pressed={on}
                   className={`flex items-center gap-3 rounded-md border p-2 text-left text-sm ${on ? "border-primary bg-primary/5" : "opacity-60"}`}
                 >
                   {home.heroUrl && (
@@ -349,6 +354,7 @@ export function CopyWorkbench(props: {
                   <Button
                     size="xs"
                     variant={pick === variant.id ? "default" : "outline"}
+                    aria-pressed={pick === variant.id}
                     onClick={() =>
                       setPicks((p) => ({ ...p, [selection]: variant.id }))
                     }
@@ -373,10 +379,18 @@ export function CopyWorkbench(props: {
                   onDuplicate={() => duplicate(variant)}
                   onRemove={
                     variants.length > 1
-                      ? () =>
+                      ? () => {
                           setVariants((list) =>
                             list.filter((v) => v.id !== variant.id),
-                          )
+                          );
+                          setPicks((p) =>
+                            Object.fromEntries(
+                              Object.entries(p).filter(
+                                ([, id]) => id !== variant.id,
+                              ),
+                            ),
+                          );
+                        }
                       : undefined
                   }
                 />
@@ -540,6 +554,7 @@ function VariantEditor(props: {
               <Textarea
                 value={variant.system}
                 onChange={(e) => onChange({ system: e.target.value })}
+                aria-label="Custom system prompt"
                 className="max-h-96 min-h-64 font-mono text-[11px]"
               />
               <Button

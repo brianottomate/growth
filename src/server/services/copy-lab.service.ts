@@ -125,9 +125,20 @@ async function runSurface(input: CopyLabRunInput, tune: CopyTune) {
         ? [{ name: h.name, headline: h.catalog.title }]
         : [],
     ),
-    approved: brand.approved
-      .filter((a) => a.homeId !== home.id)
-      .map((a) => ({ brand: brand.name, headline: a.headline })),
+    // Production's taste pool: eight of this brand's approved headlines,
+    // then four from other brands.
+    approved: [
+      ...brand.approved
+        .filter((a) => a.homeId !== home.id)
+        .slice(0, 8)
+        .map((a) => ({ brand: brand.name, headline: a.headline })),
+      ...copyLabFixtures.brands
+        .filter((b) => b.id !== brand.id)
+        .flatMap((b) =>
+          b.approved.map((a) => ({ brand: b.name, headline: a.headline })),
+        )
+        .slice(0, 4),
+    ],
   });
   return go(request, tune, result);
 }
