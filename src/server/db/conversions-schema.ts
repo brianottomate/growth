@@ -1,6 +1,7 @@
 import { relations } from "drizzle-orm";
 import { index, pgEnum, pgTable, primaryKey } from "drizzle-orm/pg-core";
 
+import { adAccountTable } from "./ad-account-schema";
 import { brandTable } from "./brand-schema";
 import { channelPlatformEnum, channelTable } from "./channel-schema";
 import { createId } from "./utils";
@@ -124,8 +125,15 @@ export const conversionMappingTable = pgTable(
       .text()
       .references(() => channelTable.id, { onDelete: "set null" }),
 
+    // The ad account that owns this conversion (a Google conversion lives on a
+    // customer, not on the connection that reaches it).
+    adAccountId: t
+      .text()
+      .references(() => adAccountTable.id, { onDelete: "set null" }),
+
     platformEventName: t.text().notNull(), // "Lead", "Submit Application", …
     externalConversionId: t.text(), // AW-… label / numeric id / null for pixel events
+    externalResourceName: t.text(), // customers/…/conversionActions/… for API use
     mode: conversionModeEnum(), // once | every | null
 
     status: conversionStatusEnum().default("wanted").notNull(),

@@ -123,41 +123,49 @@ export function createGoogleAdsTransport(
     return pendingToken;
   }
 
+  async function call<T>(customerId: string, path: string, body: unknown) {
+    const id = googleAdsCustomerId(customerId);
+    const loginCustomerId = config.loginCustomerId
+      ? googleAdsCustomerId(config.loginCustomerId)
+      : undefined;
+    const token = await accessToken();
+    const response = await request(
+      `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers/${id}${path}`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "developer-token": config.developerToken!,
+          "Content-Type": "application/json",
+          ...(loginCustomerId ? { "login-customer-id": loginCustomerId } : {}),
+        },
+        body: JSON.stringify(body),
+        cache: "no-store",
+        signal: AbortSignal.timeout(30_000),
+      },
+    );
+    if (!response.ok) {
+      if (response.status === 401) cachedToken = undefined;
+      throw new GoogleAdsRequestError(
+        response.status,
+        response.headers.get("request-id"),
+        "API",
+      );
+    }
+    return (await response.json()) as T;
+  }
+
   return {
     authMode: googleAdsAuthMode(config),
     async search<Row>(customerId: string, query: string): Promise<Row[]> {
-      const id = googleAdsCustomerId(customerId);
-      const loginCustomerId = config.loginCustomerId
-        ? googleAdsCustomerId(config.loginCustomerId)
-        : undefined;
-      const token = await accessToken();
-      const response = await request(
-        `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers/${id}/googleAds:searchStream`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "developer-token": config.developerToken!,
-            "Content-Type": "application/json",
-            ...(loginCustomerId
-              ? { "login-customer-id": loginCustomerId }
-              : {}),
-          },
-          body: JSON.stringify({ query }),
-          cache: "no-store",
-          signal: AbortSignal.timeout(30_000),
-        },
+      const batches = await call<Array<{ results?: Row[] }>>(
+        customerId,
+        "/googleAds:searchStream",
+        { query },
       );
-      if (!response.ok) {
-        if (response.status === 401) cachedToken = undefined;
-        throw new GoogleAdsRequestError(
-          response.status,
-          response.headers.get("request-id"),
-          "API",
-        );
-      }
-      const batches = (await response.json()) as Array<{ results?: Row[] }>;
       return batches.flatMap((batch) => batch.results ?? []);
     },
+    /** POST to a customer-scoped method, e.g. ":createCustomerClient". */
+    post: call,
   };
 }

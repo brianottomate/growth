@@ -62,6 +62,10 @@ export const adAccountTable = pgTable(
      * else. False for the account's own brand.
      */
     isShared: t.boolean().notNull().default(false),
+    /** The manager account this one sits under, when it is Wander's MCC. */
+    managerExternalId: t.text(),
+    /** We created the account (offboarding hands it over) rather than linked it. */
+    createdByUs: t.boolean().notNull().default(false),
     /** Why this row exists — provenance of the allow/deny decision. */
     note: t.text(),
 
