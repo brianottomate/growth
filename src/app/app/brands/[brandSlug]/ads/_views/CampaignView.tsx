@@ -17,7 +17,6 @@ import { db } from "@/server/db";
 import { homeTable, platformAdTable } from "@/server/db/schema";
 import { safeHomeUrl } from "@/lib/ad-preview-links";
 import { getSession } from "@/server/better-auth/server";
-import { campaignPrefillFromIntake } from "@/server/services/performance-intake.service";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/components/ui/lib/utils";
@@ -79,14 +78,8 @@ export async function CampaignView({
   );
   if (draft?.brand.slug !== brandSlug) notFound();
 
-  const {
-    campaign,
-    audiences,
-    ads,
-    platformCampaigns,
-    personas,
-    platformAudiences,
-  } = draft;
+  const { campaign, audiences, ads, platformCampaigns, platformAudiences } =
+    draft;
   const metaTargets = Object.fromEntries(
     audiences.flatMap((row) => {
       const hit = targetedAsset(row, platformAudiences, "meta_ads");
@@ -95,17 +88,6 @@ export async function CampaignView({
   );
   const brand = draft.brand;
   const brandName = brand.name;
-
-  // Where this client's homes are, offered to the audience form as a starting
-  // point. Only a paying client has an intake behind them; for Wander's own
-  // brands this would be a query that can only answer "nothing".
-  const prefill =
-    brand.relationship === "client"
-      ? await campaignPrefillFromIntake(
-          { orgId: org.id },
-          { brandId: brand.id },
-        ).catch(() => null)
-      : null;
 
   // Their homes, for binding an ad to one. Empty for a brand whose WanderOS
   // site is not connected, in which case a home is a name typed on the tile.
@@ -241,8 +223,11 @@ export async function CampaignView({
         )}
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="flex items-center gap-2.5">
-              <h1 className="truncate text-xl font-semibold tracking-tight">
+            <div className="flex items-start gap-2.5">
+              <h1
+                title={campaign.name}
+                className="text-lg leading-snug font-semibold tracking-tight break-all"
+              >
                 {campaign.name}
               </h1>
               <span
@@ -281,6 +266,21 @@ export async function CampaignView({
                 {campaign.description}
               </p>
             ) : null}
+            <nav aria-label="Sections" className="mt-3 flex flex-wrap gap-1.5">
+              {[
+                ["campaign-ads", `Ads · ${ads.length}`],
+                ["campaign-audiences", "Audiences"],
+                ["campaign-platforms", "Platforms"],
+              ].map(([id, label]) => (
+                <a
+                  key={id}
+                  href={`#${id}`}
+                  className="rounded-full border px-3 py-1 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  {label}
+                </a>
+              ))}
+            </nav>
           </div>
           <div className="flex items-center gap-2">
             <DeleteCampaignButton
@@ -303,7 +303,7 @@ export async function CampaignView({
         </div>
       </header>
 
-      <section className="space-y-4">
+      <section id="campaign-ads" className="scroll-mt-4 space-y-4">
         <AdIdeasList
           actions={
             <div className="flex flex-wrap items-center gap-2">
@@ -386,13 +386,7 @@ export async function CampaignView({
               brandId={brand.id}
               brandName={brandName}
               audiences={audiences}
-              personas={personas}
               metaTargets={metaTargets}
-              geoPrefill={prefill?.geography ?? null}
-              emptyActions={ask(
-                "audiences",
-                `Create the audience for “${campaign.name}”`,
-              )}
             />
           </Step>
 
@@ -516,7 +510,10 @@ function Step({
   children: React.ReactNode;
 }) {
   return (
-    <li className="space-y-3">
+    <li
+      id={`campaign-${title.toLowerCase()}`}
+      className="scroll-mt-4 space-y-3"
+    >
       <div className="flex flex-wrap items-end justify-between gap-2">
         <p className="text-[10.5px] font-semibold tracking-[0.09em] text-muted-foreground uppercase">
           {title}

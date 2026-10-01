@@ -238,6 +238,7 @@ export function CampaignRow({
       <div className="min-w-0 @lg:flex-1">
         <Link
           href={campaignHref(brand, campaign)}
+          title={campaign.name}
           className="block truncate text-[13px] font-semibold hover:underline"
         >
           {campaign.name}
