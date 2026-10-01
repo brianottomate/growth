@@ -77,9 +77,9 @@
     "test:quality-toolchain": "node --test scripts/quality-toolchain.mjs"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^4.0.50",
-    "@ai-sdk/openai": "^4.0.61",
-    "@ai-sdk/react": "^4.0.97",
+    "@ai-sdk/anthropic": "4.0.65",
+    "@ai-sdk/openai": "4.0.78",
+    "@ai-sdk/react": "4.0.121",
     "@anthropic-ai/sdk": "^0.124.0",
     "@auth/drizzle-adapter": "^1.11.3",
     "@aws-sdk/client-s3": "^3.1128.0",
@@ -145,7 +145,7 @@
     "@wandercom/design-system-tokens": "^0.6.19",
     "@wandercom/design-system-web": "^0.6.19",
     "@xyflow/react": "^12.11.6",
-    "ai": "^7.0.94",
+    "ai": "7.0.118",
     "apify-client": "^2.25.0",
     "better-auth": "1.6.30",
     "chrono-node": "^2.10.1",

@@ -13,6 +13,7 @@ import { renderToolPart } from "@/app/app/overview/OverviewChat";
 import { ChatNextOptions } from "@/app/app/overview/ChatNextOptions";
 import { ChatQueue } from "@/app/app/overview/ChatQueue";
 import type { ChatTurnSnapshot } from "@/lib/chat-turns";
+import { VoiceWorkbench } from "./VoiceWorkbench";
 import { nextMessages, specimens, resultPart } from "./fixtures";
 import type { GrowthActionPolicy } from "@/server/ai/kernel/policy";
 
@@ -32,6 +33,7 @@ const sections = [
   ["lifecycle", "Tool lifecycle"],
   ["results", "Result cards"],
   ["next-turn", "Follow-up & queue"],
+  ["voice", "Voice & dictation"],
   ["catalog", "Tool inventory"],
 ];
 const initialQueue: ChatTurnSnapshot = {
@@ -555,6 +557,18 @@ export function AssistantGallery({ catalog }: { catalog: CatalogEntry[] }) {
                 Demo queue cleared. Reset to restore it.
               </p>
             )}
+          </SpecimenFrame>
+        </Section>
+        <Section
+          id="voice"
+          title="Voice & dictation"
+          note="Try editable dictation, microphone pause, spoken captions, and steering. These specimens use sample state and make no provider calls."
+        >
+          <SpecimenFrame
+            title="Speech and current work"
+            source="AssistantVoiceControls · ChatQueue"
+          >
+            <VoiceWorkbench />
           </SpecimenFrame>
         </Section>
         <Section

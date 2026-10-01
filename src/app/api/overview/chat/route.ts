@@ -635,6 +635,7 @@ export async function POST(req: Request): Promise<Response> {
           { status: 409 },
         );
       }
+      incoming.metadata = stored.message.metadata;
       const continuationError = validateApprovalContinuation(
         stored.message,
         incoming,
@@ -804,6 +805,7 @@ export async function POST(req: Request): Promise<Response> {
     });
 
     let streamFailure: string | undefined;
+    const steeringInputIds: string[] = [];
     const deadline = AbortSignal.timeout(TURN_DEADLINE_MS);
     const result = await (async () => {
       try {
@@ -820,6 +822,7 @@ export async function POST(req: Request): Promise<Response> {
           prepareStep: async ({ messages, stepNumber }) => {
             await assertChatTurn(claimedThreadId, turnId);
             const corrections = await readChatSteering(claimedThreadId, turnId);
+            steeringInputIds.push(...corrections.map((message) => message.id));
             return {
               messages: withGrowthRollingCache(
                 [...messages, ...(await convertToModelMessages(corrections))],
@@ -868,6 +871,25 @@ export async function POST(req: Request): Promise<Response> {
             (isAborted || finishReason === "length" || finishReason === "error"
               ? "The response ended before completion. Review completed actions before retrying."
               : undefined));
+        const reply = updatedMessages
+          .slice()
+          .reverse()
+          .find((message) => message.role === "assistant");
+        if (reply) {
+          const ids = new Set<string>([
+            ...(incoming.role === "assistant"
+              ? ((incoming.metadata as { queueInputIds?: string[] } | undefined)
+                  ?.queueInputIds ?? [])
+              : []),
+            ...(inputId ? [inputId] : []),
+            ...steeringInputIds,
+          ]);
+          reply.metadata = {
+            ...((reply.metadata ?? {}) as Record<string, unknown>),
+            queueInputIds: [...ids],
+            queueTurnError: turnError ?? null,
+          };
+        }
         await finishChatTurn(
           claimedThreadId,
           turnId,

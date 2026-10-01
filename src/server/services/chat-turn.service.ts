@@ -200,7 +200,7 @@ export async function enqueueChatInput(
 export async function changeChatQueue(
   actor: ChatActor,
   threadId: string,
-  action: "pause" | "resume" | "stop" | "cancel" | "edit" | "retry",
+  action: "pause" | "resume" | "stop" | "cancel" | "edit" | "retry" | "steer",
   id?: string,
   text?: string,
 ) {
@@ -232,6 +232,34 @@ export async function changeChatQueue(
       throw new ChatTurnError(
         "This message has already started or is unavailable",
       );
+    if (action === "steer") {
+      if (
+        input.status !== "queued" ||
+        !thread.activeTurnId ||
+        thread.stopRequested
+      )
+        throw new ChatTurnError(
+          "Current work finished. Keep this message queued.",
+        );
+      const [running] = await tx
+        .select({ payload: inputs.payload })
+        .from(inputs)
+        .where(and(eq(inputs.threadId, threadId), eq(inputs.status, "running")))
+        .limit(1);
+      if (
+        !running ||
+        !sameTurnFocus(running.payload.context, input.payload.context) ||
+        input.payload.message.parts.some((part) => part.type !== "text")
+      )
+        throw new ChatTurnError(
+          "Steering requires text about the current work.",
+        );
+      await tx
+        .update(inputs)
+        .set({ status: "steering", targetTurnId: thread.activeTurnId })
+        .where(eq(inputs.id, input.id));
+      return;
+    }
     if (action === "edit" && input.status !== "queued")
       throw new ChatTurnError("Only queued messages can be edited");
     await tx
@@ -410,5 +438,48 @@ export async function finishChatTurn(
         queuePaused: Boolean(error || stopped || thread.queuePaused),
       })
       .where(eq(threads.id, threadId));
+  });
+}
+
+/** Resolve a voice request from its durable input and explicitly linked reply. */
+export async function getChatInputResult(
+  actor: ChatActor,
+  threadId: string,
+  inputId: string,
+) {
+  return withTransaction(async (tx) => {
+    await recover(tx, await lock(tx, threadId, actor));
+    const [input] = await tx
+      .select()
+      .from(inputs)
+      .where(
+        and(
+          eq(inputs.id, inputId),
+          eq(inputs.threadId, threadId),
+          eq(inputs.createdBy, actor.userId),
+        ),
+      );
+    if (!input) throw new ChatTurnError("Input not found", 404);
+    const saved = await history(tx, threadId);
+    const reply = saved
+      .map((row) => row.message)
+      .reverse()
+      .find(
+        (message) =>
+          message.role === "assistant" &&
+          (
+            message.metadata as { queueInputIds?: string[] } | undefined
+          )?.queueInputIds?.includes(inputId),
+      );
+    const error =
+      input.error ??
+      (reply?.metadata as { queueTurnError?: string } | undefined)
+        ?.queueTurnError ??
+      null;
+    return {
+      status: error ? "failed" : input.status,
+      error,
+      reply: reply ?? null,
+    };
   });
 }

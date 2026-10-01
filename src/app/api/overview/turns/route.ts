@@ -1,37 +1,14 @@
+import { chatActor } from "@/server/services/chat-actor";
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
-import { getSession } from "@/server/better-auth/server";
-import { db } from "@/server/db";
-import { memberTable } from "@/server/db/schema";
 import { queuedPayloadSchema } from "@/lib/chat-turns";
 import {
   enqueueChatInput,
   getChatTurnState,
+  getChatInputResult,
   changeChatQueue,
   ChatTurnError,
 } from "@/server/services/chat-turn.service";
 
-async function actor() {
-  const session = await getSession();
-  if (!session?.user) throw new ChatTurnError("Unauthorized", 401);
-  const active = session.session.activeOrganizationId;
-  const memberships = await db
-    .select({ organizationId: memberTable.organizationId })
-    .from(memberTable)
-    .where(
-      and(
-        eq(memberTable.userId, session.user.id),
-        active ? eq(memberTable.organizationId, active) : undefined,
-      ),
-    )
-    .limit(2);
-  if (memberships.length !== 1)
-    throw new ChatTurnError("Select an organization", 403);
-  return {
-    userId: session.user.id,
-    organizationId: memberships[0]!.organizationId,
-  };
-}
 function failure(error: unknown) {
   return Response.json(
     { error: error instanceof Error ? error.message : "Request failed" },
@@ -51,9 +28,16 @@ export async function GET(req: Request) {
       .string()
       .min(1)
       .parse(new URL(req.url).searchParams.get("threadId"));
-    return Response.json(await getChatTurnState(await actor(), threadId), {
-      headers: { "Cache-Control": "no-store" },
-    });
+    const identity = await chatActor();
+    const inputId = new URL(req.url).searchParams.get("inputId");
+    return Response.json(
+      inputId
+        ? await getChatInputResult(identity, threadId, inputId)
+        : await getChatTurnState(identity, threadId),
+      {
+        headers: { "Cache-Control": "no-store" },
+      },
+    );
   } catch (error) {
     return failure(error);
   }
@@ -66,7 +50,7 @@ const command = z.discriminatedUnion("action", [
     targetTurnId: z.string().optional(),
   }),
   z.object({
-    action: z.enum(["pause", "resume", "stop", "cancel", "retry"]),
+    action: z.enum(["pause", "resume", "stop", "cancel", "retry", "steer"]),
     threadId: z.string().min(1),
     id: z.string().optional(),
   }),
@@ -80,7 +64,7 @@ const command = z.discriminatedUnion("action", [
 export async function POST(req: Request) {
   try {
     const input = command.parse(await req.json());
-    const identity = await actor();
+    const identity = await chatActor();
     if (input.action === "enqueue")
       return Response.json(
         await enqueueChatInput(

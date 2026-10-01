@@ -73,12 +73,15 @@ export function useChatQueue({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...body, threadId }),
+        signal: AbortSignal.timeout(30_000),
       });
       if (!response.ok) {
         const result = (await response.json()) as { error?: string };
         throw new Error(result.error ?? "Could not update this session");
       }
+      const receipt = (await response.json()) as { status?: string };
       await refresh().catch(() => undefined);
+      return receipt;
     },
     [threadId, refresh],
   );
@@ -163,7 +166,7 @@ export function useChatQueue({
             ? unacknowledged.current.id
             : payload.message.id;
         unacknowledged.current = { key, id };
-        await command({
+        const receipt = await command({
           action: "enqueue",
           payload: { ...payload, message: { ...payload.message, id } },
           ...(steer && state?.activeTurnId
@@ -171,7 +174,11 @@ export function useChatQueue({
             : {}),
         });
         unacknowledged.current = null;
-        return true;
+        if (steer && receipt.status !== "steering")
+          toast.info(
+            "Current work finished. Your message was queued as a new turn.",
+          );
+        return id;
       } catch (error) {
         toast.error(
           error instanceof Error

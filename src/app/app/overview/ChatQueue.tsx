@@ -4,7 +4,7 @@ import {
   type AssistantFocus,
 } from "@/lib/assistant-focus";
 import { useState } from "react";
-import { ListPlus, Pencil, X, CornerUpLeft } from "lucide-react";
+import { ListPlus, Pencil, X, CornerUpLeft, CornerUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -49,6 +49,10 @@ export function ChatQueue({
           {state.paused ? "Resume" : "Pause"}
         </Button>
       </div>
+      <p className="mt-1 text-muted-foreground">
+        Queued messages run in order. Corrections reach current work at its next
+        step.
+      </p>
       <div className="max-h-48 overflow-y-auto">
         {pending.map((input) => (
           <div
@@ -168,6 +172,22 @@ export function ChatQueue({
                         <Pencil className="size-3.5" />
                       </Button>
                     )}
+                    {input.status === "queued" &&
+                      state.activeTurnId &&
+                      input.payload.message.parts.every(
+                        (part) => part.type === "text",
+                      ) && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Use queued message to steer current work"
+                          title="Apply as a correction at the next step"
+                          onClick={() => void control("steer", input.id)}
+                        >
+                          <CornerUpRight className="size-3.5" />
+                        </Button>
+                      )}
                     {input.status === "failed" && (
                       <Button
                         type="button"

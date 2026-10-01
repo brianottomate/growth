@@ -11,6 +11,9 @@ import { OperationJobCard } from "./OperationJobCard";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useChatQueue } from "./useChatQueue";
+import { AssistantVoiceControls } from "./AssistantVoiceControls";
+import { useAssistantVoice } from "./useAssistantVoice";
+import { useAssistantDictation } from "./useAssistantDictation";
 import { ChatQueue } from "./ChatQueue";
 import { ChatNextOptions } from "./ChatNextOptions";
 import { usePathname, useRouter } from "next/navigation";
@@ -379,6 +382,23 @@ export function OverviewChat({
       });
     }
   };
+  const speechScope = JSON.stringify(requestBodyRef.current);
+  const voice = useAssistantVoice({
+    threadId,
+    scope: speechScope,
+    active,
+    context: requestBodyRef.current,
+    enqueue,
+    queueState: queue.state,
+    recoverDraft: (text) =>
+      setInput((current) => [current, text].filter(Boolean).join("\n")),
+  });
+  const dictation = useAssistantDictation({
+    value: input,
+    onChange: setInput,
+    active,
+    scope: speechScope,
+  });
   const isEmpty = messages.length === 0;
   const navigatedCalls = useRef(new Set<string>());
   const reconciledCalls = useRef(new Set<string>());
@@ -804,6 +824,7 @@ export function OverviewChat({
   );
   const canSend =
     !queue.saving &&
+    !dictation.capturing &&
     !attachmentsUploading &&
     (input.trim().length > 0 || readyAttachments.length > 0);
 
@@ -1215,7 +1236,13 @@ export function OverviewChat({
               />
             </div>
             <ChatQueue state={queue.state} control={queue.control} />
+            <AssistantVoiceControls
+              voice={voice}
+              dictation={dictation}
+              busy={busy}
+            />
             <Textarea
+              disabled={dictation.capturing}
               ref={textareaRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
