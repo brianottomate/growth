@@ -421,8 +421,10 @@ export function OverviewChat({
         { text: assistantIntent.visibleText },
         { body: { assistantIntent } },
       );
+      // A chat opened from a button is ready for the reply to it.
+      if (desktop) requestAnimationFrame(() => textareaRef.current?.focus());
     },
-    [sendMessage],
+    [sendMessage, desktop],
   );
 
   useEffect(() => {

@@ -55,6 +55,7 @@ export function Audiences({
   const audienceChat = () =>
     sendAssistantIntent({
       type: "work_ad_campaign",
+      newThread: true,
       brandId,
       brandName,
       campaignId,
