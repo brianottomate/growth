@@ -247,6 +247,15 @@ export function AdIdeaCard({
       },
     }),
   );
+  const newCopy = useMutation(
+    orpc.ads.writeSetCopy.mutationOptions({
+      onSuccess: () => {
+        toast.success("New copy saved");
+        router.refresh();
+      },
+      onError: (error) => toast.error(error.message),
+    }),
+  );
   const receivedVersion = useRef(ad.updatedAt);
   useEffect(() => {
     if (receivedVersion.current === ad.updatedAt) return;
@@ -295,7 +304,11 @@ export function AdIdeaCard({
   const limit = isStatic ? 1 : 10;
   const swapCrop = useMutation(orpc.ads.suggestCrop.mutationOptions());
   const busy =
-    save.isPending || remove.isPending || swapCrop.isPending || uploading > 0;
+    newCopy.isPending ||
+    save.isPending ||
+    remove.isPending ||
+    swapCrop.isPending ||
+    uploading > 0;
   const updateCardById = (id: string, fn: (current: IdeaImage) => IdeaImage) =>
     edit((d) => ({
       ...d,
@@ -842,6 +855,26 @@ export function AdIdeaCard({
           </div>
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={
+              busy ||
+              locked ||
+              editor !== null ||
+              dirty ||
+              document.cards.length === 0
+            }
+            onClick={() =>
+              newCopy.mutate({
+                brandId,
+                campaignId: campaignId ?? undefined,
+                adId: ad.id,
+              })
+            }
+          >
+            {newCopy.isPending ? "Writing…" : "New copy"}
+          </Button>
           {campaignId && (
             <Button
               size="sm"
@@ -857,7 +890,7 @@ export function AdIdeaCard({
                   campaignName: "this ad's campaign",
                   adId: ad.id,
                   focus: "ads",
-                  visibleText: `Work on “${savedState.name}”. Inspect its existing carousel photos, use the brand and house facts, write shared ad copy, and compose each slide for its intended sizes. Keep the selected images and slide order, and save the result for review.`,
+                  visibleText: `Work on “${savedState.name}”. Inspect its existing copy and carousel photos, use the brand and listing facts, and suggest four or five distinct copy sets pairing the ad caption with image text for each slide and intended size. Keep the selected images and slide order. Show the options before saving; I will choose one.`,
                 })
               }
             >

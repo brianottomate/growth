@@ -1,4 +1,5 @@
 import "server-only";
+import { sameCopyHook } from "@/lib/copy-variation";
 
 import { anthropic } from "@ai-sdk/anthropic";
 import { generateText, Output, type UserContent } from "ai";
@@ -181,7 +182,8 @@ function copyProblem(
 ) {
   const { headline } = output;
   if (hasEmDash(headline)) return "It uses an em dash.";
-  if (headline === ctx.card?.title) return "It is the current headline.";
+  if (sameCopyHook(headline, ctx.card?.title))
+    return "It is the current headline.";
   const layout = CATALOG_COPY_INTENTS[templateId as CatalogCopyTemplateId];
   if (!layout) return null;
   // The facts line under the headline already prints these counts.
@@ -280,6 +282,7 @@ export type CatalogCopyInput = CopyFacts & {
   siblings: { name: string; headline: string }[];
   approved: { brand: string; headline: string | null }[];
   thorough?: boolean;
+  existingCopy?: unknown;
 };
 
 /** The catalog copy call as data: the copy lab runs it too. */
@@ -288,6 +291,7 @@ export async function catalogCopyRequest(input: CatalogCopyInput) {
     name: input.home.name,
     currentHeadline: input.card?.title ?? null,
     currentPills: input.card?.pills ?? [],
+    existingCopy: input.existingCopy,
     market: input.market,
     cardPhotoShows: input.heroNote,
     bedrooms: input.home.bedrooms ?? null,

@@ -1,3 +1,4 @@
+import { COPY_VARIATION_GUIDANCE } from "@/lib/copy-variation";
 import { isPlaceCard } from "@/lib/catalog-studio";
 import { catalogCopyRules } from "./catalog-copy";
 
@@ -21,6 +22,8 @@ export function catalogNewCopyPrompt(input: {
       ? ` The headline ends " in ${input.place}".`
       : "";
   return `You write the headline printed on one home's card in ${input.brandName}'s Meta catalog. The operator clicked New copy because the current headline is not doing the space justice: find a better one, not a synonym of it. Better usually means the real draw said plainly, not a rarer detail.
+
+${COPY_VARIATION_GUIDANCE}
 
 ${catalogCopyRules({ place: input.place, brandWide: input.brandWide, templateId: input.templateId })}
 

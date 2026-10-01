@@ -1,4 +1,11 @@
 import {
+  ideaCopySchema,
+  ideaDocumentSchema,
+  ideaShapeSchema,
+} from "@/lib/ad-idea-studio";
+import { catalogCardSchema } from "@/lib/catalog-studio";
+import { marketSchema } from "@/lib/markets";
+import {
   compositionImagePositionSchema,
   compositionTemplateIdSchema,
 } from "@/lib/compositions";
@@ -293,6 +300,7 @@ const copyOverridesSchema = z.strictObject({
       body: z.string(),
       callToAction: z.string(),
       headline: z.string(),
+      description: z.string().optional(),
       linkUrl: z.string(),
     })
     .optional(),
@@ -301,6 +309,7 @@ const copyOverridesSchema = z.strictObject({
       body: z.string(),
       callToAction: z.string(),
       headline: z.string(),
+      description: z.string().optional(),
       linkUrl: z.string(),
     })
     .optional(),
@@ -309,6 +318,7 @@ const copyOverridesSchema = z.strictObject({
       body: z.string(),
       callToAction: z.string(),
       headline: z.string(),
+      description: z.string().optional(),
       linkUrl: z.string(),
     })
     .optional(),
@@ -317,6 +327,7 @@ const copyOverridesSchema = z.strictObject({
       body: z.string(),
       callToAction: z.string(),
       headline: z.string(),
+      description: z.string().optional(),
       linkUrl: z.string(),
     })
     .optional(),
@@ -328,6 +339,7 @@ const documentSchema = z.strictObject({
     body: z.string(),
     callToAction: z.string(),
     headline: z.string(),
+    description: z.string().optional(),
     linkUrl: z.string(),
   }),
   copyOverrides: copyOverridesSchema,
@@ -1227,13 +1239,65 @@ export const suggestCampaignAudiencesActionOutputSchema = z.strictObject({
   }),
 });
 
+const copyBrandVoiceSchema = z.strictObject({
+  extractedAt: z.string().optional(),
+  fingerprintText: z.string(),
+  postsAnalyzed: z.number().optional(),
+  voices: z.array(
+    z.enum([
+      "hero",
+      "challenger",
+      "sage",
+      "innocent",
+      "explorer",
+      "creator",
+      "ruler",
+      "caregiver",
+      "everyman",
+      "jester",
+      "lover",
+      "magician",
+    ]),
+  ),
+});
+
+const listingExistingCopySchema = z.strictObject({
+  listingId: z.string(),
+  catalog: z.strictObject({
+    headline: z.string().nullable(),
+    subtitle: z.string().nullable(),
+    pills: z.array(z.string()).nullable(),
+    templateId: z.string().nullable(),
+  }),
+  ads: z.array(
+    z.strictObject({
+      adId: z.string(),
+      campaignId: z.string().nullable(),
+      name: z.string(),
+      copy: ideaCopySchema.strict(),
+      copyOverrides: z.partialRecord(ideaShapeSchema, ideaCopySchema.strict()),
+      cards: ideaDocumentSchema.shape.cards,
+    }),
+  ),
+});
+
 export const catalogHomeFactsActionOutputSchema = z.strictObject({
+  brand: z.strictObject({
+    id: z.string(),
+    name: z.string(),
+    story: z.string().nullable(),
+    voice: copyBrandVoiceSchema.nullable(),
+  }),
   homes: z.array(
     z.strictObject({
       homeId: z.string(),
       name: z.string(),
       url: z.string(),
       headline: z.string().nullable(),
+      card: catalogCardSchema.strict().nullable(),
+      existingCopy: listingExistingCopySchema.nullable(),
+      market: marketSchema.strict().nullable(),
+      copyRules: z.string(),
       bedrooms: z.number().nullable(),
       bathrooms: z.number().nullable(),
       guests: z.number().nullable(),
@@ -1348,33 +1412,11 @@ export const ideaContextActionOutputSchema = z.strictObject({
   brand: z.strictObject({
     id: z.string(),
     name: z.string(),
-    voice: z
-      .strictObject({
-        extractedAt: z.string().optional(),
-        fingerprintText: z.string(),
-        postsAnalyzed: z.number().optional(),
-        voices: z.array(
-          z.enum([
-            "hero",
-            "challenger",
-            "sage",
-            "innocent",
-            "explorer",
-            "creator",
-            "ruler",
-            "caregiver",
-            "everyman",
-            "jester",
-            "lover",
-            "magician",
-          ]),
-        ),
-      })
-      .nullable()
-      .optional(),
+    story: z.string().nullable(),
+    voice: copyBrandVoiceSchema.nullable(),
   }),
-  campaignId: z.string(),
-  campaignName: z.string(),
+  campaignId: z.string().nullable(),
+  campaignName: z.string().nullable(),
   /** How the slides are written: the house rules and what each template holds. */
   copyRules: z.string(),
   homes: z.array(
@@ -1385,6 +1427,9 @@ export const ideaContextActionOutputSchema = z.strictObject({
       city: z.string().optional(),
       description: z.string().nullable().optional(),
       guests: z.number().optional(),
+      nightlyFrom: z.number().optional(),
+      market: marketSchema.strict().nullable(),
+      existingCopy: listingExistingCopySchema.nullable(),
       id: z.string(),
       locationDescription: z.string().nullable().optional(),
       name: z.string(),

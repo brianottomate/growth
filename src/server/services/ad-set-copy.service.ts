@@ -1,4 +1,5 @@
 import "server-only";
+import { COPY_VARIATION_GUIDANCE, sameCopyHook } from "@/lib/copy-variation";
 import {
   brandStorySection,
   META_COLLECTION_CAPTION,
@@ -78,6 +79,10 @@ export type CopyHome = {
   description: string | null;
   /** The hero the card is drawn on, for the call that writes onto it. */
   heroUrl?: string | null;
+  existingCopy?: unknown;
+  market?: unknown;
+  locationDescription?: string | null;
+  petsAllowed?: boolean | null;
 };
 
 const facts = (home: CopyHome) =>
@@ -188,12 +193,54 @@ export function deterministicSetCopy(
   };
 }
 
+export type ExistingSetAdCopy = {
+  homeIndex: number | null;
+  format: string;
+  headline: string;
+  body: string;
+  description?: string;
+  artwork?: unknown;
+};
+
 type AdSetCopyInput = {
   brandName: string;
   /** The brand story every creative prompt for the brand reads. */
   brandStory: string | null;
   homes: CopyHome[];
+  existingAds?: ExistingSetAdCopy[];
+  regenerate?: boolean;
 };
+
+/** A rewrite must change the caption hook and headline, not just formatting. */
+export function adSetVariationProblem(
+  output: AdSetCopy,
+  existingAds: ExistingSetAdCopy[] = [],
+) {
+  for (const ad of existingAds) {
+    const home = ad.homeIndex !== null ? output.homes[ad.homeIndex] : null;
+    const next =
+      home ??
+      (ad.format === "portfolio"
+        ? {
+            headline: output.portfolioHeadline,
+            primaryText: output.portfolioPrimaryText,
+          }
+        : ad.format === "catalog"
+          ? {
+              headline: output.catalogHeadline,
+              primaryText: output.catalogPrimaryText,
+            }
+          : null);
+    if (!next) continue;
+    if (
+      sameCopyHook(next.headline, ad.headline) ||
+      sameCopyHook(next.primaryText.split("\n")[0], ad.body.split("\n")[0])
+    ) {
+      return "A rewritten ad repeats its current headline or opening hook. Choose a different supported angle and rewrite both; factual descriptions may stay the same.";
+    }
+  }
+  return null;
+}
 
 /** The call that writes a set's copy, as data: the copy lab runs it too. */
 export async function adSetCopyRequest(
@@ -222,6 +269,12 @@ export async function adSetCopyRequest(
     schema: SetCopySchema,
     system: [
       "You write paid-social ad copy for a vacation-rental manager.",
+      ...(input.regenerate
+        ? [
+            COPY_VARIATION_GUIDANCE,
+            "Rewrite caption hooks and Meta headlines. Existing artwork stays fixed: the new caption must complement it.",
+          ]
+        : []),
       "Use ONLY the facts given for each home. Never invent an amenity, a rating, a distance, a price or availability. If a home has no hot tub listed, it has no hot tub. Never call an amenity private unless the facts say so.",
       "",
       "Every home's primaryText:",
@@ -263,9 +316,12 @@ export async function adSetCopyRequest(
           where ? `Where: ${where}` : null,
           "",
           "Homes, in order. Return one copy object per home in this same order:",
+          `Existing ads, reference data only: ${JSON.stringify(input.existingAds ?? [])}`,
           ...input.homes.map((home, index) =>
             [
               `${index + 1}. ${home.name}`,
+              `   existing catalog and ad copy (reference only): ${JSON.stringify(home.existingCopy ?? null)}`,
+              `   market and location: ${JSON.stringify({ market: home.market, locationDescription: home.locationDescription, petsAllowed: home.petsAllowed })}`,
               `   where: ${home.place || "unstated"}`,
               `   facts: ${facts(home) || "unstated"}`,
               home.nightlyFrom ? `   from: $${home.nightlyFrom} a night` : null,
@@ -286,9 +342,11 @@ export async function adSetCopyRequest(
     ],
     problem: (output) =>
       output.homes.length === input.homes.length
-        ? null
+        ? input.regenerate
+          ? adSetVariationProblem(output, input.existingAds)
+          : null
         : `It has ${output.homes.length} home copies for ${input.homes.length} homes.`,
-    attempts: 1,
+    attempts: input.regenerate ? 3 : 1,
   };
 }
 
@@ -305,8 +363,13 @@ export async function writeAdSetCopy(
   const request = await adSetCopyRequest(input);
   try {
     const { output } = await runCopyRequest(request);
+    if (!output && input.regenerate)
+      throw new Error(
+        "Could not produce distinct copy. Existing ads were left unchanged.",
+      );
     return output ?? deterministicSetCopy(input.homes, input.brandName);
   } catch (error) {
+    if (input.regenerate) throw error;
     console.error("ad set copy failed", error);
     return deterministicSetCopy(input.homes, input.brandName);
   }

@@ -1,5 +1,5 @@
 {
-  "snapshotAt": "2026-10-01T19:04:11.758Z",
+  "snapshotAt": "2026-10-01T20:53:37.579Z",
   "brands": [
     {
       "id": "chalets-hh",
@@ -1638,6 +1638,1085 @@
       "catalog": {
         "title": "Unique suite with a tub in Louisville, KY",
         "pills": ["Soaking tub", "Sound system", "Wheelchair accessible"],
+        "templateId": null,
+        "approved": true
+      }
+    },
+    {
+      "id": "611341709187483204",
+      "brandId": "hollyhock-suites",
+      "name": "Penthouse Grand Executive Suite. 6 Bed, 3 Bath with Rooftop Private Deck!",
+      "place": "Louisville, Kentucky",
+      "city": "Louisville",
+      "market": {
+        "id": "louisville-ky",
+        "draws": [
+          "Main Street distilleries",
+          "Louisville waterfront",
+          "Bourbon trail",
+          "Old Forester Distillery",
+          "Whiskey Row"
+        ],
+        "label": "Louisville, KY",
+        "notes": "Guests plan around Main Street's distilleries and riverfront, treating downtown Louisville and nearby Henryville, IN as one walkable-to-drivable trip.",
+        "towns": ["Louisville", "Henryville"],
+        "region": "Kentuckiana",
+        "seasons": [
+          {
+            "name": "Derby season",
+            "note": "Peak demand and rates around Kentucky Derby weekend",
+            "when": "late April–early May"
+          },
+          {
+            "name": "Bachelorette & bourbon season",
+            "note": "Steady group bookings for distillery-hopping trips",
+            "when": "spring through fall"
+          }
+        ],
+        "feederCities": [
+          "Nashville",
+          "Cincinnati",
+          "Indianapolis",
+          "Chicago",
+          "Columbus"
+        ],
+        "gettingThere": "Louisville Muhammad Ali International Airport (SDF), about 10-15 minutes from downtown."
+      },
+      "bedrooms": 6,
+      "bathrooms": 3,
+      "guests": 17,
+      "nightlyFrom": 519,
+      "amenities": [
+        "Elevator",
+        "Hot water",
+        "Carbon monoxide detector",
+        "Wifi",
+        "Fire extinguisher",
+        "Smoke detector",
+        "First aid kit",
+        "Air conditioning",
+        "Dryer",
+        "Coffee maker",
+        "Dishwasher",
+        "Hair dryer",
+        "Heating",
+        "Kitchen",
+        "Iron",
+        "TV",
+        "Microwave",
+        "Oven",
+        "Washer",
+        "Shampoo",
+        "Stove",
+        "Bath linens",
+        "Bathtub",
+        "Bed linens",
+        "Bedroom door lock",
+        "Blackout curtains",
+        "Body soap",
+        "City view",
+        "Cooking basics",
+        "Dining table",
+        "Dishes",
+        "Freezer",
+        "Fridge",
+        "Kettle",
+        "Toilet",
+        "Toaster",
+        "Coffee",
+        "Paid parking",
+        "Ironing board",
+        "Hangers",
+        "Dedicated workspace",
+        "Sound system",
+        "Shower",
+        "High chair",
+        "Wheelchair accessible",
+        "Extra pillows",
+        "Children dinnerware",
+        "Pack n play",
+        "Spices",
+        "Baking sheet",
+        "Blender",
+        "Wine glasses",
+        "Long term stays allowed",
+        "Ice maker",
+        "Maid"
+      ],
+      "description": "Located in the heart of Louisville on Market Street, you're steps away from everything! From 1 to 100 or more guests, Hollyhock is here to serve you! (Pm us about our other Suites in the Building!) Easily walk to many restaurants, plays, sporting events, museums, concerts, and conventions. When you’re not out on the town, this newly remodeled Suite offers a luxurious rest and ample space for entertaining or reconnecting with old friends. Each kitchen is outfitted with a coffee/tea bar for you to enjoy year round warmth! \nThere are 6 bedrooms and 3 full bathrooms. Enjoy a street walk, a bottle of wine or a game night with those you love. Smart Tv’s are located throughout the suite with the option to add any streaming platform from your phone. High speed WIFI runs throughout the Suite making sure that if you need to get work done or relax, it’s there. Bachelor/Bachelorette/Family groups/Business trip? They're all perfect for this location! During the weekend, a lot of families visit the slugger museum and science center just a few blocks away. Many bourbon tours leave regularly from our location. We are a block from fourth street live, 3 blocks from KY center for the arts(symphonic/broadway shows), 1 block from the YUM center and across the street from the convention center. \n\nThis place is perfect for you! Uber can bring you from the airport(10 min) or take you anywhere you want to go if you don’t have your own vehicle. Once you’ve booked with us, take advantage of our guidebook that gives you recommendations and addresses to our favorite places in Louisville. \n\nLooking forward to hosting y’all! Search for Hollyhock Suites online to find us and reach out with any other questions or to see images of other Suites. Booking direct has savings!\n\nAmenities You’ll Love \n1. Steps away from Market and Main Street, the heart of Downtown Louisville. \n2. Accommodates up to more than 100 guests with elevator access. \n3. Multiple views of the city, or the river. \n4. 6 Bed/ 3 bath for this Suite \n5. Elevator access to Suites \n6. High end finishes throughout \n7. Fully equipped Kitchen for entertaining \n8. WIFI boosters throughout each floor. \n9. Smart TV’s throughout each floor--85 inch in main living room! \n10. Washer/Dryer in each Suite. Extra linens if needed. \n11. Close walking distance to sporting events, plays, KY center for the arts, restaurants and more! \n12. Detailed parking instructions and your choice of parking garages next door.",
+      "locationDescription": null,
+      "petsAllowed": true,
+      "heroUrl": "https://assets.wander.com/611347388535146618/fullres.webp",
+      "photos": [
+        {
+          "url": "https://assets.wander.com/611347385997592696/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611347385997592696/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611347388535146618/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611347388535146618/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611347353680480411/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611347353680480411/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611347388526758062/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611347388526758062/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611347368679311472/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611347368679311472/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611347385536219255/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611347385536219255/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611347354120882280/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611347354120882280/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611347371078453362/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611347371078453362/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611347385016125611/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611347385016125611/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611347372588402855/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611347372588402855/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611347356390000798/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611347356390000798/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611347358000613535/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611347358000613535/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611347374035437736/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611347374035437736/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611347355253344361/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611347355253344361/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611347369283291301/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611347369283291301/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611347367936919716/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611347367936919716/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611347369874688113/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611347369874688113/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611347375453112489/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611347375453112489/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611347373850888307/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611347373850888307/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611347390024124591/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611347390024124591/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611347360265537696/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611347360265537696/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611347371028121766/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611347371028121766/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611347376338110581/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611347376338110581/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611347366645074083/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611347366645074083/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611347366074648686/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611347366074648686/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611347374660388980/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611347374660388980/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611347362362689645/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611347362362689645/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611347367181944943/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611347367181944943/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611347386278611117/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611347386278611117/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611347380490471542/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611347380490471542/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611347385687214252/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611347385687214252/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/638834485567164281/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/638834485567164281/640.webp"
+        }
+      ],
+      "catalog": {
+        "title": "Rooftop deck & city view in Louisville, KY",
+        "pills": ["City view", "Pet-friendly", "Elevator"],
+        "templateId": null,
+        "approved": true
+      }
+    },
+    {
+      "id": "611341714149344921",
+      "brandId": "hollyhock-suites",
+      "name": "The Kentucky Lily",
+      "place": "Louisville, Kentucky",
+      "city": "Louisville",
+      "market": {
+        "id": "louisville-ky",
+        "draws": [
+          "Main Street distilleries",
+          "Louisville waterfront",
+          "Bourbon trail",
+          "Old Forester Distillery",
+          "Whiskey Row"
+        ],
+        "label": "Louisville, KY",
+        "notes": "Guests plan around Main Street's distilleries and riverfront, treating downtown Louisville and nearby Henryville, IN as one walkable-to-drivable trip.",
+        "towns": ["Louisville", "Henryville"],
+        "region": "Kentuckiana",
+        "seasons": [
+          {
+            "name": "Derby season",
+            "note": "Peak demand and rates around Kentucky Derby weekend",
+            "when": "late April–early May"
+          },
+          {
+            "name": "Bachelorette & bourbon season",
+            "note": "Steady group bookings for distillery-hopping trips",
+            "when": "spring through fall"
+          }
+        ],
+        "feederCities": [
+          "Nashville",
+          "Cincinnati",
+          "Indianapolis",
+          "Chicago",
+          "Columbus"
+        ],
+        "gettingThere": "Louisville Muhammad Ali International Airport (SDF), about 10-15 minutes from downtown."
+      },
+      "bedrooms": 4,
+      "bathrooms": 2,
+      "guests": 14,
+      "nightlyFrom": 230,
+      "amenities": [
+        "Elevator",
+        "Wifi",
+        "Fire extinguisher",
+        "Smoke detector",
+        "First aid kit",
+        "Air conditioning",
+        "Coffee maker",
+        "Dishwasher",
+        "Hair dryer",
+        "Heating",
+        "Iron",
+        "Kitchen",
+        "TV",
+        "Hot water",
+        "Carbon monoxide detector",
+        "Washer",
+        "Freezer",
+        "Microwave",
+        "Oven",
+        "Pack n play",
+        "Shampoo",
+        "Shower",
+        "Stove",
+        "Toaster",
+        "Baking sheet",
+        "Bath linens",
+        "Blender",
+        "Children dinnerware",
+        "Coffee",
+        "Cooking basics",
+        "Dining table",
+        "Dishes",
+        "Hangers",
+        "Ironing board",
+        "Fridge",
+        "Toilet",
+        "Wine glasses",
+        "Bed linens",
+        "Bedroom door lock",
+        "Paid parking",
+        "City view",
+        "Alarm system",
+        "Body soap",
+        "High chair",
+        "Dryer",
+        "Dedicated workspace",
+        "Long term stays allowed"
+      ],
+      "description": "Located in the heart of Louisville on Market Street, you're steps away from the convention center and KFC YUM center. From 1 to 200 guests, Hollyhock is here to serve you! (Pm us about our other Suites in the Building or search \"hollyhock suites Louisville\" to see all our listings or go direct for extra savings. Easily walk to many restaurants, plays, sporting events, museums, concerts, and conventions. When you’re not out on the town, this newly remodeled suite offers a luxurious rest and ample space for entertaining or reconnecting with old friends. Each kitchen is outfitted with a coffee & tea bar for your enjoyment! \n\nThere are 4 bedrooms and 2 full bathrooms, one of which has a soaking tub. Enjoy a street walk, a bottle of wine or a game night with those you love. Smart Tv’s are throughout the suite with the option to add any streaming platform from your phone. 85 inch in the living room and 50 inch in the bedrooms. High speed Wi-Fi runs throughout the Suite, making sure that if you need to get work done or relax, it’s there. \n\nBachelor/Bachelorette/Family groups/Business trip? They're all perfect for this location! Museums are all around, and bourbon tours leave regularly from our location. We are located across the street from the convention center and 1 block from the YUM center and 2 blocks from 4th street live. \n\nThis place is perfect for you! Uber can bring you from the airport(10 min) or take you anywhere you want to go if you don’t have your own vehicle. Once you’ve booked with us, take advantage of our guidebook that gives you recommendations and addresses to our favorite places in Louisville. \n\nLooking forward to hosting y’all! Search for \"Hollyhock Suites Louisville\" online for the best prices and reach out with questions. \n\nAmenities You’ll Love \n1. Steps away from Market Street, the heart of Downtown Louisville. \n2. Accommodates up to 100 guests(if all 9 suites are rented out—elevator access) \n3. Multiple views of the city.\n4. 4 Bed/ 2 bath for this Suite\n5. Elevator access to Suites \n6. High end finishes throughout \n7. Fully equipped Kitchen for entertaining \n8. Wi-Fi boosters throughout each floor. \n9. Smart TV’s throughout each floor. \n10. Washer/Dryer in each Suite. Extra linens if needed. \n11. Walking distance to sporting events, plays, KY center for the arts, broadway shows, restaurants and more! \n12. Detailed parking instructions and your choice of parking garages all next-door.",
+      "locationDescription": null,
+      "petsAllowed": true,
+      "heroUrl": "https://assets.wander.com/611346054238963790/fullres.webp",
+      "photos": [
+        {
+          "url": "https://assets.wander.com/611346054238963790/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611346054238963790/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611346023171754103/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611346023171754103/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611346060127766663/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611346060127766663/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611346042608158845/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611346042608158845/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611346053861476482/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611346053861476482/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611346038296414279/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611346038296414279/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611346034089527417/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611346034089527417/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611346054318655619/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611346054318655619/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611346039063971964/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611346039063971964/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611346027097622648/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611346027097622648/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611346062027786376/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611346062027786376/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611346032818653252/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611346032818653252/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611346038149613691/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611346038149613691/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611346056134789200/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611346056134789200/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611346053064558720/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611346053064558720/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611346047037343818/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611346047037343818/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611346024123861059/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611346024123861059/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611346063936194697/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611346063936194697/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611346044273297481/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611346044273297481/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611346036912293957/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611346036912293957/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611346045682583678/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611346045682583678/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611346053718870093/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611346053718870093/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611346057116256337/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611346057116256337/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611346053488183425/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611346053488183425/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611346052708042827/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611346052708042827/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611346022077040758/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611346022077040758/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611346037419804742/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611346037419804742/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611346056885569669/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611346056885569669/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611346057455995014/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611346057455995014/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611346054796806276/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611346054796806276/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611346022160926786/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611346022160926786/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611346037222672506/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611346037222672506/640.webp"
+        }
+      ],
+      "catalog": {
+        "title": "Chic suite steps from downtown in Louisville, KY",
+        "pills": ["Soaking tub", "City view", "Elevator"],
+        "templateId": null,
+        "approved": true
+      }
+    },
+    {
+      "id": "693190297026298370",
+      "brandId": "hollyhock-suites",
+      "name": "305",
+      "place": "Louisville, Kentucky",
+      "city": "Louisville",
+      "market": {
+        "id": "louisville-ky",
+        "draws": [
+          "Main Street distilleries",
+          "Louisville waterfront",
+          "Bourbon trail",
+          "Old Forester Distillery",
+          "Whiskey Row"
+        ],
+        "label": "Louisville, KY",
+        "notes": "Guests plan around Main Street's distilleries and riverfront, treating downtown Louisville and nearby Henryville, IN as one walkable-to-drivable trip.",
+        "towns": ["Louisville", "Henryville"],
+        "region": "Kentuckiana",
+        "seasons": [
+          {
+            "name": "Derby season",
+            "note": "Peak demand and rates around Kentucky Derby weekend",
+            "when": "late April–early May"
+          },
+          {
+            "name": "Bachelorette & bourbon season",
+            "note": "Steady group bookings for distillery-hopping trips",
+            "when": "spring through fall"
+          }
+        ],
+        "feederCities": [
+          "Nashville",
+          "Cincinnati",
+          "Indianapolis",
+          "Chicago",
+          "Columbus"
+        ],
+        "gettingThere": "Louisville Muhammad Ali International Airport (SDF), about 10-15 minutes from downtown."
+      },
+      "bedrooms": 2,
+      "bathrooms": 1,
+      "guests": 4,
+      "nightlyFrom": 200,
+      "amenities": [
+        "Elevator",
+        "Wifi",
+        "Air conditioning",
+        "Kitchen",
+        "Hair dryer",
+        "Heating",
+        "Smoke detector",
+        "Carbon monoxide detector",
+        "First aid kit",
+        "Fire extinguisher",
+        "Bed linens",
+        "Shampoo",
+        "Hangers",
+        "TV",
+        "Bedroom door lock",
+        "Paid parking",
+        "Toaster",
+        "Microwave",
+        "Oven",
+        "Coffee maker",
+        "Shower",
+        "Stove",
+        "Fridge",
+        "Bath linens",
+        "Dishes",
+        "Wheelchair accessible",
+        "Hot water",
+        "Cooking basics",
+        "Blackout curtains",
+        "Toilet",
+        "Children dinnerware",
+        "Dining table",
+        "Spices",
+        "City view",
+        "Long term stays allowed",
+        "Alarm system",
+        "Body soap",
+        "Baking sheet",
+        "Coffee",
+        "Freezer"
+      ],
+      "description": "Come and experience the bluegrass state at this centrally-located home nestled in the heart of the city. Right in the middle of it all, you're steps away from the best dining and entertainment Louisville has to offer.  Across the street from the convention center, you're in the perfect spot! One of many suites in our building, look up \"hollyhock suites Louisville\" to see all our options and availability. This is a 2 bedroom, 1 bath with an 85 inch smart tv, and kitchen.",
+      "locationDescription": "Immerse yourself in Louisville’s rich heritage and vibrant energy, where legendary attractions like Old Forester Distilling Co. and the Louisville Slugger Museum & Factory are just steps away. A short walk leads to the scenic riverfront paths of Waterfront Park, offering a peaceful natural escape in the heart of the city. For a taste of local history, a short drive brings you to the iconic Churchill",
+      "petsAllowed": true,
+      "heroUrl": "https://assets.wander.com/693190362755237527/fullres.webp",
+      "photos": [
+        {
+          "url": "https://assets.wander.com/693190362574882440/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/693190362574882440/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/693190362704905873/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/693190362704905873/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/693190362570688135/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/693190362570688135/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/693190362629408397/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/693190362629408397/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/693190362616825482/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/693190362616825482/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/693190362746848917/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/693190362746848917/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/693190362621019787/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/693190362621019787/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/693190362625214092/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/693190362625214092/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/693190362742654612/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/693190362742654612/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/693190362612631177/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/693190362612631177/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/693190362633602702/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/693190362633602702/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/693190362734266002/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/693190362734266002/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/693190362751043222/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/693190362751043222/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/693190362755237527/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/693190362755237527/640.webp"
+        }
+      ],
+      "catalog": {
+        "title": "Centrally-located suite in Louisville, KY",
+        "pills": ["Wheelchair accessible", "City view", "Elevator"],
+        "templateId": null,
+        "approved": true
+      }
+    },
+    {
+      "id": "693187660130288055",
+      "brandId": "hollyhock-suites",
+      "name": "306",
+      "place": "Louisville, Kentucky",
+      "city": "Louisville",
+      "market": {
+        "id": "louisville-ky",
+        "draws": [
+          "Main Street distilleries",
+          "Louisville waterfront",
+          "Bourbon trail",
+          "Old Forester Distillery",
+          "Whiskey Row"
+        ],
+        "label": "Louisville, KY",
+        "notes": "Guests plan around Main Street's distilleries and riverfront, treating downtown Louisville and nearby Henryville, IN as one walkable-to-drivable trip.",
+        "towns": ["Louisville", "Henryville"],
+        "region": "Kentuckiana",
+        "seasons": [
+          {
+            "name": "Derby season",
+            "note": "Peak demand and rates around Kentucky Derby weekend",
+            "when": "late April–early May"
+          },
+          {
+            "name": "Bachelorette & bourbon season",
+            "note": "Steady group bookings for distillery-hopping trips",
+            "when": "spring through fall"
+          }
+        ],
+        "feederCities": [
+          "Nashville",
+          "Cincinnati",
+          "Indianapolis",
+          "Chicago",
+          "Columbus"
+        ],
+        "gettingThere": "Louisville Muhammad Ali International Airport (SDF), about 10-15 minutes from downtown."
+      },
+      "bedrooms": 2,
+      "bathrooms": 1,
+      "guests": 6,
+      "nightlyFrom": 99,
+      "amenities": [
+        "Elevator",
+        "Wifi",
+        "Air conditioning",
+        "Hair dryer",
+        "Heating",
+        "Smoke detector",
+        "Carbon monoxide detector",
+        "First aid kit",
+        "Fire extinguisher",
+        "Bed linens",
+        "Shampoo",
+        "Hangers",
+        "Dedicated workspace",
+        "TV",
+        "Bedroom door lock",
+        "Paid parking",
+        "Ironing board",
+        "Microwave",
+        "Coffee maker",
+        "Shower",
+        "Bath linens",
+        "Wheelchair accessible",
+        "Hot water",
+        "Blackout curtains",
+        "Toilet",
+        "City view",
+        "Long term stays allowed",
+        "Alarm system",
+        "Body soap",
+        "Coffee",
+        "Mini fridge"
+      ],
+      "description": "Come and experience the bluegrass state at this centrally-located home nestled in the heart of the city. Right in the middle of it all, you're steps away from the best dining and entertainment Louisville has to offer.  Across the street from the convention center, you're in the perfect spot! One of many suites in our building, look up \"hollyhock suites Louisville\" to see all our options and availability. This is a 1 bedroom + 1 loft bed and 1 bath with a 43 inch smart tv and a kitchenette.",
+      "locationDescription": "Immerse yourself in the vibrant cultural heritage of Louisville, where historic bourbon crafting and legendary sports traditions come alive. Steps away, discover the rich legacy of the Old Forester Distilling Co. and the Louisville Slugger Museum & Factory, or enjoy a short walk to the scenic Waterfront Park. A short drive leads to the iconic Churchill Downs and Kentucky Derby Museum, while the thrilling attractions at Kentucky Kingdom & Hurricane Bay",
+      "petsAllowed": true,
+      "heroUrl": "https://assets.wander.com/693187844188931691/fullres.webp",
+      "photos": [
+        {
+          "url": "https://assets.wander.com/693187844188931691/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/693187844188931691/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/693187844197320300/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/693187844197320300/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/693187844201514605/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/693187844201514605/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/693187844205708910/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/693187844205708910/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/693187844214097519/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/693187844214097519/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/693187844218291824/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/693187844218291824/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/693187844222486129/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/693187844222486129/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/693187844226680434/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/693187844226680434/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/693187846323832452/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/693187846323832452/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/709870463832033172/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/709870463832033172/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/709870463941083904/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/709870463941083904/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/709870463853004693/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/709870463853004693/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/709870463949475108/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/709870463949475108/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/709870463815257911/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/709870463815257911/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/709870463903336218/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/709870463903336218/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/709870463882366243/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/709870463882366243/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/709870464037553947/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/709870464037553947/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/709870464033358593/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/709870464033358593/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/709870517519125387/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/709870517519125387/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/709870516369886090/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/709870516369886090/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/710301862133235980/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/710301862133235980/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/710301862150013197/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/710301862150013197/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/710301862162596110/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/710301862162596110/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/710301862175179023/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/710301862175179023/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/710301862187761936/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/710301862187761936/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/710301862296813846/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/710301862296813846/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/710301862267453716/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/710301862267453716/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/710301862250676499/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/710301862250676499/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/710301862233899282/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/710301862233899282/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/710301862221316369/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/710301862221316369/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/710301862284230933/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/710301862284230933/640.webp"
+        }
+      ],
+      "catalog": {
+        "title": "Charming suite in Louisville, KY",
+        "pills": ["Wheelchair accessible", "Blackout curtains", "City view"],
+        "templateId": null,
+        "approved": true
+      }
+    },
+    {
+      "id": "611341660239954881",
+      "brandId": "hollyhock-suites",
+      "name": "Bluegrass River View! Soak & Savor by Hollyhock",
+      "place": "Louisville, Kentucky",
+      "city": "Louisville",
+      "market": {
+        "id": "louisville-ky",
+        "draws": [
+          "Main Street distilleries",
+          "Louisville waterfront",
+          "Bourbon trail",
+          "Old Forester Distillery",
+          "Whiskey Row"
+        ],
+        "label": "Louisville, KY",
+        "notes": "Guests plan around Main Street's distilleries and riverfront, treating downtown Louisville and nearby Henryville, IN as one walkable-to-drivable trip.",
+        "towns": ["Louisville", "Henryville"],
+        "region": "Kentuckiana",
+        "seasons": [
+          {
+            "name": "Derby season",
+            "note": "Peak demand and rates around Kentucky Derby weekend",
+            "when": "late April–early May"
+          },
+          {
+            "name": "Bachelorette & bourbon season",
+            "note": "Steady group bookings for distillery-hopping trips",
+            "when": "spring through fall"
+          }
+        ],
+        "feederCities": [
+          "Nashville",
+          "Cincinnati",
+          "Indianapolis",
+          "Chicago",
+          "Columbus"
+        ],
+        "gettingThere": "Louisville Muhammad Ali International Airport (SDF), about 10-15 minutes from downtown."
+      },
+      "bedrooms": 3,
+      "bathrooms": 2,
+      "guests": 8,
+      "nightlyFrom": 175,
+      "amenities": [
+        "Elevator",
+        "Hot water",
+        "Washer",
+        "Wifi",
+        "Fire extinguisher",
+        "Smoke detector",
+        "First aid kit",
+        "Air conditioning",
+        "Dryer",
+        "Kitchen",
+        "Hair dryer",
+        "Heating",
+        "Iron",
+        "TV",
+        "Dishwasher",
+        "Coffee maker",
+        "Carbon monoxide detector",
+        "Cooking basics",
+        "Bed linens",
+        "Shampoo",
+        "Hangers",
+        "Paid parking",
+        "Ironing board",
+        "Toaster",
+        "Microwave",
+        "Oven",
+        "Shower",
+        "Stove",
+        "Fridge",
+        "Bath linens",
+        "Dining table",
+        "Dishes",
+        "Blackout curtains",
+        "Toilet",
+        "City view",
+        "Bedroom door lock",
+        "Body soap",
+        "Baking sheet",
+        "Coffee",
+        "Freezer",
+        "Wine glasses",
+        "High chair",
+        "Dedicated workspace",
+        "Extra pillows",
+        "Children dinnerware",
+        "Pack n play",
+        "Long term stays allowed"
+      ],
+      "description": "Located in the heart of Louisville on Main Street, you're steps away from everything! From 1 to 85 guests, Hollyhock is here to serve you! (Pm us about our other Suites in the Building!) Easily walk to many restaurants, plays, sporting events, museums, concerts, and conventions. When you’re not out on the town, this newly remodeled Suite offers a luxurious rest and ample space for entertaining or reconnecting with old friends. \nEach kitchen is outfitted with a coffee/tea bar for you to enjoy year round warmth! There are 3 bedrooms and 2 full bathrooms. Enjoy a soaking tub with wine or a game night with those you love.  Smart Tv’s are located throughout the suite with the option to add any streaming platform from your phone. High speed WIFI runs throughout the Suite making sure that if you need to get work done or relax, it’s there. \n\nBachelor/Bachelorette/Family groups/Business trip?  They're all perfect for this location! During the weekend, a lot of families visit the slugger museum and science center just one block west. Many bourbon tours leave regularly from our location. We are a few blocks from fourth street live. 1/2 block from KY center for the arts(symphonic/broadway shows), 3 blocks from the YUM center and about 5 From the convention center, this place is perfect for you! Uber can bring you from the airport(10 min) or take you anywhere you want to go if you don’t have your own vehicle. Once you’ve booked with us, take advantage of our guidebook that gives you recommendations and addresses to our favorite places in Louisville.  Looking forward to hosting y’all! Search for Hollyhock Suites online to find us and reach out with any other questions or to see images of other Suites.\n\n\nAmenities You’ll Love\n            1. Steps away from Main Street, the heart of Downtown Louisville.\n            2. Accommodates up to 85 guests(if all 7 suites are rented out—elevator access)\n            3. Multiple views of the city, or the river.\n            4. 4 Bed/ 3.5 bath for this Suite (28 Bedrooms/19.5 Bathrooms in the whole building)\n            5. Elevator access to Suites\n            6. High end finishes throughout \n            7. Fully equipped Kitchen for entertaining\n            8. WIFI boosters throughout each floor.\n            9. Smart TV’s throughout each floor.\n            10. Washer/Dryer in each Suite.  Extra linens if needed.\n            11. Close walking distance to sporting events, plays, KY center for the arts is next door, restaurants and more!\n            12. Detailed parking instructions and your choice of parking garages all within a half block!",
+      "locationDescription": null,
+      "petsAllowed": true,
+      "heroUrl": "https://assets.wander.com/611343850723608195/fullres.webp",
+      "photos": [
+        {
+          "url": "https://assets.wander.com/611343850723608195/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611343850723608195/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611343821220873849/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611343821220873849/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611343844314711678/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611343844314711678/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611343850207708854/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611343850207708854/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611343821610944174/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611343821610944174/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611343818859480748/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611343818859480748/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611343837389915772/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611343837389915772/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611343864204101308/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611343864204101308/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611343857539352251/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611343857539352251/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611343849725363842/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611343849725363842/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611343881874704062/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611343881874704062/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611343804032616106/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611343804032616106/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611343853215024774/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611343853215024774/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611344078252017389/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611344078252017389/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611343834424542843/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611343834424542843/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611343851705075333/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611343851705075333/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611343847695320704/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611343847695320704/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611343836546860720/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611343836546860720/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611343851101095608/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611343851101095608/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611343802409420457/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611343802409420457/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611343848148305588/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611343848148305588/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611343819337631352/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611343819337631352/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611343851059152516/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611343851059152516/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611343848995554997/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611343848995554997/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611343862950004359/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611343862950004359/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611343802715604597/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611343802715604597/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611344148884096710/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611344148884096710/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611343851763795641/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611343851763795641/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611343848982972033/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611343848982972033/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611343809535542902/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611343809535542902/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611343819782227629/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611343819782227629/640.webp"
+        },
+        {
+          "url": "https://assets.wander.com/611343868826224265/fullres.webp",
+          "thumbUrl": "https://assets.wander.com/611343868826224265/640.webp"
+        }
+      ],
+      "catalog": {
+        "title": "River view & soaking tub in Louisville, KY",
+        "pills": ["City view", "Soaking tub", "Elevator"],
         "templateId": null,
         "approved": true
       }

@@ -1,4 +1,4 @@
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 
 import { and, desc, eq, isNull } from "drizzle-orm";
 
@@ -26,13 +26,32 @@ const BRANDS = [
   "winter-park-escapes",
   "legacy-rnr",
 ];
-const HOMES_PER_BRAND = 3;
+const requestedBrand = process.argv[process.argv.indexOf("--brand") + 1];
+const hasBrand = process.argv.includes("--brand");
+if (hasBrand && !BRANDS.includes(requestedBrand ?? ""))
+  throw new Error("Unknown fixture brand");
+const requestedCount = process.argv.includes("--homes")
+  ? Number(process.argv[process.argv.indexOf("--homes") + 1])
+  : 3;
+if (
+  !Number.isInteger(requestedCount) ||
+  requestedCount < 1 ||
+  requestedCount > 8
+)
+  throw new Error("Choose 1 to 8 fixture homes");
+const HOMES_PER_BRAND = requestedCount;
 const PHOTOS = 32;
 
 const brands: CopyLabBrand[] = [];
 const homes: CopyLabHome[] = [];
 
-for (const slug of BRANDS) {
+const previous = hasBrand
+  ? (JSON.parse(
+      await readFile("fixtures/copy/fixtures.json", "utf8"),
+    ) as CopyLabFixtures)
+  : null;
+
+for (const slug of hasBrand ? [requestedBrand!] : BRANDS) {
   const brand = await db.query.brandTable.findFirst({
     where: and(eq(brandTable.slug, slug), isNull(brandTable.deletedAt)),
   });
@@ -105,8 +124,18 @@ for (const slug of BRANDS) {
 
 const fixtures: CopyLabFixtures = {
   snapshotAt: new Date().toISOString(),
-  brands,
-  homes,
+  brands: previous
+    ? previous.brands.map((b) => brands.find((fresh) => fresh.id === b.id) ?? b)
+    : brands,
+  homes: previous
+    ? previous.homes.flatMap((h, index, all) =>
+        h.brandId !== requestedBrand
+          ? [h]
+          : all.findIndex((item) => item.brandId === requestedBrand) === index
+            ? homes
+            : [],
+      )
+    : homes,
 };
 await writeFile(
   "fixtures/copy/fixtures.json",

@@ -1,4 +1,7 @@
 import "server-only";
+import { listingCopyContext } from "./listing-copy-context.service";
+import { catalogNewCopyPrompt, brandStorySection } from "@/server/ai/prompts";
+import { marketOf } from "@/lib/markets";
 
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/server/db";
@@ -13,6 +16,7 @@ import {
 import { fetchWanderOsListingDetail } from "@/server/clients/wanderos-site.client";
 import {
   catalogArtworkIssues,
+  catalogLocation,
   catalogCardCopy,
   catalogCardFingerprint,
   artworkFormat,
@@ -49,6 +53,8 @@ export async function catalogBrand(userId: string, brandId: string) {
     .select({
       id: brandTable.id,
       name: brandTable.name,
+      story: brandTable.story,
+      voice: brandTable.brandFingerprint,
       slug: brandTable.slug,
       website: brandTable.website,
       organizationId: memberTable.organizationId,
@@ -334,6 +340,7 @@ export async function catalogHomeContext(
     brand,
     home,
     rowId: row.id,
+    existingCopy: (await listingCopyContext(brand.id, [home.id]))[0] ?? null,
     card: draft.cards.find((c) => c.homeId === home.id) ?? null,
     photos,
     description: row.description ?? detail?.description ?? null,
@@ -369,6 +376,10 @@ export async function catalogHomeFacts(
   const { homes, rows, draft } = await catalogHomes(brand);
   const websiteId = await brandWebsiteId(brand.id);
   const wanted = homes.filter((home) => homeIds.includes(home.id));
+  const existing = await listingCopyContext(
+    brand.id,
+    wanted.map((home) => home.id),
+  );
   const out = [];
   // Eight at a time, as the inventory sync reads the same endpoint.
   for (let i = 0; i < wanted.length; i += 8) {
@@ -384,6 +395,22 @@ export async function catalogHomeFacts(
           url: home.url,
           headline:
             draft.cards.find((c) => c.homeId === home.id)?.title ?? null,
+          card: draft.cards.find((c) => c.homeId === home.id) ?? null,
+          existingCopy:
+            existing.find((copy) => copy.listingId === home.id) ?? null,
+          market: marketOf(brand.markets, home.city),
+          copyRules: catalogNewCopyPrompt({
+            brandName: brand.name,
+            story: brandStorySection({
+              brandName: brand.name,
+              story: brand.story,
+            }),
+            place: catalogLocation(home, brand.markets),
+            brandWide: brandWideAmenities(includedHomes(homes, draft)),
+            templateId:
+              draft.cards.find((c) => c.homeId === home.id)?.templateId ??
+              DEFAULT_CATALOG_TEMPLATE,
+          }),
           bedrooms: home.bedrooms ?? null,
           bathrooms: home.bathrooms ?? null,
           guests: home.guests ?? null,
@@ -391,7 +418,7 @@ export async function catalogHomeFacts(
           amenities:
             row?.amenities ?? detail?.amenities ?? home.amenities ?? [],
           description:
-            (row?.description ?? detail?.description)?.slice(0, 1500) ?? null,
+            (row?.description ?? detail?.description)?.slice(0, 4000) ?? null,
           locationDescription:
             detail?.locationDescription?.slice(0, 800) ?? null,
         };
@@ -400,6 +427,12 @@ export async function catalogHomeFacts(
     out.push(...batch);
   }
   return {
+    brand: {
+      id: brand.id,
+      name: brand.name,
+      story: brand.story,
+      voice: brand.voice,
+    },
     homes: out,
     unknown: homeIds.filter((id) => !wanted.some((h) => h.id === id)),
   };

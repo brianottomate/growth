@@ -1414,17 +1414,19 @@ export const buildAdSetAction = growthAction({
 
 export const writeSetCopyAction = growthAction({
   description:
-    "Write the headline and caption onto ads already drawn, in one model pass that sees each home's photos: the brand's unassigned set (unapproved ads only), or one campaign's ads when campaignId is given (approved ads too, since the operator asked for that campaign by name; artwork is never touched). The same as Write copy in the app.",
+    "Generate a fresh copy set for local ads: caption and Meta headline plus editable image text for static/carousel ideas, preserving selected photos, slide order, templates and crops. Supply adId to rewrite only one ad. Approved editable ideas must be reopened first; pushed ads cannot be changed. Legacy artwork keeps its image text. The same as New copy on an ad or Write copy for a set.",
   inputSchema: z.object({
     brandId: z.string().min(1),
     campaignId: z.string().min(1).optional(),
+    adId: z.string().min(1).optional(),
   }),
   outputSchema: z.object({ brandId: z.string(), updated: z.number() }),
   examples: [
     { brandId: "brand_01" },
     { brandId: "brand_01", campaignId: "camp_01" },
   ],
-  execute: (input, ctx) => writeSetCopy({ ...input, orgId: ctx.orgId }),
+  execute: (input, ctx) =>
+    writeSetCopy({ ...input, orgId: ctx.orgId, userId: ctx.userId }),
 });
 
 export const writeGoogleTextAdsAction = growthAction({
@@ -1663,7 +1665,7 @@ export const suggestCampaignAudiencesAction = growthAction({
 export const catalogHomeFactsAction = growthAction({
   outputSchema: catalogHomeFactsActionOutputSchema,
   description:
-    "Read what homes' listings say, for writing their catalog cards: the complete amenity list, the description, the location paragraph (what the home is near), pets, bedrooms, baths, guests, the listing URL and the card's current headline. Use this instead of reading the public listing page, which shows only the first few amenities. Up to 16 homes per call; for a whole catalog, call it once per batch.",
+    "Read what homes' listings say, for writing their catalog cards: the complete amenity list, the description, the location paragraph (what the home is near), pets, bedrooms, baths, guests, the listing URL, current catalog card and related ads (captions and image recipes), brand story, market and production copy guidance. Use this instead of reading the public listing page, which shows only the first few amenities. Up to 16 homes per call; for a whole catalog, call it once per batch.",
   inputSchema: z.object({
     brandId: z.string().min(1),
     homeIds: z
@@ -2013,9 +2015,9 @@ export const importMetaCampaignAction = growthAction({
 export const ideaContextAction = growthAction({
   outputSchema: ideaContextActionOutputSchema,
   description:
-    "Read one ad's current editable document, version, ordered source-image URLs (including size variants), brand voice and facts for every represented home. Use before saveIdea. Image URLs are references; inspect them visually before making composition decisions. Write every slide's copy by its copyRules, from the homes' facts, never from the images.",
+    "Read one ad's current editable document, version, ordered source-image URLs (including size variants), brand story, voice, market, existing catalog/ad copy and complete listing facts for every represented home. Use before proposing copy sets and before saveIdea. Image URLs are references; inspect them visually before making composition decisions. Write every slide's copy by its copyRules, from the homes' facts, never from the images.",
   inputSchema: z.object({
-    campaignId: z.string().min(1),
+    campaignId: z.string().min(1).optional(),
     adId: z.string().min(1),
   }),
   execute: (input, ctx) =>

@@ -1,5 +1,3 @@
-import { campaignCopyRules } from "@/server/ai/prompts/campaign-copy";
-import { catalogCopyRules } from "@/server/ai/prompts/catalog-copy";
 import { COPY_VOICE_RULES } from "@/server/services/blog-workbench/prompt";
 import { copyLabFixtures } from "@/server/services/copy-lab.service";
 
@@ -15,23 +13,8 @@ export default function CopyLabPage() {
     <CopyWorkbench
       snapshotAt={snapshotAt}
       brands={brands}
-      homes={homes.map(({ photos, ...home }) => ({
-        ...home,
-        photoCount: photos.length,
-      }))}
-      presets={[
-        { id: "voice", label: "AI-isms ban", text: COPY_VOICE_RULES },
-        {
-          id: "campaign",
-          label: "Campaign house rules",
-          text: campaignCopyRules(),
-        },
-        {
-          id: "catalog",
-          label: "Catalog voice",
-          text: catalogCopyRules({ place: null, brandWide: [] }),
-        },
-      ]}
+      homes={homes.map((home) => ({ ...home, photoCount: home.photos.length }))}
+      presets={[{ id: "voice", label: "AI-isms ban", text: COPY_VOICE_RULES }]}
     />
   );
 }

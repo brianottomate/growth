@@ -296,7 +296,7 @@ export const growthActionPolicies = {
     // rows only, no provider call; re-running replaces the last set rather
     // than stacking a second one, which is why it is idempotent.
     buildAdSet: write({ idempotent: true, consequence: "model-write" }),
-    // Rewrites headline and caption on drawn ads from one model call.
+    // Rewrites captions and editable static/carousel image text; saves local drafts.
     writeSetCopy: write({ idempotent: true, consequence: "model-write" }),
     // Several model calls per home; lands unapproved drafts only.
     generateStarterIdeas: write({ consequence: "model-write" }),

@@ -295,6 +295,52 @@ describe("saved approval images", () => {
   });
 });
 
+test("changing only the second carousel card's Story image text preserves its feed and every other card", () => {
+  const document = draft();
+  document.cards.push({
+    ...document.cards[0]!,
+    id: "two",
+    source: { url: "https://example.com/second.jpg" },
+    overrides: {},
+  });
+  const before = projectIdea("brand-one", content, { document }, null);
+  const next = ideaDocumentSchema.parse({
+    ...document,
+    cards: document.cards.map((card) =>
+      card.id === "two"
+        ? {
+            ...card,
+            overrides: {
+              ...card.overrides,
+              story: { ...card.recipe, title: "Gather above Main Street" },
+            },
+          }
+        : card,
+    ),
+  });
+  const saved = projectIdea(
+    "brand-one",
+    content,
+    { document: next },
+    before.placements,
+  );
+  const reloaded = ideaDocumentFromAd({
+    name: "Carousel",
+    content: saved.content,
+  });
+  expect(saved.content.media[0]).toEqual(before.content.media[0]);
+  expect(saved.content.media[1]?.url).toBe(before.content.media[1]?.url);
+  expect(saved.content.media[1]?.story?.url).not.toBe(
+    before.content.media[1]?.story?.url,
+  );
+  expect(reloaded.cards[1]?.recipe).toEqual(document.cards[1]?.recipe);
+  expect(reloaded.cards[1]?.overrides.story?.title).toBe(
+    "Gather above Main Street",
+  );
+  expect(reloaded.cards.map((card) => card.id)).toEqual(["one", "two"]);
+  expect(reloaded.copy).toEqual(document.copy);
+});
+
 test("card booking links survive saving, approval and every placement projection", () => {
   const document = draft();
   document.cards[0]!.copy = {

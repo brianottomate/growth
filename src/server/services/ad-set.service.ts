@@ -5,6 +5,9 @@ import {
   transitionAdApproval,
 } from "./ad-approval.service";
 import "server-only";
+import { rewriteAdCreative } from "./ad-creative-copy.service";
+import { listingCopyContext } from "./listing-copy-context.service";
+import { marketOf, type BrandMarkets } from "@/lib/markets";
 
 import { and, eq, inArray, isNull } from "drizzle-orm";
 
@@ -148,6 +151,7 @@ type OwnedBrand = {
   website: string | null;
   story: string | null;
   relationship: string | null;
+  markets?: BrandMarkets | null;
 };
 
 async function requireOwnedBrand(input: {
@@ -166,6 +170,7 @@ async function requireOwnedBrand(input: {
       website: true,
       relationship: true,
       story: true,
+      markets: true,
     },
   });
   if (!brand) throw new AdSetError(404, "Brand not found");
@@ -626,7 +631,13 @@ export async function buildAdSet(input: {
             websiteId,
             propertyId: listing.id,
           })
-        : { photos: [], description: null, amenities: [] };
+        : {
+            photos: [],
+            description: null,
+            amenities: [],
+            locationDescription: null,
+            petsAllowed: null,
+          };
       const home = await ensureHome({ brandId: brand.id, listing });
       const photos = detail.photos.length
         ? detail.photos.map((photo) => photo.url)
@@ -1841,6 +1852,8 @@ export async function unfreezePlacement(input: {
 export async function writeSetCopy(input: {
   brandId: string;
   orgId: string;
+  userId: string;
+  adId?: string;
   /**
    * One campaign's ads instead of the brand's catalog set. Asked for by name,
    * so approved ads are rewritten too: the pass never touches their artwork.
@@ -1851,18 +1864,52 @@ export async function writeSetCopy(input: {
   const ads = await db.query.adTable.findMany({
     where: and(
       eq(adTable.brandId, brand.id),
+      input.adId ? eq(adTable.id, input.adId) : undefined,
       input.campaignId
         ? eq(adTable.campaignId, input.campaignId)
-        : isNull(adTable.campaignId),
+        : input.adId
+          ? undefined
+          : isNull(adTable.campaignId),
     ),
     with: { home: { columns: { externalId: true, name: true, url: true } } },
   });
-  const drafts = ads.filter(
+  const candidates = ads.filter(
     (ad) =>
       ad.type === "creative" &&
       (Boolean(input.campaignId) || ad.status !== "approved"),
   );
-  if (drafts.length === 0) return { brandId: brand.id, updated: 0 };
+  if (input.adId && !candidates.length)
+    throw new Error("Editable ad not found in this brand or campaign");
+  const editableIds = new Set(
+    candidates
+      .filter(
+        (ad) =>
+          "media" in ad.content &&
+          ad.content.media.every((card) => card.type === "image") &&
+          (!ad.content.format ||
+            ["static", "carousel"].includes(ad.content.format)),
+      )
+      .map((ad) => ad.id),
+  );
+  let updated = 0;
+  for (const ad of candidates) {
+    if (!("media" in ad.content) || !editableIds.has(ad.id)) continue;
+    if (ad.status === "approved" || ad.content.ideaStudio?.approval) {
+      if (input.adId)
+        throw new Error("Reopen this approved ad before writing new copy.");
+      continue;
+    }
+    await rewriteAdCreative({
+      adId: ad.id,
+      orgId: input.orgId,
+      userId: input.userId,
+    });
+    updated++;
+  }
+  const drafts = candidates.filter(
+    (ad) => "media" in ad.content && !editableIds.has(ad.id),
+  );
+  if (drafts.length === 0) return { brandId: brand.id, updated };
 
   // The homes the per-home ads are bound to, in first-seen order, with the
   // detail the copy reads from.
@@ -1876,6 +1923,7 @@ export async function writeSetCopy(input: {
     website: brand.website,
   });
   const websiteId = await brandWebsiteId(brand.id);
+  const existing = await listingCopyContext(brand.id, externalIds);
   const homeById = new Map<string, CopyHome>();
   await Promise.all(
     externalIds.map(async (externalId) => {
@@ -1886,7 +1934,13 @@ export async function writeSetCopy(input: {
             websiteId,
             propertyId: externalId,
           })
-        : { photos: [], description: null, amenities: [] };
+        : {
+            photos: [],
+            description: null,
+            amenities: [],
+            locationDescription: null,
+            petsAllowed: null,
+          };
       homeById.set(externalId, {
         name: listing.name,
         place: [listing.city, listing.state].filter(Boolean).join(", "),
@@ -1897,6 +1951,10 @@ export async function writeSetCopy(input: {
         amenities: detail.amenities,
         description: detail.description,
         heroUrl: listing.imageUrl ?? null,
+        market: marketOf(brand.markets, listing.city),
+        locationDescription: detail.locationDescription,
+        petsAllowed: detail.petsAllowed,
+        existingCopy: existing.find((item) => item.listingId === externalId),
       });
     }),
   );
@@ -1906,12 +1964,28 @@ export async function writeSetCopy(input: {
     brandName: brand.name,
     brandStory: brand.story,
     homes: orderedIds.map((id) => homeById.get(id)!),
+    regenerate: true,
+    existingAds: drafts.flatMap((ad) => {
+      if (!("media" in ad.content)) return [];
+      const homeIndex = ad.home?.externalId
+        ? orderedIds.indexOf(ad.home.externalId)
+        : -1;
+      return [
+        {
+          homeIndex: homeIndex >= 0 ? homeIndex : null,
+          format: adFormatOf(ad.content),
+          headline: ad.content.headline,
+          body: ad.content.body,
+          description: ad.content.description,
+          artwork: ad.content.ideaStudio?.document.cards ?? ad.content.media,
+        },
+      ];
+    }),
   });
   const copyByHome = new Map(
     orderedIds.map((id, index) => [id, copy.homes[index]!]),
   );
 
-  let updated = 0;
   for (const ad of drafts) {
     const content = ad.content as AdCreativeContent;
     if (!Array.isArray(content.media)) continue;

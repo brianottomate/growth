@@ -11,10 +11,10 @@ import {
 } from "@/lib/catalog-studio";
 import { previewAtWidth } from "@/lib/compositions";
 
-type PreviewCard = {
+export type CatalogPreviewCard = {
   key: string;
   image: string | undefined;
-  home: CatalogHome | undefined;
+  home: Pick<CatalogHome, "nightlyFrom" | "city"> | undefined;
   name: string;
 };
 
@@ -36,11 +36,8 @@ export function CatalogPreview({
   homes: CatalogHome[];
   draft: CatalogDraft;
 }) {
-  const [text, setText] = useState(
-    `Find your next ${brandName} escape. Private homes, booked direct.`,
-  );
   const byId = new Map(homes.map((h) => [h.id, h]));
-  const cards: PreviewCard[] = draft.cards
+  const cards: CatalogPreviewCard[] = draft.cards
     .filter((c) => c.included)
     .map((card) => ({
       key: card.homeId,
@@ -50,6 +47,23 @@ export function CatalogPreview({
       home: byId.get(card.homeId),
       name: byId.get(card.homeId)?.name ?? card.homeId,
     }));
+
+  return <CatalogCollectionPreview brandName={brandName} cards={cards} />;
+}
+
+/** Shared catalog mock for Studio and local experiments; cards are already resolved. */
+export function CatalogCollectionPreview({
+  brandName,
+  cards,
+  compact = false,
+}: {
+  brandName: string;
+  cards: CatalogPreviewCard[];
+  compact?: boolean;
+}) {
+  const [text, setText] = useState(
+    `Find your next ${brandName} escape. Private homes, booked direct.`,
+  );
 
   return (
     <div className="space-y-5">
@@ -64,10 +78,27 @@ export function CatalogPreview({
         </label>
         <p className="text-sm text-muted-foreground">{cards.length} cards</p>
       </div>
-      <div className="grid grid-cols-1 items-start gap-6 @3xl:grid-cols-2 @6xl:grid-cols-3">
-        <FeedPreview brandName={brandName} text={text} cards={cards} />
-        <StoryPreview brandName={brandName} cards={cards} />
-        <MoreFromPreview brandName={brandName} cards={cards} />
+      <div
+        className={
+          compact
+            ? "flex flex-wrap items-start gap-6"
+            : "grid grid-cols-1 items-start gap-6 @3xl:grid-cols-2 @6xl:grid-cols-3"
+        }
+      >
+        <div className={compact ? "w-80 max-w-full space-y-2" : ""}>
+          {compact && <h4 className="text-sm font-medium">Feed carousel</h4>}
+          <FeedPreview brandName={brandName} text={text} cards={cards} />
+        </div>
+        <div className={compact ? "w-80 max-w-full space-y-2" : ""}>
+          {compact && <h4 className="text-sm font-medium">Catalog story</h4>}
+          <StoryPreview brandName={brandName} cards={cards} />
+        </div>
+        <div className={compact ? "w-80 max-w-full space-y-2" : ""}>
+          {compact && (
+            <h4 className="text-sm font-medium">More from · whole catalog</h4>
+          )}
+          <MoreFromPreview brandName={brandName} cards={cards} />
+        </div>
       </div>
     </div>
   );
@@ -80,7 +111,7 @@ function FeedPreview({
 }: {
   brandName: string;
   text: string;
-  cards: PreviewCard[];
+  cards: CatalogPreviewCard[];
 }) {
   return (
     <div className="mx-auto w-full max-w-[390px] overflow-hidden rounded-2xl border bg-card text-card-foreground shadow-sm">
@@ -133,7 +164,7 @@ function StoryPreview({
   cards,
 }: {
   brandName: string;
-  cards: PreviewCard[];
+  cards: CatalogPreviewCard[];
 }) {
   const [lead, ...rest] = cards;
   const backdrop = useAverageColor(lead?.image);
@@ -183,7 +214,7 @@ function MoreFromPreview({
   cards,
 }: {
   brandName: string;
-  cards: PreviewCard[];
+  cards: CatalogPreviewCard[];
 }) {
   return (
     <div className="relative mx-auto aspect-[9/16] w-full max-w-[390px] overflow-hidden rounded-2xl border bg-background text-foreground shadow-sm">
@@ -219,7 +250,13 @@ function Avatar({ brandName }: { brandName: string }) {
   );
 }
 
-function Tile({ card, className }: { card: PreviewCard; className?: string }) {
+function Tile({
+  card,
+  className,
+}: {
+  card: CatalogPreviewCard;
+  className?: string;
+}) {
   return (
     // oxlint-disable-next-line nextjs/no-img-element
     <img

@@ -87,7 +87,7 @@ export const adsRouter = {
 
   buildAdSet: actionProcedure(buildAdSetAction),
 
-  /** The copy pass: AI words onto the drafts already drawn. Headline/body only. */
+  /** The copy pass: AI words onto the drafts already drawn. Captions and editable image words together. */
   writeSetCopy: actionProcedure(writeSetCopyAction),
 
   saveIdea: actionProcedure(saveIdeaAction),
