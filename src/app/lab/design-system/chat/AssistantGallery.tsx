@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, useSyncExternalStore, type ReactNode } from "react";
 import Link from "next/link";
 import type { ToolUIPart } from "ai";
 import { ArrowLeft, RotateCcw, Search } from "lucide-react";
@@ -21,6 +21,12 @@ type CatalogEntry = GrowthActionPolicy & {
   action: string;
   label: string;
 };
+const subscribeToClient = () => () => {
+  // The client marker never changes after hydration.
+};
+const clientSnapshot = () => true;
+const serverSnapshot = () => false;
+
 const sections = [
   ["conversation", "Conversation"],
   ["lifecycle", "Tool lifecycle"],
@@ -114,6 +120,11 @@ function SpecimenFrame({
   );
 }
 export function AssistantGallery({ catalog }: { catalog: CatalogEntry[] }) {
+  const hydrated = useSyncExternalStore(
+    subscribeToClient,
+    clientSnapshot,
+    serverSnapshot,
+  );
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
   const [width, setWidth] = useState("full");
@@ -202,6 +213,15 @@ export function AssistantGallery({ catalog }: { catalog: CatalogEntry[] }) {
     announce(`Demo queue: ${action}${text ? ` · ${text}` : ""}`);
     return true;
   };
+  // Product cards format dates in the operator's locale. The private gallery
+  // mounts them after hydration so server locale cannot change fixture text.
+  if (!hydrated)
+    return (
+      <main className="mx-auto max-w-7xl p-8" aria-busy="true">
+        <h1 className="text-3xl font-semibold">Assistant gallery</h1>
+        <p className="mt-4 text-sm text-muted-foreground">Loading specimens…</p>
+      </main>
+    );
   return (
     <main className="@container mx-auto max-w-7xl px-4 py-8 sm:px-8">
       <header className="space-y-6 pb-8">
