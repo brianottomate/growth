@@ -12,8 +12,9 @@ export function metaPreviewPlacements(
   _content: AdCreativeContent,
   planned: MetaPlacement[],
 ) {
-  // Marketplace, Explore, profile feeds and the rest render the same card as
-  // the feed or reel beside them, so the preview shows the distinct surfaces.
+  // Profile feeds and Explore home draw the same frame as the feed or reel
+  // beside them; Marketplace, the right column, notifications and Explore
+  // each have their own frame and show the square image.
   return planned.filter((id) => PREVIEWED.has(id));
 }
 const PREVIEWED = new Set<MetaPlacement>([
@@ -23,6 +24,10 @@ const PREVIEWED = new Set<MetaPlacement>([
   "instagram-story",
   "facebook-reel",
   "instagram-reel",
+  "facebook-marketplace",
+  "facebook-right-column",
+  "facebook-notification",
+  "instagram-explore",
 ]);
 /**
  * What a placement shows. An approved ad draws its saved images once the push

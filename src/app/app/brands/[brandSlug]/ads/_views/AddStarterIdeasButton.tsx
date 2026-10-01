@@ -77,7 +77,7 @@ export function AddStarterIdeasButton({ campaignId }: { campaignId: string }) {
     source !== "blank" &&
     (homes.isPending ||
       homes.isError ||
-      !available.length ||
+      (source === "featured" && !available.length) ||
       available.length > 10 ||
       (source === "featured" && available.some((home) => !home.photos.length)));
   return (
@@ -210,8 +210,9 @@ export function AddStarterIdeasButton({ campaignId }: { campaignId: string }) {
                 </p>
               ) : available.length === 0 ? (
                 <p className="text-sm">
-                  No featured WanderOS homes yet. Choose homes on the Homes
-                  page, or start blank.
+                  {source === "shells"
+                    ? "No featured homes: 7 empty ads, a hero carousel plus three statics and three carousels."
+                    : "No featured WanderOS homes yet. Choose homes on the Homes page, or start blank."}
                 </p>
               ) : (
                 <>

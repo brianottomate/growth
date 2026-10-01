@@ -1261,6 +1261,7 @@ function ProjectedAd({
                   publisher={view.publisher}
                   verticalKind={view.kind === "reel" ? "reel" : "story"}
                   surface={view.surface}
+                  frame={"frame" in view ? view.frame : undefined}
                   crop={
                     ("crop" in resolved ? resolved.crop : undefined) ??
                     (content.ideaStudio?.document.shapes.includes("portrait")

@@ -57,6 +57,7 @@ export const META_PLACEMENTS = [
     position: "marketplace",
     surface: "facebook",
     kind: "feed",
+    frame: "marketplace",
   },
   {
     id: "facebook-right-column",
@@ -65,6 +66,7 @@ export const META_PLACEMENTS = [
     position: "right_hand_column",
     surface: "facebook",
     kind: "feed",
+    frame: "right-column",
   },
   {
     id: "facebook-profile-feed",
@@ -81,6 +83,7 @@ export const META_PLACEMENTS = [
     position: "notification",
     surface: "facebook",
     kind: "feed",
+    frame: "notification",
   },
   {
     id: "instagram-explore",
@@ -89,6 +92,7 @@ export const META_PLACEMENTS = [
     position: "explore",
     surface: "instagram",
     kind: "feed",
+    frame: "explore",
   },
   {
     id: "instagram-explore-home",
@@ -97,6 +101,7 @@ export const META_PLACEMENTS = [
     position: "explore_home",
     surface: "instagram",
     kind: "feed",
+    frame: "explore",
   },
   {
     id: "instagram-profile-feed",

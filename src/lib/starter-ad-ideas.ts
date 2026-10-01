@@ -133,7 +133,8 @@ export const ZERNIO_NATIVE_SHAPES = {
  * Empty, Zernio-native shells for the featured homes: a static and a
  * carousel per home plus a hero carousel, each bound to its home and sized
  * by `ZERNIO_NATIVE_SHAPES`, with no images yet. For a client who sends
- * finished artwork: the shells say which sizes to supply.
+ * finished artwork: the shells say which sizes to supply. A brand with no
+ * homes gets three unbound statics and carousels instead.
  */
 export function shellStarterAdIdeas(homes: StarterHome[]) {
   const ideas: {
@@ -148,12 +149,14 @@ export function shellStarterAdIdeas(homes: StarterHome[]) {
       content: { format: "carousel", headline: "", body: "", media: [] },
     },
   ];
-  for (const format of ["static", "carousel"] as const)
+  const label = (format: "static" | "carousel") =>
+    format === "static" ? "Static" : "Carousel";
+  for (const format of ["static", "carousel"] as const) {
     for (const home of homes)
       ideas.push({
         key: `${home.id}-${format}`,
         homeId: home.id,
-        name: `${home.name} · ${format === "static" ? "Static" : "Carousel"}`,
+        name: `${home.name} · ${label(format)}`,
         content: {
           format,
           propertyName: home.name,
@@ -164,6 +167,14 @@ export function shellStarterAdIdeas(homes: StarterHome[]) {
           media: [],
         },
       });
+    if (!homes.length)
+      for (let n = 1; n <= 3; n++)
+        ideas.push({
+          key: `${format}-${n}`,
+          name: `${label(format)} ${n}`,
+          content: { format, headline: "", body: "", media: [] },
+        });
+  }
   for (const idea of ideas) {
     const document = ideaDocumentFromAd(idea);
     const shapes =

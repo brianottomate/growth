@@ -227,6 +227,14 @@ is requested in the Meta app dashboard by an app admin. Until then, big
 carousel campaigns can need a re-run of `setMetaCarouselPlacementCards` for
 the ads the push warned about.
 
+**Local previews.** The placement review (`MetaPlatformCard`) draws every
+placement locally: feed, stories and reels as before, plus Marketplace, the
+right column, notifications and Explore, each in its own small frame
+(`AdMockFrame` in `components/ad-mock.tsx`, set per placement as `frame` in
+`META_PLACEMENTS`). The frames crop the image square the way Meta does, so a
+4:5 card visibly loses its edges. They are approximations; Meta's own
+renders (below) are the reference.
+
 **Checking a push before and after**
 
 - Before: a validate-only push (`pushDraftToPlatform` with

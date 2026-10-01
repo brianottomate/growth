@@ -38,6 +38,17 @@ export const AD_MOCK_SURFACES = [
 
 export type AdMockSurface = (typeof AD_MOCK_SURFACES)[number]["id"];
 
+/**
+ * Placements that are not a feed post, drawn as a small approximation of the
+ * frame Meta puts them in (a listing tile, a sidebar card, a notification
+ * row, a grid tile). Local only; Meta's own previews are the reference.
+ */
+export type AdMockFrame =
+  | "marketplace"
+  | "right-column"
+  | "notification"
+  | "explore";
+
 /** The crop a surface draws, read off the placement it maps to. */
 function cropForSurface(surface: AdMockSurface) {
   return (
@@ -70,7 +81,10 @@ export function AdMock({
   previewState = "normal",
   diagnostics = false,
   preserveArtwork = false,
+  frame,
 }: {
+  /** Draw the placement's own frame instead of a feed post. */
+  frame?: AdMockFrame;
   publisher?: "facebook" | "instagram";
   verticalKind?: "story" | "reel";
   previewState?: "normal" | "caption" | "end-card";
@@ -99,6 +113,13 @@ export function AdMock({
   className?: string;
 }) {
   const isStory = surface === "story";
+  if (frame)
+    return (
+      <PlacementFrame
+        {...{ frame, brandName, brandLogo, headline, link, media, card }}
+        className={className}
+      />
+    );
   if (isStory)
     return (
       <VerticalAdPreview
@@ -364,5 +385,124 @@ function VerticalAdPreview({
         </p>
       )}
     </article>
+  );
+}
+
+const FRAME_NOTE: Record<AdMockFrame, string> = {
+  marketplace: "Marketplace shows the image square",
+  "right-column": "Right column shows the image square",
+  notification: "Notifications show a small square thumbnail",
+  explore: "Explore shows a square tile in a grid",
+};
+
+/**
+ * One placement's frame: the first card, cropped square the way Meta crops
+ * it (so a 4:5 card visibly loses its edges), with the text Meta adds.
+ */
+function PlacementFrame({
+  frame,
+  brandName,
+  brandLogo,
+  headline,
+  link,
+  media,
+  card,
+  className,
+}: {
+  frame: AdMockFrame;
+  brandName: string;
+  brandLogo: string | null;
+  headline: string | null;
+  link: string | null;
+  media: AdMockMedia[];
+  card: number;
+  className?: string;
+}) {
+  const current = media[Math.min(card, Math.max(0, media.length - 1))];
+  const image = (size: string, rounded = "rounded-md") =>
+    current &&
+    (current.type === "video" ? (
+      <span className={cn("grid place-items-center bg-muted text-xs", size)}>
+        Video
+      </span>
+    ) : (
+      // oxlint-disable-next-line nextjs/no-img-element
+      <img
+        src={posterForMedia(current) ?? current.url}
+        alt="Ad creative"
+        className={cn("shrink-0 bg-muted object-cover", size, rounded)}
+      />
+    ));
+  const avatar = brandLogo && (
+    // oxlint-disable-next-line nextjs/no-img-element
+    <img
+      src={brandLogo}
+      alt=""
+      className="size-6 shrink-0 rounded-full bg-white object-contain"
+    />
+  );
+  const bar = (width: string) => (
+    <span className={cn("block h-2 rounded bg-muted", width)} />
+  );
+  return (
+    <figure className={cn("space-y-1.5", className ?? "w-64")}>
+      {frame === "marketplace" && (
+        <div className="overflow-hidden rounded-xl border bg-card shadow-md">
+          {image("aspect-square w-full", "rounded-none")}
+          <div className="space-y-0.5 p-3">
+            <p className="line-clamp-2 text-sm font-semibold">{headline}</p>
+            <p className="text-xs text-muted-foreground">
+              Sponsored · {domainOf(link) ?? brandName}
+            </p>
+          </div>
+        </div>
+      )}
+      {frame === "right-column" && (
+        <div className="space-y-2 rounded-xl border bg-card p-3 shadow-md">
+          {image("aspect-square w-full")}
+          <p className="line-clamp-2 text-sm font-semibold">{headline}</p>
+          <p className="text-xs text-muted-foreground">
+            {domainOf(link) ?? brandName}
+          </p>
+        </div>
+      )}
+      {frame === "notification" && (
+        <div className="space-y-2 rounded-xl border bg-card p-3 shadow-md">
+          {bar("w-2/3")}
+          <div className="flex items-center gap-3 rounded-lg bg-accent/40 p-2">
+            {image("size-12")}
+            <p className="line-clamp-3 text-xs">
+              <span className="font-semibold">{brandName}</span> has something
+              you might like: “{headline}”
+            </p>
+          </div>
+          {bar("w-3/4")}
+          {bar("w-1/2")}
+        </div>
+      )}
+      {frame === "explore" && (
+        <div className="grid grid-cols-3 gap-1 rounded-xl border bg-card p-1 shadow-md">
+          {Array.from({ length: 9 }, (_, i) =>
+            i === 4 ? (
+              <div key={i} className="relative">
+                {image("aspect-square w-full", "rounded-sm")}
+                <span className="absolute right-1 bottom-1 rounded bg-black/70 px-1 text-[8px] text-white">
+                  Sponsored
+                </span>
+              </div>
+            ) : (
+              <span
+                key={i}
+                className="block aspect-square rounded-sm bg-muted"
+              />
+            ),
+          )}
+        </div>
+      )}
+      <figcaption className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+        {avatar}
+        {FRAME_NOTE[frame]} · approximation
+      </figcaption>
+    </figure>
   );
 }

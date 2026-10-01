@@ -639,9 +639,10 @@ export async function addStarterAdIdeas(input: {
   const homes = input.homeIds
     ? available.filter((h) => input.homeIds!.includes(h.id))
     : available;
+  // Shells work without homes too: unbound placeholders in the same sizes.
   if (
     byHome &&
-    (!homes.length ||
+    ((source === "featured" && !homes.length) ||
       homes.length > 10 ||
       (input.homeIds && homes.length !== new Set(input.homeIds).size))
   )
