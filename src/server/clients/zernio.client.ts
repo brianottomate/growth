@@ -1238,8 +1238,12 @@ export type CreateZernioStandaloneAdInput = {
   callToAction?: string;
   campaignType?: "search" | "display";
   leadGenFormId?: string;
-  keywords?: string[];
-  negativeKeywords?: string[];
+  /** Google Search: the new ad group's keywords. A string is BROAD. */
+  keywords?: ZernioKeyword[];
+  /** Google Search: the new ad group's negatives. */
+  negativeKeywords?: ZernioKeyword[];
+  /** Google Search: negatives on the campaign, created with the ad group. */
+  campaignNegativeKeywords?: ZernioKeyword[];
   additionalHeadlines?: string[];
   additionalDescriptions?: string[];
   businessName?: string;
@@ -1338,6 +1342,10 @@ export async function createZernioAdCampaign(
  * ids on `ad` instead, which is why a LinkedIn push found nothing at the root.
  * Read them with `writtenCampaignId` / `writtenAdSetId` rather than by hand.
  */
+export type ZernioKeyword =
+  | string
+  | { text: string; matchType: "BROAD" | "PHRASE" | "EXACT" };
+
 export type ZernioAdWriteResponse = {
   ad?: ZernioAd;
   /** Multi-creative shape: the N ads of the single ad set that was created. */

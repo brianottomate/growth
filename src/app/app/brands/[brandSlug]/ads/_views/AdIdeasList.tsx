@@ -3,6 +3,8 @@ import { ideaDocumentFromAd } from "@/lib/ad-idea-studio";
 import { isImportedMetaCatalog } from "@/lib/meta-import";
 import { AdIdeaCard } from "./AdIdeaCard";
 import { AdIdeaGroups } from "./AdIdeaGroups";
+import { AdPlatformRouting } from "./AdPlatformRouting";
+import type { ChannelPlatform } from "@/server/db/schema";
 
 // The list files every ad under its creative type, the way a shared drive
 // would: all-homes carousels first, then statics, then each home's carousel,
@@ -13,6 +15,7 @@ const GROUPS = [
   { id: "statics", label: "Statics" },
   { id: "home-carousels", label: "Home carousels" },
   { id: "video", label: "Video" },
+  { id: "text", label: "Text ads" },
   { id: "other", label: "Other" },
 ] as const;
 type GroupId = (typeof GROUPS)[number]["id"];
@@ -22,7 +25,7 @@ function groupOf(ad: {
   content: AdContent;
   homeId?: string | null;
 }): GroupId {
-  if (!("media" in ad.content)) return "other";
+  if (!("media" in ad.content)) return "text";
   if (ad.content.media.some((m) => m.type === "video")) return "video";
   const format = ad.content.format;
   if (format && format !== "static" && format !== "carousel") return "other";
@@ -44,7 +47,10 @@ export function AdIdeasList({
   states,
   fallback,
   actions,
+  plannedPlatforms = [],
 }: {
+  /** The campaign's planned platforms; an idea can be narrowed to some. */
+  plannedPlatforms?: ChannelPlatform[];
   /** Add starter ideas, Add ad, Assets: they act on the list below them. */
   actions?: React.ReactNode;
   homeOrder: string[];
@@ -64,6 +70,7 @@ export function AdIdeasList({
     updatedAt: Date;
     homeId?: string | null;
     createdAt: Date;
+    platforms?: ChannelPlatform[] | null;
   }[];
 }) {
   const catalogs = ads.filter(
@@ -100,14 +107,24 @@ export function AdIdeasList({
     ...group,
     ads: ordered.filter((ad) => groupOf(ad) === group.id),
   })).filter((group) => group.ads.length > 0);
-  const renderAd = (ad: (typeof ordered)[number]) =>
+  const renderAd = (ad: (typeof ordered)[number]) => (
+    <div key={ad.id}>
+      <AdPlatformRouting
+        adId={ad.id}
+        platforms={ad.platforms ?? null}
+        planned={plannedPlatforms}
+        locked={Boolean(states[ad.id])}
+      />
+      {renderIdea(ad)}
+    </div>
+  );
+  const renderIdea = (ad: (typeof ordered)[number]) =>
     "media" in ad.content &&
     ad.content.media.every((m) => m.type === "image") &&
     (!ad.content.format ||
       ad.content.format === "static" ||
       ad.content.format === "carousel") ? (
       <AdIdeaCard
-        key={ad.id}
         campaignId={campaignId}
         brandId={brandId}
         brandName={brandName}
@@ -123,7 +140,7 @@ export function AdIdeasList({
         }}
       />
     ) : (
-      <div key={ad.id}>{fallback(ad.id)}</div>
+      fallback(ad.id)
     );
   return (
     <section aria-labelledby="ad-ideas-heading" className="space-y-4">

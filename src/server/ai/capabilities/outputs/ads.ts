@@ -437,6 +437,7 @@ const draftAdSchema = z.strictObject({
   id: z.string(),
   name: z.string(),
   placements: placementsSchema.nullable(),
+  platforms: z.array(z.enum(channelPlatformEnum.enumValues)).nullable(),
   status: z.enum(["approved", "drawn", "kept"]),
   type: z.enum(["text", "creative"]),
   updatedAt: z.iso.datetime(),
@@ -536,6 +537,7 @@ const addAudienceSchema = z.strictObject({
   description: z.string().nullable(),
   geography: geographySchema.nullable(),
   id: z.string(),
+  excludedKeywords: z.array(z.string()).nullable(),
   keywords: z.array(z.string()).nullable(),
   name: z.string(),
   optimizationGoal: z.string().nullable(),
@@ -808,6 +810,7 @@ export const openCampaignActionOutputSchema = z.strictObject({
       id: z.string(),
       name: z.string(),
       placements: placementsSchema.nullable(),
+      platforms: z.array(z.enum(channelPlatformEnum.enumValues)).nullable(),
       status: z.enum(["approved", "drawn", "kept"]),
       type: z.enum(["text", "creative"]),
       updatedAt: z.iso.datetime(),
@@ -823,6 +826,7 @@ export const openCampaignActionOutputSchema = z.strictObject({
       description: z.string().nullable(),
       geography: geographySchema.nullable(),
       id: z.string(),
+      excludedKeywords: z.array(z.string()).nullable(),
       keywords: z.array(z.string()).nullable(),
       name: z.string(),
       optimizationGoal: z.string().nullable(),
@@ -876,6 +880,12 @@ export const openCampaignActionOutputSchema = z.strictObject({
           brandId: z.string(),
           businessKey: z.string().nullable(),
           channelId: z.string().nullable(),
+          copy: z
+            .strictObject({
+              descriptions: z.array(z.string()),
+              headlines: z.array(z.string()),
+            })
+            .nullable(),
           createdAt: z.iso.datetime(),
           externalAdSetId: z.string().nullable(),
           externalId: z.string().nullable(),
@@ -1013,6 +1023,9 @@ export const setPlatformDraftActionOutputSchema = z.strictObject({
 });
 
 export const attachCampaignActionOutputSchema = z.strictObject({
+  adsAdopted: z.number(),
+  adsLinked: z.number(),
+  audiencesAdopted: z.number(),
   campaignId: z.string().nullable(),
   id: z.string(),
   path: z.string(),

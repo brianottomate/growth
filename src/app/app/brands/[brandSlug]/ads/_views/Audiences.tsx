@@ -27,11 +27,12 @@ type AudienceRow = {
     cities?: string[];
   } | null;
   keywords: string[] | null;
+  excludedKeywords?: string[] | null;
 };
 
 /**
  * The campaign's audiences: each row is one buyable narrowing that the push
- * compiles to a Meta ad set / Google ad group. Budgets here are advisory
+ * compiles to a Meta ad set and, when it has search terms, a Google ad group. Budgets here are advisory
  * splits; the authoritative number lives on each platform's draft.
  */
 export function Audiences({
@@ -185,8 +186,12 @@ export function Audiences({
                     values={row.geography?.cities}
                   />
                   <GeographyChips
-                    label="Keyword suggestions"
+                    label="Search terms"
                     values={row.keywords ?? undefined}
+                  />
+                  <GeographyChips
+                    label="Excluded terms"
+                    values={row.excludedKeywords ?? undefined}
                   />
                   <p className="text-xs text-muted-foreground">
                     {row.ageMin != null || row.ageMax != null

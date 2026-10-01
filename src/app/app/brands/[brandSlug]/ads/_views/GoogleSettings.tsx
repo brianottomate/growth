@@ -78,8 +78,6 @@ export function GoogleSettings({
       .filter(Boolean);
 
   const configured = Boolean(config?.campaignType);
-  const searchWithoutKeywords =
-    config?.campaignType === "search" && (config.keywords ?? []).length === 0;
 
   return (
     <section className="space-y-3">
@@ -97,7 +95,7 @@ export function GoogleSettings({
               {configured
                 ? `${config?.campaignType === "search" ? "Search" : "Display"} campaign${
                     config?.campaignType === "search"
-                      ? ` · ${(config.keywords ?? []).length} keywords`
+                      ? ` · ${(config.keywords ?? []).length} fallback keywords`
                       : ""
                   }`
                 : "Not set. Google needs a campaign type before it can be pushed."}
@@ -109,13 +107,6 @@ export function GoogleSettings({
             </Button>
           )}
         </div>
-      )}
-
-      {searchWithoutKeywords && !open && (
-        <p className="text-xs text-amber-300">
-          A Search campaign with no keywords buys nothing. Add some before
-          pushing.
-        </p>
       )}
 
       {open && (
@@ -138,7 +129,9 @@ export function GoogleSettings({
           {campaignType === "search" ? (
             <div className="grid grid-cols-1 gap-3 @xl:grid-cols-2">
               <div className="space-y-1.5">
-                <Label htmlFor="g-keywords">Keywords (one per line)</Label>
+                <Label htmlFor="g-keywords">
+                  Fallback keywords (when no audience has terms)
+                </Label>
                 <Textarea
                   id="g-keywords"
                   rows={4}
@@ -151,7 +144,7 @@ export function GoogleSettings({
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="g-negatives">Negative keywords</Label>
+                <Label htmlFor="g-negatives">Campaign negative keywords</Label>
                 <Textarea
                   id="g-negatives"
                   rows={4}

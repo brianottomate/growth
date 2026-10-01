@@ -292,6 +292,10 @@ export const growthActionPolicies = {
     writeSetCopy: write({ idempotent: true, consequence: "model-write" }),
     // Several model calls per home; lands unapproved drafts only.
     generateStarterIdeas: write({ consequence: "model-write" }),
+    // One model call; lands unapproved text drafts only.
+    writeGoogleTextAds: write({ consequence: "model-write" }),
+    // Routing is local: which platforms an unpushed idea compiles to.
+    setAdPlatforms: write({ idempotent: true }),
     // Approval is the person's sign-off that gates the push, so chat asks
     // for it with the approval card rather than deciding on its own.
     setAdStatus: write({

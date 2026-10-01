@@ -148,6 +148,7 @@ import {
   setPlacementCopy,
   unfreezePlacement,
   writeSetCopy,
+  setAdPlatforms,
 } from "@/server/services/ad-set.service";
 import {
   runStarterGeneration,
@@ -155,6 +156,8 @@ import {
   starterGenerationStatus,
 } from "@/server/services/starter-ad-generation.service";
 import { AD_PLACEMENT_SPECS } from "@/lib/ad-placements";
+import { channelPlatformEnum } from "@/server/db/channel-schema";
+import { writeGoogleTextAds } from "@/server/services/google-text-ads.service";
 import { HAND_MADE_AD_FORMATS, MAX_SET_HOMES } from "@/lib/performance-ads";
 
 import { GrowthActionError, growthAction } from "./types";
@@ -902,6 +905,15 @@ export const replaceAdCardAction = growthAction({
   },
 });
 
+const searchTermsInput = z
+  .array(z.string().trim().min(1).max(82))
+  .max(80)
+  .optional();
+const SEARCH_TERMS_HELP =
+  'What this audience searches for. Match type in the notation: [exact], "phrase", bare for broad. Google Search makes one ad group per audience from these; feed platforms ignore them.';
+const EXCLUDED_TERMS_HELP =
+  "Terms this audience must not be reached on, same notation. Sent as the Google ad group's negative keywords.";
+
 export const addAudienceAction = growthAction({
   outputSchema: addAudienceActionOutputSchema,
   description:
@@ -935,13 +947,8 @@ export const addAudienceAction = growthAction({
         'Region/state names, e.g. ["California"] — resolved to platform geo keys at push.',
       ),
     cities: z.array(z.string().trim().min(1).max(120)).max(100).optional(),
-    keywords: z
-      .array(z.string().trim().min(1).max(80))
-      .max(50)
-      .optional()
-      .describe(
-        "Loose suggestions. The Google compile derives keywords from these; Meta ignores them.",
-      ),
+    keywords: searchTermsInput.describe(SEARCH_TERMS_HELP),
+    excludedKeywords: searchTermsInput.describe(EXCLUDED_TERMS_HELP),
   }),
   examples: [
     {
@@ -970,6 +977,7 @@ export const addAudienceAction = growthAction({
             }
           : null,
       keywords: input.keywords ?? null,
+      excludedKeywords: input.excludedKeywords ?? null,
       organizationId: ctx.orgId,
     }),
 });
@@ -977,7 +985,7 @@ export const addAudienceAction = growthAction({
 export const updateAudienceAction = growthAction({
   outputSchema: updateAudienceActionOutputSchema,
   description:
-    "Update a campaign audience's fields — name, age window, geography, or keyword suggestions. Only the fields sent are changed. Local only. Budgets live on the platform draft (setPlatformDraft), never on an audience.",
+    "Update a campaign audience's fields — name, age window, geography, search terms, or excluded terms. Only the fields sent are changed. Local only. Budgets live on the platform draft (setPlatformDraft), never on an audience.",
   inputSchema: z.object({
     audienceId: z.string().trim().min(1),
     name: z.string().trim().min(1).max(300).optional(),
@@ -987,7 +995,8 @@ export const updateAudienceAction = growthAction({
     states: z.array(z.string().trim().length(2)).max(60).optional(),
     regions: z.array(z.string().trim().min(1).max(100)).max(60).optional(),
     cities: z.array(z.string().trim().min(1).max(120)).max(100).optional(),
-    keywords: z.array(z.string().trim().min(1).max(80)).max(50).optional(),
+    keywords: searchTermsInput.describe(SEARCH_TERMS_HELP),
+    excludedKeywords: searchTermsInput.describe(EXCLUDED_TERMS_HELP),
   }),
   examples: [
     {
@@ -1014,6 +1023,7 @@ export const updateAudienceAction = growthAction({
             }
           : undefined,
       keywords: input.keywords,
+      excludedKeywords: input.excludedKeywords,
       organizationId: ctx.orgId,
     }),
 });
@@ -1219,7 +1229,7 @@ export const setPlatformDraftAction = growthAction({
 export const attachCampaignAction = growthAction({
   outputSchema: attachCampaignActionOutputSchema,
   description:
-    "Attach a per-platform campaign that sync pulled to a first-party campaign, either an existing one or a new one minted from its name. This is how a campaign nobody authored here gets a parent so its spend rolls up. Local only.",
+    "Attach a per-platform campaign that sync pulled to a first-party campaign, either an existing one or a new one minted from its name, and read it back into the plan: each of its ad sets becomes an audience and each of its ads is matched to an idea with the same words and picture or becomes a new one. Attach a Meta and a Google campaign to the same plan to group them. Local only; nothing on the platform changes.",
   inputSchema: z.object({
     platformCampaignId: z.string().trim().min(1),
     campaignId: z
@@ -1402,6 +1412,37 @@ export const writeSetCopyAction = growthAction({
     { brandId: "brand_01", campaignId: "camp_01" },
   ],
   execute: (input, ctx) => writeSetCopy({ ...input, orgId: ctx.orgId }),
+});
+
+export const writeGoogleTextAdsAction = growthAction({
+  description:
+    "Write Google Search text ads for a campaign from its landing page and its audiences' search terms: each a pool of up to 15 headlines (30 chars) and 4 descriptions (90 chars). Lands as unapproved text ideas; nothing is pushed. The same as Write search ads on the campaign page.",
+  inputSchema: z.object({
+    campaignId: z.string().min(1),
+    count: z.number().int().min(1).max(3).default(2),
+  }),
+  outputSchema: z.object({
+    created: z.number(),
+    adIds: z.array(z.string()),
+  }),
+  examples: [{ campaignId: "camp_01", count: 2 }],
+  execute: (input, ctx) =>
+    writeGoogleTextAds({ ...input, organizationId: ctx.orgId }),
+});
+
+export const setAdPlatformsAction = growthAction({
+  description:
+    "Choose which platforms an unpushed ad idea runs on. null (or an empty list) means every planned platform that can render it: text ideas go to Google Search, creative ideas to feeds. Local only.",
+  inputSchema: z.object({
+    adId: z.string().min(1),
+    platforms: z.array(z.enum(channelPlatformEnum.enumValues)).nullable(),
+  }),
+  outputSchema: z.object({
+    adId: z.string(),
+    platforms: z.array(z.enum(channelPlatformEnum.enumValues)).nullable(),
+  }),
+  examples: [{ adId: "ad_01", platforms: ["meta_ads"] }],
+  execute: (input, ctx) => setAdPlatforms({ ...input, orgId: ctx.orgId }),
 });
 
 export const generateStarterIdeasAction = growthAction({

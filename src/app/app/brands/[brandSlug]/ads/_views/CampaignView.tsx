@@ -35,6 +35,7 @@ import { Audiences } from "./Audiences";
 import { CreativePool } from "./CreativePool";
 import { DeleteCampaignButton } from "./DeleteCampaignButton";
 import { AddStarterIdeasButton } from "./AddStarterIdeasButton";
+import { WriteSearchAdsButton } from "./WriteSearchAdsButton";
 import { money } from "./format";
 import { PlanPlatformButton } from "./PlanPlatformButton";
 import { PlatformSection } from "./PlatformSection";
@@ -308,6 +309,9 @@ export async function CampaignView({
           actions={
             <div className="flex flex-wrap items-center gap-2">
               <AddStarterIdeasButton campaignId={campaign.id} />
+              {plannedPlatforms.includes("google_ads") && (
+                <WriteSearchAdsButton campaignId={campaign.id} />
+              )}
               <AddAdDialog
                 brandId={brand.id}
                 homes={homes}
@@ -338,6 +342,7 @@ export async function CampaignView({
           brandName={brandName}
           brandLogo={brand.logo}
           states={states}
+          plannedPlatforms={plannedPlatforms}
           fallback={(id) => (
             <ul>
               <AdTile

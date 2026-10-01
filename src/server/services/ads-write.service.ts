@@ -13,6 +13,7 @@ import {
   type MetaPlacement,
 } from "@/lib/meta-placement-plan";
 import { ideaAwaitingArtwork } from "@/lib/ad-idea-studio";
+import { searchTerms, type SearchTerm } from "@/lib/search-terms";
 import { META_URL_TAGS } from "@/lib/ad-utm";
 import {
   createMetaPlacementCreative,
@@ -57,6 +58,7 @@ import {
 } from "@/lib/zernio-ads";
 import {
   adPlatformSpec,
+  adRoutesTo,
   channelPlatformForZernioKey,
   requireAdPlatformSpec,
   zernioAdPlatformKey,
@@ -93,6 +95,7 @@ import {
   type ZernioCarouselCard,
   writtenAdSetId,
   writtenCampaignId,
+  type ZernioKeyword,
 } from "@/server/clients/zernio.client";
 import { db } from "@/server/db";
 import { normalizeDomain } from "@/server/services/hubspot-contact-mirror";
@@ -944,8 +947,9 @@ export type CreateGoogleAdInput = {
   headline: string;
   body: string;
   linkUrl: string;
-  keywords?: string[];
-  negativeKeywords?: string[];
+  keywords?: ZernioKeyword[];
+  negativeKeywords?: ZernioKeyword[];
+  campaignNegativeKeywords?: ZernioKeyword[];
   additionalHeadlines?: string[];
   additionalDescriptions?: string[];
   images?: { landscape: string; square: string };
@@ -994,6 +998,7 @@ export async function createGoogleAd(
     linkUrl: input.linkUrl,
     keywords: input.keywords,
     negativeKeywords: input.negativeKeywords,
+    campaignNegativeKeywords: input.campaignNegativeKeywords,
     additionalHeadlines: input.additionalHeadlines,
     additionalDescriptions: input.additionalDescriptions,
     images: input.images,
@@ -2334,9 +2339,16 @@ export async function pushDraftToPlatform(
       where: eq(adTable.campaignId, campaign.id),
     }),
   ]);
-  let ads = loadedAds;
-  if (ads.length === 0) {
+  if (loadedAds.length === 0) {
     throw new Error("This campaign has no drafted ads — add ads first");
+  }
+  const routed = (rows: Ad[]) =>
+    rows.filter((ad) => adRoutesTo(ad.platforms, platform));
+  let ads = routed(loadedAds);
+  if (ads.length === 0) {
+    throw new Error(
+      `No ads are set to run on ${platformName} — add it to an ad's platforms`,
+    );
   }
   const unapproved = ads.filter(
     (ad) =>
@@ -2369,9 +2381,11 @@ export async function pushDraftToPlatform(
     if (batch.includes(true)) froze = true;
   }
   if (froze)
-    ads = await db.query.adTable.findMany({
-      where: eq(adTable.campaignId, campaign.id),
-    });
+    ads = routed(
+      await db.query.adTable.findMany({
+        where: eq(adTable.campaignId, campaign.id),
+      }),
+    );
   // A shell is an ad someone meant to fill and did not. Sending the rest
   // around it would ship a set with a hole nobody chose.
   const shells = ads.filter(
@@ -2479,11 +2493,189 @@ type PushArgs = {
 
 // ---- GOOGLE COMPILE ---------------------------------------------------
 //
-// Google's hierarchy is campaign → ad group, and the campaign TYPE decides
-// everything (Search needs keywords, Display needs sized images). One call
-// builds the whole tree; multi-ad-group is not modelled, so the first
-// audience carries the targeting and the rest are reported, not dropped
-// silently.
+// Google's hierarchy is campaign → ad group → ad, and the campaign TYPE
+// decides what an ad group is. Search: one ad group per audience that carries
+// search terms, every text idea as a responsive search ad in each. Display:
+// one ad group per audience, every image idea as a responsive display ad.
+// Zernio creates the campaign with its first ad group and ad, then
+// `existingCampaignId` adds each further ad group (inheriting the budget) and
+// `adSetId` adds each further ad to a group.
+
+/** Google's responsive search ad limits. */
+export const GOOGLE_RSA = {
+  headlines: { min: 3, max: 15, chars: 30 },
+  descriptions: { min: 2, max: 4, chars: 90 },
+} as const;
+
+type GoogleUnit = {
+  ad: Ad;
+  headline: string;
+  body: string;
+  headlines: string[];
+  descriptions: string[];
+  linkUrl: string | null;
+  media: MediaItem[] | null;
+  imageUrl?: string;
+};
+
+type GoogleGroup = {
+  audience: PlanAudience | null;
+  spec: ZernioAdTargeting | undefined;
+  keywords: SearchTerm[];
+  negatives: SearchTerm[];
+};
+
+/**
+ * What a Google push will create, before anything is sent. Pure, so the
+ * rules are pinned: which audiences become ad groups, which ideas become ads,
+ * and what is left out and why.
+ */
+export function planGoogleCompile(input: {
+  campaignType: "search" | "display";
+  compiled: Array<{
+    audience: PlanAudience;
+    spec: ZernioAdTargeting | undefined;
+  }>;
+  ads: Ad[];
+  /** Draft-level terms: the ad group when no audience carries any. */
+  draftKeywords?: string[];
+  landingUrl: string | null;
+}): { groups: GoogleGroup[]; units: GoogleUnit[]; warnings: string[] } {
+  const warnings: string[] = [];
+  let groups: GoogleGroup[];
+  if (input.campaignType === "search") {
+    groups = input.compiled
+      .map(({ audience, spec }) => ({
+        audience,
+        spec,
+        keywords: searchTerms(audience.keywords),
+        negatives: searchTerms(audience.excludedKeywords),
+      }))
+      .filter((group) => group.keywords.length > 0);
+    const termless = input.compiled.length - groups.length;
+    if (groups.length === 0 && input.draftKeywords?.length) {
+      const first = input.compiled[0];
+      groups = [
+        {
+          audience: first?.audience ?? null,
+          spec: first?.spec,
+          keywords: searchTerms(input.draftKeywords),
+          negatives: searchTerms(first?.audience.excludedKeywords),
+        },
+      ];
+    } else if (termless > 0 && groups.length > 0) {
+      warnings.push(
+        `${termless} audience(s) have no search terms, so Google Search left them out`,
+      );
+    }
+    if (groups.length === 0) {
+      throw new Error(
+        "A Google Search campaign needs search terms: add them to an audience",
+      );
+    }
+  } else {
+    groups =
+      input.compiled.length > 0
+        ? input.compiled.map(({ audience, spec }) => ({
+            audience,
+            spec,
+            keywords: [],
+            negatives: [],
+          }))
+        : [{ audience: null, spec: undefined, keywords: [], negatives: [] }];
+  }
+
+  const units: GoogleUnit[] = [];
+  if (input.campaignType === "search") {
+    const problems: string[] = [];
+    for (const { ad, content } of textAds(input.ads)) {
+      const headlines = content.headlines.map((h) => h.trim()).filter(Boolean);
+      const descriptions = content.descriptions
+        .map((d) => d.trim())
+        .filter(Boolean);
+      const issue = rsaIssue(headlines, descriptions);
+      if (issue) {
+        problems.push(`${ad.name}: ${issue}`);
+        continue;
+      }
+      units.push({
+        ad,
+        headline: headlines[0]!,
+        body: descriptions[0]!,
+        headlines: headlines.slice(0, GOOGLE_RSA.headlines.max),
+        descriptions: descriptions.slice(0, GOOGLE_RSA.descriptions.max),
+        linkUrl: content.linkUrl ?? input.landingUrl,
+        media: null,
+      });
+    }
+    if (problems.length) {
+      throw new Error(`Fix these text ads first. ${problems.join("; ")}`);
+    }
+    const creatives = creativeAds(input.ads).length;
+    if (creatives > 0) {
+      warnings.push(
+        `${creatives} creative idea(s) were not sent to Google Search; it shows text only`,
+      );
+    }
+    if (units.length === 0) {
+      throw new Error(
+        `Google Search needs a text ad with ${GOOGLE_RSA.headlines.min}+ headlines and ${GOOGLE_RSA.descriptions.min}+ descriptions`,
+      );
+    }
+  } else {
+    for (const { ad, content } of creativeAds(input.ads)) {
+      // Google Display renders images; a video must never be the source.
+      if (isVideoContent(content) || !content.media[0]?.url) continue;
+      units.push({
+        ad,
+        headline: content.headline,
+        body: content.body,
+        headlines: [content.headline],
+        descriptions: [content.body],
+        linkUrl: content.linkUrl ?? input.landingUrl,
+        media: content.media,
+        imageUrl: content.media[0].url,
+      });
+    }
+    const text = textAds(input.ads).length;
+    if (text > 0) {
+      warnings.push(
+        `${text} text idea(s) were not sent to Google Display; it needs an image`,
+      );
+    }
+    if (units.length === 0) {
+      throw new Error("A Google Display campaign needs a creative ad's image");
+    }
+  }
+  const unlinked = units.find((unit) => !unit.linkUrl);
+  if (unlinked) {
+    throw new Error(
+      `Set a landing URL on the campaign, or a link URL on “${unlinked.ad.name}”`,
+    );
+  }
+  return { groups, units, warnings };
+}
+
+function rsaIssue(headlines: string[], descriptions: string[]) {
+  const { headlines: h, descriptions: d } = GOOGLE_RSA;
+  if (headlines.length < h.min) return `needs ${h.min}+ headlines`;
+  if (descriptions.length < d.min) return `needs ${d.min}+ descriptions`;
+  const longHeadline = headlines.find((x) => x.length > h.chars);
+  if (longHeadline) return `“${longHeadline}” is over ${h.chars} characters`;
+  const longDescription = descriptions.find((x) => x.length > d.chars);
+  if (longDescription)
+    return `“${longDescription.slice(0, 40)}…” is over ${d.chars} characters`;
+  return null;
+}
+
+function zernioKeywords(terms: SearchTerm[]): ZernioKeyword[] | undefined {
+  if (terms.length === 0) return undefined;
+  return terms.map(({ text, match }) => ({
+    text,
+    matchType: match.toUpperCase() as "BROAD" | "PHRASE" | "EXACT",
+  }));
+}
+
 async function pushToGoogle(args: PushArgs) {
   const {
     input,
@@ -2521,58 +2713,44 @@ async function pushToGoogle(args: PushArgs) {
       "Google push supports traffic, engagement, awareness, and video_views",
     );
   }
+  const goal = input.goal;
 
-  // Keywords: the operator's structured override wins; otherwise derive from
-  // the audiences' suggestions — that is the whole point of the loose field.
-  const keywords = google.keywords ?? [
-    ...new Set(compiled.flatMap(({ audience }) => audience.keywords ?? [])),
-  ];
-  if (campaignType === "search" && keywords.length === 0) {
-    throw new Error(
-      "A Google Search campaign needs keywords — add suggestions on an audience, or set them on the Google draft",
-    );
-  }
-
-  const text = textAds(ads)[0];
-  // Google Display renders images; a video creative must never be the source
-  // of its landscape/square urls.
-  const creative = creativeAds(ads).find(
-    ({ content }) => !isVideoContent(content),
+  const plan = planGoogleCompile({
+    campaignType,
+    compiled,
+    ads,
+    draftKeywords: google.keywords,
+    landingUrl: campaign.landingUrl,
+  });
+  warnings.push(...plan.warnings);
+  const campaignNegatives = zernioKeywords(
+    searchTerms(google.negativeKeywords),
   );
-  if (!text && !creative) {
-    throw new Error(
-      "No usable ad: add a text ad (headlines + descriptions), or a creative ad with an image",
-    );
-  }
-  const headline =
-    text?.content.headlines[0] ?? creative?.content.headline ?? campaign.name;
-  const body =
-    text?.content.descriptions[0] ??
-    creative?.content.body ??
-    campaign.description ??
-    campaign.name;
-  const linkUrl =
-    text?.content.linkUrl ??
-    creative?.content.linkUrl ??
-    campaign.landingUrl ??
-    null;
-  if (!linkUrl) {
-    throw new Error(
-      "Set a landing URL on the campaign, or a link URL on an ad",
-    );
-  }
-  if (campaignType === "display" && !creative && !google.images) {
-    throw new Error("A Google Display campaign needs a creative ad's image");
-  }
 
-  const first = compiled[0];
-  if (compiled.length > 1) {
-    warnings.push(
-      `Google push compiles ONE audience (${first!.audience.name}); the other ${compiled.length - 1} were not sent — multi-ad-group is not modelled yet`,
-    );
-  }
+  const unitPayload = (unit: GoogleUnit) => ({
+    headline: unit.headline,
+    body: unit.body,
+    linkUrl: unit.linkUrl!,
+    ...(campaignType === "search"
+      ? {
+          additionalHeadlines: unit.headlines.slice(1),
+          additionalDescriptions: unit.descriptions.slice(1),
+        }
+      : {
+          images: googleDisplayImages(google.images, unit.imageUrl),
+          businessName: google.businessName ?? brand.name,
+        }),
+  });
 
-  const result = await createGoogleAd(
+  /** One more ad (or ad group) under what the opening call made. */
+  const send = async (payload: CreateZernioStandaloneAdInput, key: string) =>
+    createZernioStandaloneAd(payload, {
+      idempotencyKey: idempotencyKey(context, key, payload),
+    });
+
+  const [firstGroup, ...restGroups] = plan.groups;
+  const [firstUnit, ...restUnits] = plan.units;
+  const opening = await createGoogleAd(
     {
       businessKey: `push:${campaign.id}:google`,
       brandSlug: brand.slug!,
@@ -2580,73 +2758,165 @@ async function pushToGoogle(args: PushArgs) {
       adAccountId: destination.adAccount.id,
       name: campaign.name,
       campaignType,
-      goal: input.goal,
+      goal,
       budgetAmount,
       budgetType,
-      headline,
-      body,
-      linkUrl,
-      keywords,
-      negativeKeywords: google.negativeKeywords,
-      additionalHeadlines:
-        google.additionalHeadlines ?? text?.content.headlines.slice(1),
-      additionalDescriptions:
-        google.additionalDescriptions ?? text?.content.descriptions.slice(1),
-      businessName: google.businessName ?? brand.name,
-      targeting: first?.spec,
+      ...unitPayload(firstUnit!),
+      keywords: zernioKeywords(firstGroup!.keywords),
+      negativeKeywords: zernioKeywords(firstGroup!.negatives),
+      campaignNegativeKeywords: campaignNegatives,
+      targeting: firstGroup!.spec,
       startDate,
       endDate,
-      images:
-        campaignType === "display"
-          ? googleDisplayImages(google.images, creative?.content.media[0]?.url)
-          : undefined,
     },
     context,
   );
-  warnings.push(...(result.warnings ?? []));
+  warnings.push(...(opening.warnings ?? []));
+  const campaignExternalId = writtenCampaignId(opening.provider);
 
-  const provider = result.provider;
+  type Created = {
+    group: GoogleGroup;
+    adGroupId: string | null;
+    ads: Array<{ unit: GoogleUnit; externalId: string | null }>;
+  };
+  const adIdOf = (result: ZernioAdWriteResponse) => {
+    const row = result.ad ?? result.ads?.[0];
+    return (
+      (typeof row?.platformAdId === "string" ? row.platformAdId : null) ??
+      row?.id ??
+      null
+    );
+  };
+  const created: Created[] = [];
+  try {
+    const attachRest = async (group: Created, scope: string) => {
+      for (const unit of restUnits) {
+        if (!group.adGroupId) {
+          throw new Error(
+            "Zernio returned no ad group id to add the next ad to",
+          );
+        }
+        const result = await send(
+          {
+            accountId: input.connectionAccountId,
+            adAccountId: destination.adAccount.id,
+            adSetId: group.adGroupId,
+            name: unit.ad.name,
+            adName: unit.ad.name,
+            campaignType,
+            goal,
+            ...unitPayload(unit),
+          },
+          `push-attach:${scope}:${unit.ad.id}`,
+        );
+        group.ads.push({ unit, externalId: adIdOf(result) });
+      }
+    };
+
+    const first: Created = {
+      group: firstGroup!,
+      adGroupId: writtenAdSetId(opening.provider),
+      ads: [{ unit: firstUnit!, externalId: adIdOf(opening.provider) }],
+    };
+    created.push(first);
+    await attachRest(
+      first,
+      `${campaign.id}:${firstGroup!.audience?.id ?? "all"}:google`,
+    );
+
+    for (const group of restGroups) {
+      if (!campaignExternalId) {
+        throw new Error("Zernio returned no campaign id to add ad groups to");
+      }
+      const scope = `${campaign.id}:${group.audience?.id ?? "all"}:google`;
+      const result = await send(
+        {
+          accountId: input.connectionAccountId,
+          adAccountId: destination.adAccount.id,
+          existingCampaignId: campaignExternalId,
+          name: group.audience?.name ?? campaign.name,
+          adSetName: group.audience?.name,
+          adName: firstUnit!.ad.name,
+          campaignType,
+          goal,
+          ...unitPayload(firstUnit!),
+          keywords: zernioKeywords(group.keywords),
+          negativeKeywords: zernioKeywords(group.negatives),
+          targeting: group.spec,
+        },
+        `push-adset:${scope}`,
+      );
+      const next: Created = {
+        group,
+        adGroupId: writtenAdSetId(result),
+        ads: [{ unit: firstUnit!, externalId: adIdOf(result) }],
+      };
+      created.push(next);
+      await attachRest(next, scope);
+    }
+  } catch (error) {
+    const cleanedUp = campaignExternalId
+      ? await deleteZernioCampaign({
+          campaignId: campaignExternalId,
+          accountId: input.connectionAccountId,
+        })
+          .then(() => true)
+          .catch((cleanupError) => {
+            console.error("google push rollback failed", cleanupError);
+            return false;
+          })
+      : false;
+    throw new Error(
+      `Google push failed after ${created.length} of ${plan.groups.length} ad groups — ${
+        cleanedUp
+          ? "the campaign was removed from Google so nothing is half-built"
+          : `the campaign ${campaignExternalId ?? "(no id returned)"} could not be removed, delete it in Google Ads`
+      }. ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
   await recordCompiledCampaign({
     adAccountId: destination.adAccount.id,
     draft,
     campaign,
-    status: result.status,
+    status: opening.status,
     budgetAmount,
     budgetType,
-    externalCampaignId: writtenCampaignId(provider),
-    heroThumbnailUrl: creative?.content.media[0]?.url ?? null,
-    sets: [
-      {
-        audience: first?.audience ?? null,
-        name: first?.audience.name ?? campaign.name,
-        externalId: writtenAdSetId(provider),
-        targetingSpec: first?.spec ?? null,
-        budget: budgetAmount,
-        budgetType,
-        ads: [
-          {
-            planAd: (text ?? creative)!.ad,
-            externalId: null,
-            headline,
-            body,
-            linkUrl,
-            media: creative ? creative.content.media : null,
-          },
-        ],
-      },
-    ],
+    externalCampaignId: campaignExternalId,
+    heroThumbnailUrl: plan.units.find((u) => u.imageUrl)?.imageUrl ?? null,
+    sets: created.map(({ group, adGroupId, ads: made }) => ({
+      audience: group.audience,
+      name: group.audience?.name ?? campaign.name,
+      externalId: adGroupId,
+      targetingSpec: group.spec ?? null,
+      budget: budgetAmount,
+      budgetType,
+      ads: made.map(({ unit, externalId }) => ({
+        planAd: unit.ad,
+        externalId,
+        headline: unit.headline,
+        body: unit.body,
+        linkUrl: unit.linkUrl,
+        media: unit.media,
+        copy:
+          campaignType === "search"
+            ? { headlines: unit.headlines, descriptions: unit.descriptions }
+            : null,
+      })),
+    })),
   });
 
+  const adsCreated = created.reduce((n, c) => n + c.ads.length, 0);
   return {
     campaignId: campaign.id,
     platform: "google_ads" as const,
     validateOnly: false,
     platformCampaignRowId: draft.id,
-    adSetsCreated: 1,
-    adsCreated: 1,
+    adSetsCreated: created.length,
+    adsCreated,
     path: `/app/brands/${brand.slug}/ads/platform/${draft.id}`,
     warnings,
-    provider,
+    provider: opening.provider,
   };
 }
 
@@ -3862,6 +4132,7 @@ async function recordCompiledCampaign(input: {
       body: string | null;
       linkUrl: string | null;
       media: MediaItem[] | null;
+      copy?: { headlines: string[]; descriptions: string[] } | null;
     }>;
   }>;
 }) {
@@ -3928,6 +4199,7 @@ async function recordCompiledCampaign(input: {
         body: ad.body,
         linkUrl: ad.linkUrl,
         media: ad.media,
+        copy: ad.copy ?? null,
         thumbnailUrl: ad.media?.[0]?.url ?? null,
         status: input.status,
         externalAdSetId: set.externalId,

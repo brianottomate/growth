@@ -8,13 +8,16 @@ import {
   starterGenerationStatus,
 } from "@/server/services/starter-ad-generation.service";
 import { z } from "zod";
+import { channelPlatformEnum } from "@/server/db/channel-schema";
 
 import {
   setAdPhotoOnly,
   setAdTextOnly,
+  setAdPlatforms,
   setCardCopy,
 } from "@/server/services/ad-set.service";
 import { researchGoogleKeywords } from "@/server/services/ads-write.service";
+import { writeGoogleTextAds } from "@/server/services/google-text-ads.service";
 import {
   addStarterAdIdeas,
   starterIdeaHomes,
@@ -132,6 +135,18 @@ export const adsRouter = {
       }),
     ),
 
+  /** Google Search text ideas from the landing page and audiences' terms. */
+  writeGoogleTextAds: workspaceProcedure
+    .input(
+      z.object({
+        campaignId: z.string().min(1),
+        count: z.number().int().min(1).max(3).optional(),
+      }),
+    )
+    .handler(async ({ context: ctx, input }) =>
+      writeGoogleTextAds({ ...input, organizationId: ctx.workspace.orgId }),
+    ),
+
   /** An empty ad of a declared format, waiting for its creative. */
   addAdShell: actionProcedure(addAdShellAction),
 
@@ -173,6 +188,21 @@ export const adsRouter = {
         adId: input.adId,
         orgId: ctx.workspace.orgId,
         textOnly: input.textOnly,
+      }),
+    ),
+
+  setAdPlatforms: workspaceProcedure
+    .input(
+      z.object({
+        adId: z.string().min(1),
+        platforms: z.array(z.enum(channelPlatformEnum.enumValues)).nullable(),
+      }),
+    )
+    .handler(async ({ context: ctx, input }) =>
+      setAdPlatforms({
+        adId: input.adId,
+        orgId: ctx.workspace.orgId,
+        platforms: input.platforms,
       }),
     ),
 

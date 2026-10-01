@@ -394,3 +394,14 @@ export const AD_PLATFORM_SHORT_LABELS: Record<string, string> =
   Object.fromEntries(
     AD_PLATFORM_OPTIONS.map(({ value, shortLabel }) => [value, shortLabel]),
   );
+
+/**
+ * Whether an idea runs on a platform. No list means every planned platform
+ * that can render it; the compile then decides by shape (text or creative).
+ */
+export function adRoutesTo(
+  platforms: readonly ChannelPlatform[] | null | undefined,
+  platform: ChannelPlatform,
+) {
+  return !platforms?.length || platforms.includes(platform);
+}

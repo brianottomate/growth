@@ -409,6 +409,7 @@ export async function addAudience(input: {
   ageMax?: number | null;
   geography?: AudienceGeographyPlan | null;
   keywords?: string[] | null;
+  excludedKeywords?: string[] | null;
   optimizationGoal?: string | null;
 }) {
   const { campaign, brand } = await requireOwnedCampaign(
@@ -438,6 +439,7 @@ export async function addAudience(input: {
       ageMax: input.ageMax ?? null,
       geography: input.geography ?? null,
       keywords: input.keywords ?? null,
+      excludedKeywords: input.excludedKeywords ?? null,
       optimizationGoal: input.optimizationGoal ?? null,
     })
     .returning();
@@ -453,6 +455,7 @@ export async function updateAudience(input: {
   ageMax?: number | null;
   geography?: AudienceGeographyPlan | null;
   keywords?: string[] | null;
+  excludedKeywords?: string[] | null;
 }) {
   const audience = await db.query.audienceTable.findFirst({
     where: eq(audienceTable.id, input.audienceId),
@@ -937,11 +940,163 @@ export async function attachPlatformCampaign(input: {
       id: platformCampaignTable.id,
       campaignId: platformCampaignTable.campaignId,
     });
+  const adopted = await adoptMirrorIntoPlan({
+    platformCampaignId: platformCampaign.id,
+    campaignId,
+    brandId: brand.id,
+  });
 
   return {
     ...updated!,
+    ...adopted,
     path: `/app/brands/${brand.slug}/ads/${campaignId}`,
   };
+}
+
+/**
+ * The reverse compile: what a platform already runs, read back into the
+ * plan. Every ad set without a plan audience gets one, every ad without a
+ * plan idea is matched to an idea with the same words and picture or gets a
+ * new one, and the mirror rows point at them. Nothing is sent anywhere; the
+ * mirror stays the platform's account of itself and sync keeps refreshing it.
+ *
+ * Matching is by content, so the same creative running in three ad sets, or
+ * on Meta and Google under one plan, is one idea.
+ */
+async function adoptMirrorIntoPlan(input: {
+  platformCampaignId: string;
+  campaignId: string;
+  brandId: string;
+}) {
+  const [sets, mirrorAds, planAds] = await Promise.all([
+    db.query.platformAdSetTable.findMany({
+      where: eq(
+        platformAdSetTable.platformCampaignId,
+        input.platformCampaignId,
+      ),
+    }),
+    db.query.platformAdTable.findMany({
+      where: eq(platformAdTable.platformCampaignId, input.platformCampaignId),
+    }),
+    db.query.adTable.findMany({
+      where: eq(adTable.campaignId, input.campaignId),
+    }),
+  ]);
+
+  let audiencesAdopted = 0;
+  for (const set of sets) {
+    if (set.audienceId) continue;
+    const spec = (set.targetingSpec ?? {}) as {
+      ageMin?: number;
+      ageMax?: number;
+      countries?: string[];
+    };
+    const [audience] = await db
+      .insert(audienceTable)
+      .values({
+        id: createId("aud"),
+        campaignId: input.campaignId,
+        brandId: input.brandId,
+        name: set.name,
+        description: "Read back from the platform's ad set.",
+        ageMin: spec.ageMin ?? null,
+        ageMax: spec.ageMax ?? null,
+        geography: spec.countries?.length
+          ? { countries: spec.countries }
+          : null,
+      })
+      .returning({ id: audienceTable.id });
+    await db
+      .update(platformAdSetTable)
+      .set({ audienceId: audience!.id })
+      .where(eq(platformAdSetTable.id, set.id));
+    audiencesAdopted++;
+  }
+
+  const ideaBySignature = new Map<string, string>();
+  for (const ad of planAds) {
+    ideaBySignature.set(planAdSignature(ad.content), ad.id);
+  }
+  let adsAdopted = 0;
+  let adsLinked = 0;
+  for (const row of mirrorAds) {
+    if (row.adId) continue;
+    const content = contentFromMirror(row);
+    const signature = planAdSignature(content);
+    let adId = ideaBySignature.get(signature);
+    if (!adId) {
+      const [created] = await db
+        .insert(adTable)
+        .values({
+          id: createId("ad"),
+          brandId: input.brandId,
+          campaignId: input.campaignId,
+          name: row.name ?? "Platform ad",
+          type: "media" in content ? "creative" : "text",
+          // It already runs: the people who launched it signed it off.
+          status: "approved",
+          content,
+        })
+        .returning({ id: adTable.id });
+      adId = created!.id;
+      ideaBySignature.set(signature, adId);
+      adsAdopted++;
+    }
+    await db
+      .update(platformAdTable)
+      .set({ adId })
+      .where(eq(platformAdTable.id, row.id));
+    adsLinked++;
+  }
+  return { audiencesAdopted, adsAdopted, adsLinked };
+}
+
+/** A plan idea in the shape the platform ad shows: pools, or copy and media. */
+function contentFromMirror(row: {
+  headline: string | null;
+  body: string | null;
+  linkUrl: string | null;
+  media: MediaItem[] | null;
+  thumbnailUrl: string | null;
+  copy: { headlines: string[]; descriptions: string[] } | null;
+}): AdContent {
+  const media = row.media?.length
+    ? row.media
+    : row.thumbnailUrl
+      ? [{ url: row.thumbnailUrl, type: "image" as const }]
+      : [];
+  if (media.length === 0) {
+    return {
+      headlines: row.copy?.headlines ?? (row.headline ? [row.headline] : []),
+      descriptions: row.copy?.descriptions ?? (row.body ? [row.body] : []),
+      ...(row.linkUrl ? { linkUrl: row.linkUrl } : {}),
+    };
+  }
+  return {
+    format: media.some((item) => item.type === "video")
+      ? "video"
+      : media.length > 1
+        ? "carousel"
+        : "static",
+    headline: row.headline ?? "",
+    body: row.body ?? "",
+    ...(row.linkUrl ? { linkUrl: row.linkUrl } : {}),
+    media,
+  };
+}
+
+/**
+ * Same words, same first picture: same idea. Picture URLs are compared
+ * without their query string, since platform CDNs sign every fetch.
+ */
+export function planAdSignature(content: AdContent) {
+  const norm = (value: string | undefined) =>
+    (value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+  if (!("media" in content)) {
+    return `text|${norm(content.headlines[0])}|${norm(content.descriptions[0])}`;
+  }
+  const picture = content.media[0]?.url.split("?")[0] ?? "";
+  return `creative|${norm(content.headline)}|${norm(content.body)}|${picture}`;
 }
 
 /** The brand's campaigns, newest first — the attach picker's options. */

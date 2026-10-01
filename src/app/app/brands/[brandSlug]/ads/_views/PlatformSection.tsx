@@ -7,7 +7,7 @@ import type { Ad, AudienceGeographyPlan } from "@/server/db/ads-schema";
 import Link from "next/link";
 
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
-import { isPushableAdPlatform } from "@/lib/ad-platforms";
+import { adRoutesTo, isPushableAdPlatform } from "@/lib/ad-platforms";
 import { db } from "@/server/db";
 import { eq } from "drizzle-orm";
 import { adPlatformSpec } from "@/lib/ad-platforms";
@@ -17,6 +17,7 @@ import { fmtDate, money, statusStyle } from "./format";
 import { DeletePlatformCampaign } from "./DeletePlatformCampaign";
 import { DeliverySwitch } from "./DeliverySwitch";
 import { GoogleSettings } from "./GoogleSettings";
+import { searchTerms } from "@/lib/search-terms";
 import { LinkedInSettings } from "./LinkedInSettings";
 import { posterForMedia } from "@/lib/media-url";
 import { PlatformBudget } from "./PlatformBudget";
@@ -65,6 +66,7 @@ export async function PlatformSection({
     geography: AudienceGeographyPlan | null;
     ageMin: number | null;
     ageMax: number | null;
+    keywords?: string[] | null;
   }[];
 }) {
   const platform = platformCampaign.platform;
@@ -94,6 +96,20 @@ export async function PlatformSection({
   if (isDraft) {
     const googleBlocked = platform === "google_ads" && !google?.campaignType;
     const pushable = isPushableAdPlatform(platform);
+    // Search compiles audiences with terms to ad groups and text ideas to ads.
+    const searchShape =
+      platform === "google_ads" && google?.campaignType === "search"
+        ? {
+            groups:
+              (audiences ?? []).filter(
+                (row) => searchTerms(row.keywords).length > 0,
+              ).length || (google.keywords?.length ? 1 : 0),
+            ads: (draftAds ?? []).filter(
+              (ad) =>
+                ad.type === "text" && adRoutesTo(ad.platforms, "google_ads"),
+            ).length,
+          }
+        : null;
     return (
       <div className="flex flex-wrap items-center gap-2.5 rounded-xl border bg-card p-3.5">
         <ChannelLogo platform={platform} className="size-5" />
@@ -106,7 +122,13 @@ export async function PlatformSection({
             ? "Add ads to the plan, set the budget, then push."
             : googleBlocked
               ? "Pick a campaign type and the push compiles the plan."
-              : `Will compile ${audienceCount === 0 ? "1 broad ad set" : `${audienceCount} ad set${audienceCount === 1 ? "" : "s"}`} × ${draftAdCount} ad${draftAdCount === 1 ? "" : "s"}, paused.`}
+              : searchShape
+                ? searchShape.groups === 0
+                  ? "Add search terms to an audience."
+                  : searchShape.ads === 0
+                    ? "Add a text ad: Write search ads."
+                    : `Will compile ${searchShape.groups} ad group${searchShape.groups === 1 ? "" : "s"} × ${searchShape.ads} search ad${searchShape.ads === 1 ? "" : "s"}, paused.`
+                : `Will compile ${audienceCount === 0 ? "1 broad ad set" : `${audienceCount} ad set${audienceCount === 1 ? "" : "s"}`} × ${draftAdCount} ad${draftAdCount === 1 ? "" : "s"}, paused.`}
         </span>
         <div className="ml-auto flex items-center gap-2">
           <PlatformBudget

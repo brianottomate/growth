@@ -22,6 +22,7 @@ import type {
   AdTextContent,
 } from "@/server/db/ads-schema";
 import type { MediaItem } from "@/server/db/content-schema";
+import type { ChannelPlatform } from "@/server/db/schema";
 import { placementSpec, resolveCell, withTitle } from "@/lib/ad-placements";
 import {
   asPlacements,
@@ -1602,6 +1603,25 @@ export async function setAdTextOnly(input: {
       .where(eq(adTable.id, ad.id));
   }
   return { adId: ad.id, textOnly: input.textOnly };
+}
+
+/**
+ * Where an idea runs: a subset of the platforms, or null for every planned
+ * platform that can render it. Distribution, not content, so an approved
+ * idea can still be routed; a pushed one cannot.
+ */
+export async function setAdPlatforms(input: {
+  adId: string;
+  orgId: string;
+  platforms: ChannelPlatform[] | null;
+}) {
+  const ad = await requireOwnedAd(input, true);
+  await assertAdNotPushed(ad.id);
+  const platforms = input.platforms?.length
+    ? [...new Set(input.platforms)]
+    : null;
+  await db.update(adTable).set({ platforms }).where(eq(adTable.id, ad.id));
+  return { adId: ad.id, platforms };
 }
 
 // ---- PLACEMENT CELLS -------------------------------------------------------

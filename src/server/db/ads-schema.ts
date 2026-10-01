@@ -461,11 +461,18 @@ export const audienceTable = pgTable(
     ageMax: t.integer(),
     geography: t.jsonb().$type<AudienceGeographyPlan>(),
     /**
-     * Keyword SUGGESTIONS (loose). The Google compile derives its structured
-     * keyword object from these; the Meta compile ignores them. Platform
-     * overrides live on the platform campaign's settings.
+     * What this audience searches for, one term per entry. Match type rides
+     * in the notation search platforms share: `[exact]`, `"phrase"`, bare for
+     * broad (see `parseSearchTerm`). Google makes one ad group per audience
+     * from these; platforms without term targeting ignore them.
      */
     keywords: t.jsonb().$type<string[]>(),
+    /**
+     * Terms this audience must NOT be reached on, in the same notation as
+     * `keywords`. Google sends them as the ad group's negatives; platforms
+     * without term targeting ignore them.
+     */
+    excludedKeywords: t.jsonb().$type<string[]>(),
 
     optimizationGoal: t.text(),
 
@@ -496,7 +503,8 @@ export type PlanAudienceInsert = typeof audienceTable.$inferInsert;
  * transforms into platform ads. `type` picks the content shape: `creative`
  * (Meta image/carousel and friends) or `text` (Google/OpenAI asset pools).
  * Ads belong to the campaign, not to an audience: at push, every ad runs
- * under every ad set. Per-audience ad scoping is a later column, not a table.
+ * under every ad set of each platform in its `platforms`. Per-audience ad
+ * scoping is a later column, not a table.
  */
 export const adTable = pgTable(
   "ad",
@@ -538,6 +546,13 @@ export const adTable = pgTable(
      * schema push, so code that reads it must tolerate its absence until then.
      */
     placements: t.jsonb().$type<AdPlacements>(),
+
+    /**
+     * Where this idea runs. Null or empty means every planned platform that
+     * can render it (text to search, creative to feeds); a list narrows it.
+     * The compile filters by this before anything else.
+     */
+    platforms: channelPlatformEnum().array(),
 
     /**
      * Deterministic key carried to the provider as the idempotency key, and
@@ -761,6 +776,8 @@ export const platformAdTable = pgTable(
     body: t.text(),
     linkUrl: t.text(),
     media: t.jsonb().$type<MediaItem[]>(),
+    /** The full text pools sent, where the platform takes pools (Google RSA). */
+    copy: t.jsonb().$type<{ headlines: string[]; descriptions: string[] }>(),
     thumbnailUrl: t.text(),
 
     status: t.text(), // raw platform status (active/paused/rejected/…)

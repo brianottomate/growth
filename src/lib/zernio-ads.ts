@@ -67,7 +67,7 @@ export function linkedInDraftProviderControls() {
 
 export function googleCreativeRequirement(input: {
   campaignType: "search" | "display";
-  keywords?: string[];
+  keywords?: readonly unknown[];
   images?: { landscape: string; square: string };
 }): string | null {
   if (input.campaignType === "search" && !input.keywords?.length) {

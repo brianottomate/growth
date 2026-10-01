@@ -147,6 +147,8 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "buildAdSet",
     "writeSetCopy",
     "generateStarterIdeas",
+    "writeGoogleTextAds",
+    "setAdPlatforms",
     "setAdStatus",
     "setAdCopy",
     "saveIdea",
