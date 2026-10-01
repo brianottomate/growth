@@ -71,6 +71,8 @@ export const digestPropertySchema = z.object({
    * email quotes it and nothing re-prices it.
    */
   priceLabel: z.string().trim().max(160).nullable().optional(),
+  /** A line of free text under the home's name: amenities, who it suits. */
+  note: z.string().trim().max(240).nullable().optional(),
   /**
    * "Save ~$X": wander.com's "less than other sites" line for that price.
    * From the paste when it states one, else for the cheapest stay. 0 or null

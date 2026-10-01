@@ -181,6 +181,22 @@ export function HomeGroupEditor({
                 <X className="size-3.5" />
               </button>
             </div>
+            <input
+              // Remounts when the note changes elsewhere (an AI edit, a restore).
+              key={home.note ?? ""}
+              defaultValue={home.note ?? ""}
+              onBlur={(event) => {
+                const note = event.target.value.trim() || null;
+                if (note !== (home.note ?? null)) {
+                  setHomes(
+                    homes.map((h, i) => (i === index ? { ...h, note } : h)),
+                  );
+                }
+              }}
+              aria-label={`Note on ${home.name}`}
+              placeholder="Note on the card · sleeps 14, private hot tub"
+              className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1 text-xs outline-none focus:ring-2 focus:ring-ring/30"
+            />
             {photoFor === index && home.homeId && (
               <PhotoChooser
                 homeId={home.homeId}

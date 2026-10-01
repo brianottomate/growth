@@ -269,6 +269,7 @@ async function renderNewsletter(input: NewsletterRenderInput) {
           .join(", "),
         guests: property.sleeps ?? undefined,
         title: property.name,
+        note: property.note?.trim() || undefined,
         // The price line the issue carries (the paste's, or the home's
         // cheapest stay on wander.com); else whatever rate the paste stated.
         // A group can leave prices out.

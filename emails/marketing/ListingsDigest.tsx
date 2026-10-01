@@ -35,6 +35,8 @@ export type DigestProperty = {
   rating?: number;
   /** Shows a "New" tag after the title (used instead of a rating). */
   isNew?: boolean;
+  /** A line of free text under the name, e.g. "Sleeps 14, private hot tub". */
+  note?: string;
   /** Pre-formatted price line, e.g. "$2,234 for 2 nights (September 5-7)". */
   priceLabel: string;
   /** Pre-formatted savings pill, e.g. "Save ~$170 booking on Wander". */
@@ -209,6 +211,21 @@ function TitleLine({ property }: { property: DigestProperty }) {
   );
 }
 
+function CardNote({ property }: { property: DigestProperty }) {
+  return property.note ? (
+    <Text
+      style={{
+        fontSize: "14px",
+        lineHeight: "20px",
+        color: colors.body,
+        margin: "0 0 4px",
+      }}
+    >
+      {property.note}
+    </Text>
+  ) : null;
+}
+
 function Kicker({ property }: { property: DigestProperty }) {
   return (
     <Text style={kickerStyle}>
@@ -263,6 +280,7 @@ function FeaturedCard({ property }: { property: DigestProperty }) {
             <TitleLine property={property} />
           </Text>
         </Link>
+        <CardNote property={property} />
         {property.priceLabel ? (
           <Text style={{ fontSize: "15px", color: colors.body, margin: 0 }}>
             {property.priceLabel}
@@ -323,6 +341,7 @@ function CompactCard({
               <TitleLine property={property} />
             </Text>
           </Link>
+          <CardNote property={property} />
           {property.priceLabel ? (
             <Text style={{ fontSize: "14px", color: colors.body, margin: 0 }}>
               {property.priceLabel}
@@ -361,6 +380,7 @@ function GridCard({ property }: { property: DigestProperty }) {
           <TitleLine property={property} />
         </Text>
       </Link>
+      <CardNote property={property} />
       {property.priceLabel ? (
         <Text style={{ fontSize: "14px", color: colors.body, margin: 0 }}>
           {property.priceLabel}
@@ -753,7 +773,9 @@ export default function ListingsDigest(props: ListingsDigestProps) {
           <Divider />
 
           <Section style={{ paddingTop: "24px" }}>
-            {props.footer.logoSrc && (
+            {/* The logo signs off only beside a tagline; the header already
+                carries it. */}
+            {props.footer.tagline && props.footer.logoSrc && (
               <Img
                 src={props.footer.logoSrc}
                 alt={props.brandName}
@@ -771,20 +793,44 @@ export default function ListingsDigest(props: ListingsDigestProps) {
                 {props.footer.tagline}
               </Text>
             )}
+            <Text
+              style={{
+                fontSize: "13px",
+                lineHeight: "20px",
+                color: colors.muted,
+                margin: 0,
+              }}
+            >
+              © {new Date().getFullYear()} {props.brandName}
+            </Text>
             {props.footer.address && (
               <Text
-                style={{ fontSize: "11px", color: colors.faint, margin: 0 }}
+                style={{
+                  fontSize: "13px",
+                  lineHeight: "20px",
+                  color: colors.muted,
+                  margin: "2px 0 0",
+                }}
               >
                 {props.footer.address}
               </Text>
             )}
-            <Text style={{ fontSize: "11px", margin: "4px 0 0" }}>
+            <Text
+              style={{
+                fontSize: "13px",
+                lineHeight: "20px",
+                color: colors.muted,
+                margin: "16px 0 0",
+              }}
+            >
+              If you no longer want to receive our emails, you can{" "}
               <Link
                 href={props.footer.unsubscribeUrl}
-                style={{ color: colors.faint, textDecoration: "underline" }}
+                style={{ color: colors.ink, textDecoration: "underline" }}
               >
-                Unsubscribe
+                unsubscribe
               </Link>
+              .
             </Text>
           </Section>
         </Container>
