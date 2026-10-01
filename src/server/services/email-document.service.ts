@@ -577,6 +577,7 @@ export async function runEmailGenerationJob(jobId: string) {
         "Return an honest, useful draft in Markdown. Do not invent product facts, customer quotes, metrics, dates, or links. Preserve provided URLs exactly. Do not add unsubscribe language; the product sending runtime owns the compliance footer. Use one clear CTA at most.",
         `The draft may contain markers like ${HOMES_MARKER} or <!-- homes 2 -->, each where a group of home cards appears. Keep every marker exactly once, in a sensible place, and do not list those homes in the text.`,
         "Per-guest fields like {{first_name|there}} are filled per recipient; keep any the draft uses, written exactly as they are.",
+        "Keep every image in the current draft (each <p><img …></p>, such as a header card) exactly as written and in the same place.",
         document.digest
           ? "This issue is a property digest: the homes render below your text from structured data, each with its photo, location, price and link. Write the subject, preheader and a short intro (a greeting and one or two paragraphs) that sets up the theme and the places. Do not list the homes, their prices or their links in the body, and leave the CTA empty; the digest carries both. Claim nothing about the homes, prices, savings, seasons or availability beyond what the prompt states: no rates rising, no limited-time offers, no urgency you were not given."
           : null,

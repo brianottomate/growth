@@ -99,7 +99,6 @@ function Editor({ workspace }: { workspace: Workspace }) {
     return () => window.removeEventListener("beforeunload", beforeUnload);
   }, [dirty]);
   const previewSequence = useRef(0);
-  const [brief, setBrief] = useState("");
   const [previewHtml, setPreviewHtml] = useState("");
   const [fieldsOpen, setFieldsOpen] = useState(false);
   const [previewWarnings, setPreviewWarnings] = useState<string[]>([]);
@@ -119,11 +118,6 @@ function Editor({ workspace }: { workspace: Workspace }) {
         setRevision(result.revision);
         await refreshWorkspace();
       },
-    }),
-  );
-  const generate = useMutation(
-    orpc.newsletter.generateDraft.mutationOptions({
-      onSuccess: refreshWorkspace,
     }),
   );
   const restore = useMutation(
@@ -454,49 +448,15 @@ function Editor({ workspace }: { workspace: Workspace }) {
             </section>
           )}
 
-          <section className="rounded-xl border bg-card p-4">
-            <div className="flex items-center gap-2">
-              <Sparkles className="size-4" />
-              <h2 className="font-semibold">Generate this selected issue</h2>
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Uses this slot’s premise, pillar or series, brand voice, and the
-              current draft. It does not generate any neighboring slots.
+          {activeJob ? (
+            <p className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" /> Writing a new draft
             </p>
-            <textarea
-              value={brief}
-              onChange={(event) => setBrief(event.target.value)}
-              className={`${controlClass} mt-3 min-h-24`}
-              placeholder="Optional refinement: make the opening more personal, keep the launch details concrete…"
-            />
-            <button
-              type="button"
-              onClick={() =>
-                generate.mutate({
-                  platformPostId: workspace.spot.id,
-                  brief: brief.trim() || undefined,
-                })
-              }
-              disabled={generate.isPending || activeJob || dirty || stale}
-              className="mt-2 flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
-            >
-              {generate.isPending || activeJob ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Sparkles className="size-4" />
-              )}
-              {activeJob
-                ? "Generation in progress"
-                : workspace.document.currentRevision
-                  ? "Generate refinement"
-                  : "Generate first draft"}
-            </button>
-            {workspace.latestJob?.status === "failed" && (
-              <p className="mt-2 text-sm text-red-500">
-                {workspace.latestJob.error || "Generation failed."}
-              </p>
-            )}
-          </section>
+          ) : workspace.latestJob?.status === "failed" ? (
+            <p className="text-sm text-red-500">
+              {workspace.latestJob.error || "Generation failed."}
+            </p>
+          ) : null}
 
           {workspace.versions.length > 0 && (
             <section className="rounded-xl border bg-card p-4">
@@ -714,7 +674,7 @@ function ManualFieldsDialog({
             placeholder={
               isDigest
                 ? "A short greeting and one or two paragraphs. The homes below render from the digest, not from this text. Supports **bold** and [links](https://…)."
-                : "Write the email here, or generate this selected slot from its brief."
+                : "Write the email here, or ask chat to draft it."
             }
           />
         </label>
@@ -756,6 +716,13 @@ export function NewsletterIssueWorkspace({
       return status === "queued" || status === "running" ? 2_000 : false;
     },
   });
+  // Chat edits this email beside the page; reload when it writes.
+  const { refetch } = query;
+  useEffect(() => {
+    const onWrite = () => void refetch();
+    window.addEventListener("growth:write", onWrite);
+    return () => window.removeEventListener("growth:write", onWrite);
+  }, [refetch]);
 
   if (query.isLoading) {
     return (
