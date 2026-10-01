@@ -132,9 +132,9 @@ export type BuiltAd = {
 const KIND_FORMAT: Record<BuiltAd["kind"], AdFormat> = {
   static: "static",
   carousel: "carousel",
-  // A per-home catalog card is one image drawn with the listing composition;
-  // it reads as a catalog on the wall but pushes as the single static it is.
-  catalog_home: "catalog",
+  // A per-home listing card is one image drawn with the listing composition,
+  // and it pushes as the single static it is.
+  catalog_home: "static",
   // A carousel of the homes' heroes, the same portfolio shape as the catalog
   // one but drawn as feature shots.
   hero_carousel: "portfolio",
@@ -686,13 +686,15 @@ export async function buildAdSet(input: {
         })
       : deterministicSetCopy(copyHomes, brand.name);
 
+  // The catalog ad is Meta's to draw from the product feed, which the
+  // Catalog tab owns; the studio only holds ideas it can compose and freeze.
   const plan = buildPerformanceAdPlan({
     customer: brand.name,
     properties: usable.map(({ listing }) => ({
       name: listing.name,
       url: listing.url,
     })),
-  });
+  }).filter((item) => item.kind !== "catalog");
 
   /** The card with its story twin riding on it, when the card is a preview. */
   const withStory = (base: MediaItem): AdCard => {
