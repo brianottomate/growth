@@ -1394,7 +1394,7 @@ function UserMessage({ message }: { message: UIMessage }) {
 }
 
 /** Dispatch a tool part to its typed card (or a generic fallback). */
-function renderToolPart(
+export function renderToolPart(
   part: ToolUIPart,
   key: string,
   approvalSuperseded: boolean,

@@ -285,7 +285,12 @@ export async function listAdsWriteDestinations(input: {
     listZernioAccounts(),
     allowedAccountsForBrand(brand.id, input.platform),
   ]);
-  const connections = brandConnections(accounts, brand, ownZernioProfileId, input.platform);
+  const connections = brandConnections(
+    accounts,
+    brand,
+    ownZernioProfileId,
+    input.platform,
+  );
 
   const destinationResults = await Promise.allSettled(
     connections.map(async (connection) => {
@@ -405,7 +410,12 @@ async function requireAdDestination(input: {
     listZernioAccounts(),
     allowedAccountsForBrand(brand.id, input.platform),
   ]);
-  const connection = brandConnections(accounts, brand, ownZernioProfileId, input.platform).find(
+  const connection = brandConnections(
+    accounts,
+    brand,
+    ownZernioProfileId,
+    input.platform,
+  ).find(
     (candidate) => zernioAccountId(candidate) === input.connectionAccountId,
   );
   if (!connection) {
@@ -414,7 +424,12 @@ async function requireAdDestination(input: {
     // operator hunting a health problem when the real answer was that they
     // had passed a social Page connection, or one from another platform's
     // destination list, and a valid id was sitting right there.
-    const usable = brandConnections(accounts, brand, ownZernioProfileId, input.platform)
+    const usable = brandConnections(
+      accounts,
+      brand,
+      ownZernioProfileId,
+      input.platform,
+    )
       .map((candidate) => zernioAccountId(candidate))
       .filter((id): id is string => Boolean(id));
     throw new Error(

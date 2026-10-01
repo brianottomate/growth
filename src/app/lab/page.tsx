@@ -5,6 +5,11 @@ import Link from "next/link";
 
 const PAGES: { name: string; href: string; note?: string }[] = [
   {
+    name: "Assistant gallery",
+    href: "/lab/design-system/chat",
+    note: "tool cards, conversation states, generated UI, and capability inventory",
+  },
+  {
     name: "Design contracts",
     href: "/lab/design-contracts",
     note: "shared component style review",
