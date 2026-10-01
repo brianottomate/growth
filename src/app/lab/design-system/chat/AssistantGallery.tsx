@@ -358,30 +358,41 @@ export function AssistantGallery({ catalog }: { catalog: CatalogEntry[] }) {
               pass before review.
             </p>
             {render(resultPart(specimens.find((s) => s.id === "pipeline")!))}
-            <ChatNextOptions
-              messages={nextMessages}
-              disabled={false}
-              choose={(option) => {
-                if (option.kind === "detail") setDraft(option.text);
-                announce(option.text);
-              }}
-            />
-            <Textarea
-              aria-label="Demo composer"
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder="Try a follow-up here…"
-            />
-            <Button
-              size="sm"
-              disabled={!draft.trim()}
-              onClick={() => {
-                announce(`Demo message: ${draft}`);
-                setDraft("");
-              }}
+            <div
+              className="rounded-xl border bg-muted/30 px-3 py-2"
+              aria-label="Message composer"
             >
-              Send demo message
-            </Button>
+              <ChatNextOptions
+                messages={nextMessages}
+                disabled={false}
+                choose={(option) => {
+                  if (option.kind === "detail") setDraft(option.text);
+                  announce(option.text);
+                }}
+              />
+              <Textarea
+                rows={2}
+                className="max-h-40 resize-none"
+                appearance="composer"
+                aria-label="Demo composer"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                placeholder="Try a follow-up here…"
+              />
+              <div className="mt-2 flex justify-end">
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={!draft.trim()}
+                  onClick={() => {
+                    announce(`Demo message: ${draft}`);
+                    setDraft("");
+                  }}
+                >
+                  Send demo message
+                </Button>
+              </div>
+            </div>
           </SpecimenFrame>
         </Section>
         <Section
@@ -514,14 +525,28 @@ export function AssistantGallery({ catalog }: { catalog: CatalogEntry[] }) {
           note="Suggested replies, editable details, paused input, and retries. Queue controls operate on local fixtures."
         >
           <SpecimenFrame title="Suggested next steps" source="ChatNextOptions">
-            <ChatNextOptions
-              messages={nextMessages}
-              disabled={false}
-              choose={(option) => {
-                setDraft(option.text);
-                announce(`${option.kind}: ${option.text}`);
-              }}
-            />
+            <div
+              className="rounded-xl border bg-muted/30 px-3 py-2"
+              aria-label="Follow-up composer"
+            >
+              <ChatNextOptions
+                messages={nextMessages}
+                disabled={false}
+                choose={(option) => {
+                  if (option.kind === "detail") setDraft(option.text);
+                  announce(`${option.kind}: ${option.text}`);
+                }}
+              />
+              <Textarea
+                rows={2}
+                className="max-h-40 resize-none"
+                aria-label="Follow-up draft"
+                appearance="composer"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                placeholder="Write your next message…"
+              />
+            </div>
           </SpecimenFrame>
           <SpecimenFrame title="Durable input queue" source="ChatQueue">
             <ChatQueue state={queue} control={controlQueue} />

@@ -6,7 +6,7 @@ The signed-in team gallery lives at `/lab/design-system/chat`, linked from
 The gallery renders synthetic results through the same `renderToolPart`
 function used by `OverviewChat`. It covers conversation anatomy, pending and
 interrupted tools, errors, approval requests and superseded approvals, result
-cards, suggested next steps, and the durable input queue. Demo callbacks update
+cards, suggested next steps inside the composer, and the durable input queue. Demo callbacks update
 local state. Fixture detail links report their destination on the page.
 Workspace links open the existing product pages.
 
