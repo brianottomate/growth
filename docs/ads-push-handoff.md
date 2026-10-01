@@ -194,31 +194,46 @@ Meta's placement rules (`asset_customization_rules.customization_spec`) split
 by app and position but **not by device**, so "square on desktop only" is not
 expressible: all of Facebook gets the square.
 
-**How each format gets there**
+**How each format gets there (since 2026-10-01)**
 
-- **Statics** go out in one Zernio call with `placementAssets`: the 4:5 as the
-  default, a rule pinning the 9:16 to stories and reels, a rule pinning the
-  1:1 to Facebook's feed placements. Nothing runs after the push.
-  `metaPlacementAssetsFor` in `ads-write.service.ts`.
-- **Carousels** go out as Zernio `carouselCards`, one set of cards, which
-  Zernio will not combine with `placementAssets`. When the carousel has other
-  sizes than its feed cards, the push rebuilds its creative on the Graph API
-  with one card set per group (square on Facebook, 4:5 on Instagram, 9:16 in
-  stories and reels) and swaps it onto the same ad
-  (`setMetaCarouselPlacementCards`, called from `placeCarouselCards`). A
-  square-only carousel with no 9:16 needs nothing and makes no calls.
-  Every text in that creative (primary text, titles, descriptions, links)
-  must be labelled and named by each rule (`body_label`, `title_label`, ...):
-  an unlabelled body is dropped in the placements the rules cover, so the post
-  showed no text on Facebook and Instagram until 2026-10-01. Check a swapped
-  ad by opening Meta's own preview, not just reading the rules back: the text
-  is drawn in the browser, so curl on a desktop preview cannot see it.
+Growth builds every image ad's creative on Meta itself, before the ad
+exists, and Zernio attaches it with `existingCreativeId`. Nothing runs after
+the push. `createMetaPlacementCreative` in `meta.client.ts`, called through
+`creativeFor` / `placementSetsFor` in `pushToMeta`.
+
+- **One creative per ad**, statics and carousels alike: a set of images per
+  placement group (square, 4:5, 9:16) as placement asset customization
+  (`asset_feed_spec` rules), or a plain creative when one size covers every
+  placement. Every planned placement sits in exactly one set; without a
+  9:16, stories and reels get the feed images.
+- **Every text is labelled and named by each rule** (`body_label`,
+  `title_label`, ...): an unlabelled body is dropped in the placements the
+  rules cover, which is how carousels ran with no primary text until
+  2026-10-01.
+- **What the creative carries**: the brand's Page, that Page's own Instagram
+  account (read from the Page; the push stops if none is connected, rather
+  than run Instagram as the Page), the house UTMs as `url_tags`, and every
+  Advantage+ creative enhancement opted out (`META_CREATIVE_FEATURES`). Meta
+  turns on a feature missing from that list, so add new ones as Meta ships
+  them.
+- **Why not Zernio's creatives**: Zernio sends one image or one card set per
+  ad, and since 2026-10-01 every creative Zernio builds fails Meta with
+  "Reconnect your WhatsApp number to your Facebook Page" (code 100, subcode
+  2446880), on every brand, while an ad with a creative we built validates.
+- **Videos** still go through Zernio (`placementAssets`, the multi-creative
+  shape for plain videos).
+- **Images go up in one request per ad** (multipart `adimages`), and a
+  throttled call waits out Meta's own estimate once, up to five minutes.
 - **Starter shells.** "Add starter ad ideas → Empty shells" creates empty ads
-  per featured home sized by `ZERNIO_NATIVE_SHAPES` (statics 4:5 + 1:1 + 9:16,
-  carousels 1:1): the sizes a push can deliver with nothing to fix after.
-  Zernio's docs give no ratio advice, so these follow the shape of its API
-  and Meta's specs as of 2026-09-30; revisit when Zernio adds per-placement
-  carousels or ratio guidance.
+  per featured home sized by `ZERNIO_NATIVE_SHAPES` (statics 4:5 + 1:1 +
+  9:16, carousels 1:1).
+
+**Artwork for stories and reels.** Meta covers the bottom of a 9:16: the
+call-to-action sticker in Stories, the caption and button in Reels (keep the
+bottom 35% and the top 14% free of text). The Chalets 9:16 exports put
+"Explore your forest escape" at about 85% of the height, so it sits under
+the sticker in every story and reel. No push setting fixes that; the art has
+to move the line up.
 
 **Facebook video feeds** is gone from `META_PLACEMENTS`: Meta's API refuses it
 (code 100, subcode 2490562), so "all placements" is 14.
@@ -226,17 +241,20 @@ expressible: all of Facebook gets the square.
 **Rate limits.** Our app is on Meta's *development* access tier for the
 Marketing API (`ads_api_access_tier` in the `X-Business-Use-Case-Usage`
 header): a score of 60 per ad account, reads 1 point, writes 3, regained over
-300 s, with a 300 s block when exceeded (code 17, subcode 2446079). Each
-carousel swap uploads every card image per set, so a campaign of 9 carousels
-hit the limit on 2026-09-30 and 3 swaps failed with a push warning; they were
-re-run by script once it cleared. The higher tier (9,000 points, 60 s block)
+300 s, with a 300 s block when exceeded (code 17, subcode 2446079). The old
+post-push carousel swap uploaded every card image one call at a time, so a
+campaign of 9 carousels hit the limit on 2026-09-30. A push now costs one
+upload and one creative per image ad. The higher tier (9,000 points, 60 s block)
 is Advanced access, which Meta now calls Full Access (and Standard is now
 Limited Access). An app admin requests it in the app dashboard: App Review →
 Permissions and Features → `ads_management` → Request advanced access.
 Meta's eligibility (checked 2026-10-01): at least 500 successful Marketing API
 calls in the last 15 days and an error rate under 15% in the last 500 calls.
-Until it is granted, big carousel campaigns can need a re-run of
-`setMetaCarouselPlacementCards` for the ads the push warned about.
+Ad writes use `META_ADS_ACCESS_TOKEN` when set (else `FB_SYSUSER_TOKEN`,
+app "Wander Data Lake Transfer"). Both that app and "Wander Growth Leads"
+are on development access; the Leads app's system user token has
+`ads_read` but not `ads_management`, so it needs that permission before it
+can write ads.
 
 **Local previews.** The placement review (`MetaPlatformCard`) draws every
 placement locally: feed, stories and reels as before, plus Marketplace, the
@@ -250,12 +268,12 @@ renders (below) are the reference.
 
 - Before: a validate-only push (`pushDraftToPlatform` with
   `validateOnly: true`) makes Meta check every node and creates nothing. It
-  caught the video feeds refusal. It cannot check the carousel swap, which
-  only runs after a real push.
+  caught the video feeds refusal. It builds the opening ad's creative on Meta
+  to validate it (a creative, not an ad).
 - After: read the ads' `creative{asset_feed_spec}` for their rules, and Meta's
   own renders with `GET /{ad_id}/previews?ad_format=DESKTOP_FEED_STANDARD`
   (also `MOBILE_FEED_STANDARD`, `MARKETPLACE_MOBILE`, `INSTAGRAM_STANDARD`,
-  `INSTAGRAM_STORY`). Previews can lag a creative swap by a minute. Ads
+  `INSTAGRAM_PROFILE_FEED`, `INSTAGRAM_STORY`, `FACEBOOK_REELS_MOBILE`). Ads
   Manager's hover thumbnails zoom and are not what runs; the full ad preview
   is.
 - Zernio sometimes creates the first ad of an ad set ACTIVE although the push

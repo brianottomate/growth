@@ -14,7 +14,11 @@ import {
 } from "@/lib/meta-placement-plan";
 import { ideaAwaitingArtwork } from "@/lib/ad-idea-studio";
 import { META_URL_TAGS } from "@/lib/ad-utm";
-import { setMetaCarouselPlacementCards } from "@/server/clients/meta.client";
+import {
+  createMetaPlacementCreative,
+  metaCreativeTemplate,
+  type MetaCreativeTemplate,
+} from "@/server/clients/meta.client";
 import "server-only";
 import { freezeApprovedAd } from "./ad-approval.service";
 
@@ -2161,7 +2165,8 @@ function isVideoContent(content: AdCreativeContent) {
  * marketplace, the right column and the desktop feed show it square. Meta's
  * asset customization, which is how Brooke builds it by hand. A carousel's
  * cards are the carousel's (Zernio will not combine the two), so singles
- * only; carousels get theirs after the push. See `ZERNIO_NATIVE_SHAPES`.
+ * only. The push sends this for videos; an image ad goes as a creative
+ * Growth builds itself (`createMetaPlacementCreative`).
  */
 export function metaPlacementAssetsFor(
   content: AdCreativeContent,
@@ -2858,9 +2863,6 @@ async function pushToMeta(args: PushArgs) {
     host: normalizeDomain(brand.website),
   });
 
-  const isCarousel = (content: AdCreativeContent) =>
-    !isVideoContent(content) && (content.media?.length ?? 0) >= 2;
-
   // Zernio rejects a Meta ad with no call to action, on every shape. A
   // Performance client's ads always book; a stored LEARN_MORE is overridden.
   const isClient = brand.relationship === "client";
@@ -2946,54 +2948,126 @@ async function pushToMeta(args: PushArgs) {
       : { imageUrl: content.media[0]!.url };
 
   /**
-   * How a set's ads split across Meta's create shapes. The multi-creative
-   * shape takes N plain statics in one call but carries no per-placement
-   * assets, so a static with a story rides the single-creative or attach
-   * shape like a carousel does. The opening call takes the plain statics,
-   * else the first placed static, else the first carousel; everything else
-   * is attached one call at a time.
+   * How a set's ads split across Meta's create shapes. An image ad goes as
+   * the creative we built for it, one call per ad: the opening call creates
+   * the campaign and ad set with the first, the rest attach. Plain videos
+   * still open together in the multi-creative shape, which carries no
+   * creative of ours.
    */
   const splitForPush = (subset: typeof usable) => {
-    const carousels = subset.filter(({ content }) => isCarousel(content));
-    const statics = subset.filter(({ content }) => !isCarousel(content));
-    // The opening create supports pageId; attaching a standalone carousel does not.
-    // Start with the lone carousel so all trailing statics stay in this same ad set.
-    if (
-      brand.metaPageId &&
-      !connectionRunsAsBrandPage(brand, destination.connection) &&
-      carousels.length === 1
-    ) {
-      return {
-        shape: "carousel" as const,
-        opening: carousels,
-        trailing: statics,
-      };
-    }
-
-    const placed = statics.filter(({ content }) =>
-      Boolean(placementAssetsFor(content)),
+    const plain = subset.filter(
+      ({ content }) => isVideoContent(content) && !placementAssetsFor(content),
     );
-    const plain = statics.filter((row) => !placed.includes(row));
-    if (plain.length > 0) {
+    if (plain.length > 0)
       return {
-        shape: "creatives" as const,
         opening: plain,
-        trailing: [...placed, ...carousels],
+        trailing: subset.filter((row) => !plain.includes(row)),
       };
-    }
-    if (placed.length > 0) {
-      return {
-        shape: "single" as const,
-        opening: placed.slice(0, 1),
-        trailing: [...placed.slice(1), ...carousels],
-      };
-    }
-    return {
-      shape: "carousel" as const,
-      opening: carousels.slice(0, 1),
-      trailing: carousels.slice(1),
-    };
+    return { opening: subset.slice(0, 1), trailing: subset.slice(1) };
   };
+
+  // An image ad gets a set of images per placement group: square wherever
+  // Meta shows a single image square (all of Facebook's feeds, Instagram's
+  // profile feed and Explore), the feed images on Instagram's main feed,
+  // 9:16 in stories and reels. Every planned placement is in one set.
+  const tallPlacements = placementPlan.filter((p) => !isFeedPlacement(p));
+  const feedPlacements = placementPlan.filter(isFeedPlacement);
+  const squarePlacements = feedPlacements.filter(showsSquare);
+  const otherFeed = feedPlacements.filter((p) => !showsSquare(p));
+  // The push freezes approved ideas first, so their square renders exist.
+  const squareImages = async (adId: string) => {
+    const row = await db.query.adTable.findFirst({
+      where: eq(adTable.id, adId),
+      columns: { content: true },
+    });
+    const square =
+      row && "media" in row.content
+        ? row.content.ideaStudio?.approval?.renders.square
+        : undefined;
+    return square?.length ? square.map((render) => render.url) : null;
+  };
+  const placementSetsFor = async (ad: Ad, content: AdCreativeContent) => {
+    const media = content.media.slice(0, 10);
+    const feed = media.map((card) => card.url);
+    const square = squarePlacements.length ? await squareImages(ad.id) : null;
+    // Square images that already are the feed images need no set of their own.
+    const distinctSquare =
+      square?.length === media.length &&
+      square.some((url, i) => url !== feed[i])
+        ? square
+        : null;
+    if (squarePlacements.length && square?.length !== media.length)
+      warnings.push(
+        `${ad.name}: no square ${media.length > 1 ? "cards" : "image"}, so Facebook's feeds crop it. Export the Square size and push again.`,
+      );
+    const tall = media.every((card) => card.story?.url)
+      ? media.map((card) => card.story!.url)
+      : null;
+    // Without 9:16 images, stories and reels show the feed images.
+    const feedShows = [
+      ...(distinctSquare ? otherFeed : feedPlacements),
+      ...(tall ? [] : tallPlacements),
+    ];
+    return [
+      ...(distinctSquare
+        ? [{ imageUrls: distinctSquare, placements: squarePlacements }]
+        : []),
+      { imageUrls: feed, placements: feedShows },
+      ...(tall ? [{ imageUrls: tall, placements: tallPlacements }] : []),
+    ]
+      .filter((set) => set.placements.length > 0)
+      .map((set) => ({
+        imageUrls: set.imageUrls,
+        positions: metaProviderPlacements(set.placements),
+      }));
+  };
+
+  // Every image ad goes to Meta as a creative we built before the ad
+  // exists: Zernio sends one image or one set of cards, and since
+  // 2026-10-01 the creatives it builds fail Meta's WhatsApp check. Built
+  // once per ad and shared by every ad set.
+  let template: Promise<MetaCreativeTemplate> | null = null;
+  const creativeIds = new Map<string, Promise<string>>();
+  const creativeFor = (ad: Ad, content: AdCreativeContent) => {
+    const known = creativeIds.get(ad.id);
+    if (known) return known;
+    const pageId =
+      destination.brand.metaPageId ??
+      metaPageIdFromConnection(destination.connection.platformUserId);
+    if (!pageId)
+      throw new Error("Could not resolve the Facebook Page this ad runs as");
+    template ??= metaCreativeTemplate({
+      pageId,
+      urlTags: META_URL_TAGS.map(({ key, value }) => `${key}=${value}`).join(
+        "&",
+      ),
+    });
+    const built = (async () => {
+      const { creativeId } = await createMetaPlacementCreative({
+        adAccountId: destination.adAccount.id,
+        template: await template,
+        name: adNameFor(ad, content),
+        message: content.body,
+        callToActionType: metaCallToAction(content),
+        cards: carouselCardsFor(content).map((card) => ({
+          title: card.headline ?? campaign.name,
+          description: card.description,
+          link: card.linkUrl,
+        })),
+        sets: await placementSetsFor(ad, content),
+      });
+      return creativeId;
+    })();
+    creativeIds.set(ad.id, built);
+    return built;
+  };
+  const mediaFor = async (ad: Ad, content: AdCreativeContent) =>
+    isVideoContent(content)
+      ? {
+          ...singleMediaFor(ad, content),
+          placementAssets: placementAssetsFor(content),
+        }
+      : { existingCreativeId: await creativeFor(ad, content) };
 
   /** One ad set as the API sees it. */
   const adSetPayload = (setArgs: {
@@ -3043,11 +3117,12 @@ async function pushToMeta(args: PushArgs) {
     validateOnly: boolean;
     keyScope: string;
   }) => {
-    const { shape, opening, trailing } = splitForPush(usable);
+    const { opening, trailing } = splitForPush(usable);
     const lead = opening[0]!;
     const payload: CreateZernioStandaloneAdInput = {
       ...adSetPayload(setArgs),
-      ...(shape === "creatives"
+      ...(opening.length > 1 ||
+      (isVideoContent(lead.content) && !placementAssetsFor(lead.content))
         ? { creatives: creativesFor(opening) }
         : {
             // A single-creative opening: the set's words are this ad's words.
@@ -3058,12 +3133,7 @@ async function pushToMeta(args: PushArgs) {
             description: lead.content.description,
             linkUrl: lead.content.linkUrl ?? linkUrl,
             callToAction: metaCallToAction(lead.content),
-            ...(shape === "carousel"
-              ? { carouselCards: carouselCardsFor(lead.content) }
-              : {
-                  ...singleMediaFor(lead.ad, lead.content),
-                  placementAssets: placementAssetsFor(lead.content),
-                }),
+            ...(await mediaFor(lead.ad, lead.content)),
           }),
     };
     const result = await createMetaAd(payload, {
@@ -3102,12 +3172,7 @@ async function pushToMeta(args: PushArgs) {
           description: content.description,
           linkUrl: content.linkUrl ?? linkUrl,
           callToAction: metaCallToAction(content),
-          ...(isCarousel(content)
-            ? { carouselCards: carouselCardsFor(content) }
-            : {
-                ...singleMediaFor(ad, content),
-                placementAssets: placementAssetsFor(content),
-              }),
+          ...(await mediaFor(ad, content)),
           ...metaDraftProviderControls(false),
         };
         attached.push({
@@ -3122,11 +3187,6 @@ async function pushToMeta(args: PushArgs) {
               attachPayload,
             ),
             adAccount: destination.adAccount,
-            carouselSeedBudget:
-              brand.metaPageId &&
-              !connectionRunsAsBrandPage(brand, destination.connection)
-                ? budgetAmount
-                : undefined,
           }),
         });
       }
@@ -3200,101 +3260,6 @@ async function pushToMeta(args: PushArgs) {
     return [...fromOpening, ...fromAttach];
   };
 
-  // Zernio sends one set of carousel cards. Swap each pushed carousel onto a
-  // creative with a set per placement group: square on Facebook, whose
-  // desktop feed crops carousel cards to square; the feed cards on
-  // Instagram; 9:16 in stories and reels. A failure leaves the pushed ad as
-  // it was and says so.
-  const tallPlacements = placementPlan.filter((p) => !isFeedPlacement(p));
-  const feedPlacements = placementPlan.filter(isFeedPlacement);
-  // Square wherever a single card shows square (all of Facebook's feeds,
-  // Instagram's profile feed and Explore); 4:5 on Instagram's main feed.
-  const facebookFeed = feedPlacements.filter(showsSquare);
-  const otherFeed = feedPlacements.filter((p) => !showsSquare(p));
-  // The push freezes approved ideas first, so their square renders exist.
-  const squareCards = async (adId: string) => {
-    const row = await db.query.adTable.findFirst({
-      where: eq(adTable.id, adId),
-      columns: { content: true },
-    });
-    const square =
-      row && "media" in row.content
-        ? row.content.ideaStudio?.approval?.renders.square
-        : undefined;
-    return square?.length ? square.map((render) => render.url) : null;
-  };
-  const placeCarouselCards = async (ads: ReturnType<typeof setAdsFor>) => {
-    for (const { planAd, externalId, media } of ads) {
-      if (
-        !externalId ||
-        media.length < 2 ||
-        media.some((card) => card.type === "video")
-      )
-        continue;
-      const feed = media.map((card) => card.url);
-      const square = facebookFeed.length ? await squareCards(planAd.id) : null;
-      // Square cards that already are the feed cards (a square-only
-      // carousel) need no swap on Facebook.
-      const usable =
-        square?.length === media.length &&
-        square.some((url, i) => url !== feed[i])
-          ? square
-          : null;
-      if (facebookFeed.length && !usable && square?.length !== media.length)
-        warnings.push(
-          `${planAd.name}: no square cards, so Facebook's desktop feed crops this carousel. Export the Square size and push again.`,
-        );
-      const tall = media.every((card) => card.story?.url)
-        ? media.map((card) => card.story!.url)
-        : null;
-      const sets = [
-        ...(usable
-          ? [
-              {
-                imageUrls: usable,
-                positions: metaProviderPlacements(facebookFeed),
-              },
-              ...(otherFeed.length
-                ? [
-                    {
-                      imageUrls: feed,
-                      positions: metaProviderPlacements(otherFeed),
-                    },
-                  ]
-                : []),
-            ]
-          : feedPlacements.length
-            ? [
-                {
-                  imageUrls: feed,
-                  positions: metaProviderPlacements(feedPlacements),
-                },
-              ]
-            : []),
-        ...(tall && tallPlacements.length
-          ? [
-              {
-                imageUrls: tall,
-                positions: metaProviderPlacements(tallPlacements),
-              },
-            ]
-          : []),
-      ];
-      if (sets.length < 2) continue;
-      await setMetaCarouselPlacementCards({
-        adAccountId: destination.adAccount.id,
-        adId: externalId,
-        sets,
-      }).catch((error: unknown) => {
-        warnings.push(
-          `${planAd.name}: per-placement carousel cards not applied, every placement shows the feed cards (${
-            error instanceof Error ? error.message : String(error)
-          })`,
-        );
-      });
-    }
-  };
-
   // ---- one (or no) audience: a single create --------------------------
   if (
     compiled.length <= 1 &&
@@ -3338,7 +3303,6 @@ async function pushToMeta(args: PushArgs) {
         },
       ],
     });
-    await placeCarouselCards(setAdsFor(set, usable));
     return {
       campaignId: campaign.id,
       platform: "meta_ads" as const,
@@ -3435,8 +3399,6 @@ async function pushToMeta(args: PushArgs) {
       ads: setAdsFor(set, usable),
     })),
   });
-  for (const { set } of perSet)
-    await placeCarouselCards(setAdsFor(set, usable));
 
   return {
     campaignId: campaign.id,

@@ -432,117 +432,330 @@ type MetaPositions = {
   instagramPositions?: string[];
 };
 
+type MetaError = {
+  error?: { message: string; code?: number; error_user_msg?: string };
+};
+
+function adsToken() {
+  const token =
+    env.META_ADS_ACCESS_TOKEN ?? env.FB_SYSUSER_TOKEN ?? env.META_ACCESS_TOKEN;
+  if (!token) throw new Error("META_ADS_ACCESS_TOKEN is required");
+  return token;
+}
+
+// Throttled: the ad account's business-use-case limit (17, 80004) or the
+// app's (4, 613). Meta says in a header how long until it lets us back in.
+const THROTTLED = new Set([4, 17, 613, 80004]);
+
+/** Wait out Meta's rate limit once, up to five minutes, then retry. */
+async function metaFetch<T>(url: string, init?: RequestInit) {
+  for (let attempt = 0; ; attempt++) {
+    const response = await fetch(url, { cache: "no-store", ...init });
+    const json = (await response.json()) as T & MetaError;
+    const code = json.error?.code;
+    if (!json.error || !code || !THROTTLED.has(code) || attempt > 0) {
+      if (json.error)
+        throw new Error(json.error.error_user_msg ?? json.error.message);
+      return json;
+    }
+    const usage = JSON.parse(
+      response.headers.get("x-business-use-case-usage") ?? "{}",
+    ) as Record<string, { estimated_time_to_regain_access?: number }[]>;
+    const minutes = Math.max(
+      1,
+      ...Object.values(usage)
+        .flat()
+        .map((row) => row.estimated_time_to_regain_access ?? 0),
+    );
+    if (minutes > 5) throw new Error(json.error.message);
+    await new Promise((resolve) => setTimeout(resolve, minutes * 60_000));
+  }
+}
+
 async function metaWrite<T>(path: string, body: Record<string, unknown>) {
-  const accessToken = env.FB_SYSUSER_TOKEN ?? env.META_ACCESS_TOKEN;
-  if (!accessToken) throw new Error("FB_SYSUSER_TOKEN is required");
-  const form = new URLSearchParams({ access_token: accessToken });
+  const form = new URLSearchParams({ access_token: adsToken() });
   for (const [key, value] of Object.entries(body))
     form.set(key, typeof value === "string" ? value : JSON.stringify(value));
-  const url = `${ADS_WRITE_URL}/${path}`;
-  const response = await fetch(url, { method: "POST", body: form });
-  const json = (await response.json()) as T & {
-    error?: { message: string; error_user_msg?: string };
-  };
-  if (json.error)
-    throw new Error(json.error.error_user_msg ?? json.error.message);
-  return json;
+  return metaFetch<T>(`${ADS_WRITE_URL}/${path}`, {
+    method: "POST",
+    body: form,
+  });
 }
 
 async function metaRead<T>(path: string, fields: string) {
-  const accessToken = env.FB_SYSUSER_TOKEN ?? env.META_ACCESS_TOKEN;
-  if (!accessToken) throw new Error("FB_SYSUSER_TOKEN is required");
-  const params = new URLSearchParams({ access_token: accessToken, fields });
-  const response = await fetch(`${ADS_WRITE_URL}/${path}?${params}`, {
-    cache: "no-store",
-  });
-  const json = (await response.json()) as T & { error?: { message: string } };
-  if (json.error) throw new Error(json.error.message);
-  return json;
-}
-
-async function uploadMetaAdImage(adAccountId: string, imageUrl: string) {
-  const image = await fetch(imageUrl);
-  if (!image.ok) throw new Error(`Image fetch ${image.status}: ${imageUrl}`);
-  const bytes = Buffer.from(await image.arrayBuffer()).toString("base64");
-  const result = await metaWrite<{ images: Record<string, { hash: string }> }>(
-    `${adAccountId}/adimages`,
-    { bytes },
-  );
-  return Object.values(result.images)[0]!.hash;
+  const params = new URLSearchParams({ access_token: adsToken(), fields });
+  return metaFetch<T>(`${ADS_WRITE_URL}/${path}?${params}`);
 }
 
 /**
- * Give a pushed carousel ad a set of cards per group of placements: square on
- * Facebook (whose desktop feed crops carousel cards to square), 4:5 on
- * Instagram, 9:16 in stories and reels. Zernio can only send one set of
- * cards. Meta's placement asset customization pins a set per placement, the
- * same as "Edit placement" in Ads Manager, so the ad's creative is rebuilt on
- * the Graph API from the pushed one and swapped in. Same ad, same ad set.
- * Rules cannot split by device, so the square set covers all of Facebook.
+ * Upload images to the ad account in ONE request, so a carousel's three
+ * sizes cost one write, not one per file. Hashes are per ad account and
+ * returned in the order given; a repeated URL is uploaded once.
+ */
+async function uploadMetaAdImages(adAccountId: string, imageUrls: string[]) {
+  const unique = [...new Set(imageUrls)];
+  const form = new FormData();
+  form.set("access_token", adsToken());
+  await Promise.all(
+    unique.map(async (url, i) => {
+      const image = await fetch(url);
+      if (!image.ok) throw new Error(`Image fetch ${image.status}: ${url}`);
+      const type = image.headers.get("content-type") ?? "image/png";
+      const name = `image_${i}.${type.includes("jpeg") ? "jpg" : "png"}`;
+      form.set(name, new Blob([await image.arrayBuffer()], { type }), name);
+    }),
+  );
+  const result = await metaFetch<{ images: Record<string, { hash: string }> }>(
+    `${ADS_WRITE_URL}/${adAccountId}/adimages`,
+    { method: "POST", body: form },
+  );
+  const hashOf = new Map(
+    unique.map((url, i) => {
+      const entry = Object.entries(result.images).find(([key]) =>
+        key.startsWith(`image_${i}.`),
+      );
+      if (!entry) throw new Error(`Meta returned no hash for ${url}`);
+      return [url, entry[1].hash] as const;
+    }),
+  );
+  return imageUrls.map((url) => hashOf.get(url)!);
+}
+
+/**
+ * Every Advantage+ creative enhancement Meta lists, switched off: the ad runs
+ * as the artwork and words that were approved. Meta turns on a feature that
+ * is missing from this list, so add new ones as Meta announces them.
+ */
+const META_CREATIVE_FEATURES = [
+  "adapt_to_placement",
+  "add_text_overlay",
+  "ads_with_benefits",
+  "advantage_plus_creative",
+  "app_highlights",
+  "audio",
+  "auto_promotion_tag",
+  "biz_ai",
+  "carousel_to_video",
+  "catalog_feed_tag",
+  "creative_stickers",
+  "customize_product_recommendation",
+  "cv_transformation",
+  "description_automation",
+  "dha_optimization",
+  "dynamic_cta_text",
+  "dynamic_partner_content",
+  "enable_ncs_testimonials",
+  "enhance_cta",
+  "fb_feed_tag",
+  "fb_reels_tag",
+  "fb_story_tag",
+  "feed_caption_optimization",
+  "generate_cta",
+  "hide_price",
+  "hyperlink_formatting",
+  "ig_feed_tag",
+  "ig_glados_feed",
+  "ig_reels_tag",
+  "ig_stream_tag",
+  "ig_video_native_subtitle",
+  "image_animation",
+  "image_auto_crop",
+  "image_background_gen",
+  "image_banner",
+  "image_brightness_and_contrast",
+  "image_end_card",
+  "image_enhancement",
+  "image_templates",
+  "image_text_translation",
+  "image_touchups",
+  "image_uncrop",
+  "inline_comment",
+  "local_store_extension",
+  "media_liquidity_animated_image",
+  "media_order",
+  "media_type_automation",
+  "multi_creative_post_carousel",
+  "multi_photo_to_video",
+  "music_generation",
+  "pac_genai_recomposition",
+  "pac_recomposition",
+  "pac_relaxation",
+  "product_browsing",
+  "product_extensions",
+  "product_metadata_automation",
+  "product_tags",
+  "profile_card",
+  "profile_extension",
+  "replace_media_text",
+  "reveal_details_over_time",
+  "show_destination_blurbs",
+  "show_summary",
+  "site_extensions",
+  "standard_enhancements_catalog",
+  "text_extraction_for_headline",
+  "text_extraction_for_tap_target",
+  "text_formatting_optimization",
+  "text_generation",
+  "text_optimizations",
+  "text_overlay_translation",
+  "text_translation",
+  "translate_voiceover",
+  "video_auto_crop",
+  "video_filtering",
+  "video_highlight",
+  "video_highlights",
+  "video_to_image",
+  "video_uncrop",
+  "video_uncrop_9x16_to_9x18",
+  "video_voiceover",
+  "wa_mm_image_filtering",
+  "wa_mm_text_truncation_length",
+] as const;
+
+/** Who the ad runs as and what every creative carries. */
+export type MetaCreativeTemplate = {
+  pageId: string;
+  instagramUserId: string;
+  urlTags: string;
+};
+
+/** The Page's own Instagram account, the one Ads Manager would pick. */
+export async function metaCreativeTemplate(input: {
+  pageId: string;
+  urlTags: string;
+}): Promise<MetaCreativeTemplate> {
+  const page = await metaRead<{ instagram_business_account?: { id: string } }>(
+    input.pageId,
+    "instagram_business_account",
+  );
+  const instagramUserId = page.instagram_business_account?.id;
+  if (!instagramUserId)
+    throw new Error(
+      "The brand's Facebook Page has no Instagram account connected, so Instagram placements would run as the Page. Connect it in Meta Business Suite.",
+    );
+  return { ...input, instagramUserId };
+}
+
+type MetaCreativeSet = { imageUrls: string[]; positions: MetaPositions };
+
+/**
+ * The ad's finished creative, built on Meta before the ad exists, so the
+ * push only attaches it and Meta can preview exactly what will run. One set
+ * of images per group of placements: square wherever Meta shows a single
+ * image square, 4:5 on Instagram's main feed, 9:16 in stories and reels. One
+ * set is a plain creative; more use placement asset customization, the same
+ * as "Edit placement" in Ads Manager. Rules cannot split by device.
  * https://developers.facebook.com/docs/marketing-api/dynamic-creative/placement-asset-customization/
  */
-export async function setMetaCarouselPlacementCards(input: {
+export async function createMetaPlacementCreative(input: {
   adAccountId: string;
-  adId: string;
-  /** In priority order; Meta needs two or more. */
-  sets: { imageUrls: string[]; positions: MetaPositions }[];
+  template: MetaCreativeTemplate;
+  name: string;
+  message: string;
+  callToActionType: string;
+  /** One card is a single image ad; two or more a carousel. */
+  cards: { title: string; description?: string; link: string }[];
+  /** In priority order, one image per card each. */
+  sets: MetaCreativeSet[];
 }) {
-  if (input.sets.length < 2)
-    throw new Error("Placement cards need two or more sets");
-  const { creative } = await metaRead<{
-    creative: {
-      object_story_spec: {
-        page_id: string;
-        instagram_user_id?: string;
-        link_data: {
-          message: string;
-          call_to_action: { type: string };
-          child_attachments: {
-            name: string;
-            description?: string;
-            link: string;
-          }[];
-        };
-      };
-      url_tags?: string;
-      degrees_of_freedom_spec?: unknown;
-    };
-  }>(
-    input.adId,
-    "creative{object_story_spec,url_tags,degrees_of_freedom_spec}",
+  const { cards, template, sets } = input;
+  if (!sets.length) throw new Error("A creative needs at least one image set");
+  if (sets.some((set) => set.imageUrls.length !== cards.length))
+    throw new Error("Every set needs one image per card");
+  const carousel = cards.length > 1;
+  const flat = await uploadMetaAdImages(
+    input.adAccountId,
+    sets.flatMap((set) => set.imageUrls),
   );
-  const story = creative.object_story_spec;
-  const cards = story.link_data.child_attachments;
-  if (input.sets.some((set) => set.imageUrls.length !== cards.length))
-    throw new Error("Card count differs from the pushed carousel");
-
-  const hashes = await Promise.all(
-    input.sets.map((set) =>
-      Promise.all(
-        set.imageUrls.map((url) => uploadMetaAdImage(input.adAccountId, url)),
+  const hashAt = (set: number, card: number) =>
+    flat[set * cards.length + card]!;
+  const common = {
+    name: input.name,
+    url_tags: template.urlTags,
+    degrees_of_freedom_spec: {
+      creative_features_spec: Object.fromEntries(
+        META_CREATIVE_FEATURES.map((feature) => [
+          feature,
+          { enroll_status: "OPT_OUT" },
+        ]),
       ),
-    ),
-  );
-  // Meta refuses duplicate asset values, so equal texts share one entry.
+    },
+  };
+  const page = {
+    page_id: template.pageId,
+    instagram_user_id: template.instagramUserId,
+  };
+  const callToAction = (link: string) => ({
+    type: input.callToActionType,
+    value: { link },
+  });
+
+  if (sets.length === 1) {
+    const [card] = cards;
+    const { id } = await metaWrite<{ id: string }>(
+      `${input.adAccountId}/adcreatives`,
+      {
+        ...common,
+        object_story_spec: {
+          ...page,
+          link_data: carousel
+            ? {
+                link: card!.link,
+                message: input.message,
+                multi_share_end_card: false,
+                multi_share_optimized: false,
+                child_attachments: cards.map((child, i) => ({
+                  link: child.link,
+                  name: child.title,
+                  ...(child.description
+                    ? { description: child.description }
+                    : {}),
+                  image_hash: hashAt(0, i),
+                  call_to_action: callToAction(child.link),
+                })),
+                call_to_action: callToAction(card!.link),
+              }
+            : {
+                link: card!.link,
+                message: input.message,
+                name: card!.title,
+                ...(card!.description
+                  ? { description: card!.description }
+                  : {}),
+                image_hash: hashAt(0, 0),
+                call_to_action: callToAction(card!.link),
+              },
+        },
+      },
+    );
+    return { creativeId: id };
+  }
+
+  // Meta refuses duplicate asset values, so equal texts and images share
+  // one labelled entry. Every text is labelled and every rule names its
+  // labels: an unlabelled text is dropped from the placements the rules
+  // cover (a carousel once ran with no primary text that way).
   const unique = (values: string[]) => [...new Set(values)];
-  const titles = unique(cards.map((card) => card.name));
+  const hashes = unique(flat);
+  const titles = unique(cards.map((card) => card.title));
   const descriptions = unique(
     cards.flatMap((card) => (card.description ? [card.description] : [])),
   );
   const links = unique(cards.map((card) => card.link));
-  const childAttachments = (set: number) =>
-    cards.map((card, i) => ({
-      image_label: { name: `set${set}_${i}` },
-      title_label: { name: `title_${titles.indexOf(card.name)}` },
-      ...(card.description
-        ? {
-            description_label: {
-              name: `description_${descriptions.indexOf(card.description)}`,
-            },
-          }
-        : {}),
-      link_url_label: { name: `link_${links.indexOf(card.link)}` },
-    }));
+  const label = (name: string) => ({ name });
+  const imageLabel = (set: number, card: number) =>
+    label(`image_${hashes.indexOf(hashAt(set, card))}`);
+  const textLabels = (card: (typeof cards)[number]) => ({
+    title_label: label(`title_${titles.indexOf(card.title)}`),
+    ...(card.description
+      ? {
+          description_label: label(
+            `description_${descriptions.indexOf(card.description)}`,
+          ),
+        }
+      : {}),
+    link_url_label: label(`link_${links.indexOf(card.link)}`),
+  });
   const spec = (positions: MetaPositions) => ({
     publisher_platforms: positions.publisherPlatforms,
     ...(positions.facebookPositions
@@ -553,64 +766,58 @@ export async function setMetaCarouselPlacementCards(input: {
       : {}),
   });
 
-  const { id: creativeId } = await metaWrite<{ id: string }>(
+  const { id } = await metaWrite<{ id: string }>(
     `${input.adAccountId}/adcreatives`,
     {
-      object_story_spec: {
-        page_id: story.page_id,
-        ...(story.instagram_user_id
-          ? { instagram_user_id: story.instagram_user_id }
-          : {}),
-      },
-      ...(creative.url_tags ? { url_tags: creative.url_tags } : {}),
-      ...(creative.degrees_of_freedom_spec
-        ? { degrees_of_freedom_spec: creative.degrees_of_freedom_spec }
-        : {}),
+      ...common,
+      object_story_spec: page,
       asset_feed_spec: {
-        images: hashes.flatMap((set, s) =>
-          set.map((hash, i) => ({
-            hash,
-            adlabels: [{ name: `set${s}_${i}` }],
-          })),
-        ),
+        images: hashes.map((hash, i) => ({
+          hash,
+          adlabels: [label(`image_${i}`)],
+        })),
         titles: titles.map((text, i) => ({
           text,
-          adlabels: [{ name: `title_${i}` }],
+          adlabels: [label(`title_${i}`)],
         })),
         ...(descriptions.length
           ? {
               descriptions: descriptions.map((text, i) => ({
                 text,
-                adlabels: [{ name: `description_${i}` }],
+                adlabels: [label(`description_${i}`)],
               })),
             }
           : {}),
         link_urls: links.map((website_url, i) => ({
           website_url,
-          adlabels: [{ name: `link_${i}` }],
+          adlabels: [label(`link_${i}`)],
         })),
-        // Labelled and named by every rule: an unlabelled body is dropped by
-        // the placements the rules cover, so the post showed no text.
-        bodies: [
-          { text: story.link_data.message, adlabels: [{ name: "body_0" }] },
-        ],
-        call_to_action_types: [story.link_data.call_to_action.type],
-        ad_formats: ["CAROUSEL"],
+        bodies: [{ text: input.message, adlabels: [label("body_0")] }],
+        call_to_action_types: [input.callToActionType],
+        ad_formats: [carousel ? "CAROUSEL" : "SINGLE_IMAGE"],
         optimization_type: "PLACEMENT",
-        carousels: input.sets.map((_, s) => ({
-          adlabels: [{ name: `carousel_${s}` }],
-          child_attachments: childAttachments(s),
-          multi_share_end_card: false,
-        })),
-        asset_customization_rules: input.sets.map((set, s) => ({
+        ...(carousel
+          ? {
+              carousels: sets.map((_, s) => ({
+                adlabels: [label(`carousel_${s}`)],
+                child_attachments: cards.map((card, i) => ({
+                  image_label: imageLabel(s, i),
+                  ...textLabels(card),
+                })),
+                multi_share_end_card: false,
+              })),
+            }
+          : {}),
+        asset_customization_rules: sets.map((set, s) => ({
           customization_spec: spec(set.positions),
-          carousel_label: { name: `carousel_${s}` },
-          body_label: { name: "body_0" },
+          body_label: label("body_0"),
+          ...(carousel
+            ? { carousel_label: label(`carousel_${s}`) }
+            : { image_label: imageLabel(s, 0), ...textLabels(cards[0]!) }),
           priority: s + 1,
         })),
       },
     },
   );
-  await metaWrite(input.adId, { creative: { creative_id: creativeId } });
-  return { creativeId };
+  return { creativeId: id };
 }

@@ -107,22 +107,13 @@ export function featuredStarterAdIdeas(homes: StarterHome[]) {
 }
 
 /**
- * The sizes each format needs to run on Meta through Zernio with nothing to
- * fix after the push. Zernio's docs give no ratio advice, so this follows
- * the shape of its API (checked 2026-09-30, docs.zernio.com/platforms/
- * meta-ads/creatives) and Meta's specs; revisit both when Zernio changes:
- *
- * - A static goes out as one ad with `placementAssets`: a default image plus
- *   rules that pin other images to placements. 4:5 is the default (feeds),
- *   1:1 is pinned to Facebook's feed placements (marketplace, the right
- *   column and the desktop feed show a single image square), 9:16 to
- *   stories and reels.
- * - A carousel goes out as `carouselCards`: one set of cards, which Zernio
- *   will not combine with `placementAssets`. Meta crops carousel cards to
- *   square in many placements, so square cards are the only set that shows
- *   whole everywhere. A carousel given 4:5 and 9:16 sizes is still pushed,
- *   but then Growth swaps its cards per placement on the Graph API after the
- *   push (`setMetaCarouselPlacementCards`), which costs extra Meta calls.
+ * The sizes each format starts with. Growth builds every image ad's Meta
+ * creative itself and Zernio attaches it, so any mix of sizes reaches the
+ * right placements with nothing to fix after the push: 4:5 on Instagram's
+ * main feed, 1:1 wherever Meta shows a single image square (Facebook's
+ * feeds, Instagram's profile feed and Explore), 9:16 in stories and reels.
+ * A carousel starts square only, the one card shape Meta shows whole in
+ * every feed; add 4:5 and 9:16 when the artwork exists.
  */
 export const ZERNIO_NATIVE_SHAPES = {
   static: ["portrait", "square", "story"],

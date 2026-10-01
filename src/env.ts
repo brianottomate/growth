@@ -75,6 +75,7 @@ export const env = createEnv({
     FB_SYSUSER_TOKEN: z.string().optional(), // Meta system user token (preferred)
     META_ACCESS_TOKEN: z.string().optional(), // Meta access token (fallback)
     META_AD_ACCOUNT_ID: z.string().optional(), // Meta ad account ID (e.g. act_885632...)
+    META_ADS_ACCESS_TOKEN: z.string().optional(), // system user token with ads_management for ad writes; FB_SYSUSER_TOKEN otherwise
     // Meta lead ads → growth (app "Wander Growth Leads" 2121713918736592)
     META_LEADS_ACCESS_TOKEN: z.string().optional(), // system user token: leads_retrieval, pages_manage_metadata, pixel CAPI
     META_LEADS_APP_SECRET: z.string().optional(), // verifies X-Hub-Signature-256 on the leadgen webhook
@@ -228,6 +229,7 @@ export const env = createEnv({
     FB_SYSUSER_TOKEN: process.env.FB_SYSUSER_TOKEN,
     META_ACCESS_TOKEN: process.env.META_ACCESS_TOKEN,
     META_AD_ACCOUNT_ID: process.env.META_AD_ACCOUNT_ID,
+    META_ADS_ACCESS_TOKEN: process.env.META_ADS_ACCESS_TOKEN,
     META_LEADS_ACCESS_TOKEN: process.env.META_LEADS_ACCESS_TOKEN,
     META_LEADS_APP_SECRET: process.env.META_LEADS_APP_SECRET,
     META_LEADGEN_VERIFY_TOKEN: process.env.META_LEADGEN_VERIFY_TOKEN,
