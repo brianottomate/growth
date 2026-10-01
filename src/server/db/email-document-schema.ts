@@ -256,3 +256,42 @@ export type EmailDocumentVersion =
   typeof emailDocumentVersionTable.$inferSelect;
 export type EmailGenerationJob = typeof emailGenerationJobTable.$inferSelect;
 export type MessageSend = typeof messageSendTable.$inferSelect;
+
+/**
+ * Every Postmark webhook event from the servers Growth controls, as received.
+ * Postmark retries until it gets a 200, so `dedupeKey` makes redelivery a no-op.
+ */
+export const postmarkEventTable = pgTable(
+  "postmark_event",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("pme")),
+    serverId: t.integer(),
+    messageStream: t.text(),
+    recordType: t.text().notNull(),
+    messageId: t.text(),
+    recipient: t.text(),
+    tag: t.text(),
+    occurredAt: t.timestamp({ withTimezone: true }),
+    payload: jsonb().$type<Record<string, unknown>>().notNull(),
+    dedupeKey: t.text().notNull(),
+    receivedAt: t
+      .timestamp({ withTimezone: true })
+      .$defaultFn(() => new Date())
+      .notNull(),
+  }),
+  (table) => [
+    uniqueIndex("postmark_event_dedupe_idx").on(table.dedupeKey),
+    index("postmark_event_recipient_idx").on(table.recipient),
+    index("postmark_event_message_idx").on(table.messageId),
+    index("postmark_event_server_type_idx").on(
+      table.serverId,
+      table.recordType,
+      table.occurredAt,
+    ),
+  ],
+);
+
+export type PostmarkEvent = typeof postmarkEventTable.$inferSelect;
