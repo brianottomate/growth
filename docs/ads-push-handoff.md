@@ -222,10 +222,14 @@ header): a score of 60 per ad account, reads 1 point, writes 3, regained over
 300 s, with a 300 s block when exceeded (code 17, subcode 2446079). Each
 carousel swap uploads every card image per set, so a campaign of 9 carousels
 hit the limit on 2026-09-30 and 3 swaps failed with a push warning; they were
-re-run by script once it cleared. Standard access (9,000 points, 60 s block)
-is requested in the Meta app dashboard by an app admin. Until then, big
-carousel campaigns can need a re-run of `setMetaCarouselPlacementCards` for
-the ads the push warned about.
+re-run by script once it cleared. The higher tier (9,000 points, 60 s block)
+is Advanced access, which Meta now calls Full Access (and Standard is now
+Limited Access). An app admin requests it in the app dashboard: App Review →
+Permissions and Features → `ads_management` → Request advanced access.
+Meta's eligibility (checked 2026-10-01): at least 500 successful Marketing API
+calls in the last 15 days and an error rate under 15% in the last 500 calls.
+Until it is granted, big carousel campaigns can need a re-run of
+`setMetaCarouselPlacementCards` for the ads the push warned about.
 
 **Local previews.** The placement review (`MetaPlatformCard`) draws every
 placement locally: feed, stories and reels as before, plus Marketplace, the
