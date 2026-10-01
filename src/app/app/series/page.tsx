@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SeriesEditor } from "./SeriesEditor";
 import { redirect } from "next/navigation";
 import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import {
@@ -183,6 +184,9 @@ export default async function SeriesPage() {
 
   return (
     <div>
+      <div className="mb-4 flex justify-end">
+        <SeriesEditor brands={brands} />
+      </div>
       <div className="flex flex-wrap items-start gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Series</h1>

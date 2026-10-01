@@ -31,6 +31,7 @@ describe("composition blueprints", () => {
       { id: "story", width: 1080, height: 1920 },
       { id: "wide", width: 1920, height: 1080 },
       { id: "email", width: 1200, height: 800 },
+      { id: "banner", width: 1200, height: 600 },
     ]);
   });
 

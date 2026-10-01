@@ -40,7 +40,19 @@ type Seed = (typeof SEEDS)[number]["id"];
 // The channels an idea can fan out to at create time (owned spots, primary
 // format). Listening-only + ads platforms are intentionally excluded here.
 const SPOT_TARGETS = [
-  { id: "instagram", platform: "instagram", label: "Instagram" },
+  { id: "instagram", platform: "instagram", label: "Instagram image" },
+  {
+    id: "instagram.reel",
+    platform: "instagram",
+    format: "instagram.reel",
+    label: "Instagram Reel",
+  },
+  {
+    id: "instagram.carousel",
+    platform: "instagram",
+    format: "instagram.carousel",
+    label: "Instagram carousel",
+  },
   {
     id: "instagram.story",
     platform: "instagram",
@@ -63,6 +75,18 @@ const SPOT_TARGETS = [
     label: "Facebook Story",
   },
   { id: "youtube", platform: "youtube", label: "YouTube" },
+  {
+    id: "youtube.short",
+    platform: "youtube",
+    format: "youtube.short",
+    label: "YouTube Short",
+  },
+  {
+    id: "facebook.reel",
+    platform: "facebook",
+    format: "facebook.reel",
+    label: "Facebook Reel",
+  },
   { id: "threads", platform: "threads", label: "Threads" },
   { id: "pinterest", platform: "pinterest", label: "Pinterest" },
   { id: "linkedin", platform: "linkedin", label: "LinkedIn" },
@@ -83,12 +107,14 @@ const SPOT_TARGETS = [
 export function AddIdeaDrawer({
   brands,
   defaultBrandId,
+  defaultSeriesId,
   open,
   onOpenChange,
   onCreated,
 }: {
   brands: Brand[];
   defaultBrandId: string | null;
+  defaultSeriesId?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated: (id?: string) => void;
@@ -177,6 +203,7 @@ export function AddIdeaDrawer({
     create.mutate({
       brandId,
       title: finalTitle,
+      seriesId: defaultSeriesId,
       hook: hook.trim() || undefined,
       captionDirection: caption.trim() || undefined,
       ctaText: cta.trim() || undefined,
@@ -197,7 +224,9 @@ export function AddIdeaDrawer({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-2xl">
         <SheetHeader divided>
-          <SheetTitle>New idea</SheetTitle>
+          <SheetTitle>
+            {defaultSeriesId ? "New installment" : "New idea"}
+          </SheetTitle>
           {/* Seed: an idea can start from anywhere. */}
           <div className="mt-2 flex flex-wrap gap-1.5">
             {SEEDS.map((s) => {
@@ -383,8 +412,7 @@ export function AddIdeaDrawer({
                 })}
               </div>
               <p className="text-xs text-muted-foreground">
-                Each selected channel becomes a spot at its primary format —
-                tune them on the idea page.
+                Choose the channels and formats for this idea.
               </p>
             </div>
           </div>

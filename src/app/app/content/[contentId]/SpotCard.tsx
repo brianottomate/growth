@@ -9,7 +9,7 @@ import { orpc, type RouterInputs } from "@/orpc/client";
 import { SimpleSelect } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
-import { MediaThumbnail } from "@/components/media-thumbnail";
+import { MediaAssetView } from "@/components/media-asset-view";
 import { cn } from "@/components/ui/lib/utils";
 import type { Member } from "@/components/assignment/assignee";
 import type { MediaItem, PostStats } from "@/server/db/schema";
@@ -548,15 +548,11 @@ export function SpotCard({
                               className="min-w-0"
                             >
                               <div className="relative aspect-square overflow-hidden rounded-lg border bg-muted">
-                                <MediaThumbnail
-                                  src={item.url}
-                                  thumbnail={item.thumbnail}
-                                  kind={item.type}
-                                  alt={`${platformLabel(spot.platform)} post ${threadIndex + 1} media ${mediaIndex + 1}`}
-                                  className="object-contain"
-                                  sizes="180px"
+                                <MediaAssetView
+                                  item={item}
+                                  label={`${platformLabel(spot.platform)} media ${mediaIndex + 1}`}
                                 />
-                                <span className="absolute top-1.5 left-1.5 rounded-full bg-black/70 px-1.5 py-0.5 text-[9px] font-medium text-white">
+                                <span className="pointer-events-none absolute top-1.5 left-1.5 rounded-full bg-black/70 px-1.5 py-0.5 text-[9px] font-medium text-white">
                                   {mediaIndex + 1}
                                 </span>
                               </div>

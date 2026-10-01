@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { SeriesProductionBoard } from "./SeriesProductionBoard";
+import { SeriesEditor } from "../SeriesEditor";
 import { notFound, redirect } from "next/navigation";
 import { and, eq, gte, inArray, isNull, lt, ne, or } from "drizzle-orm";
 import { AlertTriangle, CheckCircle2, CircleDashed } from "lucide-react";
 
 import { ContentStructureAssistantButton } from "@/components/content-structure-assistant-button";
-import { HoverVideo } from "@/components/hover-video";
+import { MediaAssetView } from "@/components/media-asset-view";
 import { DeleteSeriesButton } from "../DeleteSeriesButton";
 import { getSeriesRunway } from "@/lib/series-runway";
 import { db } from "@/server/db";
@@ -117,6 +119,8 @@ export default async function SeriesDetailPage({
           columns: {
             id: true,
             platform: true,
+            format: true,
+            parentPlatformPostId: true,
             archetype: true,
             status: true,
             text: true,
@@ -282,9 +286,7 @@ export default async function SeriesDetailPage({
   // The installment's hero image (first pool item) — shown as the card's
   // leading social-card thumbnail.
   const heroFor = (post: (typeof installments)[number]) =>
-    post.media?.[0] ? (post.media[0].thumbnail ?? post.media[0].url) : null;
-  const videoOf = (media: MediaItem[] | null | undefined) =>
-    media?.[0]?.type === "video" ? media[0].url : null;
+    post.media?.[0] ?? null;
 
   // Prefer the real platform_post rows; fall back to the targetSpots intent
   // manifest for ideas whose spots haven't materialized yet. Thumbnails read
@@ -301,12 +303,7 @@ export default async function SeriesDetailPage({
           text: spot.text,
           // Spot's own media wins; drafted copy beats the shared pool image
           // (a text preview says more than the same card repeated six times).
-          thumb: spot.media?.[0]
-            ? (spot.media[0].thumbnail ?? spot.media[0].url)
-            : spot.text
-              ? null
-              : poolThumb,
-          video: spot.media?.[0] ? videoOf(spot.media) : videoOf(post.media),
+          media: spot.media?.[0] ?? (spot.text ? null : poolThumb),
         }))
       : (post.targetSpots ?? []).map((spot, index) => ({
           id: `target-${index}`,
@@ -314,8 +311,7 @@ export default async function SeriesDetailPage({
           archetype: spot.archetype ?? null,
           status: "slot",
           text: null,
-          thumb: poolThumb,
-          video: videoOf(post.media),
+          media: poolThumb,
         }));
   };
 
@@ -355,6 +351,7 @@ export default async function SeriesDetailPage({
             · {target.platform}
           </span>
         ))}
+        <SeriesEditor brands={[series.brand]} series={series} />
         <DeleteSeriesButton
           brandId={series.brandId}
           seriesId={series.id}
@@ -437,96 +434,102 @@ export default async function SeriesDetailPage({
         </div>
       </section>
 
-      {unscheduled.length > 0 ? (
+      <SeriesProductionBoard
+        posts={installments}
+        seriesId={series.id}
+        brand={series.brand}
+      >
+        {unscheduled.length > 0 ? (
+          <section className="mt-6">
+            <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+              Unscheduled installments
+            </h2>
+            <div className="mt-2 grid grid-cols-1 gap-2 @2xl:grid-cols-2">
+              {unscheduled.map((post) => (
+                <InstallmentCard
+                  key={post.id}
+                  post={post}
+                  spots={spotsFor(post)}
+                  hero={heroFor(post)}
+                  boosts={boostsFor(post)}
+                />
+              ))}
+            </div>
+          </section>
+        ) : null}
+
         <section className="mt-6">
-          <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-            Unscheduled installments
-          </h2>
-          <div className="mt-2 grid grid-cols-1 gap-2 @2xl:grid-cols-2">
-            {unscheduled.map((post) => (
-              <InstallmentCard
-                key={post.id}
-                post={post}
-                spots={spotsFor(post)}
-                hero={heroFor(post)}
-                boosts={boostsFor(post)}
-              />
-            ))}
+          <div className="flex items-center gap-2">
+            <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+              Scheduled installments
+            </h2>
+            <span className="text-[11px] text-muted-foreground">
+              other {series.brand.name} posts dimmed
+            </span>
+            <span className="flex-1" />
+            <Link
+              href="/app/calendar"
+              className="text-[11px] text-muted-foreground hover:underline"
+            >
+              Open calendar →
+            </Link>
           </div>
+
+          {orderedWeeks.length === 0 ? (
+            <div className="mt-3 rounded-xl border bg-card p-6 text-sm">
+              <p className="font-medium">No installments yet</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Use “Plan first posts” to turn the series promise into distinct
+                installments, channel renderings, and dates.
+              </p>
+            </div>
+          ) : (
+            <div className="mt-3 space-y-3">
+              {orderedWeeks.map((week) => (
+                <div key={week.start.getTime()} className="flex gap-4">
+                  <div className="w-24 shrink-0 pt-3 text-[11px] text-muted-foreground tabular-nums">
+                    {weekLabel(week.start)}
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-2 border-l pl-4">
+                    {week.installments.map((post) => (
+                      <InstallmentCard
+                        key={post.id}
+                        post={post}
+                        spots={spotsFor(post)}
+                        hero={heroFor(post)}
+                        boosts={boostsFor(post)}
+                      />
+                    ))}
+                    {week.context.slice(0, 3).map((post) => (
+                      <Link
+                        key={post.id}
+                        href={`/app/content/${post.id}`}
+                        className="block rounded-lg border border-transparent px-3 py-2 opacity-45 transition hover:opacity-80"
+                      >
+                        <span className="text-xs">
+                          {post.title ?? "Untitled"}
+                        </span>
+                        <span className="ml-2 text-[11px] text-muted-foreground">
+                          {post.plannedAt ? dayLabel(post.plannedAt) : null}
+                        </span>
+                      </Link>
+                    ))}
+                    {week.context.length > 3 ? (
+                      <p className="px-3 text-[11px] text-muted-foreground">
+                        +{week.context.length - 3} more on the calendar
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
-      ) : null}
-
-      <section className="mt-6">
-        <div className="flex items-center gap-2">
-          <h2 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-            Scheduled installments
-          </h2>
-          <span className="text-[11px] text-muted-foreground">
-            other {series.brand.name} posts dimmed
-          </span>
-          <span className="flex-1" />
-          <Link
-            href="/app/calendar"
-            className="text-[11px] text-muted-foreground hover:underline"
-          >
-            Open calendar →
-          </Link>
-        </div>
-
-        {orderedWeeks.length === 0 ? (
-          <div className="mt-3 rounded-xl border bg-card p-6 text-sm">
-            <p className="font-medium">No installments yet</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Use “Plan first posts” to turn the series promise into distinct
-              installments, channel renderings, and dates.
-            </p>
-          </div>
-        ) : (
-          <div className="mt-3 space-y-3">
-            {orderedWeeks.map((week) => (
-              <div key={week.start.getTime()} className="flex gap-4">
-                <div className="w-24 shrink-0 pt-3 text-[11px] text-muted-foreground tabular-nums">
-                  {weekLabel(week.start)}
-                </div>
-                <div className="min-w-0 flex-1 space-y-2 border-l pl-4">
-                  {week.installments.map((post) => (
-                    <InstallmentCard
-                      key={post.id}
-                      post={post}
-                      spots={spotsFor(post)}
-                      hero={heroFor(post)}
-                      boosts={boostsFor(post)}
-                    />
-                  ))}
-                  {week.context.slice(0, 3).map((post) => (
-                    <Link
-                      key={post.id}
-                      href={`/app/content/${post.id}`}
-                      className="block rounded-lg border border-transparent px-3 py-2 opacity-45 transition hover:opacity-80"
-                    >
-                      <span className="text-xs">
-                        {post.title ?? "Untitled"}
-                      </span>
-                      <span className="ml-2 text-[11px] text-muted-foreground">
-                        {post.plannedAt ? dayLabel(post.plannedAt) : null}
-                      </span>
-                    </Link>
-                  ))}
-                  {week.context.length > 3 ? (
-                    <p className="px-3 text-[11px] text-muted-foreground">
-                      +{week.context.length - 3} more on the calendar
-                    </p>
-                  ) : null}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+      </SeriesProductionBoard>
 
       <p className="mt-8 text-[11px] text-muted-foreground">
-        Edit this series from the assistant panel — cadence, installments, and
-        pillar changes land here live.
+        Use Edit series for the recurring promise, or the assistant for cadence
+        and pillar changes.
       </p>
     </div>
   );
@@ -538,8 +541,7 @@ type SpotPreview = {
   archetype: string | null;
   status: string;
   text: string | null;
-  thumb: string | null;
-  video: string | null;
+  media: MediaItem | null;
 };
 
 const SPOT_DOT: Record<string, string> = {
@@ -555,7 +557,7 @@ const SPOT_DOT: Record<string, string> = {
 // dashed placeholder. Emptiness is the only "gap" signal on this page —
 // deliberate: cadence is inspiration, not a scorecard.
 function SpotTile({ spot }: { spot: SpotPreview }) {
-  const filled = Boolean(spot.thumb ?? spot.text);
+  const filled = Boolean(spot.media ?? spot.text);
   const label = `${spot.platform}${
     spot.archetype && spot.archetype !== "article"
       ? ` · ${spot.archetype.replace("_", " ")}`
@@ -569,15 +571,8 @@ function SpotTile({ spot }: { spot: SpotPreview }) {
       title={`${label} · ${spot.status.replace("_", " ")}`}
     >
       <div className="h-14">
-        {spot.video ? (
-          <HoverVideo
-            src={spot.video}
-            poster={spot.thumb}
-            className="h-full w-full object-cover"
-          />
-        ) : spot.thumb ? (
-          // oxlint-disable-next-line nextjs/no-img-element
-          <img src={spot.thumb} alt="" className="h-full w-full object-cover" />
+        {spot.media ? (
+          <MediaAssetView item={spot.media} label={`${label} media`} />
         ) : spot.text ? (
           <p className="line-clamp-3 px-1.5 py-1 text-[9px] leading-tight text-muted-foreground">
             {spot.text}
@@ -630,28 +625,30 @@ function InstallmentCard({
   };
   spots: SpotPreview[];
   boosts: Boost[];
-  hero: string | null;
+  hero: MediaItem | null;
 }) {
   return (
-    <Link
-      href={`/app/content/${post.id}`}
-      className="block rounded-lg border bg-card px-3 py-2 transition hover:border-neutral-500"
-    >
+    <article className="block rounded-lg border bg-card px-3 py-2">
       <div className="flex items-start gap-3">
         {/* Social-card hero: the installment's pool image. Its absence is the
             "no visual yet" signal, so no placeholder box when missing. */}
         {hero ? (
-          // oxlint-disable-next-line nextjs/no-img-element
-          <img
-            src={hero}
-            alt=""
-            className="mt-0.5 aspect-video w-36 shrink-0 rounded-md border object-cover"
-          />
+          <div className="mt-0.5 aspect-video w-36 shrink-0">
+            <MediaAssetView
+              item={hero}
+              label={`${post.title ?? "Installment"} media`}
+            />
+          </div>
         ) : null}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="truncate text-sm font-medium">
-              {post.title ?? "Untitled"}
+              <Link
+                href={`/app/content/${post.id}`}
+                className="hover:underline"
+              >
+                {post.title ?? "Untitled"}
+              </Link>
             </span>
             <span className="flex-1" />
             <span
@@ -695,6 +692,6 @@ function InstallmentCard({
           ))}
         </div>
       ) : null}
-    </Link>
+    </article>
   );
 }

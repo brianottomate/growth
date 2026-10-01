@@ -7,7 +7,7 @@ import { HardDrive, Images, Sparkles, X } from "lucide-react";
 
 import { orpc } from "@/orpc/client";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
-import { MediaThumbnail } from "@/components/media-thumbnail";
+import { MediaAssetView } from "@/components/media-asset-view";
 import { cn } from "@/components/ui/lib/utils";
 import type { MediaItem } from "@/server/db/schema";
 import { MediaPickerDialog } from "./MediaPickerDialog";
@@ -95,12 +95,7 @@ export function ContentPool({
               className="w-28 rounded-lg border bg-card p-1.5"
             >
               <div className="relative aspect-square overflow-hidden rounded-md bg-muted">
-                <MediaThumbnail
-                  src={m.url}
-                  thumbnail={m.thumbnail}
-                  kind={m.type}
-                  className="size-full object-cover"
-                />
+                <MediaAssetView item={m} label={`${contentTitle} media`} />
                 {onPool && (
                   <button
                     onClick={() => removeFromPool(m)}

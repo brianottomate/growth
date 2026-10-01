@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { MediaAssetView } from "@/components/media-asset-view";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
@@ -93,6 +94,7 @@ export function AdWall({
   groupBy?: "home" | "format";
 }) {
   const [surface, setSurface] = useState<AdMockSurface>("instagram");
+  const [platformPreview, setPlatformPreview] = useState(false);
   const grouped = groupWall(ads);
   const formatGroups = groupBy === "format" ? groupWallByFormat(ads) : null;
   const formatLabel = (key: string) =>
@@ -107,6 +109,7 @@ export function AdWall({
     landingUrl,
     homes,
     surface,
+    platformPreview,
     states,
   };
 
@@ -120,18 +123,27 @@ export function AdWall({
           {approved ? ` · ${approved} approved` : ""}
           {shells ? ` · ${shells} awaiting creative` : ""}
         </p>
-        <Tabs
-          value={surface}
-          onValueChange={(value) => setSurface(value as AdMockSurface)}
+        <Button
+          variant="outline"
+          aria-pressed={platformPreview}
+          onClick={() => setPlatformPreview(!platformPreview)}
         >
-          <TabsList>
-            {AD_MOCK_SURFACES.map((option) => (
-              <TabsTrigger key={option.id} value={option.id} textSize="xs">
-                {option.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+          {platformPreview ? "Show media" : "Platform previews"}
+        </Button>
+        {platformPreview && (
+          <Tabs
+            value={surface}
+            onValueChange={(value) => setSurface(value as AdMockSurface)}
+          >
+            <TabsList>
+              {AD_MOCK_SURFACES.map((option) => (
+                <TabsTrigger key={option.id} value={option.id} textSize="xs">
+                  {option.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+        )}
       </div>
 
       {formatGroups
@@ -231,6 +243,7 @@ export function AdTile({
   states,
   slice = false,
   allowHomeBinding = true,
+  platformPreview = false,
 }: {
   ad: WallAd;
   brandId: string;
@@ -244,6 +257,7 @@ export function AdTile({
   /** The portfolio and catalog rows: the cards laid out beside the mock. */
   slice?: boolean;
   allowHomeBinding?: boolean;
+  platformPreview?: boolean;
 }) {
   const router = useRouter();
   const [card, setCard] = useState(0);
@@ -387,6 +401,23 @@ export function AdTile({
       hint="or click to browse · saved to the library"
       className="min-h-40"
     />
+  ) : !platformPreview ? (
+    <div className="w-full max-w-80 space-y-3">
+      <div className="aspect-square">
+        <MediaAssetView
+          item={{
+            ...ad.cards[Math.min(card, ad.cards.length - 1)]!,
+            thumbnail:
+              ad.cards[Math.min(card, ad.cards.length - 1)]?.thumbnail ??
+              undefined,
+            assetId:
+              ad.cards[Math.min(card, ad.cards.length - 1)]?.assetId ??
+              undefined,
+          }}
+          label={ad.name}
+        />
+      </div>
+    </div>
   ) : (
     <AdMock
       surface={surface}
@@ -649,11 +680,11 @@ export function AdTile({
               </Button>
             )
           ) : null}
-          {!shell && ad.cards[0]?.type !== "video" ? (
+          {!shell ? (
             <button
               type="button"
               onClick={() => setChecking(true)}
-              title="Check against Meta's own render"
+              title="Platform preview"
               className="rounded-full p-1 text-muted-foreground hover:text-foreground"
             >
               <Eye className="size-3.5" />

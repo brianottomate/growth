@@ -1,4 +1,5 @@
 "use client";
+import { MediaAssetView } from "@/components/media-asset-view";
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -187,36 +188,7 @@ export function CreativePool({
                 title={asset?.alt ?? name}
               >
                 <div className="relative h-24 bg-muted">
-                  {/* A video's `thumbnail` can be the clip itself when no poster
-                was ever cut, and an <img> pointed at an .mp4 is a blank tile
-                that still downloads the whole file. Let <video> paint its own
-                first frame instead. */}
-                  {item.type === "video" ? (
-                    <video
-                      src={item.url}
-                      poster={
-                        item.thumbnail && item.thumbnail !== item.url
-                          ? item.thumbnail
-                          : undefined
-                      }
-                      className="h-full w-full bg-black object-cover"
-                      muted
-                      playsInline
-                      preload="metadata"
-                    />
-                  ) : (
-                    // oxlint-disable-next-line nextjs/no-img-element
-                    <img
-                      src={item.thumbnail ?? item.url}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  )}
-                  {item.type === "video" && (
-                    <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white">
-                      {length ?? "Video"}
-                    </span>
-                  )}
+                  <MediaAssetView item={item} label="Campaign creative" />
                 </div>
 
                 <div className="space-y-1 p-2">
