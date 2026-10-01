@@ -4,11 +4,15 @@ import {
   isOutreachConfigured,
   isOutreachError,
 } from "@/server/clients/outreach.client";
+import { assertLabAccess } from "@/server/lab-access";
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const denied = await assertLabAccess(request);
+  if (denied) return denied;
+
   if (!isOutreachConfigured) {
     return NextResponse.json(
       { success: false, error: "Outreach is not configured" },

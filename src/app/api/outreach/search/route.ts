@@ -4,6 +4,7 @@ import {
   getProspects,
   isOutreachError,
 } from "@/server/clients/outreach.client";
+import { assertLabAccess } from "@/server/lab-access";
 
 /**
  * Search for prospects in Outreach
@@ -11,6 +12,9 @@ import {
  * GET /api/outreach/search?email=example@email.com
  */
 export async function GET(request: NextRequest) {
+  const denied = await assertLabAccess(request);
+  if (denied) return denied;
+
   if (!isOutreachConfigured) {
     return NextResponse.json(
       {

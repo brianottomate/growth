@@ -76,22 +76,11 @@ export function useNewsletter(
     defaultValue: undefined,
   });
 
-  // Get email for API query
-  const emailForQuery = isRealUser
-    ? undefined // Real users use session email
-    : localData?.email && !localData.email.includes(ANONYMOUS_EMAIL_DOMAIN)
-      ? localData.email // Anonymous users with real email in localStorage
-      : undefined;
-
-  // API query - enabled for:
-  // 1. Real users with autoFetch=true
-  // 2. Anonymous users with a real email in localStorage
-  const shouldFetchFromAPI = autoFetch && (isRealUser || !!emailForQuery);
+  // Topics are only readable for the signed-in user's own email.
+  const shouldFetchFromAPI = autoFetch && isRealUser;
 
   const topicsQuery = useQuery({
-    ...orpc.newsletter.getMyTopics.queryOptions({
-      input: emailForQuery ? { email: emailForQuery } : undefined,
-    }),
+    ...orpc.newsletter.getMyTopics.queryOptions(),
     enabled: shouldFetchFromAPI,
     staleTime: 1000 * 60 * 5, // Cache for 5 minutes
   });
@@ -199,16 +188,9 @@ export function useNewsletter(
         await updateTopicsMutation.mutateAsync({
           topics: remainingTopics,
         });
-      } else if (emailForQuery) {
-        // Anonymous user with localStorage email: update via API
-        await updateTopicsMutation.mutateAsync({
-          topics: remainingTopics,
-          email: emailForQuery,
-        });
       }
-      // No else - can't unsubscribe without email
     },
-    [isRealUser, topics, updateTopicsMutation, emailForQuery],
+    [isRealUser, topics, updateTopicsMutation],
   );
 
   // =====================================================

@@ -4,29 +4,6 @@ import { Heading } from "@wandercom/design-system-web/ui/heading";
 import { Text } from "@wandercom/design-system-web/ui/text";
 import { Button } from "@wandercom/design-system-web/ui/button";
 
-// Every statically-reachable route, grouped. Dynamic routes (/blog/[slug],
-// /app/org/[orgSlug], etc.) are omitted since they need an id to resolve.
-const LINK_GROUPS: {
-  label: string;
-  links: { name: string; href: string }[];
-}[] = [
-  // NOTE: the old "Prototypes" group (system maps, whiteboard, tracking
-  // audit) moved to /lab — Kristian's admin-gated private workspace. Don't
-  // link lab pages from public surfaces.
-  {
-    label: "Marketing & misc",
-    links: [
-      { name: "Brand", href: "/brand" },
-      { name: "Growth", href: "/growth" },
-      { name: "Zernio", href: "/zernio" },
-      { name: "Zernio ads", href: "/zernio/ads" },
-      { name: "Design system", href: "/design-system" },
-      { name: "Blog", href: "/blog" },
-      { name: "Contact", href: "/contact" },
-    ],
-  },
-];
-
 export default function IntroPage() {
   return (
     <div className="relative isolate">
@@ -68,45 +45,6 @@ export default function IntroPage() {
                 <ArrowRight className="h-4 w-4" />
               </Button>
             </Link>
-          </div>
-        </div>
-
-        {/* Jump-to index — every reachable route in one click */}
-        <div className="border-t border-secondary py-16">
-          <Text
-            as="h2"
-            variant="body-sm"
-            weight="medium"
-            color="secondary"
-            className="mb-8 tracking-wider uppercase"
-          >
-            Jump to
-          </Text>
-          <div className="grid grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-3">
-            {LINK_GROUPS.map((group) => (
-              <div key={group.label}>
-                <Text
-                  as="h3"
-                  variant="body-sm"
-                  weight="medium"
-                  className="mb-3"
-                >
-                  {group.label}
-                </Text>
-                <ul className="space-y-1.5">
-                  {group.links.map((link) => (
-                    <li key={link.href}>
-                      <Link
-                        href={link.href}
-                        className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-                      >
-                        {link.name}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
           </div>
         </div>
       </div>

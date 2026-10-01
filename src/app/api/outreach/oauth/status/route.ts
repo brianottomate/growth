@@ -4,6 +4,7 @@ import {
   isOAuthConfigured,
   isS2SConfigured,
 } from "@/server/clients/outreach.client";
+import { assertLabAccess } from "@/server/lab-access";
 
 /**
  * OAuth Status Check
@@ -12,7 +13,10 @@ import {
  *
  * Check if OAuth tokens are cached for a user
  */
-export async function GET() {
+export async function GET(request: Request) {
+  const denied = await assertLabAccess(request);
+  if (denied) return denied;
+
   const testUserId = "test-user";
   const hasTokens = hasOAuthTokens(testUserId);
 

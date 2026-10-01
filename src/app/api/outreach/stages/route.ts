@@ -4,6 +4,7 @@ import {
   isOutreachConfigured,
   isOutreachError,
 } from "@/server/clients/outreach.client";
+import { assertLabAccess } from "@/server/lab-access";
 
 /**
  * Outreach stages endpoint.
@@ -12,6 +13,9 @@ import {
  * GET /api/outreach/stages?pageSize=200&pageNumber=1
  */
 export async function GET(request: Request) {
+  const denied = await assertLabAccess(request);
+  if (denied) return denied;
+
   if (!isOutreachConfigured) {
     return NextResponse.json(
       {

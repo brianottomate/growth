@@ -5,6 +5,7 @@ import {
   isOutreachConfigured,
   isOutreachError,
 } from "@/server/clients/outreach.client";
+import { assertLabAccess } from "@/server/lab-access";
 
 /**
  * Outreach webhook management endpoint.
@@ -14,7 +15,10 @@ import {
  *   body: { url, resource, action, secret?, payloadVersion? }
  */
 
-export async function GET() {
+export async function GET(request: Request) {
+  const denied = await assertLabAccess(request);
+  if (denied) return denied;
+
   if (!isOutreachConfigured) {
     return NextResponse.json(
       { success: false, error: "Outreach is not configured" },
@@ -48,6 +52,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const denied = await assertLabAccess(request);
+  if (denied) return denied;
+
   if (!isOutreachConfigured) {
     return NextResponse.json(
       { success: false, error: "Outreach is not configured" },

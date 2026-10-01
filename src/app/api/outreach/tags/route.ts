@@ -4,6 +4,7 @@ import {
   isOutreachConfigured,
   isOutreachError,
 } from "@/server/clients/outreach.client";
+import { assertLabAccess } from "@/server/lab-access";
 
 /**
  * Outreach prospect tags endpoint.
@@ -12,6 +13,9 @@ import {
  * GET /api/outreach/tags?pageSize=100&maxPages=50&minCount=1
  */
 export async function GET(request: Request) {
+  const denied = await assertLabAccess(request);
+  if (denied) return denied;
+
   if (!isOutreachConfigured) {
     return NextResponse.json(
       {

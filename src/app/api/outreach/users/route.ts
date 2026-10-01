@@ -4,6 +4,7 @@ import {
   isOutreachConfigured,
   isOutreachError,
 } from "@/server/clients/outreach.client";
+import { assertLabAccess } from "@/server/lab-access";
 
 /**
  * Outreach users endpoint.
@@ -13,6 +14,9 @@ import {
  * GET /api/outreach/users?emailDomain=wander.com
  */
 export async function GET(request: Request) {
+  const denied = await assertLabAccess(request);
+  if (denied) return denied;
+
   if (!isOutreachConfigured) {
     return NextResponse.json(
       {

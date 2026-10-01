@@ -1,26 +1,6 @@
 import type { MetadataRoute } from "next";
 
+// Internal back-office: nothing here should be indexed.
 export default function robots(): MetadataRoute.Robots {
-  return {
-    rules: [
-      {
-        userAgent: "*",
-        allow: [
-          "/", // Home
-          "/blog", // Blog
-          "/blog/*", // Blog posts
-          "/contact",
-        ],
-        disallow: [
-          "/app/*", // Block authenticated app pages
-          "/api/*", // Block API routes
-          "/signin", // Block auth pages
-          "/signup",
-          "/reset-password",
-          "/verify-email",
-        ],
-      },
-    ],
-    sitemap: "https://example.com/sitemap.xml",
-  };
+  return { rules: [{ userAgent: "*", disallow: "/" }] };
 }

@@ -387,85 +387,47 @@ export const newsletterRouter = {
       }
     }),
 
-  /**
-   * Get newsletter topic subscriptions
-   * For authenticated users: uses session email
-   * For anonymous users: requires email parameter (from localStorage)
-   */
-  getMyTopics: publicProcedure
-    .input(
-      z
-        .object({
-          email: z.string().email().optional(), // Optional email for anonymous users
-        })
-        .optional(),
-    )
+  /** Topic subscriptions for the signed-in user's email. */
+  getMyTopics: protectedProcedure.handler(async ({ context: ctx }) => {
+    const email = ctx.session.user.email;
+
+    // Skip anonymous email domains
+    if (email.includes(ANONYMOUS_EMAIL_DOMAIN)) {
+      return {
+        isSubscribed: false,
+        topics: [],
+      };
+    }
+
+    try {
+      const result = await getContactTopicSubscriptions({ email });
+
+      if (!result.success) {
+        return {
+          isSubscribed: false,
+          topics: [],
+        };
+      }
+
+      return {
+        isSubscribed: true,
+        email,
+        topics: result.topics || [],
+      };
+    } catch (error) {
+      console.error("Failed to get user topics:", error);
+      return {
+        isSubscribed: false,
+        topics: [],
+      };
+    }
+  }),
+
+  /** Replace the signed-in user's topic subscriptions. */
+  updateMyTopics: protectedProcedure
+    .input(z.object({ topics: z.array(topicKeySchema) }))
     .handler(async ({ context: ctx, input }) => {
-      // Determine which email to use:
-      // 1. If provided in input, use that (for anonymous users with localStorage email)
-      // 2. Otherwise, use session email (for authenticated users)
-      const email = input?.email || ctx.session?.user?.email;
-
-      if (!email) {
-        return {
-          isSubscribed: false,
-          topics: [],
-        };
-      }
-
-      // Skip anonymous email domains
-      if (email.includes(ANONYMOUS_EMAIL_DOMAIN)) {
-        return {
-          isSubscribed: false,
-          topics: [],
-        };
-      }
-
-      try {
-        const result = await getContactTopicSubscriptions({ email });
-
-        if (!result.success) {
-          return {
-            isSubscribed: false,
-            topics: [],
-          };
-        }
-
-        return {
-          isSubscribed: true,
-          email,
-          topics: result.topics || [],
-        };
-      } catch (error) {
-        console.error("Failed to get user topics:", error);
-        return {
-          isSubscribed: false,
-          topics: [],
-        };
-      }
-    }),
-
-  /**
-   * Update topic subscriptions
-   * For authenticated users: uses session email
-   * For anonymous users: requires email parameter (from localStorage)
-   */
-  updateMyTopics: publicProcedure
-    .input(
-      z.object({
-        topics: z.array(topicKeySchema),
-        email: z.string().email().optional(), // Optional email for anonymous users
-      }),
-    )
-    .handler(async ({ context: ctx, input }) => {
-      // Determine which email to use:
-      // 1. If provided in input, use that (for anonymous users with localStorage email)
-      // 2. Otherwise, use session email (for authenticated users)
-      const email = input.email || ctx.session?.user?.email;
-
-      if (!email) {
-        throw new Error("No email found for user");
-      }
+      const email = ctx.session.user.email;
 
       // Skip anonymous email domains
       if (email.includes(ANONYMOUS_EMAIL_DOMAIN)) {

@@ -95,6 +95,7 @@ export const rootMetadata: Metadata = {
   title: { template: TITLE_TEMPLATE, default: SITE_NAME },
   description: DEFAULT_DESCRIPTION,
   icons: [{ rel: "icon", url: "/favicon.ico" }],
+  robots: { index: false, follow: false },
   openGraph: {
     type: "website",
     siteName: SITE_NAME,

@@ -5,6 +5,7 @@ import {
   isOutreachConfigured,
   isOutreachError,
 } from "@/server/clients/outreach.client";
+import { assertLabAccess } from "@/server/lab-access";
 
 interface BdrCandidate {
   outreachUserId: string;
@@ -39,6 +40,9 @@ function toTimestamp(value: string | null): number {
  * GET /api/outreach/bdr-load?includeEmails=serrelle.baker@wander.com,catherine@wander.com
  */
 export async function GET(request: Request) {
+  const denied = await assertLabAccess(request);
+  if (denied) return denied;
+
   if (!isOutreachConfigured) {
     return NextResponse.json(
       {

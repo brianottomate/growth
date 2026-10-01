@@ -49,6 +49,7 @@ const PAGES: { name: string; href: string; note?: string }[] = [
   { name: "Growth system", href: "/lab/growth-system", note: "system map" },
   { name: "Message streams", href: "/lab/message-streams", note: "system map" },
   { name: "System map", href: "/lab/system" },
+  { name: "Design system", href: "/lab/design-system" },
 ];
 
 const DIAGNOSTICS: { name: string; href: string; note?: string }[] = [
