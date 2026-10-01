@@ -1,3 +1,4 @@
+import { WanderOsSiteCard } from "@/app/app/brands/[brandSlug]/WanderOsSiteCard";
 import { BrandBrandingCard } from "@/app/app/brands/[brandSlug]/BrandBrandingCard";
 import { BrandPreviewCard } from "../BrandPreviewCard";
 import { BrandMarkCard } from "@/app/app/brands/[brandSlug]/BrandMarkCard";
@@ -243,6 +244,25 @@ export default async function PerformanceBrandHomesPage({
           previewHome={previewHome}
         />
       </HeroCard>
+      <section id="booking" className="space-y-4 rounded-xl border p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold">Homes & booking targets</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Organize Featured and custom home groups. With WanderOS enabled,
+              create booking links for selected homes, dates, or both.
+            </p>
+          </div>
+          <ButtonLink
+            href={brandTabHref(slug, "booking")}
+            size="sm"
+            variant="outline"
+          >
+            Manage groups & targets
+          </ButtonLink>
+        </div>
+        <WanderOsSiteCard brandId={brand.id} />
+      </section>
       {committed.length > 0 || feedRows.length > 0 ? (
         <PickedHomes
           brandId={brand.id}

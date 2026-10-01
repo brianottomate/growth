@@ -44,9 +44,11 @@ type Target = {
 export function HomeGroupsWorkspace({
   brandId,
   brandSlug,
+  setupHref = `/app/brands/${brandSlug}/setup`,
 }: {
   brandId: string;
   brandSlug: string;
+  setupHref?: string;
 }) {
   const client = useQueryClient();
   const context = useQuery(
@@ -151,7 +153,7 @@ export function HomeGroupsWorkspace({
         </p>
         {!data.connected && (
           <p className="text-sm">
-            <Link className="underline" href={`/app/brands/${brandSlug}/setup`}>
+            <Link className="underline" href={setupHref}>
               Enable and connect WanderOS
             </Link>{" "}
             to use booking targets.

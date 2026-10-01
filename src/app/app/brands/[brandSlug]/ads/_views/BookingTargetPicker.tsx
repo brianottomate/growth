@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,10 @@ export function BookingTargetPicker({
   targetId: string | null;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const manageHref = pathname.startsWith("/app/performance/")
+    ? `/app/performance/brands/${brandSlug}/booking`
+    : `/app/brands/${brandSlug}/homes`;
   const [selected, setSelected] = useState(targetId ?? "none");
   const targets = useQuery(
     orpc.homeGroups.targets.queryOptions({ input: { brandId } }),
@@ -44,7 +48,7 @@ export function BookingTargetPicker({
   if (!targets.data?.targets.length)
     return (
       <p className="text-xs text-muted-foreground">
-        <Link href={`/app/brands/${brandSlug}/homes`} className="underline">
+        <Link href={manageHref} className="underline">
           Home groups & booking targets
         </Link>
       </p>
@@ -74,10 +78,7 @@ export function BookingTargetPicker({
         >
           Apply booking link
         </Button>
-        <Link
-          href={`/app/brands/${brandSlug}/homes`}
-          className="text-xs underline"
-        >
+        <Link href={manageHref} className="text-xs underline">
           Manage targets
         </Link>
       </div>
