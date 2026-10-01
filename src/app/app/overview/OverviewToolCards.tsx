@@ -754,21 +754,27 @@ function ToolCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="overflow-hidden rounded-lg border bg-card text-card-foreground">
-      <div className="flex items-center justify-between gap-2 border-b px-3.5 py-2.5">
-        <div className="flex items-center gap-2">
+    <div className="@container min-w-0 overflow-hidden rounded-lg border bg-card text-card-foreground">
+      <div className="flex items-start justify-between gap-3 border-b px-3.5 py-2.5">
+        <div className="flex min-w-0 items-start gap-2">
           <span className="grid size-6 shrink-0 grid-cols-1 place-items-center rounded-md bg-primary/10 text-primary">
             <Icon className="h-3.5 w-3.5" />
           </span>
-          <span className="text-sm font-medium">{title}</span>
-          {hint && (
-            <span className="text-xs text-muted-foreground">{hint}</span>
-          )}
+          <div className="min-w-0 space-y-0.5">
+            <p className="text-sm leading-snug font-medium break-words">
+              {title}
+            </p>
+            {hint && (
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                {hint}
+              </p>
+            )}
+          </div>
         </div>
         {href && (
           <Link
             href={href}
-            className="inline-flex items-center gap-0.5 text-xs text-muted-foreground hover:text-foreground"
+            className="inline-flex shrink-0 items-center gap-0.5 py-1 text-xs text-muted-foreground hover:text-foreground"
           >
             View
             <ArrowUpRight className="h-3 w-3" />
@@ -1239,7 +1245,7 @@ export function ContentStrategyCard({
       icon={Layers}
       title={`Content structure · ${output.brand.name}`}
       href={output.pillarsUrl}
-      hint={`${output.pillars.length} pillars · ${output.series.length} series`}
+      hint={`${output.pillars.length} pillar${output.pillars.length === 1 ? "" : "s"} · ${output.series.length} series`}
     >
       <div className="space-y-3">
         <div>
@@ -1247,23 +1253,30 @@ export function ContentStrategyCard({
             Pillars
           </p>
           {output.pillars.length ? (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="grid grid-cols-1 gap-2 @lg:grid-cols-2">
               {output.pillars.map((pillar) => (
-                <span
+                <div
                   key={pillar.slug}
-                  className="inline-flex items-center gap-1.5 rounded-full border bg-muted/50 px-2 py-1 text-[11px]"
+                  className="min-w-0 rounded-md border bg-muted/30 px-2.5 py-2"
                   title={pillar.description}
                 >
-                  <span
-                    className="size-1.5 rounded-full"
-                    style={{ background: pillar.color }}
-                  />
-                  {pillar.name}
-                  <span className="text-muted-foreground tabular-nums">
-                    {pillar.contentCount}
-                    {pillar.targetPct != null ? ` · ${pillar.targetPct}%` : ""}
-                  </span>
-                </span>
+                  <div className="flex items-start gap-2">
+                    <span
+                      className="mt-1 size-1.5 shrink-0 rounded-full"
+                      style={{ background: pillar.color }}
+                    />
+                    <p className="min-w-0 text-xs font-medium break-words">
+                      {pillar.name}
+                    </p>
+                  </div>
+                  <p className="mt-1 pl-3.5 text-[11px] text-muted-foreground tabular-nums">
+                    {pillar.contentCount} idea
+                    {pillar.contentCount === 1 ? "" : "s"}
+                    {pillar.targetPct != null
+                      ? ` · ${pillar.targetPct}% target`
+                      : ""}
+                  </p>
+                </div>
               ))}
             </div>
           ) : (
@@ -1280,19 +1293,24 @@ export function ContentStrategyCard({
           {output.series.length ? (
             <ul className="space-y-1.5">
               {output.series.slice(0, 6).map((series) => (
-                <li key={series.id} className="flex items-center gap-2 text-xs">
-                  <span className="min-w-0 flex-1 truncate font-medium">
-                    {series.name}
-                  </span>
-                  {series.pillarSlug && (
-                    <span className="max-w-32 truncate text-muted-foreground">
-                      {series.pillarSlug}
+                <li
+                  key={series.id}
+                  className="min-w-0 rounded-md border px-2.5 py-2 text-xs"
+                >
+                  <p className="font-medium break-words">{series.name}</p>
+                  <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+                    {series.pillarSlug && (
+                      <span className="break-words">
+                        {output.pillars.find(
+                          (pillar) => pillar.slug === series.pillarSlug,
+                        )?.name ?? series.pillarSlug}
+                      </span>
+                    )}
+                    <span className="tabular-nums">
+                      {series.content.length} idea
+                      {series.content.length === 1 ? "" : "s"}
                     </span>
-                  )}
-                  <span className="text-muted-foreground tabular-nums">
-                    {series.content.length} idea
-                    {series.content.length === 1 ? "" : "s"}
-                  </span>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -1653,7 +1671,7 @@ export function MentionsCard({ output }: { output: MentionsOutput }) {
       icon={Radio}
       title="Social mentions"
       href="/app/listen"
-      hint={`${count}`}
+      hint={`${count} mention${count === 1 ? "" : "s"}`}
     >
       {mentions.length === 0 ? (
         <p className="text-sm text-muted-foreground">Nothing in the queue.</p>
@@ -1670,38 +1688,39 @@ export function MentionsCard({ output }: { output: MentionsOutput }) {
             const Row = (
               <div className="flex items-start gap-2 py-2 first:pt-0 last:pb-0">
                 <MessageCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm">
+                <div className="min-w-0 flex-1 space-y-2">
+                  <p className="text-sm leading-relaxed break-words">
                     {m.title?.trim() || (
                       <span className="text-muted-foreground italic">
                         No title
                       </span>
                     )}
                   </p>
-                  <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                    <span className="uppercase">{where}</span>
-                    {m.author && <span>· {m.author}</span>}
-                    <span>· {fmtDate(m.receivedAt)}</span>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+                    <span className="break-words uppercase">{where}</span>
+                    {m.author && <span className="break-all">{m.author}</span>}
+                    <span>{fmtDate(m.receivedAt)}</span>
                     {typeof m.relevance === "number" && (
-                      <span className="inline-flex items-center gap-0.5">
-                        · <CircleDot className="h-2.5 w-2.5" />
+                      <span className="inline-flex items-center gap-1">
+                        <CircleDot className="size-2.5" />
                         {m.relevance <= 1
                           ? Math.round(m.relevance * 100)
                           : m.relevance}
+                        % relevance
                       </span>
                     )}
-                  </p>
+                  </div>
+                  {action && (
+                    <span
+                      className={cn(
+                        "inline-flex max-w-full rounded-md px-2 py-1 text-[11px] leading-relaxed font-medium break-words",
+                        action.badge,
+                      )}
+                    >
+                      {action.label}
+                    </span>
+                  )}
                 </div>
-                {action && (
-                  <span
-                    className={cn(
-                      "shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium",
-                      action.badge,
-                    )}
-                  >
-                    {action.label}
-                  </span>
-                )}
               </div>
             );
             return (
