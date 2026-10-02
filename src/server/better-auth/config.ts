@@ -13,6 +13,7 @@ import {
 } from "better-auth/plugins";
 import { nextCookies } from "better-auth/next-js";
 import { and, eq } from "drizzle-orm";
+import { needsOAuthWorkspace } from "./oauth-workspace";
 
 import { env } from "@/env";
 import { db } from "@/server/db";
@@ -460,7 +461,8 @@ export const auth = betterAuth({
       silenceWarnings: { oauthAuthServerConfig: true },
       postLogin: {
         page: "/oauth/workspace",
-        shouldRedirect: ({ scopes }) => scopes.includes(GROWTH_MCP_SCOPE),
+        shouldRedirect: (context) =>
+          needsOAuthWorkspace(context, hasOrganizationAccess),
         consentReferenceId: async ({ user, session, scopes }) => {
           if (!scopes.includes(GROWTH_MCP_SCOPE)) return undefined;
           const organizationId = session.activeOrganizationId;

@@ -43,7 +43,10 @@ export function WorkspaceSelector({
         throw new Error(active.error.message ?? "Could not select workspace");
       }
 
-      const response = await authClient.oauth2.continue({ postLogin: true });
+      const response = await authClient.oauth2.continue({
+        postLogin: true,
+        oauth_query: window.location.search.replace(/^\?/, ""),
+      });
       if (response.error) {
         throw new Error(
           response.error.message ?? "Could not continue authorization",

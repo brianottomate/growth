@@ -25,7 +25,12 @@ simple (`growth:all` plus the standard identity/offline scopes), but each
 tool retains its policy metadata so the grant can become more granular
 later without rewriting handlers.
 
-During authorization the user chooses one Growth organization. Better Auth
+During authorization a valid active Growth organization is reused. If the
+session has no active organization or its membership is stale, the user selects
+one on the workspace screen. Better Auth re-checks live membership when
+continuing, rather than unconditionally redirecting back to that screen.
+The selector submits the signed OAuth query so continuation retains the
+client request and rejects tampering. Better Auth
 stores that organization in the consent, access token, and refresh token
 `referenceId`; it is also signed into the access token as `org_id`. The MCP
 endpoint verifies token issuer, audience, expiry, and scope and then re-checks
