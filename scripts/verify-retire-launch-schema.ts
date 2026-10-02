@@ -1,5 +1,6 @@
 /** Verify retirement against session-local temporary tables, then roll back. */
 import postgres from "postgres";
+import { launchRetirementStatements } from "./production-schema-contract";
 import { env } from "@/env";
 
 const client = postgres(env.DATABASE_URL, {
@@ -26,13 +27,9 @@ try {
     ).text();
     // All targets are redirected to this connection's temporary namespace.
     // Never execute the public-schema migration in this verification script.
-    const statements = source
-      .replace(/^--.*$/gm, "")
-      .replace(/^BEGIN;|^COMMIT;/gm, "")
-      .replaceAll("public.", "pg_temp.")
-      .split(";")
-      .map((statement) => statement.trim())
-      .filter(Boolean);
+    const statements = launchRetirementStatements(
+      source.replaceAll("public.", "pg_temp."),
+    );
     for (let attempt = 0; attempt < 2; attempt++) {
       for (const statement of statements) await tx.unsafe(statement);
       for (const table of ["product", "campaign", "series", "content_post"]) {
