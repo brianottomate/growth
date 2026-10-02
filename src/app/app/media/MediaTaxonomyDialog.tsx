@@ -103,7 +103,7 @@ export function MediaTaxonomyDialog({
                   if (event.key === "Enter" && folderName.trim())
                     createFolder.mutate({ brandId, name: folderName.trim() });
                 }}
-                placeholder="Brand kit, Launches, UGC…"
+                placeholder="Brand kit, Campaigns, UGC…"
               />
               <Button
                 onClick={() =>

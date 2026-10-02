@@ -40,14 +40,16 @@ async function run(
   action: string,
   args: Record<string, unknown> = {},
 ) {
-  const tool = NATIVE_TOOLS[`${name}__${action}`]!;
+  const tools: import("@/server/ai/kernel/operations").GrowthCatalog =
+    NATIVE_TOOLS;
+  const tool = tools[`${name}__${action}`]!;
   const policy = policyForGrowthTool(name, { action });
   assert(
     ["local-read", "local-write"].includes(policy.consequence),
     `Refusing external work: ${name}.${action}`,
   );
   const input = tool.validationSchema.parse(args);
-  const output = normalizeGrowthJson(await tool.run(input, context));
+  const output = normalizeGrowthJson(await tool.runValidated(input, context));
   const parsed = z
     .object({ ok: z.literal(true), data: z.unknown() })
     .parse(output);
@@ -318,11 +320,11 @@ try {
     messages: [],
     context: runtime.context,
   };
-  const result = await runtime.tools.personaWrite.execute!(
+  const result = await runtime.tools.personaWrite.execute(
     { action: "create" },
     options,
   );
-  const replay = await runtime.tools.personaWrite.execute!(
+  const replay = await runtime.tools.personaWrite.execute(
     { action: "create" },
     options,
   );

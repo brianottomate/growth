@@ -6,7 +6,7 @@
  * notNull with onDelete cascade, and it only gates which Media Library and
  * Website pages the product may reference — it is not a claim about who
  * markets it. Hanging WanderOS off a WanderOS brand row would mean deleting
- * that brand silently deletes the product, its storefronts and its launches.
+ * that brand silently deletes the product, its storefronts.
  * If WanderOS ever becomes its own brand, this is one column on one row.
  *
  * Atlas content is read from wandercom/app.wander.com route definitions

@@ -79,7 +79,7 @@ export type CatalogOverrides = {
 export type CatalogHome = HotelFeedHome & {
   rating?: number;
   thumbUrl?: string;
-  gallery?: { url: string; thumbUrl: string }[];
+  gallery?: { url: string; thumbUrl: string; room?: string | null }[];
 };
 export type CatalogExport = {
   id: string;

@@ -1,0 +1,14 @@
+import { COMPOSITION_TEMPLATES } from "@/lib/compositions";
+
+/** Template semantics come from the renderer's own catalog, not guesses from names. */
+export function creativeEditingSection() {
+  return `# Reliable workspace edits
+Call one tool at a time. For edits affecting several homes or ads, read, edit and verify ONE entity, then move to the next. Do not use batch rewrite tools. Count only successful saves and name skipped or failed entities. If time runs out, report completed work and what remains; never say the whole set is done.
+For mini-studio ads (ideaStudio), use adsRead.ideaContext then adsWrite.saveIdea, never editAdCards. Each save requires a fresh read of that ad's version. Preserve stable card IDs, other cards, pool, crops, sources and every unrelated field. After reopening or saving, the old updatedAt is stale. On a conflict, read again and reapply only the requested change.
+When removing supporting copy in every shape, clear recipe.subtitle AND each existing overrides[shape].subtitle; an override otherwise keeps drawing its old text. For a single-shape edit, change only its override. Two headline lines belong in title, not title plus a small subtitle. Do not invent new wording to force a wrap without authorization. Supplied artwork does not draw saved overlay text; changing its text requires composed mode or new artwork, with sources preserved.
+Catalog location data alone does not prove that the template draws a location. Choose by the visible fields below. When location belongs inside the headline, keep it in title; that differs from a separate location caption. Read each card's approval state before editing; skip locked cards and explain that they need reopening.
+After a visible edit, call inspectCreative on the saved card and affected shape(s). Check line count, headline versus supporting text, facts, location, rating, pills, crop and placement against the operator's request. A successful save proves data changed, not that pixels are correct. If inspection fails, say the edit was saved but its appearance is unverified. Never dismiss a reported mismatch as browser cache without evidence.
+When the task needs tools outside this section, selectToolDomain enables another domain, then toolSearch discovers its operations.
+Template reference:
+${COMPOSITION_TEMPLATES.map((template) => `${template.id}: ${template.description}`).join("\n")}`;
+}

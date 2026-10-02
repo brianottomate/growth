@@ -84,12 +84,12 @@ try {
   assert.equal((await readWorkspaceChanges(orgId, since)).changes.length, 0);
   pass("acceptance is pending and creates no domain change notification");
   await work!();
-  const completed = await NATIVE_TOOLS.operationRead__status!.run(
+  const completed = await NATIVE_TOOLS.operationRead__status.run(
     { runId: started.runId },
     context,
   );
   assert(
-    NATIVE_TOOLS.operationRead__status!.resultSchema.safeParse(completed)
+    NATIVE_TOOLS.operationRead__status.resultSchema.safeParse(completed)
       .success,
   );
   assert.equal(

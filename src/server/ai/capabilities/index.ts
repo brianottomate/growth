@@ -1,6 +1,5 @@
 import "server-only";
 
-import type { GrowthTool } from "../kernel/tool";
 import type { ToolSet } from "ai";
 import {
   operationStatusTool,
@@ -47,8 +46,9 @@ export const OVERVIEW_TOOLS = {
  */
 const jobResults = [...BACKGROUND_OPERATIONS].map((name) => {
   const { capability, action } = growthOperation(name);
-  const parent = OVERVIEW_TOOLS[capability as keyof typeof OVERVIEW_TOOLS];
-  const spec = "actions" in parent ? parent.actions?.[action!] : undefined;
+  const catalog: import("../kernel/operations").GrowthCatalog = OVERVIEW_TOOLS;
+  const parent = catalog[capability];
+  const spec = parent?.actions?.[action!];
   if (!spec) throw new Error(`Missing job contract for ${name}`);
   return z.object({
     ok: z.literal(true),
@@ -57,11 +57,11 @@ const jobResults = [...BACKGROUND_OPERATIONS].map((name) => {
   });
 });
 const statusTool = operationStatusTool([...jobResults, capabilityErrorSchema]);
-export const NATIVE_TOOLS: Record<string, GrowthTool> = {
+export const NATIVE_TOOLS = {
   ...operationTools(OVERVIEW_TOOLS, "overview-chat"),
-  operationRead__status: statusTool as unknown as GrowthTool,
+  operationRead__status: statusTool,
 };
-export const MCP_TOOLS: Record<string, GrowthTool> = {
+export const MCP_TOOLS = {
   ...operationTools(OVERVIEW_TOOLS, "mcp"),
-  operationRead__status: statusTool as unknown as GrowthTool,
+  operationRead__status: statusTool,
 };

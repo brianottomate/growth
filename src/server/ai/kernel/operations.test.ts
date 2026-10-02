@@ -5,6 +5,7 @@ import { operationTools, legacyApprovalTools } from "./operations";
 import { growthAction, growthDomainTool } from "./tool";
 import { anthropicTools } from "./anthropic-tools";
 import { policyForGrowthTool } from "./policy";
+import { withGrowthExecution } from "./runtime";
 import { startOperationJob } from "./operation-jobs";
 const context = {
   orgId: "org",
@@ -42,9 +43,39 @@ describe("operation discovery", () => {
     expect(schema.properties).not.toHaveProperty("campaignId");
     expect(schema.properties).not.toHaveProperty("action");
     expect(edit.validationSchema.safeParse({ adId: "ad" }).success).toBe(false);
-    expect(
-      await edit.run({ adId: "ad", headline: "New copy" }, context),
-    ).toEqual({ ok: true, action: "setAdCopy", data: { id: "ad" } });
+    const result = await edit.run(
+      { adId: "ad", headline: "New copy" },
+      context,
+    );
+    result satisfies { ok: true; action: "setAdCopy"; data: { id: string } };
+    expect(result).toEqual({
+      ok: true,
+      action: "setAdCopy",
+      data: { id: "ad" },
+    });
+  });
+  test("the receipt adapter retains each operation's input and output contract", () => {
+    const runtime = withGrowthExecution(operationTools(catalog, "test"));
+    const edit = runtime.adsWrite__setAdCopy!;
+    type Input = z.infer<typeof edit.validationSchema>;
+    const valid: Input = { adId: "ad", headline: "Copy" };
+    // @ts-expect-error A registry or wrapper that erases input types breaks this check.
+    const invalid: Input = { adId: "ad", headline: 123 };
+    expect(edit.validationSchema.safeParse(valid).success).toBe(true);
+    expect(edit.validationSchema.safeParse(invalid).success).toBe(false);
+    type Output = Awaited<ReturnType<typeof edit.execute>>;
+    const assertResult = (output: Output) => {
+      if (output.ok) {
+        output.action satisfies "setAdCopy";
+        output.data.id satisfies string;
+        // @ts-expect-error A result ID is a string, not an erased or numeric value.
+        output.data.id satisfies number;
+      } else {
+        output.error.message satisfies string;
+      }
+    };
+    assertResult({ ok: true, action: "setAdCopy", data: { id: "ad" } });
+    expect(edit.outputSchema).toBe(edit.resultSchema);
   });
   test("MCP excludes provider-spend operations individually", () => {
     const tools = operationTools(catalog, "mcp");

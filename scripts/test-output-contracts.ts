@@ -112,7 +112,7 @@ for (const brand of brands) {
       }
       try {
         const raw = normalizeGrowthJson(
-          await spec.run(parsed.data as never, context),
+          await spec.runValidated(parsed.data, context),
         );
         if (
           raw &&

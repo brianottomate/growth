@@ -24,7 +24,6 @@ import {
   Newspaper,
   Crosshair,
   Radar,
-  Rocket,
   MailCheck,
   Repeat,
   Radio,
@@ -95,7 +94,6 @@ export const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
   {
     label: "Plan & publish",
     items: [
-      { label: "Launches", href: "/app/launches", icon: Rocket },
       { label: "Content", href: "/app/content", icon: FileText },
       { label: "Series", href: "/app/series", icon: ListTree },
       { label: "Calendar", href: "/app/calendar", icon: Calendar },

@@ -22,6 +22,8 @@ const catalogHomeSchema = z.strictObject({
   ...address,
   id: z.string().describe("The WanderOS listing id."),
   name: z.string(),
+  slug: z.string().optional(),
+  reviewCount: z.number().nullable().optional(),
   url: z.string(),
   imageUrl: z.string().nullable().optional(),
   city: z.string().nullable().optional(),
@@ -35,7 +37,13 @@ const catalogHomeSchema = z.strictObject({
   rating: z.number().optional(),
   thumbUrl: z.string().optional(),
   gallery: z
-    .array(z.strictObject({ url: z.string(), thumbUrl: z.string() }))
+    .array(
+      z.strictObject({
+        url: z.string(),
+        thumbUrl: z.string(),
+        room: z.string().nullable().optional(),
+      }),
+    )
     .optional(),
 });
 

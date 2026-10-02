@@ -77,7 +77,6 @@ const campaignSchema = z.strictObject({
   homesRun: homesRunSchema.nullable(),
   id: z.string(),
   landingUrl: z.string().nullable(),
-  launchId: z.string().nullable(),
   name: z.string(),
   performanceCycleId: z.string().nullable(),
   slug: z.string().nullable(),

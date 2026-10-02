@@ -735,6 +735,7 @@ export const previewIntakeApplyActionOutputSchema = z.strictObject({
                         z.strictObject({
                           thumbUrl: z.string(),
                           url: z.string(),
+                          room: z.string().nullable().optional(),
                         }),
                       )
                       .optional(),

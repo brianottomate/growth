@@ -5,6 +5,7 @@ import { assertOutputContract } from "./output-contract";
 import { jsonValueSchema, normalizeGrowthJson } from "./output";
 import { listPersonasOutputSchema } from "../capabilities/outputs/personas";
 import { pushDraftActionOutputSchema } from "../capabilities/outputs/ads";
+import type { Persona } from "@/server/db/brand-schema";
 import { lifecycleWrite } from "../capabilities/lifecycle";
 
 const context = {
@@ -16,7 +17,7 @@ const context = {
 
 describe("Growth output boundary", () => {
   test("normalizes persisted dates and validates nullable persona fields", async () => {
-    const persona = {
+    const persona: Persona = {
       id: "pers_test",
       brandId: "brand_test",
       name: "Family trips",
@@ -36,7 +37,7 @@ describe("Growth output boundary", () => {
           description: "List",
           inputSchema: z.object({}),
           outputSchema: listPersonasOutputSchema,
-          execute: async (): Promise<unknown> => [persona],
+          execute: async () => [persona],
         }),
       },
     });
@@ -49,6 +50,8 @@ describe("Growth output boundary", () => {
       data: [
         {
           ...persona,
+          deletedAt: null,
+          demandGeography: { states: ["California"], source: null },
           createdAt: "2026-09-22T00:00:00.000Z",
           updatedAt: "2026-09-22T00:00:00.000Z",
         },
@@ -86,7 +89,13 @@ describe("Growth output boundary", () => {
       inputSchema: z.object({}),
       resultSchema: z.object({
         ok: z.literal(true),
-        provider: z.object({ id: z.string() }).catchall(jsonValueSchema),
+        provider: z
+          .object({
+            id: z.string(),
+            metrics: z.object({ clicks: z.number() }),
+            flags: z.array(z.string()),
+          })
+          .catchall(jsonValueSchema),
       }),
       execute: async () => ({
         ok: true,
@@ -178,4 +187,23 @@ test("brand projections exclude connection credentials and issuance details", as
       z.object({ brand: z.object({ connectToken: z.string() }) }),
     ),
   ).toThrow("connection credential");
+});
+
+test("stored legacy sender fields are projected out without losing current settings", async () => {
+  const { brandForAssistant } = await import("../capabilities/brand-output");
+  const brand = {
+    connectToken: null,
+    connectTokenIssuedAt: null,
+    connectTokenIssuedByEmail: null,
+    connectTokenIssuedByName: null,
+    emailSender: {
+      fromName: "Wander",
+      copyGuide: "Use plain language",
+      marketingDomain: "retired.example",
+    },
+  };
+  expect(brandForAssistant(brand)).toEqual({
+    emailSender: { fromName: "Wander", copyGuide: "Use plain language" },
+  });
+  expect(brand.emailSender.marketingDomain).toBe("retired.example");
 });

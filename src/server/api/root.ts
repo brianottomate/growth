@@ -25,7 +25,6 @@ import { outreachRouter } from "@/server/api/routers/outreach.router";
 import { performanceRouter } from "@/server/api/routers/performance.router";
 import { productStorefrontRouter } from "@/server/api/routers/productStorefront.router";
 import { instantlyRouter } from "@/server/api/routers/instantly.router";
-import { launchRouter } from "@/server/api/routers/launch.router";
 import { leadsRouter } from "@/server/api/routers/leads.router";
 import { lifecycleRouter } from "@/server/api/routers/lifecycle.router";
 import { pregenNativeRouter } from "@/server/api/routers/pregen-native.router";
@@ -49,7 +48,6 @@ import { zernioRouter } from "@/server/api/routers/zernio.router";
  */
 export const appRouter = {
   homeGroups: homeGroupsRouter,
-  launch: launchRouter,
   user: userRouter,
   ads: adsRouter,
   affiliate: affiliateRouter,

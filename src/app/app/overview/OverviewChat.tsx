@@ -1,4 +1,6 @@
 "use client";
+
+import { isChatUtilityTool } from "@/lib/chat-utility-tools";
 import {
   assistantFocusLabel,
   sameTurnFocus,
@@ -168,6 +170,8 @@ function toolLabel(toolName: string, action?: string) {
 }
 
 function pendingLabel(toolName: string, action?: string) {
+  if (toolName === "inspectCreative") return "Checking the saved preview…";
+  if (toolName === "selectToolDomain") return "Finding relevant tools…";
   if (!isGrowthCapabilityId(toolName))
     return `Running ${humanizeToolName(action ?? toolName)}…`;
   const base = GROWTH_CAPABILITY_LABELS[toolName];
@@ -969,7 +973,8 @@ export function OverviewChat({
                   isToolUIPart(part) &&
                   part.state === "output-available" &&
                   getToolName(part) !== "toolSearch" &&
-                  !isGrowthCapabilityId(getToolName(part)),
+                  !isGrowthCapabilityId(getToolName(part)) &&
+                  !isChatUtilityTool(getToolName(part)),
               ),
             ) && (
               <details className="rounded-lg border px-3 py-2 text-xs text-muted-foreground">

@@ -16,7 +16,6 @@ export * from "./content-pillar-schema";
 export * from "./creative-work-schema";
 export * from "./email-document-schema";
 export * from "./product-storefront-schema";
-export * from "./launch-schema";
 export * from "./ads-schema";
 export * from "./affiliate-schema";
 export * from "./conversions-schema";

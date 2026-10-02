@@ -21,7 +21,7 @@ import {
   type GrowthExecutionContext,
 } from "./tool";
 
-export const BACKGROUND_OPERATIONS = new Set([
+export const BACKGROUND_OPERATION_NAMES = [
   "sourceSyncWrite__discoverChannels",
   "sourceSyncWrite__scrapePosts",
   "sourceSyncWrite__syncOwnedContent",
@@ -30,17 +30,22 @@ export const BACKGROUND_OPERATIONS = new Set([
   "mediaAnalysisWrite__analyzeImage",
   "storefrontWrite__captureReference",
   "contentMediaWrite__importFromDrive",
-]);
+] as const;
+export type BackgroundOperationName =
+  (typeof BACKGROUND_OPERATION_NAMES)[number];
+export const BACKGROUND_OPERATIONS = new Set<string>(
+  BACKGROUND_OPERATION_NAMES,
+);
 export const jobStartedDataSchema = z.strictObject({
   status: z.literal("started"),
   runId: z.string(),
   statusTool: z.literal("operationRead__status"),
 });
 
-export async function startOperationJob(
+export async function startOperationJob<Input, Output>(
   name: string,
-  tool: GrowthTool,
-  input: unknown,
+  tool: GrowthTool<Input, Output>,
+  input: Input,
   context: GrowthExecutionContext,
   schedule: (work: () => Promise<void>) => void = after,
 ) {
@@ -157,9 +162,7 @@ export async function readOperationJob(
 }
 
 export function operationStatusTool(results: z.ZodType[]) {
-  const result = z
-    .union(results as [z.ZodType, z.ZodType, ...z.ZodType[]])
-    .nullable();
+  const result = z.union(results).nullable();
   const data = z.discriminatedUnion("status", [
     z.object({ runId: z.string(), status: z.literal("running") }),
     z.object({
@@ -187,7 +190,7 @@ export function operationStatusTool(results: z.ZodType[]) {
     execute: async ({ runId }, context) => ({
       ok: true as const,
       action: "status" as const,
-      data: await readOperationJob(runId, context),
+      data: data.parse(await readOperationJob(runId, context)),
     }),
   });
 }

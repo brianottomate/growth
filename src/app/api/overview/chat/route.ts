@@ -18,19 +18,24 @@ import { catalogLocation } from "@/lib/catalog-studio";
 import { marketOf } from "@/lib/markets";
 import { streamErrorMessage } from "@/server/ai/kernel/stream-error";
 
-import { anthropic } from "@ai-sdk/anthropic";
+import { createAnthropic } from "@ai-sdk/anthropic";
+import { chatBudgetFetch } from "@/server/ai/kernel/chat-token-budget";
 import {
   convertToModelMessages,
   consumeStream,
-  isToolUIPart,
   stepCountIs,
   streamText,
   type ModelMessage,
   type UIMessage,
+  type ToolSet,
 } from "ai";
 import { and, asc, eq, inArray, isNull, or } from "drizzle-orm";
 
 import { getSession } from "@/server/better-auth/server";
+import {
+  resolveWorkspaceOrganizationId,
+  WorkspaceAccessError,
+} from "@/server/workspace-actor";
 import { db } from "@/server/db";
 import {
   assistantMessageTable,
@@ -38,9 +43,18 @@ import {
   brandTable,
   campaignTable,
   contentPostTable,
-  memberTable,
 } from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
+import {
+  chatHistoryForModel,
+  compactChatMessages,
+  chatModelOutput,
+} from "@/server/ai/kernel/chat-context";
+import { isChatUtilityTool } from "@/lib/chat-utility-tools";
+import { createChatWriteGate } from "@/server/ai/kernel/chat-write-gate";
+import { createChatToolScope } from "@/server/ai/kernel/chat-tool-scope";
+import { chatCreativePreview } from "@/server/ai/kernel/chat-creative-preview";
+import { creativeEditingSection } from "@/server/ai/prompts/creative-editing";
 import { OVERVIEW_AGENT_PERSONA } from "@/server/ai/overview-agent/persona";
 import {
   BRAND_STORY_UPKEEP,
@@ -106,39 +120,7 @@ export const maxDuration = 800;
 const TURN_DEADLINE_MS = (maxDuration - 45) * 1000;
 
 const MODEL = "claude-sonnet-5";
-function sanitizeForModel(history: UIMessage[]) {
-  return history
-    .map((message, index) => {
-      if (message.role === "user") {
-        return {
-          ...message,
-          parts: message.parts.filter(
-            (part) =>
-              part.type !== "file" ||
-              ((part as { mediaType?: string }).mediaType ?? "").startsWith(
-                "image/",
-              ),
-          ),
-        };
-      }
-      if (index === history.length - 1) {
-        return message;
-      }
-      return {
-        ...message,
-        parts: message.parts.filter(
-          (part) =>
-            !isToolUIPart(part) ||
-            part.state === "output-available" ||
-            part.state === "output-error",
-        ),
-      };
-    })
-    .filter(
-      (message) => message.role !== "assistant" || message.parts.length > 0,
-    );
-}
-
+const chatAnthropic = createAnthropic({ fetch: chatBudgetFetch() });
 /**
  * Which step of the campaign page the operator asked from. Local steps are
  * built, not proposed: the chat makes the piece, reports it in a line, and
@@ -154,7 +136,7 @@ function campaignFocusPrompt(focus: AdCampaignWorkContext["focus"]) {
     case "photos":
       return `\n\nThe operator asked from the Photos step: fill this campaign's pool. Check mediaLibraryRead.list for the brand first; mediaLibraryWrite.importListingPhotos brings in their listing photos, and adsWrite.setCreativePool sets the pool from library assets.${BUILD_FIRST}`;
     case "ads":
-      return `\n\nThe operator asked from the Ads step: they want ads drafted or improved. For a brand with featured WanderOS homes, adsWrite.generateStarterIdeas is the fast path (a static and a carousel per featured home); otherwise adsWrite.draftAd with pool media. Write the copy yourself, do not ask them for it.${BUILD_FIRST}`;
+      return `\n\nThe operator asked from the Ads step: they want ads drafted or improved. Create and edit one ad at a time with adsWrite.draftAd and adsWrite.saveIdea; never use a batch rewrite. Write the copy yourself, do not ask them for it.${BUILD_FIRST}`;
     case "audiences":
       return `\n\nThe operator asked from the Audiences step: create the audience. Broad with a geography is the default that leaves the learning phase at these budgets; derive the geography from where the brand's guests come from or, failing that, its homes' region and the brand's personas. Create it with adsWrite.addAudience.${BUILD_FIRST}`;
     case "platforms":
@@ -172,26 +154,17 @@ export async function POST(req: Request): Promise<Response> {
   if (!session?.user) return new Response("Unauthorized", { status: 401 });
 
   const currentUser = session.user;
-  const activeOrganizationId = session.session.activeOrganizationId;
-  const memberships = await db.query.memberTable.findMany({
-    where: activeOrganizationId
-      ? and(
-          eq(memberTable.userId, currentUser.id),
-          eq(memberTable.organizationId, activeOrganizationId),
-        )
-      : eq(memberTable.userId, currentUser.id),
-    columns: { organizationId: true },
-    limit: 2,
-  });
-  if (memberships.length !== 1 || !memberships[0]?.organizationId) {
-    return new Response(
-      memberships.length > 1
-        ? "Select an active organization"
-        : "No organization",
-      { status: 403 },
-    );
+  let organizationId: string;
+  try {
+    organizationId = await resolveWorkspaceOrganizationId({
+      userId: currentUser.id,
+      preferredOrganizationId: session.session.activeOrganizationId,
+    });
+  } catch (error) {
+    if (error instanceof WorkspaceAccessError)
+      return new Response(error.message, { status: 403 });
+    throw error;
   }
-  const membership = memberships[0];
 
   const submitted = (await req.json()) as {
     threadId?: string;
@@ -206,7 +179,7 @@ export async function POST(req: Request): Promise<Response> {
   let claimed;
   try {
     claimed = await claimChatTurn(
-      { userId: currentUser.id, organizationId: membership.organizationId },
+      { userId: currentUser.id, organizationId },
       claimedThreadId,
       inputId,
       submitted.trigger === "submit-message" &&
@@ -282,7 +255,7 @@ export async function POST(req: Request): Promise<Response> {
     const thread = await db.query.assistantThreadTable.findFirst({
       where: and(
         eq(assistantThreadTable.id, threadId),
-        eq(assistantThreadTable.organizationId, membership.organizationId),
+        eq(assistantThreadTable.organizationId, organizationId),
         or(
           eq(assistantThreadTable.createdBy, currentUser.id),
           eq(assistantThreadTable.visibility, "shared"),
@@ -299,7 +272,7 @@ export async function POST(req: Request): Promise<Response> {
     const contextMode = assistantIntent ? "pinned" : requestedContextMode;
     const pageContext = await resolvePageContext(
       pagePath ?? "",
-      membership.organizationId,
+      organizationId,
     );
     const requestedWorkContext =
       assistantIntent?.type === "work_content_post"
@@ -323,7 +296,7 @@ export async function POST(req: Request): Promise<Response> {
       (post) => post.id === requestedWorkContext?.platformPostId,
     );
     const activeWorkContext: ContentWorkContext | null =
-      workItem?.brand?.organizationId === membership.organizationId
+      workItem?.brand?.organizationId === organizationId
         ? {
             type: "work_content_post",
             brandId: workItem.brandId,
@@ -375,13 +348,13 @@ export async function POST(req: Request): Promise<Response> {
       : null;
     const selectedAd = requestedCampaignContext?.adId
       ? await adChatContext({
-          organizationId: membership.organizationId,
+          organizationId,
           campaignId: requestedCampaignContext.campaignId,
           adId: requestedCampaignContext.adId,
         }).catch(() => null)
       : null;
     const ownedCampaign =
-      campaignWorkItem?.brand?.organizationId === membership.organizationId
+      campaignWorkItem?.brand?.organizationId === organizationId
         ? campaignWorkItem
         : null;
     const activeCampaignContext: AdCampaignWorkContext | null = ownedCampaign
@@ -419,7 +392,7 @@ export async function POST(req: Request): Promise<Response> {
           requestedCatalogContext.homeId,
         )
           .then((ctx) =>
-            ctx.brand.organizationId === membership.organizationId ? ctx : null,
+            ctx.brand.organizationId === organizationId ? ctx : null,
           )
           .catch(() => null)
       : null;
@@ -446,7 +419,7 @@ export async function POST(req: Request): Promise<Response> {
       ? await db.query.brandTable.findFirst({
           where: and(
             eq(brandTable.id, requestedBrandId),
-            eq(brandTable.organizationId, membership.organizationId),
+            eq(brandTable.organizationId, organizationId),
             isNull(brandTable.deletedAt),
           ),
           columns: { id: true, name: true },
@@ -634,21 +607,20 @@ export async function POST(req: Request): Promise<Response> {
     const pageContextPrompt = await composePageContextSection({
       pagePath,
       contextMode,
-      organizationId: membership.organizationId,
+      organizationId,
     });
     // The brand story of whichever brand this turn is about: the one the work
     // item or intent names, else the one on the page.
     const storyBrandId =
       brand?.id ??
       (pagePath
-        ? (await resolvePageContext(pagePath, membership.organizationId)).brand
-            ?.id
+        ? (await resolvePageContext(pagePath, organizationId)).brand?.id
         : undefined);
     const storyBrand = storyBrandId
       ? await db.query.brandTable.findFirst({
           where: and(
             eq(brandTable.id, storyBrandId),
-            eq(brandTable.organizationId, membership.organizationId),
+            eq(brandTable.organizationId, organizationId),
           ),
           columns: { name: true, story: true },
         })
@@ -769,9 +741,6 @@ export async function POST(req: Request): Promise<Response> {
       history = persisted.slice(0, incomingIdx + 1).map((row) => row.message);
       staleTailIds = persisted.slice(incomingIdx + 1).map((row) => row.id);
     }
-    const historyMessages = await convertToModelMessages(
-      sanitizeForModel(history).slice(-30),
-    );
 
     const sheets: ModelMessage[] = [];
     if (activeAd?.images.length && activeCampaignContext?.focus !== "copy") {
@@ -823,7 +792,6 @@ export async function POST(req: Request): Promise<Response> {
         });
       }
     }
-    const modelMessages = withRequestContext(historyMessages, sheets);
 
     const context = composeGrowthContext({
       surface: "overview-chat",
@@ -831,6 +799,11 @@ export async function POST(req: Request): Promise<Response> {
       rollingCacheTtl: GROWTH_CONVERSATION_CACHE_TTL,
       sections: [
         { id: "persona", content: OVERVIEW_AGENT_PERSONA, cache: "session" },
+        {
+          id: "creative-editing",
+          content: creativeEditingSection(),
+          cache: "session",
+        },
         {
           id: "runtime-clock",
           content: runtimeClockSection({
@@ -848,50 +821,113 @@ export async function POST(req: Request): Promise<Response> {
       ],
     });
     const runId = await startAssistantRun({
-      organizationId: membership.organizationId,
+      organizationId,
       userId: currentUser.id,
       threadId: thread.id,
       surface: "overview-chat",
       model: MODEL,
       contextManifest: context.manifest,
     });
-    const runtime = buildGrowthToolRuntime({
-      tools: {
+    const writeGate = createChatWriteGate();
+    const runtimeTools: import("@/server/ai/kernel/operations").GrowthCatalog =
+      {
         ...NATIVE_TOOLS,
         ...legacyApprovalTools(OVERVIEW_TOOLS, incoming),
-      },
+      };
+    const runtime = buildGrowthToolRuntime({
+      tools: runtimeTools,
       identity: {
-        orgId: membership.organizationId,
+        orgId: organizationId,
         userId: currentUser.id,
         threadId: thread.id,
       },
       runId,
       surface: "overview-chat",
-      beforeExecute: () => assertChatTurn(claimedThreadId, turnId),
+      beforeExecute: async (name, value) => {
+        await assertChatTurn(claimedThreadId, turnId);
+        writeGate.beforeExecute(name, value);
+      },
     });
 
+    const scope = createChatToolScope({
+      tools: runtime.tools,
+      pagePath: contextMode === "page" ? pagePath : undefined,
+      performance: Boolean(activeCampaignContext || activeCatalogContext),
+      content: Boolean(activeWorkContext),
+      continuation: incoming,
+      focus: activeAd
+        ? "creative"
+        : activeCatalogContext
+          ? "catalog"
+          : activeCampaignContext?.focus,
+    });
+    const modelTools: typeof runtime.tools = Object.fromEntries(
+      Object.entries(runtime.tools).map(([name, definition]) => [
+        name,
+        {
+          ...definition,
+          toModelOutput: ({ output }: { output: unknown }) =>
+            chatModelOutput(name, output),
+        },
+      ]),
+    );
+    const utilityTools = {
+      selectToolDomain: scope.selectToolDomain,
+      inspectCreative: chatCreativePreview({
+        userId: currentUser.id,
+        orgId: organizationId,
+      }),
+    } satisfies ToolSet;
+    const chatTools: Record<
+      string,
+      | (typeof modelTools)[string]
+      | (typeof utilityTools)[keyof typeof utilityTools]
+    > &
+      typeof utilityTools = { ...modelTools, ...utilityTools };
+    const historyMessages = await convertToModelMessages(
+      chatHistoryForModel(history),
+      {
+        tools: chatTools,
+        ignoreIncompleteToolCalls: true,
+      },
+    );
+    const modelMessages = withRequestContext(historyMessages, sheets);
     let streamFailure: string | undefined;
     const steeringInputIds: string[] = [];
     const deadline = AbortSignal.timeout(TURN_DEADLINE_MS);
     const result = await (async () => {
       try {
         return streamText({
-          model: anthropic(MODEL),
+          model: chatAnthropic(MODEL),
           messages: [...context.messages, ...modelMessages],
           allowSystemInMessages: true,
-          tools: anthropicTools(runtime.tools),
-          toolsContext: runtime.toolsContext,
-          toolApproval: runtime.toolApproval,
+          tools: anthropicTools(chatTools, scope.activeTools()),
+          activeTools: scope.activeTools(),
+          providerOptions: { anthropic: { disableParallelToolUse: true } },
+          toolsContext: {
+            ...runtime.toolsContext,
+            selectToolDomain: runtime.context,
+            inspectCreative: runtime.context,
+          },
+          toolApproval: (options) =>
+            isChatUtilityTool(options.toolCall.toolName)
+              ? "not-applicable"
+              : runtime.toolApproval(options),
           abortSignal: deadline,
-          stopWhen: stepCountIs(20),
+          stopWhen: stepCountIs(160),
           maxOutputTokens: GROWTH_MAX_OUTPUT_TOKENS,
           prepareStep: async ({ messages, stepNumber }) => {
             await assertChatTurn(claimedThreadId, turnId);
+            writeGate.nextStep();
             const corrections = await readChatSteering(claimedThreadId, turnId);
             steeringInputIds.push(...corrections.map((message) => message.id));
             return {
+              activeTools: scope.activeTools(),
               messages: withGrowthRollingCache(
-                [...messages, ...(await convertToModelMessages(corrections))],
+                compactChatMessages([
+                  ...messages,
+                  ...(await convertToModelMessages(corrections)),
+                ]),
                 growthCacheTtlForStep(stepNumber),
               ),
             };

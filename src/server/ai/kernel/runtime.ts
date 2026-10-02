@@ -1,20 +1,15 @@
 import "server-only";
 
-import type {
-  InferToolInput,
-  InferToolOutput,
-  Tool,
-  ToolExecutionOptions,
-  ToolSet,
-} from "ai";
+import type { ToolExecutionOptions } from "ai";
 import { and, eq } from "drizzle-orm";
-import { z } from "zod";
+import type { z } from "zod";
 
 import { db } from "@/server/db";
 import { assistantToolReceiptTable, memberTable } from "@/server/db/schema";
-import { compactGrowthError } from "./errors";
-import { policyForGrowthTool, type GrowthActionPolicy } from "./policy";
-import type { GrowthExecutionContext } from "./tool";
+import { executeReceipt, type ReceiptStore } from "./receipt-execution";
+import { policyForGrowthTool } from "./policy";
+import type { GrowthCapabilityError, GrowthExecutionContext } from "./tool";
+import type { GrowthCatalog } from "./operations";
 
 export interface GrowthRuntimeIdentity {
   orgId: string;
@@ -23,36 +18,6 @@ export interface GrowthRuntimeIdentity {
 }
 
 export { normalizeGrowthJson } from "./output";
-import { normalizeGrowthJson, type JsonValue } from "./output";
-
-function isErrorOutput(
-  value: JsonValue,
-): value is JsonValue & { ok: false; error: { message: string } } {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    !Array.isArray(value) &&
-    value.ok === false &&
-    typeof value.error === "object" &&
-    value.error !== null &&
-    !Array.isArray(value.error) &&
-    typeof value.error.message === "string"
-  );
-}
-
-function failureOutput(error: unknown, action?: string) {
-  const compact = compactGrowthError(error);
-  return {
-    ok: false as const,
-    ...(action ? { action } : {}),
-    error: {
-      code: compact.code,
-      message: compact.error,
-      suggestedAction: compact.suggestedAction,
-    },
-  };
-}
-
 async function assertOrganizationAccess(context: GrowthExecutionContext) {
   const membership = await db.query.memberTable.findFirst({
     where: and(
@@ -66,159 +31,107 @@ async function assertOrganizationAccess(context: GrowthExecutionContext) {
   }
 }
 
-async function executeWithReceipt(input: {
-  name: string;
-  policy: GrowthActionPolicy;
-  value: unknown;
-  options: ToolExecutionOptions<GrowthExecutionContext>;
-  execute: (
-    value: unknown,
-    options: ToolExecutionOptions<GrowthExecutionContext>,
-  ) => unknown;
-}): Promise<JsonValue> {
-  const context = input.options.context;
-  const startedAt = new Date();
-  const normalizedInput = normalizeGrowthJson(input.value);
-  const [created] = await db
-    .insert(assistantToolReceiptTable)
-    .values({
-      runId: context.runId,
-      threadId: context.threadId ?? null,
-      toolCallId: input.options.toolCallId,
-      toolName: input.name,
-      policy: { ...input.policy },
-      input: normalizedInput,
-      startedAt,
-    })
-    .onConflictDoNothing()
-    .returning({ id: assistantToolReceiptTable.id });
-
-  if (!created) {
-    const existing = await db.query.assistantToolReceiptTable.findFirst({
+const receipts: ReceiptStore = {
+  async claim({ name, value, context, toolCallId, policy, startedAt }) {
+    const [created] = await db
+      .insert(assistantToolReceiptTable)
+      .values({
+        runId: context.runId,
+        threadId: context.threadId ?? null,
+        toolCallId,
+        toolName: name,
+        policy: { ...policy },
+        input: value,
+        startedAt,
+      })
+      .onConflictDoNothing()
+      .returning({ id: assistantToolReceiptTable.id });
+    return created?.id;
+  },
+  read: (runId, toolCallId) =>
+    db.query.assistantToolReceiptTable.findFirst({
       where: and(
-        eq(assistantToolReceiptTable.runId, context.runId),
-        eq(assistantToolReceiptTable.toolCallId, input.options.toolCallId),
+        eq(assistantToolReceiptTable.runId, runId),
+        eq(assistantToolReceiptTable.toolCallId, toolCallId),
       ),
-    });
-    if (existing?.output !== null && existing?.output !== undefined) {
-      return existing.output as JsonValue;
-    }
-    return normalizeGrowthJson(
-      failureOutput(
-        new Error(
-          `Tool call ${input.options.toolCallId} is already ${existing?.status ?? "running"}`,
-        ),
-        typeof normalizedInput === "object" &&
-          normalizedInput !== null &&
-          !Array.isArray(normalizedInput) &&
-          typeof normalizedInput.action === "string"
-          ? normalizedInput.action
-          : undefined,
-      ),
-    );
-  }
-
-  try {
-    await assertOrganizationAccess(context);
-    if (!input.policy.surfaces.includes(context.surface)) {
-      throw new Error(
-        `${input.name} is not available on the ${context.surface} surface.`,
-      );
-    }
-    const execution = await input.execute(input.value, input.options);
-    if (
-      typeof execution === "object" &&
-      execution !== null &&
-      Symbol.asyncIterator in execution
-    ) {
-      throw new Error("Streaming Growth tool outputs are not supported");
-    }
-    const output = normalizeGrowthJson(execution);
-    const failed = isErrorOutput(output);
-    const finishedAt = new Date();
-    await db
-      .update(assistantToolReceiptTable)
-      .set({
-        status: failed ? "failed" : "completed",
-        output,
-        ...(failed ? { error: output as Record<string, unknown> } : {}),
-        finishedAt,
-        durationMs: finishedAt.getTime() - startedAt.getTime(),
-      })
-      .where(eq(assistantToolReceiptTable.id, created.id));
-    return output;
-  } catch (error) {
-    const action =
-      typeof normalizedInput === "object" &&
-      normalizedInput !== null &&
-      !Array.isArray(normalizedInput) &&
-      typeof normalizedInput.action === "string"
-        ? normalizedInput.action
-        : undefined;
-    const output = failureOutput(error, action);
-    const finishedAt = new Date();
-    await db
-      .update(assistantToolReceiptTable)
-      .set({
-        status: "failed",
-        error: output.error,
-        output,
-        finishedAt,
-        durationMs: finishedAt.getTime() - startedAt.getTime(),
-      })
-      .where(eq(assistantToolReceiptTable.id, created.id));
-    return output;
-  }
-}
-
-/** Add receipts, compact errors, and execute-time org access to native tools. */
-export function withGrowthExecution<Tools extends ToolSet>(
-  tools: Tools,
-  beforeExecute?: () => Promise<void>,
-): {
-  [Name in keyof Tools]: Tool<
-    InferToolInput<Tools[Name]>,
-    InferToolOutput<Tools[Name]> | JsonValue,
-    GrowthExecutionContext
-  >;
-} {
-  return Object.fromEntries(
-    Object.entries(tools).map(([name, definition]) => {
-      return [
-        name,
-        {
-          ...definition,
-          outputSchema: z.json(),
-          execute: definition.execute
-            ? async (
-                value: unknown,
-                options: ToolExecutionOptions<GrowthExecutionContext>,
-              ) => {
-                await beforeExecute?.();
-                return executeWithReceipt({
-                  name,
-                  policy: policyForGrowthTool(name, value),
-                  value,
-                  options,
-                  execute: definition.execute as (
-                    value: unknown,
-                    executionOptions: ToolExecutionOptions<GrowthExecutionContext>,
-                  ) => unknown,
-                });
-              }
-            : undefined,
-        },
-      ];
     }),
-  ) as never;
+  async finish(id, result) {
+    await db
+      .update(assistantToolReceiptTable)
+      .set(result)
+      .where(eq(assistantToolReceiptTable.id, id));
+  },
+};
+
+type RuntimeTool<Definition extends GrowthCatalog[string]> = Omit<
+  Definition,
+  "execute" | "outputSchema"
+> & {
+  outputSchema: Definition["resultSchema"];
+  execute: (
+    input: z.infer<Definition["validationSchema"]>,
+    options: ToolExecutionOptions<GrowthExecutionContext>,
+  ) => Promise<z.infer<Definition["resultSchema"]> | GrowthCapabilityError>;
+};
+export type RuntimeTools<Tools extends GrowthCatalog> = {
+  [Name in keyof Tools]: RuntimeTool<NonNullable<Tools[Name]>>;
+};
+
+function wrapGrowthTool<Input, Output>(
+  name: string,
+  definition: GrowthCatalog[string] & {
+    validationSchema: z.ZodType<Input>;
+    resultSchema: z.ZodType<Output>;
+  },
+  beforeExecute?: (name: string, value: unknown) => Promise<void>,
+) {
+  return {
+    ...definition,
+    inputSchema: definition.inputSchema,
+    outputSchema: definition.resultSchema,
+    execute: async (
+      value: Input,
+      options: ToolExecutionOptions<GrowthExecutionContext>,
+    ) => {
+      await beforeExecute?.(name, value);
+      return executeReceipt({
+        name,
+        value,
+        toolCallId: options.toolCallId,
+        context: options.context,
+        policy: policyForGrowthTool(name, value),
+        resultSchema: definition.resultSchema,
+        assertAccess: assertOrganizationAccess,
+        receipts,
+        execute: async () => definition.runValidated(value, options.context),
+      });
+    },
+  };
 }
 
-export function buildGrowthToolRuntime<Tools extends ToolSet>(input: {
+/** Add receipts, output contracts, compact errors, and live access to native tools. */
+export function withGrowthExecution<const Tools extends GrowthCatalog>(
+  tools: Tools,
+  beforeExecute?: (name: string, value: unknown) => Promise<void>,
+): RuntimeTools<Tools> {
+  // Object.fromEntries cannot retain keys. Every value is produced by the
+  // typed wrapper; this assertion reconstructs keys, not input/output types.
+  return Object.fromEntries(
+    Object.entries(tools).map(([name, definition]) => [
+      name,
+      wrapGrowthTool(name, definition, beforeExecute),
+    ]),
+  ) as RuntimeTools<Tools>;
+}
+
+export function buildGrowthToolRuntime<
+  const Tools extends GrowthCatalog,
+>(input: {
   tools: Tools;
   identity: GrowthRuntimeIdentity;
   runId: string;
   surface: GrowthExecutionContext["surface"];
-  beforeExecute?: () => Promise<void>;
+  beforeExecute?: (name: string, value: unknown) => Promise<void>;
 }) {
   const tools = withGrowthExecution(input.tools, input.beforeExecute);
   const context: GrowthExecutionContext = {

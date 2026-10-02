@@ -10,7 +10,10 @@ const eager = new Set([
 ]);
 
 /** Provider discovery wraps tools after receipts and approval hooks are installed. */
-export function anthropicTools<Tools extends ToolSet>(tools: Tools) {
+export function anthropicTools<Tools extends ToolSet>(
+  tools: Tools,
+  activeTools?: string[],
+) {
   const wrapped = { ...tools };
   for (const name in wrapped) {
     const definition = wrapped[name];
@@ -21,7 +24,19 @@ export function anthropicTools<Tools extends ToolSet>(tools: Tools) {
         ...definition.providerOptions,
         anthropic: {
           ...definition.providerOptions?.anthropic,
-          deferLoading: !eager.has(name),
+          deferLoading:
+            !eager.has(name) &&
+            name !== "selectToolDomain" &&
+            name !== "inspectCreative" &&
+            !(
+              activeTools?.includes(name) &&
+              [
+                "adsRead__ideaContext",
+                "adsWrite__saveIdea",
+                "adsRead__catalogHomeFacts",
+                "adsWrite__editCatalogCard",
+              ].includes(name)
+            ),
         },
       },
     };

@@ -12,10 +12,21 @@ import { InvalidToolInputError, NoSuchToolError } from "ai";
  * was told were legal. Naming the field is what lets it self-correct.
  */
 export function streamErrorMessage(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error);
+  if (
+    /prompt is too long|context[_ ]length|maximum context|too much context/i.test(
+      raw,
+    )
+  ) {
+    return "This request contains too much context. Completed edits are saved. Start a new chat from the specific ad or home with your latest instructions; do not repeat completed edits.";
+  }
+  if (/tool_use.*tool_result|tool.call.*without.*result/i.test(raw)) {
+    return "The response was interrupted while handling a tool. Completed edits are saved. Continue to read the current state and finish only the remaining work.";
+  }
   if (NoSuchToolError.isInstance(error)) {
     return `No such tool: ${error.toolName}.${
       error.availableTools?.length
-        ? ` Available: ${error.availableTools.join(", ")}.`
+        ? ` Search the tools available in this section, or enable the relevant domain with selectToolDomain.`
         : ""
     }`;
   }

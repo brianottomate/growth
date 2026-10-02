@@ -103,7 +103,13 @@ export const homesSchema = z.strictObject({
   city: z.string().nullable().optional(),
   country: z.string().nullable().optional(),
   gallery: z
-    .array(z.strictObject({ thumbUrl: z.string(), url: z.string() }))
+    .array(
+      z.strictObject({
+        thumbUrl: z.string(),
+        url: z.string(),
+        room: z.string().nullable().optional(),
+      }),
+    )
     .optional(),
   guests: z.number().nullable().optional(),
   id: z.string(),
@@ -111,6 +117,8 @@ export const homesSchema = z.strictObject({
   latitude: z.number().nullable().optional(),
   longitude: z.number().nullable().optional(),
   name: z.string(),
+  slug: z.string().optional(),
+  reviewCount: z.number().nullable().optional(),
   nightlyFrom: z.number().nullable().optional(),
   postalCode: z.string().nullable().optional(),
   rating: z.number().optional(),

@@ -13,7 +13,6 @@ const seriesSchema = z.strictObject({
   description: z.string().nullable(),
   endAt: z.iso.datetime().nullable(),
   id: z.string(),
-  launchId: z.string().nullable(),
   name: z.string(),
   pillar: z.string().nullable(),
   slug: z.string().nullable(),

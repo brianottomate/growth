@@ -4,13 +4,7 @@ import { NEXT_OPTIONS_URI } from "@/server/mcp/next-options-ui";
 
 import type { AuthInfo, McpServer } from "@modelcontextprotocol/server";
 import { anthropic } from "@ai-sdk/anthropic";
-import {
-  generateText,
-  stepCountIs,
-  type Tool,
-  type ToolExecutionOptions,
-  type ToolSet,
-} from "ai";
+import { generateText, stepCountIs, type ToolExecutionOptions } from "ai";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 
@@ -34,7 +28,7 @@ import { policyForGrowthTool } from "../kernel/policy";
 import { buildGrowthToolRuntime } from "../kernel/runtime";
 import { runtimeClockSection } from "../kernel/runtime-clock";
 import { summarizeGrowthUsage } from "../kernel/usage";
-import type { GrowthExecutionContext, GrowthTool } from "../kernel/tool";
+import type { GrowthExecutionContext } from "../kernel/tool";
 import { SOCIAL_POST_PREVIEW_URI } from "@/server/mcp/social-post-preview-ui";
 
 type ToolContext = { http?: { authInfo?: AuthInfo } };
@@ -137,7 +131,10 @@ You may read, draft, plan, and apply authorized workspace changes. Prefer acting
 Report exactly what changed and include the canonical Growth route when useful.
 You do not have open-world web research on this surface. Never invent workspace state.`;
 
-function registerInvokeGrowth(server: McpServer, toolSet: ToolSet) {
+function registerInvokeGrowth(
+  server: McpServer,
+  toolSet: import("../kernel/operations").GrowthCatalog,
+) {
   server.registerTool(
     "invoke_growth",
     {
@@ -239,10 +236,13 @@ function registerInvokeGrowth(server: McpServer, toolSet: ToolSet) {
 }
 
 /** Project native AI SDK tools onto the authenticated OAuth MCP surface. */
-export function registerMcpTools(server: McpServer, toolSet: ToolSet) {
+export function registerMcpTools(
+  server: McpServer,
+  toolSet: import("../kernel/operations").GrowthCatalog,
+) {
   for (const [name, definition] of Object.entries(toolSet)) {
     const policy = policyForGrowthTool(name);
-    const nativeDefinition = definition as GrowthTool<unknown, unknown>;
+    const nativeDefinition = definition;
     const inputSchema = nativeDefinition.transportInputSchema;
     const rendersSocialPostPreview = name === "renderSocialPosts";
     const outputSchema = mcpOutputSchema(nativeDefinition.resultSchema);
@@ -303,12 +303,9 @@ export function registerMcpTools(server: McpServer, toolSet: ToolSet) {
             runId,
             surface: "mcp",
           });
-          const executable = runtime.tools[name] as Tool<
-            unknown,
-            unknown,
-            GrowthExecutionContext
-          >;
-          if (!executable.execute) throw new Error(`${name} is not executable`);
+          const executable = runtime.tools[name];
+          if (!executable?.execute)
+            throw new Error(`${name} is not executable`);
           const options: ToolExecutionOptions<GrowthExecutionContext> = {
             toolCallId: createId("mcp_call"),
             messages: [],

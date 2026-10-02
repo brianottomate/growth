@@ -574,27 +574,6 @@ export const growthActionPolicies = {
     createBrandMix: write(),
     updateBrandMix: write({ idempotent: true }),
   },
-  launchRead: {
-    list: read("local-read", ALL),
-    get: read("local-read", ALL),
-  },
-  launchWrite: {
-    create: write(),
-    // Merging brief fields is a plain field edit: re-running with the same
-    // payload lands the same row, and the previous value is visible in the UI.
-    setBrief: write({ idempotent: true, undoWith: "launchWrite.setBrief" }),
-    setFields: write({ idempotent: true, undoWith: "launchWrite.setFields" }),
-    setFeatures: write({
-      idempotent: true,
-      undoWith: "launchWrite.setFeatures",
-    }),
-    setDeliverable: write({
-      idempotent: true,
-      undoWith: "launchWrite.setDeliverable",
-    }),
-    // Records a pointer; the referenced draft is untouched either way.
-    attach: write({ idempotent: true, undoWith: "launchWrite.setDeliverable" }),
-  },
   planningRead: {
     previewSlots: read("model-read", ALL),
   },

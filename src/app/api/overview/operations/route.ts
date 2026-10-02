@@ -3,7 +3,7 @@ import { NATIVE_TOOLS } from "@/server/ai/capabilities";
 export async function GET(request: Request) {
   const actor = await workspaceActor();
   if (!actor) return new Response(null, { status: 401 });
-  const tool = NATIVE_TOOLS.operationRead__status!;
+  const tool = NATIVE_TOOLS.operationRead__status;
   const input = tool.validationSchema.safeParse({
     runId: new URL(request.url).searchParams.get("runId"),
   });

@@ -8,6 +8,23 @@ import { streamErrorMessage } from "./stream-error";
  * sentence that explains it — not the serialized zod error it arrives in.
  */
 describe("streamErrorMessage", () => {
+  it("turns provider overflow into an actionable recovery message", () => {
+    const message = streamErrorMessage(
+      new Error("prompt is too long: 1001091 tokens > 1000000 maximum"),
+    );
+    expect(message).toContain("Completed edits are saved");
+    expect(message).not.toContain("1001091");
+  });
+
+  it("explains interrupted tool history without telling the operator to redo saved edits", () => {
+    const message = streamErrorMessage(
+      new Error(
+        "messages.2: tool_use ids were found without tool_result blocks immediately after",
+      ),
+    );
+    expect(message).toContain("read the current state");
+    expect(message).toContain("only the remaining work");
+  });
   const zodish = (issues: unknown[]) => {
     const cause = new Error("big serialized dump ".repeat(100));
     (cause as unknown as { issues: unknown[] }).issues = issues;

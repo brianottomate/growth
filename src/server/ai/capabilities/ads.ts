@@ -1774,7 +1774,7 @@ export const setAdHomeAction = growthAction({
 export const editAdCardsAction = growthAction({
   outputSchema: editAdCardsActionOutputSchema,
   description:
-    "One change to a drafted ad's cards. With a library asset: replace the card at an index, append a card, remove one, move one. Per placement: setStory pins a 9:16 library asset to a card for stories and reels, clearStory drops it, makeStory derives one from the card's baseline (auto picks the best method: re-render when the card came from a composition, extend the photo past its edges via outpaint, else a centred crop; or name crop/extend/render). A static holds one card, a carousel two to ten (one while it is being filled), a video ad one clip. Works on ads in the brand's set and on ads in a campaign that has not been pushed.",
+    "One change to a legacy drafted ad's cards. Does NOT support mini-studio ads (ideaStudio): for those read adsRead.ideaContext and use adsWrite.saveIdea with the complete document. With a library asset: replace the card at an index, append a card, remove one, move one. Per placement: setStory pins a 9:16 library asset to a card for stories and reels, clearStory drops it, makeStory derives one from the card's baseline (auto picks the best method: re-render when the card came from a composition, extend the photo past its edges via outpaint, else a centred crop; or name crop/extend/render). A static holds one card, a carousel two to ten (one while it is being filled), a video ad one clip. Works on ads in the brand's set and on ads in a campaign that has not been pushed.",
   inputSchema: z.object({
     adId: z.string().min(1),
     edit: z.discriminatedUnion("op", [
@@ -1988,7 +1988,7 @@ export const unfreezePlacementAction = growthAction({
 export const saveIdeaAction = growthAction({
   outputSchema: saveIdeaActionOutputSchema,
   description:
-    "Save an editable image ad idea: shared ad copy, ordered source images, per-image composition recipes and shape overrides. Read the campaign first for the current updatedAt and ideaStudio document. Preserves recipes and returns the ad to draft; does not publish or materialize renders.",
+    "Save an editable image ad idea: shared ad copy, ordered source images, per-image composition recipes and shape overrides. Read adsRead.ideaContext immediately before saving for this ad's current updatedAt and complete document. After reopening or any prior save, read again; never reuse the old version. Preserves recipes and returns the ad to draft; does not publish or materialize renders.",
   inputSchema: ideaSaveSchema,
   execute: (input, ctx) =>
     saveAdIdea(input, { orgId: ctx.orgId, userId: ctx.userId }),

@@ -20,7 +20,6 @@ function campaign(overrides: Partial<Campaign> = {}): Campaign {
     homesRun: null,
     budget: 10_000,
     performanceCycleId: null,
-    launchId: null,
     startAt: new Date("2026-07-01"),
     endAt: new Date("2026-09-30"),
     createdAt: new Date(),

@@ -152,3 +152,14 @@ Provider extension metadata remains explicit JSON; domain records have named
 fields. See [output contracts](ai-output-contracts.md) for coverage and recovery,
 and [chat turn control](chat-turn-control.md) for queue, steering, approval
 boundaries, migration, and verification details.
+
+Launches is retired from the assistant/MCP catalog and primary navigation. Launch pages and service actions are removed as well. The schema retirement removes the launch table and the three nullable launch links; products, campaigns, series, and content posts remain.
+
+Native operation catalogs preserve each action's input and service result types.
+The receipt adapter exposes the JSON wire result contract (dates become ISO
+strings) plus the compact error envelope. Dynamic discovery accepts unknown
+input only through schema-validated dispatch. Fresh results and replayed
+receipts are validated against the same contract; replay rechecks current
+membership and surface policy before reading the receipt. Reused call IDs with
+different tools or inputs are rejected without repeating the operation. Output
+contract failures require inspecting saved state before repeating a write.
