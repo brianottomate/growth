@@ -2,7 +2,7 @@ import { workspaceActor } from "@/server/workspace-actor";
 import "server-only";
 
 import { cache } from "react";
-import { and, eq, isNull, or } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import {
@@ -33,7 +33,7 @@ export const loadPerformanceBrand = cache(async (brandSlug: string) => {
   const [brand, desk] = await Promise.all([
     db.query.brandTable.findFirst({
       where: and(
-        or(eq(brandTable.slug, brandSlug), eq(brandTable.id, brandSlug)),
+        eq(brandTable.slug, brandSlug),
         eq(brandTable.organizationId, org.id),
         isNull(brandTable.deletedAt),
       ),

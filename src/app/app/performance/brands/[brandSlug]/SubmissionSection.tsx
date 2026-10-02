@@ -3,9 +3,11 @@ import { CheckCircle2, CircleDashed } from "lucide-react";
 import { desc, eq } from "drizzle-orm";
 
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/components/ui/lib/utils";
 import { db } from "@/server/db";
 import { homeTable, performanceIntakeTable } from "@/server/db/schema";
 
+import { panel, SectionLabel } from "../../_components";
 import { IntakeAnswers, type IntakeHome } from "../../IntakeAnswers";
 import { SendLink } from "../../SendLink";
 import { IntakeActions } from "./IntakeActions";
@@ -78,15 +80,12 @@ export async function SubmissionSection({
   const [latest, ...earlier] = intakes;
 
   return (
-    <section
-      id="submission"
-      className="scroll-mt-6 space-y-4 rounded-xl border bg-card p-5"
-    >
+    <section id="submission" className="scroll-mt-6 space-y-2.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="font-semibold">
+        <SectionLabel>
           Submission
           {latest ? ` · ${dateOf(latest.submittedAt)}` : ""}
-        </h3>
+        </SectionLabel>
         <div className="flex flex-wrap items-center gap-1.5">
           {pitchUrl ? <SendLink label="Pitch page" url={pitchUrl} /> : null}
           {intakeUrl ? <SendLink label="Intake form" url={intakeUrl} /> : null}
@@ -151,7 +150,12 @@ export async function SubmissionSection({
           ))}
         </>
       ) : (
-        <p className="rounded-lg border border-dashed px-4 py-6 text-center text-xs text-muted-foreground">
+        <p
+          className={cn(
+            panel,
+            "px-4 py-6 text-center text-xs text-muted-foreground",
+          )}
+        >
           No submission yet.
         </p>
       )}

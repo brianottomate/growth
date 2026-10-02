@@ -17,23 +17,18 @@ import {
   readinessLinks,
 } from "@/server/services/performance-readiness.service";
 
-import { LaunchBrief } from "../../LaunchPanels";
-import { loadLaunchWorkspace } from "../../load-launch-workspace";
-
-import { SectionLabel } from "../../_components";
+import { panel, SectionLabel } from "../../_components";
 import { ReadinessChecklist } from "../../ReadinessChecklist";
 
 import { MediaStrip } from "./MediaStrip";
 import { SubmissionSection } from "./SubmissionSection";
-import { loadPerformanceBrand } from "./_data";
+import { brandAvatarUrl, loadPerformanceBrand } from "./_data";
 
 export const metadata: Metadata = { title: "Brand · Wander Performance" };
 export const dynamic = "force-dynamic";
 
-const overviewCard = "rounded-xl border bg-card p-5 space-y-4";
-
 /**
- * The client's Overview: the launch brief, where they stand on the checklist, what they filed
+ * The client's Overview: where they stand on the checklist, what they filed
  * on the intake, what is in their library, and who to talk to. Homes, ads and campaigns are the
  * other tabs.
  */
@@ -50,23 +45,22 @@ export default async function PerformanceBrandPage({
     return <div className="text-muted-foreground">No organization found.</div>;
   if (!brand) notFound();
 
-  const [media, account, people, launchWorkspace, readiness] =
-    await Promise.all([
-      listMedia({ brandId: brand.id, kind: "image" }),
-      db.query.performanceAccountTable.findFirst({
-        where: and(
-          eq(performanceAccountTable.brandId, brand.id),
-          isNull(performanceAccountTable.deletedAt),
-        ),
-        columns: { id: true, contactName: true, contactEmail: true },
-      }),
-      loadBrandContacts({
-        leadDomain: brand.leadDomain,
-        website: brand.website,
-      }),
-      loadLaunchWorkspace({ brand, deskBrand }),
-      deskBrand ? loadBrandReadiness([deskBrand]) : Promise.resolve(null),
-    ]);
+  const [media, account, people, avatarUrl, readiness] = await Promise.all([
+    listMedia({ brandId: brand.id, kind: "image" }),
+    db.query.performanceAccountTable.findFirst({
+      where: and(
+        eq(performanceAccountTable.brandId, brand.id),
+        isNull(performanceAccountTable.deletedAt),
+      ),
+      columns: { id: true, contactName: true, contactEmail: true },
+    }),
+    loadBrandContacts({
+      leadDomain: brand.leadDomain,
+      website: brand.website,
+    }),
+    brandAvatarUrl(brand),
+    deskBrand ? loadBrandReadiness([deskBrand]) : Promise.resolve(null),
+  ]);
   const intake = account
     ? await db.query.performanceIntakeTable.findFirst({
         where: eq(performanceIntakeTable.accountId, account.id),
@@ -141,13 +135,8 @@ export default async function PerformanceBrandPage({
 
   return (
     <div className="space-y-7">
-      <section className="space-y-2.5">
-        <SectionLabel>Launch brief</SectionLabel>
-        <LaunchBrief data={launchWorkspace} />
-      </section>
-
       {deskBrand && brandReadiness ? (
-        <section className={cn(overviewCard, "pt-2")}>
+        <section className={cn(panel, "px-4 pb-1")}>
           <ReadinessChecklist
             checklist={brandReadiness.checklist}
             links={readinessLinks(deskBrand)}
@@ -161,11 +150,11 @@ export default async function PerformanceBrandPage({
         intakeUrl={deskBrand?.intakeUrl ?? null}
       />
 
-      <section className={overviewCard}>
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="font-semibold">
+      <section className="space-y-2.5">
+        <div className="flex items-baseline justify-between">
+          <SectionLabel>
             Media library{shown.length ? ` · ${shown.length}` : ""}
-          </h3>
+          </SectionLabel>
           <div className="flex items-center gap-3 text-[11.5px]">
             <Link
               href={`/app/compositions?brandId=${encodeURIComponent(brand.id)}`}
@@ -182,7 +171,12 @@ export default async function PerformanceBrandPage({
           </div>
         </div>
         {images.length === 0 ? (
-          <p className="rounded-lg border border-dashed px-4 py-6 text-center text-xs text-muted-foreground">
+          <p
+            className={cn(
+              panel,
+              "px-4 py-6 text-center text-xs text-muted-foreground",
+            )}
+          >
             Nothing in the library yet.
           </p>
         ) : (
@@ -203,14 +197,19 @@ export default async function PerformanceBrandPage({
         )}
       </section>
 
-      <section className={overviewCard}>
-        <h3 className="font-semibold">Contacts</h3>
+      <section className="space-y-2.5">
+        <SectionLabel>Contacts</SectionLabel>
         {contacts.length === 0 ? (
-          <p className="rounded-lg border border-dashed px-4 py-6 text-center text-xs text-muted-foreground">
+          <p
+            className={cn(
+              panel,
+              "px-4 py-6 text-center text-xs text-muted-foreground",
+            )}
+          >
             No contacts on record.
           </p>
         ) : (
-          <ul className="divide-y rounded-lg border">
+          <ul className={cn(panel, "divide-y")}>
             {contacts.map((contact) => (
               <li
                 key={`${contact.role}-${contact.email ?? contact.name}`}
@@ -237,14 +236,14 @@ export default async function PerformanceBrandPage({
       </section>
 
       {people ? (
-        <section className={overviewCard}>
-          <div className="flex flex-wrap items-baseline justify-between gap-3">
-            <h3 className="font-semibold">
+        <section className="space-y-2.5">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+            <SectionLabel>
               CRM contacts
               {people.contacts.length
                 ? ` · ${people.contacts.length + people.moreCount}`
                 : ""}
-            </h3>
+            </SectionLabel>
             {people.company ? (
               <div className="flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
                 {people.company.leadStatus ? (
@@ -281,11 +280,16 @@ export default async function PerformanceBrandPage({
             ) : null}
           </div>
           {people.contacts.length === 0 ? (
-            <p className="rounded-lg border border-dashed px-4 py-6 text-center text-xs text-muted-foreground">
+            <p
+              className={cn(
+                panel,
+                "px-4 py-6 text-center text-xs text-muted-foreground",
+              )}
+            >
               No contacts on file for {people.domain}.
             </p>
           ) : (
-            <ul className="divide-y rounded-lg border">
+            <ul className={cn(panel, "divide-y")}>
               {people.contacts.map((person) => (
                 <li
                   key={person.id}

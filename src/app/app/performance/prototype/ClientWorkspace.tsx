@@ -6,12 +6,59 @@ import { parseAsStringLiteral, useQueryState } from "nuqs";
 
 import { ButtonLink } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { PersonaDemandGeography } from "@/server/db/brand-schema";
 
-import { AudiencePanel, CampaignPanel, LaunchBrief } from "../LaunchPanels";
-import { CreativePanel } from "../CreativePanel";
+import { AudiencePanel, CampaignPanel, LaunchBrief } from "./LaunchPanels";
+import { CreativePanel } from "./CreativePanel";
 import { CatalogPanel } from "./CatalogPanel";
 
-import type { WorkspaceData } from "../launch-workspace";
+export type WorkspaceHome = {
+  id: string;
+  name: string;
+  imageUrl: string;
+  thumbUrl: string | null;
+  city: string | null;
+  state: string | null;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  guests: number | null;
+  rating: number | null;
+};
+
+export type WorkspaceCampaign = {
+  id: string;
+  name: string;
+  state: "draft" | "pushed" | "live" | "ended";
+  budget: number;
+  spend: number;
+  adCount: number;
+  platforms: { platform: string; status: string }[];
+};
+
+export type WorkspaceData = {
+  brand: {
+    id: string;
+    name: string;
+    slug: string;
+    website: string | null;
+    avatarUrl: string | null;
+    delivery: string;
+    deliveryLabel: string;
+  };
+  budget: { monthly: number | null; spend: number | null };
+  campaigns: WorkspaceCampaign[];
+  homes: WorkspaceHome[];
+  starting: WorkspaceHome[];
+  adCount: number;
+  marketCity: string | null;
+  personas: WorkspacePersona[];
+};
+
+export type WorkspacePersona = {
+  id: string;
+  name: string;
+  demandGeography: PersonaDemandGeography | null;
+};
 
 const LIVE_TONE: Record<string, string> = {
   live: "border-emerald-500/30 bg-emerald-500/10 text-emerald-600",
@@ -121,16 +168,14 @@ export function ClientWorkspace({ data }: { data: WorkspaceData }) {
           <CreativePanel brandId={brand.id} homes={data.homes} />
         </TabsContent>
         <TabsContent value="audience">
-          <AudiencePanel brand={data.brand} />
+          <AudiencePanel
+            marketCity={data.marketCity}
+            personas={data.personas}
+            brandSlug={brand.slug}
+          />
         </TabsContent>
         <TabsContent value="campaign">
-          <CampaignPanel
-            campaigns={data.campaigns}
-            adCount={data.campaigns.reduce(
-              (sum, campaign) => sum + campaign.adCount,
-              0,
-            )}
-          />
+          <CampaignPanel campaigns={data.campaigns} adCount={data.adCount} />
         </TabsContent>
         <TabsContent value="catalog">
           <CatalogPanel brandId={brand.id} homes={data.homes} />

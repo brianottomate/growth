@@ -210,7 +210,7 @@ export default async function PerformanceBrandHomesPage({
         markets={brand.markets ?? null}
         towns={townCounts}
       />
-      <section id="meta-audiences" className="rounded-xl border p-4">
+      <section className="rounded-xl border p-4">
         <PersonaAudiences
           brand={{ id: brand.id, slug, name: brand.name }}
           personas={audiences.personas.map(({ persona, targets }) => ({

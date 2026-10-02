@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { eq } from "drizzle-orm";
 import { ArrowRight, Crosshair } from "lucide-react";
 
-import { workspaceActor } from "@/server/workspace-actor";
-import { journeyColumn } from "@/lib/performance-journey";
+import { db } from "@/server/db";
+import { memberTable } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/components/ui/lib/utils";
@@ -43,17 +44,17 @@ type Hand = {
 export default async function PerformanceDashboardPage() {
   const session = await getSession();
   if (!session?.user) redirect("/signin");
-  const actor = await workspaceActor();
-  if (!actor)
-    return (
-      <div className="text-muted-foreground">
-        Select an organization to view Performance.
-      </div>
-    );
+  const membership = await db.query.memberTable.findFirst({
+    where: eq(memberTable.userId, session.user.id),
+    with: { organization: true },
+  });
+  const org = membership?.organization;
+  if (!org)
+    return <div className="text-muted-foreground">No organization found.</div>;
 
   const [desk, tracker] = await Promise.all([
-    loadPerformanceDesk(actor.orgId).then((all) => narrowDesk(all, "client")),
-    loadPerformanceTracker(actor.orgId),
+    loadPerformanceDesk(org.id).then((all) => narrowDesk(all, "client")),
+    loadPerformanceTracker(org.id),
   ]);
   const brandById = new Map(desk.brands.map((brand) => [brand.id, brand]));
 
@@ -131,11 +132,11 @@ export default async function PerformanceDashboardPage() {
         <div className="grid grid-cols-3 gap-2 @xl:gap-3">
           <Figure
             href="/app/performance/campaigns"
-            label="Provider live campaigns"
+            label="Live campaigns"
             value={String(desk.live.length)}
             sub={
               desk.live.length === 0
-                ? "No connected campaign reports live"
+                ? "Nothing spending"
                 : uncapped > 0
                   ? `${deskMoney(desk.liveSpend)} spent · ${uncapped === desk.live.length ? "no" : `${desk.live.length - uncapped} of ${desk.live.length} with a`} budget cap`
                   : `${deskMoney(desk.liveSpend)} spent of ${deskMoney(desk.liveBudget)}`
@@ -156,39 +157,6 @@ export default async function PerformanceDashboardPage() {
           />
         </div>
       </div>
-
-      <section className="rounded-xl border bg-card p-5">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="font-semibold">Client journey</h2>
-          <Link
-            href="/app/performance/clients"
-            className="text-xs font-medium hover:underline"
-          >
-            Open journey board →
-          </Link>
-        </div>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Team delivery stages and campaign activity, separate from billing.
-        </p>
-        <div className="mt-4 grid grid-cols-2 gap-3 @3xl:grid-cols-5">
-          {["Onboarding", "Building", "Ready for review", "Live", "Paused"].map(
-            (stage) => (
-              <div key={stage} className="rounded-lg border bg-muted/30 p-3">
-                <p className="text-[11px] text-muted-foreground">
-                  {stage === "Live" ? "Clients live" : stage}
-                </p>
-                <p className="mt-1 text-xl font-semibold tabular-nums">
-                  {
-                    desk.brands.filter(
-                      (brand) => journeyColumn(brand) === stage,
-                    ).length
-                  }
-                </p>
-              </div>
-            ),
-          )}
-        </div>
-      </section>
 
       {tracker.length > 0 && (
         <section className="space-y-2.5">

@@ -2,7 +2,7 @@
 
 import { CatalogCards } from "../brands/[brandSlug]/catalog/CatalogCards";
 
-import type { WorkspaceHome } from "../launch-workspace";
+import type { WorkspaceHome } from "./ClientWorkspace";
 
 /**
  * The real catalog: the same production `CatalogCards` the Ads tab renders,

@@ -7,8 +7,6 @@ import { listAdSet } from "@/server/services/ad-set.service";
 
 import { brandAvatarUrl, loadPerformanceBrand } from "../_data";
 
-import { CreativePanel } from "../../../CreativePanel";
-import { loadLaunchWorkspace } from "../../../load-launch-workspace";
 import { MAX_SET_HOMES } from "@/lib/performance-ads";
 
 import { AdPreviewsWorkspace, type WorkspaceHome } from "./AdPreviewsWorkspace";
@@ -31,7 +29,7 @@ export default async function PerformanceBrandAdsPage({
   searchParams,
 }: {
   params: Promise<{ brandSlug: string }>;
-  searchParams: Promise<{ homes?: string; focus?: string; view?: string }>;
+  searchParams: Promise<{ homes?: string; focus?: string }>;
 }) {
   const [{ brandSlug }, query] = await Promise.all([params, searchParams]);
   const { session, org, brand, deskBrand } =
@@ -40,52 +38,6 @@ export default async function PerformanceBrandAdsPage({
   if (!org)
     return <div className="text-muted-foreground">No organization found.</div>;
   if (!brand) notFound();
-
-  const studioBase = `/app/performance/brands/${brand.slug ?? brand.id}/ads`;
-  const views = (
-    <nav
-      aria-label="Ad studio views"
-      className="mb-5 inline-flex rounded-lg border bg-muted/40 p-1"
-    >
-      {[
-        { id: "ideas", label: "Ad ideas" },
-        { id: "preview", label: "Property preview" },
-      ].map((item) => (
-        <Link
-          key={item.id}
-          href={`${studioBase}?view=${item.id}`}
-          aria-current={
-            (
-              query.view === "preview"
-                ? item.id === "preview"
-                : item.id === "ideas"
-            )
-              ? "page"
-              : undefined
-          }
-          className={`rounded-md px-3 py-2 text-xs font-medium ${(query.view === "preview" ? item.id === "preview" : item.id === "ideas") ? "bg-background shadow-xs" : "text-muted-foreground"}`}
-        >
-          {item.label}
-        </Link>
-      ))}
-    </nav>
-  );
-  if (query.view === "preview") {
-    const workspace = await loadLaunchWorkspace({ brand, deskBrand });
-    return (
-      <div>
-        {views}
-        <div className="mb-4">
-          <h2 className="text-lg font-semibold">Property creative preview</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Compare homes and formats before building ads. Previews do not
-            create or publish ads.
-          </p>
-        </div>
-        <CreativePanel brandId={brand.id} homes={workspace.homes} />
-      </div>
-    );
-  }
 
   const [listings, avatarUrl, drafted] = await Promise.all([
     brandListings({ id: brand.id, website: brand.website }),
@@ -175,7 +127,6 @@ export default async function PerformanceBrandAdsPage({
 
   return (
     <>
-      {views}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-semibold">Ad studio · {ideas.length}</h1>
         <div className="flex items-center gap-3">

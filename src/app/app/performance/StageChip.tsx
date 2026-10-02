@@ -20,11 +20,11 @@ export function BusinessChip({
 }) {
   const tone =
     stage === "paid"
-      ? "border-emerald-500/40 text-foreground"
+      ? "border-emerald-500/40 text-emerald-300"
       : stage === "signed"
-        ? "border-amber-500/40 text-foreground"
+        ? "border-amber-500/40 text-amber-300"
         : stage === "paused"
-          ? "border-amber-500/40 text-foreground"
+          ? "border-amber-500/40 text-amber-300"
           : isClosedStage(stage)
             ? "border-border/60 text-muted-foreground/70"
             : "border-border/80 text-muted-foreground";
@@ -48,12 +48,12 @@ export function DeliveryChip({
 }) {
   const tone =
     stage === "live"
-      ? "border-emerald-500/40 text-foreground"
+      ? "border-emerald-500/40 text-emerald-300"
       : stage === "paused" || stage === "ads_review"
-        ? "border-amber-500/40 text-foreground"
+        ? "border-amber-500/40 text-amber-300"
         : stage === "not_started"
           ? "border-border/60 text-muted-foreground/70"
-          : "border-sky-500/40 text-foreground";
+          : "border-sky-500/40 text-sky-300";
   return (
     <span className={cn(chip, tone, className)} title="Delivery">
       {stage === "live" ? (
