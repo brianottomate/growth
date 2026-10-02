@@ -1,4 +1,6 @@
 "use client";
+import { EmailDmarcGuidance } from "./EmailDmarcGuidance";
+import type { EmailDmarcStatus } from "@/lib/email-dmarc";
 import { ClientPageViewBeacon } from "@/components/client-page/ClientPageViewBeacon";
 
 import { useState } from "react";
@@ -11,6 +13,7 @@ type Connection = {
   rootDomain: string;
   automaticAvailable: boolean;
   status: EmailDnsStatus;
+  dmarc: EmailDmarcStatus;
 };
 
 export function EmailDnsConnection({
@@ -21,6 +24,8 @@ export function EmailDnsConnection({
   connection: Connection;
 }) {
   const [status, setStatus] = useState(connection.status);
+  const [dmarc, setDmarc] = useState(connection.dmarc);
+  const [includeStarter, setIncludeStarter] = useState(false);
   const [busy, setBusy] = useState<"connect" | "verify" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<number | null>(null);
@@ -29,7 +34,11 @@ export function EmailDnsConnection({
     const response = await fetch(`/connect/email/${token}/${action}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: "{}",
+      body: JSON.stringify(
+        action === "session"
+          ? { includeStarterDmarc: includeStarter && dmarc.state === "missing" }
+          : {},
+      ),
     });
     const data: unknown = await response.json();
     if (!response.ok)
@@ -68,7 +77,12 @@ export function EmailDnsConnection({
     setError(null);
     setBusy("verify");
     try {
-      setStatus((await request("verify")) as EmailDnsStatus);
+      const result = (await request("verify")) as EmailDnsStatus & {
+        dmarc: EmailDmarcStatus;
+      };
+      setStatus(result);
+      setDmarc(result.dmarc);
+      setIncludeStarter(false);
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -117,6 +131,16 @@ export function EmailDnsConnection({
         This setup adds email authentication records. Your website and existing
         email inboxes keep their current configuration.
       </p>
+
+      <EmailDmarcGuidance
+        dmarc={dmarc}
+        rootDomain={connection.rootDomain}
+        sendingDomain={status.sendingDomain}
+        automaticAvailable={connection.automaticAvailable}
+        includeStarter={includeStarter}
+        onIncludeStarter={setIncludeStarter}
+        busy={busy !== null}
+      />
 
       <section className="mt-8 space-y-4 rounded-xl border p-5">
         <h2 className="text-lg font-semibold">
@@ -206,11 +230,6 @@ export function EmailDnsConnection({
             </dl>
           </div>
         ))}
-        <p className="text-sm text-muted-foreground">
-          Your domain&apos;s DMARC policy also applies to marketing email. Ask
-          your DNS administrator to confirm it; this connection does not change
-          that policy.
-        </p>
       </section>
     </main>
   );

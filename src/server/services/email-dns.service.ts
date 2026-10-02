@@ -1,3 +1,5 @@
+import { getEmailDmarcStatus } from "./email-dmarc.service";
+import { optionalDmarcRecords } from "@/lib/email-dmarc";
 import { isConnectionToken, newConnectionToken } from "./connection-token";
 import "server-only";
 import { and, eq, isNull, sql } from "drizzle-orm";
@@ -162,6 +164,10 @@ export async function getEmailDnsConnection(token: string) {
     brandName: resolved.brand.name,
     rootDomain: resolved.setup.rootDomain,
     automaticAvailable: isEntriConfigured(),
+    dmarc: await getEmailDmarcStatus(
+      resolved.setup.rootDomain,
+      resolved.setup.sendingDomain,
+    ),
     status: statusFor(
       await getPostmarkDomain(resolved.setup.postmarkDomainId),
       resolved.setup,
@@ -169,14 +175,26 @@ export async function getEmailDnsConnection(token: string) {
   };
 }
 
-export async function startEmailDnsConnection(token: string) {
+export async function startEmailDnsConnection(
+  token: string,
+  includeStarterDmarc = false,
+) {
   const resolved = await resolveEmailDnsLink(token);
   if (!resolved) return null;
   const domain = await getPostmarkDomain(resolved.setup.postmarkDomainId);
   return createEmailEntriConfig({
     rootDomain: resolved.setup.rootDomain,
     brandId: resolved.brand.id,
-    records: marketingDnsRecords(domain, resolved.setup),
+    records: [
+      ...marketingDnsRecords(domain, resolved.setup),
+      ...optionalDmarcRecords(
+        await getEmailDmarcStatus(
+          resolved.setup.rootDomain,
+          resolved.setup.sendingDomain,
+        ),
+        includeStarterDmarc,
+      ),
+    ],
   });
 }
 
@@ -186,5 +204,11 @@ export async function recheckEmailDnsConnection(token: string) {
   const domain = await verifyPostmarkMarketingDomain(
     resolved.setup.postmarkDomainId,
   );
-  return statusFor(domain, resolved.setup);
+  return {
+    ...statusFor(domain, resolved.setup),
+    dmarc: await getEmailDmarcStatus(
+      resolved.setup.rootDomain,
+      resolved.setup.sendingDomain,
+    ),
+  };
 }

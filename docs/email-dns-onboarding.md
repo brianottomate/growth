@@ -10,7 +10,15 @@ No migration is needed. No DNS changes or sends happen during preparation.
 The client page shows live Postmark authentication status, offers Entri Connect,
 and displays copyable manual records. Its configuration includes only DKIM TXT
 and return-path CNAME records under the selected marketing subdomain. No website
-routing, root SPF, MX, redirects or DMARC changes are included.
+routing, root SPF, MX or redirects are included. The page reads DMARC from the
+sending domain and explicit root zone. An existing policy is displayed and preserved.
+Only when neither has a policy does the page offer an unchecked option to add
+`v=DMARC1; p=none` at `_dmarc.<marketing-label>` in that same root zone.
+The server rechecks DNS when starting Entri, adds the suggestion only if still
+missing and explicitly selected, and sets Entri `validateDmarc: true`.
+Lookup failures or malformed/ambiguous records never authorize a DMARC change.
+The same suggested record is copyable for manual setup. This adds no reporting
+mailbox and does not change root-domain policy.
 
 ## Choosing the subdomain
 
@@ -37,9 +45,9 @@ domain once its send-time checks are implemented.
 
 Missing Entri credentials leave manual setup available. They do not simulate
 success. Configure them in the deployment environment before testing automatic
-connection. The Entri application must allow the exact Growth preview or
-production origin. Adding that origin is a dashboard task for Nathan or another
-Entri administrator. The browser URL used by the operator supplies the copied
+connection. Test the Entri flow on the deployed origin. If Entri reports an origin
+restriction, an Entri administrator can update the allowed origins. Loading
+the modal alone is not evidence that an allowlist change is required. The browser URL used by the operator supplies the copied
 connection link's origin, so a preview generates preview links.
 
 References: [Entri configuration and scoped tokens](https://developers.entri.com/connect/configuration),
@@ -65,14 +73,13 @@ readiness, DMARC policy checks, opt-outs and delivery setup are separate gates.
 
 Use the existing Wander brand's Email tab and `wander.com` as the DNS zone.
 The chosen subdomain remains provisional until launch. Prepare the connection
-link, then give Nathan that link and the exact origin to allow in Entri together.
+link, then give Nathan that link to test.
 He can connect automatically or install the manual records. Recheck Postmark
 after DNS propagation. This PR does not activate campaigns, create brand servers,
 replace Customer.io, or alter the WanderOS dashboard/backend.
 
 Example handoff:
 
-> Nathan — the Growth email DNS pilot is ready for Wander. Please allow this
-> Growth origin in our existing Entri application, then open the email-only setup
+> Nathan, the Growth email DNS pilot is ready for Wander. Please try the email-only setup
 > link. It adds the marketing subdomain's DKIM and return-path records, with a
 > manual option too. Authentication won't switch senders or launch campaigns.

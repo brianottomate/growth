@@ -48,5 +48,6 @@ export async function createEmailEntriConfig(input: {
     wwwRedirect: false,
     secureRootDomain: false,
     checkConflicts: true,
+    validateDmarc: true,
   };
 }
