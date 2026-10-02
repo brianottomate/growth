@@ -159,11 +159,13 @@ export function EmailDnsConnection({
           </li>
         </ul>
         <div className="flex flex-wrap gap-3">
-          {!status.verified && connection.automaticAvailable && (
-            <Button onClick={connect} disabled={busy !== null}>
-              {busy === "connect" ? "Opening…" : "Connect automatically"}
-            </Button>
-          )}
+          {(!status.verified ||
+            (dmarc.state === "missing" && includeStarter)) &&
+            connection.automaticAvailable && (
+              <Button onClick={connect} disabled={busy !== null}>
+                {busy === "connect" ? "Opening…" : "Connect automatically"}
+              </Button>
+            )}
           <Button variant="outline" onClick={verify} disabled={busy !== null}>
             {busy === "verify" ? "Checking…" : "Check verification"}
           </Button>
