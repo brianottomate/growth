@@ -21,7 +21,7 @@ const SCOPE_LABELS: Record<string, string> = {
   profile: "View your name and profile",
   email: "View your email address",
   offline_access: "Stay connected when you are away",
-  "growth:all": "Read and operate your selected Wander Growth workspace",
+  "growth:all": "Read and operate Wander Growth",
 };
 
 export function ConsentForm() {
@@ -92,8 +92,7 @@ export function ConsentForm() {
         </div>
         <CardTitle>Authorize access</CardTitle>
         <CardDescription>
-          This application will be connected to the Wander Growth workspace you
-          just selected.
+          Connect this application to Wander Growth.
         </CardDescription>
       </CardHeader>
       <Separator />

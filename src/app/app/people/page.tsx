@@ -3,6 +3,7 @@ import { and, desc, eq, gt, isNull, or } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import { invitationTable, memberTable } from "@/server/db/schema";
+import { getWanderMembership } from "@/server/wander-workspace";
 import { getSession } from "@/server/better-auth/server";
 import { AddPersonDialog } from "./AddPersonDialog";
 import { PeopleManager } from "./PeopleManager";
@@ -11,13 +12,14 @@ export default async function PeoplePage() {
   const session = await getSession();
   if (!session?.user) redirect("/signin");
 
-  const membership = await db.query.memberTable.findFirst({
-    where: eq(memberTable.userId, session.user.id),
-    with: { organization: true },
-  });
+  const membership = await getWanderMembership(session.user.id);
   const org = membership?.organization;
   if (!org) {
-    return <div className="text-muted-foreground">No organization found.</div>;
+    return (
+      <div className="text-muted-foreground">
+        You do not have access to Wander Growth.
+      </div>
+    );
   }
   const canManage = membership.role === "owner" || membership.role === "admin";
 

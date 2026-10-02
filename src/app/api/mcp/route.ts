@@ -1,9 +1,8 @@
 import type { AuthInfo } from "@modelcontextprotocol/server";
 import { oauthProviderResourceClient } from "@better-auth/oauth-provider/resource-client";
-import { and, eq } from "drizzle-orm";
 
-import { db } from "@/server/db";
-import { memberTable } from "@/server/db/schema";
+import { getWanderMembership } from "@/server/wander-workspace";
+
 import {
   GROWTH_AUTH_ISSUER,
   GROWTH_JWKS_URL,
@@ -34,14 +33,9 @@ async function verifyToken(bearerToken: string): Promise<AuthInfo | undefined> {
 
   // Membership is intentionally live rather than copied into a long-lived
   // connector record. Removing a user from an organization removes MCP access.
-  const membership = await db.query.memberTable.findFirst({
-    where: and(
-      eq(memberTable.userId, userId),
-      eq(memberTable.organizationId, organizationId),
-    ),
-    columns: { organizationId: true },
-  });
-  if (!membership) return undefined;
+  const membership = await getWanderMembership(userId);
+  if (!membership || membership.organizationId !== organizationId)
+    return undefined;
 
   const grantedScopes =
     typeof claims.scope === "string" ? claims.scope.split(" ") : [];

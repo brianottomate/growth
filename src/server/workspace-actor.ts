@@ -1,36 +1,21 @@
 import "server-only";
-import { eq } from "drizzle-orm";
+
 import { getSession } from "@/server/better-auth/server";
-import { db } from "@/server/db";
-import { memberTable } from "@/server/db/schema";
+import { getWanderMembership } from "@/server/wander-workspace";
 
 export class WorkspaceAccessError extends Error {
   override name = "WorkspaceAccessError";
 }
 
-/**
- * The organization a signed-in person is acting in: the session's active
- * organization when they are still a member of it, otherwise their only
- * membership. Membership is read from the database, never trusted from the
- * session claim.
- */
+/** Resolve Wander directly and re-check live membership on every request. */
 export async function resolveWorkspaceOrganizationId(input: {
   userId: string;
   preferredOrganizationId?: string | null;
 }) {
-  const memberships = await db
-    .select({ organizationId: memberTable.organizationId })
-    .from(memberTable)
-    .where(eq(memberTable.userId, input.userId));
-  const preferred = input.preferredOrganizationId;
-  if (preferred && memberships.some((m) => m.organizationId === preferred))
-    return preferred;
-  if (memberships.length === 1) return memberships[0]!.organizationId;
-  throw new WorkspaceAccessError(
-    memberships.length === 0
-      ? "No organization membership found"
-      : "Select an active organization first",
-  );
+  const membership = await getWanderMembership(input.userId);
+  if (!membership)
+    throw new WorkspaceAccessError("You do not have access to Wander Growth");
+  return membership.organizationId;
 }
 
 export async function workspaceActor() {

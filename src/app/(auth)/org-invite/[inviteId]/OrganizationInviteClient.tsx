@@ -41,10 +41,7 @@ export function OrganizationInviteClient({
   // Query param to trigger auto-accept after auth redirect
   const [autoAccept, setAutoAccept] = useQueryState("autoAccept");
   const redirectToOrg = () => {
-    const destination = initialInvitation.organization.slug
-      ? `/app/org/${initialInvitation.organization.slug}`
-      : "/app";
-    router.push(destination);
+    router.push("/app/people");
   };
 
   const acceptMutation = useMutation(

@@ -4,9 +4,9 @@ import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
 import { jwt, organization } from "better-auth/plugins";
 import { oauthProvider } from "@better-auth/oauth-provider";
-import { needsOAuthWorkspace } from "./oauth-workspace";
+import { wanderOAuthPolicy } from "./wander-oauth";
 
-test("OAuth advances from workspace selection to consent and rejects tampered requests", async () => {
+test("OAuth defaults to Wander despite another active org and rejects tampered requests", async () => {
   const origin = "http://localhost:3000";
   const store: Record<string, Record<string, unknown>[]> = Object.fromEntries(
     [
@@ -40,22 +40,18 @@ test("OAuth advances from workspace selection to consent and rejects tampered re
         allowDynamicClientRegistration: true,
         allowUnauthenticatedClientRegistration: true,
         silenceWarnings: { oauthAuthServerConfig: true, openidConfig: true },
-        customAccessTokenClaims: async ({ referenceId }) => ({
-          org_id: referenceId,
-        }),
-        postLogin: {
-          page: "/oauth/workspace",
-          shouldRedirect: (context) =>
-            needsOAuthWorkspace(context, async (userId, organizationId) =>
-              store.member?.some(
-                (member) =>
-                  member.userId === userId &&
-                  member.organizationId === organizationId,
-              ),
-            ),
-          consentReferenceId: ({ session }) =>
-            session.activeOrganizationId as string | undefined,
-        },
+        ...wanderOAuthPolicy(async (userId) => {
+          const wander = store.organization?.find(
+            (org) => org.slug === "wander",
+          );
+          const membership = store.member?.find(
+            (member) =>
+              member.userId === userId && member.organizationId === wander?.id,
+          );
+          return membership
+            ? { organizationId: String(membership.organizationId) }
+            : undefined;
+        }, "growth:all"),
       }),
     ],
   });
@@ -105,10 +101,12 @@ test("OAuth advances from workspace selection to consent and rejects tampered re
   });
   const workspace = (await created.json()) as { id: string };
   expect(created.status).toBe(200);
+  // A different active organization must never scope the Growth grant.
   expect(
     (
-      await request("/api/auth/organization/set-active", {
-        organizationId: null,
+      await request("/api/auth/organization/create", {
+        name: "Other",
+        slug: "other",
       })
     ).status,
   ).toBe(200);
@@ -135,49 +133,17 @@ test("OAuth advances from workspace selection to consent and rejects tampered re
     resource: `${origin}/api/mcp`,
   });
   const initial = await request(`/api/auth/oauth2/authorize?${query}`);
-  const selector = new URL(initial.headers.get("location")!, origin);
-  expect(selector.pathname).toBe("/oauth/workspace");
-  const oauthQuery = selector.search.slice(1);
-  const unselected = await request("/api/auth/oauth2/continue", {
-    postLogin: true,
-    oauth_query: oauthQuery,
-  });
-  const stillSelecting = (await unselected.json()) as {
-    url?: string;
-    redirect_uri?: string;
-  };
-  expect(
-    new URL(stillSelecting.url ?? stillSelecting.redirect_uri!, origin)
-      .pathname,
-  ).toBe("/oauth/workspace");
-  expect(
-    (
-      await request("/api/auth/organization/set-active", {
-        organizationId: workspace.id,
-      })
-    ).status,
-  ).toBe(200);
-  const continued = await request("/api/auth/oauth2/continue", {
-    postLogin: true,
-    oauth_query: oauthQuery,
-  });
-  const result = (await continued.json()) as {
-    url?: string;
-    redirect_uri?: string;
-  };
-  expect(continued.status).toBe(200);
-  expect(new URL(result.url ?? result.redirect_uri!, origin).pathname).toBe(
-    "/consent",
-  );
-  const tampered = await request("/api/auth/oauth2/continue", {
-    postLogin: true,
+  const consentLocation = new URL(initial.headers.get("location")!, origin);
+  expect(consentLocation.pathname).toBe("/consent");
+  const oauthQuery = consentLocation.search.slice(1);
+  const tampered = await request("/api/auth/oauth2/consent", {
+    accept: true,
     oauth_query: oauthQuery.replace("regression-state", "tampered-state"),
   });
   expect(tampered.status).toBe(400);
-  const consentUrl = new URL(result.url ?? result.redirect_uri!, origin);
   const consent = await request("/api/auth/oauth2/consent", {
     accept: true,
-    oauth_query: consentUrl.search.slice(1),
+    oauth_query: oauthQuery,
   });
   const approved = (await consent.json()) as {
     url?: string;
@@ -204,4 +170,34 @@ test("OAuth advances from workspace selection to consent and rejects tampered re
   };
   expect(claims.org_id).toBe(workspace.id);
   expect([claims.aud].flat()).toContain(`${origin}/api/mcp`);
+  store.member = store.member!.filter(
+    (member) => member.organizationId !== workspace.id,
+  );
+  const denied = await request(`/api/auth/oauth2/authorize?${query}`);
+  expect(denied.status).toBe(403);
+});
+
+test("token issuance rejects non-Wander grants and revoked membership", async () => {
+  let membership: { organizationId: string } | undefined = {
+    organizationId: "wander",
+  };
+  const policy = wanderOAuthPolicy(async () => membership, "growth:all");
+  const request = {
+    user: { id: "operator" },
+    scopes: ["growth:all"],
+    referenceId: "wander",
+  };
+  expect(await policy.customAccessTokenClaims(request)).toEqual({
+    org_id: "wander",
+  });
+  expect(
+    policy.customAccessTokenClaims({ ...request, referenceId: "other" }),
+  ).rejects.toThrow("You no longer have access");
+  membership = undefined;
+  expect(policy.customAccessTokenClaims(request)).rejects.toThrow(
+    "You no longer have access",
+  );
+  expect(policy.postLogin.consentReferenceId(request)).rejects.toThrow(
+    "You do not have access",
+  );
 });

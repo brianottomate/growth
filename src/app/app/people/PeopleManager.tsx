@@ -227,7 +227,7 @@ export function PeopleManager({
           })
         }
         title={`Remove ${removeTarget?.name ?? removeTarget?.email ?? "this member"}?`}
-        description="They'll lose access to this organization. You can add them back later."
+        description="They'll lose access to Wander Growth. You can add them back later."
         isLoading={removeMember.isPending}
       />
     </>

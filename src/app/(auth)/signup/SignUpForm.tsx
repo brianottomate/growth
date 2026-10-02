@@ -78,7 +78,7 @@ export function SignUpForm({
           {searchParams.get("inviteId")
             ? "Create an account to accept the collection invitation"
             : searchParams.get("orgInviteId")
-              ? "Create an account to join the organization"
+              ? "Create an account to join Wander Growth"
               : "Sign up to get started"}
         </p>
       </div>

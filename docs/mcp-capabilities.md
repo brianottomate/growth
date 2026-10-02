@@ -25,17 +25,15 @@ simple (`growth:all` plus the standard identity/offline scopes), but each
 tool retains its policy metadata so the grant can become more granular
 later without rewriting handlers.
 
-During authorization a valid active Growth organization is reused. If the
-session has no active organization or its membership is stale, the user selects
-one on the workspace screen. Better Auth re-checks live membership when
-continuing, rather than unconditionally redirecting back to that screen.
-The selector submits the signed OAuth query so continuation retains the
-client request and rejects tampering. Better Auth
-stores that organization in the consent, access token, and refresh token
-`referenceId`; it is also signed into the access token as `org_id`. The MCP
-endpoint verifies token issuer, audience, expiry, and scope and then re-checks
-the user's live organization membership on every request. There is no parallel
-connector table and no fallback to the browser session's active or first org.
+During authorization Growth uses the user's live Wander membership, regardless
+of the session's active organization. Users without Wander membership are refused;
+there is no workspace selector. Consent submits the signed OAuth query so
+continuation retains the client request and rejects tampering. Better Auth stores
+Wander in the consent, access token, and refresh token `referenceId` and signs it
+into the access token as `org_id`. Token issuance re-checks live Wander membership
+and rejects grants for another organization. The MCP endpoint verifies issuer,
+audience, expiry, and scope, then re-checks the user's live Wander membership on
+every request. There is no parallel connector table or browser-session fallback.
 
 The MCP tools and the in-app Growth assistant are projections of the same
 native AI SDK 7 catalog in `src/server/ai/capabilities`. Executable names use

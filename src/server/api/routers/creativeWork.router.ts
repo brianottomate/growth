@@ -12,8 +12,8 @@ import {
   brandTable,
   contentPostTable,
   creativeRunTable,
-  memberTable,
 } from "@/server/db/schema";
+import { getWanderMembership } from "@/server/wander-workspace";
 import { isFalConfigured } from "@/server/clients/fal.client";
 import { isGeminiImageConfigured } from "@/server/clients/gemini-image.client";
 import {
@@ -25,12 +25,9 @@ import {
 type Database = typeof db;
 
 async function membershipForUser(database: Database, userId: string) {
-  const membership = await database.query.memberTable.findFirst({
-    where: eq(memberTable.userId, userId),
-    columns: { organizationId: true },
-  });
+  const membership = await getWanderMembership(userId, database);
   if (!membership) {
-    throw new ORPCError("FORBIDDEN", { message: "No organization" });
+    throw new ORPCError("FORBIDDEN", { message: "No access to Wander Growth" });
   }
   return membership;
 }

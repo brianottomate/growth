@@ -14,8 +14,9 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { db } from "@/server/db";
-import { brandTable, memberTable } from "@/server/db/schema";
+import { brandTable } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
+import { getWanderMembership } from "@/server/wander-workspace";
 import { OverviewAssistantPopup } from "./overview/OverviewAssistantPopup";
 
 // The whole back-office is internal — keep every route under /app out of
@@ -36,12 +37,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     );
   }
 
-  // Active organization for the sidebar header. Falls back to the user's first
-  // membership if no active org is set on the session yet.
-  const membership = await db.query.memberTable.findFirst({
-    where: eq(memberTable.userId, session.user.id),
-    with: { organization: true },
-  });
+  // Resolve the single Wander workspace.
+  const membership = await getWanderMembership(session.user.id);
   const brands = membership?.organizationId
     ? await db.query.brandTable.findMany({
         where: and(
@@ -56,8 +53,6 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     <SidebarProvider>
       <WorkspaceChanges />
       <AppSidebar
-        orgName={membership?.organization?.name ?? "—"}
-        orgSlug={membership?.organization?.slug ?? undefined}
         userName={session.user.name ?? session.user.email ?? "You"}
         userEmail={session.user.email ?? ""}
         userImage={session.user.image ?? undefined}

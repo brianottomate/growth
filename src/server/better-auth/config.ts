@@ -13,7 +13,8 @@ import {
 } from "better-auth/plugins";
 import { nextCookies } from "better-auth/next-js";
 import { and, eq } from "drizzle-orm";
-import { needsOAuthWorkspace } from "./oauth-workspace";
+import { wanderOAuthPolicy } from "./wander-oauth";
+import { getWanderMembership } from "@/server/wander-workspace";
 
 import { env } from "@/env";
 import { db } from "@/server/db";
@@ -66,16 +67,6 @@ const authAllowedHosts = Array.from(
     ].filter((host): host is string => Boolean(host)),
   ),
 );
-
-async function hasOrganizationAccess(userId: string, organizationId: string) {
-  return db.query.memberTable.findFirst({
-    where: and(
-      eq(schema.memberTable.userId, userId),
-      eq(schema.memberTable.organizationId, organizationId),
-    ),
-    columns: { id: true },
-  });
-}
 
 export const auth = betterAuth({
   // Resolve auth URLs from approved request hosts so canonical, preview, and
@@ -404,12 +395,12 @@ export const auth = betterAuth({
     }),
     // Organization plugin (NEW)
     organization({
+      allowUserToCreateOrganization: false,
       teams: {
         enabled: true,
         maximumTeams: 10,
         maximumMembersPerTeam: 50,
       },
-      allowUserToCreateOrganization: true,
       organizationLimit: 5,
       membershipLimit: 100,
       invitationLimit: 50,
@@ -459,37 +450,7 @@ export const auth = betterAuth({
       clientRegistrationDefaultScopes: [...GROWTH_OAUTH_SCOPES],
       clientRegistrationAllowedScopes: [...GROWTH_OAUTH_SCOPES],
       silenceWarnings: { oauthAuthServerConfig: true },
-      postLogin: {
-        page: "/oauth/workspace",
-        shouldRedirect: (context) =>
-          needsOAuthWorkspace(context, hasOrganizationAccess),
-        consentReferenceId: async ({ user, session, scopes }) => {
-          if (!scopes.includes(GROWTH_MCP_SCOPE)) return undefined;
-          const organizationId = session.activeOrganizationId;
-          if (typeof organizationId !== "string") {
-            throw new Error("Choose a Wander Growth organization to continue");
-          }
-          const membership = await hasOrganizationAccess(
-            user.id,
-            organizationId,
-          );
-          if (!membership) {
-            throw new Error("You no longer have access to that organization");
-          }
-          return organizationId;
-        },
-      },
-      customAccessTokenClaims: async ({ user, referenceId, scopes }) => {
-        if (!scopes.includes(GROWTH_MCP_SCOPE)) return {};
-        if (!user?.id || !referenceId) {
-          throw new Error("The OAuth grant is not attached to an organization");
-        }
-        const membership = await hasOrganizationAccess(user.id, referenceId);
-        if (!membership) {
-          throw new Error("You no longer have access to that organization");
-        }
-        return { org_id: referenceId };
-      },
+      ...wanderOAuthPolicy(getWanderMembership, GROWTH_MCP_SCOPE),
     }),
     // Next.js cookie helper - MUST be last plugin in array
     nextCookies(),

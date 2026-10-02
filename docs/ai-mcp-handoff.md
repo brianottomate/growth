@@ -25,6 +25,14 @@ model-facing vocabulary, policy, and operator outcome are clear. Provider sends,
 publishes, deletes, campaign changes, and other irreversible operations need an
 explicit policy and approval path.
 
+## Workspace identity
+
+Growth always uses the Wander workspace (`organization.slug = "wander").
+OAuth goes directly from sign-in to consent, with no organization picker.
+Consent, token issuance, MCP requests, and workspace actors check live Wander
+membership; an active session organization never chooses the workspace.
+The organization and membership tables remain in place for access control.
+
 ## The four product surfaces
 
 | Surface          | Contract                | Purpose                                                                                     |
@@ -183,10 +191,11 @@ It is an OAuth 2.1 protected resource backed by Better Auth. Clients discover
 authorization metadata through the standard well-known endpoints. Dynamic
 client registration and PKCE are supported.
 
-During authorization, the user chooses one Growth organization. The access
-token carries that organization as `org_id`. The MCP route verifies issuer,
-audience, expiry, and scope, then checks live organization membership on every
-request.
+During authorization, Growth resolves the user’s live Wander membership without
+a workspace selector. The access token carries Wander as `org_id`, independent
+of the session’s active organization. Token issuance and the MCP route reject
+non-Wander grants and revoked membership. The route verifies issuer, audience,
+expiry, and scope, then checks live Wander membership on every request.
 
 The route does not fall back to the browser session, the first organization, or
 a separate connector record. Removing a user from the organization removes MCP

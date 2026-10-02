@@ -4,15 +4,12 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { Logo } from "@wandercom/design-system-web/ui/logo";
 import { usePathname, useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+
 import {
-  Building2,
-  Check,
   ChevronsUpDown,
   LogOut,
   Monitor,
   Moon,
-  Plus,
   Search,
   Settings,
   Sun,
@@ -46,20 +43,16 @@ import {
 } from "@/components/ui/sidebar";
 import { useTheme } from "@/components/ui/theme";
 import { authClient } from "@/server/better-auth/client";
-import { orpc } from "@/orpc/client";
+
 import { NAV_GROUPS, type NavItem } from "@/components/app-nav";
 
 interface AppSidebarProps {
-  orgName: string;
-  orgSlug?: string;
   userName: string;
   userEmail: string;
   userImage?: string;
 }
 
 export function AppSidebar({
-  orgName,
-  orgSlug,
   userName,
   userEmail,
   userImage,
@@ -71,7 +64,6 @@ export function AppSidebar({
   useEffect(() => {
     if (isMobile) setOpenMobile(false);
   }, [pathname, isMobile, setOpenMobile]);
-  const { data: orgs } = useQuery(orpc.org.list.queryOptions());
   const { themeMode, setTheme } = useTheme();
 
   const isActive = (item: NavItem) =>
@@ -90,60 +82,16 @@ export function AppSidebar({
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            {/* Org switcher disabled: kept open={false} + non-trigger button so
-                the selector is not accessible from the frontend, but the code
-                remains intact for when multi-org support is re-enabled. */}
-            <DropdownMenu open={false}>
-              <SidebarMenuButton
-                size="lg"
-                tooltip={orgName}
-                className="cursor-default"
-              >
-                {/* The real logomark, not the first letter of the org name.
-                    Same component the client-facing connect page uses, so the
-                    back-office and the pages we send clients agree. */}
+            <SidebarMenuButton size="lg" tooltip="Wander Growth" asChild>
+              <Link href="/app">
                 <div className="flex aspect-square size-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
                   <Logo variant="logomark" className="size-4" />
                 </div>
-                <div className="grid flex-1 text-left leading-tight">
-                  <span className="truncate text-sm font-semibold">
-                    {orgName}
-                  </span>
-                  <span className="truncate text-xs text-muted-foreground">
-                    Organization
-                  </span>
-                </div>
-              </SidebarMenuButton>
-              <DropdownMenuContent align="start" side="right" className="w-56">
-                <DropdownMenuLabel tone="muted" textSize="xs">
-                  Organizations
-                </DropdownMenuLabel>
-                {orgs?.map((o) => (
-                  <DropdownMenuItem key={o.id} asChild>
-                    <Link href={`/app/org/${o.slug}`}>
-                      <Building2 className="size-4" />
-                      <span className="flex-1 truncate">{o.name}</span>
-                      {o.name === orgName && <Check className="size-4" />}
-                    </Link>
-                  </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator />
-                {orgSlug && (
-                  <DropdownMenuItem asChild>
-                    <Link href={`/app/org/${orgSlug}/settings`}>
-                      <Settings className="size-4" />
-                      Organization settings
-                    </Link>
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem asChild>
-                  <Link href="/app/org/create">
-                    <Plus className="size-4" />
-                    Create organization
-                  </Link>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                <span className="truncate text-sm font-semibold">
+                  Wander Growth
+                </span>
+              </Link>
+            </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
