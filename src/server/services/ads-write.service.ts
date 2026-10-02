@@ -1053,7 +1053,7 @@ export async function createGoogleAd(
   });
   // Google's create call takes no status, so the campaign can be delivering the
   // moment the provider accepts it. Pausing is a second, documented call.
-  const pause = await pauseFreshGoogleCampaign(result.platformCampaignId);
+  const pause = await pauseFreshGoogleCampaign(result);
   return {
     brand: destination.brand,
     connectionAccountId: input.connectionAccountId,
@@ -1664,14 +1664,16 @@ export async function addAdAudienceUsers(input: {
  * Meta's create call carries `status: PAUSED`; Google's does not, so the only
  * way to keep the promise the push dialog makes is a second, documented call.
  */
-async function pauseFreshGoogleCampaign(
-  platformCampaignId: string | null | undefined,
+export async function pauseFreshGoogleCampaign(
+  result: ZernioAdWriteResponse,
+  pauseCampaign = setZernioCampaignStatus,
 ): Promise<{ status: PlatformCampaignStatus; warnings: string[] }> {
+  const platformCampaignId = writtenCampaignId(result);
   if (!platformCampaignId) {
     return googlePauseOutcome({ paused: false, reason: "no-campaign-id" });
   }
   try {
-    await setZernioCampaignStatus({
+    await pauseCampaign({
       platformCampaignId,
       status: "paused",
       platform: requireAdPlatformSpec("google_ads").zernio!.treePlatform,

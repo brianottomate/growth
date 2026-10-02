@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import {
   planGoogleCompile,
+  pauseFreshGoogleCampaign,
   zernioKeywords,
 } from "@/server/services/ads-write.service";
 import { parseSearchTerm } from "@/lib/search-terms";
@@ -123,5 +124,21 @@ describe("planGoogleCompile", () => {
     });
     expect(plan.groups).toHaveLength(2);
     expect(plan.units.map((u) => u.ad.id)).toEqual(["feed"]);
+  });
+});
+
+describe("automatic Google campaign pause", () => {
+  it("pauses the native campaign from a legacy single-ad creation response", async () => {
+    const pausedIds: string[] = [];
+    const result = await pauseFreshGoogleCampaign(
+      { ad: { platformCampaignId: "24305726595" } },
+      async ({ platformCampaignId, status }) => {
+        expect(status).toBe("paused");
+        pausedIds.push(platformCampaignId);
+        return { status: "paused" };
+      },
+    );
+    expect(pausedIds).toEqual(["24305726595"]);
+    expect(result).toEqual({ status: "paused", warnings: [] });
   });
 });
