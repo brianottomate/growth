@@ -189,21 +189,27 @@ test("brand projections exclude connection credentials and issuance details", as
   ).toThrow("connection credential");
 });
 
-test("stored legacy sender fields are projected out without losing current settings", async () => {
+test("brand projections retain current marketing DNS settings", async () => {
   const { brandForAssistant } = await import("../capabilities/brand-output");
-  const brand = {
-    connectToken: null,
-    connectTokenIssuedAt: null,
-    connectTokenIssuedByEmail: null,
-    connectTokenIssuedByName: null,
-    emailSender: {
-      fromName: "Wander",
-      copyGuide: "Use plain language",
-      marketingDomain: "retired.example",
+  const emailSender = {
+    fromName: "Wander",
+    copyGuide: "Use plain language",
+    marketingDomain: {
+      rootDomain: "wander.com",
+      sendingDomain: "post.wander.com",
+      postmarkDomainId: 123,
+      token: "a".repeat(32),
+      createdAt: "2026-10-02T00:00:00.000Z",
+      expiresAt: "2026-10-09T00:00:00.000Z",
     },
   };
-  expect(brandForAssistant(brand)).toEqual({
-    emailSender: { fromName: "Wander", copyGuide: "Use plain language" },
-  });
-  expect(brand.emailSender.marketingDomain).toBe("retired.example");
+  expect(
+    brandForAssistant({
+      connectToken: null,
+      connectTokenIssuedAt: null,
+      connectTokenIssuedByEmail: null,
+      connectTokenIssuedByName: null,
+      emailSender,
+    }),
+  ).toEqual({ emailSender });
 });

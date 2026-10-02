@@ -23,7 +23,11 @@ export function ClientPageViewBeacon({
     } catch {}
     let timer: ReturnType<typeof setTimeout> | undefined;
     let stopped = false;
+    let sent = false;
+    let inFlight = false;
     const fire = async () => {
+      if (stopped || sent || inFlight) return;
+      inFlight = true;
       try {
         const response = await fetch(endpoint, {
           method: "POST",
@@ -32,17 +36,26 @@ export function ClientPageViewBeacon({
           keepalive: true,
         });
         if (!response.ok || stopped) return;
+        sent = true;
+        clearTimeout(timer);
         try {
           sessionStorage.setItem(sessionKey + ":sent", "1");
         } catch {}
         document.removeEventListener("visibilitychange", onVisibility);
       } catch {
         /* Tracking never blocks setup. */
+      } finally {
+        inFlight = false;
       }
     };
     const onVisibility = () => {
       clearTimeout(timer);
-      if (document.visibilityState === "visible")
+      if (
+        !stopped &&
+        !sent &&
+        !inFlight &&
+        document.visibilityState === "visible"
+      )
         timer = setTimeout(() => {
           void fire();
         }, 3000);

@@ -21,7 +21,6 @@ export function brandForAssistant<T extends ConnectionFields>(brand: T) {
   } = brand;
   return {
     ...visible,
-    // Stored JSON can predate the current contract (e.g. marketingDomain).
     // Project only declared sender settings; preserve the stored record.
     ...("emailSender" in brand
       ? {
