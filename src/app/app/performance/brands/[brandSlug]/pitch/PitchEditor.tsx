@@ -3,6 +3,9 @@
 import { PitchChatButton } from "../../../PitchChatButton";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { SimpleDialog } from "@/components/ui/dialog";
+import { PitchVisualPreview, PitchAsset } from "./PitchVisualPreview";
+import { resolvePitchFields, selectPitchHomes } from "@/lib/pitch-settings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,6 +45,7 @@ export function PitchEditor({
 }) {
   const initial = pitchFieldsSchema.parse(brand.pitchSettings ?? EMPTY_PITCH);
   const [editing, setEditing] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [fields, setFields] = useState<PitchFields>(initial);
   const [saved, setSaved] = useState(initial);
   const [revision, setRevision] = useState(brand.pitchSettings?.revision ?? 0);
@@ -94,6 +98,12 @@ export function PitchEditor({
   );
   const finalize = useMutation(orpc.media.finalizeUpload.mutationOptions());
   const failUpload = useMutation(orpc.media.failUpload.mutationOptions());
+  const taxonomy = useQuery({
+    ...orpc.media.taxonomy.queryOptions({ input: { brandId: brand.id } }),
+    enabled: false,
+  });
+  const createFolder = useMutation(orpc.media.createFolder.mutationOptions());
+  const organize = useMutation(orpc.media.updateMeta.mutationOptions());
   const busy = save.isPending || draft.isPending || uploading;
   const patch = (value: Partial<PitchFields>) =>
     setFields((current) => ({ ...current, ...value }));
@@ -105,6 +115,7 @@ export function PitchEditor({
     setUploading(true);
     setError(null);
     let mediaId: string | undefined;
+    let finalized = false;
     try {
       const slot = await createUpload.mutateAsync({
         brandId: brand.id,
@@ -125,6 +136,32 @@ export function PitchEditor({
         url: slot.publicUrl,
         pathname: slot.pathname,
       });
+      finalized = true;
+      // Organizing is best effort: a library failure must not undo a completed upload.
+      try {
+        const folders = await taxonomy.refetch();
+        let folder = folders.data?.folders.find(
+          (item) => item.name === "Pitch",
+        );
+        if (!folder) {
+          try {
+            folder = await createFolder.mutateAsync({
+              brandId: brand.id,
+              name: "Pitch",
+            });
+          } catch {
+            folder = (await taxonomy.refetch()).data?.folders.find(
+              (item) => item.name === "Pitch",
+            );
+          }
+        }
+        if (!folder) throw new Error("Folder unavailable");
+        await organize.mutateAsync({ id: slot.mediaId, folderId: folder.id });
+      } catch {
+        toast.error(
+          "Image uploaded, but could not organize it into the Pitch folder.",
+        );
+      }
       if (target === "logo") patch({ logoUrl: slot.publicUrl });
       else if (target === "hero")
         patch({ heroMedia: { url: slot.publicUrl, kind: "image" } });
@@ -134,7 +171,7 @@ export function PitchEditor({
           imageUrls: [...current.imageUrls, slot.publicUrl].slice(0, 3),
         }));
     } catch (cause) {
-      if (mediaId)
+      if (mediaId && !finalized)
         await failUpload
           .mutateAsync({ mediaId, reason: "Pitch image upload failed" })
           .catch(() => undefined);
@@ -167,6 +204,22 @@ export function PitchEditor({
   const previewUrl = pitchUrl
     ? `${pitchUrl}?pitchRevision=${revision}&noping=1`
     : null;
+  const visibleFields = editing ? fields : saved;
+  const resolved = resolvePitchFields(
+    visibleFields,
+    { ...brand, icon: brand.resolved.iconUrl },
+    brand.resolved.location,
+  );
+  const selectedHomes = selectPitchHomes(
+    homes.map((home) => ({ ...home, url: home.urlKey })),
+    visibleFields.selectedHomeUrls,
+  );
+  const photos = visibleFields.imageUrls.length
+    ? visibleFields.imageUrls
+    : selectedHomes
+        .map((home) => home.heroSourceUrl)
+        .filter((url): url is string => Boolean(url))
+        .slice(0, 3);
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -208,14 +261,8 @@ export function PitchEditor({
                   Open live pitch
                 </a>
               </Button>
-              <Button variant="outline" asChild>
-                <a
-                  href={`${pitchUrl}?key=wanderplus&export=1&noping=1`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Export PDF / PNG
-                </a>
+              <Button variant="outline" onClick={() => setExportOpen(true)}>
+                Export PDF / PNG
               </Button>
             </>
           )}
@@ -309,7 +356,11 @@ export function PitchEditor({
             {textFields.map(([key, label]) => (
               <div key={key} className="space-y-1">
                 <dt className="text-sm font-medium">
-                  {label}{" "}
+                  {key === "logoUrl"
+                    ? "Logo"
+                    : key === "iconUrl"
+                      ? "Icon"
+                      : label}{" "}
                   <span className="ml-2 text-xs font-normal text-muted-foreground">
                     {saved[key]
                       ? "Pitch override"
@@ -323,7 +374,14 @@ export function PitchEditor({
                   </span>
                 </dt>
                 <dd className="text-sm break-words whitespace-pre-wrap text-muted-foreground">
-                  {saved[key] || defaults[key]}
+                  {key === "logoUrl" || key === "iconUrl" ? (
+                    <PitchAsset
+                      url={resolved[key]}
+                      label={key === "logoUrl" ? "Brand logo" : "Brand icon"}
+                    />
+                  ) : (
+                    saved[key] || defaults[key]
+                  )}
                 </dd>
               </div>
             ))}
@@ -485,30 +543,53 @@ export function PitchEditor({
                   </Button>
                 </div>
               ))}
-              <select
-                aria-label="Choose a library photo"
-                className="w-full rounded-lg border bg-background p-2"
-                value=""
-                disabled={fields.imageUrls.length >= 3}
-                onChange={(event) => {
-                  if (
-                    event.target.value &&
-                    !fields.imageUrls.includes(event.target.value)
-                  )
-                    patch({
-                      imageUrls: [...fields.imageUrls, event.target.value],
-                    });
-                }}
-              >
-                <option value="">Choose from the brand’s media library…</option>
-                {media
-                  .filter((item) => item.url?.startsWith("https:"))
-                  .map((item) => (
-                    <option key={item.id} value={item.url!}>
-                      {item.title ?? item.id}
-                    </option>
-                  ))}
-              </select>
+              <details className="rounded-xl border p-3">
+                <summary className="cursor-pointer text-sm font-medium">
+                  Choose from the brand’s media library
+                </summary>
+                <div className="mt-3 grid grid-cols-2 gap-2 @xl:grid-cols-3">
+                  {media
+                    .filter((item) => item.url?.startsWith("https:"))
+                    .map((item) => {
+                      const selected = fields.imageUrls.includes(item.url!);
+                      return (
+                        <button
+                          type="button"
+                          key={item.id}
+                          aria-pressed={selected}
+                          aria-label={`Select ${item.title ?? "library photo"}`}
+                          disabled={!selected && fields.imageUrls.length >= 3}
+                          className={`overflow-hidden rounded-lg border p-1 text-left disabled:opacity-40 ${selected ? "ring-2 ring-ring" : ""}`}
+                          onClick={() =>
+                            patch({
+                              imageUrls: selected
+                                ? fields.imageUrls.filter(
+                                    (url) => url !== item.url,
+                                  )
+                                : [...fields.imageUrls, item.url!],
+                            })
+                          }
+                        >
+                          <img
+                            src={item.url!}
+                            alt={item.title ?? "Library photo"}
+                            loading="lazy"
+                            className="aspect-video w-full rounded object-cover"
+                          />
+                          <span className="block truncate p-1 text-xs">
+                            {selected ? "Selected · " : ""}
+                            {item.title ?? "Library photo"}
+                          </span>
+                        </button>
+                      );
+                    })}
+                </div>
+                {!media.length && (
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    No library photos yet. Upload a photo below.
+                  </p>
+                )}
+              </details>
               <Label className="block">
                 Upload photo
                 <Input
@@ -700,6 +781,27 @@ export function PitchEditor({
             )}
           </div>
         </div>
+      )}
+      <PitchVisualPreview
+        fields={resolved}
+        photos={photos}
+        editing={editing}
+        automaticPhotos={!visibleFields.imageUrls.length}
+      />
+      {pitchUrl && (
+        <SimpleDialog
+          open={exportOpen}
+          onOpenChange={setExportOpen}
+          title="Export saved pitch"
+          description="Download the saved page. Save any manual edits before exporting."
+          size="xl"
+        >
+          <iframe
+            src={`${pitchUrl}/preview?key=wanderplus&exportPanel=1&pitchRevision=${Math.max(revision, brand.pitchSettings?.revision ?? 0)}&noping=1`}
+            title="Pitch PDF and PNG downloads"
+            className="h-[360px] w-full rounded-xl border bg-white"
+          />
+        </SimpleDialog>
       )}
       {pitchUrl && (
         <section className="mt-8 space-y-3">

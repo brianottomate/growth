@@ -98,3 +98,11 @@ that result. Legacy payload fields remain temporarily for safe rollout. Updating
 explicit overrides stay fixed, including a deliberate zero fee. Older gateway
 responses remain compatible with the renderer. Explicit copy query variants
 continue to supply their own headline/introduction unless overridden.
+
+### Visual review and export
+
+The read-only pitch workspace displays the resolved logo/icon, a lightweight page opening and sample-ad frame, and featured-photo thumbnails. It reuses the public pitch resolver for brand marks, homes and location; these illustrative frames do not replace the embedded live page. Manual edits update the frames locally and are labelled unsaved until saved. When no home images are available, the workspace explicitly shows the missing asset rather than substituting generic property photography.
+
+New image uploads use the existing R2 media service and are organized into the brand's `Pitch` folder. Selecting an existing library image leaves its folder unchanged. Folder organization is best effort and does not roll back a successful upload. Pitch JSONB retains only hosted asset references.
+
+PDF/PNG controls open in a Growth dialog embedding wander.com's narrow `/preview?exportPanel=1` surface. The renderer captures its own actual saved page, so Growth does not duplicate capture logic or copy the entire pitch UI. The download overlay is excluded from the exported document.
