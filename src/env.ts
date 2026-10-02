@@ -21,6 +21,8 @@ export const env = createEnv({
     POSTMARK_ACCOUNT_TOKEN: z.string().optional(),
     POSTMARK_SERVER_TOKEN: z.string().optional(),
     POSTMARK_WEBHOOK_SECRET: z.string().optional(),
+    SAAS_ENTRI_APPLICATION_ID: z.string().optional(),
+    SAAS_ENTRI_APPLICATION_SECRET: z.string().optional(),
     GOOGLE_CLIENT_ID: z.string().optional(),
     GOOGLE_CLIENT_SECRET: z.string().optional(),
     // Separate OAuth client from sign-in: connecting Drive must never alter
@@ -185,6 +187,8 @@ export const env = createEnv({
     POSTMARK_ACCOUNT_TOKEN: process.env.POSTMARK_ACCOUNT_TOKEN,
     POSTMARK_SERVER_TOKEN: process.env.POSTMARK_SERVER_TOKEN,
     POSTMARK_WEBHOOK_SECRET: process.env.POSTMARK_WEBHOOK_SECRET,
+    SAAS_ENTRI_APPLICATION_ID: process.env.SAAS_ENTRI_APPLICATION_ID,
+    SAAS_ENTRI_APPLICATION_SECRET: process.env.SAAS_ENTRI_APPLICATION_SECRET,
     RESEND_FROM_EMAIL: process.env.RESEND_FROM_EMAIL,
     RESEND_REPLY_TO_EMAIL: process.env.RESEND_REPLY_TO_EMAIL,
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,

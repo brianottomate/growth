@@ -1,3 +1,4 @@
+import { ClientPageActivity } from "../ClientPageActivity";
 import { WanderOsSiteCard } from "@/app/app/brands/[brandSlug]/WanderOsSiteCard";
 import { BrandBrandingCard } from "@/app/app/brands/[brandSlug]/BrandBrandingCard";
 import { BrandPreviewCard } from "../BrandPreviewCard";
@@ -183,6 +184,7 @@ export default async function PerformanceBrandHomesPage({
 
   return (
     <div className="space-y-4">
+      <ClientPageActivity brandId={brand.id} orgId={org.id} />
       {inventory?.enrichmentError && (
         <p className="text-sm text-muted-foreground">
           {inventory.enrichmentError}

@@ -329,7 +329,10 @@ async function brandForHandle(handle: { token?: string; slug?: string }) {
 
   if (handle.token) {
     const brand = await db.query.brandTable.findFirst({
-      where: eq(brandTable.connectToken, handle.token),
+      where: and(
+        eq(brandTable.connectToken, handle.token),
+        isNull(brandTable.deletedAt),
+      ),
       columns,
     });
     // Restated in the return type: the null check does not survive the

@@ -4,6 +4,11 @@ import { notFound, redirect } from "next/navigation";
 import { NewslettersView } from "@/app/app/newsletters/NewslettersView";
 
 import { loadPerformanceBrand } from "../_data";
+import { db } from "@/server/db";
+import { brandTable } from "@/server/db/schema";
+import { and, eq, isNull } from "drizzle-orm";
+import { suggestedEmailRoot } from "@/lib/email-dns";
+import { EmailDnsSetup } from "./EmailDnsSetup";
 
 export const metadata: Metadata = { title: "Email · Wander Performance" };
 export const dynamic = "force-dynamic";
@@ -26,13 +31,29 @@ export default async function PerformanceBrandNewslettersPage({
   if (!brand) notFound();
 
   const slug = brand.slug ?? brand.id;
+  const sender = await db.query.brandTable.findFirst({
+    where: and(
+      eq(brandTable.id, brand.id),
+      eq(brandTable.organizationId, org.id),
+      isNull(brandTable.deletedAt),
+    ),
+    columns: { emailSender: true },
+  });
+  const setup = sender?.emailSender?.marketingDomain;
   return (
-    <NewslettersView
-      brands={[{ id: brand.id, name: brand.name, slug: brand.slug }]}
-      brand={{ id: brand.id, name: brand.name, slug: brand.slug }}
-      basePath={`/app/performance/brands/${slug}/newsletters`}
-      kindFilter={kind}
-      view={view === "wall" || view === "read" ? view : "list"}
-    />
+    <div className="space-y-6">
+      <EmailDnsSetup
+        brandId={brand.id}
+        rootDomain={setup?.rootDomain ?? suggestedEmailRoot(brand.website)}
+        sendingDomain={setup?.sendingDomain}
+      />
+      <NewslettersView
+        brands={[{ id: brand.id, name: brand.name, slug: brand.slug }]}
+        brand={{ id: brand.id, name: brand.name, slug: brand.slug }}
+        basePath={`/app/performance/brands/${slug}/newsletters`}
+        kindFilter={kind}
+        view={view === "wall" || view === "read" ? view : "list"}
+      />
+    </div>
   );
 }

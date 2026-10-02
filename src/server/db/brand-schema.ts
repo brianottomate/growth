@@ -195,6 +195,8 @@ export type BrandLegalIdentity = {
  * shows. Every block is optional; the email omits what a brand has not set.
  */
 export type BrandEmailSender = {
+  /** Marketing authentication setup; no provider credentials or send activation. */
+  marketingDomain?: import("@/lib/email-dns").BrandMarketingDomain | null;
   /** Brand-specific email colors; omitted values use a neutral frame. */
   theme?: BrandEmailTheme | null;
   /** Email-specific voice, preferred language and claims to avoid. */

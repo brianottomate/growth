@@ -1,6 +1,6 @@
 import "server-only";
 
-import { randomBytes } from "node:crypto";
+import { newConnectionToken, isConnectionToken } from "./connection-token";
 
 import { and, eq, isNotNull, isNull } from "drizzle-orm";
 
@@ -108,7 +108,7 @@ export function isOfferedConnectChannel(key: string): boolean {
 
 /** Exported so brand creation can stamp a token at insert (no Zernio call). */
 export function newConnectToken(): string {
-  return randomBytes(24).toString("base64url");
+  return newConnectionToken();
 }
 
 export function brandConnectUrl(token: string): string {
@@ -143,10 +143,11 @@ export function brandPitchUrl(slug: string): string {
 }
 
 export async function getBrandByConnectToken(token: string) {
-  if (!token || token.length < 16) return null;
+  if (!isConnectionToken(token)) return null;
   return db.query.brandTable.findFirst({
     where: and(
       eq(brandTable.connectToken, token),
+      isNull(brandTable.deletedAt),
       isNotNull(brandTable.organizationId),
     ),
   });

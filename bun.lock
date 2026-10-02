@@ -90,6 +90,7 @@
         "drizzle-orm": "^0.45.2",
         "elkjs": "^0.12.0",
         "embla-carousel-react": "^8.6.0",
+        "entrijs": "^1.4.0",
         "exceljs": "^4.4.0",
         "ffmpeg-static": "5.3.0",
         "he": "^1.2.0",
@@ -1501,6 +1502,8 @@
     "enhanced-resolve": ["enhanced-resolve@5.24.5", "", { "dependencies": { "graceful-fs": "^4.2.4", "tapable": "^2.3.3" } }, "sha512-L1l8TNvomm6UVW5B253AGxQagSQr+vGwhMlrrfRS2qmhx46AMpMVJKQYLvWYbysTMY8VoicOvzHzoHMbyzB+4A=="],
 
     "entities": ["entities@7.0.1", "", {}, "sha512-TWrgLOFUQTH994YUyl1yT4uyavY5nNB5muff+RtWaqNVCAK408b5ZnnbNAUEWLTCpum9w6arT70i1XdQ4UeOPA=="],
+
+    "entrijs": ["entrijs@1.4.0", "", {}, "sha512-rEbSqrboSdlL6yW9XwqzN2NsJalA8Y06UCBHAd0SmKBvYI9DJRhgzvVCIxyV00BfvXdd6A37n7aHGVncc0V4IA=="],
 
     "env-paths": ["env-paths@2.2.1", "", {}, "sha512-+h1lkLKhZMTYjog1VEpJNG7NZJWcuc2DDk/qsqSTRRCOXiLjeQ1d1/udrUGhqMxUgAlwKNZ0cf2uqan5GLuS2A=="],
 

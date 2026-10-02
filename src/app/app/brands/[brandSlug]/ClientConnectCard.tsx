@@ -98,7 +98,7 @@ export function ClientConnectCard({ brandId }: { brandId: string }) {
                 {copied === "pitch" ? "Copied" : "Copy"}
               </Button>
               <a
-                href={pitchUrl}
+                href={`${pitchUrl}${pitchUrl.includes("?") ? "&" : "?"}noping=1`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs text-muted-foreground hover:text-foreground"
@@ -131,7 +131,7 @@ export function ClientConnectCard({ brandId }: { brandId: string }) {
                 {copied === "intake" ? "Copied" : "Copy"}
               </Button>
               <a
-                href={intakeUrl}
+                href={`${intakeUrl}${intakeUrl.includes("?") ? "&" : "?"}noping=1`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs text-muted-foreground hover:text-foreground"

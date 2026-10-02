@@ -1,3 +1,4 @@
+import { ClientPageViewBeacon } from "@/components/client-page/ClientPageViewBeacon";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Logo } from "@wandercom/design-system-web/ui/logo";
@@ -86,6 +87,10 @@ export default async function ConnectPage({
 
   return (
     <main className="flex min-h-screen flex-col lg:grid lg:grid-cols-[minmax(0,26rem)_1fr]">
+      <ClientPageViewBeacon
+        endpoint={`/connect/${token}/view`}
+        sessionKey={`social-connect:${token}`}
+      />
       {/* Wander's half. Second in the DOM order that matters on mobile: it
           renders below the task, so a phone opens on the four buttons. */}
       <aside className="order-2 flex flex-col justify-between gap-10 border-t px-6 py-10 lg:order-1 lg:min-h-screen lg:border-t-0 lg:border-r lg:px-10 lg:py-12">

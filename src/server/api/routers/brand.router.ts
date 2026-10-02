@@ -1,3 +1,4 @@
+import { getClientPageActivity } from "@/server/services/client-page-activity.service";
 import { brandEmailThemeSchema } from "@/lib/brand-email-style";
 import type { BrandingProfile } from "@mendable/firecrawl-js";
 import { z } from "zod";
@@ -92,6 +93,12 @@ import {
   setBrandAdAccountAllowed,
 } from "@/server/services/brand-ad-accounts.service";
 import { syncZernioAds } from "@/server/services/ads-sync.service";
+import { emailDnsInputSchema } from "@/lib/email-dns";
+import {
+  getBrandEmailDns,
+  prepareBrandEmailDns,
+} from "@/server/services/email-dns.service";
+import { workspaceProcedure } from "@/server/api/orpc";
 
 type Ctx = {
   db: typeof db;
@@ -202,6 +209,22 @@ function slugify(name: string): string {
 }
 
 export const brandRouter = {
+  pageActivity: workspaceProcedure
+    .input(z.object({ brandId: z.string() }))
+    .handler(({ context, input }) =>
+      getClientPageActivity(input.brandId, context.workspace.orgId),
+    ),
+  emailDnsStatus: workspaceProcedure
+    .input(z.object({ brandId: z.string() }))
+    .handler(({ context, input }) =>
+      getBrandEmailDns(input.brandId, context.workspace.orgId),
+    ),
+
+  prepareEmailDns: workspaceProcedure
+    .input(emailDnsInputSchema)
+    .handler(({ context, input }) =>
+      prepareBrandEmailDns(input, context.workspace.orgId),
+    ),
   listLite: actionProcedure(listBrands),
 
   /**

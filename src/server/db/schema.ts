@@ -33,3 +33,4 @@ export * from "./pregen-native-schema";
 export * from "./website-schema";
 
 export * from "./home-group-schema";
+export * from "./client-page-schema";
