@@ -4,6 +4,10 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus, Trash2, Users } from "lucide-react";
 
+import { GeographyChips } from "@/components/geography-chips";
+import { DefinePersonasButton } from "@/app/app/brands/[brandSlug]/ads/DefinePersonasButton";
+import Link from "next/link";
+
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -55,11 +59,16 @@ const EMPTY: PersonaForm = {
 export function PersonasClient({
   brands,
   embedded = false,
+  launchBrief = false,
+  brandSlug,
 }: {
   brands: Brand[];
   /** Rendered inside another page (the brand Strategy page): drop the page
    * shell and the big header so it aligns with the surrounding sections. */
   embedded?: boolean;
+  /** A compact persona + guest-origin editor inside the Performance brief. */
+  launchBrief?: boolean;
+  brandSlug?: string;
 }) {
   const queryClient = useQueryClient();
   const [brandId, setBrandId] = useState(brands[0]?.id ?? "");
@@ -172,6 +181,12 @@ export function PersonasClient({
               ))}
             </select>
           )}
+          {launchBrief && brands[0] ? (
+            <DefinePersonasButton
+              brandId={brandId}
+              brandName={brands[0].name}
+            />
+          ) : null}
           <Button size="sm" onClick={() => setForm(EMPTY)}>
             <Plus className="size-3.5" />
             New persona
@@ -181,18 +196,28 @@ export function PersonasClient({
 
       {personas.isPending ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
+      ) : personas.error ? (
+        <p role="alert" className="text-xs text-destructive">
+          Could not load personas: {personas.error.message}
+        </p>
       ) : (personas.data ?? []).length === 0 ? (
         <div className="rounded-xl border bg-card p-8 text-center">
           <Users className="mx-auto size-6 text-muted-foreground" />
           <p className="mt-2 text-sm font-medium">No personas yet</p>
           <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
-            Start with the two or three kinds of people this brand exists for.
-            &ldquo;Remote workers who travel&rdquo;, not &ldquo;CA remote
-            workers 28-45&rdquo; — the narrowing happens per campaign.
+            {launchBrief
+              ? "Define who books these homes, then add where those guests come from."
+              : "Start with the two or three kinds of people this brand exists for. Campaigns narrow each persona into targeting."}
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 @2xl:grid-cols-2">
+        <div
+          className={
+            launchBrief
+              ? "space-y-3"
+              : "grid grid-cols-1 gap-3 @2xl:grid-cols-2"
+          }
+        >
           {(personas.data ?? []).map((persona) => (
             <div key={persona.id} className="rounded-xl border bg-card p-4">
               <div className="flex items-start justify-between gap-2">
@@ -202,6 +227,7 @@ export function PersonasClient({
                     size="sm"
                     variant="ghost"
                     className="h-7"
+                    aria-label={`Edit ${persona.name}`}
                     onClick={() =>
                       setForm({
                         personaId: persona.id,
@@ -233,6 +259,7 @@ export function PersonasClient({
                     variant="ghost"
                     tone="muted"
                     className="h-7"
+                    aria-label={`Delete ${persona.name}`}
                     disabled={remove.isPending}
                     onClick={() => remove.mutate({ personaId: persona.id })}
                   >
@@ -253,10 +280,58 @@ export function PersonasClient({
                   .filter(Boolean)
                   .join(" · ") || "No planning metadata yet"}
               </p>
+              {launchBrief ? (
+                <div className="mt-3 space-y-1.5 border-t pt-3">
+                  <p className="text-[11px] font-medium">Guest origins</p>
+                  {[
+                    persona.demandGeography?.states,
+                    persona.demandGeography?.cities,
+                    persona.demandGeography?.countries,
+                    persona.demandGeography?.regions,
+                  ].some((locations) => locations?.length) ? (
+                    <>
+                      <GeographyChips
+                        label="States"
+                        values={persona.demandGeography?.states}
+                      />
+                      <GeographyChips
+                        label="Cities"
+                        values={persona.demandGeography?.cities}
+                      />
+                      <GeographyChips
+                        label="Countries"
+                        values={persona.demandGeography?.countries}
+                      />
+                      <GeographyChips
+                        label="Regions"
+                        values={persona.demandGeography?.regions}
+                      />
+                    </>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Guest-origin locations haven’t been added yet.
+                    </p>
+                  )}
+                  {persona.demandGeography?.source ? (
+                    <p className="text-[11px] text-muted-foreground">
+                      Source: {persona.demandGeography.source}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           ))}
         </div>
       )}
+
+      {launchBrief && brandSlug ? (
+        <Link
+          href={`/app/performance/brands/${brandSlug}/setup#meta-audiences`}
+          className="inline-block text-xs text-primary hover:underline"
+        >
+          Manage Meta audiences & seed lists →
+        </Link>
+      ) : null}
 
       {error && <p className="text-xs text-red-300">{error.message}</p>}
 
@@ -264,13 +339,15 @@ export function PersonasClient({
         open={form !== null}
         onOpenChange={(next) => !next && setForm(null)}
       >
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md" scrollable>
           <DialogHeader>
             <DialogTitle>
               {form?.personaId ? "Edit persona" : "New persona"}
             </DialogTitle>
             <DialogDescription>
-              Planning metadata only — loose prose, never ad targeting.
+              {launchBrief
+                ? "Describe the guests and where they come from. Campaign targeting is configured separately."
+                : "Planning metadata only — loose prose, never ad targeting."}
             </DialogDescription>
           </DialogHeader>
           {form && (
@@ -324,7 +401,7 @@ export function PersonasClient({
               </div>
               <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
                 <div>
-                  <p className="text-xs font-semibold">Demand geography</p>
+                  <p className="text-xs font-semibold">Guest origins</p>
                   <p className="text-[11px] text-muted-foreground">
                     Where the guests we want come from. The structured source a
                     campaign audience derives from. Comma-separated.

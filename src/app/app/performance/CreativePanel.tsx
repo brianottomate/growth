@@ -1,19 +1,20 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/components/ui/lib/utils";
 import { homeCatalogCopy, homeCatalogPreviewUrl } from "@/lib/home-ad-previews";
 import type { CompositionFormatId } from "@/lib/compositions";
 
-import type { WorkspaceHome } from "./ClientWorkspace";
+import type { WorkspaceHome } from "./launch-workspace";
 
 const FORMATS: { id: CompositionFormatId; label: string; aspect: string }[] = [
   { id: "square", label: "1:1", aspect: "aspect-square" },
   { id: "portrait", label: "4:5", aspect: "aspect-[4/5]" },
   { id: "story", label: "9:16", aspect: "aspect-[9/16]" },
-  { id: "landscape", label: "16:9", aspect: "aspect-video" },
+  { id: "wide", label: "16:9", aspect: "aspect-video" },
 ];
 
 export function CreativePanel({
@@ -23,6 +24,7 @@ export function CreativePanel({
   brandId: string;
   homes: WorkspaceHome[];
 }) {
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const [homeId, setHomeId] = useState(homes[0]?.id ?? "");
   const [formatId, setFormatId] = useState<CompositionFormatId>("portrait");
   const home = homes.find((item) => item.id === homeId) ?? homes[0];
@@ -95,7 +97,7 @@ export function CreativePanel({
           <div>
             <h3 className="font-semibold">{home.name} · Catalog card</h3>
             <p className="text-xs text-muted-foreground">
-              Live render from the brand&apos;s composition · same as production
+              Preview from the brand&apos;s catalog template and feed facts
             </p>
           </div>
         </div>
@@ -123,12 +125,30 @@ export function CreativePanel({
               format.aspect,
             )}
           >
-            {/* oxlint-disable-next-line nextjs/no-img-element */}
-            <img
-              src={src}
-              alt={`${home.name} catalog card`}
-              className="size-full object-cover"
-            />
+            {failedSrc === src ? (
+              <div
+                role="alert"
+                className="flex size-full flex-col items-center justify-center gap-3 bg-muted p-5 text-center text-xs"
+              >
+                <p>Could not render the catalog preview.</p>
+                <Link
+                  href={`/app/compositions?brandId=${encodeURIComponent(brandId)}`}
+                  className="font-medium underline"
+                >
+                  Review the catalog template
+                </Link>
+              </div>
+            ) : (
+              <>
+                {/* oxlint-disable-next-line nextjs/no-img-element */}
+                <img
+                  src={src}
+                  alt={`${home.name} catalog card`}
+                  className="size-full object-cover"
+                  onError={() => setFailedSrc(src)}
+                />
+              </>
+            )}
           </div>
         </div>
       </section>

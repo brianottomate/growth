@@ -25,7 +25,7 @@ export function SectionLabel({
     <p
       className={cn(
         "text-[10.5px] font-semibold tracking-[0.09em] uppercase",
-        tone === "amber" ? "text-amber-300" : "text-muted-foreground",
+        tone === "amber" ? "text-foreground" : "text-muted-foreground",
         className,
       )}
     >
@@ -43,7 +43,7 @@ export const pill = "rounded-full";
 
 const STATE_LABEL: Record<DeskCampaignState, string> = {
   draft: "draft",
-  pushed: "paused",
+  pushed: "pushed",
   live: "live",
   ended: "ended",
 };
@@ -54,7 +54,7 @@ const DOT: Record<DeskCampaignState, string> = {
   ended: "bg-white/15",
 };
 
-/** A coloured dot for a campaign state: green live, amber paused, grey draft. */
+/** A coloured dot for a campaign state: green live, amber pushed, grey draft. */
 export function StateDot({
   state,
   className,
@@ -86,11 +86,9 @@ export function StateChip({
     <span
       className={cn(
         "shrink-0 rounded-full border border-border/80 px-2 py-0.5 text-[10px] font-medium whitespace-nowrap",
-        state === "live"
-          ? "text-emerald-300"
-          : state === "pushed"
-            ? "text-amber-300"
-            : "text-muted-foreground",
+        state === "live" || state === "pushed"
+          ? "text-foreground"
+          : "text-muted-foreground",
         className,
       )}
     >
@@ -171,11 +169,9 @@ export function SpendCell({ campaign }: { campaign: DeskCampaign }) {
         <span
           className={cn(
             "ml-1.5",
-            campaign.pace === "behind"
-              ? "text-amber-300"
-              : campaign.pace === "ahead"
-                ? "text-sky-300"
-                : "text-muted-foreground",
+            campaign.pace !== "on"
+              ? "text-foreground"
+              : "text-muted-foreground",
           )}
         >
           {campaign.pace === "on" ? "on pace" : `${campaign.pace} of pace`}
@@ -188,7 +184,7 @@ export function SpendCell({ campaign }: { campaign: DeskCampaign }) {
 /** One campaign as a row: dot, name over its client, platforms, money. */
 const STATE_WORD: Record<DeskCampaign["state"], string> = {
   draft: "Draft",
-  pushed: "Pushed, paused",
+  pushed: "Pushed",
   live: "Live",
   ended: "Ended",
 };

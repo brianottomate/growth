@@ -1,11 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
 import { Building2 } from "lucide-react";
 
-import { db } from "@/server/db";
-import { memberTable } from "@/server/db/schema";
+import { workspaceActor } from "@/server/workspace-actor";
 import { getSession } from "@/server/better-auth/server";
 import { EmptyState } from "@/components/ui/empty-state";
 import { isSettled, lineLabel, periodLabel } from "@/lib/performance-billing";
@@ -26,19 +24,12 @@ import {
   type IntakeSummary,
 } from "@/server/services/performance-readiness.service";
 
+import { JourneyBoard } from "../JourneyBoard";
+import { journeyBrands } from "../journey-data";
 import { cn } from "@/components/ui/lib/utils";
-import {
-  brandAdsHref,
-  BrandLogo,
-  CampaignRow,
-  panel,
-  SectionLabel,
-  tile,
-} from "../_components";
-import { ExpandableList } from "../ExpandableList";
+import { BrandLogo, panel, SectionLabel, tile } from "../_components";
 import { ReadinessChecklist } from "../ReadinessChecklist";
 import { StageChips } from "../StageChip";
-import { StartCampaignInChat } from "../StartCampaignInChat";
 import { BrandRowMenu } from "../BrandRowMenu";
 import { SendLink } from "../SendLink";
 
@@ -54,18 +45,23 @@ const fmtDate = (d: Date) =>
  * stand on the production checklist, where their campaigns are, and the
  * intake link to send when they have not filed yet.
  */
-export default async function PerformanceClientsPage() {
+export default async function PerformanceClientsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string }>;
+}) {
+  const { view } = await searchParams;
   const session = await getSession();
   if (!session?.user) redirect("/signin");
-  const membership = await db.query.memberTable.findFirst({
-    where: eq(memberTable.userId, session.user.id),
-    with: { organization: true },
-  });
-  const org = membership?.organization;
-  if (!org)
-    return <div className="text-muted-foreground">No organization found.</div>;
+  const actor = await workspaceActor();
+  if (!actor)
+    return (
+      <div className="text-muted-foreground">
+        Select an organization to view clients.
+      </div>
+    );
 
-  const desk = narrowDesk(await loadPerformanceDesk(org.id), "client");
+  const desk = narrowDesk(await loadPerformanceDesk(actor.orgId), "client");
   const readiness = await loadBrandReadiness(desk.brands);
 
   const entry = (brand: DeskBrand) => ({
@@ -101,21 +97,62 @@ export default async function PerformanceClientsPage() {
   ];
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-semibold">Client journey</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Launch progress, the next setup step, and a workspace for each
+            client.
+          </p>
+        </div>
+        <nav
+          aria-label="Client views"
+          className="inline-flex rounded-lg border bg-muted/40 p-1"
+        >
+          {[
+            { id: "journey", label: "Journey board" },
+            { id: "cards", label: "Client cards" },
+          ].map((item) => (
+            <Link
+              key={item.id}
+              href={`/app/performance/clients?view=${item.id}`}
+              aria-current={
+                (view === "cards" ? item.id === "cards" : item.id === "journey")
+                  ? "page"
+                  : undefined
+              }
+              className={cn(
+                "rounded-md px-3 py-2 text-xs font-medium",
+                (view === "cards" ? item.id === "cards" : item.id === "journey")
+                  ? "bg-background shadow-xs"
+                  : "text-muted-foreground",
+              )}
+            >
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+      </div>
       {desk.brands.length === 0 ? (
         <EmptyState
           icon={Building2}
           title="No clients yet"
           description="Prospects become clients on the Prospects tab."
         />
-      ) : (
+      ) : view === "cards" ? (
         <BrandSearch groups={groups} />
+      ) : (
+        <JourneyBoard
+          brands={journeyBrands(desk.brands, readiness)}
+          clientsOnly
+        />
       )}
     </div>
   );
 }
 
-/** One client: who they are on one line, what they filed as tiles, and what is missing. */
+/** A scan-friendly launch summary; the Overview holds the full brief. */
 function ClientRow({
   brand,
   readiness,
@@ -124,39 +161,70 @@ function ClientRow({
   readiness: BrandReadiness | null;
 }) {
   const intake = readiness?.intake ?? null;
-  const meta = [
-    intake
-      ? `intake filed ${fmtDate(intake.submittedAt)}${intake.by ? ` by ${intake.by}` : ""}`
-      : "no intake yet",
+  const slug = brand.slug ?? brand.id;
+  const overviewHref = `/app/performance/brands/${slug}`;
+  const budget = brand.campaigns.reduce(
+    (sum, campaign) => sum + campaign.budget,
+    0,
+  );
+  const spend = brand.campaigns.reduce(
+    (sum, campaign) => sum + campaign.spend,
+    0,
+  );
+  const adCount = brand.campaigns.reduce(
+    (sum, campaign) => sum + campaign.adCount,
+    0,
+  );
+  const nextItem = readiness?.checklist.groups
+    .flatMap((group) => group.items)
+    .find((item) => !item.done);
+  const nextHref = nextItem?.action
+    ? readinessLinks(brand)[nextItem.action.to]
+    : null;
+  const stats = [
+    {
+      label:
+        intake?.budget != null ? "Monthly media budget" : "Campaign budget",
+      value:
+        intake?.budget != null
+          ? `$${intake.budget.toLocaleString()}/mo`
+          : budget
+            ? `$${budget.toLocaleString()}`
+            : "Not set",
+    },
+    { label: "Spend to date", value: `$${spend.toLocaleString()}` },
+    { label: "Campaigns", value: `${brand.campaigns.length} · ${adCount} ads` },
+    {
+      label: "Intake",
+      value: intake
+        ? `Filed ${fmtDate(intake.submittedAt)}`
+        : "Waiting on intake",
+    },
   ];
   return (
-    <article className={cn(panel, "p-4 sm:p-5")}>
+    <article className={cn(panel, "p-4 @xl:p-5")}>
       <div className="flex items-start gap-3">
         <BrandLogo brand={brand} className="size-10 text-[13px]" />
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <Link
-              href={`/app/performance/brands/${brand.slug ?? brand.id}`}
+              href={overviewHref}
               className="text-[15px] font-semibold hover:underline"
             >
               {brand.name}
             </Link>
             <StageChips business={brand.business} delivery={brand.delivery} />
           </div>
-          <p className="truncate text-xs text-muted-foreground">
-            {brand.website ? (
-              <a
-                href={brand.website}
-                target="_blank"
-                rel="noreferrer"
-                className="hover:underline"
-              >
-                {brand.website.replace(/^https?:\/\//, "")}
-              </a>
-            ) : null}
-            {brand.website ? " · " : ""}
-            {meta.join(" · ")}
-          </p>
+          {brand.website ? (
+            <a
+              href={brand.website}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs text-muted-foreground hover:underline"
+            >
+              {brand.website.replace(/^https?:\/\//, "")}
+            </a>
+          ) : null}
           {brand.billing ? <BillingLine billing={brand.billing} /> : null}
         </div>
         <BrandRowMenu
@@ -168,61 +236,78 @@ function ClientRow({
         />
       </div>
 
-      {brand.featuredHomes.length > 0 ? (
-        <ul className="mt-3 flex gap-2 overflow-x-auto pb-1">
-          {brand.featuredHomes.map((home) => (
-            <li key={home.id} className="w-24 shrink-0 sm:w-28">
-              <div className="aspect-[4/3] overflow-hidden rounded-lg border bg-muted">
-                {home.photo ? (
-                  // oxlint-disable-next-line nextjs/no-img-element
-                  <img
-                    src={home.photo}
-                    alt=""
-                    loading="lazy"
-                    className="size-full object-cover"
-                  />
-                ) : null}
-              </div>
-              <p className="mt-1 truncate text-[11px] text-muted-foreground">
-                {home.name}
-              </p>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      <div className="mt-4 grid grid-cols-2 gap-2 @3xl:grid-cols-4">
+        {stats.map((stat) => (
+          <div key={stat.label} className={tile}>
+            <p className="text-[11px] text-muted-foreground">{stat.label}</p>
+            <p className="mt-1 text-sm font-semibold">{stat.value}</p>
+          </div>
+        ))}
+      </div>
 
-      {brand.pitchUrl || brand.intakeUrl ? (
-        <div className="mt-3 flex flex-wrap items-center gap-1.5">
-          {brand.pitchUrl ? (
-            <SendLink label="Pitch page" url={brand.pitchUrl} />
-          ) : null}
-          {brand.intakeUrl ? (
-            <SendLink
-              label="Intake form"
-              url={brand.intakeUrl}
-              viewHref={
-                intake
-                  ? `/app/performance/brands/${brand.slug ?? brand.id}#submission`
-                  : undefined
-              }
-              viewLabel="View submission"
-            />
-          ) : null}
-        </div>
-      ) : null}
-
-      {intake ? (
-        <IntakeFacts intake={intake} plan={brand.account?.plan ?? null} />
-      ) : (
-        <p className="mt-4 text-xs text-muted-foreground">
-          {brand.intakeUrl
-            ? "No intake filed yet."
-            : "No intake filed, and no intake link for this brand."}
-        </p>
-      )}
+      <div className="mt-4 grid grid-cols-1 gap-4 @3xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <section className="min-w-0 space-y-2">
+          <SectionLabel>Property preview</SectionLabel>
+          {brand.featuredHomes.length ? (
+            <ul className="grid grid-cols-3 gap-2">
+              {brand.featuredHomes.slice(0, 3).map((home) => (
+                <li key={home.id} className="min-w-0">
+                  <div className="aspect-[16/9] overflow-hidden rounded-lg border bg-muted">
+                    {home.photo ? (
+                      // oxlint-disable-next-line nextjs/no-img-element
+                      <img
+                        src={home.photo}
+                        alt=""
+                        loading="lazy"
+                        className="size-full object-cover"
+                      />
+                    ) : null}
+                  </div>
+                  <p
+                    className="mt-1 truncate text-[11px] text-muted-foreground"
+                    title={home.name}
+                  >
+                    {home.name}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              No property preview yet.
+            </p>
+          )}
+        </section>
+        <section className="min-w-0 space-y-2">
+          <SectionLabel>
+            {brand.delivery === "live"
+              ? "Still to complete"
+              : "Next checklist item"}
+          </SectionLabel>
+          <div className="rounded-lg border bg-background p-3 text-xs">
+            <p className="font-medium">
+              {nextItem?.label ??
+                (readiness
+                  ? "Checklist complete"
+                  : "Open the launch brief to review setup")}
+            </p>
+            {nextItem?.detail ? (
+              <p className="mt-1 text-muted-foreground">{nextItem.detail}</p>
+            ) : null}
+            {nextHref ? (
+              <Link
+                href={nextHref}
+                className="mt-2 inline-block text-primary hover:underline"
+              >
+                {nextItem!.action!.label}
+              </Link>
+            ) : null}
+          </div>
+        </section>
+      </div>
 
       {readiness ? (
-        <div className="mt-4 border-t pt-1">
+        <div className="mt-3 border-t pt-1">
           <ReadinessChecklist
             checklist={readiness.checklist}
             links={readinessLinks(brand)}
@@ -230,47 +315,35 @@ function ClientRow({
         </div>
       ) : null}
 
-      <div className="mt-4 space-y-2 border-t pt-3">
-        <div className="flex items-baseline justify-between">
-          <SectionLabel>
-            Campaigns
-            {brand.campaigns.length ? ` · ${brand.campaigns.length}` : ""}
-          </SectionLabel>
-          {brand.campaigns.length === 0 ? (
-            <StartCampaignInChat brandId={brand.id} brandName={brand.name} />
-          ) : (
-            <Link
-              href={brandAdsHref(brand)}
-              className="text-[11.5px] text-sky-300 hover:underline"
-            >
-              View campaigns
-            </Link>
-          )}
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-3">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {brand.pitchUrl ? (
+            <SendLink label="Pitch page" url={brand.pitchUrl} />
+          ) : null}
+          {brand.intakeUrl ? (
+            <SendLink
+              label="Intake form"
+              url={brand.intakeUrl}
+              viewHref={intake ? `${overviewHref}#submission` : undefined}
+              viewLabel="View submission"
+            />
+          ) : null}
         </div>
-        {brand.campaigns.length > 0 ? (
-          <ExpandableList limit={3} noun="campaigns">
-            {brand.campaigns.map((campaign) => (
-              <CampaignRow
-                key={campaign.id}
-                brand={brand}
-                campaign={campaign}
-              />
-            ))}
-          </ExpandableList>
-        ) : null}
+        <Link
+          href={overviewHref}
+          className="text-xs font-medium text-primary hover:underline"
+        >
+          Open launch brief →
+        </Link>
       </div>
 
-      {!brand.hasMark ? (
-        <div className="mt-4 flex items-center gap-2 border-t pt-3 text-xs text-amber-300">
-          <span className="size-1.5 rounded-full bg-amber-400" />
-          Brand mark missing, so cards render without the logo.
-          <Link
-            href={`/app/brands/${brand.slug ?? brand.id}#brand-mark`}
-            className="text-sky-300 hover:underline"
-          >
-            Fix
-          </Link>
-        </div>
+      {intake ? (
+        <details className="mt-3 border-t pt-3">
+          <summary className="cursor-pointer text-xs text-muted-foreground">
+            Intake details
+          </summary>
+          <IntakeFacts intake={intake} plan={brand.account?.plan ?? null} />
+        </details>
       ) : null}
     </article>
   );
@@ -360,7 +433,7 @@ function IntakeFacts({
   ];
   return (
     <div className="mt-4 space-y-3">
-      <div className="grid grid-cols-2 gap-2.5 @2xl:grid-cols-3 @4xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-2.5 @2xl:grid-cols-3">
         {tiles.map((row) => (
           <div key={row.label} className={tile}>
             <SectionLabel className="text-[10px] tracking-[0.07em]">

@@ -50,7 +50,7 @@ export function ProspectSearch({
         toast.success(
           result.created
             ? `${result.name} added`
-            : `${result.name} is already a prospect`,
+            : `${result.name} is already on the desk`,
         );
         // The row appears now; the site read runs behind it.
         router.refresh();
@@ -77,7 +77,12 @@ export function ProspectSearch({
           <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
         ) : null}
       </label>
-      {term.length >= 2 && !leads.isLoading ? (
+      {leads.isError && term.length >= 2 ? (
+        <p role="alert" className="text-xs text-muted-foreground">
+          Could not load leads. {leads.error.message}
+        </p>
+      ) : null}
+      {term.length >= 2 && !leads.isLoading && !leads.isError ? (
         items.length === 0 ? (
           <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
             <span>No lead matches “{term}”.</span>
@@ -118,7 +123,7 @@ export function ProspectSearch({
                   >
                     {added ? (
                       <span className="inline-flex items-center gap-1">
-                        <Check className="size-3" /> In your list
+                        <Check className="size-3" /> Already on the desk
                       </span>
                     ) : pending ? (
                       <span className="inline-flex items-center gap-1">
