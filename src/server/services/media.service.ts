@@ -1106,36 +1106,38 @@ export async function deleteMedia(id: string) {
   });
   if (!asset) return { id };
 
+  // Library rows can share bytes. Deleting one row must not break the others.
+  const shared = await db.query.mediaAssetTable.findFirst({
+    where: and(
+      sql`${mediaAssetTable.id} <> ${id}`,
+      or(
+        asset.url ? eq(mediaAssetTable.url, asset.url) : undefined,
+        asset.r2Key ? eq(mediaAssetTable.r2Key, asset.r2Key) : undefined,
+        asset.streamUid
+          ? eq(mediaAssetTable.streamUid, asset.streamUid)
+          : undefined,
+      ),
+    ),
+    columns: { id: true },
+  });
+  if (!shared) {
+    if (asset.provider === "r2" && asset.r2Key) {
+      const keys = [asset.r2Key];
+      const thumbnail = R2.buildThumbnailKey(asset.r2Key);
+      if (asset.thumbnailUrl === R2.publicUrl(thumbnail)) keys.push(thumbnail);
+      if (asset.storyboard)
+        keys.push(
+          ...asset.storyboard.boards.map((board) => board.pathname),
+          R2.buildStoryboardManifestKey(asset.r2Key),
+        );
+      // Await storage cleanup; retain the row when storage fails so the failure remains repairable.
+      await Promise.all([...new Set(keys)].map((key) => R2.delete(key)));
+    } else if (asset.provider === "stream" && asset.streamUid) {
+      await Stream.deleteVideo(asset.streamUid);
+    }
+  }
   await db.delete(mediaAssetTable).where(eq(mediaAssetTable.id, id));
 
-  if (asset.provider === "r2" && asset.r2Key) {
-    R2.delete(asset.r2Key).catch((error) =>
-      console.error(`R2 delete failed for ${asset.id}:`, error),
-    );
-    // Derived objects are separate — without this they outlive the asset
-    // forever. Only ours: an externally-set thumbnail isn't at this key.
-    const derivedThumbnailKey = R2.buildThumbnailKey(asset.r2Key);
-    if (asset.thumbnailUrl === R2.publicUrl(derivedThumbnailKey)) {
-      R2.delete(derivedThumbnailKey).catch((error) =>
-        console.error(`R2 thumbnail delete failed for ${asset.id}:`, error),
-      );
-    }
-    // Storyboard boards, plus the manifest a chat upload leaves. Both keys are
-    // derived, so a missing object just no-ops.
-    const derivedKeys = [
-      ...(asset.storyboard?.boards ?? []).map((board) => board.pathname),
-      ...(asset.storyboard ? [R2.buildStoryboardManifestKey(asset.r2Key)] : []),
-    ];
-    for (const key of derivedKeys) {
-      R2.delete(key).catch((error) =>
-        console.error(`R2 storyboard delete failed for ${asset.id}:`, error),
-      );
-    }
-  } else if (asset.provider === "stream" && asset.streamUid) {
-    Stream.deleteVideo(asset.streamUid).catch((error) =>
-      console.error(`Stream delete failed for ${asset.streamUid}:`, error),
-    );
-  }
   return { id };
 }
 

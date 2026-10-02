@@ -11,6 +11,8 @@ export type IntakeHome = {
   name: string;
   thumbUrl: string | null;
   href: string;
+  location?: string;
+  facts?: string;
 };
 
 /**
@@ -56,13 +58,13 @@ function Answer({
     return (
       <span className="break-words whitespace-pre-wrap">{value.text}</span>
     );
-  return <Homes all={value.all} urls={value.urls} homes={homes} />;
+  return <IntakeHomes all={value.all} urls={value.urls} homes={homes} />;
 }
 
 /** Past this many, the rest fold behind "Show N more" so the budget stays in view. */
 const HOMES_SHOWN = 8;
 
-function Homes({
+export function IntakeHomes({
   all,
   urls,
   homes,
@@ -77,7 +79,7 @@ function Homes({
   }));
   const suffix = sharedSuffix(picked.flatMap(({ home }) => home?.name ?? []));
   const grid = (rows: typeof picked) => (
-    <ul className="grid grid-cols-2 gap-3 @xl:grid-cols-3 @3xl:grid-cols-4">
+    <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       {rows.map(({ url, home }) => (
         <li key={url} className="min-w-0">
           {home ? (
@@ -124,9 +126,15 @@ function HomeTile({ home, name }: { home: IntakeHome; name: string }) {
           />
         ) : null}
       </div>
-      <p className="line-clamp-2 text-xs leading-snug group-hover/home:underline">
+      <p className="text-sm leading-snug break-words group-hover/home:underline">
         {name}
       </p>
+      {home.location && (
+        <p className="text-xs text-muted-foreground">{home.location}</p>
+      )}
+      {home.facts && (
+        <p className="text-xs text-muted-foreground">{home.facts}</p>
+      )}
     </Link>
   );
 }

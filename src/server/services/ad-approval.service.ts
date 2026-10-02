@@ -310,27 +310,29 @@ export async function transitionAdApproval(input: {
     throw new Error(
       "This ad changed during approval. Review it and approve again.",
     );
-  if (input.status === "drawn" && previous) {
-    const published = await db.query.platformAdTable.findFirst({
-      where: eq(platformAdTable.adId, ad.id),
-      columns: { id: true },
-    });
-    // A published version keeps its assets. Reopening only changes the local draft.
-    if (!published) {
-      const others = await db.query.adTable.findMany({
-        columns: { id: true, content: true, placements: true },
+  let cleanupWarning: string | undefined;
+  try {
+    if (input.status === "drawn" && previous) {
+      const published = await db.query.platformAdTable.findFirst({
+        where: eq(platformAdTable.adId, ad.id),
+        columns: { id: true },
       });
-      for (const asset of Object.values(previous.renders).flat()) {
-        // Reused originals belong to the library, not this approval.
-        if (asset.reused) continue;
-        const shared = others.some(
-          (row) =>
-            row.id !== ad.id &&
-            (JSON.stringify(row.content).includes(asset.assetId) ||
-              JSON.stringify(row.content).includes(asset.url) ||
-              JSON.stringify(row.placements).includes(asset.url)),
-        );
-        const otherUse = await db.execute(sql`
+      // A published version keeps its assets. Reopening only changes the local draft.
+      if (!published) {
+        const others = await db.query.adTable.findMany({
+          columns: { id: true, content: true, placements: true },
+        });
+        for (const asset of Object.values(previous.renders).flat()) {
+          // Reused originals belong to the library, not this approval.
+          if (asset.reused) continue;
+          const shared = others.some(
+            (row) =>
+              row.id !== ad.id &&
+              (JSON.stringify(row.content).includes(asset.assetId) ||
+                JSON.stringify(row.content).includes(asset.url) ||
+                JSON.stringify(row.placements).includes(asset.url)),
+          );
+          const otherUse = await db.execute(sql`
           select 1 from (
             select to_jsonb(p)::text as payload from content_post p
             union all select to_jsonb(p)::text from platform_post p
@@ -339,19 +341,29 @@ export async function transitionAdApproval(input: {
             union all select to_jsonb(p)::text from media_asset p where p.id <> ${asset.assetId}
           ) refs where position(${asset.assetId} in payload) > 0 or position(${asset.url} in payload) > 0 limit 1
         `);
-        if (!shared && otherUse.rows.length === 0) {
-          const own = await db.query.mediaAssetTable.findFirst({
-            where: and(
-              eq(mediaAssetTable.id, asset.assetId),
-              eq(mediaAssetTable.brandId, brand.id),
-              sql`${mediaAssetTable.metadata}->'adApproval'->>'adId' = ${ad.id}`,
-            ),
-            columns: { id: true },
-          });
-          if (own) await deleteMedia(own.id);
+          if (!shared && otherUse.rows.length === 0) {
+            const own = await db.query.mediaAssetTable.findFirst({
+              where: and(
+                eq(mediaAssetTable.id, asset.assetId),
+                eq(mediaAssetTable.brandId, brand.id),
+                sql`${mediaAssetTable.metadata}->'adApproval'->>'adId' = ${ad.id}`,
+              ),
+              columns: { id: true },
+            });
+            if (own) await deleteMedia(own.id);
+          }
         }
       }
     }
+  } catch (error) {
+    // Status was already committed. Cleanup must not turn a successful reopen into an error.
+    console.error("Reopened ad; old export cleanup failed", ad.id, error);
+    cleanupWarning =
+      "Idea reopened. Some old generated media could not be cleaned up and were kept in the library.";
   }
-  return { adId: ad.id, status: input.status };
+  return {
+    adId: ad.id,
+    status: input.status,
+    ...(cleanupWarning ? { cleanupWarning } : {}),
+  };
 }

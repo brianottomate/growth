@@ -1077,6 +1077,11 @@ export const pullPlatformAudiencesActionOutputSchema = z.strictObject({
 
 export const deleteCampaignDraftActionOutputSchema = z.strictObject({
   deleted: z.boolean(),
+  mediaCleanup: z.strictObject({
+    deleted: z.number(),
+    kept: z.number(),
+    errors: z.array(z.string()),
+  }),
 });
 
 export const deleteAudienceActionOutputSchema = z.strictObject({
@@ -1340,6 +1345,7 @@ export const attachAdSetActionOutputSchema = z.strictObject({
 });
 
 export const setAdStatusActionOutputSchema = z.strictObject({
+  cleanupWarning: z.string().optional(),
   adId: z.string(),
   status: z.enum(["approved", "drawn"]),
 });

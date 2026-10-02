@@ -149,6 +149,8 @@ const BUILD_FIRST =
 
 function campaignFocusPrompt(focus: AdCampaignWorkContext["focus"]) {
   switch (focus) {
+    case "copy":
+      return "\n\nWork only on the selected ad’s written copy. Discuss options before saving; preserve its images and image text. Do not generate additional ads, change the campaign, or push anything.";
     case "photos":
       return `\n\nThe operator asked from the Photos step: fill this campaign's pool. Check mediaLibraryRead.list for the brand first; mediaLibraryWrite.importListingPhotos brings in their listing photos, and adsWrite.setCreativePool sets the pool from library assets.${BUILD_FIRST}`;
     case "ads":
@@ -371,26 +373,38 @@ export async function POST(req: Request): Promise<Response> {
           with: { brand: { columns: { organizationId: true, name: true } } },
         })
       : null;
-    const activeCampaignContext: AdCampaignWorkContext | null =
-      campaignWorkItem?.brand?.organizationId === membership.organizationId
-        ? {
-            type: "work_ad_campaign",
-            brandId: campaignWorkItem.brandId,
-            brandName: campaignWorkItem.brand.name,
-            campaignId: campaignWorkItem.id,
-            campaignName: campaignWorkItem.name,
-            focus: requestedCampaignContext?.focus,
-            adId: requestedCampaignContext?.adId,
-          }
-        : null;
-
-    const activeAd = activeCampaignContext?.adId
+    const selectedAd = requestedCampaignContext?.adId
       ? await adChatContext({
           organizationId: membership.organizationId,
-          campaignId: activeCampaignContext.campaignId,
-          adId: activeCampaignContext.adId,
-        })
+          campaignId: requestedCampaignContext.campaignId,
+          adId: requestedCampaignContext.adId,
+        }).catch(() => null)
       : null;
+    const ownedCampaign =
+      campaignWorkItem?.brand?.organizationId === membership.organizationId
+        ? campaignWorkItem
+        : null;
+    const activeCampaignContext: AdCampaignWorkContext | null = ownedCampaign
+      ? {
+          type: "work_ad_campaign",
+          brandId: ownedCampaign.brandId,
+          brandName: ownedCampaign.brand.name,
+          campaignId: ownedCampaign.id,
+          campaignName: ownedCampaign.name,
+          focus: requestedCampaignContext?.focus,
+          adId: selectedAd?.ad.id,
+        }
+      : selectedAd && !requestedCampaignContext?.campaignId
+        ? {
+            type: "work_ad_campaign",
+            brandId: selectedAd.brand.id,
+            brandName: selectedAd.brand.name,
+            campaignName: selectedAd.ad.name,
+            adId: selectedAd.ad.id,
+            focus: requestedCampaignContext?.focus,
+          }
+        : null;
+    const activeAd = activeCampaignContext ? selectedAd : null;
 
     const requestedCatalogContext = catalogFocusForTurn({
       mode: contextMode,
@@ -445,7 +459,9 @@ export async function POST(req: Request): Promise<Response> {
         : "";
     const intentContext = triggeredIntentPrompt(assistantIntent, brand ?? null);
     const campaignContextPrompt =
-      activeCampaignContext && brand
+      activeCampaignContext?.campaignId &&
+      activeCampaignContext.focus !== "copy" &&
+      brand
         ? `\n\n# Active ad campaign\nThe operator is working on the campaign “${activeCampaignContext.campaignName}” (campaignId: ${activeCampaignContext.campaignId}) for ${brand.name} (brandId: ${brand.id}). Use this exact brandId; never construct an ID from a slug. Call adsRead.openCampaign first so you are working from its current state, not from earlier in this conversation.\n\nIt is a first-party campaign: ads and ad sets live on it, and local per-platform drafts are created with adsWrite.planPlatform before anything is pushed. No provider connection is required to plan. Local edits touch no provider: adsWrite.draftAd adds an ad, adsWrite.addAdSet adds an ad set (audience and budget live there; omitting both audience fields means broad, which is often right), adsWrite.setCreativePool sets the shared images, and adsWrite.setGoogleSettings is required before any Google push.\n\nadsWrite.push creates the campaign tree PAUSED, so it cannot spend; adsWrite.setDelivery with status active is what starts spend on the client's account. Both ask the operator to approve before they run. Offer them when the campaign looks ready, and run them only when the operator asks, never unprompted. Call adsRead.listDestinations for account ids rather than guessing them. Prefer concrete copy over suggestion lists.${campaignFocusPrompt(activeCampaignContext.focus)}`
         : "";
     const workContextPrompt =
@@ -453,8 +469,40 @@ export async function POST(req: Request): Promise<Response> {
       (activeAd
         ? adCopyChatSection({
             adId: activeAd.ad.id,
+            copyOnly: activeCampaignContext?.focus === "copy",
             copyRules: activeAd.copyRules,
-            snapshot: { ...activeAd, copyRules: undefined },
+            snapshot:
+              activeCampaignContext?.focus === "copy"
+                ? {
+                    campaignId: activeAd.campaignId,
+                    brand: { id: activeAd.brand.id, name: activeAd.brand.name },
+                    ad: {
+                      id: activeAd.ad.id,
+                      name: activeAd.ad.name,
+                      updatedAt: activeAd.ad.updatedAt,
+                      approved: activeAd.ad.approved,
+                      copy: activeAd.ad.document.copy,
+                      copyOverrides: activeAd.ad.document.copyOverrides,
+                    },
+                    homes: activeAd.homes.map(
+                      ({
+                        existingCopy: _existingCopy,
+                        description,
+                        locationDescription,
+                        ...facts
+                      }) => ({
+                        ...facts,
+                        description: description?.slice(0, 3000),
+                        locationDescription: locationDescription?.slice(
+                          0,
+                          1500,
+                        ),
+                      }),
+                    ),
+                    contextNote:
+                      "Artwork documents and historic copy omitted. Listing descriptions are excerpts. Read adsRead.ideaContext for the full current document and complete listing facts before saving or making claims not supported here.",
+                  }
+                : { ...activeAd, copyRules: undefined },
           })
         : "") +
       (activeWorkContext && brand
@@ -726,7 +774,7 @@ export async function POST(req: Request): Promise<Response> {
     );
 
     const sheets: ModelMessage[] = [];
-    if (activeAd?.images.length) {
+    if (activeAd?.images.length && activeCampaignContext?.focus !== "copy") {
       for (let offset = 0; offset < activeAd.images.length; offset += 16) {
         const batch = activeAd.images.slice(offset, offset + 16);
         const sheet = await contactSheet({

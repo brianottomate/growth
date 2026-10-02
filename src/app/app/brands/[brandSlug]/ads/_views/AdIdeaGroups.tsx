@@ -1,8 +1,17 @@
 "use client";
 
-import { parseAsStringLiteral, useQueryState } from "nuqs";
+import { parseAsStringLiteral, useQueryStates } from "nuqs";
 import { Button } from "@/components/ui/button";
 import { ApprovedStamp } from "@/components/approved-stamp";
+
+const AD_TYPES = [
+  "all-homes",
+  "statics",
+  "home-carousels",
+  "video",
+  "text",
+  "other",
+] as const;
 
 type Group = {
   id: string;
@@ -10,106 +19,108 @@ type Group = {
   ads: { id: string; approved: boolean; node: React.ReactNode }[];
 };
 
-/** The ads by type, with the catalog's All / Needs review / Approved switch. */
+/** Independent status and type filters over one stable list of ads. */
 export function AdIdeaGroups({ groups }: { groups: Group[] }) {
-  const [filter, setFilter] = useQueryState(
-    "filter",
-    parseAsStringLiteral(["all", "review", "approved"]).withDefault("all"),
-  );
+  const [{ filter, adType }, setFilters] = useQueryStates({
+    filter: parseAsStringLiteral(["all", "review", "approved"]).withDefault(
+      "all",
+    ),
+    adType: parseAsStringLiteral(AD_TYPES),
+  });
   const all = groups.flatMap((group) => group.ads);
   const approved = all.filter((ad) => ad.approved).length;
-  const shown = groups
-    .map((group) => ({
-      ...group,
-      ads: group.ads.filter((ad) =>
-        filter === "all" ? true : ad.approved === (filter === "approved"),
-      ),
-    }))
-    .filter((group) => group.ads.length > 0);
+  const filteredGroups = groups.map((group) => ({
+    ...group,
+    ads: group.ads.filter((ad) =>
+      filter === "all" ? true : ad.approved === (filter === "approved"),
+    ),
+  }));
+  const statusCount = filteredGroups.reduce(
+    (count, group) => count + group.ads.length,
+    0,
+  );
+  const shown = filteredGroups
+    .filter((group) => adType === null || group.id === adType)
+    .flatMap((group) => group.ads);
+
   return (
     <>
-      <div className="flex w-fit max-w-full flex-wrap rounded-lg border p-0.5 text-sm">
+      <div
+        aria-label="Ad review status"
+        className="flex w-fit max-w-full flex-wrap rounded-lg border p-0.5 text-sm"
+      >
         {(["all", "review", "approved"] as const).map((key) => (
           <Button
             key={key}
             variant={filter === key ? "secondary" : "ghost"}
             size="sm"
             aria-pressed={filter === key}
-            onClick={() => setFilter(key)}
+            onClick={() => setFilters({ filter: key })}
           >
             {key === "review"
               ? `Needs review ${all.length - approved}`
               : key === "approved"
                 ? `Approved ${approved}`
-                : "All"}
+                : `All ${all.length}`}
           </Button>
         ))}
       </div>
-      {shown.length === 0 &&
-        (filter === "review" ? (
-          <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed py-10">
-            <ApprovedStamp className="scale-150" />
-            <p className="pt-2 text-sm text-muted-foreground">
-              All {all.length} approved
-            </p>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed py-10 text-sm text-muted-foreground">
-            <p>Nothing approved yet</p>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setFilter("review")}
-            >
-              Review {all.length - approved}
-            </Button>
-          </div>
-        ))}
-      {shown.length > 1 && (
-        <nav
-          aria-label="Ad types"
-          className="sticky top-0 z-10 -mx-1 flex flex-wrap gap-1.5 bg-background/95 px-1 py-2 backdrop-blur"
+      <div
+        role="group"
+        aria-label="Ad types"
+        className="sticky top-0 z-10 -mx-1 flex flex-wrap gap-1.5 bg-background/95 px-1 py-2 backdrop-blur"
+      >
+        <Button
+          variant={adType === null ? "secondary" : "outline"}
+          size="sm"
+          aria-pressed={adType === null}
+          onClick={() => setFilters({ adType: null })}
         >
-          {shown.map((group) => (
-            <a
-              key={group.id}
-              href={`#ads-${group.id}`}
-              className="rounded-full border px-3 py-1 text-xs text-muted-foreground hover:text-foreground"
-            >
-              {group.label}{" "}
-              <span className="tabular-nums">· {group.ads.length}</span>
-            </a>
-          ))}
-        </nav>
-      )}
-      {shown.map((group) => (
-        <section
-          key={group.id}
-          id={`ads-${group.id}`}
-          aria-labelledby={`ads-${group.id}-heading`}
-          className="scroll-mt-14 space-y-3"
-        >
-          <h3
-            id={`ads-${group.id}-heading`}
-            className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
-          >
-            {group.label} · {group.ads.length}
-          </h3>
-          <div
-            className={
-              group.id === "text"
-                ? "grid grid-cols-1 gap-3 @3xl:grid-cols-2"
-                : "space-y-3"
+          All types · {statusCount}
+        </Button>
+        {filteredGroups.map((group) => (
+          <Button
+            key={group.id}
+            variant={adType === group.id ? "secondary" : "outline"}
+            size="sm"
+            aria-pressed={adType === group.id}
+            onClick={() =>
+              setFilters({
+                adType: AD_TYPES.find((type) => type === group.id) ?? null,
+              })
             }
           >
-            {group.ads.map((ad) => (
-              <div key={ad.id} className="min-w-0">
-                {ad.node}
-              </div>
-            ))}
-          </div>
-        </section>
-      ))}
+            {group.label} · {group.ads.length}
+          </Button>
+        ))}
+      </div>
+      {shown.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed py-10 text-sm text-muted-foreground">
+          {filter === "review" && statusCount === 0 ? (
+            <>
+              <ApprovedStamp className="scale-150" />
+              <p className="pt-2">All {all.length} approved</p>
+            </>
+          ) : (
+            <p>No ads match these filters.</p>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setFilters({ filter: "all", adType: null })}
+          >
+            Clear filters
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {shown.map((ad) => (
+            <div key={ad.id} className="min-w-0">
+              {ad.node}
+            </div>
+          ))}
+        </div>
+      )}
     </>
   );
 }

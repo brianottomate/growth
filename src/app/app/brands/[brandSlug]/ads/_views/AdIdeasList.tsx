@@ -6,10 +6,7 @@ import { AdIdeaGroups } from "./AdIdeaGroups";
 import { AdPlatformRouting } from "./AdPlatformRouting";
 import type { ChannelPlatform } from "@/server/db/schema";
 
-// The list files every ad under its creative type, the way a shared drive
-// would: all-homes carousels first, then statics, then each home's carousel,
-// then video and anything else. A jump bar names every group with its count,
-// so nine ads never read as the three slides of the first one.
+// Stable type order for the filter bar and the combined ad list.
 const GROUPS = [
   { id: "all-homes", label: "All-homes carousels" },
   { id: "statics", label: "Statics" },

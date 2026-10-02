@@ -20,6 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { toast } from "@/components/ui/toast";
 import { orpc } from "@/orpc/client";
 
 /**
@@ -53,7 +54,11 @@ export function DeleteCampaignButton({
   const [open, setOpen] = useState(false);
 
   const onPlatform = livePlatformCampaigns > 0;
-  const finish = () => {
+  const finish = (result: { mediaCleanup: { errors: string[] } }) => {
+    if (result.mediaCleanup.errors.length)
+      toast.error(
+        "Campaign deleted. Some generated media could not be cleaned up; their library records were kept.",
+      );
     setOpen(false);
     if (afterDelete === "list")
       router.push(listPath ?? `/app/brands/${brandSlug}/ads`);
@@ -63,7 +68,7 @@ export function DeleteCampaignButton({
     mutationFn: async () => {
       for (const platformCampaignId of platformCampaignIds)
         await orpc.ads.deletePlatformCampaign.call({ platformCampaignId });
-      await orpc.ads.deleteDraftCampaign.call({ campaignId });
+      return orpc.ads.deleteDraftCampaign.call({ campaignId });
     },
     onSuccess: finish,
   });
@@ -114,7 +119,7 @@ export function DeleteCampaignButton({
             <DialogDescription>
               {onPlatform
                 ? `This campaign is on a platform (${livePlatformCampaigns}). Deleting it there removes its ad sets, ads and reporting history and cannot be undone. Deleting it here only leaves it running and spending, with nothing in Growth describing it.`
-                : "Removes the draft and its ad sets and ads. Nothing exists on a platform yet, so nothing else is affected."}
+                : "Removes the draft and its ad sets and ads. Also removes generated exports unused elsewhere. Source photos and shared media are kept."}
             </DialogDescription>
           </DialogHeader>
           <p className="min-w-0 text-sm font-medium [overflow-wrap:anywhere]">

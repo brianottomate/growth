@@ -149,3 +149,16 @@ test("MCP context preserves captions, placement descriptions and individual caro
     "Sleeps 14",
   );
 });
+
+test("copy chat discusses one ad without changing its artwork", () => {
+  const prompt = adCopyChatSection({
+    adId: "ad_1",
+    snapshot: { copy },
+    copyRules: "Facts only",
+    copyOnly: true,
+  });
+  expect(prompt).toContain("two or three numbered");
+  expect(prompt).toContain("Keep pictures, overlay image text");
+  expect(prompt).toContain("Do not save merely because chat was opened");
+  expect(prompt).not.toContain("proactively offer four or five");
+});

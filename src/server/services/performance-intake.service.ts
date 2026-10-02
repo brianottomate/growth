@@ -12,10 +12,13 @@ import {
 import { and, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { z } from "zod";
 
-import { db } from "@/server/db";
+import { db, withTransaction } from "@/server/db";
+import { listAllBrandHomes, listBrandHomes } from "./homes.service";
 import { fillSettingsFromIntake } from "./performance-settings.service";
 import {
   brandTable,
+  homeGroupTable,
+  homeGroupMemberTable,
   performanceAccountTable,
   performanceCycleTable,
   performanceIntakeTable,
@@ -51,7 +54,7 @@ import {
 // The client fills one form at /intake/[token] and we write a RECEIPT. Nothing
 // downstream reads that receipt as state: `applyPerformanceIntake` promotes it
 // into the tables that own each fact: contact on the account, money on the
-// cycle, homes on performance_property, logo on the brand. After that the
+// cycle, homes in the featured group and aligned performance_property rows. After that the
 // receipt is history. This is the same draft-then-apply shape as the content
 // loop and the ads plan/compile split, for the same reason: a form that stays
 // authoritative goes stale the first time a client changes their mind.
@@ -155,7 +158,29 @@ export const submitIntakeSchema = z
   .object({
     token: z.string().min(16).optional(),
     slug: z.string().min(1).max(200).optional(),
-    answers: z.record(z.string(), z.unknown()),
+    // Preserve new questions while validating the fields downstream code consumes.
+    answers: z
+      .object({
+        propertyUrls: z
+          .array(z.string().trim().min(1).max(2000))
+          .max(1000)
+          .optional(),
+        allProperties: z.boolean().optional(),
+        detailsConfirmed: z.boolean().optional(),
+        billingAcknowledged: z.boolean().optional(),
+        accountsConnected: z.boolean().optional(),
+        budget: z.string().max(200).optional(),
+        reportEmails: z.string().max(4000).optional(),
+        invoiceEmail: z.string().max(4000).optional(),
+        ugcPermission: z.string().max(4000).optional(),
+        creativeDriveUrl: z.string().max(4000).optional(),
+        guestListDriveUrl: z.string().max(4000).optional(),
+        propertyNotes: z.string().max(20000).optional(),
+        anythingElse: z.string().max(20000).optional(),
+        contactName: z.string().max(500).optional(),
+        contactEmail: z.string().max(500).optional(),
+      })
+      .catchall(z.unknown()),
   })
   .refine((value) => Boolean(value.token ?? value.slug), {
     message: "A token or a slug is required",
@@ -212,8 +237,14 @@ export async function submitPerformanceIntake(input: {
       brandId: brand.id,
       brandSlug: brand.slug,
       status: "submitted",
-      submittedByName: brand.connectTokenIssuedByName,
-      submittedByEmail: brand.connectTokenIssuedByEmail,
+      submittedByName:
+        typeof answers.contactName === "string"
+          ? answers.contactName.trim() || null
+          : null,
+      submittedByEmail:
+        typeof answers.contactEmail === "string"
+          ? answers.contactEmail.trim() || null
+          : null,
       answers,
       mediaBudgetDollars: budgetIsRecommendation
         ? null
@@ -353,15 +384,7 @@ export async function intakePrefill(handle: { token?: string; slug?: string }) {
     columns: { id: true, contactName: true, contactEmail: true },
   });
 
-  const properties = account
-    ? await db.query.performancePropertyTable.findMany({
-        where: and(
-          eq(performancePropertyTable.accountId, account.id),
-          isNull(performancePropertyTable.deletedAt),
-        ),
-        columns: { siteUrl: true },
-      })
-    : [];
+  const properties = await listBrandHomes(brand.id);
 
   return {
     brand: brand.name,
@@ -370,7 +393,7 @@ export async function intakePrefill(handle: { token?: string; slug?: string }) {
     site: brand.website,
     // URLs, because that is what the form collects and pre-ticks.
     properties: properties
-      .map((row) => row.siteUrl)
+      .map((row) => row.url)
       .filter((url): url is string => Boolean(url)),
     repName: brand.connectTokenIssuedByName?.split(" ")[0] ?? null,
     repEmail: brand.connectTokenIssuedByEmail,
@@ -465,6 +488,46 @@ export async function listPerformanceIntakes(
   });
 }
 
+/** Resolve only this brand's catalog; never guess or silently drop requested homes. */
+export function intakeHomeSelection<
+  T extends { id: string; name: string; url: string },
+>(
+  answers: PerformanceIntakeAnswers,
+  catalog: T[],
+): { homes: T[]; blockers: string[] } {
+  if (answers.allProperties)
+    return {
+      homes: catalog,
+      blockers: catalog.length
+        ? []
+        : ["Sync the brand's homes before applying this intake."],
+    };
+  const requested = [
+    ...new Set(
+      (answers.propertyUrls ?? []).map(normalizeListingUrl).filter(Boolean),
+    ),
+  ];
+  const homes = requested.flatMap((url) =>
+    catalog.filter((home) => normalizeListingUrl(home.url) === url).slice(0, 1),
+  );
+  const unmatched = requested.filter(
+    (url) => !homes.some((home) => normalizeListingUrl(home.url) === url),
+  );
+  return {
+    homes,
+    blockers: [
+      ...(requested.length
+        ? []
+        : ["Select homes before applying this intake."]),
+      ...(unmatched.length
+        ? [
+            `${unmatched.length} selected home(s) could not be matched to this brand's catalog. Sync or add them first.`,
+          ]
+        : []),
+    ],
+  };
+}
+
 /** What apply would write, without writing it. */
 export async function previewIntakeApply(
   actor: PerformanceActor,
@@ -480,13 +543,31 @@ export async function previewIntakeApply(
     ),
     columns: { siteUrl: true },
   });
-  const newProperties = propertyRowsFromAnswers(
-    intake.accountId,
-    answers,
-    // Dedupe on the URL, which is what a row is now keyed by. Comparing
-    // titles here would typecheck and silently never match.
-    existing.map((row) => row.siteUrl ?? ""),
-  );
+  const catalog = intake.brand ? await listAllBrandHomes(intake.brand.id) : [];
+  const selection = intakeHomeSelection(answers, catalog);
+  const featuredHomes = selection.homes.map((home) => ({
+    id: home.id,
+    name: home.name,
+    url: home.url,
+  }));
+  const newProperties: {
+    accountId: string;
+    siteUrl: string;
+    title: string | null;
+  }[] = selection.homes
+    .filter(
+      (home) =>
+        !existing.some(
+          (row) =>
+            normalizeListingUrl(row.siteUrl ?? "") ===
+            normalizeListingUrl(home.url),
+        ),
+    )
+    .map((home) => ({
+      accountId: intake.accountId,
+      siteUrl: home.url,
+      title: home.name,
+    }));
 
   const period = currentPeriod();
   const cycle = await db.query.performanceCycleTable.findFirst({
@@ -505,11 +586,18 @@ export async function previewIntakeApply(
     currentMediaBudget: cycle?.mediaBudget ?? null,
     mediaBudgetDollars: intake.mediaBudgetDollars,
     newProperties,
+    featuredHomes,
     // A recommendation request has no number to write, so the operator sets
     // the budget rather than apply inventing one.
     needsBudgetDecision:
       intake.budgetIsRecommendation || intake.mediaBudgetDollars === null,
-    blockers: applyBlockers(intake),
+    blockers: [
+      ...applyBlockers(intake),
+      ...selection.blockers,
+      ...(!intake.brand
+        ? ["Link this intake to a brand before applying it."]
+        : []),
+    ],
   };
 }
 
@@ -535,8 +623,7 @@ export function applyBlockers(intake: { status: string }): string[] {
  *
  * Idempotent per intake: the row flips to `applied` and blocks a second run,
  * because re-applying would re-open a cycle a human may have since adjusted.
- * Property titles are matched case-insensitively so a re-submission does not
- * duplicate homes.
+ * Selected catalog homes replace the featured group; existing campaigns remain snapshots.
  */
 export async function applyPerformanceIntake(
   actor: PerformanceActor,
@@ -567,146 +654,245 @@ export async function applyPerformanceIntake(
         });
   };
 
-  // 1. Contact details onto the commercial record. The free-text corrections
-  //    field is gone from the form (an AE handles those), so what carries over
-  //    is the notes the client did leave plus where their assets live.
-  const accountPatch: Record<string, unknown> = { status: "active" };
-  const noteLines = [
-    answers.propertyNotes?.trim(),
-    answers.anythingElse?.trim(),
-    answers.creativeDriveUrl?.trim() &&
-      `Creative: ${answers.creativeDriveUrl.trim()}`,
-    answers.guestListDriveUrl?.trim() &&
-      `Guest list: ${answers.guestListDriveUrl.trim()}`,
-    answers.allProperties ? "Client asked for ALL properties." : undefined,
-  ].filter((line): line is string => Boolean(line));
-  if (noteLines.length > 0) {
-    accountPatch.notes = [intake.account.notes, ...noteLines]
-      .filter(Boolean)
-      .join("\n\n");
-  }
-  await db
-    .update(performanceAccountTable)
-    .set(accountPatch)
-    .where(eq(performanceAccountTable.id, intake.accountId));
-  record("account", intake.accountId, accountPatch);
-  written.push("Account marked active");
+  return withTransaction(async (tx) => {
+    // Serialize applications for this account, including duplicate submissions.
+    await tx
+      .select()
+      .from(performanceAccountTable)
+      .where(eq(performanceAccountTable.id, intake.accountId))
+      .for("update");
+    const [currentIntake] = await tx
+      .select()
+      .from(performanceIntakeTable)
+      .where(eq(performanceIntakeTable.id, intake.id))
+      .for("update");
+    if (currentIntake?.status === "applied")
+      throw new PerformanceError(
+        "BAD_REQUEST",
+        "This intake has already been applied.",
+      );
+    const [currentAccount] = await tx
+      .select()
+      .from(performanceAccountTable)
+      .where(eq(performanceAccountTable.id, intake.accountId));
 
-  // 2. Money onto the cycle, which is what reconciliation reads.
-  const budget = input.mediaBudgetDollars ?? intake.mediaBudgetDollars;
-  if (budget != null) {
-    if (preview.cycleId) {
-      await db
-        .update(performanceCycleTable)
-        .set({ mediaBudget: budget })
-        .where(eq(performanceCycleTable.id, preview.cycleId));
-      record("cycle", preview.cycleId, { mediaBudget: budget });
-      written.push(`Set ${preview.period} media budget to $${budget}`);
+    // 1. Contact details onto the commercial record. The free-text corrections
+    //    field is gone from the form (an AE handles those), so what carries over
+    //    is the notes the client did leave plus where their assets live.
+    const accountPatch: Record<string, unknown> = { status: "active" };
+    const noteLines = [
+      answers.propertyNotes?.trim(),
+      answers.anythingElse?.trim(),
+      answers.creativeDriveUrl?.trim() &&
+        `Creative: ${answers.creativeDriveUrl.trim()}`,
+      answers.guestListDriveUrl?.trim() &&
+        `Guest list: ${answers.guestListDriveUrl.trim()}`,
+      answers.allProperties ? "Client asked for ALL properties." : undefined,
+    ].filter((line): line is string => Boolean(line));
+    if (noteLines.length > 0) {
+      accountPatch.notes = [currentAccount?.notes, ...noteLines]
+        .filter(Boolean)
+        .join("\n\n");
+    }
+    await tx
+      .update(performanceAccountTable)
+      .set(accountPatch)
+      .where(eq(performanceAccountTable.id, intake.accountId));
+    record("account", intake.accountId, accountPatch);
+    written.push("Account marked active");
+
+    // 2. Money onto the cycle, which is what reconciliation reads.
+    const budget = input.mediaBudgetDollars ?? intake.mediaBudgetDollars;
+    const currentCycle = await tx.query.performanceCycleTable.findFirst({
+      where: and(
+        eq(performanceCycleTable.accountId, intake.accountId),
+        eq(performanceCycleTable.period, preview.period),
+      ),
+      columns: { id: true },
+    });
+    if (budget != null) {
+      if (currentCycle) {
+        await tx
+          .update(performanceCycleTable)
+          .set({ mediaBudget: budget })
+          .where(eq(performanceCycleTable.id, currentCycle.id));
+        record("cycle", currentCycle.id, { mediaBudget: budget });
+        written.push(`Set ${preview.period} media budget to $${budget}`);
+      } else {
+        const [createdCycle] = await tx
+          .insert(performanceCycleTable)
+          .values({
+            accountId: intake.accountId,
+            period: preview.period,
+            mediaBudget: budget,
+            status: "planned",
+          })
+          .returning();
+        if (createdCycle)
+          record("cycle", createdCycle.id, {
+            period: preview.period,
+            mediaBudget: budget,
+            status: "planned",
+          });
+        written.push(`Opened cycle ${preview.period} at $${budget}`);
+      }
     } else {
-      const [createdCycle] = await db
-        .insert(performanceCycleTable)
+      written.push("No budget set, client asked for a recommendation");
+    }
+
+    // The featured group owns current selection. Existing campaigns keep their snapshots.
+    const brandId = intake.brand!.id;
+    const [group] = await tx
+      .select()
+      .from(homeGroupTable)
+      .where(
+        and(
+          eq(homeGroupTable.brandId, brandId),
+          eq(homeGroupTable.kind, "featured"),
+        ),
+      )
+      .for("update");
+    if (!group)
+      throw new PerformanceError(
+        "BAD_REQUEST",
+        "The brand's featured group is missing. Sync its home groups first.",
+      );
+    await tx
+      .delete(homeGroupMemberTable)
+      .where(eq(homeGroupMemberTable.groupId, group.id));
+    if (preview.featuredHomes.length)
+      await tx.insert(homeGroupMemberTable).values(
+        preview.featuredHomes.map((home, sortOrder) => ({
+          groupId: group.id,
+          homeId: home.id,
+          sortOrder,
+        })),
+      );
+    await tx
+      .update(homeGroupTable)
+      .set({ updatedAt: new Date() })
+      .where(eq(homeGroupTable.id, group.id));
+    record("brand", brandId, {
+      featuredHomeIds: preview.featuredHomes.map((home) => home.id),
+    });
+    written.push(
+      `Replaced featured homes with ${preview.featuredHomes.length} selected home(s)`,
+    );
+
+    // Keep commercial property rows aligned, retaining history via soft deletion.
+    const selectedUrls = preview.featuredHomes.map((home) =>
+      normalizeListingUrl(home.url),
+    );
+    const oldProperties = await tx.query.performancePropertyTable.findMany({
+      where: and(
+        eq(performancePropertyTable.accountId, intake.accountId),
+        isNull(performancePropertyTable.deletedAt),
+      ),
+    });
+    const removed = oldProperties.filter(
+      (row) => !selectedUrls.includes(normalizeListingUrl(row.siteUrl ?? "")),
+    );
+    if (removed.length)
+      await tx
+        .update(performancePropertyTable)
+        .set({ deletedAt: new Date() })
+        .where(
+          inArray(
+            performancePropertyTable.id,
+            removed.map((row) => row.id),
+          ),
+        );
+    const homes = await listAllBrandHomes(brandId);
+    for (const selected of preview.featuredHomes) {
+      if (
+        oldProperties.some(
+          (row) =>
+            normalizeListingUrl(row.siteUrl ?? "") ===
+            normalizeListingUrl(selected.url),
+        )
+      )
+        continue;
+      const home = homes.find((row) => row.id === selected.id)!;
+      const [added] = await tx
+        .insert(performancePropertyTable)
         .values({
           accountId: intake.accountId,
-          period: preview.period,
-          mediaBudget: budget,
-          status: "planned",
+          title: home.name,
+          siteUrl: home.url,
+          city: home.city,
+          state: home.state,
+          country: home.country,
         })
         .returning();
-      if (createdCycle)
-        record("cycle", createdCycle.id, {
-          period: preview.period,
-          mediaBudget: budget,
-          status: "planned",
+      if (added)
+        record("property", added.id, {
+          title: added.title,
+          siteUrl: added.siteUrl,
+          city: added.city,
+          state: added.state,
         });
-      written.push(`Opened cycle ${preview.period} at $${budget}`);
     }
-  } else {
-    written.push("No budget set, client asked for a recommendation");
-  }
 
-  // 3. Homes as rows, because ads fan out over them and reporting needs ids.
-  //    Their city and state come from the client's own listing feed, which is
-  //    what the campaign audience's geography is later rolled up from.
-  if (preview.newProperties.length > 0) {
-    const addresses = intake.brand
-      ? await listingAddressMap(intake.brand)
-      : new Map<string, PropertyAddress>();
-    const rows = withPropertyAddresses(preview.newProperties, addresses);
-    const added = await db
-      .insert(performancePropertyTable)
-      .values(rows)
-      .returning();
-    for (const property of added)
-      record("property", property.id, {
-        title: property.title,
-        siteUrl: property.siteUrl,
-        city: property.city,
-        state: property.state,
+    // 4. Settings onto the brand, filling only what is still empty: the
+    //    receipt never overwrites a deliberate edit. Replacing one is the
+    //    agent's call, made with the explicit settings verb.
+    if (intake.brand) {
+      const filled = await fillSettingsFromIntake({
+        brandId: intake.brand.id,
+        orgId: actor.orgId,
+        answers,
+        client: tx,
       });
-    const located = rows.filter((row) => row.state !== null).length;
-    written.push(
-      `Added ${rows.length} home(s)${located > 0 ? `, ${located} with a location` : ""}`,
-    );
-  }
-
-  // 4. Settings onto the brand, filling only what is still empty: the
-  //    receipt never overwrites a deliberate edit. Replacing one is the
-  //    agent's call, made with the explicit settings verb.
-  if (intake.brand) {
-    const filled = await fillSettingsFromIntake({
-      brandId: intake.brand.id,
-      orgId: actor.orgId,
-      answers,
-    });
-    if (filled.length > 0) {
-      const updated = await db.query.brandTable.findFirst({
-        where: eq(brandTable.id, intake.brand.id),
-        columns: { performanceSettings: true },
-      });
-      const settings = updated?.performanceSettings as Record<
-        string,
-        unknown
-      > | null;
-      for (const field of filled)
-        record("brand", intake.brand.id, {
-          [`performanceSettings.${field}`]: settings?.[field] ?? null,
+      if (filled.length > 0) {
+        const updated = await tx.query.brandTable.findFirst({
+          where: eq(brandTable.id, intake.brand.id),
+          columns: { performanceSettings: true },
         });
-      written.push(`Settings filled: ${filled.join(", ")}`);
+        const settings = updated?.performanceSettings as Record<
+          string,
+          unknown
+        > | null;
+        for (const field of filled)
+          record("brand", intake.brand.id, {
+            [`performanceSettings.${field}`]: settings?.[field] ?? null,
+          });
+        written.push(`Settings filled: ${filled.join(", ")}`);
+      }
     }
-  }
 
-  await db
-    .update(performanceIntakeTable)
-    .set({
-      status: "applied",
-      appliedAt: new Date(),
-      appliedBy: actor.orgId,
-      appliedSummary: written,
-    })
-    .where(eq(performanceIntakeTable.id, intake.id));
+    await tx
+      .update(performanceIntakeTable)
+      .set({
+        status: "applied",
+        appliedAt: new Date(),
+        appliedBy: actor.orgId,
+        appliedSummary: written,
+      })
+      .where(eq(performanceIntakeTable.id, intake.id));
 
-  const evidence: AppliedEvidence["evidence"] = [
-    {
-      sourceType: "intake",
-      sourceId: intake.id,
-      sourceUrl: null,
-      observedAt: new Date().toISOString(),
-      method: "client-submission",
-    },
-  ];
-  if (input.mediaBudgetDollars != null)
-    evidence.push({
-      sourceType: "operator",
-      sourceId: actor.orgId,
-      sourceUrl: null,
-      observedAt: new Date().toISOString(),
-      method: "operator-override",
-    });
-  return {
-    intakeId: intake.id,
-    written,
-    ...appliedEvidenceSchema.parse({ evidence, applied }),
-  };
+    const evidence: AppliedEvidence["evidence"] = [
+      {
+        sourceType: "intake",
+        sourceId: intake.id,
+        sourceUrl: null,
+        observedAt: new Date().toISOString(),
+        method: "client-submission",
+      },
+    ];
+    if (input.mediaBudgetDollars != null)
+      evidence.push({
+        sourceType: "operator",
+        sourceId: actor.orgId,
+        sourceUrl: null,
+        observedAt: new Date().toISOString(),
+        method: "operator-override",
+      });
+    return {
+      intakeId: intake.id,
+      written,
+      ...appliedEvidenceSchema.parse({ evidence, applied }),
+    };
+  });
 }
 
 // ---- ACCESS VERIFICATION ---------------------------------------------------
@@ -1077,23 +1263,14 @@ export async function campaignPrefillFromIntake(
 
   const [intake, properties, cycle] = await Promise.all([
     db.query.performanceIntakeTable.findFirst({
-      where: eq(performanceIntakeTable.accountId, account.id),
+      where: and(
+        eq(performanceIntakeTable.accountId, account.id),
+        eq(performanceIntakeTable.status, "applied"),
+      ),
       orderBy: desc(performanceIntakeTable.submittedAt),
       columns: { answers: true, mediaBudgetDollars: true },
     }),
-    db.query.performancePropertyTable.findMany({
-      where: and(
-        eq(performancePropertyTable.accountId, account.id),
-        isNull(performancePropertyTable.deletedAt),
-      ),
-      columns: {
-        siteUrl: true,
-        wanderUrl: true,
-        city: true,
-        state: true,
-        country: true,
-      },
-    }),
+    listBrandHomes(brand.id),
     db.query.performanceCycleTable.findFirst({
       where: and(
         eq(performanceCycleTable.accountId, account.id),
@@ -1105,11 +1282,10 @@ export async function campaignPrefillFromIntake(
 
   return {
     accountId: account.id,
-    mediaBudgetDollars:
-      cycle?.mediaBudget ?? intake?.mediaBudgetDollars ?? null,
+    mediaBudgetDollars: cycle?.mediaBudget ?? null,
     landingUrl: brand.website,
     propertyUrls: properties
-      .map((row) => row.siteUrl ?? row.wanderUrl)
+      .map((row) => row.url)
       .filter((url): url is string => Boolean(url)),
     allProperties: intake?.answers.allProperties === true,
     geography: await resolveGeography(properties),

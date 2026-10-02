@@ -167,6 +167,7 @@ export type AssistantIntent =
  * so it starts on that step rather than reading the whole campaign back.
  */
 export type CampaignFocus =
+  | "copy"
   | "photos"
   | "ads"
   | "audiences"
@@ -179,7 +180,7 @@ export type WorkAdCampaignIntent = {
   newThread?: boolean;
   brandId: string;
   brandName: string;
-  campaignId: string;
+  campaignId?: string;
   campaignName: string;
   focus?: CampaignFocus;
   visibleText: string;

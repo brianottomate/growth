@@ -61,6 +61,14 @@ import type {
 import type { AdCreativeContent, MediaItem } from "@/server/db/schema";
 import { ApprovedStamp } from "@/components/approved-stamp";
 
+const CALL_TO_ACTION_OPTIONS = [
+  { value: "BOOK_NOW", label: "Book now" },
+  { value: "LEARN_MORE", label: "Learn more" },
+  { value: "CONTACT_US", label: "Contact us" },
+  { value: "SHOP_NOW", label: "Shop now" },
+  { value: "SIGN_UP", label: "Sign up" },
+] as const;
+
 export type StudioAd = {
   id: string;
   name: string;
@@ -95,7 +103,7 @@ export function AdIdeaCard({
 }) {
   const router = useRouter();
   const savedApproved = Boolean(ad.content.ideaStudio?.approval);
-  // Approve and Reopen show at once; the refresh confirms, an error undoes.
+  // Approval can show immediately; reopening waits for the server to unlock it.
   const [optimistic, setOptimistic] = useState<boolean | null>(null);
   const [stamped, setStamped] = useState(false);
   useEffect(() => setOptimistic(null), [savedApproved]);
@@ -146,11 +154,13 @@ export function AdIdeaCard({
   const approval = useMutation(
     orpc.ads.setAdStatus.mutationOptions({
       onMutate: ({ status }) => {
-        setOptimistic(status === "approved");
+        if (status === "approved") setOptimistic(true);
         setStamped(status === "approved");
         setView("overview");
       },
-      onSuccess: (_, { status }) => {
+      onSuccess: (result, { status }) => {
+        if (result.cleanupWarning) toast.warning(result.cleanupWarning);
+        setOptimistic(status === "approved");
         toast.success(
           status === "approved" ? "Ad approved" : "Draft reopened.",
         );
@@ -572,19 +582,44 @@ export function AdIdeaCard({
                     }
                   />
                 </label>
-                <label className="block space-y-1 text-xs">
-                  Call to action
-                  <Input
+                <div className="space-y-1 text-xs">
+                  <label htmlFor={`ad-cta-${ad.id}`}>Call to action</label>
+                  <Select
                     value={document.copy.callToAction}
-                    maxLength={60}
-                    onChange={(e) =>
+                    onValueChange={(callToAction) =>
                       edit((d) => ({
                         ...d,
-                        copy: { ...d.copy, callToAction: e.target.value },
+                        copy: { ...d.copy, callToAction },
                       }))
                     }
-                  />
-                </label>
+                  >
+                    <SelectTrigger id={`ad-cta-${ad.id}`} className="w-full">
+                      <SelectValue placeholder="Choose a call to action" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {document.copy.callToAction &&
+                        !CALL_TO_ACTION_OPTIONS.some(
+                          (option) =>
+                            option.value === document.copy.callToAction,
+                        ) && (
+                          <SelectItem
+                            value={document.copy.callToAction}
+                            disabled
+                          >
+                            {document.copy.callToAction
+                              .replaceAll("_", " ")
+                              .toLowerCase()}{" "}
+                            (current)
+                          </SelectItem>
+                        )}
+                      {CALL_TO_ACTION_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
           </>
@@ -875,28 +910,26 @@ export function AdIdeaCard({
           >
             {newCopy.isPending ? "Writing…" : "New copy"}
           </Button>
-          {campaignId && (
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={busy || editor !== null}
-              onClick={() =>
-                sendAssistantIntent({
-                  type: "work_ad_campaign",
-                  newThread: true,
-                  brandId,
-                  brandName,
-                  campaignId,
-                  campaignName: "this ad's campaign",
-                  adId: ad.id,
-                  focus: "ads",
-                  visibleText: `Work on “${savedState.name}”. Inspect its existing copy and carousel photos, use the brand and listing facts, and suggest four or five distinct copy sets pairing the ad caption with image text for each slide and intended size. Keep the selected images and slide order. Show the options before saving; I will choose one.`,
-                })
-              }
-            >
-              <MessageSquare className="size-3.5" /> Start new chat
-            </Button>
-          )}
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={busy || editor !== null}
+            onClick={() =>
+              sendAssistantIntent({
+                type: "work_ad_campaign",
+                newThread: true,
+                brandId,
+                brandName,
+                campaignId: campaignId ?? undefined,
+                campaignName: savedState.name,
+                adId: ad.id,
+                focus: "copy",
+                visibleText: `Talk through the ad copy for “${savedState.name}”. Review only this ad's primary text, headline, description and call to action against brand and listing facts. Suggest two or three focused options. Keep images and image text unchanged. Show me the options before saving; I will choose one.`,
+              })
+            }
+          >
+            <MessageSquare className="size-3.5" /> Talk through copy
+          </Button>
           {studio && !pushed && (!approved || !imagesSaved) && (
             <Button
               size="sm"
@@ -924,6 +957,7 @@ export function AdIdeaCard({
               size="sm"
               variant={approved ? "outline" : "default"}
               disabled={busy || approval.isPending || editor !== null}
+              loading={approval.isPending}
               onClick={() =>
                 approval.mutate({
                   adId: ad.id,

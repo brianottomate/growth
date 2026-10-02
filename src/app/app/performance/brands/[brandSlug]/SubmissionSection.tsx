@@ -37,6 +37,7 @@ export async function SubmissionSection({
         status: true,
         submittedAt: true,
         answers: true,
+        appliedSummary: true,
         accessClaimedAt: true,
         zernioVerifiedAt: true,
       },
@@ -49,6 +50,10 @@ export async function SubmissionSection({
         externalId: true,
         heroSourceUrl: true,
         galleryCache: true,
+        city: true,
+        state: true,
+        bedrooms: true,
+        guests: true,
       },
     }),
   ]);
@@ -58,6 +63,13 @@ export async function SubmissionSection({
       home.urlKey,
       {
         name: home.name,
+        location: [home.city, home.state].filter(Boolean).join(", "),
+        facts: [
+          home.bedrooms != null ? `${home.bedrooms} bedrooms` : null,
+          home.guests != null ? `Sleeps ${home.guests}` : null,
+        ]
+          .filter(Boolean)
+          .join(" · "),
         thumbUrl: home.galleryCache?.[0]?.thumbUrl ?? home.heroSourceUrl,
         href: `/app/performance/brands/${slug}/homes/${home.externalId}`,
       },
@@ -106,11 +118,28 @@ export async function SubmissionSection({
                 />
                 <IntakeActions
                   intakeId={latest.id}
+                  homes={homeByUrl}
                   verified={Boolean(latest.zernioVerifiedAt)}
                 />
               </div>
             )}
           </div>
+          {latest.status === "applied" && latest.appliedSummary?.length ? (
+            <div
+              role="status"
+              className="rounded-xl border bg-card px-4 py-3 text-sm"
+            >
+              <p className="font-medium">Intake applied</p>
+              <ul className="mt-1 space-y-1 text-xs text-muted-foreground">
+                {latest.appliedSummary.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Applying an intake does not rebuild existing campaign creatives.
+              </p>
+            </div>
+          ) : null}
           <IntakeAnswers answers={latest.answers} homes={homeByUrl} />
           {earlier.map((intake) => (
             <details key={intake.id} className="group space-y-3">

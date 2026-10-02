@@ -8,6 +8,7 @@ import {
   linkedInCreativeRequirement,
   linkedInDraftProviderControls,
   metaDraftProviderControls,
+  metaCallToActionType,
   sameAdAccountId,
   zernioConnectionMatchesPlatform,
 } from "./zernio-ads";
@@ -197,4 +198,15 @@ describe("provider-write idempotency", () => {
       }),
     ).toBe("deal_9:pm_4:catalog_sales");
   });
+});
+
+test("Meta uses Book now by default and respects the selected CTA", () => {
+  expect(metaCallToActionType()).toBe("BOOK_TRAVEL");
+  expect(metaCallToActionType(null)).toBe("BOOK_TRAVEL");
+  expect(metaCallToActionType(" ")).toBe("BOOK_TRAVEL");
+  expect(metaCallToActionType("BOOK_NOW")).toBe("BOOK_TRAVEL");
+  expect(metaCallToActionType("Book now")).toBe("BOOK_TRAVEL");
+  expect(metaCallToActionType("Learn more")).toBe("LEARN_MORE");
+  expect(metaCallToActionType("LEARN_MORE")).toBe("LEARN_MORE");
+  expect(metaCallToActionType("CONTACT_US")).toBe("CONTACT_US");
 });

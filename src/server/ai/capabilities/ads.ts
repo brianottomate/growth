@@ -1283,7 +1283,7 @@ export const pullPlatformAudiencesAction = growthAction({
 export const deleteCampaignDraftAction = growthAction({
   outputSchema: deleteCampaignDraftActionOutputSchema,
   description:
-    "Delete a LOCAL campaign draft with its ad sets and ads. Refused once a per-platform campaign exists for it — delete that on the platform first. Nothing on any ad platform is touched.",
+    "Delete a LOCAL campaign draft with its ad sets and ads, and purge generated exports unused elsewhere. Source photos and shared media are retained. Refused while a live platform campaign exists — delete that first. Nothing on any ad platform is touched.",
   inputSchema: z.object({ campaignId: z.string().trim().min(1) }),
   execute: async (input, ctx) =>
     deleteDraftCampaign({ ...input, organizationId: ctx.orgId }),

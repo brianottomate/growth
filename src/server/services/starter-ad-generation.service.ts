@@ -1,4 +1,5 @@
 import "server-only";
+import { performanceCopyNotes } from "./performance-copy-notes.service";
 import {
   brandStorySection,
   META_BRAND_CONCEPT,
@@ -288,6 +289,10 @@ export async function runStarterGeneration(runId: string, input: Input) {
       input.campaignId,
       input.organizationId,
     );
+    const clientNotes = await performanceCopyNotes(
+      brand.id,
+      input.organizationId,
+    );
     const booking = campaign.bookingTargetId
       ? await resolveBookingTarget(
           campaign.bookingTargetId,
@@ -307,6 +312,7 @@ export async function runStarterGeneration(runId: string, input: Input) {
           brandContext: fullBrand?.brandFingerprint,
           campaign: campaign.name,
         }),
+        { appendix: clientNotes },
       );
       if (!output) throw new Error("No brand concepts came back");
       for (const idea of output.ideas) {
@@ -430,6 +436,7 @@ export async function runStarterGeneration(runId: string, input: Input) {
           placements: input.intendedPlacements,
           image: grid.image,
         }),
+        { appendix: clientNotes },
       );
       if (!generated) throw new Error("No usable home composition");
       // A curated home keeps every photo someone picked; the rest are held to
@@ -488,7 +495,11 @@ export async function runStarterGeneration(runId: string, input: Input) {
           brandName: brand.name,
           story: fullBrand?.story ?? null,
         }),
-      prompt: JSON.stringify({ brand: brand.name, homes: homeCopies }),
+      prompt: JSON.stringify({
+        brand: brand.name,
+        homes: homeCopies,
+        clientNotes,
+      }),
     });
     await save("Hero carousel", {
       ...heroDocument!,

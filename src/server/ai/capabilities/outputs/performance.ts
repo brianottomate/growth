@@ -822,6 +822,9 @@ export const previewIntakeApplyActionOutputSchema = z.strictObject({
   }),
   mediaBudgetDollars: z.number().nullable(),
   needsBudgetDecision: z.boolean(),
+  featuredHomes: z.array(
+    z.strictObject({ id: z.string(), name: z.string(), url: z.string() }),
+  ),
   newProperties: z.array(
     z.strictObject({
       accountId: z.string(),

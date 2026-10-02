@@ -449,7 +449,9 @@ export function OverviewAssistantPopup({
                           ? `/app/newsletters/${pinnedWork.platformPostId}`
                           : `/app/content/${pinnedWork.contentPostId}`
                         : pinnedCampaign && effectiveBrand?.slug
-                          ? `/app/performance/brands/${effectiveBrand.slug}/campaigns/${pinnedCampaign.campaignId}`
+                          ? pinnedCampaign.campaignId
+                            ? `/app/performance/brands/${effectiveBrand.slug}/campaigns/${pinnedCampaign.campaignId}`
+                            : `/app/performance/brands/${effectiveBrand.slug}/ads`
                           : `/app/brands/${effectiveBrand?.slug ?? ""}`
                   }
                   title={pinnedLabel}

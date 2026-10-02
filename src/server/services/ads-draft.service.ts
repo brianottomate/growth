@@ -10,7 +10,11 @@ import {
   LINKEDIN_MIN_LIFETIME_BUDGET,
 } from "@/lib/zernio-ads";
 
-import { db } from "@/server/db";
+import { db, withTransaction } from "@/server/db";
+import {
+  campaignExportCandidates,
+  cleanupCampaignExports,
+} from "./campaign-media-cleanup.service";
 import {
   adTable,
   audienceTable,
@@ -1356,15 +1360,25 @@ export async function deleteDraftCampaign(input: {
       `This campaign has ${live.length} campaign(s) on a platform — delete those first, or they keep running without anything here describing them`,
     );
   }
-  // Draft platform rows die with the plan; audiences and ads cascade. Pushed
-  // rows outlive it (campaignId goes null) when the operator chose to leave them.
-  for (const row of pushed.filter((row) => !row.externalId)) {
-    await db
-      .delete(platformCampaignTable)
-      .where(eq(platformCampaignTable.id, row.id));
-  }
-  await db.delete(campaignTable).where(eq(campaignTable.id, campaign.id));
-  return { deleted: true };
+  const ads = await db.query.adTable.findMany({
+    where: eq(adTable.campaignId, campaign.id),
+    columns: { id: true },
+  });
+  const exports = await campaignExportCandidates(
+    campaign.brandId,
+    campaign.id,
+    ads.map((ad) => ad.id),
+  );
+  await withTransaction(async (tx) => {
+    // Local cascades remove plan ads and audiences; retained live rows preserve their references.
+    for (const row of pushed.filter((row) => !row.externalId))
+      await tx
+        .delete(platformCampaignTable)
+        .where(eq(platformCampaignTable.id, row.id));
+    await tx.delete(campaignTable).where(eq(campaignTable.id, campaign.id));
+  });
+  const mediaCleanup = await cleanupCampaignExports(exports);
+  return { deleted: true, mediaCleanup };
 }
 
 export async function deleteAudience(input: {

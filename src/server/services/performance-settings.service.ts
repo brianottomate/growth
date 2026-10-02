@@ -3,7 +3,7 @@ import "server-only";
 import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
-import { db } from "@/server/db";
+import { db, type Database, type TransactionClient } from "@/server/db";
 import { brandTable, userTable } from "@/server/db/schema";
 import type { PerformanceSettings } from "@/server/db/brand-schema";
 import type { PerformanceIntakeAnswers } from "@/server/db/performance-schema";
@@ -65,8 +65,10 @@ export async function setPerformanceSettings(input: {
   /** A display name, or a user id to resolve to one. */
   by: string | null;
   from: NonNullable<PerformanceSettings["updatedFrom"]>;
+  client?: Database | TransactionClient;
 }): Promise<{ settings: PerformanceSettings; changed: string[] }> {
-  const brand = await db.query.brandTable.findFirst({
+  const client = input.client ?? db;
+  const brand = await client.query.brandTable.findFirst({
     where: and(
       eq(brandTable.id, input.brandId),
       eq(brandTable.organizationId, input.orgId),
@@ -92,7 +94,7 @@ export async function setPerformanceSettings(input: {
   next.updatedAt = new Date().toISOString();
   next.updatedBy = await displayName(input.by);
   next.updatedFrom = input.from;
-  await db
+  await client
     .update(brandTable)
     .set({ performanceSettings: next })
     .where(eq(brandTable.id, brand.id));
@@ -109,6 +111,18 @@ async function displayName(by: string | null): Promise<string | null> {
   return user ? (user.name ?? user.email ?? by) : by;
 }
 
+export function validIntakeUrl(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === "https:" || url.protocol === "http:"
+      ? url.href
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** The settings an intake carries, as a patch; blanks are dropped, not written. */
 export function settingsFromIntake(
   answers: PerformanceIntakeAnswers,
@@ -119,8 +133,8 @@ export function settingsFromIntake(
     reportEmails: clean(answers.reportEmails),
     invoiceEmail: clean(answers.invoiceEmail),
     ugcPermission: clean(answers.ugcPermission),
-    creativeDriveUrl: clean(answers.creativeDriveUrl),
-    guestListDriveUrl: clean(answers.guestListDriveUrl),
+    creativeDriveUrl: validIntakeUrl(answers.creativeDriveUrl),
+    guestListDriveUrl: validIntakeUrl(answers.guestListDriveUrl),
   };
 }
 
@@ -133,9 +147,15 @@ export async function fillSettingsFromIntake(input: {
   brandId: string;
   orgId: string;
   answers: PerformanceIntakeAnswers;
+  client?: Database | TransactionClient;
 }): Promise<string[]> {
-  const brand = await db.query.brandTable.findFirst({
-    where: eq(brandTable.id, input.brandId),
+  const client = input.client ?? db;
+  const brand = await client.query.brandTable.findFirst({
+    where: and(
+      eq(brandTable.id, input.brandId),
+      eq(brandTable.organizationId, input.orgId),
+      isNull(brandTable.deletedAt),
+    ),
     columns: { performanceSettings: true },
   });
   const current = brand?.performanceSettings ?? {};
@@ -154,6 +174,7 @@ export async function fillSettingsFromIntake(input: {
     patch,
     by: "intake",
     from: "intake",
+    client,
   });
   return changed;
 }

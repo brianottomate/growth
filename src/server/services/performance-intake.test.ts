@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, test } from "bun:test";
 
 import { intakeBrandRef } from "@/lib/intake-ref";
 
@@ -8,6 +8,8 @@ import {
   withPropertyAddresses,
   ACCESS_CHECK_INTERVAL_MS,
   applyBlockers,
+  intakeHomeSelection,
+  submitIntakeSchema,
   currentPeriod,
   matchBrandPage,
   normalizePageName,
@@ -277,4 +279,65 @@ describe("audience geography from the homes", () => {
     ).toEqual({});
     expect(geographyFromProperties([])).toEqual({});
   });
+});
+
+describe("intake featured-home replacement", () => {
+  const catalog = [
+    { id: "a", name: "Lake", url: "https://brand.com/property/a" },
+    { id: "b", name: "Pool", url: "https://brand.com/property/b" },
+  ];
+  it("resolves the complete replacement, including homes already saved", () => {
+    expect(
+      intakeHomeSelection(
+        {
+          propertyUrls: [
+            "https://brand.com/property/b/",
+            "https://brand.com/property/b",
+          ],
+        },
+        catalog,
+      ),
+    ).toEqual({ homes: [catalog[1]!], blockers: [] });
+  });
+  it("uses the whole current catalog for advertise everything", () => {
+    expect(intakeHomeSelection({ allProperties: true }, catalog)).toEqual({
+      homes: catalog,
+      blockers: [],
+    });
+    expect(
+      intakeHomeSelection({ allProperties: true }, []).blockers,
+    ).toHaveLength(1);
+  });
+  it("blocks partial matches and a different brand rather than silently featuring fewer homes", () => {
+    expect(
+      intakeHomeSelection(
+        { propertyUrls: [catalog[0]!.url, "https://other.com/property/b"] },
+        catalog,
+      ).blockers,
+    ).toHaveLength(1);
+    expect(intakeHomeSelection({}, catalog).blockers).toHaveLength(1);
+  });
+});
+
+test("intake rejects malformed known answers and preserves future questions", () => {
+  expect(
+    submitIntakeSchema.safeParse({
+      slug: "brand",
+      answers: { propertyUrls: "not an array" },
+    }).success,
+  ).toBe(false);
+  expect(
+    submitIntakeSchema.safeParse({
+      slug: "brand",
+      answers: { allProperties: "yes" },
+    }).success,
+  ).toBe(false);
+  const input = {
+    slug: "brand",
+    answers: {
+      propertyUrls: ["https://brand.com/home"],
+      newQuestion: "keep this on the receipt",
+    },
+  };
+  expect(submitIntakeSchema.parse(input)).toEqual(input);
 });

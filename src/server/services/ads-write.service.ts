@@ -48,7 +48,6 @@ import {
   LINKEDIN_PUSH_GOALS,
   linkedInCreativeRequirement,
   linkedInDraftProviderControls,
-  META_DEFAULT_CALL_TO_ACTION,
   metaCallToActionType,
   metaDraftProviderControls,
   sameAdAccountId,
@@ -3125,26 +3124,10 @@ async function pushToMeta(args: PushArgs) {
     host: normalizeDomain(brand.website),
   });
 
-  // Zernio rejects a Meta ad with no call to action, on every shape. A
-  // Performance client's ads always book; a stored LEARN_MORE is overridden.
+  // Book now is the default; an operator's selected CTA reaches the platform.
   const isClient = brand.relationship === "client";
-  const overriddenCta = usable.filter(
-    ({ content }) =>
-      isClient &&
-      content.callToAction &&
-      content.callToAction !== META_DEFAULT_CALL_TO_ACTION,
-  );
-  if (overriddenCta.length > 0) {
-    warnings.push(
-      `${overriddenCta.length} ad(s) had a call to action other than ${META_DEFAULT_CALL_TO_ACTION}; client ads push with ${META_DEFAULT_CALL_TO_ACTION}`,
-    );
-  }
   const metaCallToAction = (content: AdCreativeContent) =>
-    metaCallToActionType(
-      isClient
-        ? META_DEFAULT_CALL_TO_ACTION
-        : (content.callToAction ?? META_DEFAULT_CALL_TO_ACTION),
-    );
+    metaCallToActionType(content.callToAction);
 
   // House naming at every level. A campaign, ad set or ad already in the
   // convention keeps its name; anything else is renamed on the way out.

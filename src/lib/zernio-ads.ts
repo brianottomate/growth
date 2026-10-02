@@ -106,8 +106,11 @@ export const META_DEFAULT_CALL_TO_ACTION = "BOOK_NOW";
  * reads it back as "Unknown (BOOK_NOW)" and asset-feed ads under OUTCOME_SALES
  * refuse it (error 1885396). BOOK_TRAVEL is Meta's "Book now" button.
  */
-export function metaCallToActionType(callToAction: string): string {
-  return callToAction === "BOOK_NOW" ? "BOOK_TRAVEL" : callToAction;
+export function metaCallToActionType(callToAction?: string | null): string {
+  const selected = (callToAction?.trim() || META_DEFAULT_CALL_TO_ACTION)
+    .toUpperCase()
+    .replace(/\s+/g, "_");
+  return selected === "BOOK_NOW" ? "BOOK_TRAVEL" : selected;
 }
 
 export const LINKEDIN_CALL_TO_ACTIONS = [

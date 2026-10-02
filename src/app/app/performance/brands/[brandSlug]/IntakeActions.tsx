@@ -11,12 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/toast";
 import { orpc } from "@/orpc/client";
-
-/** A listing URL's last path segment, read as words. */
-const homeLabel = (url: string) => {
-  const slug = url.split("?")[0]!.replace(/\/+$/, "").split("/").pop() ?? url;
-  return decodeURIComponent(slug).replace(/-/g, " ");
-};
+import { IntakeHomes, type IntakeHome } from "../../IntakeAnswers";
 
 const money = (dollars: number | null) =>
   dollars == null ? "Not set" : `$${dollars.toLocaleString()}/mo`;
@@ -25,9 +20,11 @@ const money = (dollars: number | null) =>
 export function IntakeActions({
   intakeId,
   verified,
+  homes,
 }: {
   intakeId: string;
   verified: boolean;
+  homes: Record<string, IntakeHome>;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -60,7 +57,9 @@ export function IntakeActions({
   const apply = useMutation(
     orpc.performance.applyIntake.mutationOptions({
       onSuccess: () => {
-        toast.success("Intake applied");
+        toast.success(
+          "Intake applied — account, budget and selected homes saved",
+        );
         setOpen(false);
         router.refresh();
       },
@@ -89,6 +88,9 @@ export function IntakeActions({
       )}
       <SimpleDialog
         title="Apply intake"
+        description="Replace featured homes with this selection and save the client’s account and budget details. Existing campaigns keep their homes."
+        size="lg"
+        className="min-w-0"
         open={open}
         onOpenChange={(next) => {
           setOpen(next);
@@ -124,7 +126,7 @@ export function IntakeActions({
         ) : preview.error ? (
           <p className="text-sm text-destructive">{preview.error.message}</p>
         ) : data ? (
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+          <dl className="grid min-w-0 grid-cols-[7rem_minmax(0,1fr)] gap-x-4 gap-y-3 text-sm">
             <dt className="text-muted-foreground">Period</dt>
             <dd>
               {data.period}
@@ -156,20 +158,22 @@ export function IntakeActions({
                 </>
               )}
             </dd>
-            <dt className="text-muted-foreground">New homes</dt>
-            <dd>
-              {data.newProperties.length === 0 ? (
-                "None"
-              ) : (
-                <ul className="space-y-0.5">
-                  {data.newProperties.map((home) => (
-                    <li key={home.siteUrl} className="truncate">
-                      {home.title ?? homeLabel(home.siteUrl)}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </dd>
+            <div className="col-span-2 min-w-0 border-t pt-3">
+              <dt className="mb-2 font-medium">
+                Featured homes · replaces current selection
+              </dt>
+              <dd className="max-h-[40dvh] overflow-y-auto pr-1">
+                {data.featuredHomes.length === 0 ? (
+                  <p className="text-muted-foreground">No homes selected.</p>
+                ) : (
+                  <IntakeHomes
+                    all={false}
+                    urls={data.featuredHomes.map((home) => home.url)}
+                    homes={homes}
+                  />
+                )}
+              </dd>
+            </div>
             {data.blockers.length > 0 && (
               <>
                 <dt className="text-destructive">Blocked</dt>

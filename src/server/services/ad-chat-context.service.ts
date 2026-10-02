@@ -1,4 +1,5 @@
 import "server-only";
+import { performanceCopyNotes } from "./performance-copy-notes.service";
 import { listingCopyContext } from "./listing-copy-context.service";
 import { marketOf } from "@/lib/markets";
 import { and, eq, isNull } from "drizzle-orm";
@@ -6,7 +7,7 @@ import { db } from "@/server/db";
 import { adTable, brandTable } from "@/server/db/schema";
 import { ideaDocumentFromAd, sameIdeaSource } from "@/lib/ad-idea-studio";
 import { requireOwnedCampaign, starterIdeaHomes } from "./ads-draft.service";
-import { listBrandHomes } from "./homes.service";
+import { listAllBrandHomes } from "./homes.service";
 import { brandListings, brandWebsiteId } from "./wanderos-listings.service";
 import { fetchWanderOsListingDetail } from "@/server/clients/wanderos-site.client";
 import {
@@ -54,8 +55,9 @@ export async function adChatContext(input: {
     starterIdeaHomes({
       organizationId: input.organizationId,
       brandId: brand.id,
+      allHomes: true,
     }),
-    listBrandHomes(brand.id),
+    listAllBrandHomes(brand.id),
     brandListings(brand),
     brandWebsiteId(brand.id),
   ]);
@@ -124,6 +126,7 @@ export async function adChatContext(input: {
     images,
     homes: facts,
     copyRules: [
+      await performanceCopyNotes(brand.id, input.organizationId),
       campaignCopyRules(),
       META_HOME_CAPTION,
       META_COLLECTION_CAPTION,

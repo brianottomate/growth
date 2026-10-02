@@ -448,6 +448,7 @@ export async function listAllBrandHomes(brandId: string) {
       url: true,
       city: true,
       state: true,
+      country: true,
       bedrooms: true,
       bathrooms: true,
       guests: true,
