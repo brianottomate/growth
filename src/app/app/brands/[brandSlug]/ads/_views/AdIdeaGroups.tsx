@@ -28,7 +28,7 @@ export function AdIdeaGroups({ groups }: { groups: Group[] }) {
     .filter((group) => group.ads.length > 0);
   return (
     <>
-      <div className="flex w-fit rounded-lg border p-0.5 text-sm">
+      <div className="flex w-fit max-w-full flex-wrap rounded-lg border p-0.5 text-sm">
         {(["all", "review", "approved"] as const).map((key) => (
           <Button
             key={key}
@@ -65,7 +65,7 @@ export function AdIdeaGroups({ groups }: { groups: Group[] }) {
             </Button>
           </div>
         ))}
-      {shown.length > 0 && (
+      {shown.length > 1 && (
         <nav
           aria-label="Ad types"
           className="sticky top-0 z-10 -mx-1 flex flex-wrap gap-1.5 bg-background/95 px-1 py-2 backdrop-blur"
@@ -95,9 +95,19 @@ export function AdIdeaGroups({ groups }: { groups: Group[] }) {
           >
             {group.label} · {group.ads.length}
           </h3>
-          {group.ads.map((ad) => (
-            <div key={ad.id}>{ad.node}</div>
-          ))}
+          <div
+            className={
+              group.id === "text"
+                ? "grid grid-cols-1 gap-3 @3xl:grid-cols-2"
+                : "space-y-3"
+            }
+          >
+            {group.ads.map((ad) => (
+              <div key={ad.id} className="min-w-0">
+                {ad.node}
+              </div>
+            ))}
+          </div>
         </section>
       ))}
     </>

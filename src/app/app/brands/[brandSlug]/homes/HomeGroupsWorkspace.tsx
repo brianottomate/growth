@@ -2,7 +2,15 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowUp, ArrowDown } from "lucide-react";
+import {
+  ArrowUp,
+  ArrowDown,
+  Home as HomeIcon,
+  CalendarDays,
+  ExternalLink,
+  Users,
+  Layers,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,7 +32,12 @@ import {
 import { toast } from "@/components/ui/toast";
 import { orpc } from "@/orpc/client";
 
-type Home = { id: string; name: string; source: string };
+type Home = {
+  id: string;
+  name: string;
+  source: string;
+  heroSourceUrl?: string | null;
+};
 type Group = {
   id: string;
   name: string;
@@ -81,12 +94,15 @@ export function HomeGroupsWorkspace({
         </div>
         <div className="grid grid-cols-1 gap-4 @3xl:grid-cols-2">
           {data.groups.map((group) => (
-            <div key={group.id} className="space-y-3 rounded-xl border p-4">
+            <div
+              key={group.id}
+              className="min-w-0 space-y-3 rounded-xl border bg-card p-4"
+            >
               <div>
-                <h3 className="font-medium">
+                <h3 className="font-medium [overflow-wrap:anywhere]">
                   {group.name}
                   {group.kind === "featured" && (
-                    <span className="ml-2 text-xs text-muted-foreground">
+                    <span className="ml-2 inline-block rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                       Default
                     </span>
                   )}
@@ -97,11 +113,34 @@ export function HomeGroupsWorkspace({
                   </p>
                 )}
               </div>
-              <ol className="space-y-1 text-sm">
-                {group.homeIds.map((id) => (
-                  <li key={id}>{data.homes.find((h) => h.id === id)?.name}</li>
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Layers className="size-3.5" />
+                {group.homeIds.length}{" "}
+                {group.homeIds.length === 1 ? "home" : "homes"}
+              </p>
+              <ol className="grid grid-cols-1 gap-2 @xl:grid-cols-2">
+                {group.homeIds.slice(0, 4).map((id) => (
+                  <li key={id} className="min-w-0">
+                    <HomeSummary home={data.homes.find((h) => h.id === id)} />
+                  </li>
                 ))}
               </ol>
+              {group.homeIds.length > 4 && (
+                <details className="text-sm">
+                  <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                    Show {group.homeIds.length - 4} more homes
+                  </summary>
+                  <ol className="mt-2 grid grid-cols-1 gap-2 @xl:grid-cols-2">
+                    {group.homeIds.slice(4).map((id) => (
+                      <li key={id} className="min-w-0">
+                        <HomeSummary
+                          home={data.homes.find((h) => h.id === id)}
+                        />
+                      </li>
+                    ))}
+                  </ol>
+                </details>
+              )}
               {!group.homeIds.length && (
                 <p className="text-sm text-muted-foreground">
                   No homes selected.
@@ -162,8 +201,10 @@ export function HomeGroupsWorkspace({
         {targets.error && <p role="alert">{targets.error.message}</p>}
         {targets.data?.targets.map((target) => (
           <div key={target.id} className="space-y-2 rounded-xl border p-4">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="font-medium">{target.name}</h3>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className="font-medium [overflow-wrap:anywhere]">
+                {target.name}
+              </h3>
               <Button
                 size="sm"
                 variant="outline"
@@ -173,25 +214,36 @@ export function HomeGroupsWorkspace({
                 Edit
               </Button>
             </div>
-            <p className="text-sm text-muted-foreground">
-              {target.homeGroupId
-                ? data.groups.find((g) => g.id === target.homeGroupId)?.name
-                : target.homeId
-                  ? data.homes.find((h) => h.id === target.homeId)?.name
-                  : "All brand homes"}
-              {target.checkIn
-                ? ` · ${target.checkIn} → ${target.checkOut}`
-                : " · Guest chooses dates"}
-              {target.guests ? ` · ${target.guests} guests` : ""}
-            </p>
+            <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-1">
+                <HomeIcon className="size-3.5 shrink-0" />
+                {target.homeGroupId
+                  ? data.groups.find((g) => g.id === target.homeGroupId)?.name
+                  : target.homeId
+                    ? data.homes.find((h) => h.id === target.homeId)?.name
+                    : "All brand homes"}
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-1">
+                <CalendarDays className="size-3.5 shrink-0" />
+                {target.checkIn
+                  ? `${bookingDate(target.checkIn)} – ${bookingDate(target.checkOut)}`
+                  : "Guest chooses dates"}
+              </span>
+              {target.guests && (
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-1">
+                  <Users className="size-3.5" />
+                  {target.guests} guests
+                </span>
+              )}
+            </div>
             {target.url && (
               <a
-                className="block text-sm break-all underline"
+                className="inline-flex items-center gap-1.5 text-sm underline underline-offset-4"
                 href={target.url}
                 target="_blank"
                 rel="noreferrer"
               >
-                Preview booking search
+                Preview booking search <ExternalLink className="size-3.5" />
               </a>
             )}
             {target.issue && (
@@ -344,8 +396,8 @@ function GroupEditor({
                   )
                 }
               />
-              <Label className="flex-1" htmlFor={`member-${home.id}`}>
-                {home.name}
+              <Label className="min-w-0 flex-1" htmlFor={`member-${home.id}`}>
+                <HomeSummary home={home} />
               </Label>
               {index >= 0 && (
                 <>
@@ -507,5 +559,39 @@ function TargetEditor({
         Save booking target
       </Button>
     </div>
+  );
+}
+
+function bookingDate(value: string | null) {
+  if (!value) return "Choose checkout";
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${value}T00:00:00Z`));
+}
+function HomeSummary({ home }: { home?: Home }) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <span className="flex min-w-0 items-center gap-2.5 rounded-lg bg-muted/40 p-1.5">
+      {home?.heroSourceUrl && !failed ? (
+        // oxlint-disable-next-line nextjs/no-img-element
+        <img
+          src={home.heroSourceUrl}
+          alt=""
+          loading="lazy"
+          onError={() => setFailed(true)}
+          className="h-12 w-16 shrink-0 rounded-md object-cover"
+        />
+      ) : (
+        <span className="grid h-12 w-16 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground">
+          <HomeIcon className="size-5" />
+        </span>
+      )}
+      <span className="min-w-0 text-xs leading-snug font-medium [overflow-wrap:anywhere]">
+        {home?.name ?? "Home unavailable"}
+      </span>
+    </span>
   );
 }

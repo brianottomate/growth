@@ -1,4 +1,5 @@
 "use client";
+import { destinationLabel, safeHomeUrl } from "@/lib/ad-preview-links";
 
 import { useState } from "react";
 import { MediaAssetView } from "@/components/media-asset-view";
@@ -367,15 +368,15 @@ export function AdTile({
   const mock = ad.textOnly ? (
     // A text-only idea is copy alone: render it as a search result, not a
     // feed card, and never nag for a creative.
-    <div className="w-full max-w-80 rounded-xl border bg-card p-4 text-left">
+    <div className="w-full max-w-96 min-w-0 rounded-xl border bg-card p-4 text-left">
       <p className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
-        Ad · Text
+        Sponsored · Search preview
       </p>
-      <p className="mt-1 line-clamp-2 text-[13px] leading-snug font-medium text-sky-300">
+      <p className="mt-1 line-clamp-2 text-[13px] leading-snug font-medium text-primary">
         {ad.headline || "Headline"}
       </p>
-      <p className="mt-0.5 text-[11px] text-emerald-300/80">
-        {(ad.linkUrl ?? landingUrl ?? "wander.com").replace(/^https?:\/\//, "")}
+      <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+        {destinationLabel(ad.linkUrl ?? landingUrl ?? "wander.com")}
       </p>
       <p className="mt-1 line-clamp-3 text-[11px] leading-snug text-muted-foreground">
         {ad.body || "Description"}
@@ -599,8 +600,8 @@ export function AdTile({
               className={cn(
                 "rounded-full px-2 py-0.5 text-[10px] font-medium capitalize",
                 state === "live"
-                  ? "bg-emerald-500/15 text-emerald-300"
-                  : "bg-sky-500/15 text-sky-300",
+                  ? "bg-primary/10 text-primary"
+                  : "bg-muted text-muted-foreground",
               )}
             >
               {state}
@@ -706,19 +707,25 @@ export function AdTile({
 
       <div
         className={cn(
-          "mt-3 grid gap-3",
+          "mt-3 grid grid-cols-1 gap-3",
           slice ? "@2xl:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]" : "",
         )}
       >
-        <div className="flex justify-center @2xl:justify-start">{mock}</div>
+        <div className="flex min-w-0 justify-start">{mock}</div>
         <div className="min-w-0 space-y-2">
           {ad.textOnly ? null : strip}
           {!editing ? (
             <div className="space-y-1">
-              <p className="truncate text-[12px] font-medium">{ad.headline}</p>
-              <p className="line-clamp-3 text-[11px] leading-snug whitespace-pre-line text-muted-foreground">
-                {ad.body || "No primary text yet."}
-              </p>
+              {!ad.textOnly && (
+                <>
+                  <p className="truncate text-[12px] font-medium">
+                    {ad.headline}
+                  </p>
+                  <p className="line-clamp-3 text-[11px] leading-snug whitespace-pre-line text-muted-foreground">
+                    {ad.body || "No primary text yet."}
+                  </p>
+                </>
+              )}
               {locked ? null : (
                 <button
                   type="button"
@@ -785,7 +792,19 @@ export function AdTile({
                   {`${ad.homeName}, by name; no listing on their site yet. `}
                 </>
               ) : null}
-              Links to {ad.linkUrl ?? landingUrl ?? "the brand's site"}.
+              {safeHomeUrl(ad.linkUrl ?? landingUrl) ? (
+                <a
+                  href={safeHomeUrl(ad.linkUrl ?? landingUrl)!}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={ad.linkUrl ?? landingUrl ?? undefined}
+                  className="min-w-0 truncate underline underline-offset-4"
+                >
+                  Open {destinationLabel(ad.linkUrl ?? landingUrl!)} ↗
+                </a>
+              ) : (
+                "Links to the brand’s site."
+              )}
             </p>
           ) : null}
         </div>

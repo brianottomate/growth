@@ -59,7 +59,10 @@ export function BookingTargetPicker({
       <Label htmlFor="campaign-booking-target">Default booking target</Label>
       <div className="flex flex-wrap items-center gap-2">
         <Select value={selected} onValueChange={setSelected}>
-          <SelectTrigger id="campaign-booking-target" className="w-64">
+          <SelectTrigger
+            id="campaign-booking-target"
+            className="w-full min-w-0 @lg:w-72"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -73,7 +76,7 @@ export function BookingTargetPicker({
         </Select>
         <Button
           size="sm"
-          disabled={!target?.url || apply.isPending}
+          disabled={!target?.url || selected === targetId || apply.isPending}
           onClick={() => apply.mutate({ campaignId, targetId: selected })}
         >
           Apply booking link

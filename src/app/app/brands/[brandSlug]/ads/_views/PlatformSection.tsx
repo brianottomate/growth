@@ -331,7 +331,9 @@ export async function PlatformSection({
                     />
                   )}
                   <span className="absolute top-1 right-1 rounded-full bg-black/50 px-1.5 py-0.5 text-[9px] font-medium text-white capitalize backdrop-blur-sm">
-                    {ad.status ?? "live"}
+                    {platformCampaign.status === "paused"
+                      ? "paused"
+                      : (ad.status ?? "unknown")}
                   </span>
                 </div>
                 <div className="space-y-0.5 p-2">

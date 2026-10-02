@@ -16,7 +16,7 @@ import { Radio } from "lucide-react";
 
 import { db } from "@/server/db";
 import { homeTable, platformAdTable } from "@/server/db/schema";
-import { safeHomeUrl } from "@/lib/ad-preview-links";
+import { destinationLabel, safeHomeUrl } from "@/lib/ad-preview-links";
 import { getSession } from "@/server/better-auth/server";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -223,28 +223,22 @@ export async function CampaignView({
             ]}
           />
         )}
-        <BookingTargetPicker
-          brandId={brand.id}
-          brandSlug={brandSlug}
-          campaignId={campaign.id}
-          targetId={campaign.bookingTargetId}
-        />
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-start gap-2.5">
+        <div className="flex flex-col items-start justify-between gap-3 @3xl:flex-row">
+          <div className="w-full min-w-0 @3xl:flex-1">
+            <div className="flex flex-wrap items-start gap-2.5">
               <h1
                 title={campaign.name}
-                className="text-lg leading-snug font-semibold tracking-tight break-all"
+                className="min-w-0 text-lg leading-snug font-semibold tracking-tight [overflow-wrap:anywhere]"
               >
                 {campaign.name}
               </h1>
               <span
                 className={cn(
-                  "rounded-full px-2 py-0.5 text-[11px] font-medium",
+                  "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium",
                   anyLive
-                    ? "bg-emerald-500/15 text-emerald-300"
+                    ? "bg-primary/10 text-primary"
                     : anyPushed
-                      ? "bg-sky-500/15 text-sky-300"
+                      ? "bg-primary/10 text-primary"
                       : "bg-muted text-muted-foreground",
                 )}
               >
@@ -266,7 +260,15 @@ export async function CampaignView({
                 <span>· {money(campaign.budget)} planned</span>
               ) : null}
               {campaign.landingUrl ? (
-                <span className="truncate">· {campaign.landingUrl}</span>
+                <a
+                  href={safeHomeUrl(campaign.landingUrl) ?? undefined}
+                  title={campaign.landingUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="max-w-full min-w-0 truncate underline underline-offset-4"
+                >
+                  {destinationLabel(campaign.landingUrl)} ↗
+                </a>
               ) : null}
             </p>
             {campaign.description ? (
@@ -309,6 +311,12 @@ export async function CampaignView({
             />
           </div>
         </div>
+        <BookingTargetPicker
+          brandId={brand.id}
+          brandSlug={brandSlug}
+          campaignId={campaign.id}
+          targetId={campaign.bookingTargetId}
+        />
       </header>
 
       <section id="campaign-ads" className="scroll-mt-4 space-y-4">

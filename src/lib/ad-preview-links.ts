@@ -81,3 +81,11 @@ export function safeHomeUrl(value: unknown): string | null {
     return null;
   }
 }
+
+/** Human-readable destination; query parameters remain in the actual link. */
+export function destinationLabel(value: string): string {
+  const safe = safeHomeUrl(value);
+  if (!safe) return value;
+  const url = new URL(safe);
+  return `${url.host}${url.pathname === "/" ? "" : url.pathname}`;
+}
