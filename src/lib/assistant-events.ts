@@ -52,6 +52,7 @@ export type PlanEmailIntent = {
  */
 export type WorkProspectIntent = {
   type: "work_prospect";
+  newThread?: true;
   domain: string;
   companyName: string | null;
   visibleText: string;
@@ -140,7 +141,16 @@ export type WorkCatalogHomeIntent = {
 };
 export type CatalogHomeWorkContext = Omit<WorkCatalogHomeIntent, "visibleText">;
 
+export type WorkPitchIntent = {
+  type: "work_pitch";
+  newThread: true;
+  brandId: string;
+  brandName: string;
+  visibleText: string;
+};
+
 export type AssistantIntent =
+  | WorkPitchIntent
   | WorkCatalogHomeIntent
   | StartClientCampaignIntent
   | DefinePersonasIntent
@@ -194,7 +204,7 @@ export function wantsNewThread(intent: AssistantIntent): intent is Extract<
   AssistantIntent,
   { newThread?: boolean }
 > & {
-  brandId: string;
+  brandId?: string;
 } {
   return "newThread" in intent && intent.newThread === true;
 }

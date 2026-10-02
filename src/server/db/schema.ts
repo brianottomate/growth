@@ -10,6 +10,7 @@ export * from "./oauth-provider-schema";
 // schema (`import * as schema`) see every table. Add new domains here.
 export * from "./ad-account-schema";
 export * from "./brand-schema";
+export * from "./pitch-schema";
 export * from "./channel-schema";
 export * from "./content-schema";
 export * from "./content-pillar-schema";

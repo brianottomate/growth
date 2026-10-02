@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { HeaderNewClient } from "./HeaderNewClient";
@@ -20,7 +21,15 @@ export default function PerformanceLayout({
         <h1 className="text-xl font-semibold tracking-tight">
           Wander Performance
         </h1>
-        <HeaderNewClient />
+        <div className="flex items-center gap-3">
+          <Link
+            href="/app/performance/pitch"
+            className="text-sm hover:underline"
+          >
+            Pitch desk
+          </Link>
+          <HeaderNewClient />
+        </div>
       </div>
       {children}
     </div>

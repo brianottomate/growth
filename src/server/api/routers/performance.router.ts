@@ -1,3 +1,8 @@
+import {
+  getPitchAction,
+  savePitchAction,
+  draftPitchAction,
+} from "@/server/ai/capabilities/pitch";
 import { z } from "zod";
 import { setBrandStages } from "@/server/services/brand-relationship.service";
 import { BUSINESS_STAGES, DELIVERY_STAGES } from "@/lib/performance-stage";
@@ -30,6 +35,9 @@ import {
 // commercial layer plus a read of what is attached to each cycle.
 
 export const performanceRouter = {
+  pitch: actionProcedure(getPitchAction),
+  savePitch: actionProcedure(savePitchAction),
+  draftPitch: actionProcedure(draftPitchAction),
   list: actionProcedure(listPerformanceAccountsAction),
 
   get: actionProcedure(getPerformanceAccountAction),

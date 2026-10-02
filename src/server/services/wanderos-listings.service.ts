@@ -1,5 +1,6 @@
 import "server-only";
 
+import { plausibleWanderOsId } from "@/lib/wanderos-site-detection";
 import { eq } from "drizzle-orm";
 
 import {
@@ -38,6 +39,8 @@ export async function brandWebsiteId(brandId: string): Promise<string | null> {
     },
   });
   if (!brand?.website) return null;
+  if (brand.wanderOsWebsiteId && !plausibleWanderOsId(brand.wanderOsWebsiteId))
+    return discoverAndRemember(brand.id, brand.website);
   if (brand.wanderOsWebsiteId)
     return brand.wanderOsEnabled ? brand.wanderOsWebsiteId : null;
   // Looked before and found nothing. Asking again is a decision someone makes.

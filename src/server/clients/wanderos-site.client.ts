@@ -1,4 +1,5 @@
 import "server-only";
+import { wanderOsIdFromHtml } from "@/lib/wanderos-site-detection";
 
 // ---- WANDEROS SITE SEARCH --------------------------------------------------
 //
@@ -12,8 +13,6 @@ import "server-only";
 
 const SEARCH_URL = "https://api.wander.com/saas/website/search";
 const LISTING_URL = "https://api.wander.com/saas/website/listings";
-/** WanderOS ids are long numerics; 12+ digits avoids matching a price or year. */
-const WEBSITE_ID_RE = /\b(\d{12,})\b/;
 
 export type WanderOsListing = {
   id: string;
@@ -75,11 +74,7 @@ export async function wanderOsWebsiteId(
     const html = await response.text();
     // The id appears in asset URLs (assets-websites.wander.com/<id>/...),
     // which is the most stable place it shows up.
-    const asset =
-      /(?:assets-websites|wander-upload-assets)\.wander\.com\/(\d{12,})\//.exec(
-        html,
-      );
-    return asset?.[1] ?? WEBSITE_ID_RE.exec(html)?.[1] ?? null;
+    return wanderOsIdFromHtml(html);
   } catch {
     return null;
   }

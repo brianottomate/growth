@@ -41,6 +41,8 @@ export const GROWTH_CAPABILITY_ACTIONS = {
   ],
   personaRead: ["list"],
   performanceRead: [
+    "pitch",
+    "draftPitch",
     "list",
     "get",
     "searchAttachableCampaigns",
@@ -55,6 +57,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "previewIntakeApply",
   ],
   performanceWrite: [
+    "savePitch",
     "createAccount",
     "updateAccount",
     "addProperty",

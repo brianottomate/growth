@@ -1,3 +1,4 @@
+import { getPitchAction, savePitchAction, draftPitchAction } from "./pitch";
 import {
   attachBookingTargetAction,
   bookingTargetsAction,
@@ -291,6 +292,8 @@ export const performanceRead = growthDomainTool({
   description:
     "Read Performance accounts, the commercial record of each client paying Wander to run performance marketing for their homes, with their properties, billing cycles, and attached delivery.",
   actions: {
+    pitch: getPitchAction,
+    draftPitch: draftPitchAction,
     list: listPerformanceAccountsAction,
     get: getPerformanceAccountAction,
     searchAttachableCampaigns: searchAttachableCampaignsAction,
@@ -310,6 +313,7 @@ export const performanceWrite = growthDomainTool({
   description:
     "Manage Performance accounts: onboard clients, add their homes, update one home at a time (featured on the Setup page, hero photo), open and update billing cycles, and attach existing delivery (campaigns, lifecycle campaigns, amplification targets) to a cycle. Never creates ads or sends anything.",
   actions: {
+    savePitch: savePitchAction,
     createAccount: createPerformanceAccountAction,
     updateAccount: updatePerformanceAccountAction,
     addProperty: addPerformancePropertyAction,

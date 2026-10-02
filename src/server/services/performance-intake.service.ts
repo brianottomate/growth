@@ -1,3 +1,10 @@
+import {
+  STANDARD_PITCH_DEFAULTS,
+  publicPitchSettings,
+  selectPitchHomes,
+  resolvePitchFields,
+  pitchFieldsSchema,
+} from "@/lib/pitch-settings";
 import "server-only";
 import {
   appliedEvidenceSchema,
@@ -12,6 +19,7 @@ import {
 import { and, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { z } from "zod";
 
+import { getPitchWorkspace } from "./pitch-workspace.service";
 import { db, withTransaction } from "@/server/db";
 import { listAllBrandHomes, listBrandHomes } from "./homes.service";
 import { fillSettingsFromIntake } from "./performance-settings.service";
@@ -321,6 +329,7 @@ async function brandForHandle(handle: { token?: string; slug?: string }) {
     organizationId: true,
     // The favicon here is the only square mark we hold for most brands.
     websiteMeta: true,
+
     // Read so submission can promote a prospect. Never put on a payload: the
     // pitch and prefill responses are built field by field and reach a page
     // addressed by a guessable slug.
@@ -1154,6 +1163,9 @@ export type PerformancePitchHome = {
 };
 
 export type PerformancePitch = {
+  defaults: typeof STANDARD_PITCH_DEFAULTS;
+  settings: ReturnType<typeof publicPitchSettings>;
+  resolved: ReturnType<typeof resolvePitchFields> & { revision: number };
   brand: {
     name: string;
     website: string | null;
@@ -1185,7 +1197,7 @@ export async function performancePitch(handle: {
 
   // A pitch page with no homes is still a pitch page, which is what an empty
   // list from here means.
-  const homes: PerformancePitchHome[] = (await brandListings(brand)).map(
+  const allHomes: PerformancePitchHome[] = (await brandListings(brand)).map(
     (row) => ({
       name: row.name,
       url: row.url,
@@ -1196,7 +1208,27 @@ export async function performancePitch(handle: {
     }),
   );
 
+  const workspace = await getPitchWorkspace(brand.organizationId, brand.id);
+  const settings = workspace.pitchSettings;
+  const homes = selectPitchHomes(allHomes, settings?.selectedHomeUrls ?? []);
+  const geography = await resolveGeography(homes);
+  const location =
+    [geography.markets, geography.cities, geography.states, geography.countries]
+      .find((places) => places?.length)
+      ?.slice(0, 3)
+      .join(", ") ?? "";
+
   return {
+    defaults: STANDARD_PITCH_DEFAULTS,
+    settings: publicPitchSettings(settings),
+    resolved: {
+      ...resolvePitchFields(
+        pitchFieldsSchema.parse(settings ?? {}),
+        { name: brand.name, logo: brand.logo, icon: squareBrandMark(brand) },
+        location,
+      ),
+      revision: settings?.revision ?? 0,
+    },
     brand: {
       name: brand.name,
       website: brand.website,
@@ -1205,7 +1237,7 @@ export async function performancePitch(handle: {
       tagline: brand.tagline,
     },
     homes,
-    geography: await resolveGeography(homes),
+    geography,
     // The slug, never the token: this payload can reach a guessable page.
     intakePath: brand.slug ? `/internal/intake/${brand.slug}` : "",
   };

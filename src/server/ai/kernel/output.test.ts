@@ -175,6 +175,7 @@ test("brand projections exclude connection credentials and issuance details", as
     brandForAssistant({
       id: "brand",
       name: "QA brand",
+      pitchSettings: { updatedBy: "usr_private", revision: 1 },
       connectToken: "private-token",
       connectTokenIssuedAt: new Date(),
       connectTokenIssuedByEmail: "private@example.com",

@@ -124,6 +124,8 @@ export const growthActionPolicies = {
   },
   personaRead: { list: read() },
   performanceRead: {
+    pitch: read(),
+    draftPitch: read("model-read"),
     list: read(),
     get: read(),
     searchAttachableCampaigns: read(),
@@ -143,6 +145,7 @@ export const growthActionPolicies = {
   // rows with a cycle id (undo = attach with cycleId null); nothing here
   // touches a provider or spends.
   performanceWrite: {
+    savePitch: write({ undoWith: "performanceWrite.savePitch" }),
     saveHomeGroup: write(),
     changeHomeGroupHomes: write({ idempotent: true }),
     deleteHomeGroup: write(),

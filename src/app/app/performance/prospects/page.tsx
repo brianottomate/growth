@@ -94,6 +94,12 @@ export default async function PerformanceProspectsPage() {
                     )}
                   </div>
                 </div>
+                <Link
+                  className="text-xs hover:underline"
+                  href={`/app/performance/brands/${brand.slug ?? brand.id}/pitch`}
+                >
+                  Edit pitch
+                </Link>
                 {brand.pitchUrl ? (
                   <SendLink label="Pitch page" url={brand.pitchUrl} />
                 ) : null}
