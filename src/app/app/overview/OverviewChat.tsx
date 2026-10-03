@@ -784,6 +784,8 @@ export function OverviewChat({
   const tailIsPendingTool =
     !!tailPart &&
     isToolUIPart(tailPart) &&
+    getToolName(tailPart) !== "toolSearch" &&
+    getToolName(tailPart) !== "selectToolDomain" &&
     tailPart.state !== "output-available" &&
     tailPart.state !== "output-error";
   const tailIsStreamingText =
@@ -1472,6 +1474,13 @@ export function renderToolPart(
   }
 
   if (part.state === "input-streaming" || part.state === "input-available") {
+    // Tool discovery is internal bookkeeping. Keep the shared thinking row
+    // mounted through these short calls instead of swapping in a temporary card.
+    if (
+      isRunning &&
+      (toolName === "toolSearch" || toolName === "selectToolDomain")
+    )
+      return null;
     if (!isRunning) {
       return (
         <p
