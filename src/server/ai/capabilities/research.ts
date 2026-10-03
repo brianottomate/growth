@@ -5,6 +5,7 @@ import {
 import "server-only";
 
 import { z } from "zod";
+import { webPagePreview } from "@/lib/web-page-preview";
 
 import {
   exaGetContents,
@@ -48,7 +49,9 @@ export const readWebPage = growthAction({
   inputSchema: z.object({
     url: z.string().describe("The full public http(s) URL to read."),
   }),
-  execute: async ({ url }) => {
+  execute: async ({
+    url,
+  }): Promise<z.infer<typeof readWebPageOutputSchema>> => {
     const classified = classifyFetchUrl(url);
     if (!classified.ok || !classified.url) {
       throw new GrowthActionError(
@@ -59,9 +62,10 @@ export const readWebPage = growthAction({
 
     if (isExaConfigured) {
       try {
-        const page = await exaGetContents(classified.url);
+        const { image, ...page } = await exaGetContents(classified.url);
         return {
           ...page,
+          preview: webPagePreview(page.url, { title: page.title, image }),
           provider: "exa" as const,
           untrustedContent: true,
           note: UNTRUSTED_NOTE,
@@ -78,6 +82,11 @@ export const readWebPage = growthAction({
           title: page.title ?? classified.url,
           url: classified.url,
           text: page.content.slice(0, 12_000),
+          preview: webPagePreview(classified.url, {
+            title: page.title,
+            description: page.description,
+            ...page.metadata,
+          }),
           provider: "firecrawl" as const,
           untrustedContent: true,
           note: UNTRUSTED_NOTE,

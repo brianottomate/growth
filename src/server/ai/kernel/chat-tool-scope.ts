@@ -64,6 +64,12 @@ const domainSchema = z.enum([
   "product",
   "research",
 ]);
+const pitchOperations = new Set([
+  "performanceRead__pitch",
+  "performanceRead__draftPitch",
+  "performanceWrite__savePitch",
+]);
+
 const common = new Set([
   "presentNextOptions",
   "workspaceOverview",
@@ -91,6 +97,7 @@ export function createChatToolScope(input: {
   tools: ToolSet;
   pagePath?: string;
   performance?: boolean;
+  pitch?: boolean;
   content?: boolean;
   continuation: UIMessage;
   focus?:
@@ -105,6 +112,7 @@ export function createChatToolScope(input: {
 }) {
   const selected = new Set<Domain>();
   let performanceExpanded = false;
+  if (input.pitch) selected.add("research");
   const path = input.pagePath?.split(/[?#]/)[0] ?? "";
   if (input.performance || /\/(performance|ads|campaigns)(\/|$)/.test(path))
     selected.add("performance");
@@ -139,7 +147,7 @@ export function createChatToolScope(input: {
     GrowthExecutionContext
   >({
     description:
-      "Enable another Growth tool domain when the task crosses sections. Domains: performance (ads, catalogs, campaigns), content (posts, calendar, strategy, publishing), email (newsletters and lifecycle), leads, listening, product (atlas, storefronts), research (web, Drive, blogs). This changes tool availability only and authorizes no edits.",
+      "Enable another Growth tool domain when the task crosses sections. Domains: performance (sales pitches, client accounts, ads, catalogs, campaigns), content (posts, calendar, strategy, publishing), email (newsletters and lifecycle), leads, listening, product (atlas, storefronts), research (web, Drive, blogs). This changes tool availability only and authorizes no edits.",
     inputSchema: domainInputSchema,
     execute: async ({ domain }) => {
       selected.add(domain);
@@ -227,6 +235,7 @@ export function createChatToolScope(input: {
         ...Object.keys(input.tools).filter(
           (name) =>
             pending.has(name) ||
+            (input.pitch && pitchOperations.has(name)) ||
             (!batchEdits.has(name) &&
               capabilities.has(name.split("__", 1)[0] ?? "") &&
               (!focus ||

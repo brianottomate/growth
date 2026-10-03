@@ -1,5 +1,7 @@
 "use client";
 
+import { WebPageUnfurl } from "./WebPageUnfurl";
+import type { WebPagePreview } from "@/lib/web-page-preview";
 import { ThinkingOrb, type OrbState } from "@/components/thinking-orb";
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -118,6 +120,7 @@ export interface WebSearchOutput {
 }
 
 export interface ReadWebPageOutput {
+  preview?: WebPagePreview;
   error?: string;
   title?: string;
   url: string;
@@ -1146,22 +1149,12 @@ export function ReadWebPageCard({ output }: { output: ReadWebPageOutput }) {
       {output.error ? (
         <p className="text-sm text-destructive">{output.error}</p>
       ) : (
-        <>
-          <a
-            href={output.url}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-start gap-1 text-sm font-medium hover:text-primary"
-          >
-            <span className="line-clamp-2">{output.title ?? output.url}</span>
-            <ArrowUpRight className="mt-0.5 h-3 w-3 shrink-0" />
-          </a>
-          {output.text && (
-            <p className="mt-1.5 line-clamp-4 text-xs text-muted-foreground">
-              {output.text}
-            </p>
-          )}
-        </>
+        <WebPageUnfurl
+          url={output.url}
+          title={output.title}
+          preview={output.preview}
+          text={output.text}
+        />
       )}
     </ToolCard>
   );

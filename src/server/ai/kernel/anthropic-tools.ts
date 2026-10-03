@@ -31,6 +31,9 @@ export function anthropicTools<Tools extends ToolSet>(
             !(
               activeTools?.includes(name) &&
               [
+                "performanceRead__pitch",
+                "performanceRead__draftPitch",
+                "performanceWrite__savePitch",
                 "adsRead__ideaContext",
                 "adsWrite__saveIdea",
                 "adsRead__catalogHomeFacts",

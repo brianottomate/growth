@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { webPagePreviewSchema } from "@/lib/web-page-preview";
 
 /** Wire results for this capability. Dates are ISO strings after JSON normalization. */
 export const webSearchOutputSchema = z.strictObject({
@@ -21,6 +22,7 @@ export const readWebPageOutputSchema = z.union([
     author: z.string().optional(),
     note: z.string(),
     provider: z.literal("exa"),
+    preview: webPagePreviewSchema.optional(),
     publishedDate: z.string().optional(),
     text: z.string(),
     title: z.string(),
@@ -30,6 +32,7 @@ export const readWebPageOutputSchema = z.union([
   z.strictObject({
     note: z.string(),
     provider: z.literal("firecrawl"),
+    preview: webPagePreviewSchema.optional(),
     text: z.string(),
     title: z.string(),
     untrustedContent: z.boolean(),

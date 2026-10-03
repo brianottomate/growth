@@ -853,6 +853,13 @@ export async function POST(req: Request): Promise<Response> {
       tools: runtime.tools,
       pagePath: contextMode === "page" ? pagePath : undefined,
       performance: Boolean(activeCampaignContext || activeCatalogContext),
+      pitch: Boolean(
+        brand &&
+        (assistantIntent?.type === "work_pitch" ||
+          /^\/app\/performance\/brands\/[^/]+\/pitch(?:[?#]|$)/.test(
+            pagePath ?? "",
+          )),
+      ),
       content: Boolean(activeWorkContext),
       continuation: incoming,
       focus: activeAd

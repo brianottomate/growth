@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
-import type { UIMessage } from "ai";
+import { tool, type UIMessage } from "ai";
 import { operationTools, legacyApprovalTools } from "./operations";
 import { growthAction, growthDomainTool } from "./tool";
 import { anthropicTools } from "./anthropic-tools";
@@ -147,4 +147,22 @@ test("saved grouped approvals retain only their pending action", () => {
       parts: [{ type: "text", text: "hello" }],
     }),
   ).toEqual({});
+});
+
+test("pitch edits advertise their read and save schemas directly to the assistant", () => {
+  const definition = tool({ inputSchema: z.object({}) });
+  const wrapped = anthropicTools(
+    {
+      performanceRead__pitch: definition,
+      performanceWrite__savePitch: definition,
+    },
+    ["performanceRead__pitch", "performanceWrite__savePitch"],
+  );
+  expect(
+    wrapped.performanceRead__pitch.providerOptions?.anthropic?.deferLoading,
+  ).toBe(false);
+  expect(
+    wrapped.performanceWrite__savePitch.providerOptions?.anthropic
+      ?.deferLoading,
+  ).toBe(false);
 });

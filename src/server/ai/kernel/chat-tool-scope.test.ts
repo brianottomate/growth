@@ -83,3 +83,27 @@ test("a step can read freely but cannot execute two mutations from the same mode
     gate.beforeExecute("adsWrite__editCatalogCard", {}),
   ).not.toThrow();
 });
+
+test("a pinned pitch conversation can read and save copy without enabling unrelated performance work", () => {
+  const pitchTools = {
+    ...tools,
+    performanceRead__pitch: definition,
+    performanceRead__draftPitch: definition,
+    performanceWrite__savePitch: definition,
+    researchRead__readPage: definition,
+  };
+  const scope = createChatToolScope({
+    tools: pitchTools,
+    pitch: true,
+    continuation: { id: "u", role: "user", parts: [] },
+  });
+  for (const name of [
+    "performanceRead__pitch",
+    "performanceRead__draftPitch",
+    "performanceWrite__savePitch",
+  ]) {
+    expect(scope.activeTools()).toContain(name);
+  }
+  expect(scope.activeTools()).not.toContain("adsWrite__push");
+  expect(scope.activeTools()).toContain("researchRead__readPage");
+});

@@ -28,7 +28,7 @@ export const getPitchAction = growthAction({
 });
 export const savePitchAction = growthAction({
   description:
-    "Save a brand's public sales pitch, immediately updating its live wander.com page. Supply the revision just read and the complete fields. Proposed pricing is presentation only and never changes agreed billing. On conflict reload; never silently retry over another rep's edits.",
+    "Save a brand's sales pitch copy (pageHeadline, pageSubtitle, headline, caption, location), logo, images, and proposed pricing to its dedicated pitch record, immediately updating its live wander.com page. Supply expectedRevision from pitchSettings.revision (0 when no record exists). Start fields from pitchSettings or empty defaults, preserving existing overrides, then apply the requested changes; do not copy resolved defaults into overrides. Proposed pricing is presentation only and never changes agreed billing. On conflict reload; never silently retry over another rep's edits.",
   inputSchema: savePitchSchema,
   outputSchema: pitchSettingsSchema,
   execute: (input, ctx) => savePitchWorkspace(ctx.orgId, ctx.userId, input),

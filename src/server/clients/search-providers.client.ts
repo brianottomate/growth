@@ -160,6 +160,7 @@ export type ExaWebSearchResult = {
 };
 
 export type ExaContentsResult = {
+  image?: string;
   title: string;
   url: string;
   text: string;
@@ -223,11 +224,12 @@ export async function exaWebSearch(params: {
 export async function exaGetContents(url: string): Promise<ExaContentsResult> {
   const json = await exaRequest<{
     results?: {
+      image?: string;
       title?: string;
       url?: string;
       text?: string;
-      publishedDate?: string;
-      author?: string;
+      publishedDate?: string | null;
+      author?: string | null;
     }[];
   }>("contents", {
     urls: [url],
@@ -237,11 +239,12 @@ export async function exaGetContents(url: string): Promise<ExaContentsResult> {
   if (!result?.text)
     throw new Error("Exa could not extract readable page content.");
   return {
+    image: result.image,
     title: result.title?.trim() || url,
     url: result.url ?? url,
     text: result.text.slice(0, 12_000),
-    publishedDate: result.publishedDate,
-    author: result.author,
+    publishedDate: result.publishedDate ?? undefined,
+    author: result.author ?? undefined,
   };
 }
 
