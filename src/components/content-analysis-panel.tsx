@@ -19,11 +19,13 @@ export function ContentAnalysisPanel({
   kind,
   initialAnalysis,
   sourceUrl,
+  readOnly = false,
 }: {
   id: string;
   kind: ContentArtifactKind;
   initialAnalysis: ContentAnalysis | null;
   sourceUrl?: string | null;
+  readOnly?: boolean;
 }) {
   const router = useRouter();
   const [analysis, setAnalysis] = useState(initialAnalysis);
@@ -155,25 +157,27 @@ export function ContentAnalysisPanel({
         </p>
       )}
 
-      <div className="mt-5 space-y-2 border-t pt-4">
-        <Textarea
-          value={steer}
-          onChange={(event) => setSteer(event.target.value)}
-          maxLength={1_000}
-          rows={2}
-          placeholder="Optional guidance or correction for the analysis…"
-        />
-        <Button
-          size="sm"
-          loading={analyze.isPending}
-          onClick={() =>
-            analyze.mutate({ id, kind, steer: steer.trim() || undefined })
-          }
-        >
-          <Sparkles className="size-3.5" />
-          {analysis ? "Re-analyze" : `Analyze ${kind}`}
-        </Button>
-      </div>
+      {!readOnly && (
+        <div className="mt-5 space-y-2 border-t pt-4">
+          <Textarea
+            value={steer}
+            onChange={(event) => setSteer(event.target.value)}
+            maxLength={1_000}
+            rows={2}
+            placeholder="Optional guidance or correction for the analysis…"
+          />
+          <Button
+            size="sm"
+            loading={analyze.isPending}
+            onClick={() =>
+              analyze.mutate({ id, kind, steer: steer.trim() || undefined })
+            }
+          >
+            <Sparkles className="size-3.5" />
+            {analysis ? "Re-analyze" : `Analyze ${kind}`}
+          </Button>
+        </div>
+      )}
     </section>
   );
 }

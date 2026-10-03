@@ -445,8 +445,34 @@ export function OverviewChat({
   const submitAssistantIntent = useCallback(
     (assistantIntent: AssistantIntent) => {
       void sendMessage(
-        { text: assistantIntent.visibleText },
-        { body: { assistantIntent } },
+        {
+          text:
+            assistantIntent.type === "review_email"
+              ? `${assistantIntent.visibleText}\n\n${assistantIntent.contextText}`
+              : assistantIntent.visibleText,
+          ...(assistantIntent.type === "review_email" &&
+          assistantIntent.screenshot
+            ? {
+                files: [
+                  {
+                    type: "file" as const,
+                    url: assistantIntent.screenshot.url,
+                    mediaType: assistantIntent.screenshot.mediaType,
+                    filename: assistantIntent.screenshot.fileName,
+                  },
+                ],
+              }
+            : {}),
+        },
+        {
+          body: {
+            assistantIntent,
+            ...(assistantIntent.type === "review_email" &&
+            assistantIntent.screenshot
+              ? { chatAttachments: [assistantIntent.screenshot] }
+              : {}),
+          },
+        },
       );
       // A chat opened from a button is ready for the reply to it.
       if (desktop) requestAnimationFrame(() => textareaRef.current?.focus());

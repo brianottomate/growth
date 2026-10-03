@@ -149,7 +149,18 @@ export type WorkPitchIntent = {
   visibleText: string;
 };
 
+export type ReviewEmailIntent = {
+  type: "review_email";
+  newThread: true;
+  brandId: string;
+  brandName: string;
+  visibleText: string;
+  contextText: string;
+  screenshot?: { url: string; fileName: string; mediaType: "image/jpeg" };
+};
+
 export type AssistantIntent =
+  | ReviewEmailIntent
   | WorkPitchIntent
   | WorkCatalogHomeIntent
   | StartClientCampaignIntent
