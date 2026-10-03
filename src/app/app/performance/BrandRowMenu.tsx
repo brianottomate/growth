@@ -28,6 +28,7 @@ import type { BusinessStage, DeliveryStage } from "@/lib/performance-stage";
 import { orpc } from "@/orpc/client";
 
 import { StageDialog } from "./StageDialog";
+import { sendAssistantIntent } from "@/lib/assistant-events";
 
 /**
  * The quiet menu on a client or prospect row: settle this month's fee or
@@ -41,12 +42,14 @@ export function BrandRowMenu({
   business,
   delivery,
   billing,
+  setupWebsite,
 }: {
   brandId: string;
   brandName: string;
   business: BusinessStage;
   delivery: DeliveryStage;
   billing: BillingSummary | null;
+  setupWebsite?: string | null;
 }) {
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
@@ -108,6 +111,19 @@ export function BrandRowMenu({
               <DropdownMenuSeparator />
             </>
           ) : null}
+          {setupWebsite && (
+            <DropdownMenuItem
+              onClick={() =>
+                sendAssistantIntent({
+                  type: "set_up_client",
+                  website: setupWebsite,
+                  visibleText: `Set up ${setupWebsite.replace(/^https?:\/\//, "")}: mark, photos, a campaign shell and first ads from their homes. Stop before pushing.`,
+                })
+              }
+            >
+              Set up in chat
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem onClick={() => setStaging(true)}>
             Set stages…
           </DropdownMenuItem>

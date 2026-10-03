@@ -58,6 +58,7 @@ export type DeskBrand = {
   name: string;
   slug: string | null;
   logo: string | null;
+  wanderOsWebsiteId: string | null;
   website: string | null;
   relationship: "internal" | "client" | "prospect" | "reference";
   /** The money and the relationship, as a person last set it. */
@@ -149,6 +150,7 @@ export async function loadPerformanceDesk(
       name: true,
       slug: true,
       logo: true,
+      wanderOsWebsiteId: true,
       website: true,
       relationship: true,
       brandMark: true,
@@ -357,6 +359,7 @@ export async function loadPerformanceDesk(
         name: brand.name,
         slug: brand.slug,
         logo: brand.logo,
+        wanderOsWebsiteId: brand.wanderOsWebsiteId,
         website: brand.website,
         relationship: brand.relationship,
         hasMark: Boolean(brand.brandMark),
@@ -472,11 +475,4 @@ export function narrowDesk(
   };
 }
 
-/** Whole dollars as the desk writes them. */
-export function deskMoney(n: number | null | undefined) {
-  return n == null
-    ? "—"
-    : n >= 1000
-      ? `$${(n / 1000).toFixed(1)}K`
-      : `$${Math.round(n)}`;
-}
+export { deskMoney } from "@/lib/performance-desk";

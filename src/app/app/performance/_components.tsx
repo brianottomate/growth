@@ -4,11 +4,11 @@ import type { ReactNode } from "react";
 import { DeleteCampaignButton } from "@/app/app/brands/[brandSlug]/ads/_views/DeleteCampaignButton";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { cn } from "@/components/ui/lib/utils";
-import {
-  deskMoney,
-  type DeskBrand,
-  type DeskCampaign,
-  type DeskCampaignState,
+import { deskMoney } from "@/lib/performance-desk";
+import type {
+  DeskBrand,
+  DeskCampaign,
+  DeskCampaignState,
 } from "@/server/services/performance-desk.service";
 
 /** Small uppercase label above a group, the way the section names its parts. */

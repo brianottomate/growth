@@ -1,7 +1,6 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { HeaderNewClient } from "./HeaderNewClient";
+import { PerformanceHeader } from "./PerformanceHeader";
 
 /**
  * Wander Performance: the paid-media desk for the people who run client
@@ -17,20 +16,7 @@ export default function PerformanceLayout({
 }) {
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold tracking-tight">
-          Wander Performance
-        </h1>
-        <div className="flex items-center gap-3">
-          <Link
-            href="/app/performance/pitch"
-            className="text-sm hover:underline"
-          >
-            Pitch desk
-          </Link>
-          <HeaderNewClient />
-        </div>
-      </div>
+      <PerformanceHeader />
       {children}
     </div>
   );
