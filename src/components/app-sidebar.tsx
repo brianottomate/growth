@@ -60,11 +60,13 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { isMobile, setOpenMobile, open, toggleSidebar } = useSidebar();
+  const { isMobile, setOpenMobile, open, toggleSidebar, setPeek } =
+    useSidebar();
   // On a phone the sidebar is a sheet over the page: going somewhere closes it.
   useEffect(() => {
+    setPeek(false);
     if (isMobile) setOpenMobile(false);
-  }, [pathname, isMobile, setOpenMobile]);
+  }, [pathname, isMobile, setOpenMobile, setPeek]);
   const { themeMode, setTheme } = useTheme();
 
   const isActive = (item: NavItem) =>
@@ -92,17 +94,6 @@ export function AppSidebar({
                   Wander Growth
                 </span>
               </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          {/* Same spot in the rail and the panel, so hover peeks and the click pins without moving. */}
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              type="button"
-              tooltip={open ? "Collapse sidebar" : "Expand sidebar"}
-              onClick={toggleSidebar}
-            >
-              <PanelLeft />
-              <span>{open ? "Collapse" : "Expand"}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -162,6 +153,49 @@ export function AppSidebar({
 
       <SidebarFooter>
         <SidebarMenu>
+          {" "}
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              type="button"
+              tooltip={open ? "Collapse sidebar" : "Expand sidebar"}
+              onClick={toggleSidebar}
+            >
+              <PanelLeft />
+              <span>{open ? "Collapse" : "Expand"}</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuButton tooltip="Appearance" aria-label="Appearance">
+                  <Sun />
+                  <span>Appearance</span>
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" side="right" className="w-44">
+                <DropdownMenuLabel tone="muted" textSize="xs">
+                  Theme
+                </DropdownMenuLabel>
+                <DropdownMenuRadioGroup
+                  value={themeMode}
+                  onValueChange={(value) => setTheme(value as typeof themeMode)}
+                >
+                  <DropdownMenuRadioItem value="light" suppressHydrationWarning>
+                    <Sun className="size-4" />
+                    Light
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="dark" suppressHydrationWarning>
+                    <Moon className="size-4" />
+                    Dark
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="auto" suppressHydrationWarning>
+                    <Monitor className="size-4" />
+                    System
+                  </DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -205,27 +239,6 @@ export function AppSidebar({
                     Account settings
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel tone="muted" textSize="xs">
-                  Theme
-                </DropdownMenuLabel>
-                <DropdownMenuRadioGroup
-                  value={themeMode}
-                  onValueChange={(value) => setTheme(value as typeof themeMode)}
-                >
-                  <DropdownMenuRadioItem value="light" suppressHydrationWarning>
-                    <Sun className="size-4" />
-                    Light
-                  </DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="dark" suppressHydrationWarning>
-                    <Moon className="size-4" />
-                    Dark
-                  </DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="auto" suppressHydrationWarning>
-                    <Monitor className="size-4" />
-                    System
-                  </DropdownMenuRadioItem>
-                </DropdownMenuRadioGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSignOut}>
                   <LogOut className="size-4" />

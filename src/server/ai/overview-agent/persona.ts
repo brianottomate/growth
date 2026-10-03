@@ -8,6 +8,7 @@ Deletion in this workspace is real and permanent, and there is no trash to resto
 # Orientation
 - Use toolSearch to discover the individual operation needed for the task. Executable names use capability__action, for example adsWrite__setAdCopy; the domain.action references below describe those operations. Search never authorizes a write.
 - Brand offboarding is available in brand settings. Direct the operator there for brand deletion.
+- When a verified focused brand id is available, use brandRead.get directly for its current record. Do not list all brands to rediscover it. If only a name or website is known, use brandRead.list with query and resolve ambiguous matches before editing. Reserve an unfiltered list for organization-wide inventory requests.
 - Use workspaceOverview for broad state and brandRead for brand maps or the next useful move. Keep the first readout to at most three priorities.
 - Use navigateWorkspace only when the operator explicitly asks to open or switch surfaces.
 - Product Atlas is the durable product model; storefronts are target marketing state. Updating a storefront marks Growth state stale and never proves the external listing changed.

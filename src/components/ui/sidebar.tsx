@@ -204,6 +204,15 @@ const Sidebar = React.forwardRef<
     const { isMobile, state, openMobile, setOpenMobile, peek, setPeek } =
       useSidebar();
     const peeking = state === "collapsed" && peek;
+    const peekTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+    const cancelPeekTimer = React.useCallback(() => {
+      if (peekTimer.current) clearTimeout(peekTimer.current);
+      peekTimer.current = null;
+    }, []);
+    React.useEffect(() => cancelPeekTimer, [cancelPeekTimer]);
+    React.useEffect(() => {
+      if (state === "expanded") cancelPeekTimer();
+    }, [state, cancelPeekTimer]);
 
     if (collapsible === "none") {
       return (
@@ -253,8 +262,18 @@ const Sidebar = React.forwardRef<
         data-variant={variant}
         data-side={side}
       >
-        {/* This is what handles the sidebar gap on desktop */}
+        {/* Reserve the pinned width only: peek never changes the page column. */}
         <div
+          style={{
+            width:
+              state === "collapsed"
+                ? collapsible === "offcanvas"
+                  ? 0
+                  : variant === "sidebar"
+                    ? "var(--sidebar-width-icon)"
+                    : "calc(var(--sidebar-width-icon) + 1rem)"
+                : "var(--sidebar-width)",
+          }}
           className={cn(
             "relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear",
             "group-data-[collapsible=offcanvas]:w-0",
@@ -268,13 +287,26 @@ const Sidebar = React.forwardRef<
           )}
         />
         <div
-          // The collapsed rail is the hover target; the overlay closes on leave.
-          onMouseEnter={
-            state === "collapsed" && collapsible === "icon"
-              ? () => setPeek(true)
-              : undefined
-          }
-          onMouseLeave={peeking ? () => setPeek(false) : undefined}
+          onMouseEnter={() => {
+            if (
+              state !== "collapsed" ||
+              collapsible !== "icon" ||
+              !window.matchMedia("(hover: hover) and (pointer: fine)").matches
+            )
+              return;
+            cancelPeekTimer();
+            peekTimer.current = setTimeout(() => setPeek(true), 200);
+          }}
+          onMouseLeave={() => {
+            cancelPeekTimer();
+            setPeek(false);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              cancelPeekTimer();
+              setPeek(false);
+            }
+          }}
           className={cn(
             "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear md:flex",
             peeking && "z-30 shadow-xl",
@@ -484,7 +516,7 @@ const SidebarGroupLabel = React.forwardRef<
       data-sidebar="group-label"
       className={cn(
         "flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 ring-sidebar-ring transition-[margin,opacity] duration-200 ease-linear outline-none focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
-        "group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0",
+        "group-data-[collapsible=icon]:opacity-0",
         className,
       )}
       {...props}
@@ -567,7 +599,7 @@ const sidebarMenuButtonVariants = cva(
       size: {
         default: "h-8 text-sm",
         sm: "h-7 text-xs",
-        lg: "h-12 text-sm group-data-[collapsible=icon]:!p-0",
+        lg: "h-12 p-0 text-sm group-data-[collapsible=icon]:!h-12 group-data-[collapsible=icon]:!p-0",
       },
     },
     defaultVariants: {
@@ -598,7 +630,7 @@ const SidebarMenuButton = React.forwardRef<
     ref,
   ) => {
     const Comp = asChild ? Slot : "button";
-    const { isMobile, state } = useSidebar();
+    const { isMobile, state, peek } = useSidebar();
 
     const button = (
       <Comp
@@ -627,7 +659,7 @@ const SidebarMenuButton = React.forwardRef<
         <TooltipContent
           side="right"
           align="center"
-          hidden={state !== "collapsed" || isMobile}
+          hidden={state !== "collapsed" || peek || isMobile}
           {...tooltip}
         />
       </Tooltip>

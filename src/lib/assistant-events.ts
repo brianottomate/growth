@@ -159,7 +159,17 @@ export type ReviewEmailIntent = {
   screenshot?: { url: string; fileName: string; mediaType: "image/jpeg" };
 };
 
+/** Open a fresh brand-scoped conversation from a recorded Performance card. */
+export type WorkPerformanceClientIntent = {
+  type: "work_performance_client";
+  newThread: true;
+  brandId: string;
+  brandName: string;
+  visibleText: string;
+};
+
 export type AssistantIntent =
+  | WorkPerformanceClientIntent
   | ReviewEmailIntent
   | WorkPitchIntent
   | WorkCatalogHomeIntent

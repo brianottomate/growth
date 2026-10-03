@@ -19,6 +19,8 @@ import {
 
 import { panel, SectionLabel } from "../../_components";
 import { ReadinessChecklist } from "../../ReadinessChecklist";
+import { PerformanceClientCard } from "../../PerformanceClientCard";
+import { performanceCardFromBrand } from "@/lib/performance-card";
 
 import { MediaStrip } from "./MediaStrip";
 import { SubmissionSection } from "./SubmissionSection";
@@ -135,6 +137,16 @@ export default async function PerformanceBrandPage({
 
   return (
     <div className="space-y-7">
+      {deskBrand && (
+        <section className="space-y-2.5">
+          <SectionLabel>Recorded client progress</SectionLabel>
+          <PerformanceClientCard card={performanceCardFromBrand(deskBrand)} />
+          <p className="text-xs text-muted-foreground">
+            The same recorded state shown on the Performance pipeline.
+            Operational checks below are separate.
+          </p>
+        </section>
+      )}
       {deskBrand && brandReadiness ? (
         <section className={cn(panel, "px-4 pb-1")}>
           <ReadinessChecklist

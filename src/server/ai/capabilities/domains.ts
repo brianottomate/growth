@@ -103,6 +103,7 @@ import {
   createBrandAction,
   enrichBrandAction,
   listBrands,
+  getBrand,
   createProspectAction,
   setBrandRelationshipAction,
   setBrandMarkAction,
@@ -238,7 +239,12 @@ import { growthDomainTool } from "./types";
 
 export const brandRead = growthDomainTool({
   description: "Read brands, their mapped surfaces, and the next useful move.",
-  actions: { list: listBrands, getMap: getBrandMap, next: nextForBrand },
+  actions: {
+    list: listBrands,
+    get: getBrand,
+    getMap: getBrandMap,
+    next: nextForBrand,
+  },
 });
 
 export const brandWrite = growthDomainTool({

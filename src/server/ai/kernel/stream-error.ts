@@ -12,7 +12,7 @@ import { InvalidToolInputError, NoSuchToolError } from "ai";
  * was told were legal. Naming the field is what lets it self-correct.
  */
 export function streamErrorMessage(error: unknown): string {
-  const raw = error instanceof Error ? error.message : String(error);
+  const raw = readableError(error);
   if (
     /prompt is too long|context[_ ]length|maximum context|too much context/i.test(
       raw,
@@ -33,8 +33,33 @@ export function streamErrorMessage(error: unknown): string {
   if (InvalidToolInputError.isInstance(error)) {
     return `Invalid input for ${error.toolName}: ${compactValidationText(error)}`;
   }
-  if (error instanceof Error) return error.message;
-  return String(error);
+  return raw;
+}
+
+/** Provider errors may arrive as plain objects or nested error envelopes. */
+function readableError(error: unknown, depth = 0): string {
+  const fallback =
+    "The response could not complete. Completed actions are saved; try again to continue.";
+  if (depth >= 6) return fallback;
+  if (typeof error === "string" && error.trim() && error !== "[object Object]")
+    return error;
+  if (typeof error === "object" && error !== null) {
+    const record = error as Record<string, unknown>;
+    if (
+      typeof record.message === "string" &&
+      record.message.trim() &&
+      record.message !== "[object Object]"
+    )
+      return record.message;
+    for (const key of ["error", "cause"]) {
+      if (record[key] != null) {
+        const message = readableError(record[key], depth + 1);
+        if (message !== fallback) return message;
+      }
+    }
+  }
+  // Do not stringify arbitrary objects: provider payloads can contain credentials.
+  return fallback;
 }
 
 type ZodishIssue = {

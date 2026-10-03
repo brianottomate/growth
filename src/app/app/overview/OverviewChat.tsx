@@ -95,6 +95,7 @@ import {
   AdsScopeCard,
   AudienceTargetsCard,
   BrandsCard,
+  BrandCard,
   ContentPipelineCard,
   ContentStrategyCard,
   ContentStructureMutationCard,
@@ -1607,6 +1608,16 @@ export function renderToolPart(
           output={output as WorkspaceOverviewOutput}
         />
       );
+    case "brandRead.get": {
+      return (
+        <BrandCard
+          key={key}
+          output={output as Parameters<typeof BrandCard>[0]["output"]}
+          onPrompt={onPrompt}
+          isRunning={isRunning}
+        />
+      );
+    }
     case "brandRead.list":
       return <BrandsCard key={key} output={output as ListBrandsOutput} />;
     case "navigateWorkspace.navigate": {

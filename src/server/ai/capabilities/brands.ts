@@ -1,5 +1,6 @@
 import {
   listBrandsOutputSchema,
+  getBrandOutputSchema,
   createBrandActionOutputSchema,
   addBrandAdPreviewActionOutputSchema,
   setPerformanceSettingsActionOutputSchema,
@@ -8,7 +9,7 @@ import {
 import "server-only";
 
 import { z } from "zod";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, ilike, or } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import { brandTable, homeTable } from "@/server/db/schema";
@@ -55,13 +56,26 @@ export async function orgBrandIds(orgId: string): Promise<string[]> {
 export const listBrands = growthAction({
   outputSchema: listBrandsOutputSchema,
   description:
-    "List the brands in the current organization (id, name, slug, tagline, and Wander's relationship to each: internal, client, prospect or reference). Use when the operator asks about brands or you need a brand's name/id.",
-  inputSchema: z.object({}),
-  execute: async (_input, ctx) => {
+    "Find brands by name, slug, or website using query. Use this when a brand's id is unknown; use brandRead.get directly when the focused brand id is already known. Omit query only when the operator needs an organization-wide brand inventory. Returns id, name, slug, tagline and relationship.",
+  inputSchema: z.object({
+    query: z.string().trim().min(1).max(200).optional(),
+  }),
+  execute: async (input, ctx) => {
+    // Search literal text; operator input is not an SQL wildcard expression.
+    const pattern = input.query
+      ? `%${input.query.replace(/[\\%_]/g, "\\$&")}%`
+      : undefined;
     const brands = await db.query.brandTable.findMany({
       where: and(
         eq(brandTable.organizationId, ctx.orgId),
         isNull(brandTable.deletedAt),
+        pattern
+          ? or(
+              ilike(brandTable.name, pattern),
+              ilike(brandTable.slug, pattern),
+              ilike(brandTable.website, pattern),
+            )
+          : undefined,
       ),
       columns: {
         id: true,
@@ -73,6 +87,50 @@ export const listBrands = growthAction({
       orderBy: (t, { asc }) => asc(t.name),
     });
     return { brands };
+  },
+});
+
+export const getBrand = growthAction({
+  outputSchema: getBrandOutputSchema,
+  description:
+    "Read one brand by its known id, especially the focused brand. Returns current website, identity summary, story, and Performance settings including recorded journey, card statuses and note. Read before targeted edits and again to verify them. No organization-wide list is needed when the brand id is known. Missing recorded facts do not imply unpaid or unstarted work.",
+  inputSchema: z.object({ brandId: z.string().trim().min(1) }),
+  execute: async (input, ctx) => {
+    const brand = await db.query.brandTable.findFirst({
+      where: and(
+        eq(brandTable.id, input.brandId),
+        eq(brandTable.organizationId, ctx.orgId),
+        isNull(brandTable.deletedAt),
+      ),
+      columns: {
+        id: true,
+        name: true,
+        slug: true,
+        relationship: true,
+        tagline: true,
+        website: true,
+        logo: true,
+        description: true,
+        story: true,
+        websiteMeta: true,
+        brandIdentity: true,
+        performanceSettings: true,
+      },
+    });
+    if (!brand)
+      throw new Error(
+        "That brand is not available in the active organization.",
+      );
+    const { websiteMeta, brandIdentity, ...fields } = brand;
+    return {
+      brand: {
+        ...fields,
+        enrichment: {
+          scrapedAt: websiteMeta?.scrapedAt ?? null,
+          hasBrandIdentity: Boolean(brandIdentity),
+        },
+      },
+    };
   },
 });
 
@@ -248,7 +306,7 @@ export const draftBrandStoryAction = growthAction({
 export const setPerformanceSettingsAction = growthAction({
   outputSchema: setPerformanceSettingsActionOutputSchema,
   description:
-    "Set a Performance client's live settings on the brand, which the Performance tracker reads: the contract (monthly fee, effective and end dates as YYYY-MM-DD, terms, WanderOS site live, agreed ad spend a month), report emails, invoice email, UGC permission, the client's creative and guest-list folders, the catalog / carousel / hero creative folders, the ad copies doc, dedicated newsletter, influencer, social posts, and hand-counted bookings. Send only the keys to change; an empty string clears one. This is the only writer besides an applied intake, which fills empty cells and never overwrites, so replacing a value the client gave is your decision to make and to say.",
+    "Set a Performance client's live settings on the brand, including the manually selected pipelineStage (prospects, signed, onboarding, launch_prep meaning Launch prep, first_month, live meaning Ongoing, paused meaning On hold; legacy review displays as onboarding), independent of campaign pushes or intake progress, and cardState: separately recorded commercial relationship, intake, billingPeriod, managementPayment, spendPayment, catalog, ads, newsletter, meta, google, site, siteConnected, zernioAccess (Not connected or Connected, independently checked; FB/Leadsie access is not proof), emailDns, and includedHomes. These are explicit application facts, never inferred from campaigns, provider status, or billing cycles. A partial cardState patch preserves other fields; null clears a fact. Recording Paid or Live here does not charge anyone or launch delivery. Use monthlyFee for Management and agreedAdSpend for Spend. Other settings read by the Performance tracker include: the contract (monthly fee, effective and end dates as YYYY-MM-DD, terms, WanderOS site live, agreed ad spend a month), report emails, invoice email, UGC permission, the client's creative and guest-list folders, the catalog / carousel / hero creative folders, the ad copies doc, dedicated newsletter, influencer, social posts, and hand-counted bookings. Set note for a single current plain-text handoff note (up to 2000 characters); null or an empty string clears it. Note editor and edit time are stamped by the server, not supplied by the assistant. Send only the keys to change; an empty string clears one. This is the only writer besides an applied intake, which fills empty cells and never overwrites, so replacing a value the client gave is your decision to make and to say.",
   inputSchema: z.object({
     brandId: z.string().min(1),
     patch: performanceSettingsPatchSchema,

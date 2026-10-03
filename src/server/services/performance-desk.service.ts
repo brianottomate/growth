@@ -3,14 +3,13 @@ import "server-only";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import {
-  DELIVERY_STAGES,
   isClientStage,
   isClosedStage,
-  laterStage,
   type BusinessStage,
   type DeliveryStage,
 } from "@/lib/performance-stage";
 import { type BillingSummary } from "@/lib/performance-billing";
+import type { PerformanceSettings } from "@/server/db/brand-schema";
 import { db } from "@/server/db";
 import {
   brandIntakeUrl,
@@ -65,11 +64,14 @@ export type DeskBrand = {
   business: BusinessStage;
   businessAt: Date | null;
   /**
-   * The production line: the stored stage, or further along when the
-   * campaigns say so (ads ready to review, live, paused).
+   * The saved delivery record; campaign activity never overrides it.
    */
   delivery: DeliveryStage;
   deliveryAt: Date | null;
+  pipelineStage?:
+    | import("@/lib/performance-pipeline").StoredPipelineStage
+    | null;
+  settings: PerformanceSettings | null;
   hasMark: boolean;
   /** The client-facing intake form on wander.com, by slug or by connect token. */
   intakeUrl: string | null;
@@ -159,6 +161,7 @@ export async function loadPerformanceDesk(
       businessStageAt: true,
       deliveryStage: true,
       deliveryStageAt: true,
+      performanceSettings: true,
     },
     orderBy: (brand, { asc }) => [asc(brand.name)],
   });
@@ -353,7 +356,9 @@ export async function loadPerformanceDesk(
       return {
         business,
         businessAt: brand.businessStageAt,
-        delivery: effectiveDelivery(brand.deliveryStage, business, own),
+        delivery: brand.deliveryStage ?? "not_started",
+        pipelineStage: brand.performanceSettings?.pipelineStage,
+        settings: brand.performanceSettings,
         deliveryAt: brand.deliveryStageAt,
         id: brand.id,
         name: brand.name,
@@ -410,41 +415,6 @@ export async function loadPerformanceDesk(
         !isClosedStage(brand.business) && !isClientStage(brand.business),
     ).length,
   };
-}
-
-/**
- * What the campaigns say about a brand's delivery, laid over what is stored.
- * A stored stage never moves backwards here, and a closed brand is left alone.
- */
-function effectiveDelivery(
-  stored: DeliveryStage | null,
-  business: BusinessStage,
-  campaigns: DeskCampaign[],
-): DeliveryStage {
-  const base: DeliveryStage = stored ?? "not_started";
-  if (isClosedStage(business)) return base;
-  let derived: DeliveryStage | null = null;
-  if (campaigns.some((campaign) => campaign.state === "live")) derived = "live";
-  else if (
-    campaigns.some(
-      (campaign) => campaign.state === "pushed" || campaign.state === "ended",
-    )
-  ) {
-    derived = "paused";
-  } else if (
-    campaigns.some(
-      (campaign) =>
-        campaign.state === "draft" &&
-        campaign.adCount > 0 &&
-        campaign.platforms.length > 0,
-    )
-  ) {
-    derived = "ads_review";
-  }
-  // Live and paused are only meaningful once the brand is a client; a
-  // prospect with a test draft does not become "ads ready for review".
-  if (derived && !isClientStage(business)) return base;
-  return derived ? laterStage(DELIVERY_STAGES, base, derived) : base;
 }
 
 /** The desk for one side of the client line; closed brands leave both. */

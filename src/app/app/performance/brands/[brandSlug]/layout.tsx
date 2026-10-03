@@ -5,7 +5,8 @@ import { notFound, redirect } from "next/navigation";
 import { ExternalLink } from "lucide-react";
 
 import { BrandLogo } from "../../_components";
-import { StageChips } from "../../StageChip";
+import { Badge } from "@/components/ui/badge";
+import { PIPELINE_COLUMNS, pipelineStage } from "@/lib/performance-pipeline";
 
 import { BrandTabs } from "./BrandTabs";
 import { loadPerformanceBrand } from "./_data";
@@ -48,10 +49,13 @@ export default async function PerformanceBrandLayout({
               {brand.name}
             </h2>
             {deskBrand ? (
-              <StageChips
-                business={deskBrand.business}
-                delivery={deskBrand.delivery}
-              />
+              <Badge variant="outline" title="Manual client journey">
+                {
+                  PIPELINE_COLUMNS.find(
+                    (column) => column.id === pipelineStage(deskBrand),
+                  )?.name
+                }
+              </Badge>
             ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">

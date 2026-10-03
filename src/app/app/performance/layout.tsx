@@ -1,4 +1,7 @@
+"use client";
+
 import type { ReactNode } from "react";
+import { usePathname } from "next/navigation";
 
 import { PerformanceHeader } from "./PerformanceHeader";
 
@@ -14,8 +17,11 @@ export default function PerformanceLayout({
 }: {
   children: ReactNode;
 }) {
+  const overview = usePathname() === "/app/performance";
   return (
-    <div className="space-y-6">
+    <div
+      className={overview ? "flex h-full min-h-0 flex-col gap-6" : "space-y-6"}
+    >
       <PerformanceHeader />
       {children}
     </div>

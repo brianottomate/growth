@@ -1,3 +1,4 @@
+import type { PerformanceCardState } from "@/lib/performance-card-state";
 import type { BrandEmailTheme } from "@/lib/brand-email-style";
 import type { BrandingProfile } from "@mendable/firecrawl-js";
 import type { PerformanceChecklist } from "@/lib/performance-checklist";
@@ -225,6 +226,21 @@ export type BrandEmailSender = {
 };
 
 export type PerformanceSettings = {
+  /** One current plain-text handoff note, edited through the canonical settings writer. */
+  note?: string | null;
+  /** Note-specific stamps; other status updates must not change these. */
+  noteEditedAt?: string;
+  noteEditedBy?: {
+    id: string | null;
+    name: string | null;
+    image: string | null;
+  } | null;
+  /** Independent, explicitly recorded dashboard facts. Stored in the existing settings JSONB. */
+  cardState?: PerformanceCardState | null;
+  /** Operator-selected client journey; unrelated to campaign/platform state. */
+  pipelineStage?:
+    | import("@/lib/performance-pipeline").StoredPipelineStage
+    | null;
   /** Verified tracking defaults, keyed by the paying Meta account id. */
   metaTrackingDefaults?: Record<
     string,
@@ -275,7 +291,7 @@ export type PerformanceSettings = {
   endDate?: string | null;
   /** Whether their WanderOS site is live, in words ("Yes", "Dec 1st"). */
   siteLive?: string | null;
-  /** Media a month the client agreed to, over the intake's figure. */
+  /** Monthly Spend agreed with the client, over the intake's figure. */
   agreedAdSpend?: number | null;
   /** Whether new ad and catalog cards carry the brand mark. Unset means yes; a card can still override it. */
   logoOnCreatives?: boolean | null;

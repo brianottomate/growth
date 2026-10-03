@@ -8,6 +8,29 @@ import { streamErrorMessage } from "./stream-error";
  * sentence that explains it — not the serialized zod error it arrives in.
  */
 describe("streamErrorMessage", () => {
+  it("extracts nested provider errors instead of showing object Object", () => {
+    expect(
+      streamErrorMessage({
+        error: { message: "Provider temporarily unavailable" },
+      }),
+    ).toBe("Provider temporarily unavailable");
+    expect(
+      streamErrorMessage(
+        new Error("[object Object]", {
+          cause: { message: "Connection interrupted" },
+        }),
+      ),
+    ).toBe("Connection interrupted");
+  });
+
+  it("does not expose arbitrary payloads when an error has no readable message", () => {
+    const error: Record<string, unknown> = { token: "private-credential" };
+    error.cause = error;
+    const message = streamErrorMessage(error);
+    expect(message).toContain("try again");
+    expect(message).not.toContain("private-credential");
+    expect(message).not.toContain("[object Object]");
+  });
   it("turns provider overflow into an actionable recovery message", () => {
     const message = streamErrorMessage(
       new Error("prompt is too long: 1001091 tokens > 1000000 maximum"),

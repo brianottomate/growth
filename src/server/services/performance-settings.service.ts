@@ -1,7 +1,13 @@
 import "server-only";
 
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
+import { STORED_PIPELINE_STAGES } from "@/lib/performance-pipeline";
+import {
+  performanceCardStateSchema,
+  performanceAmountSchema,
+  mergePerformanceCardState,
+} from "@/lib/performance-card-state";
 
 import { db, type Database, type TransactionClient } from "@/server/db";
 import { brandTable, userTable } from "@/server/db/schema";
@@ -18,6 +24,9 @@ const text = z.string().max(500);
 
 /** What a patch may carry. An empty string clears a cell; omitted keys are untouched. */
 export const performanceSettingsPatchSchema = z.object({
+  note: z.string().trim().max(2000).nullish(),
+  cardState: performanceCardStateSchema.nullish(),
+  pipelineStage: z.enum(STORED_PIPELINE_STAGES).nullish(),
   reportEmails: text.nullish(),
   invoiceEmail: text.nullish(),
   ugcPermission: text.nullish(),
@@ -31,12 +40,12 @@ export const performanceSettingsPatchSchema = z.object({
   influencer: text.nullish(),
   socialMediaPosts: text.nullish(),
   bookings: z.number().int().min(0).nullish(),
-  monthlyFee: z.number().int().min(0).nullish(),
+  monthlyFee: performanceAmountSchema.nullish(),
   effectiveDate: z.iso.date().or(z.literal("")).nullish(),
   terms: text.nullish(),
   endDate: z.iso.date().or(z.literal("")).nullish(),
   siteLive: text.nullish(),
-  agreedAdSpend: z.number().int().min(0).nullish(),
+  agreedAdSpend: performanceAmountSchema.nullish(),
   logoOnCreatives: z.boolean().nullish(),
 });
 
@@ -83,32 +92,67 @@ export async function setPerformanceSettings(input: {
   const changed: string[] = [];
   for (const [key, raw] of Object.entries(input.patch)) {
     if (raw === undefined) continue;
-    const value = raw === "" ? null : raw;
+    const value =
+      key === "cardState" && raw != null
+        ? mergePerformanceCardState(
+            current.cardState,
+            performanceCardStateSchema.parse(raw),
+          )
+        : key === "note"
+          ? performanceSettingsPatchSchema.shape.note.parse(raw) || null
+          : raw === ""
+            ? null
+            : raw;
     const k = key as keyof PerformanceSettingsPatch;
-    if (current[k] === value || (current[k] == null && value == null)) continue;
+    if (
+      JSON.stringify(current[k]) === JSON.stringify(value) ||
+      (current[k] == null && value == null)
+    )
+      continue;
     (next as Record<string, unknown>)[k] = value;
     changed.push(k);
   }
   if (changed.length === 0) return { settings: current, changed };
 
   next.updatedAt = new Date().toISOString();
-  next.updatedBy = await displayName(input.by);
+  const editor = input.by
+    ? await client.query.userTable.findFirst({
+        where: eq(userTable.id, input.by),
+        columns: { id: true, name: true, email: true, image: true },
+      })
+    : null;
+  next.updatedBy = editor
+    ? (editor.name ?? editor.email ?? input.by)
+    : input.by;
   next.updatedFrom = input.from;
-  await client
+  if (changed.includes("note")) {
+    next.noteEditedAt = next.updatedAt;
+    next.noteEditedBy = editor
+      ? {
+          id: editor.id,
+          name: editor.name ?? editor.email,
+          image: editor.image,
+        }
+      : { id: null, name: input.by, image: null };
+  }
+  const saved = await client
     .update(brandTable)
     .set({ performanceSettings: next })
-    .where(eq(brandTable.id, brand.id));
+    .where(
+      and(
+        eq(brandTable.id, brand.id),
+        eq(brandTable.organizationId, input.orgId),
+        isNull(brandTable.deletedAt),
+        sql`${brandTable.performanceSettings} is not distinct from ${brand.performanceSettings == null ? null : JSON.stringify(brand.performanceSettings)}::jsonb`,
+      ),
+    )
+    .returning();
+  if (!saved.length)
+    throw new PerformanceSettingsError(
+      422,
+      "Client settings changed while saving. Refresh and try again.",
+    );
   return { settings: next, changed };
-}
-
-/** A user id becomes the person's name; anything else is already a name. */
-async function displayName(by: string | null): Promise<string | null> {
-  if (!by) return null;
-  const user = await db.query.userTable.findFirst({
-    where: eq(userTable.id, by),
-    columns: { name: true, email: true },
-  });
-  return user ? (user.name ?? user.email ?? by) : by;
 }
 
 export function validIntakeUrl(value: unknown): string | undefined {

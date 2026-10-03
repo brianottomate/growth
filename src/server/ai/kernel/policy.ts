@@ -75,6 +75,7 @@ export const growthActionPolicies = {
   newsletterAgent: { run: write({ consequence: "local-write" }) },
   brandRead: {
     list: read("local-read", ALL),
+    get: read("local-read", ALL),
     getMap: read("local-read", ALL),
     next: read("local-read", ALL),
   },

@@ -4,6 +4,8 @@ import {
   draftPitchAction,
 } from "@/server/ai/capabilities/pitch";
 import { z } from "zod";
+import { PIPELINE_COLUMNS } from "@/lib/performance-pipeline";
+import { setPerformanceSettings } from "@/server/services/performance-settings.service";
 import { setBrandStages } from "@/server/services/brand-relationship.service";
 import { BUSINESS_STAGES, DELIVERY_STAGES } from "@/lib/performance-stage";
 import { markCycleLinePaid } from "@/server/services/performance-billing.service";
@@ -35,6 +37,22 @@ import {
 // commercial layer plus a read of what is attached to each cycle.
 
 export const performanceRouter = {
+  setPipelineStage: workspaceProcedure
+    .input(
+      z.object({
+        brandId: z.string().min(1),
+        stage: z.enum(PIPELINE_COLUMNS.map((column) => column.id)),
+      }),
+    )
+    .handler(async ({ context: ctx, input }) =>
+      setPerformanceSettings({
+        brandId: input.brandId,
+        orgId: ctx.workspace.orgId,
+        patch: { pipelineStage: input.stage },
+        by: ctx.workspace.userId,
+        from: "operator",
+      }),
+    ),
   pitch: actionProcedure(getPitchAction),
   savePitch: actionProcedure(savePitchAction),
   draftPitch: actionProcedure(draftPitchAction),

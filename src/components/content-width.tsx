@@ -11,13 +11,20 @@ type ContentWidth = "contained" | "full";
 
 // Longest prefix wins. Anything unlisted is contained.
 const DEFAULTS: Array<[prefix: string, width: ContentWidth]> = [
-  ["/app/performance", "full"],
+  ["/app/performance", "contained"],
 ];
 
 const STORAGE_KEY = "growth.content-width";
 const CHANGE_EVENT = "growth:content-width";
 
 function scopeFor(pathname: string) {
+  // The overview pipeline gets its own width preference; client workspaces
+  // and all other Performance pages retain the contained default.
+  if (pathname === "/app/performance")
+    return {
+      prefix: "/app/performance/overview",
+      fallback: "full" as ContentWidth,
+    };
   const match = DEFAULTS.filter(
     ([p]) => pathname === p || pathname.startsWith(`${p}/`),
   ).sort((a, b) => b[0].length - a[0].length)[0];
@@ -83,11 +90,13 @@ export function ContentWidthToggle({ className }: { className?: string }) {
 }
 
 export function ContentColumn({ children }: { children: ReactNode }) {
+  const isPerformanceOverview = usePathname() === "/app/performance";
   const { width } = useContentWidth();
   return (
     <div
       className={cn(
         "mx-auto w-full p-4 pb-20 transition-[max-width] duration-300 ease-out motion-reduce:transition-none @xl:p-8 @xl:pb-20",
+        isPerformanceOverview && "h-full min-h-0 pb-4 @xl:pb-8",
         width === "contained" ? "max-w-5xl" : "max-w-full",
       )}
     >

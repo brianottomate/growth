@@ -29,6 +29,8 @@ import {
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { PIPELINE_COLUMNS, pipelineStage } from "@/lib/performance-pipeline";
+import type { GetBrandOutput } from "@/server/ai/capabilities/outputs/brands";
 import {
   CREATIVE_IMAGE_MODELS,
   DEFAULT_CREATIVE_IMAGE_MODEL_ID,
@@ -72,7 +74,12 @@ export interface WorkspaceOverviewOutput {
 }
 
 export interface ListBrandsOutput {
-  brands: { id: string; name: string; tagline: string | null }[];
+  brands: {
+    id: string;
+    name: string;
+    tagline: string | null;
+    slug?: string | null;
+  }[];
 }
 
 export interface AudienceTargetsOutput {
@@ -972,14 +979,113 @@ export function WorkspaceOverviewCard({
 }
 
 /** `brandRead.list` — name + tagline rows. */
+export function BrandCard({
+  output,
+  onPrompt,
+  isRunning,
+}: {
+  output: GetBrandOutput;
+  onPrompt: (prompt: string) => void;
+  isRunning: boolean;
+}) {
+  const { brand } = output;
+  const stage = pipelineStage({
+    relationship: brand.relationship,
+    pipelineStage: brand.performanceSettings?.pipelineStage,
+  });
+  const stageName = PIPELINE_COLUMNS.find(
+    (column) => column.id === stage,
+  )?.name;
+  const enriched = Boolean(brand.enrichment.scrapedAt);
+  const website = brand.website;
+  return (
+    <ToolCard
+      icon={Layers}
+      title={brand.name}
+      href={brand.slug ? `/app/brands/${brand.slug}` : "/app/brands"}
+    >
+      <div className="space-y-3">
+        <div className="flex items-start gap-3">
+          {brand.logo && (
+            <img
+              src={brand.logo}
+              alt=""
+              className="size-11 shrink-0 rounded-lg bg-muted object-contain"
+            />
+          )}
+          <div className="min-w-0 space-y-1">
+            {brand.tagline && (
+              <p className="line-clamp-2 text-sm">{brand.tagline}</p>
+            )}
+            {website && (
+              <a
+                href={website}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex max-w-full items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <span className="truncate">
+                  {website.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+                </span>
+                <ArrowUpRight className="size-3 shrink-0" />
+              </a>
+            )}
+          </div>
+        </div>
+        {brand.description && (
+          <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+            {brand.description}
+          </p>
+        )}
+        <div className="flex flex-wrap gap-1.5 text-xs">
+          <span className="rounded-md border px-2 py-1 capitalize">
+            {brand.relationship}
+          </span>
+          {(brand.relationship === "client" ||
+            brand.relationship === "prospect") && (
+            <span className="rounded-md border px-2 py-1">{stageName}</span>
+          )}
+          <span
+            className="rounded-md border px-2 py-1"
+            title={brand.enrichment.scrapedAt ?? undefined}
+          >
+            {enriched ? "Website enriched" : "Not enriched"}
+          </span>
+          {brand.story && (
+            <span className="rounded-md border px-2 py-1">Story saved</span>
+          )}
+        </div>
+        {!enriched && website && (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={isRunning}
+            onClick={() =>
+              onPrompt(
+                `Enrich ${brand.name} (brandId ${brand.id}) from its saved website ${website}. Use brandWrite.enrich and report what was saved.`,
+              )
+            }
+          >
+            <Sparkles className="size-3.5" /> Enrich from website
+          </Button>
+        )}
+      </div>
+    </ToolCard>
+  );
+}
+
 export function BrandsCard({ output }: { output: ListBrandsOutput }) {
   const { brands } = output;
   return (
     <ToolCard
       icon={Layers}
-      title="Brands"
-      href="/app/brands"
-      hint={`${brands.length}`}
+      title={brands.length === 1 ? brands[0]!.name : "Brands"}
+      href={
+        brands.length === 1 && brands[0]!.slug
+          ? `/app/brands/${brands[0]!.slug}`
+          : "/app/brands"
+      }
+      hint={brands.length === 1 ? undefined : `${brands.length}`}
     >
       {brands.length === 0 ? (
         <p className="text-sm text-muted-foreground">No brands yet.</p>

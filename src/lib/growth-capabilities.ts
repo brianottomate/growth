@@ -13,7 +13,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
   presentNextOptions: ["present"],
   blogAgent: ["run"],
   newsletterAgent: ["run"],
-  brandRead: ["list", "getMap", "next"],
+  brandRead: ["list", "get", "getMap", "next"],
   brandWrite: [
     "create",
     "createProspect",

@@ -62,6 +62,11 @@ const GROUPS = [
     description: "Review UI behavior and content generation.",
     links: [
       {
+        label: "Performance vision board",
+        href: "/lab/performance-board",
+        note: "Surface map, component extracts, and loose planning notes",
+      },
+      {
         label: "Design system",
         href: "/lab/design-system",
         note: "Shared components and style contracts",

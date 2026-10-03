@@ -1,5 +1,7 @@
 import { homesSchema, metaReportingConversionsSchema } from "./shared";
 import { z } from "zod";
+import { STORED_PIPELINE_STAGES } from "@/lib/performance-pipeline";
+import { performanceCardStateSchema } from "@/lib/performance-card-state";
 import { appliedEvidenceSchema } from "@/lib/applied-evidence";
 import type { PerformanceSettings } from "@/server/db/brand-schema";
 
@@ -36,6 +38,16 @@ export const addBrandAdPreviewActionOutputSchema = z.strictObject({
  * rather than failing an MCP client's strict output check at runtime.
  */
 const performanceSettingsShape = {
+  cardState: performanceCardStateSchema.nullish(),
+  note: z.string().nullable().optional(),
+  noteEditedAt: z.string().optional(),
+  noteEditedBy: z
+    .strictObject({
+      id: z.string().nullable(),
+      name: z.string().nullable(),
+      image: z.string().nullable(),
+    })
+    .nullish(),
   adCopiesUrl: z.string().nullable().optional(),
   adsConnectionBrandId: z.string().optional(),
   bookings: z.number().nullable().optional(),
@@ -82,6 +94,7 @@ const performanceSettingsShape = {
   monthlyFee: z.number().nullable().optional(),
   reportEmails: z.string().nullable().optional(),
   siteLive: z.string().nullable().optional(),
+  pipelineStage: z.enum(STORED_PIPELINE_STAGES).nullish(),
   socialMediaPosts: z.string().nullable().optional(),
   terms: z.string().nullable().optional(),
   ugcPermission: z.string().nullable().optional(),
@@ -97,6 +110,22 @@ export const setPerformanceSettingsActionOutputSchema = z.strictObject({
   path: z.string(),
   settings: z.strictObject(performanceSettingsShape),
 });
+
+export const getBrandOutputSchema = z.strictObject({
+  brand: listBrandsOutputSchema.shape.brands.element.extend({
+    website: z.string().nullable(),
+    logo: z.string().nullable(),
+    description: z.string().nullable(),
+    story: z.string().nullable(),
+    enrichment: z.strictObject({
+      scrapedAt: z.string().nullable(),
+      hasBrandIdentity: z.boolean(),
+    }),
+    performanceSettings: z.strictObject(performanceSettingsShape).nullable(),
+  }),
+});
+
+export type GetBrandOutput = z.infer<typeof getBrandOutputSchema>;
 
 export const enrichBrandActionOutputSchema = z.strictObject({
   ...appliedEvidenceSchema.shape,
