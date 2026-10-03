@@ -1,0 +1,164 @@
+{
+  "version": "source-article-derived/v1",
+  "provenance": "Source-derived comparison fixture from https://www.wander.com/article/best-time-to-visit-orlando, captured 2026-10-02T22:43:32.895Z. Claims are from the published article, not independently verified or live PMS data. This tests regeneration and layout, not fresh research.",
+  "targetDomain": "wander.com",
+  "crawledUrls": ["https://www.wander.com/article/best-time-to-visit-orlando"],
+  "derivedAt": "2026-10-02T22:43:32.895Z",
+  "model": "claude-sonnet-5",
+  "usage": {
+    "inputTokens": null,
+    "outputTokens": null
+  },
+  "context": {
+    "businessName": "Wander",
+    "summary": "Wander offers luxury vacation rental homes in Orlando, Florida, positioned around helping travelers navigate Orlando's seasonal shifts in weather, humidity, crowd levels, and theme park events across spring, summer, fall, and winter.",
+    "locations": ["Orlando, Florida"],
+    "amenities": [
+      "private pool",
+      "heated pool",
+      "shaded outdoor seating",
+      "large indoor living areas",
+      "indoor-outdoor layout/flow",
+      "resort-style amenities",
+      "spacious interiors",
+      "generous living space",
+      "outdoor lounge areas",
+      "quieter/calmer residential setting"
+    ],
+    "activities": [
+      "visiting Disney World",
+      "visiting Universal Orlando",
+      "Halloween Horror Nights",
+      "Disney Halloween celebrations",
+      "holiday/Christmas events",
+      "pool days",
+      "outdoor dining",
+      "shopping",
+      "golf",
+      "theme park touring",
+      "resort downtime"
+    ],
+    "targetAudience": null,
+    "distinctiveFeatures": [
+      "March is the busiest spring month due to spring break crowds",
+      "April and early May offer more balanced weather and manageable crowds before summer heat",
+      "Summer (June-September) brings hot, humid days with frequent afternoon thunderstorms",
+      "September crowds ease after school resumes while Halloween events begin",
+      "October features Halloween Horror Nights at Universal and Disney's Halloween celebrations",
+      "November is mild with holiday events but without peak December crowds",
+      "Hurricane season causes occasional weather disruptions between August and October",
+      "Early December is relaxed and festive compared to the very busy Christmas and New Year's weeks",
+      "January and February bring milder weather and lighter crowds after the holidays",
+      "Pool weather becomes less predictable between December and February due to cold fronts",
+      "Thanksgiving week is one of the busiest travel periods of the year"
+    ],
+    "typicalPriceRange": null,
+    "voice": null,
+    "properties": [
+      {
+        "name": "Wander Orlando Grove Retreat",
+        "href": "https://www.wander.com/property/wander-orlando-grove-retreat",
+        "sleeps": null,
+        "bedrooms": null,
+        "location": null,
+        "amenities": ["pool", "lounge areas", "open layout"]
+      },
+      {
+        "name": "Wander Orlando Halo Grove",
+        "href": "https://www.wander.com/property/wander-orlando-halo-grove",
+        "sleeps": null,
+        "bedrooms": null,
+        "location": null,
+        "amenities": ["spacious interiors", "calmer residential setting"]
+      },
+      {
+        "name": "Wander Orlando Waterfall",
+        "href": "https://www.wander.com/property/wander-orlando-waterfall",
+        "sleeps": null,
+        "bedrooms": null,
+        "location": null,
+        "amenities": ["indoor-outdoor setup"]
+      },
+      {
+        "name": "Wander Orlando Palms Diamond",
+        "href": "https://www.wander.com/property/wander-orlando-palms-diamond",
+        "sleeps": null,
+        "bedrooms": null,
+        "location": null,
+        "amenities": [
+          "private pool",
+          "shaded outdoor seating",
+          "large indoor living areas"
+        ]
+      },
+      {
+        "name": "Wander Orlando Everglow",
+        "href": "https://www.wander.com/property/wander-orlando-everglow",
+        "sleeps": null,
+        "bedrooms": null,
+        "location": null,
+        "amenities": ["layout suited to spending time at home"]
+      },
+      {
+        "name": "Wander Orlando Waters Retreat",
+        "href": "https://www.wander.com/property/wander-orlando-waters-retreat",
+        "sleeps": null,
+        "bedrooms": null,
+        "location": null,
+        "amenities": [
+          "spacious design",
+          "resort-style amenities",
+          "private pool"
+        ]
+      },
+      {
+        "name": "Wander Orlando Paradise Retreat",
+        "href": "https://www.wander.com/property/wander-orlando-paradise-retreat",
+        "sleeps": null,
+        "bedrooms": null,
+        "location": null,
+        "amenities": ["outdoor areas"]
+      },
+      {
+        "name": "Wander Orlando Cypress Allure",
+        "href": "https://www.wander.com/property/wander-orlando-cypress-allure",
+        "sleeps": null,
+        "bedrooms": null,
+        "location": null,
+        "amenities": ["quieter atmosphere", "generous living space"]
+      },
+      {
+        "name": "Wander Orlando Links",
+        "href": "https://www.wander.com/property/wander-orlando-links",
+        "sleeps": null,
+        "bedrooms": null,
+        "location": null,
+        "amenities": ["indoor-outdoor flow"]
+      },
+      {
+        "name": "Wander Orlando Palaces",
+        "href": "https://www.wander.com/property/wander-orlando-palaces",
+        "sleeps": null,
+        "bedrooms": null,
+        "location": null,
+        "amenities": ["larger layout", "outdoor areas"]
+      },
+      {
+        "name": "Wander Orlando Grove Oasis",
+        "href": "https://www.wander.com/property/wander-orlando-grove-oasis",
+        "sleeps": null,
+        "bedrooms": null,
+        "location": null,
+        "amenities": ["calmer residential setting", "usable outdoor space"]
+      },
+      {
+        "name": "Wander Orlando Palms Zenith",
+        "href": "https://www.wander.com/property/wander-orlando-palms-zenith",
+        "sleeps": null,
+        "bedrooms": null,
+        "location": null,
+        "amenities": ["heated pool access", "generous indoor living areas"]
+      }
+    ]
+  }
+}

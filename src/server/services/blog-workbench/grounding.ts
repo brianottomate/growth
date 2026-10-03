@@ -23,7 +23,10 @@ export type GroundingContextRecord = {
   // crawl-derived/v1 comes from this builder; synthetic-fixture/v1 is a
   // hand-authored fixture for briefs whose target domain has no crawlable
   // site (the golden-run example targets a parked domain).
-  version: typeof GROUNDING_VERSION | "synthetic-fixture/v1";
+  version:
+    | typeof GROUNDING_VERSION
+    | "synthetic-fixture/v1"
+    | "source-article-derived/v1";
   provenance: string;
   targetDomain: string;
   crawledUrls: string[];

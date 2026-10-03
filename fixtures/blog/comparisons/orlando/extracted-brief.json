@@ -1,0 +1,305 @@
+{
+  "brief": {
+    "brief_id": "source-derived-demo-brief-001",
+    "context_package_id": "source-derived-demo-context-001",
+    "measurement_id": "source-derived-demo-measurement-001",
+    "target_query": "best time to visit Orlando for weather and crowds",
+    "guest_intent": "A traveler deciding which month or season to book an Orlando trip, trying to balance comfortable weather, manageable theme park crowds, lower prices, and seasonal events like Halloween or holiday celebrations.",
+    "working_title": "When to Visit Orlando: A Month-by-Month Guide to Weather, Crowds, and Events",
+    "summary": "An outline-ready assignment covering Orlando's seasonal travel patterns, drawn from a source article that breaks the year into quarters (spring, summer, fall, winter) plus a month-by-month table. The source presents multiple, sometimes conflicting, 'best time' answers depending on traveler priority (weather, crowds, price, or events) rather than a single universal best month, and that nuance should be preserved rather than collapsed into one recommendation.",
+    "outline": [
+      {
+        "heading": "Quick Answer Snapshot",
+        "key_points": [
+          "Best overall window per source: late January through early April",
+          "Best balance of weather and manageable crowds: early November",
+          "Best for theme park seasonal events: October and December",
+          "Best for pool weather: March through early June",
+          "Best for lower prices: late August and September",
+          "These are presented as separate, sometimes competing, recommendations depending on traveler priority, not one single best month"
+        ]
+      },
+      {
+        "heading": "Month-by-Month Weather and Crowd Patterns",
+        "key_points": [
+          "January: mild and comfortable, medium crowds, lighter lines after New Year",
+          "February: warm afternoons, cooler mornings, medium crowds, easier park days",
+          "March: warm and busy with high crowds due to spring break",
+          "April: warm, less humid, medium crowds, comfortable before summer",
+          "May: hotter afternoons, medium crowds, longer pool days",
+          "June: hot and humid, high crowds as summer vacations begin",
+          "July: very hot with frequent storms, very high crowds, peak summer",
+          "August: very hot and humid, medium crowds, quieter and better value late in month",
+          "September: hot with storm risk, lower crowds, Halloween events begin",
+          "October: warm and comfortable, medium-to-high crowds, Halloween season",
+          "November: mild and pleasant, medium crowds, holiday events without December peak",
+          "December: comfortable but very busy late month around Christmas and New Year's, calmer early month"
+        ]
+      },
+      {
+        "heading": "Spring (March to May): Comfortable Park Days and Outdoor Dining",
+        "key_points": [
+          "March is the busiest spring month due to spring break travel, with quickly rising wait times and earlier-than-expected reservation sellouts",
+          "April and early May are described as more balanced, with pool weather and long daylight but more manageable parks outside holiday weekends",
+          "Strategy: early park mornings for cooler temps and shorter waits",
+          "Strategy: evenings around Disney Springs or Winter Park feel more comfortable once daytime humidity eases after sunset",
+          "Strategy: slower pool or resort afternoons help balance long park days during busy spring periods",
+          "Watch for: spring break crowd spikes around Disney and Universal",
+          "Watch for: May bringing noticeably hotter late-spring afternoons that make full midday schedules harder"
+        ]
+      },
+      {
+        "heading": "Summer (June to September): Pool Days and Late-Night Parks",
+        "key_points": [
+          "Summer days typically start well, turn intensely hot by early afternoon, then shift into short, heavy thunderstorms later in the day",
+          "September is described as better than expected: still hot, but crowds ease after school resumes and Halloween events begin appearing",
+          "Strategy: rope-dropping major attractions early, before heat and long standby lines set in",
+          "Strategy: scheduling indoor lunches or resort breaks during afternoon storms",
+          "Strategy: staying for nighttime shows and extended evening hours once temperatures drop after sunset",
+          "Watch for: daily thunderstorms interrupting outdoor rides, water parks, and transportation",
+          "Watch for: hurricane season bringing occasional weather disruptions between August and October"
+        ]
+      },
+      {
+        "heading": "Fall (October to November): Halloween Events and Lower Humidity",
+        "key_points": [
+          "October brings Halloween Horror Nights at Universal alongside Disney's Halloween celebrations, changing the atmosphere citywide",
+          "November is described as calmer, with mild temperatures supporting both pool time on warmer afternoons and comfortable evenings for long park days",
+          "Strategy: visiting during Halloween season adds atmosphere without intense summer heat",
+          "Strategy: mixing busy attraction days with slower afternoons works well across both months",
+          "Watch for: Halloween event weekends still bringing crowd spikes around Universal Orlando and Magic Kingdom evenings",
+          "Watch for: early October afternoons can still run warm with lingering late-season humidity",
+          "Watch for: Thanksgiving week becoming one of the busiest travel periods of the year"
+        ]
+      },
+      {
+        "heading": "Winter (December to February): Holiday Events and Easier Park Visits",
+        "key_points": [
+          "December varies dramatically by timing: early December is described as relaxed and festive, while weeks around Christmas and New Year's are among the busiest of the year",
+          "January and February are described as generally easier, with milder weather and more manageable lines after holiday crowds leave",
+          "Strategy: visiting in early December for decorations and events without extreme Christmas/New Year's crowds",
+          "Strategy: combining park days with shopping, golf, or resort time in milder winter weather",
+          "Watch for: Christmas and New Year's weeks bringing extremely heavy crowds and harder reservations",
+          "Watch for: Florida winter temperatures fluctuating, with cooler mornings and evenings catching visitors off guard",
+          "Watch for: pool weather becoming less predictable between December and February after seasonal cold fronts"
+        ]
+      },
+      {
+        "heading": "Choosing the Best Time by Traveler Priority",
+        "key_points": [
+          "Source presents distinct, non-universal recommendations: first-time visit (February, April, or early November)",
+          "Theme park-focused trip: January, February, or September",
+          "Halloween events specifically: October",
+          "Holiday atmosphere specifically: early December",
+          "Pool and resort stays: March through June",
+          "Lower prices and better availability: late August or September",
+          "Easier weather for younger kids: February or November",
+          "Luxury villa-focused stay: October through April",
+          "These should be preserved as separate conditional answers rather than merged into one 'best month' claim"
+        ]
+      },
+      {
+        "heading": "Where to Stay by Season (Property Highlights)",
+        "key_points": [
+          "Spring properties highlighted: Wander Orlando Grove Retreat, Wander Orlando Halo Grove, Wander Orlando Waterfall — each noted for outdoor space, pool areas, and indoor-outdoor layouts suited to milder March-to-May weather",
+          "Summer properties highlighted: Wander Orlando Palms Diamond, Wander Orlando Everglow, Wander Orlando Waters Retreat — noted for private pools, shaded outdoor seating, and indoor living space to escape midday heat",
+          "Fall properties highlighted: Wander Orlando Paradise Retreat, Wander Orlando Cypress Allure, Wander Orlando Links — noted for outdoor areas and indoor-outdoor flow suited to cooler October/November evenings",
+          "Winter properties highlighted: Wander Orlando Palaces, Wander Orlando Grove Oasis, Wander Orlando Palms Zenith — noted for larger layouts, calmer residential settings, and heated pool access during cooler months",
+          "Only amenities and seasonal fit explicitly stated in the source should be attributed to each property"
+        ]
+      }
+    ],
+    "entities_to_cover": [
+      "Orlando",
+      "Florida",
+      "Disney World",
+      "Universal Orlando",
+      "Halloween Horror Nights",
+      "Magic Kingdom",
+      "Disney Springs",
+      "Winter Park",
+      "Wander Orlando Grove Retreat",
+      "Wander Orlando Halo Grove",
+      "Wander Orlando Waterfall",
+      "Wander Orlando Palms Diamond",
+      "Wander Orlando Everglow",
+      "Wander Orlando Waters Retreat",
+      "Wander Orlando Paradise Retreat",
+      "Wander Orlando Cypress Allure",
+      "Wander Orlando Links",
+      "Wander Orlando Palaces",
+      "Wander Orlando Grove Oasis",
+      "Wander Orlando Palms Zenith"
+    ],
+    "recommended_page_kind": "seasonal destination travel guide",
+    "suggested_word_count": 1400
+  },
+  "context": {
+    "businessName": "Wander",
+    "summary": "Wander offers luxury vacation rental homes in Orlando, Florida, positioned around helping travelers navigate Orlando's seasonal shifts in weather, humidity, crowd levels, and theme park events across spring, summer, fall, and winter.",
+    "locations": ["Orlando, Florida"],
+    "amenities": [
+      "private pool",
+      "heated pool",
+      "shaded outdoor seating",
+      "large indoor living areas",
+      "indoor-outdoor layout/flow",
+      "resort-style amenities",
+      "spacious interiors",
+      "generous living space",
+      "outdoor lounge areas",
+      "quieter/calmer residential setting"
+    ],
+    "activities": [
+      "visiting Disney World",
+      "visiting Universal Orlando",
+      "Halloween Horror Nights",
+      "Disney Halloween celebrations",
+      "holiday/Christmas events",
+      "pool days",
+      "outdoor dining",
+      "shopping",
+      "golf",
+      "theme park touring",
+      "resort downtime"
+    ],
+    "targetAudience": null,
+    "distinctiveFeatures": [
+      "March is the busiest spring month due to spring break crowds",
+      "April and early May offer more balanced weather and manageable crowds before summer heat",
+      "Summer (June-September) brings hot, humid days with frequent afternoon thunderstorms",
+      "September crowds ease after school resumes while Halloween events begin",
+      "October features Halloween Horror Nights at Universal and Disney's Halloween celebrations",
+      "November is mild with holiday events but without peak December crowds",
+      "Hurricane season causes occasional weather disruptions between August and October",
+      "Early December is relaxed and festive compared to the very busy Christmas and New Year's weeks",
+      "January and February bring milder weather and lighter crowds after the holidays",
+      "Pool weather becomes less predictable between December and February due to cold fronts",
+      "Thanksgiving week is one of the busiest travel periods of the year"
+    ],
+    "typicalPriceRange": null,
+    "voice": null,
+    "properties": [
+      {
+        "name": "Wander Orlando Grove Retreat",
+        "href": "https://www.wander.com/property/wander-orlando-grove-retreat",
+        "sleeps": null,
+        "bedrooms": null,
+        "location": null,
+        "amenities": ["pool", "lounge areas", "open layout"]
+      },
+      {
+        "name": "Wander Orlando Halo Grove",
+        "href": "https://www.wander.com/property/wander-orlando-halo-grove",
+        "sleeps": null,
+        "bedrooms": null,
+        "location": null,
+        "amenities": ["spacious interiors", "calmer residential setting"]
+      },
+      {
+        "name": "Wander Orlando Waterfall",
+        "href": "https://www.wander.com/property/wander-orlando-waterfall",
+        "sleeps": null,
+        "bedrooms": null,
+        "location": null,
+        "amenities": ["indoor-outdoor setup"]
+      },
+      {
+        "name": "Wander Orlando Palms Diamond",
+        "href": "https://www.wander.com/property/wander-orlando-palms-diamond",
+        "sleeps": null,
+        "bedrooms": null,
+        "location": null,
+        "amenities": [
+          "private pool",
+          "shaded outdoor seating",
+          "large indoor living areas"
+        ]
+      },
+      {
+        "name": "Wander Orlando Everglow",
+        "href": "https://www.wander.com/property/wander-orlando-everglow",
+        "sleeps": null,
+        "bedrooms": null,
+        "location": null,
+        "amenities": ["layout suited to spending time at home"]
+      },
+      {
+        "name": "Wander Orlando Waters Retreat",
+        "href": "https://www.wander.com/property/wander-orlando-waters-retreat",
+        "sleeps": null,
+        "bedrooms": null,
+        "location": null,
+        "amenities": [
+          "spacious design",
+          "resort-style amenities",
+          "private pool"
+        ]
+      },
+      {
+        "name": "Wander Orlando Paradise Retreat",
+        "href": "https://www.wander.com/property/wander-orlando-paradise-retreat",
+        "sleeps": null,
+        "bedrooms": null,
+        "location": null,
+        "amenities": ["outdoor areas"]
+      },
+      {
+        "name": "Wander Orlando Cypress Allure",
+        "href": "https://www.wander.com/property/wander-orlando-cypress-allure",
+        "sleeps": null,
+        "bedrooms": null,
+        "location": null,
+        "amenities": ["quieter atmosphere", "generous living space"]
+      },
+      {
+        "name": "Wander Orlando Links",
+        "href": "https://www.wander.com/property/wander-orlando-links",
+        "sleeps": null,
+        "bedrooms": null,
+        "location": null,
+        "amenities": ["indoor-outdoor flow"]
+      },
+      {
+        "name": "Wander Orlando Palaces",
+        "href": "https://www.wander.com/property/wander-orlando-palaces",
+        "sleeps": null,
+        "bedrooms": null,
+        "location": null,
+        "amenities": ["larger layout", "outdoor areas"]
+      },
+      {
+        "name": "Wander Orlando Grove Oasis",
+        "href": "https://www.wander.com/property/wander-orlando-grove-oasis",
+        "sleeps": null,
+        "bedrooms": null,
+        "location": null,
+        "amenities": ["calmer residential setting", "usable outdoor space"]
+      },
+      {
+        "name": "Wander Orlando Palms Zenith",
+        "href": "https://www.wander.com/property/wander-orlando-palms-zenith",
+        "sleeps": null,
+        "bedrooms": null,
+        "location": null,
+        "amenities": ["heated pool access", "generous indoor living areas"]
+      }
+    ]
+  },
+  "extractionUsage": {
+    "inputTokens": 7186,
+    "inputTokenDetails": {
+      "noCacheTokens": 7186,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0
+    },
+    "outputTokens": 6862,
+    "outputTokenDetails": {
+      "textTokens": 4454,
+      "reasoningTokens": 2408
+    },
+    "totalTokens": 14048
+  },
+  "model": "claude-sonnet-5",
+  "sourceUrl": "https://www.wander.com/article/best-time-to-visit-orlando"
+}

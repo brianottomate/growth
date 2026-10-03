@@ -1,0 +1,137 @@
+---
+h1: "Editorial building blocks"
+metaTitle: "Editorial building blocks | Growth"
+metaDescription: "An internal preview of reusable article layouts for destination guides: galleries, place cards, fact boxes, banners and split sections."
+publishedAt: "9999-12-31"
+category: Guides
+tags: []
+showStickyCTA: false
+enableAutoCtAs: false
+---
+
+<ArticleNote title="Layout example">
+  This is an internal component preview. The images reuse Growth's existing
+  login artwork and do not document a destination or customer property. Replace
+  them with reviewed media before preparing a real guide.
+</ArticleNote>
+
+## Give practical advice its own space
+
+The article should explain the decision behind a trip. A fact box holds the details a reader will want to find again without making the surrounding paragraph repeat them.
+
+<ArticleNote title="Before you plan the route">
+  Confirm the starting point, transport options and current opening dates from
+  the supplied sources. Leave unknown prices and travel times out until they are
+  verified.
+</ArticleNote>
+
+<ArticleSplit image="/auth-hero.jpg" alt="Growth login artwork used to demonstrate a supporting image" caption="Existing Growth artwork, used for layout review.">
+
+## One idea, one supporting image
+
+Use this layout for a short detour, property comparison or practical recommendation. Keep the body typography consistent with the rest of the article, and let the image stack after the text on a phone.
+
+</ArticleSplit>
+
+<ArticleBanner
+  image="/auth-hero.jpg"
+  alt="Existing Growth artwork demonstrating a section banner"
+  title="A new part of the trip"
+  position="50% 45%"
+/>
+
+## Keep related media together
+
+A gallery preserves each image's shape. Use a stacked layout when two landscape images belong alongside a taller image. Captions identify the media; the prose should contribute a useful observation.
+
+<ArticleGallery
+  layout="stacked-left"
+  caption="Repeated artwork here demonstrates layout only."
+  items={[
+    { src: "/auth-hero.jpg", alt: "Layout example, first image" },
+    { src: "/auth-hero.jpg", alt: "Layout example, second image" },
+    { src: "/auth-hero.jpg", alt: "Layout example, third image" },
+  ]}
+/>
+
+## Make a shortlist easy to inspect
+
+Each card has one purpose and one verified link. Unknown images stay absent, and relevant closure or seasonal status belongs beside the name.
+
+<ArticlePlaces
+  places={[
+    {
+      name: "Review the article",
+      note: "Read the brief, grounding facts and editorial comments together.",
+      href: "/lab/blog-workbench",
+      linkLabel: "Open the workbench",
+      image: "/auth-hero.jpg",
+      alt: "Growth artwork",
+    },
+    {
+      name: "Review the sources",
+      note: "Check provenance before turning a draft into a recommendation.",
+      href: "/lab/blog-workbench?view=grounding",
+      linkLabel: "Inspect grounding",
+    },
+  ]}
+/>
+
+## Show the order of a trip
+
+Use named stops and sourced durations. This example shows the review workflow rather than inventing a destination itinerary.
+
+<ArticleItinerary
+  title="Prepare a useful guide"
+  stops={[
+    {
+      name: "Choose the traveler decision",
+      detail: "Start with a seasonal, activity or itinerary question.",
+      href: "/lab/blog-workbench",
+    },
+    {
+      name: "Verify the shortlist",
+      detail:
+        "Check local businesses, property fit and route details against real sources.",
+    },
+    {
+      name: "Review the finished page",
+      detail: "Check media, links and draft evidence before publishing.",
+    },
+  ]}
+/>
+
+## Explain why each recommendation belongs
+
+The same link card can support a property recommendation or a useful resource. Its note should explain the fit, not repeat the headline.
+
+<ArticleLinks
+  links={[
+    {
+      name: "Blog builder",
+      href: "/lab/blog-workbench",
+      label: "Review resource",
+      note: "Compare the article with its evidence and evaluation.",
+      image: "/auth-hero.jpg",
+      alt: "Growth artwork used as a card layout example",
+    },
+    {
+      name: "Draft layout preview",
+      href: "/lab/blog-workbench/preview/builder-editorial-blocks",
+      label: "Layout reference",
+      note: "Inspect the reading experience before choosing a publishing destination.",
+    },
+  ]}
+/>
+
+<ArticleHero
+  image="/auth-hero.jpg"
+  title="A larger editorial transition"
+  subtitle="Existing artwork for layout review; replace it with reviewed destination media."
+  position="50% 45%"
+  parallax={true}
+/>
+
+## Enlarge media without losing context
+
+Select an image in the gallery to open its accessible expanded view. Standalone video and YouTube blocks are also available, but this fixture has no reviewed video to embed.

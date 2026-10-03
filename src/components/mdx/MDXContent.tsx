@@ -11,8 +11,33 @@ import { Quote } from "./Quote";
 import { Stats } from "./Stats";
 import { TLDR } from "./TLDR";
 import { Video } from "./Video";
+import {
+  ArticleNote,
+  ArticleSplit,
+  ArticleBanner,
+  ArticleGallery,
+  ArticlePlaces,
+  ArticleItinerary,
+  ArticleLinks,
+  ArticleVideo,
+  ArticleYouTube,
+  ArticleHero,
+} from "./ArticleBlocks";
+
+import {
+  ArticleQuickAnswers,
+  ArticleComparison,
+  ArticleTradeoffs,
+  ArticleFigure,
+  ArticleUpdate,
+} from "./ArticleDecisions";
 
 const sharedComponents = {
+  ArticleQuickAnswers,
+  ArticleComparison,
+  ArticleTradeoffs,
+  ArticleFigure,
+  ArticleUpdate,
   CalloutBox,
   CtaCard,
   FeatureGrid,
@@ -21,6 +46,16 @@ const sharedComponents = {
   Stats,
   TLDR,
   Video,
+  ArticleNote,
+  ArticleSplit,
+  ArticleBanner,
+  ArticleGallery,
+  ArticlePlaces,
+  ArticleItinerary,
+  ArticleLinks,
+  ArticleVideo,
+  ArticleYouTube,
+  ArticleHero,
 };
 
 // Parse the Velite generated MDX code into a React component function
@@ -34,11 +69,26 @@ const useMDXComponent = (code: string) => {
 interface MDXProps {
   code: string;
   components?: Record<string, React.ComponentType>;
+  hideDraftEvidence?: boolean;
 }
 
 // MDXContent component
-export function MDXContent({ code, components }: MDXProps) {
+export function MDXContent({ code, components, hideDraftEvidence }: MDXProps) {
   // oxlint-disable-next-line typescript/no-unsafe-assignment
   const Component = useMDXComponent(code);
-  return <Component components={{ ...sharedComponents, ...components }} />;
+  const renderArticleNote = (
+    props: React.ComponentProps<typeof ArticleNote>,
+  ) =>
+    hideDraftEvidence && props.title === "Draft evidence" ? null : (
+      <ArticleNote {...props} />
+    );
+  return (
+    <Component
+      components={{
+        ...sharedComponents,
+        ArticleNote: renderArticleNote,
+        ...components,
+      }}
+    />
+  );
 }

@@ -70,6 +70,7 @@ reports/
 runs/
 # Immutable blog-workbench run fixtures are tracked despite the generic runs/ ignore.
 !fixtures/blog/runs/
+!fixtures/blog/comparisons/orlando/runs/
 future-plans/
 
 # Private, locally generated HubSpot email corpora live under reports/private/.

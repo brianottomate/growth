@@ -9,6 +9,7 @@ import type {
   ContentBriefInput,
 } from "./contract";
 import type { GeneratedArticle } from "./checks";
+import { EDITORIAL_RULES } from "./editorial";
 
 // The independent editorial evaluator: a separate model pass that never saw
 // the generation, judging the article against the brief and grounding. Its
@@ -17,7 +18,7 @@ import type { GeneratedArticle } from "./checks";
 // punchlines, staccato drama, negative parallelism, forced triads, generic
 // signposting, filler conclusions.
 
-export const EVALUATOR_VERSION = "editorial-evaluator/v1";
+export const EVALUATOR_VERSION = "editorial-evaluator/v5";
 export const EVALUATOR_MODEL = "claude-sonnet-5";
 
 const EvaluatorComment = z.object({
@@ -76,6 +77,8 @@ const EVALUATOR_SYSTEM = [
   "   search-engine-first roundup.",
   "",
   "Anchor every comment to its section heading with an exact excerpt.",
+  "Also judge these editorial requirements; flag violations using the existing comment kinds:",
+  EDITORIAL_RULES,
   "Verdict: publish_candidate only when no major comment exists.",
 ].join("\n");
 

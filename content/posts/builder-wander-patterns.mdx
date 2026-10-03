@@ -1,0 +1,156 @@
+---
+h1: "Wander blog patterns"
+metaTitle: "Wander blog patterns | Growth lab"
+metaDescription: "Editorial patterns from announcement and travel posts, expressed as reusable Growth article blocks."
+publishedAt: "9999-12-31"
+category: Guides
+tags: []
+showStickyCTA: false
+enableAutoCtAs: false
+---
+
+<ArticleNote title="Internal layout study">
+  These examples show how to organize reviewed material. They are not
+  destination advice, property endorsements or announcements of shipped product
+  changes. The image uses existing Growth artwork.
+</ArticleNote>
+
+## Answer the decision first
+
+A reader should find a useful starting point before the long explanation. Priorities can lead to different choices, so explain the condition behind each recommendation.
+
+<ArticleQuickAnswers
+  title="Which article structure fits?"
+  answers={[
+    {
+      priority: "Choosing a travel season",
+      answer: "Start with a summary and a seasonal comparison.",
+      reason: "Explain what changes with the timing of the trip.",
+    },
+    {
+      priority: "Choosing a home base",
+      answer:
+        "Compare areas, then connect activities with suitable properties.",
+      reason:
+        "Verify the distance and practical access before calling a location convenient.",
+    },
+    {
+      priority: "Sharing a product release",
+      answer: "Explain the change, show evidence, then describe its benefit.",
+      reason: "Distinguish shipped functionality from a future plan.",
+    },
+  ]}
+/>
+
+## Make choices comparable
+
+The same table can compare seasons, neighborhoods or airports. Use common criteria, and keep missing inputs explicit. On phones, this table scrolls within the article.
+
+<ArticleComparison
+  caption="Article planning matrix"
+  columns={["Format", "Reader decision", "Evidence needed", "Useful next step"]}
+  rows={[
+    [
+      "Seasonal guide",
+      "When to travel",
+      "Weather, events, crowd patterns",
+      "Choose a window",
+    ],
+    [
+      "Area guide",
+      "Where to stay",
+      "Activities, access, property details",
+      "Inspect a shortlist",
+    ],
+    [
+      "Transportation guide",
+      "How to arrive",
+      "Routes, distances, service links",
+      "Compare arrival options",
+    ],
+    [
+      "Announcement",
+      "What the change means",
+      "Release status and product evidence",
+      "Explore the relevant feature",
+    ],
+  ]}
+  sourceNote="Layout example only. Replace these planning criteria with sourced facts in a real guide."
+/>
+
+## Put caveats beside the recommendation
+
+A strong recommendation should explain its limitations. Follow each area or season with its activities and a small property shortlist using the existing place and recommendation cards.
+
+<ArticleTradeoffs
+  title="Choosing a quieter home base"
+  benefits={[
+    "Explain how the location supports the intended pace of the trip.",
+    "Show which activities and property features make it a good fit.",
+  ]}
+  cautions={[
+    "Verify travel time to the main destination and key activities.",
+    "Check transport, seasonal closures and dining availability before recommending it.",
+  ]}
+/>
+
+## Explain a release through its reader benefit
+
+<ArticleUpdate
+  title="Example: a simpler comparison view"
+  benefit="Readers can compare relevant options without piecing together several disconnected descriptions."
+  image="/auth-hero.jpg"
+  alt="Existing Growth artwork used as a layout placeholder, not a product screenshot"
+>
+  This is an illustrative announcement section. A real release post should
+  explain the exact change, establish availability and show a reviewed
+  screenshot of the shipped experience.
+</ArticleUpdate>
+
+## Keep image credit separate from the story
+
+<ArticleFigure
+  src="/auth-hero.jpg"
+  alt="Growth login artwork used to demonstrate an attributed article image"
+  caption="Artwork placeholder for layout review."
+  credit="Existing Growth artwork; not destination photography."
+/>
+
+## Posts inspected
+
+These links document the live references. Their factual claims were not independently checked; reusing their layout does not make those claims current.
+
+<ArticleLinks
+  links={[
+    {
+      name: "September at Wander",
+      href: "https://www.wander.com/article/september-at-wander-welcome-to-the-direct-booking-revolution",
+      label: "Announcement",
+      note: "Product changes illustrated section by section, with explanations of the operator benefit.",
+    },
+    {
+      name: "Wander welcomes Polarity",
+      href: "https://www.wander.com/article/wander-x-polarity",
+      label: "Announcement",
+      note: "A short introduction followed by the rationale and implications.",
+    },
+    {
+      name: "When to visit Orlando",
+      href: "https://www.wander.com/article/best-time-to-visit-orlando",
+      label: "Travel guide",
+      note: "Quick answers, a monthly comparison, seasonal benefits and caveats, and property links.",
+    },
+    {
+      name: "Where to stay near Big Sur",
+      href: "https://www.wander.com/article/best-places-to-stay-big-sur",
+      label: "Travel guide",
+      note: "Area-by-area sections connecting activities, practical advice and property choices.",
+    },
+    {
+      name: "Secluded Dunes transportation",
+      href: "https://www.wander.com/article/wander-secluded-dunes-transportation-guide",
+      label: "Travel logistics",
+      note: "Arrival options, distance information, service links and visible photo credit.",
+    },
+  ]}
+/>

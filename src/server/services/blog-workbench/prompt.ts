@@ -2,12 +2,13 @@ import type {
   ContentBriefGroundingContext,
   ContentBriefInput,
 } from "./contract";
+import { EDITORIAL_RULES } from "./editorial";
 
 // Versioned workbench copy of the site-editor prompt and shared copy voice.
 // The lab records its exact prompt text with each immutable run. Production
 // evolves independently, so every workbench prompt change needs a new version.
 
-export const PROMPT_VERSION = "content-brief-page/workbench-v2-2026-08-17";
+export const PROMPT_VERSION = "content-brief-page/workbench-v6-2026-10-02";
 
 /**
  * Builds the system prompt for generating a page from a content brief.
@@ -29,18 +30,22 @@ export const buildContentBriefPagePrompt = (
     `You are writing one long-form guide for ${context.businessName}, a vacation-rental property`,
     `manager. The guide must genuinely help someone searching: "${brief.targetQuery}".`,
     ``,
-    `Write as the manager who knows these homes and this area first-hand. Your edge over a generic`,
-    `roundup is the specific, real detail in the facts below — lead with it. Google rewards original,`,
-    `first-hand, people-first content and demotes generic filler, so each section should give something`,
-    `only someone who knows this portfolio could write. Never manufacture that specificity: draw it from`,
+    `Write from the manager's supplied knowledge of these homes and this area. Your edge over a generic`,
+    `roundup is the specific, real detail in the facts below. Help the reader make the travel decision`,
+    `before promoting the portfolio. Each section should add a useful distinction, practical detail or`,
+    `supported recommendation. Never manufacture that specificity: draw it from`,
     `the facts, and where you lack a detail, be honestly useful instead of padding with generic advice.`,
     ``,
-    `Use the real homes as the backbone of your answers: name and link the specific home that makes each`,
-    `point concrete, so a planner leaves knowing which of your actual homes fit and why — not just`,
-    `abstract advice a generic roundup could give. If a home is only a partial match, say so honestly.`,
+    `Use a real home when its supplied features make the travel advice concrete. Select examples for`,
+    `a distinct, evidenced fit, not equal coverage of the inventory. A spacious interior alone does not`,
+    `establish a unique seasonal recommendation. Do not force a property into every section or recommend`,
+    `three homes per season by habit. If a home is only a partial match, explain the supported tradeoff.`,
     ``,
     `# Who is searching, and what they need`,
     brief.guestIntent,
+    ``,
+    `# Editorial decisions`,
+    EDITORIAL_RULES,
     ``,
     `# What this page must do`,
     brief.summary,
@@ -73,6 +78,9 @@ export const buildContentBriefPagePrompt = (
     `  (e.g. <a href="/property/...">Name</a>). Never invent a home, an amenity it lacks, or a link.`,
     `- Where the honest answer is "it depends" or "confirm with the host", say so — that earns trust and`,
     `  reads as genuine operator knowledge, not a search-engine-first roundup.`,
+    `- A missing amenity in the supplied facts means unknown, not absent. Do not write "no pool" or`,
+    `  "no pool is listed" from an incomplete amenity list. Do not claim fixed features such as bedroom`,
+    `  counts vary by booking date. Do not invent concierge services or promises to arrange bookings.`,
     ``,
     `# Voice`,
     context.voice ??

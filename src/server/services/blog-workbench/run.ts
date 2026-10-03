@@ -26,6 +26,7 @@ import {
   type GroundingContextRecord,
 } from "./grounding";
 import { buildContentBriefPagePrompt, PROMPT_VERSION } from "./prompt";
+import { serializeArticleMdx } from "./mdx";
 import {
   evaluatorCommentsToWorkbench,
   generatedStoryboardSchema,
@@ -109,7 +110,6 @@ export type BlogRunRecord = {
 };
 
 const FIXTURE_DIR = path.resolve("fixtures/blog");
-const FIXTURE_RESPONSE = path.join(FIXTURE_DIR, "seo-engine-response.json");
 
 // Long-form prose is generated as plain markdown, not structured JSON: a
 // 1,600-word article inside a strict schema is exactly the shape that dies
@@ -125,47 +125,70 @@ const MetadataOutput = z.object({
     .describe("SEO meta description, at most 160 characters"),
 });
 
-export async function executeBlogGoldenRun(): Promise<BlogRunRecord> {
-  const previousRun = await loadLatestBlogRun();
+export type BlogRunOptions = {
+  fixtureDirectory?: string;
+  response?: SeoEngineResponse;
+  grounding?: GroundingContextRecord;
+  visualDirections?: VisualDirection[];
+  missingInputs?: MissingInput[];
+  onStage?: (stage: string) => void;
+};
+
+export async function executeBlogGoldenRun(
+  options: BlogRunOptions = {},
+): Promise<BlogRunRecord> {
+  const fixtureDirectory = options.fixtureDirectory ?? FIXTURE_DIR;
+  const fixtureResponse = path.join(
+    fixtureDirectory,
+    "seo-engine-response.json",
+  );
+  const previousRun = options.fixtureDirectory
+    ? null
+    : await loadLatestBlogRun();
   const previousComments = previousRun
     ? (
         previousRun.comments ??
         evaluatorCommentsToWorkbench(previousRun.receipts.evaluator)
       ).filter((comment) => comment.status === "open")
     : [];
-  const visualDirections = await loadBlogVisualDirections();
+  const visualDirections =
+    options.visualDirections ?? (await loadBlogVisualDirections());
   const raw = seoEngineResponseSchema.parse(
-    JSON.parse(await readFile(FIXTURE_RESPONSE, "utf8")),
+    options.response ?? JSON.parse(await readFile(fixtureResponse, "utf8")),
   );
   const brief = normalizeSeoResponseToBrief(raw);
 
   // Grounding is cached on disk: the crawl-derived stand-in is itself a
   // fixture once built, so reruns iterate on generation, not crawling.
   const groundingPath = path.join(
-    FIXTURE_DIR,
+    fixtureDirectory,
     "grounding",
     `${raw.target_domain.replace(/[^a-z0-9]+/gi, "-")}.json`,
   );
   let grounding: GroundingContextRecord;
-  try {
-    grounding = JSON.parse(
-      await readFile(groundingPath, "utf8"),
-    ) as GroundingContextRecord;
-  } catch {
-    grounding = await buildCrawlDerivedGrounding(raw.target_domain);
-    await mkdir(path.dirname(groundingPath), { recursive: true });
-    await writeFile(
-      groundingPath,
-      `${JSON.stringify(grounding, null, 2)}\n`,
-      "utf8",
-    );
-  }
+  if (options.grounding) {
+    grounding = options.grounding;
+  } else
+    try {
+      grounding = JSON.parse(
+        await readFile(groundingPath, "utf8"),
+      ) as GroundingContextRecord;
+    } catch {
+      grounding = await buildCrawlDerivedGrounding(raw.target_domain);
+      await mkdir(path.dirname(groundingPath), { recursive: true });
+      await writeFile(
+        groundingPath,
+        `${JSON.stringify(grounding, null, 2)}\n`,
+        "utf8",
+      );
+    }
 
   const promptText = buildContentBriefPagePrompt(brief, grounding.context);
 
   const usage: UsageEntry[] = [];
   const transportAdjustments: string[] = [];
 
+  options.onStage?.("storyboard");
   const storyboardStart = Date.now();
   const { output: storyboardOutput, usage: storyboardUsage } =
     await generateText({
@@ -204,6 +227,7 @@ export async function executeBlogGoldenRun(): Promise<BlogRunRecord> {
     ),
   );
 
+  options.onStage?.("writer");
   const writerStart = Date.now();
   const { text: draftMarkdown, usage: writerUsage } = await generateText({
     model: anthropic(WRITER_MODEL),
@@ -233,6 +257,7 @@ export async function executeBlogGoldenRun(): Promise<BlogRunRecord> {
     transportAdjustments,
   );
 
+  options.onStage?.("editorial-revision");
   const revisionStart = Date.now();
   const { text: revisedMarkdown, usage: revisionUsage } = await generateText({
     model: anthropic(WRITER_MODEL),
@@ -241,6 +266,7 @@ export async function executeBlogGoldenRun(): Promise<BlogRunRecord> {
     prompt: [
       "Edit this complete draft once before independent evaluation.",
       "Preserve the exact section headings and order. Remove unsupported claims, generic filler, manufactured punchlines, repeated conclusions, and unearned promotion.",
+      "Check recommendation/date consistency across the opening, tables and closing. Remove invented date-window overlaps, negative amenity claims based on missing data, and unsupported service promises. Keep each repeated fact only where it adds a new decision or exception.",
       "Address every applicable previous comment. Preserve a visual direction only where its placement helps the surrounding decision.",
       "Return the complete markdown article with one `## ` heading per storyboard section. Return no commentary around it.",
       "",
@@ -264,6 +290,7 @@ export async function executeBlogGoldenRun(): Promise<BlogRunRecord> {
   );
   const sections = splitMarkdownSections(revisedMarkdown, transportAdjustments);
 
+  options.onStage?.("metadata");
   const metadataStart = Date.now();
   const { output: metadata, usage: metadataUsage } = await generateText({
     model: anthropic("claude-sonnet-5"),
@@ -314,6 +341,7 @@ export async function executeBlogGoldenRun(): Promise<BlogRunRecord> {
     brief,
     grounding.context,
   );
+  options.onStage?.("evaluator");
   const evaluator = await evaluateArticle(article, brief, grounding.context);
   usage.push({
     stage: "evaluator",
@@ -339,11 +367,11 @@ export async function executeBlogGoldenRun(): Promise<BlogRunRecord> {
     schemaVersion: RUN_SCHEMA_VERSION,
     runId,
     createdAt: new Date().toISOString(),
-    fixturePath: "fixtures/blog/seo-engine-response.json",
+    fixturePath: path.relative(process.cwd(), fixtureResponse),
     adapterVersion: ADAPTER_VERSION,
     promptVersion: PROMPT_VERSION,
     writerModel: WRITER_MODEL,
-    missingInputs: MISSING_INPUTS,
+    missingInputs: options.missingInputs ?? MISSING_INPUTS,
     transportAdjustments,
     stages: {
       rawResponse: raw,
@@ -387,7 +415,7 @@ export async function executeBlogGoldenRun(): Promise<BlogRunRecord> {
     },
   };
 
-  const runDirectory = path.join(FIXTURE_DIR, "runs", runId);
+  const runDirectory = path.join(fixtureDirectory, "runs", runId);
   await mkdir(runDirectory, { recursive: true });
   await writeFile(
     path.join(runDirectory, "run.json"),
@@ -405,7 +433,7 @@ export async function executeBlogGoldenRun(): Promise<BlogRunRecord> {
     "utf8",
   );
   await writeFile(
-    path.join(FIXTURE_DIR, "runs", "latest.json"),
+    path.join(fixtureDirectory, "runs", "latest.json"),
     `${JSON.stringify({ runId }, null, 2)}\n`,
     "utf8",
   );
@@ -444,29 +472,6 @@ export async function exportDatoDraftForRun(
   );
   await writeFile(exportPath, `${JSON.stringify(draft, null, 2)}\n`, "utf8");
   return { runId: resolvedRunId, export: draft, path: exportPath };
-}
-
-/**
- * Serializes the typed article into MDX with frontmatter shaped for the
- * production velite posts collection. Drafts publish at the end of time,
- * so compiling one never surfaces it as published content.
- */
-function serializeArticleMdx(record: BlogRunRecord): string {
-  const { article, normalizedBrief } = record.stages;
-  const frontmatter = [
-    "---",
-    `h1: ${JSON.stringify(normalizedBrief.workingTitle)}`,
-    `metaTitle: ${JSON.stringify(article.metaTitle)}`,
-    `metaDescription: ${JSON.stringify(article.metaDescription)}`,
-    `publishedAt: "9999-12-31"`,
-    `category: Guides`,
-    `tags: []`,
-    "---",
-  ].join("\n");
-  const body = article.sections
-    .map((section) => `## ${section.heading}\n\n${section.markdown}`)
-    .join("\n\n");
-  return `${frontmatter}\n\n${body}\n`;
 }
 
 /**

@@ -12,6 +12,7 @@ import type { CheckReceipt } from "@/server/services/blog-workbench/checks";
 import type { DatoDraftExport } from "@/server/services/blog-workbench/datocms";
 import { MISSING_INPUTS } from "@/server/services/blog-workbench/contract";
 import { buildWorkbenchSnapshot } from "@/server/services/blog-workbench/workflow";
+import { blogDraftSlug } from "@/server/services/blog-workbench/mdx";
 import {
   AgentWorkbenchView,
   ReviewWorkbenchView,
@@ -67,6 +68,32 @@ export default async function BlogWorkbenchPage({
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-sm font-semibold">Blog golden run</h1>
+              {run ? (
+                <Link
+                  href={`/lab/blog-workbench/preview/${blogDraftSlug(run)}`}
+                  className="text-xs text-lime-300 underline"
+                >
+                  Velite draft preview
+                </Link>
+              ) : null}
+              <Link
+                href="/lab/blog-workbench/preview/builder-editorial-blocks"
+                className="text-xs text-lime-300 underline"
+              >
+                Editorial layouts
+              </Link>
+              <Link
+                href="/lab/blog-workbench/compare/orlando"
+                className="text-sm underline underline-offset-4"
+              >
+                Original vs Growth demo
+              </Link>
+              <Link
+                href="/lab/blog-workbench/preview/builder-wander-patterns"
+                className="text-sm underline underline-offset-4"
+              >
+                Wander blog patterns
+              </Link>
               <Pill tone="lime">fixture-backed</Pill>
               {run ? (
                 <Pill tone="lime">run {run.runId}</Pill>

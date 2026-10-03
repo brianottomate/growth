@@ -1,0 +1,674 @@
+{
+  "runId": "bgr_2026-10-02T22-51-47-810Z",
+  "originalSlug": "builder-orlando-original",
+  "generatedSlug": "builder-orlando-bgr-2026-10-02t22-51-47-810z",
+  "sourceUrl": "https://www.wander.com/article/best-time-to-visit-orlando",
+  "sourceTitle": "The Best Time to Visit Orlando for a Luxury Vacation ",
+  "createdAt": "2026-10-02T22:55:01.056Z",
+  "brief": {
+    "targetQuery": "best time to visit Orlando for weather and crowds",
+    "guestIntent": "A traveler deciding which month or season to book an Orlando trip, trying to balance comfortable weather, manageable theme park crowds, lower prices, and seasonal events like Halloween or holiday celebrations.",
+    "workingTitle": "When to Visit Orlando: A Month-by-Month Guide to Weather, Crowds, and Events",
+    "summary": "An outline-ready assignment covering Orlando's seasonal travel patterns, drawn from a source article that breaks the year into quarters (spring, summer, fall, winter) plus a month-by-month table. The source presents multiple, sometimes conflicting, 'best time' answers depending on traveler priority (weather, crowds, price, or events) rather than a single universal best month, and that nuance should be preserved rather than collapsed into one recommendation.",
+    "outline": [
+      {
+        "heading": "Quick Answer Snapshot",
+        "keyPoints": [
+          "Best overall window per source: late January through early April",
+          "Best balance of weather and manageable crowds: early November",
+          "Best for theme park seasonal events: October and December",
+          "Best for pool weather: March through early June",
+          "Best for lower prices: late August and September",
+          "These are presented as separate, sometimes competing, recommendations depending on traveler priority, not one single best month"
+        ]
+      },
+      {
+        "heading": "Month-by-Month Weather and Crowd Patterns",
+        "keyPoints": [
+          "January: mild and comfortable, medium crowds, lighter lines after New Year",
+          "February: warm afternoons, cooler mornings, medium crowds, easier park days",
+          "March: warm and busy with high crowds due to spring break",
+          "April: warm, less humid, medium crowds, comfortable before summer",
+          "May: hotter afternoons, medium crowds, longer pool days",
+          "June: hot and humid, high crowds as summer vacations begin",
+          "July: very hot with frequent storms, very high crowds, peak summer",
+          "August: very hot and humid, medium crowds, quieter and better value late in month",
+          "September: hot with storm risk, lower crowds, Halloween events begin",
+          "October: warm and comfortable, medium-to-high crowds, Halloween season",
+          "November: mild and pleasant, medium crowds, holiday events without December peak",
+          "December: comfortable but very busy late month around Christmas and New Year's, calmer early month"
+        ]
+      },
+      {
+        "heading": "Spring (March to May): Comfortable Park Days and Outdoor Dining",
+        "keyPoints": [
+          "March is the busiest spring month due to spring break travel, with quickly rising wait times and earlier-than-expected reservation sellouts",
+          "April and early May are described as more balanced, with pool weather and long daylight but more manageable parks outside holiday weekends",
+          "Strategy: early park mornings for cooler temps and shorter waits",
+          "Strategy: evenings around Disney Springs or Winter Park feel more comfortable once daytime humidity eases after sunset",
+          "Strategy: slower pool or resort afternoons help balance long park days during busy spring periods",
+          "Watch for: spring break crowd spikes around Disney and Universal",
+          "Watch for: May bringing noticeably hotter late-spring afternoons that make full midday schedules harder"
+        ]
+      },
+      {
+        "heading": "Summer (June to September): Pool Days and Late-Night Parks",
+        "keyPoints": [
+          "Summer days typically start well, turn intensely hot by early afternoon, then shift into short, heavy thunderstorms later in the day",
+          "September is described as better than expected: still hot, but crowds ease after school resumes and Halloween events begin appearing",
+          "Strategy: rope-dropping major attractions early, before heat and long standby lines set in",
+          "Strategy: scheduling indoor lunches or resort breaks during afternoon storms",
+          "Strategy: staying for nighttime shows and extended evening hours once temperatures drop after sunset",
+          "Watch for: daily thunderstorms interrupting outdoor rides, water parks, and transportation",
+          "Watch for: hurricane season bringing occasional weather disruptions between August and October"
+        ]
+      },
+      {
+        "heading": "Fall (October to November): Halloween Events and Lower Humidity",
+        "keyPoints": [
+          "October brings Halloween Horror Nights at Universal alongside Disney's Halloween celebrations, changing the atmosphere citywide",
+          "November is described as calmer, with mild temperatures supporting both pool time on warmer afternoons and comfortable evenings for long park days",
+          "Strategy: visiting during Halloween season adds atmosphere without intense summer heat",
+          "Strategy: mixing busy attraction days with slower afternoons works well across both months",
+          "Watch for: Halloween event weekends still bringing crowd spikes around Universal Orlando and Magic Kingdom evenings",
+          "Watch for: early October afternoons can still run warm with lingering late-season humidity",
+          "Watch for: Thanksgiving week becoming one of the busiest travel periods of the year"
+        ]
+      },
+      {
+        "heading": "Winter (December to February): Holiday Events and Easier Park Visits",
+        "keyPoints": [
+          "December varies dramatically by timing: early December is described as relaxed and festive, while weeks around Christmas and New Year's are among the busiest of the year",
+          "January and February are described as generally easier, with milder weather and more manageable lines after holiday crowds leave",
+          "Strategy: visiting in early December for decorations and events without extreme Christmas/New Year's crowds",
+          "Strategy: combining park days with shopping, golf, or resort time in milder winter weather",
+          "Watch for: Christmas and New Year's weeks bringing extremely heavy crowds and harder reservations",
+          "Watch for: Florida winter temperatures fluctuating, with cooler mornings and evenings catching visitors off guard",
+          "Watch for: pool weather becoming less predictable between December and February after seasonal cold fronts"
+        ]
+      },
+      {
+        "heading": "Choosing the Best Time by Traveler Priority",
+        "keyPoints": [
+          "Source presents distinct, non-universal recommendations: first-time visit (February, April, or early November)",
+          "Theme park-focused trip: January, February, or September",
+          "Halloween events specifically: October",
+          "Holiday atmosphere specifically: early December",
+          "Pool and resort stays: March through June",
+          "Lower prices and better availability: late August or September",
+          "Easier weather for younger kids: February or November",
+          "Luxury villa-focused stay: October through April",
+          "These should be preserved as separate conditional answers rather than merged into one 'best month' claim"
+        ]
+      },
+      {
+        "heading": "Where to Stay by Season (Property Highlights)",
+        "keyPoints": [
+          "Spring properties highlighted: Wander Orlando Grove Retreat, Wander Orlando Halo Grove, Wander Orlando Waterfall — each noted for outdoor space, pool areas, and indoor-outdoor layouts suited to milder March-to-May weather",
+          "Summer properties highlighted: Wander Orlando Palms Diamond, Wander Orlando Everglow, Wander Orlando Waters Retreat — noted for private pools, shaded outdoor seating, and indoor living space to escape midday heat",
+          "Fall properties highlighted: Wander Orlando Paradise Retreat, Wander Orlando Cypress Allure, Wander Orlando Links — noted for outdoor areas and indoor-outdoor flow suited to cooler October/November evenings",
+          "Winter properties highlighted: Wander Orlando Palaces, Wander Orlando Grove Oasis, Wander Orlando Palms Zenith — noted for larger layouts, calmer residential settings, and heated pool access during cooler months",
+          "Only amenities and seasonal fit explicitly stated in the source should be attributed to each property"
+        ]
+      }
+    ],
+    "entitiesToCover": [
+      "Orlando",
+      "Florida",
+      "Disney World",
+      "Universal Orlando",
+      "Halloween Horror Nights",
+      "Magic Kingdom",
+      "Disney Springs",
+      "Winter Park",
+      "Wander Orlando Grove Retreat",
+      "Wander Orlando Halo Grove",
+      "Wander Orlando Waterfall",
+      "Wander Orlando Palms Diamond",
+      "Wander Orlando Everglow",
+      "Wander Orlando Waters Retreat",
+      "Wander Orlando Paradise Retreat",
+      "Wander Orlando Cypress Allure",
+      "Wander Orlando Links",
+      "Wander Orlando Palaces",
+      "Wander Orlando Grove Oasis",
+      "Wander Orlando Palms Zenith"
+    ],
+    "recommendedPageKind": "seasonal destination travel guide",
+    "suggestedWordCount": 1400
+  },
+  "groundingProvenance": "Source-derived comparison fixture from https://www.wander.com/article/best-time-to-visit-orlando, captured 2026-10-02T22:43:32.895Z. Claims are from the published article, not independently verified or live PMS data. This tests regeneration and layout, not fresh research.",
+  "writerModel": "claude-opus-5",
+  "layoutModel": "claude-sonnet-5",
+  "runEvaluation": {
+    "evaluatorVersion": "editorial-evaluator/v3",
+    "model": "claude-sonnet-5",
+    "verdict": "revise",
+    "summary": "The piece is well-structured against the brief: it leads with a direct multi-answer snapshot, preserves the outline's non-universal recommendations, and mostly sources property amenities correctly from the grounding facts. However, one property note breaks the fourth wall by referencing 'the facts we have,' which is a serious voice failure for published copy and must be rewritten before this can ship. There are also several minor fabrications (invented seasonal behavior/benefits not in the grounding facts), a handful of AI-pattern aphoristic closers and repeated triad constructions, and a small inconsistency between the pool-weather window stated in the snapshot versus the priority table. None of these minor issues are disqualifying on their own, but combined with the major voice lapse, the article needs a revision pass before publication.",
+    "strengths": [
+      "Quick Answer Snapshot leads with a direct, citable set of answers and explicitly preserves competing priorities instead of collapsing them into one 'best month,' exactly as the brief demands.",
+      "Month-by-month table and Choosing-by-Priority table are both well-justified uses of tabular comparison and track closely to the outline's key points without inventing figures.",
+      "Property amenity claims in the seasonal highlights section are, with a couple of exceptions, pulled faithfully from the grounding facts rather than invented.",
+      "No em dashes, no invented quotes or experts, and no generic signposting phrases ('let's dive in,' 'when it comes to') anywhere in the piece.",
+      "Each seasonal section ties strategy and watch-for items to actual travel decisions (rope-drop timing, reservation timing, hurricane season) rather than generic filler."
+    ],
+    "comments": [
+      {
+        "sectionHeading": "Where to Stay by Season (Property Highlights)",
+        "excerpt": "though the facts we have list no pool there, so ask us if a pool is essential to your stay",
+        "kind": "voice",
+        "note": "This breaks the reader-facing voice entirely by referencing internal source material ('the facts we have'). It reads like leftover editorial reasoning rather than operator copy and should be rewritten as confident, grounded text or cut.",
+        "severity": "major"
+      },
+      {
+        "sectionHeading": "Where to Stay by Season (Property Highlights)",
+        "excerpt": "has a layout suited to spending real time at home rather than just sleeping there",
+        "kind": "fabrication",
+        "note": "Grounding facts list only 'layout suited to spending time at home' for Everglow. The added contrast is an invented embellishment not supported by the source.",
+        "severity": "minor"
+      },
+      {
+        "sectionHeading": "Where to Stay by Season (Property Highlights)",
+        "excerpt": "outdoor areas that come into their own once the humidity drops",
+        "kind": "fabrication",
+        "note": "Grounding facts list only 'outdoor areas' for Paradise Retreat. The seasonal behavior claimed here is invented rather than sourced.",
+        "severity": "minor"
+      },
+      {
+        "sectionHeading": "Choosing the Best Time by Traveler Priority",
+        "excerpt": "If your priorities conflict, decide which one you would regret missing.",
+        "kind": "ai_pattern",
+        "note": "Aphoristic closing line that restates the section's premise rather than adding new information.",
+        "severity": "minor"
+      },
+      {
+        "sectionHeading": "Summer (June to September): Pool Days and Late-Night Parks",
+        "excerpt": "Plan the day around that rhythm instead of fighting it.",
+        "kind": "ai_pattern",
+        "note": "Manufactured punchline closing the opening paragraph instead of a grounded observation.",
+        "severity": "minor"
+      },
+      {
+        "sectionHeading": "Winter (December to February): Holiday Events and Easier Park Visits",
+        "excerpt": "Same month, completely different experience.",
+        "kind": "ai_pattern",
+        "note": "Staccato fragment used for dramatic effect rather than conveying information.",
+        "severity": "minor"
+      },
+      {
+        "sectionHeading": "Quick Answer Snapshot",
+        "excerpt": "Mild weather, crowds that have thinned after the holidays, and park days that do not wear you down by lunch.",
+        "kind": "ai_pattern",
+        "note": "Forced three-part parallel construction that is echoed almost verbatim later in the Winter section, making the phrasing feel templated rather than observed.",
+        "severity": "minor"
+      },
+      {
+        "sectionHeading": "Winter (December to February): Holiday Events and Easier Park Visits",
+        "excerpt": "Milder weather, more manageable lines once the holiday crowds leave, and park days that do not require a survival plan.",
+        "kind": "ai_pattern",
+        "note": "Near-duplicate triad structure of the Quick Answer Snapshot's opening sentence; the repetition reads as a template rather than fresh description.",
+        "severity": "minor"
+      },
+      {
+        "sectionHeading": "Quick Answer Snapshot",
+        "excerpt": "Best for pool weather: March through early June.",
+        "kind": "structure",
+        "note": "The Choosing the Best Time table gives the matching row as 'March through June' without 'early,' a small but avoidable inconsistency between two answers meant to agree.",
+        "severity": "minor"
+      },
+      {
+        "sectionHeading": "Spring (March to May): Comfortable Park Days and Outdoor Dining",
+        "excerpt": "This is the stretch where you can do a full park day and still have energy for dinner.",
+        "kind": "ai_pattern",
+        "note": "Aphoristic flourish closing the paragraph rather than adding a grounded detail about April/May conditions.",
+        "severity": "minor"
+      },
+      {
+        "sectionHeading": "Where to Stay by Season (Property Highlights)",
+        "excerpt": "Seasonal fit matters more in Orlando than in most places, because the day splits between park time and home time.",
+        "kind": "structure",
+        "note": "Per editorial guidance, a property shortlist should be presented as place cards; here the shortlist is buried in prose paragraphs with inline links instead of a clear comparable format.",
+        "severity": "minor"
+      }
+    ],
+    "usage": {
+      "inputTokens": 10363,
+      "outputTokens": 11328
+    },
+    "latencyMs": 104980
+  },
+  "layoutEvaluation": {
+    "evaluatorVersion": "editorial-evaluator/v3",
+    "model": "claude-sonnet-5",
+    "verdict": "revise",
+    "summary": "The piece is well-grounded on facts and genuinely honors the brief's instruction to keep competing 'best time' answers separate rather than forcing a single verdict. The main problems are structural: the pool-weather date window shifts between sections without reconciliation, and the property shortlist is organized as plain link lists that blur season boundaries and don't follow the place-card format the editorial guidance calls for. Layered on top are several aphoristic closing lines and staccato fragment sentences typical of AI drafting, which should be trimmed. None of these amount to fabricated facts, but the inconsistent date windows and shortlist structure need fixing before this is publish-ready.",
+    "strengths": [
+      "Preserves the brief's core nuance: multiple, sometimes competing 'best time' answers rather than collapsing into one universal recommendation.",
+      "Month-by-month and seasonal facts track tightly to the grounding facts with no invented statistics or wait-time numbers.",
+      "Property amenity call-outs match the grounding facts exactly, including correctly flagging the one property without a listed pool rather than assuming one.",
+      "Clean use of answers/comparison/tradeoffs components that fit the seasonal-guide format well, and no em dashes or generic signposting phrases."
+    ],
+    "comments": [
+      {
+        "sectionHeading": "Quick Answer Snapshot",
+        "excerpt": "Pick the priority first, then pick the month.",
+        "kind": "ai_pattern",
+        "note": "Aphoristic closing line that restates the section's point rather than adding information. Classic AI-style punchline.",
+        "severity": "minor"
+      },
+      {
+        "sectionHeading": "Spring (March to May): Comfortable Park Days and Outdoor Dining",
+        "excerpt": "This is the stretch where you can do a full park day and still have energy for dinner.",
+        "kind": "ai_pattern",
+        "note": "Unsupported, feel-good generalization with no grounding behind the 'energy for dinner' claim; reads as a manufactured punchline rather than a sourced observation.",
+        "severity": "minor"
+      },
+      {
+        "sectionHeading": "Spring (March to May): Comfortable Park Days and Outdoor Dining",
+        "excerpt": "A slow pool or resort afternoon built into the schedule is what makes a long spring park day survivable, especially during busy periods.",
+        "kind": "ai_pattern",
+        "note": "Aphoristic closing line that just restates the tradeoffs box above instead of adding a new, grounded point.",
+        "severity": "minor"
+      },
+      {
+        "sectionHeading": "Summer (June to September): Pool Days and Late-Night Parks",
+        "excerpt": "Mornings start well. By early afternoon the heat turns intense. Later in the day, short heavy thunderstorms roll through.",
+        "kind": "ai_pattern",
+        "note": "Staccato fragment chain used for dramatic effect; could be written as a single grounded sentence without the manufactured rhythm.",
+        "severity": "minor"
+      },
+      {
+        "sectionHeading": "Summer (June to September): Pool Days and Late-Night Parks",
+        "excerpt": "Hurricane season brings occasional weather disruptions between August and October, worth factoring into travel insurance and flexible flight plans",
+        "kind": "grounding",
+        "note": "The grounding facts mention hurricane-season disruptions but say nothing about travel insurance or flexible flight plans; this specific advice is invented and should be cut or sourced.",
+        "severity": "minor"
+      },
+      {
+        "sectionHeading": "Summer (June to September): Pool Days and Late-Night Parks",
+        "excerpt": "Scheduling indoor lunches or a break back at the house during the afternoon storm window keeps the rest of the day on track.",
+        "kind": "ai_pattern",
+        "note": "Another aphoristic closing sentence that restates the tradeoffs box rather than advancing the section.",
+        "severity": "minor"
+      },
+      {
+        "sectionHeading": "Winter (December to February): Holiday Events and Easier Park Visits",
+        "excerpt": "Same month, completely different experience.",
+        "kind": "ai_pattern",
+        "note": "Staccato fragment used as a punchline; stylistic flourish rather than grounded content.",
+        "severity": "minor"
+      },
+      {
+        "sectionHeading": "Choosing the Best Time by Traveler Priority",
+        "excerpt": "If two rows apply to you, the overlap is usually February or early November. If your priorities conflict, decide which one you would regret missing.",
+        "kind": "ai_pattern",
+        "note": "Manufactured 'wisdom' closing line with an invented decision heuristic not supported by the grounding facts; reads as filler rather than sourced advice.",
+        "severity": "minor"
+      },
+      {
+        "sectionHeading": "Choosing the Best Time by Traveler Priority",
+        "excerpt": "Pool and resort stays | March through June",
+        "kind": "structure",
+        "note": "Conflicts with the Quick Answer Snapshot's pool-weather window of 'March through early June' and with the Spring section's 'March to May' framing. The three windows should be reconciled into one consistent range before publication.",
+        "severity": "major"
+      },
+      {
+        "sectionHeading": "Where to Stay by Season (Property Highlights)",
+        "excerpt": "\"name\":\"Wander Orlando Palms Diamond\",\"href\":\"https://www.wander.com/property/wander-orlando-palms-diamond\",\"label\":\"Summer pick\"",
+        "kind": "structure",
+        "note": "This summer-labeled property is bundled into the same link block as three spring properties with no section break, so the grouping mixes two seasons together. Related picks should be grouped under their own season so the shortlist reads cleanly.",
+        "severity": "major"
+      },
+      {
+        "sectionHeading": "Where to Stay by Season (Property Highlights)",
+        "excerpt": "Here is how the portfolio lines up.",
+        "kind": "structure",
+        "note": "A seasonal property shortlist like this calls for a place-card component (per the editorial guidance: place cards for a shortlist), not three generic link lists that straddle season boundaries. The current format undersells the distinct seasonal fit the section promises.",
+        "severity": "major"
+      },
+      {
+        "sectionHeading": "Where to Stay by Season (Property Highlights)",
+        "excerpt": "no pool is listed, so ask us if one is essential",
+        "kind": "grounding",
+        "note": "The 'ask us' prompt is an invented service interaction not present in the grounding facts; the absence of a pool is correctly noted, but the follow-up instruction should be dropped or softened to avoid implying an unverified concierge offer.",
+        "severity": "minor"
+      }
+    ],
+    "usage": {
+      "inputTokens": 11052,
+      "outputTokens": 13284
+    },
+    "latencyMs": 117937
+  },
+  "checks": [
+    {
+      "id": "outline-coverage",
+      "name": "Outline coverage",
+      "status": "passed",
+      "summary": "8/8 outline positions matched",
+      "rows": [
+        {
+          "label": "1. Quick Answer Snapshot",
+          "detail": "matched in position",
+          "ok": true
+        },
+        {
+          "label": "2. Month-by-Month Weather and Crowd Patterns",
+          "detail": "matched in position",
+          "ok": true
+        },
+        {
+          "label": "3. Spring (March to May): Comfortable Park Days and Outdoor Dining",
+          "detail": "matched in position",
+          "ok": true
+        },
+        {
+          "label": "4. Summer (June to September): Pool Days and Late-Night Parks",
+          "detail": "matched in position",
+          "ok": true
+        },
+        {
+          "label": "5. Fall (October to November): Halloween Events and Lower Humidity",
+          "detail": "matched in position",
+          "ok": true
+        },
+        {
+          "label": "6. Winter (December to February): Holiday Events and Easier Park Visits",
+          "detail": "matched in position",
+          "ok": true
+        },
+        {
+          "label": "7. Choosing the Best Time by Traveler Priority",
+          "detail": "matched in position",
+          "ok": true
+        },
+        {
+          "label": "8. Where to Stay by Season (Property Highlights)",
+          "detail": "matched in position",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "id": "numeric-grounding",
+      "name": "Numeric grounding",
+      "status": "passed",
+      "summary": "0/0 numbers trace to permitted sources",
+      "rows": []
+    },
+    {
+      "id": "link-provenance",
+      "name": "Link provenance",
+      "status": "passed",
+      "summary": "12/12 links trace to grounding properties",
+      "rows": [
+        {
+          "label": "https://www.wander.com/property/wander-orlando-grove-retreat",
+          "detail": "a real property href from the grounding context",
+          "ok": true
+        },
+        {
+          "label": "https://www.wander.com/property/wander-orlando-halo-grove",
+          "detail": "a real property href from the grounding context",
+          "ok": true
+        },
+        {
+          "label": "https://www.wander.com/property/wander-orlando-waterfall",
+          "detail": "a real property href from the grounding context",
+          "ok": true
+        },
+        {
+          "label": "https://www.wander.com/property/wander-orlando-palms-diamond",
+          "detail": "a real property href from the grounding context",
+          "ok": true
+        },
+        {
+          "label": "https://www.wander.com/property/wander-orlando-everglow",
+          "detail": "a real property href from the grounding context",
+          "ok": true
+        },
+        {
+          "label": "https://www.wander.com/property/wander-orlando-waters-retreat",
+          "detail": "a real property href from the grounding context",
+          "ok": true
+        },
+        {
+          "label": "https://www.wander.com/property/wander-orlando-paradise-retreat",
+          "detail": "a real property href from the grounding context",
+          "ok": true
+        },
+        {
+          "label": "https://www.wander.com/property/wander-orlando-cypress-allure",
+          "detail": "a real property href from the grounding context",
+          "ok": true
+        },
+        {
+          "label": "https://www.wander.com/property/wander-orlando-links",
+          "detail": "a real property href from the grounding context",
+          "ok": true
+        },
+        {
+          "label": "https://www.wander.com/property/wander-orlando-palms-zenith",
+          "detail": "a real property href from the grounding context",
+          "ok": true
+        },
+        {
+          "label": "https://www.wander.com/property/wander-orlando-palaces",
+          "detail": "a real property href from the grounding context",
+          "ok": true
+        },
+        {
+          "label": "https://www.wander.com/property/wander-orlando-grove-oasis",
+          "detail": "a real property href from the grounding context",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "id": "voice-bans",
+      "name": "Voice bans (lexical)",
+      "status": "passed",
+      "summary": "no em dashes, no hard-banned clichés",
+      "rows": [
+        {
+          "label": "em dashes",
+          "detail": "none in generated copy",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "id": "entity-coverage",
+      "name": "Entity coverage",
+      "status": "passed",
+      "summary": "20/20 brief entities mentioned",
+      "rows": [
+        {
+          "label": "Orlando",
+          "detail": "mentioned",
+          "ok": true
+        },
+        {
+          "label": "Florida",
+          "detail": "mentioned",
+          "ok": true
+        },
+        {
+          "label": "Disney World",
+          "detail": "mentioned",
+          "ok": true
+        },
+        {
+          "label": "Universal Orlando",
+          "detail": "mentioned",
+          "ok": true
+        },
+        {
+          "label": "Halloween Horror Nights",
+          "detail": "mentioned",
+          "ok": true
+        },
+        {
+          "label": "Magic Kingdom",
+          "detail": "mentioned",
+          "ok": true
+        },
+        {
+          "label": "Disney Springs",
+          "detail": "mentioned",
+          "ok": true
+        },
+        {
+          "label": "Winter Park",
+          "detail": "mentioned",
+          "ok": true
+        },
+        {
+          "label": "Wander Orlando Grove Retreat",
+          "detail": "mentioned",
+          "ok": true
+        },
+        {
+          "label": "Wander Orlando Halo Grove",
+          "detail": "mentioned",
+          "ok": true
+        },
+        {
+          "label": "Wander Orlando Waterfall",
+          "detail": "mentioned",
+          "ok": true
+        },
+        {
+          "label": "Wander Orlando Palms Diamond",
+          "detail": "mentioned",
+          "ok": true
+        },
+        {
+          "label": "Wander Orlando Everglow",
+          "detail": "mentioned",
+          "ok": true
+        },
+        {
+          "label": "Wander Orlando Waters Retreat",
+          "detail": "mentioned",
+          "ok": true
+        },
+        {
+          "label": "Wander Orlando Paradise Retreat",
+          "detail": "mentioned",
+          "ok": true
+        },
+        {
+          "label": "Wander Orlando Cypress Allure",
+          "detail": "mentioned",
+          "ok": true
+        },
+        {
+          "label": "Wander Orlando Links",
+          "detail": "mentioned",
+          "ok": true
+        },
+        {
+          "label": "Wander Orlando Palaces",
+          "detail": "mentioned",
+          "ok": true
+        },
+        {
+          "label": "Wander Orlando Grove Oasis",
+          "detail": "mentioned",
+          "ok": true
+        },
+        {
+          "label": "Wander Orlando Palms Zenith",
+          "detail": "mentioned",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "id": "metadata-gate",
+      "name": "Metadata gate (velite limits)",
+      "status": "passed",
+      "summary": "frontmatter satisfies the production posts schema limits",
+      "rows": [
+        {
+          "label": "h1 (76 chars)",
+          "detail": "When to Visit Orlando: A Month-by-Month Guide to Weather, Crowds, and Events",
+          "ok": true
+        },
+        {
+          "label": "metaTitle (55 chars, limit 60)",
+          "detail": "Best Time to Visit Orlando: Weather and Crowds by Month",
+          "ok": true
+        },
+        {
+          "label": "metaDescription (144 chars, limit 160)",
+          "detail": "A month-by-month guide to Orlando weather, crowd levels, and events, so you can choose the best time to visit based on what matters most to you.",
+          "ok": true
+        },
+        {
+          "label": "publication gate",
+          "detail": "draft publishes at the end of time (9999-12-31)",
+          "ok": true
+        }
+      ]
+    }
+  ],
+  "usage": [
+    {
+      "stage": "storyboard",
+      "model": "claude-sonnet-5",
+      "inputTokens": 6054,
+      "outputTokens": 4138,
+      "latencyMs": 32513,
+      "estCostUsd": 0.080232
+    },
+    {
+      "stage": "writer",
+      "model": "claude-opus-5",
+      "inputTokens": 10976,
+      "outputTokens": 3736,
+      "latencyMs": 46616,
+      "estCostUsd": 0.44484
+    },
+    {
+      "stage": "editorial-revision",
+      "model": "claude-opus-5",
+      "inputTokens": 14376,
+      "outputTokens": 3370,
+      "latencyMs": 26452,
+      "estCostUsd": 0.46839000000000003
+    },
+    {
+      "stage": "metadata",
+      "model": "claude-sonnet-5",
+      "inputTokens": 3011,
+      "outputTokens": 533,
+      "latencyMs": 5418,
+      "estCostUsd": 0.017028
+    },
+    {
+      "stage": "evaluator",
+      "model": "claude-sonnet-5",
+      "inputTokens": 10363,
+      "outputTokens": 11328,
+      "latencyMs": 104980,
+      "estCostUsd": 0.201009
+    }
+  ],
+  "layoutUsage": {
+    "inputTokens": 7037,
+    "inputTokenDetails": {
+      "noCacheTokens": 7037,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0
+    },
+    "outputTokens": 8866,
+    "outputTokenDetails": {
+      "textTokens": 4239,
+      "reasoningTokens": 4627
+    },
+    "totalTokens": 15903
+  },
+  "presentationNote": "Property photos, location, bedroom/bath counts and available ratings captured from the public Wander listing API; 12 exact listing matches, 0 unavailable. Cards moved into seasonal sections after the saved model review; this presentation revision has not been re-evaluated."
+}
