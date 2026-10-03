@@ -68,6 +68,12 @@ export default async function BlogWorkbenchPage({
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-sm font-semibold">Blog golden run</h1>
+              <Link
+                href="/lab/blog-workbench/prompt-bank"
+                className="text-sm underline underline-offset-4"
+              >
+                Prompt bank
+              </Link>
               {run ? (
                 <Link
                   href={`/lab/blog-workbench/preview/${blogDraftSlug(run)}`}
