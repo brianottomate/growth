@@ -9,11 +9,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { CommandMenu } from "@/components/command-menu";
 import { ContentColumn, ContentWidthToggle } from "@/components/content-width";
 import { AUTH_RETURN_TO_HEADER, getSafeInternalPath } from "@/lib/auth-utils";
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { db } from "@/server/db";
 import { brandTable } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
@@ -61,8 +57,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       <div className="flex h-svh min-w-0 flex-1 overflow-hidden">
         <SidebarInset className="h-svh min-h-0 min-w-0 overflow-hidden">
           <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
-            <SidebarTrigger className="-ml-1" />
-            <ContentWidthToggle />
+            <ContentWidthToggle className="-ml-1" />
           </header>
           {/* @container lets wide surfaces (e.g. the content Board) break out of
               the centered column with a cqw-based negative margin. Those

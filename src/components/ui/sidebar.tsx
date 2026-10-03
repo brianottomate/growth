@@ -268,6 +268,12 @@ const Sidebar = React.forwardRef<
           )}
         />
         <div
+          // The collapsed rail is the hover target; the overlay closes on leave.
+          onMouseEnter={
+            state === "collapsed" && collapsible === "icon"
+              ? () => setPeek(true)
+              : undefined
+          }
           onMouseLeave={peeking ? () => setPeek(false) : undefined}
           className={cn(
             "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear md:flex",
@@ -300,7 +306,7 @@ const SidebarTrigger = React.forwardRef<
   React.ElementRef<typeof Button>,
   React.ComponentProps<typeof Button>
 >(({ className, onClick, ...props }, ref) => {
-  const { toggleSidebar, state, isMobile, setPeek } = useSidebar();
+  const { toggleSidebar, setPeek } = useSidebar();
 
   return (
     <Button
@@ -308,17 +314,7 @@ const SidebarTrigger = React.forwardRef<
       data-sidebar="trigger"
       variant="ghost"
       size="icon"
-      // Stays above the peek overlay so the click that pins still lands here.
-      className={cn("relative z-40 h-7 w-7", className)}
-      onMouseEnter={() => {
-        if (state === "collapsed" && !isMobile) setPeek(true);
-      }}
-      onMouseLeave={(event) => {
-        const into = event.relatedTarget;
-        if (into instanceof Element && into.closest("[data-sidebar=sidebar]"))
-          return;
-        setPeek(false);
-      }}
+      className={cn("h-7 w-7", className)}
       onClick={(event) => {
         onClick?.(event);
         setPeek(false);

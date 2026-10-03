@@ -10,6 +10,7 @@ import {
   LogOut,
   Monitor,
   Moon,
+  PanelLeft,
   Search,
   Settings,
   Sun,
@@ -59,7 +60,7 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { isMobile, setOpenMobile } = useSidebar();
+  const { isMobile, setOpenMobile, open, toggleSidebar } = useSidebar();
   // On a phone the sidebar is a sheet over the page: going somewhere closes it.
   useEffect(() => {
     if (isMobile) setOpenMobile(false);
@@ -91,6 +92,17 @@ export function AppSidebar({
                   Wander Growth
                 </span>
               </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          {/* Same spot in the rail and the panel, so hover peeks and the click pins without moving. */}
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              type="button"
+              tooltip={open ? "Collapse sidebar" : "Expand sidebar"}
+              onClick={toggleSidebar}
+            >
+              <PanelLeft />
+              <span>{open ? "Collapse" : "Expand"}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
