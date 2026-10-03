@@ -247,6 +247,7 @@ export async function extendSource(input: {
       eq(mediaAssetTable.provider, "r2"),
       eq(mediaAssetTable.kind, "image"),
       eq(mediaAssetTable.status, "ready"),
+      eq(mediaAssetTable.reviewStatus, "approved"),
       isNull(mediaAssetTable.deletedAt),
       sql`${mediaAssetTable.metadata} ->> 'extendedFrom' = ${input.source.id}`,
       sql`${mediaAssetTable.metadata} ->> 'aspectRatio' = ${aspectRatio}`,

@@ -614,6 +614,7 @@ export const listMediaLibrary = growthAction({
       where: and(
         eq(mediaAssetTable.brandId, brand.id),
         eq(mediaAssetTable.status, "ready"),
+        eq(mediaAssetTable.reviewStatus, "approved"),
         isNull(mediaAssetTable.deletedAt),
         ...(kind ? [eq(mediaAssetTable.kind, kind)] : []),
       ),

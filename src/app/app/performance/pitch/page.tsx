@@ -95,11 +95,11 @@ export default async function PitchDesk({
                       <Badge variant="secondary">WanderOS</Badge>
                     )}
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {customized.has(brand.id)
-                      ? "Customized pitch"
-                      : "Automatic pitch · uses available brand information"}
-                  </p>
+                  {customized.has(brand.id) && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Customized pitch
+                    </p>
+                  )}
                 </div>
                 <div className="flex shrink-0 flex-wrap items-center gap-4">
                   <PitchChatButton brandId={brand.id} name={brand.name} />

@@ -1,5 +1,6 @@
 "use client";
 
+import { WebsiteMediaSuggestions } from "./WebsiteMediaSuggestions";
 import { useCallback, useDeferredValue, useRef, useState } from "react";
 import Image from "next/image";
 import {
@@ -504,6 +505,7 @@ export function MediaLibrary({
         </div>
       </div>
 
+      <WebsiteMediaSuggestions brandId={brandId} />
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-56 flex-1 @xl:max-w-sm">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />

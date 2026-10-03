@@ -1,3 +1,8 @@
+import {
+  listMediaSuggestionsAction,
+  discoverMediaSuggestionsAction,
+  reviewMediaSuggestionAction,
+} from "@/server/ai/capabilities/media-review";
 import { scrapeSiteImages } from "@/server/clients/firecrawl.client";
 import { z } from "zod";
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
@@ -149,6 +154,9 @@ const videoFrameSchema = z.object({
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024; // 25MB
 
 export const mediaRouter = {
+  suggestions: actionProcedure(listMediaSuggestionsAction),
+  discoverWebsiteImages: actionProcedure(discoverMediaSuggestionsAction),
+  reviewWebsiteImage: actionProcedure(reviewMediaSuggestionAction),
   /**
    * Presign a transient chat attachment for direct browser → R2 upload. Not a
    * media_asset — used by the /overview chat composer to attach the image to a
@@ -315,6 +323,7 @@ export const mediaRouter = {
             where: and(
               eq(mediaAssetTable.brandId, input.brandId),
               eq(mediaAssetTable.status, "ready"),
+              eq(mediaAssetTable.reviewStatus, "approved"),
               isNull(mediaAssetTable.deletedAt),
               sql`${mediaAssetTable.metadata} ->> 'sourceUrl' in (${sql.join(
                 urls.map((url) => sql`${url}`),
@@ -404,6 +413,7 @@ export const mediaRouter = {
         where: and(
           eq(mediaAssetTable.brandId, input.brandId),
           inArray(mediaAssetTable.id, input.ids),
+          eq(mediaAssetTable.reviewStatus, "approved"),
           isNull(mediaAssetTable.deletedAt),
         ),
         columns: {

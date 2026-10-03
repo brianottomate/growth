@@ -30,6 +30,7 @@ export default async function PitchWorkspace({
       where: and(
         eq(mediaAssetTable.brandId, brand.id),
         eq(mediaAssetTable.status, "ready"),
+        eq(mediaAssetTable.reviewStatus, "approved"),
         eq(mediaAssetTable.kind, "image"),
       ),
       columns: { id: true, title: true, url: true },

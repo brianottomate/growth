@@ -553,12 +553,21 @@ export const growthActionPolicies = {
     prepareVideo: write({ consequence: "model-write" }),
   },
   mediaLibraryRead: {
+    suggestions: read(),
     list: read(),
     // Reads the brand's own site feed; nothing enters the library.
     listingPhotos: read("provider-read"),
   },
   sessionRead: { get: read() },
   mediaLibraryWrite: {
+    discoverWebsiteImages: write({
+      idempotent: true,
+      consequence: "provider-read",
+    }),
+    reviewWebsiteImage: write({
+      idempotent: true,
+      consequence: "provider-read",
+    }),
     // Promotion dedups by URL, so re-saving the same paste is a no-op; the
     // model-write consequence covers the auto-tag analysis pass.
     saveChatMedia: write({ idempotent: true, consequence: "model-write" }),

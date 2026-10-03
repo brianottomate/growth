@@ -244,6 +244,7 @@ export async function resolveCompositionContext(
         eq(mediaAssetTable.provider, "r2"),
         eq(mediaAssetTable.kind, "image"),
         eq(mediaAssetTable.status, "ready"),
+        eq(mediaAssetTable.reviewStatus, "approved"),
         isNull(mediaAssetTable.deletedAt),
       ),
       columns: {
@@ -2174,6 +2175,7 @@ export async function findFrozenComposition(input: {
       eq(mediaAssetTable.provider, "r2"),
       eq(mediaAssetTable.kind, "image"),
       eq(mediaAssetTable.status, "ready"),
+      eq(mediaAssetTable.reviewStatus, "approved"),
       isNull(mediaAssetTable.deletedAt),
       sql`${mediaAssetTable.metadata} -> 'composition' @> ${wanted}::jsonb`,
     ),

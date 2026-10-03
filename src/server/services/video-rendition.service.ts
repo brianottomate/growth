@@ -84,6 +84,7 @@ async function claim(mediaId: string, force: boolean) {
         eq(mediaAssetTable.kind, "video"),
         eq(mediaAssetTable.provider, "r2"),
         eq(mediaAssetTable.status, "ready"),
+        eq(mediaAssetTable.reviewStatus, "approved"),
         isNull(mediaAssetTable.deletedAt),
         force
           ? sql`(coalesce(${mediaAssetTable.metadata}->'renditions'->>'status', '') <> 'processing'
@@ -232,6 +233,7 @@ export async function pendingVideoRenditions(limit: number) {
         eq(mediaAssetTable.kind, "video"),
         eq(mediaAssetTable.provider, "r2"),
         eq(mediaAssetTable.status, "ready"),
+        eq(mediaAssetTable.reviewStatus, "approved"),
         isNull(mediaAssetTable.deletedAt),
         gt(mediaAssetTable.createdAt, since),
         sql`(${mediaAssetTable.metadata}->'renditions' is null

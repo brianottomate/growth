@@ -1213,6 +1213,7 @@ export const suggestMediaForContent = growthAction({
         where: and(
           eq(mediaAssetTable.brandId, content.brandId),
           eq(mediaAssetTable.status, "ready"),
+          eq(mediaAssetTable.reviewStatus, "approved"),
           isNull(mediaAssetTable.deletedAt),
           inArray(mediaAssetTable.kind, ["image", "gif", "video"]),
         ),
@@ -1342,6 +1343,7 @@ export const attachLibraryMediaToContent = growthAction({
         eq(mediaAssetTable.id, input.mediaAssetId),
         eq(mediaAssetTable.brandId, content.brandId),
         eq(mediaAssetTable.status, "ready"),
+        eq(mediaAssetTable.reviewStatus, "approved"),
         isNull(mediaAssetTable.deletedAt),
       ),
     });

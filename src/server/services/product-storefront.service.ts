@@ -281,6 +281,7 @@ async function validateStorefrontMedia(
       inArray(mediaAssetTable.id, ids),
       eq(mediaAssetTable.brandId, brandId),
       eq(mediaAssetTable.status, "ready"),
+      eq(mediaAssetTable.reviewStatus, "approved"),
       isNull(mediaAssetTable.deletedAt),
     ),
     columns: { id: true, kind: true },
@@ -408,6 +409,7 @@ export async function listProductBrandAssets(
     where: and(
       eq(mediaAssetTable.brandId, brandId),
       eq(mediaAssetTable.status, "ready"),
+      eq(mediaAssetTable.reviewStatus, "approved"),
       isNull(mediaAssetTable.deletedAt),
       inArray(mediaAssetTable.kind, ["image", "gif", "video"]),
     ),

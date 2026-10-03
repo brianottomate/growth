@@ -55,6 +55,8 @@ const imageItemSchema = z.strictObject({
     .nullable(),
   mimeType: z.string().nullable(),
   provider: z.enum(["external", "r2", "stream"]),
+  reviewStatus: z.enum(["suggested", "approved", "rejected"]),
+  discoveredSourceUrl: z.string().nullable(),
   r2Key: z.string().nullable(),
   size: z.number().nullable(),
   sourceMediaIndex: z.number().nullable(),

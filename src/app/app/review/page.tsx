@@ -197,6 +197,7 @@ export default async function ReviewPage() {
         inArray(mediaAssetTable.brandId, brandIds),
         eq(mediaAssetTable.kind, "image"),
         eq(mediaAssetTable.status, "ready"),
+        eq(mediaAssetTable.reviewStatus, "approved"),
         isNull(mediaAssetTable.deletedAt),
       ),
       columns: { brandId: true, metadata: true },

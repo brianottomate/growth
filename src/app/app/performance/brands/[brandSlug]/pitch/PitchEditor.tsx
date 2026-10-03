@@ -1,5 +1,8 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { PitchMediaPicker, type PitchAssetTarget } from "./PitchMediaPicker";
+import { WebsiteMediaSuggestions } from "@/app/app/media/WebsiteMediaSuggestions";
 import { PitchChatButton } from "../../../PitchChatButton";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -43,6 +46,8 @@ export function PitchEditor({
   homes: { name: string; urlKey: string; heroSourceUrl: string | null }[];
   media: { id: string; title: string | null; url: string | null }[];
 }) {
+  const router = useRouter();
+  const [assetTarget, setAssetTarget] = useState<PitchAssetTarget | null>(null);
   const initial = pitchFieldsSchema.parse(brand.pitchSettings ?? EMPTY_PITCH);
   const [editing, setEditing] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
@@ -83,6 +88,7 @@ export function PitchEditor({
         setError(null);
         setEditing(false);
         toast.success("Live pitch updated");
+        router.refresh();
       },
       onError: (cause) => setError(cause.message),
     }),
@@ -782,7 +788,46 @@ export function PitchEditor({
           </div>
         </div>
       )}
+      {!editing && <WebsiteMediaSuggestions brandId={brand.id} />}
+      {assetTarget && (
+        <PitchMediaPicker
+          key={assetTarget}
+          brandId={brand.id}
+          target={assetTarget}
+          selected={
+            assetTarget === "photos"
+              ? saved.imageUrls
+              : assetTarget === "hero"
+                ? saved.heroMedia
+                  ? [saved.heroMedia.url]
+                  : []
+                : [
+                    assetTarget === "logo" ? saved.logoUrl : saved.iconUrl,
+                  ].filter(Boolean)
+          }
+          onClose={() => setAssetTarget(null)}
+          onSave={async (urls) => {
+            const latest = await load.refetch();
+            if (!latest.data)
+              throw new Error("Could not load the current pitch. Try again.");
+            const next = pitchFieldsSchema.parse(
+              latest.data.pitchSettings ?? EMPTY_PITCH,
+            );
+            if (assetTarget === "photos") next.imageUrls = urls;
+            else if (assetTarget === "hero")
+              next.heroMedia = urls[0] ? { url: urls[0], kind: "image" } : null;
+            else if (assetTarget === "logo") next.logoUrl = urls[0] ?? "";
+            else next.iconUrl = urls[0] ?? "";
+            await save.mutateAsync({
+              brandId: brand.id,
+              expectedRevision: latest.data.pitchSettings?.revision ?? 0,
+              fields: next,
+            });
+          }}
+        />
+      )}
       <PitchVisualPreview
+        onChooseAsset={!editing && !busy ? setAssetTarget : undefined}
         fields={resolved}
         photos={photos}
         editing={editing}

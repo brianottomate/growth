@@ -386,6 +386,7 @@ export default async function BrandsPage() {
     inArray(mediaAssetTable.brandId, brandIds),
     isNull(mediaAssetTable.deletedAt),
     eq(mediaAssetTable.status, "ready"),
+    eq(mediaAssetTable.reviewStatus, "approved"),
     inArray(mediaAssetTable.kind, ["image", "video"]),
   );
   const rankedMedia = db

@@ -182,6 +182,7 @@ export async function resolveMarkIconUrl(
       eq(mediaAssetTable.id, recipe.iconAssetId),
       eq(mediaAssetTable.brandId, brand.id),
       eq(mediaAssetTable.status, "ready"),
+      eq(mediaAssetTable.reviewStatus, "approved"),
       isNull(mediaAssetTable.deletedAt),
     ),
     columns: { url: true },

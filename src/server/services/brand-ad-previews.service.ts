@@ -97,6 +97,7 @@ export async function listBrandAdPreviews(
       ),
       eq(mediaAssetTable.brandId, brandId),
       eq(mediaAssetTable.status, "ready"),
+      eq(mediaAssetTable.reviewStatus, "approved"),
       isNull(mediaAssetTable.deletedAt),
     ),
     columns: { id: true, url: true, thumbnailUrl: true, metadata: true },

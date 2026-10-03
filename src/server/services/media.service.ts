@@ -1,7 +1,12 @@
 import { and, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import { db, withTransaction } from "../db";
+import {
+  db,
+  withTransaction,
+  type Database,
+  type TransactionClient,
+} from "../db";
 import type { MediaKind, MediaStoryboard } from "../db/schema";
 import {
   mediaAssetTable,
@@ -527,6 +532,7 @@ export async function findImportedImage(input: {
       // importRemoteImage files a GIF under its own kind.
       inArray(mediaAssetTable.kind, ["image", "gif"]),
       eq(mediaAssetTable.status, "ready"),
+      eq(mediaAssetTable.reviewStatus, "approved"),
       isNull(mediaAssetTable.deletedAt),
       sql`${mediaAssetTable.metadata} ->> 'sourceUrl' = ${input.url}`,
     ),
@@ -943,17 +949,22 @@ export async function reconcileStaleUploads(brandId: string) {
   return { recovered, failed };
 }
 
-export async function listMedia(input: {
-  brandId: string;
-  kind?: MediaKind;
-  folderId?: string | null;
-  tagId?: string;
-  query?: string;
-}) {
+export async function listMedia(
+  input: {
+    brandId: string;
+    kind?: MediaKind;
+    folderId?: string | null;
+    tagId?: string;
+    query?: string;
+    reviewStatus?: "suggested" | "approved" | "rejected";
+  },
+  client: Database | TransactionClient = db,
+) {
   const query = input.query?.trim();
-  return db.query.mediaAssetTable.findMany({
+  return client.query.mediaAssetTable.findMany({
     where: and(
       eq(mediaAssetTable.brandId, input.brandId),
+      eq(mediaAssetTable.reviewStatus, input.reviewStatus ?? "approved"),
       // An upload still unfinalised after this long never landed — the tab
       // closed, or the PUT hung. Hide it rather than showing a dead tile.
       sql<boolean>`(${mediaAssetTable.status} <> 'uploading'

@@ -305,6 +305,7 @@ async function cardFromAsset(brandId: string, mediaAssetId: string) {
       eq(mediaAssetTable.id, mediaAssetId),
       eq(mediaAssetTable.brandId, brandId),
       eq(mediaAssetTable.status, "ready"),
+      eq(mediaAssetTable.reviewStatus, "approved"),
       isNull(mediaAssetTable.deletedAt),
     ),
     columns: {

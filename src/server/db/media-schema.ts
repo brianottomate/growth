@@ -57,6 +57,12 @@ export const mediaStatusEnum = pgEnum("media_status", [
 ]);
 export type MediaStatus = (typeof mediaStatusEnum.enumValues)[number];
 
+export const mediaReviewStatusEnum = pgEnum("media_review_status", [
+  "suggested",
+  "approved",
+  "rejected",
+]);
+
 export const mediaTagSourceEnum = pgEnum("media_tag_source", ["human", "ai"]);
 export type MediaTagSource = (typeof mediaTagSourceEnum.enumValues)[number];
 
@@ -200,6 +206,9 @@ export const mediaAssetTable = pgTable(
     provider: mediaProviderEnum().notNull(),
     kind: mediaKindEnum().notNull(),
     status: mediaStatusEnum().default("uploading").notNull(),
+    reviewStatus: mediaReviewStatusEnum().default("approved").notNull(),
+    // Durable scrape identity: rejection survives rediscovery of the same URL.
+    discoveredSourceUrl: t.text(),
 
     // Human-facing
     title: t.text(),
@@ -250,6 +259,10 @@ export const mediaAssetTable = pgTable(
     index("media_asset_folder_idx").on(table.folderId),
     index("media_asset_kind_idx").on(table.kind),
     index("media_asset_status_idx").on(table.status),
+    uniqueIndex("media_asset_discovered_source_idx").on(
+      table.brandId,
+      table.discoveredSourceUrl,
+    ),
     index("media_asset_uploaded_by_idx").on(table.uploadedBy),
     // Non-unique: a chat image promoted into several brand libraries shares
     // one underlying object key.

@@ -921,6 +921,7 @@ async function previousRenders(brandId: string, fresh = false) {
         keyed.map((a) => a.assetId),
       ),
       eq(mediaAssetTable.status, "ready"),
+      eq(mediaAssetTable.reviewStatus, "approved"),
       isNull(mediaAssetTable.deletedAt),
     ),
   });
@@ -964,6 +965,7 @@ async function finishedCatalogAsset(brandId: string, assetId: string) {
       eq(mediaAssetTable.brandId, brandId),
       eq(mediaAssetTable.kind, "image"),
       eq(mediaAssetTable.status, "ready"),
+      eq(mediaAssetTable.reviewStatus, "approved"),
       eq(mediaAssetTable.provider, "r2"),
       isNull(mediaAssetTable.deletedAt),
     ),

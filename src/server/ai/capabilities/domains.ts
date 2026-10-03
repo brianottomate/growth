@@ -1,3 +1,8 @@
+import {
+  listMediaSuggestionsAction,
+  discoverMediaSuggestionsAction,
+  reviewMediaSuggestionAction,
+} from "./media-review";
 import { getPitchAction, savePitchAction, draftPitchAction } from "./pitch";
 import {
   attachBookingTargetAction,
@@ -593,10 +598,12 @@ export const mediaAnalysisWrite = growthDomainTool({
 
 export const mediaLibraryWrite = growthDomainTool({
   description:
-    "Save operator-pasted chat media into an owned brand's durable media library, or import the hero photos of the brand's own homes from its WanderOS site.",
+    "Save operator-pasted chat media, import listing photos, discover website image suggestions, and approve or reject suggestions for an owned brand's media library. Website discovery does not approve images or update pitches.",
   actions: {
     saveChatMedia: saveChatMediaToLibrary,
     importListingPhotos,
+    discoverWebsiteImages: discoverMediaSuggestionsAction,
+    reviewWebsiteImage: reviewMediaSuggestionAction,
   },
 });
 
@@ -615,7 +622,11 @@ export const sessionRead = growthDomainTool({
 export const mediaLibraryRead = growthDomainTool({
   description:
     "Browse an owned brand's media library, or look at the homes and hero photos on its WanderOS site before importing any. Use list when the operator says to use, pick, or reuse something already saved, rather than asking them to re-attach it.",
-  actions: { list: listMediaLibrary, listingPhotos: listListingPhotos },
+  actions: {
+    list: listMediaLibrary,
+    listingPhotos: listListingPhotos,
+    suggestions: listMediaSuggestionsAction,
+  },
 });
 
 export const strategyRead = growthDomainTool({

@@ -584,6 +584,7 @@ export async function starterIdeaHomes(input: {
         where: and(
           eq(mediaAssetTable.brandId, brand.id),
           eq(mediaAssetTable.status, "ready"),
+          eq(mediaAssetTable.reviewStatus, "approved"),
           isNull(mediaAssetTable.deletedAt),
           inArray(mediaAssetTable.url, urls),
         ),
@@ -1444,6 +1445,7 @@ export async function replaceDraftAdMedia(input: {
       eq(mediaAssetTable.id, input.mediaAssetId),
       eq(mediaAssetTable.brandId, brand.id),
       eq(mediaAssetTable.status, "ready"),
+      eq(mediaAssetTable.reviewStatus, "approved"),
       isNull(mediaAssetTable.deletedAt),
     ),
     columns: {
