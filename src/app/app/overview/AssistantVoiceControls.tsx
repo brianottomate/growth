@@ -11,6 +11,11 @@ import {
   Check,
   Volume2,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import type { useAssistantVoice } from "./useAssistantVoice";
 import type { useAssistantDictation } from "./useAssistantDictation";
@@ -53,15 +58,68 @@ function VoiceTranscript({
   );
 }
 
+type VoiceControlsProps = {
+  voice: ReturnType<typeof useAssistantVoice>;
+  dictation: ReturnType<typeof useAssistantDictation>;
+};
+
+/** Start controls live with Send; active sessions keep their status above the draft. */
+export function AssistantVoiceButtons({
+  voice,
+  dictation,
+}: VoiceControlsProps) {
+  if (voice.requested || dictation.capturing) return null;
+  return (
+    <>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            tone="muted"
+            size="icon"
+            className="size-11 lg:size-9"
+            aria-label="Dictate"
+            onClick={() => void dictation.start()}
+          >
+            <Mic className="h-4 w-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Dictate</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            tone="muted"
+            size="icon"
+            className="size-11 lg:size-9"
+            aria-label="Talk with Growth"
+            onClick={() => void voice.start()}
+          >
+            <AudioLines className="h-4 w-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Talk with Growth</TooltipContent>
+      </Tooltip>
+    </>
+  );
+}
+
 export function AssistantVoiceControls({
   voice,
   dictation,
   busy,
-}: {
-  voice: ReturnType<typeof useAssistantVoice>;
-  dictation: ReturnType<typeof useAssistantDictation>;
-  busy: boolean;
-}) {
+}: VoiceControlsProps & { busy: boolean }) {
+  if (
+    !voice.requested &&
+    !dictation.capturing &&
+    !voice.captions.length &&
+    !voice.error &&
+    !dictation.error
+  )
+    return null;
   const connected = voice.status === "connected";
   return (
     <div className="mb-2 space-y-2">
@@ -180,29 +238,7 @@ export function AssistantVoiceControls({
             <Check /> Done
           </Button>
         </div>
-      ) : (
-        <div className="flex flex-wrap items-center gap-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => void dictation.start()}
-          >
-            <Mic /> Dictate
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => void voice.start()}
-          >
-            <AudioLines /> Talk with Growth
-          </Button>
-          <span className="text-xs text-muted-foreground">
-            Dictate a draft or start a conversation
-          </span>
-        </div>
-      )}
+      ) : null}
       {!voice.requested && voice.captions.length > 0 && (
         <details className="rounded-lg border bg-muted/30 p-3">
           <summary className="cursor-pointer text-sm font-medium">

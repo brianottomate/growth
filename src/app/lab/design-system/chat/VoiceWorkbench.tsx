@@ -1,6 +1,9 @@
 "use client";
 import { useState } from "react";
-import { AssistantVoiceControls } from "@/app/app/overview/AssistantVoiceControls";
+import {
+  AssistantVoiceControls,
+  AssistantVoiceButtons,
+} from "@/app/app/overview/AssistantVoiceControls";
 import { ChatQueue } from "@/app/app/overview/ChatQueue";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -142,12 +145,15 @@ export function VoiceWorkbench() {
         onChange={(event) => setDraft(event.target.value)}
         disabled={dictating}
       />
-      <Button
-        disabled={!draft.trim() || dictating}
-        onClick={() => setDraft("")}
-      >
-        Send sample
-      </Button>
+      <div className="flex items-center justify-end gap-2">
+        <AssistantVoiceButtons voice={voice} dictation={dictation} />
+        <Button
+          disabled={!draft.trim() || dictating}
+          onClick={() => setDraft("")}
+        >
+          Send sample
+        </Button>
+      </div>
     </div>
   );
 }

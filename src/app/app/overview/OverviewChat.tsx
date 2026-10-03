@@ -13,7 +13,10 @@ import { OperationJobCard } from "./OperationJobCard";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useChatQueue } from "./useChatQueue";
-import { AssistantVoiceControls } from "./AssistantVoiceControls";
+import {
+  AssistantVoiceControls,
+  AssistantVoiceButtons,
+} from "./AssistantVoiceControls";
 import { useAssistantVoice } from "./useAssistantVoice";
 import { useAssistantDictation } from "./useAssistantDictation";
 import { ChatQueue } from "./ChatQueue";
@@ -1295,6 +1298,7 @@ export function OverviewChat({
                 <Paperclip className="h-4 w-4" />
               </Button>
               <div className="flex items-center gap-2">
+                <AssistantVoiceButtons voice={voice} dictation={dictation} />
                 {busy &&
                   queue.state?.activeTurnId &&
                   canSend &&
