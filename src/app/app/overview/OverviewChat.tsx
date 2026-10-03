@@ -1624,6 +1624,7 @@ export function renderToolPart(
       const navigation = output as {
         href?: string;
         brandName?: string;
+        pageLabel?: string;
       };
       return (
         <div
@@ -1632,6 +1633,7 @@ export function renderToolPart(
         >
           <Check className="size-3.5 text-emerald-500" />
           Opened {navigation.brandName ?? "the requested surface"}
+          {navigation.pageLabel ? ` · ${navigation.pageLabel}` : ""}
           {navigation.href && (
             <Link
               href={navigation.href}

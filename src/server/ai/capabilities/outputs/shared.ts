@@ -1,3 +1,4 @@
+import type { CatalogHome } from "@/lib/catalog-studio";
 import { brandEmailThemeSchema } from "@/lib/brand-email-style";
 import { contentStatusEnum } from "@/server/db/content-schema";
 import { channelPlatformEnum } from "@/server/db/channel-schema";
@@ -98,7 +99,8 @@ export const cardsSchema = z.strictObject({
   title: z.string(),
 });
 
-export const homesSchema = z.strictObject({
+const homeShape = {
+  amenities: z.array(z.string()).nullable().optional(),
   bathrooms: z.number().nullable().optional(),
   bedrooms: z.number().nullable().optional(),
   city: z.string().nullable().optional(),
@@ -129,7 +131,9 @@ export const homesSchema = z.strictObject({
   streetAddress3: z.string().nullable().optional(),
   thumbUrl: z.string().optional(),
   url: z.string(),
-});
+} satisfies Record<keyof CatalogHome, z.ZodType> & Record<string, z.ZodType>;
+
+export const homesSchema = z.strictObject(homeShape);
 
 /** Brand legalIdentity. */
 export const brandLegalIdentitySchema = z

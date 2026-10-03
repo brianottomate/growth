@@ -3,6 +3,8 @@ import { getSafeInternalPath } from "./auth-utils";
 export const WORKSPACE_SURFACES = [
   "performance",
   "performance_clients",
+  "performance_client",
+  "performance_setup",
   "performance_campaigns",
   "performance_prospects",
   "performance_accounts",
@@ -83,7 +85,10 @@ export const WORKSPACE_ROUTES = {
   leads: "/app/leads",
   spend: "/app/spend",
 } as const satisfies Record<
-  Exclude<WorkspaceSurface, "brand_map" | "path">,
+  Exclude<
+    WorkspaceSurface,
+    "brand_map" | "path" | "performance_client" | "performance_setup"
+  >,
   string
 >;
 

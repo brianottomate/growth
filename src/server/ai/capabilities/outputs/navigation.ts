@@ -4,6 +4,16 @@ import { z } from "zod";
 export const navigateWorkspaceOutputSchema = z.union([
   z.strictObject({
     action: z.literal("navigate"),
+    ok: z.literal(true),
+    data: z.strictObject({
+      surface: z.enum(["performance_client", "performance_setup"]),
+      brandName: z.string(),
+      href: z.string(),
+      pageLabel: z.string(),
+    }),
+  }),
+  z.strictObject({
+    action: z.literal("navigate"),
     error: z.strictObject({
       code: z.string(),
       message: z.string(),
