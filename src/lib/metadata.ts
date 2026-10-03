@@ -29,7 +29,7 @@ export function ogImageUrl({
   eyebrow?: string;
   description?: string;
 }): string {
-  const params = new URLSearchParams();
+  const params = new URLSearchParams({ format: "square", design: "2" });
   if (title) params.set("title", title);
   if (eyebrow) params.set("eyebrow", eyebrow);
   if (description) params.set("description", description);
@@ -60,8 +60,7 @@ export function constructMetadata({
   noIndex = false,
 }: ConstructMetadataInput = {}): Metadata {
   const ogTitle = title ? `${title} | ${SITE_NAME}` : SITE_NAME;
-  const ogImage =
-    image ?? ogImageUrl({ title: title ?? SITE_NAME, eyebrow, description });
+  const ogImage = image ?? ogImageUrl({ title: title ?? SITE_NAME, eyebrow });
 
   return {
     metadataBase: new URL(baseUrl),
@@ -73,7 +72,13 @@ export function constructMetadata({
       siteName: SITE_NAME,
       type: "website",
       ...(path ? { url: path } : {}),
-      images: [{ url: ogImage, width: 1200, height: 630, alt: ogTitle }],
+      images: [
+        {
+          url: ogImage,
+          ...(!image ? { width: 1200, height: 1200 } : {}),
+          alt: ogTitle,
+        },
+      ],
     },
     twitter: {
       card: "summary_large_image",
@@ -103,9 +108,9 @@ export const rootMetadata: Metadata = {
     description: DEFAULT_DESCRIPTION,
     images: [
       {
-        url: ogImageUrl({ title: SITE_NAME, description: DEFAULT_DESCRIPTION }),
+        url: ogImageUrl({ title: SITE_NAME }),
         width: 1200,
-        height: 630,
+        height: 1200,
         alt: SITE_NAME,
       },
     ],
@@ -114,8 +119,6 @@ export const rootMetadata: Metadata = {
     card: "summary_large_image",
     title: SITE_NAME,
     description: DEFAULT_DESCRIPTION,
-    images: [
-      ogImageUrl({ title: SITE_NAME, description: DEFAULT_DESCRIPTION }),
-    ],
+    images: [ogImageUrl({ title: SITE_NAME })],
   },
 };

@@ -14,8 +14,8 @@ export default function OgPreviewPage() {
         ...DEFAULT_OG_OPTIONS,
         title: post.metaTitle,
         description: post.metaDescription,
-        eyebrow: "Blog",
-        footer: "Wander growth team",
+        eyebrow: "",
+        footer: "",
       },
     }));
   return <OgStudio presets={[...OG_PRESETS, ...blogPresets]} />;

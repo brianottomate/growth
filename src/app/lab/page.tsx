@@ -12,7 +12,7 @@ const PAGES: { name: string; href: string; note?: string }[] = [
   {
     name: "OG Studio",
     href: "/lab/og-preview",
-    note: "share-card editor, format comparison, and preset wall",
+    note: "square design wall and compact chat previews",
   },
   {
     name: "Assistant gallery",

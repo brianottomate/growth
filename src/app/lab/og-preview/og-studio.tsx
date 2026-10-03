@@ -2,35 +2,22 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Copy, Download, ExternalLink, RefreshCw } from "lucide-react";
+import { ArrowLeft, Copy, Download, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SimpleSelect } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   DEFAULT_OG_OPTIONS,
-  OG_FORMATS,
-  OG_IMAGES,
-  OG_LAYOUTS,
   studioImageUrl,
   type OgOptions,
   type OgPreset,
 } from "@/lib/og-studio";
 
-function ImagePreview({
-  url,
-  title,
-  square = false,
-}: {
-  url: string;
-  title: string;
-  square?: boolean;
-}) {
+function ImagePreview({ url, title }: { url: string; title: string }) {
   const [status, setStatus] = useState<"loading" | "ready" | "error">(
     "loading",
   );
@@ -40,15 +27,13 @@ function ImagePreview({
     if (image?.complete) setStatus(image.naturalWidth > 0 ? "ready" : "error");
   }, []);
   return (
-    <div
-      className={`relative overflow-hidden rounded-lg border bg-muted ${square ? "aspect-square" : "aspect-[1200/630]"}`}
-    >
+    <div className="relative aspect-square overflow-hidden rounded-lg bg-muted">
       <img
         ref={imageRef}
         src={url}
         alt={title}
         width={1200}
-        height={square ? 1200 : 630}
+        height={1200}
         className="size-full object-contain"
         onLoad={() => setStatus("ready")}
         onError={() => setStatus("error")}
@@ -59,8 +44,8 @@ function ImagePreview({
           className="absolute inset-0 flex items-center justify-center bg-background/90 p-4 text-center text-sm text-muted-foreground"
         >
           {status === "error"
-            ? "The image could not render. Refresh to try again."
-            : "Rendering preview…"}
+            ? "Could not render the card. Try changing the look."
+            : "Rendering…"}
         </div>
       )}
     </div>
@@ -70,202 +55,227 @@ function ImagePreview({
 export function OgStudio({ presets }: { presets: OgPreset[] }) {
   const [options, setOptions] = useState<OgOptions>(DEFAULT_OG_OPTIONS);
   const [rendered, setRendered] = useState(options);
-  const [refresh, setRefresh] = useState(0);
-  const [tab, setTab] = useState("preview");
-  const [filter, setFilter] = useState("");
+  const [presetIndex, setPresetIndex] = useState("0");
+  const [large, setLarge] = useState(false);
+  const [view, setView] = useState("wall");
+  const designs = presets.flatMap((preset) =>
+    [false, true].map((withPhoto) => ({
+      label: preset.label,
+      path: preset.path,
+      look: withPhoto ? "Photo" : "Type",
+      options: {
+        ...preset.options,
+        format: "square" as const,
+        eyebrow: "",
+        footer: "",
+        layout: withPhoto ? ("editorial" as const) : ("brand" as const),
+        image: withPhoto ? ("wander-home" as const) : ("none" as const),
+      },
+    })),
+  );
   useEffect(() => {
-    const timer = setTimeout(() => setRendered(options), 350);
+    const timer = setTimeout(() => setRendered(options), 250);
     return () => clearTimeout(timer);
   }, [options]);
   const url = studioImageUrl(rendered);
-  const previewUrl = `${url}&refresh=${refresh}`;
-  const update = <K extends keyof OgOptions>(key: K, value: OgOptions[K]) =>
+  const photo = options.image === "wander-home";
+  const update = <K extends keyof OgOptions>(key: K, value: OgOptions[K]) => {
+    setPresetIndex("");
     setOptions((current) => ({ ...current, [key]: value }));
-  const apply = (preset: OgPreset) => {
-    setOptions(preset.options);
-    setTab("preview");
   };
-  const copy = async (value: string) => {
+  const chooseLook = (withPhoto: boolean) => {
+    setPresetIndex("");
+    setOptions((current) => ({
+      ...current,
+      layout: withPhoto ? "editorial" : "brand",
+      image: withPhoto ? "wander-home" : "none",
+    }));
+  };
+  const copyUrl = async () => {
     try {
-      await navigator.clipboard.writeText(value);
-      toast.success("Copied to clipboard");
+      await navigator.clipboard.writeText(
+        new URL(url, window.location.origin).toString(),
+      );
+      toast.success("Image URL copied");
     } catch {
-      toast.error("Clipboard unavailable. Open the image to copy its URL.");
+      toast.error("Open the image to copy its URL.");
     }
   };
-  const filtered = presets.filter((preset) =>
-    `${preset.label} ${preset.path}`
-      .toLowerCase()
-      .includes(filter.toLowerCase()),
-  );
 
   return (
-    <main className="@container mx-auto max-w-7xl space-y-6 p-4 sm:p-8">
-      <header className="flex flex-wrap items-start justify-between gap-4">
+    <main className="@container mx-auto max-w-5xl p-5 sm:p-8">
+      <header className="mb-8 space-y-3">
+        <Link
+          href="/app/admin"
+          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="size-3.5" />
+          Team tools
+        </Link>
         <div>
-          <Link
-            href="/app/admin"
-            className="text-sm text-muted-foreground hover:text-foreground"
-          >
-            Team tools
-          </Link>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-            OG Studio
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Create Wander Growth share cards. Edit the copy, compare layouts,
-            and download a PNG. Page metadata changes through its normal code
-            review.
+          <h1 className="text-2xl font-semibold tracking-tight">Share cards</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Create square share images for team chat.
           </p>
         </div>
-        <Button variant="outline" asChild>
-          <Link href="/lab/og-map">
-            <ExternalLink />
-            Wander.com metadata audit
-          </Link>
-        </Button>
       </header>
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="preview">Editor</TabsTrigger>
-          <TabsTrigger value="wall">Preset wall ({presets.length})</TabsTrigger>
-          <TabsTrigger value="media">Brand assets</TabsTrigger>
+      <Tabs value={view} onValueChange={setView}>
+        <TabsList className="mb-6">
+          <TabsTrigger value="wall">Wall ({designs.length})</TabsTrigger>
+          <TabsTrigger value="editor">Editor</TabsTrigger>
         </TabsList>
-        <TabsContent value="preview" className="mt-6">
-          <div className="grid grid-cols-1 gap-6 @4xl:grid-cols-[320px_minmax(0,1fr)]">
-            <Card>
-              <CardHeader>
-                <CardTitle>Design a share card</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-5">
-                <div className="space-y-2">
-                  <Label>Start from a preset</Label>
-                  <SimpleSelect
-                    aria-label="Start from a preset"
-                    value=""
-                    placeholder="Choose a page"
-                    options={presets.map((preset, index) => ({
-                      value: String(index),
-                      label: preset.label,
-                    }))}
-                    onValueChange={(value) => {
-                      const preset = presets[Number(value)];
-                      if (preset) apply(preset);
-                    }}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="og-title">
-                    Title ({options.title.length}/80)
-                  </Label>
-                  <Textarea
-                    id="og-title"
-                    rows={3}
-                    maxLength={80}
-                    value={options.title}
-                    onChange={(event) => update("title", event.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="og-description">
-                    Description ({options.description.length}/140)
-                  </Label>
-                  <Textarea
-                    id="og-description"
-                    rows={3}
-                    maxLength={140}
-                    value={options.description}
-                    onChange={(event) =>
-                      update("description", event.target.value)
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="og-eyebrow">Eyebrow</Label>
-                  <Input
-                    id="og-eyebrow"
-                    maxLength={28}
-                    value={options.eyebrow}
-                    onChange={(event) => update("eyebrow", event.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="og-footer">Footer</Label>
-                  <Input
-                    id="og-footer"
-                    maxLength={60}
-                    value={options.footer}
-                    onChange={(event) => update("footer", event.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Layout</Label>
-                  <SimpleSelect
-                    aria-label="Layout"
-                    value={options.layout}
-                    options={[...OG_LAYOUTS]}
-                    onValueChange={(value) => {
-                      const layout = OG_LAYOUTS.find(
-                        (item) => item.value === value,
-                      );
-                      if (layout) update("layout", layout.value);
-                    }}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Format</Label>
-                  <SimpleSelect
-                    aria-label="Format"
-                    value={options.format}
-                    options={[...OG_FORMATS]}
-                    onValueChange={(value) =>
-                      update(
-                        "format",
-                        value === "square" ? "square" : "landscape",
-                      )
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Photo</Label>
-                  <SimpleSelect
-                    aria-label="Photo"
-                    value={options.image}
-                    options={OG_IMAGES.map((image) => ({
-                      value: image.value,
-                      label: image.label,
-                    }))}
-                    disabled={
-                      options.layout === "brand" ||
-                      options.layout === "centered"
-                    }
-                    onValueChange={(value) =>
-                      update(
-                        "image",
-                        value === "wander-home" ? "wander-home" : "none",
-                      )
-                    }
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Split and editorial layouts use the selected photo. With no
-                    photo, they render on the brand background.
-                  </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  onClick={() => setOptions(DEFAULT_OG_OPTIONS)}
+        <TabsContent value="wall">
+          <div className="grid grid-cols-1 gap-6 @xl:grid-cols-2 @4xl:grid-cols-3">
+            {designs.map((design) => (
+              <article
+                key={`${design.path}-${design.look}`}
+                className="min-w-0 space-y-3"
+              >
+                <button
+                  type="button"
+                  aria-label={`Edit ${design.label} ${design.look} card`}
+                  className="block w-full rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  onClick={() => {
+                    setOptions(design.options);
+                    setPresetIndex("");
+                    setView("editor");
+                  }}
                 >
-                  Reset design
-                </Button>
-              </CardContent>
-            </Card>
-            <div className="min-w-0 space-y-6">
-              <ImagePreview
-                key={previewUrl}
-                url={previewUrl}
-                title={rendered.title}
-                square={rendered.format === "square"}
-              />
+                  <ImagePreview
+                    url={studioImageUrl(design.options)}
+                    title={`${design.label} · ${design.look}`}
+                  />
+                </button>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <h2 className="truncate text-sm font-medium">
+                      {design.label}
+                    </h2>
+                    <p className="text-xs text-muted-foreground">
+                      {design.look} · Square
+                    </p>
+                  </div>
+                  <Button asChild variant="ghost" size="icon-sm">
+                    <a
+                      href={`${studioImageUrl(design.options)}&download=1`}
+                      aria-label={`Download ${design.label} ${design.look} card`}
+                    >
+                      <Download />
+                    </a>
+                  </Button>
+                </div>
+              </article>
+            ))}
+          </div>
+          <p className="mt-6 text-xs text-muted-foreground">
+            Click a design to edit it. These are starting designs; page metadata
+            updates through code review.
+          </p>
+        </TabsContent>
+        <TabsContent value="editor">
+          <div className="grid grid-cols-1 items-start gap-8 @3xl:grid-cols-[minmax(0,320px)_minmax(0,1fr)] @3xl:gap-12">
+            <section aria-label="Card editor" className="min-w-0 space-y-6">
+              <div className="space-y-2">
+                <Label>Start from a page</Label>
+                <SimpleSelect
+                  aria-label="Start from a page"
+                  className="w-full"
+                  value={presetIndex}
+                  placeholder="Custom card"
+                  options={presets.map((preset, index) => ({
+                    value: String(index),
+                    label: preset.label,
+                  }))}
+                  onValueChange={(value) => {
+                    const preset = presets[Number(value)];
+                    if (preset) {
+                      setPresetIndex(value);
+                      setOptions({
+                        ...preset.options,
+                        format: "square",
+                        eyebrow: "",
+                        footer: "",
+                        layout:
+                          preset.options.image === "wander-home"
+                            ? "editorial"
+                            : "brand",
+                      });
+                    }
+                  }}
+                />
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="share-title">Title</Label>
+                  <span className="text-xs text-muted-foreground">
+                    {options.title.length}/80
+                  </span>
+                </div>
+                <Textarea
+                  id="share-title"
+                  rows={3}
+                  maxLength={80}
+                  value={options.title}
+                  placeholder="Give the card a clear title"
+                  onChange={(event) => update("title", event.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Short titles stay readable in a small preview.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="share-description">
+                  Description{" "}
+                  <span className="font-normal text-muted-foreground">
+                    (optional)
+                  </span>
+                </Label>
+                <Textarea
+                  id="share-description"
+                  rows={2}
+                  maxLength={140}
+                  value={options.description}
+                  placeholder="Add a little context"
+                  onChange={(event) =>
+                    update("description", event.target.value)
+                  }
+                />
+              </div>
+              <fieldset className="space-y-3">
+                <legend className="text-sm font-medium">Look</legend>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    aria-pressed={!photo}
+                    onClick={() => chooseLook(false)}
+                    className={`overflow-hidden rounded-lg border p-1 text-left transition-colors ${!photo ? "border-foreground" : "border-border hover:border-foreground/40"}`}
+                  >
+                    <div className="flex aspect-[2/1] items-center rounded-md bg-foreground px-4 text-xl font-semibold tracking-tight text-background">
+                      Growth.
+                    </div>
+                    <span className="block px-2 py-2 text-xs font-medium">
+                      Type
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={photo}
+                    onClick={() => chooseLook(true)}
+                    className={`overflow-hidden rounded-lg border p-1 text-left transition-colors ${photo ? "border-foreground" : "border-border hover:border-foreground/40"}`}
+                  >
+                    <img
+                      src="/auth-hero.jpg"
+                      alt=""
+                      width={240}
+                      height={120}
+                      className="aspect-[2/1] w-full rounded-md object-cover"
+                    />
+                    <span className="block px-2 py-2 text-xs font-medium">
+                      Photo
+                    </span>
+                  </button>
+                </div>
+              </fieldset>
               <div className="flex flex-wrap gap-2">
                 <Button asChild>
                   <a href={`${url}&download=1`}>
@@ -273,155 +283,86 @@ export function OgStudio({ presets }: { presets: OgPreset[] }) {
                     Download PNG
                   </a>
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    void copy(new URL(url, window.location.origin).toString())
-                  }
-                >
+                <Button variant="outline" onClick={() => void copyUrl()}>
                   <Copy />
-                  Copy image URL
-                </Button>
-                <Button variant="outline" asChild>
-                  <a href={url} target="_blank" rel="noreferrer">
-                    <ExternalLink />
-                    Open image
-                  </a>
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => setRefresh((value) => value + 1)}
-                >
-                  <RefreshCw />
-                  Refresh
+                  Copy URL
                 </Button>
               </div>
-              <Card>
-                <CardHeader>
-                  <CardTitle>Image URL</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <code className="block text-xs break-all text-muted-foreground">
-                    {url}
-                  </code>
-                  <p className="mt-3 text-sm text-muted-foreground">
-                    This public image URL contains the copy you enter. Use copy
-                    suitable for sharing.
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader>
-                  <CardTitle>Compare formats</CardTitle>
-                </CardHeader>
-                <CardContent className="grid grid-cols-1 items-start gap-4 @xl:grid-cols-2">
-                  {OG_FORMATS.map((format) => {
-                    const comparison = studioImageUrl({
-                      ...rendered,
-                      format: format.value,
-                    });
-                    return (
-                      <div key={format.value} className="space-y-2">
-                        <p className="text-xs text-muted-foreground">
-                          {format.label}
-                        </p>
-                        <ImagePreview
-                          key={comparison}
-                          url={comparison}
-                          title={`${rendered.title} (${format.value})`}
-                          square={format.value === "square"}
-                        />
-                      </div>
-                    );
-                  })}
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </TabsContent>
-        <TabsContent value="wall" className="mt-6 space-y-5">
-          <div className="max-w-md space-y-2">
-            <Label htmlFor="preset-filter">Find a page</Label>
-            <Input
-              id="preset-filter"
-              placeholder="Search presets and blog posts"
-              value={filter}
-              onChange={(event) => setFilter(event.target.value)}
-            />
-          </div>
-          <div className="grid grid-cols-1 gap-5 @xl:grid-cols-2 @5xl:grid-cols-3">
-            {filtered.map((preset) => (
-              <Card key={preset.path}>
-                <CardContent className="space-y-3 pt-6">
-                  <ImagePreview
-                    url={studioImageUrl(preset.options)}
-                    title={preset.label}
-                  />
-                  <div>
-                    <h2 className="text-sm font-medium">{preset.label}</h2>
-                    <p className="text-xs text-muted-foreground">
-                      {preset.path}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" onClick={() => apply(preset)}>
-                      Edit design
-                    </Button>
-                    <Button size="sm" variant="outline" asChild>
-                      <Link href={preset.path} target="_blank">
-                        Open page
-                      </Link>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-          {filtered.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              No presets match your search.
-            </p>
-          )}
-          <p className="text-xs text-muted-foreground">
-            Presets are starting designs. Blog presets use the published article
-            copy; compare the live page before changing its metadata.
-          </p>
-        </TabsContent>
-        <TabsContent value="media" className="mt-6 space-y-5">
-          <p className="text-sm text-muted-foreground">
-            Repository-owned photography available to the share-card renderer.
-          </p>
-          <div className="grid grid-cols-1 gap-5 @xl:grid-cols-3">
-            {OG_IMAGES.filter((image) => image.path).map((image) => (
-              <Card key={image.value}>
-                <CardContent className="space-y-3 pt-6">
-                  <img
-                    src={image.path}
-                    alt={image.label}
-                    width={600}
-                    height={400}
-                    className="aspect-[3/2] w-full rounded-lg object-cover"
-                  />
-                  <h2 className="text-sm font-medium">{image.label}</h2>
-                  <Button
-                    onClick={() => {
-                      setOptions((current) => ({
-                        ...current,
-                        image: image.value,
-                        layout: "editorial",
-                      }));
-                      setTab("preview");
-                    }}
+              <details className="text-xs text-muted-foreground">
+                <summary className="cursor-pointer hover:text-foreground">
+                  More options
+                </summary>
+                <div className="mt-3 flex flex-wrap gap-3">
+                  <a
+                    href={url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 hover:text-foreground"
                   >
-                    Use in design
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
+                    Open full image
+                    <ExternalLink className="size-3" />
+                  </a>
+                  <a
+                    href={`${studioImageUrl({ ...rendered, format: "landscape" })}&download=1`}
+                    className="hover:text-foreground"
+                  >
+                    Download landscape
+                  </a>
+                  <Link href="/lab/og-map" className="hover:text-foreground">
+                    Metadata audit
+                  </Link>
+                </div>
+                <p className="mt-3">
+                  Card URLs are public. Page metadata updates through code
+                  review.
+                </p>
+              </details>
+            </section>
+            <section
+              aria-label="Chat preview"
+              className="order-first min-w-0 @3xl:order-last"
+            >
+              <div className="mb-4 flex items-center justify-between gap-2">
+                <p className="text-xs font-medium text-muted-foreground">
+                  {large ? "Larger preview" : "At chat size"}
+                </p>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => setLarge((value) => !value)}
+                >
+                  {large ? "Chat size" : "Larger"}
+                </Button>
+              </div>
+              <div className="rounded-xl border bg-card p-5 text-card-foreground">
+                <div className="border-l-2 border-border pl-4">
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">
+                    Wander Growth
+                  </p>
+                  <p className="text-sm font-semibold">
+                    {rendered.title || "Wander Growth"}
+                  </p>
+                  {rendered.description && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {rendered.description}
+                    </p>
+                  )}
+                  <div
+                    className={`mt-3 max-w-full ${large ? "w-[360px]" : "w-[240px]"}`}
+                  >
+                    <ImagePreview
+                      key={url}
+                      url={url}
+                      title={rendered.title || "Wander Growth"}
+                    />
+                  </div>
+                </div>
+              </div>
+              <p className="mt-3 text-xs text-muted-foreground">
+                1200 × 1200 PNG. Preview approximates a compact chat unfurl.
+              </p>
+            </section>
           </div>
-          <Button variant="outline" asChild>
-            <Link href="/app/media">Open team media library</Link>
-          </Button>
         </TabsContent>
       </Tabs>
     </main>

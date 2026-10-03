@@ -53,7 +53,7 @@ export async function generateMetadata({
     return {};
   }
 
-  const ogImageUrl = `${env.NEXT_PUBLIC_BASE_URL}/api/og/blog?title=${encodeURIComponent(post.metaTitle)}&description=${encodeURIComponent(post.metaDescription || "")}`;
+  const ogImageUrl = `${env.NEXT_PUBLIC_BASE_URL}/api/og/blog?format=square&design=2&title=${encodeURIComponent(post.metaTitle)}`;
 
   return {
     title: post.metaTitle,
@@ -69,7 +69,7 @@ export async function generateMetadata({
         {
           url: ogImageUrl,
           width: 1200,
-          height: 630,
+          height: 1200,
           alt: post.metaTitle,
         },
       ],

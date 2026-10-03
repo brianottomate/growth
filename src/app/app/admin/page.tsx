@@ -20,7 +20,7 @@ const GROUPS = [
       {
         label: "OG Studio",
         href: "/lab/og-preview",
-        note: "Live editor, preset wall, and PNG downloads",
+        note: "Square design wall and PNG downloads",
       },
       {
         label: "Wander.com metadata audit",

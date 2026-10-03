@@ -8,6 +8,7 @@ export function StudioCard({
   photo?: string;
 }) {
   const square = options.format === "square";
+  if (square) return <SquareCard options={options} photo={photo} />;
   const split = options.layout === "split" && Boolean(photo);
   const editorial = options.layout === "editorial" && Boolean(photo);
   const centered = options.layout === "centered";
@@ -141,6 +142,132 @@ export function StudioCard({
         >
           {options.footer}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function SquareCard({
+  options,
+  photo,
+}: {
+  options: OgOptions;
+  photo?: string;
+}) {
+  const hasPhoto = Boolean(photo);
+  const titleSize = hasPhoto
+    ? options.title.length > 50
+      ? 78
+      : 104
+    : options.title.length > 55
+      ? 96
+      : options.title.length > 30
+        ? 120
+        : 156;
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        width: 1200,
+        height: 1200,
+        background: "#0A0A0A",
+        color: "#FFFFFF",
+        fontFamily: "sans-serif",
+      }}
+    >
+      {photo ? (
+        <img
+          alt=""
+          src={photo}
+          width={1200}
+          height={440}
+          style={{ objectFit: "cover", flexShrink: 0 }}
+        />
+      ) : null}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          padding: hasPhoto ? "56px 72px" : "80px 80px",
+          flex: 1,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            fontSize: 40,
+            fontWeight: 700,
+            letterSpacing: 5,
+            flexShrink: 0,
+          }}
+        >
+          WANDER
+          <span
+            style={{
+              marginLeft: 24,
+              letterSpacing: 0,
+              color: "#C9A86A",
+              fontWeight: 400,
+            }}
+          >
+            Growth
+          </span>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            flex: 1,
+            paddingTop: hasPhoto ? 28 : 48,
+          }}
+        >
+          {options.eyebrow ? (
+            <div style={{ color: "#C9A86A", fontSize: 30, marginBottom: 20 }}>
+              {options.eyebrow}
+            </div>
+          ) : null}
+          <div
+            style={{
+              display: "flex",
+              fontSize: titleSize,
+              lineHeight: 1.05,
+              letterSpacing: -3,
+              fontWeight: 700,
+              flexShrink: 0,
+            }}
+          >
+            {options.title}
+          </div>
+          {options.description ? (
+            <div
+              style={{
+                display: "flex",
+                marginTop: 28,
+                fontSize: hasPhoto ? 32 : 38,
+                lineHeight: 1.3,
+                color: "#B8B8B8",
+                flexShrink: 0,
+              }}
+            >
+              {options.description}
+            </div>
+          ) : null}
+        </div>
+        {options.footer ? (
+          <div
+            style={{
+              marginTop: 28,
+              fontSize: 28,
+              color: "#B8B8B8",
+              flexShrink: 0,
+            }}
+          >
+            {options.footer}
+          </div>
+        ) : null}
       </div>
     </div>
   );

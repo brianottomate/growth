@@ -20,7 +20,7 @@ describe("public OG rendering contract", () => {
       readOgOptions(new URLSearchParams({ image: "wander-home" })).image,
     ).toBe("wander-home");
   });
-  test("existing metadata requests retain their landscape brand defaults", () => {
+  test("metadata requests use square cards by default", () => {
     const options = readOgOptions(
       new URLSearchParams({
         title: "Campaigns",
@@ -28,8 +28,13 @@ describe("public OG rendering contract", () => {
       }),
     );
     expect(options.layout).toBe("brand");
-    expect(ogSize(options.format)).toEqual({ width: 1200, height: 630 });
-    expect(options.footer).toBe("Internal · Wander growth team");
+    expect(ogSize(options.format)).toEqual({ width: 1200, height: 1200 });
+    expect(options.footer).toBe("");
+    expect(
+      ogSize(
+        readOgOptions(new URLSearchParams({ format: "landscape" })).format,
+      ),
+    ).toEqual({ width: 1200, height: 630 });
   });
   test("copied designs round-trip punctuation and square dimensions", () => {
     const design = {
@@ -54,6 +59,6 @@ describe("public OG rendering contract", () => {
     expect(options.title.length).toBe(80);
     expect(options.description.length).toBe(140);
     expect(options.layout).toBe("brand");
-    expect(options.format).toBe("landscape");
+    expect(options.format).toBe("square");
   });
 });

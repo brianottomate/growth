@@ -31,11 +31,11 @@ export type OgPreset = { label: string; path: string; options: OgOptions };
 
 export const DEFAULT_OG_OPTIONS: OgOptions = {
   title: "Wander Growth",
-  description: "Plan campaigns and create content with the Wander growth team.",
-  eyebrow: "Growth team",
-  footer: "Internal · Wander growth team",
+  description: "",
+  eyebrow: "",
+  footer: "",
   layout: "brand",
-  format: "landscape",
+  format: "square",
   image: "none",
 };
 
@@ -48,7 +48,7 @@ export const OG_PRESETS: OgPreset[] = [
       ...DEFAULT_OG_OPTIONS,
       title: "Plan the next campaign",
       eyebrow: "Campaigns",
-      layout: "split",
+      layout: "editorial",
       image: "wander-home",
     },
   },
@@ -72,21 +72,21 @@ export const OG_PRESETS: OgPreset[] = [
       title: "A clearer view of performance",
       description: "Review campaigns and prospect activity.",
       eyebrow: "Performance",
-      layout: "centered",
+      layout: "brand",
     },
   },
 ];
 
 export function readOgOptions(params: URLSearchParams): OgOptions {
   return {
-    title: (params.get("title") || "Wander Growth").slice(0, 80),
+    title: (params.get("title")?.trim() || "Wander Growth").slice(0, 80),
     description: (params.get("description") || "").slice(0, 140),
     eyebrow: (params.get("eyebrow") || "").slice(0, 28),
     footer: (params.get("footer") ?? DEFAULT_OG_OPTIONS.footer).slice(0, 60),
     layout:
       OG_LAYOUTS.find((item) => item.value === params.get("layout"))?.value ??
       "brand",
-    format: params.get("format") === "square" ? "square" : "landscape",
+    format: params.get("format") === "landscape" ? "landscape" : "square",
     image:
       OG_IMAGES.find((item) => item.value === params.get("image"))?.value ??
       "none",
@@ -94,7 +94,7 @@ export function readOgOptions(params: URLSearchParams): OgOptions {
 }
 
 export function studioImageUrl(options: OgOptions): string {
-  return `/api/og?${new URLSearchParams(options).toString()}`;
+  return `/api/og?${new URLSearchParams({ ...options, design: "2" }).toString()}`;
 }
 
 export function ogSize(format: OgOptions["format"]) {

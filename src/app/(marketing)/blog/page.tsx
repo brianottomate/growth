@@ -5,7 +5,7 @@ import { env } from "@/env";
 import { posts as allPosts } from "#velite";
 import { BlogPageContent } from "./BlogPageContent";
 
-const ogImageUrl = `${env.NEXT_PUBLIC_BASE_URL}/api/og/blog?title=${encodeURIComponent("Wander Growth Blog")}&description=${encodeURIComponent("Insights and updates")}`;
+const ogImageUrl = `${env.NEXT_PUBLIC_BASE_URL}/api/og/blog?format=square&design=2&title=${encodeURIComponent("Wander Growth Blog")}`;
 
 export const metadata = {
   title: "Blog | Wander Growth - Insights and Updates",
@@ -22,7 +22,7 @@ export const metadata = {
       {
         url: ogImageUrl,
         width: 1200,
-        height: 630,
+        height: 1200,
         alt: "Wander Growth Blog - Insights and Updates",
       },
     ],

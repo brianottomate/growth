@@ -1,27 +1,20 @@
 import type { NextRequest } from "next/server";
 import { ImageResponse } from "next/og";
 
-import { OG_SIZE, OgCard } from "../og-card";
+import { ogSize, readOgOptions } from "@/lib/og-studio";
+import { StudioCard } from "../studio-card";
 
 export const runtime = "edge";
 
-/** Branded OG card for blog posts. Params: `title`, `description`. */
 export function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const title = searchParams.get("title") || "Blog";
-    const description =
-      searchParams.get("description") ||
-      "Insights from the Wander growth team.";
-
+    const params = new URL(request.url).searchParams;
+    if (!params.get("title")) params.set("title", "Blog");
+    params.set("eyebrow", "Blog");
+    const options = readOgOptions(params);
     return new ImageResponse(
-      <OgCard
-        eyebrow="Blog"
-        title={title}
-        description={description}
-        footer="Wander growth team"
-      />,
-      OG_SIZE,
+      <StudioCard options={options} />,
+      ogSize(options.format),
     );
   } catch (error) {
     console.error("Blog OG image generation error:", error);
