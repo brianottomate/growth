@@ -150,6 +150,7 @@ export const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
     items: [
       { label: "Affiliate", href: "/app/affiliate", icon: Handshake },
       { label: "Engineering", href: "/app/engineering", icon: Gauge },
+      { label: "Team tools", href: "/app/admin", icon: FlaskConical },
     ],
   },
 ];

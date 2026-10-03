@@ -16,6 +16,7 @@ const config: NextConfig = {
   // Only /api/media/renditions imports ffmpeg-static, so the binary ships
   // with that one function.
   outputFileTracingIncludes: {
+    "/api/og": ["./public/auth-hero.jpg"],
     "/api/media/renditions": ["./node_modules/ffmpeg-static/ffmpeg"],
   },
   turbopack: {

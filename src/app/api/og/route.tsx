@@ -1,22 +1,50 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import type { NextRequest } from "next/server";
 import { ImageResponse } from "next/og";
 
-import { OG_SIZE, OgCard } from "./og-card";
+import { ogSize, readOgOptions } from "@/lib/og-studio";
+import { OgCard } from "./og-card";
+import { StudioCard } from "./studio-card";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
-/** Branded OG card. Params: `title`, `eyebrow` (kicker), `description`. */
-export function GET(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const title = searchParams.get("title") || "Wander Growth";
-    const eyebrow = searchParams.get("eyebrow") || undefined;
-    const description = searchParams.get("description") || undefined;
-
-    return new ImageResponse(
-      <OgCard title={title} eyebrow={eyebrow} description={description} />,
-      OG_SIZE,
-    );
+    const params = new URL(request.url).searchParams;
+    const options = readOgOptions(params);
+    let photo: string | undefined;
+    if (
+      options.image === "wander-home" &&
+      ["split", "editorial"].includes(options.layout)
+    ) {
+      const bytes = await readFile(
+        path.join(process.cwd(), "public/auth-hero.jpg"),
+      );
+      photo = `data:image/jpeg;base64,${bytes.toString("base64")}`;
+    }
+    const card =
+      options.layout === "brand" && options.format === "landscape" ? (
+        <OgCard
+          title={options.title}
+          eyebrow={options.eyebrow}
+          description={options.description}
+          footer={options.footer}
+        />
+      ) : (
+        <StudioCard options={options} photo={photo} />
+      );
+    return new ImageResponse(card, {
+      ...ogSize(options.format),
+      headers: {
+        "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400",
+        ...(params.get("download") === "1"
+          ? {
+              "Content-Disposition": `attachment; filename="wander-growth-${options.format}.png"`,
+            }
+          : {}),
+      },
+    });
   } catch (error) {
     console.error("OG image generation error:", error);
     return new Response("Failed to generate image", { status: 500 });

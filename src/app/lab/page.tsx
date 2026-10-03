@@ -5,6 +5,16 @@ import Link from "next/link";
 
 const PAGES: { name: string; href: string; note?: string }[] = [
   {
+    name: "Team tools",
+    href: "/app/admin",
+    note: "support tools and creative workbenches",
+  },
+  {
+    name: "OG Studio",
+    href: "/lab/og-preview",
+    note: "share-card editor, format comparison, and preset wall",
+  },
+  {
     name: "Assistant gallery",
     href: "/lab/design-system/chat",
     note: "tool cards, conversation states, generated UI, and capability inventory",
