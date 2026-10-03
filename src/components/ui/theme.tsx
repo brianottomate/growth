@@ -61,6 +61,42 @@ const updateThemeClass = (themeMode: ThemeMode) => {
   root.setAttribute("data-theme", newTheme);
 };
 
+// Circular reveal from the bottom-left, where the theme switcher lives in the
+// sidebar footer. Plain swap when the View Transitions API is missing or the
+// user prefers reduced motion.
+const withCircularReveal = (apply: () => void) => {
+  if (
+    !document.startViewTransition ||
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  ) {
+    apply();
+    return;
+  }
+  const x = 32;
+  const y = window.innerHeight - 32;
+  const radius = Math.hypot(window.innerWidth - x, y);
+  const transition = document.startViewTransition(apply);
+  transition.ready
+    .then(() => {
+      document.documentElement.animate(
+        {
+          clipPath: [
+            `circle(0px at ${x}px ${y}px)`,
+            `circle(${radius}px at ${x}px ${y}px)`,
+          ],
+        },
+        {
+          duration: 500,
+          easing: "ease-in-out",
+          pseudoElement: "::view-transition-new(root)",
+        },
+      );
+    })
+    .catch(() => {
+      // Rapid toggles abort the previous transition; nothing to recover.
+    });
+};
+
 const setupPreferredListener = () => {
   const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
   const handler = () => updateThemeClass("auto");
@@ -107,9 +143,11 @@ export function ThemeProvider({ children }: React.PropsWithChildren) {
   const resolvedTheme = themeMode === "auto" ? getSystemTheme() : themeMode;
 
   const setTheme = (newTheme: ThemeMode) => {
-    setThemeMode(newTheme);
     setStoredThemeMode(newTheme);
-    updateThemeClass(newTheme);
+    withCircularReveal(() => {
+      setThemeMode(newTheme);
+      updateThemeClass(newTheme);
+    });
   };
 
   const toggleMode = () => {

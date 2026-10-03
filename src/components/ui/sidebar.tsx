@@ -40,6 +40,8 @@ type SidebarContextProps = {
   setOpenMobile: (open: boolean) => void;
   isMobile: boolean;
   toggleSidebar: () => void;
+  peek: boolean;
+  setPeek: (peek: boolean) => void;
 };
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null);
@@ -122,6 +124,13 @@ const SidebarProvider = React.forwardRef<
     // This makes it easier to style the sidebar with Tailwind classes.
     const state = open ? "expanded" : "collapsed";
 
+    // Hovering the trigger while collapsed floats the full sidebar over the
+    // content; clicking pins it open. Content never shifts until the click.
+    const [peek, setPeek] = React.useState(false);
+    React.useEffect(() => {
+      if (open) setPeek(false);
+    }, [open]);
+
     const contextValue = React.useMemo<SidebarContextProps>(
       () => ({
         state,
@@ -131,6 +140,8 @@ const SidebarProvider = React.forwardRef<
         openMobile,
         setOpenMobile,
         toggleSidebar,
+        peek,
+        setPeek,
       }),
       [
         state,
@@ -140,6 +151,7 @@ const SidebarProvider = React.forwardRef<
         openMobile,
         setOpenMobile,
         toggleSidebar,
+        peek,
       ],
     );
 
@@ -189,7 +201,9 @@ const Sidebar = React.forwardRef<
     },
     ref,
   ) => {
-    const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
+    const { isMobile, state, openMobile, setOpenMobile, peek, setPeek } =
+      useSidebar();
+    const peeking = state === "collapsed" && peek;
 
     if (collapsible === "none") {
       return (
@@ -235,7 +249,7 @@ const Sidebar = React.forwardRef<
         ref={ref}
         className="group peer hidden text-sidebar-foreground md:block"
         data-state={state}
-        data-collapsible={state === "collapsed" ? collapsible : ""}
+        data-collapsible={state === "collapsed" && !peeking ? collapsible : ""}
         data-variant={variant}
         data-side={side}
       >
@@ -248,11 +262,16 @@ const Sidebar = React.forwardRef<
             variant === "floating" || variant === "inset"
               ? "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4))]"
               : "group-data-[collapsible=icon]:w-(--sidebar-width-icon)",
+            // Peek floats over content; the gap keeps the collapsed width.
+            peeking && collapsible === "icon" && "w-(--sidebar-width-icon)",
+            peeking && collapsible === "offcanvas" && "w-0",
           )}
         />
         <div
+          onMouseLeave={peeking ? () => setPeek(false) : undefined}
           className={cn(
             "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear md:flex",
+            peeking && "z-30 shadow-xl",
             side === "left"
               ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
               : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
@@ -281,7 +300,7 @@ const SidebarTrigger = React.forwardRef<
   React.ElementRef<typeof Button>,
   React.ComponentProps<typeof Button>
 >(({ className, onClick, ...props }, ref) => {
-  const { toggleSidebar } = useSidebar();
+  const { toggleSidebar, state, isMobile, setPeek } = useSidebar();
 
   return (
     <Button
@@ -289,9 +308,20 @@ const SidebarTrigger = React.forwardRef<
       data-sidebar="trigger"
       variant="ghost"
       size="icon"
-      className={cn("h-7 w-7", className)}
+      // Stays above the peek overlay so the click that pins still lands here.
+      className={cn("relative z-40 h-7 w-7", className)}
+      onMouseEnter={() => {
+        if (state === "collapsed" && !isMobile) setPeek(true);
+      }}
+      onMouseLeave={(event) => {
+        const into = event.relatedTarget;
+        if (into instanceof Element && into.closest("[data-sidebar=sidebar]"))
+          return;
+        setPeek(false);
+      }}
       onClick={(event) => {
         onClick?.(event);
+        setPeek(false);
         toggleSidebar();
       }}
       {...props}

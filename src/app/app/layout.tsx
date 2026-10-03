@@ -7,6 +7,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { WorkspaceChanges } from "./WorkspaceChanges";
 import { AppSidebar } from "@/components/app-sidebar";
 import { CommandMenu } from "@/components/command-menu";
+import { ContentColumn, ContentWidthToggle } from "@/components/content-width";
 import { AUTH_RETURN_TO_HEADER, getSafeInternalPath } from "@/lib/auth-utils";
 import {
   SidebarInset,
@@ -61,15 +62,14 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         <SidebarInset className="h-svh min-h-0 min-w-0 overflow-hidden">
           <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
             <SidebarTrigger className="-ml-1" />
+            <ContentWidthToggle />
           </header>
           {/* @container lets wide surfaces (e.g. the content Board) break out of
               the centered column with a cqw-based negative margin. Those
               margins repeat the column's padding (1rem, 2rem from @xl), so
               change them together. */}
           <div className="@container min-h-0 flex-1 scrollbar-thin overflow-x-hidden overflow-y-auto">
-            <div className="mx-auto w-full max-w-5xl p-4 pb-20 @xl:p-8 @xl:pb-20">
-              {children}
-            </div>
+            <ContentColumn>{children}</ContentColumn>
           </div>
         </SidebarInset>
         <OverviewAssistantPopup
