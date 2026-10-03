@@ -27,6 +27,12 @@ import type { MediaItem } from "@/server/db/schema";
 import { platformTextLength } from "@/lib/platform-thread";
 import { isStoryFormat, sequenceNoun } from "@/lib/platform-sequence";
 import { getPlatformFormat } from "@/server/content/formats";
+import { firstCommentLimit } from "@/lib/first-comment";
+import {
+  parsePlatformPostText,
+  type PlatformPostDocument,
+} from "@/lib/platform-post-document";
+import { PlatformPostEditor } from "@/components/tiptap/PlatformPostEditor";
 import {
   CompactPlatformPreview,
   type CompactPreviewLinkCard,
@@ -37,6 +43,7 @@ export type PlatformThreadItemData = {
   id: string;
   updatedAtISO: string;
   text: string | null;
+  textDocument?: PlatformPostDocument | null;
   media: MediaItem[] | null;
   assetLinks: string[] | null;
   sequence: number | null;
@@ -50,20 +57,23 @@ type EditorItem = {
   clientKey: string;
   id?: string;
   text: string;
+  textDocument: PlatformPostDocument;
   media: MediaItem[];
   assetLinks: string[];
   pendingLink: string;
 };
 
-const persistedSnapshot = (items: EditorItem[]) =>
-  JSON.stringify(
-    items.map(({ id, text, media, assetLinks }) => ({
+const persistedSnapshot = (items: EditorItem[], firstComment: string) =>
+  JSON.stringify({
+    items: items.map(({ id, text, textDocument, media, assetLinks }) => ({
       id,
       text,
+      textDocument,
       media,
       assetLinks,
     })),
-  );
+    firstComment,
+  });
 
 const makeClientKey = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -85,6 +95,8 @@ export function PlatformPostEditDialog({
   text,
   media,
   assetLinks,
+  firstComment,
+  deliveryExternalId,
   threadItems,
   linkCard,
   scheduled,
@@ -103,6 +115,8 @@ export function PlatformPostEditDialog({
   text: string | null;
   media: MediaItem[];
   assetLinks: string[];
+  firstComment: string | null;
+  deliveryExternalId: string | null;
   threadItems?: PlatformThreadItemData[];
   linkCard?: CompactPreviewLinkCard | null;
   scheduled: boolean;
@@ -115,6 +129,7 @@ export function PlatformPostEditDialog({
   const [openedVersion, setOpenedVersion] = useState("");
   const [baseSnapshot, setBaseSnapshot] = useState("");
   const [items, setItems] = useState<EditorItem[]>([]);
+  const [firstCommentDraft, setFirstCommentDraft] = useState("");
 
   const save = useMutation(
     orpc.content.saveSpotThread.mutationOptions({
@@ -139,7 +154,8 @@ export function PlatformPostEditDialog({
     platform === "threads";
   const characterLimit =
     platform === "x" ? 280 : platform === "threads" ? 500 : null;
-  const dirty = persistedSnapshot(items) !== baseSnapshot;
+  const firstCommentMax = firstCommentLimit(platform, format);
+  const dirty = persistedSnapshot(items, firstCommentDraft) !== baseSnapshot;
   const stale = open && openedVersion !== updatedAtISO;
   const invalid =
     items.length === 0 ||
@@ -177,6 +193,8 @@ export function PlatformPostEditDialog({
       clientKey: item.id,
       id: item.id,
       text: item.text ?? "",
+      textDocument:
+        item.textDocument ?? parsePlatformPostText(item.text, platform),
       media: [...(item.media ?? [])],
       assetLinks: [...(item.assetLinks ?? [])],
       pendingLink: "",
@@ -186,7 +204,8 @@ export function PlatformPostEditDialog({
   const beginEditing = () => {
     const next = initialItems();
     setItems(next);
-    setBaseSnapshot(persistedSnapshot(next));
+    setFirstCommentDraft(firstComment ?? "");
+    setBaseSnapshot(persistedSnapshot(next, firstComment ?? ""));
     setOpenedVersion(updatedAtISO);
     save.reset();
     setOpen(true);
@@ -277,9 +296,13 @@ export function PlatformPostEditDialog({
             items: items.map((item) => ({
               id: item.id,
               text: item.text.trim() ? item.text : null,
+              ...(!story ? { textDocument: item.textDocument } : {}),
               media: item.media,
               assetLinks: item.assetLinks,
             })),
+            ...(firstCommentMax !== null
+              ? { firstComment: firstCommentDraft || null }
+              : {}),
           })
         }
       >
@@ -408,26 +431,39 @@ export function PlatformPostEditDialog({
                   )}
                 </div>
 
-                <textarea
-                  value={item.text}
-                  onChange={(event) =>
-                    updateItem(index, (current) => ({
-                      ...current,
-                      text: event.target.value,
-                    }))
-                  }
-                  placeholder={
-                    story
-                      ? "Optional internal note. Story captions are not displayed."
-                      : items.length > 1
+                {story ? (
+                  <textarea
+                    value={item.text}
+                    onChange={(event) =>
+                      updateItem(index, (current) => ({
+                        ...current,
+                        text: event.target.value,
+                      }))
+                    }
+                    placeholder="Optional internal note. Story captions are not displayed."
+                    rows={3}
+                    className="mt-3 w-full resize-y rounded-lg border px-3 py-2 text-sm leading-relaxed outline-none focus:ring-2 focus:ring-ring/40"
+                  />
+                ) : (
+                  <PlatformPostEditor
+                    document={item.textDocument}
+                    platform={platform}
+                    placeholder={
+                      items.length > 1
                         ? index === 0
                           ? "Write the thread opener"
                           : "Write the next reply"
                         : "Write the platform-ready copy"
-                  }
-                  rows={story ? 3 : items.length > 1 ? 5 : 8}
-                  className="mt-3 w-full resize-y rounded-lg border px-3 py-2 text-sm leading-relaxed outline-none focus:ring-2 focus:ring-ring/40"
-                />
+                    }
+                    onChange={(textDocument, nextText) =>
+                      updateItem(index, (current) => ({
+                        ...current,
+                        text: nextText,
+                        textDocument,
+                      }))
+                    }
+                  />
+                )}
 
                 {item.media.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -580,6 +616,7 @@ export function PlatformPostEditDialog({
                     {
                       clientKey: makeClientKey(),
                       text: "",
+                      textDocument: parsePlatformPostText("", platform),
                       media: [],
                       assetLinks: [],
                       pendingLink: "",
@@ -591,6 +628,32 @@ export function PlatformPostEditDialog({
                 <Plus className="size-4" />
                 Add another {sequenceNoun(format, 1)}
               </button>
+            )}
+
+            {firstCommentMax !== null && (
+              <section className="rounded-xl border bg-background p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-medium">First comment</h3>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {deliveryExternalId
+                        ? "This saves a local revision. Updating the queued Zernio post remains an approved provider action."
+                        : "This comment will be included when the post is sent to Zernio."}
+                    </p>
+                  </div>
+                  <span className="text-[11px] text-muted-foreground">
+                    {firstCommentDraft.length}/{firstCommentMax}
+                  </span>
+                </div>
+                <textarea
+                  value={firstCommentDraft}
+                  onChange={(event) => setFirstCommentDraft(event.target.value)}
+                  maxLength={firstCommentMax}
+                  rows={4}
+                  placeholder="Add hashtags, a link, or supporting context"
+                  className="mt-3 w-full resize-y rounded-lg border px-3 py-2 text-sm leading-relaxed outline-none focus:ring-2 focus:ring-ring/40"
+                />
+              </section>
             )}
 
             {save.isError && (
@@ -616,6 +679,7 @@ export function PlatformPostEditDialog({
               media: item.media,
             }))}
             linkCard={linkCard}
+            firstComment={firstCommentDraft}
             scheduled={scheduled}
           />
         </div>

@@ -265,7 +265,8 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "archiveProgram",
     "restoreProgram",
   ],
-  listeningRead: ["recent"],
+  listeningRead: ["recent", "browserRuns"],
+  listeningWrite: ["importBrowserRun"],
 } as const;
 
 export type GrowthCapabilityId = keyof typeof GROWTH_CAPABILITY_ACTIONS;
@@ -319,6 +320,7 @@ export const GROWTH_CAPABILITY_LABELS = {
   lifecycleRead: "Reading lifecycle",
   lifecycleWrite: "Updating lifecycle",
   listeningRead: "Reading mentions",
+  listeningWrite: "Recording browser evidence",
   playbookRead: "Reading a playbook",
 } as const satisfies Record<GrowthCapabilityId, string>;
 

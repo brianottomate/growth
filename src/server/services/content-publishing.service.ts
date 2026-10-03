@@ -8,6 +8,7 @@ import {
   isZernioConfigured,
   listZernioAccounts,
   mapZernioPlatform,
+  resolveZernioLinkedInMention,
   retryZernioPost,
   updateZernioPost,
   type CreateZernioPostInput,
@@ -23,6 +24,14 @@ import {
 } from "@/server/db/schema";
 import { isStoryFormat, sequenceScheduledAt } from "@/lib/platform-sequence";
 import { deliveryMediaFor } from "@/server/services/video-delivery.service";
+import { firstCommentLimit } from "@/lib/first-comment";
+import {
+  platformPostText,
+  readCurrentPlatformPostDocument,
+  resolvePlatformPostMentions,
+  serializePlatformPostDocument,
+  type PlatformMention,
+} from "@/lib/platform-post-document";
 import { buildZernioReschedulePayload } from "@/lib/zernio-reschedule";
 
 export type SocialDeliveryMode = "schedule" | "publish_now";
@@ -71,6 +80,66 @@ type DeliveryPayload = {
   media: NonNullable<CreateZernioPostInput["mediaItems"]>;
   platformSpecificData?: Record<string, unknown>;
 };
+
+async function providerReadyText(input: {
+  metadata: unknown;
+  text: string | null;
+  platform: SocialPublishingPlatform;
+  connectedAccountId: string;
+}): Promise<string> {
+  const document = readCurrentPlatformPostDocument(input);
+  if (input.platform !== "linkedin" || !document) {
+    return platformPostText(input);
+  }
+
+  const resolvedByProfile = new Map<string, Promise<PlatformMention>>();
+  const resolvedDocument = await resolvePlatformPostMentions(
+    document,
+    async (mention) => {
+      if (
+        mention.platform !== "linkedin" ||
+        mention.nativeId?.startsWith("urn:li:")
+      ) {
+        return mention;
+      }
+      if (!mention.profileUrl) {
+        throw new Error(
+          `LinkedIn mention @${mention.label} needs a profile URL before publishing.`,
+        );
+      }
+
+      const key = `${mention.profileUrl}\n${mention.label}`;
+      let pending = resolvedByProfile.get(key);
+      if (!pending) {
+        pending = resolveZernioLinkedInMention({
+          accountId: input.connectedAccountId,
+          url: mention.profileUrl,
+          displayName: mention.label,
+        })
+          .then((resolved) => ({
+            ...mention,
+            id: resolved.urn,
+            label: resolved.displayName || mention.label,
+            nativeId: resolved.urn,
+            kind: resolved.type,
+          }))
+          .catch((error) => {
+            const detail =
+              error instanceof Error
+                ? error.message
+                : "LinkedIn did not resolve this profile";
+            throw new Error(
+              `Could not resolve @${mention.label} for LinkedIn publishing. Verify the profile link or remove the mention chip and type the name as plain text. ${detail}`,
+            );
+          });
+        resolvedByProfile.set(key, pending);
+      }
+      return pending;
+    },
+  );
+
+  return serializePlatformPostDocument(resolvedDocument, input.platform);
+}
 
 function accountId(
   value: string | { _id?: string } | null | undefined,
@@ -275,13 +344,13 @@ export function deliveryPayload(input: {
   const root = input.items[0];
   if (!root) throw new Error("Platform post not found");
   const firstComment = input.firstComment?.trim() || null;
-  const firstCommentLimit = FIRST_COMMENT_LIMIT[input.platform] ?? null;
-  if (firstComment && firstCommentLimit === null) {
+  const commentLimit = firstCommentLimit(input.platform, input.format);
+  if (firstComment && commentLimit === null) {
     throw new Error("This platform format does not support a first comment");
   }
-  if (firstComment && firstComment.length > firstCommentLimit!) {
+  if (firstComment && firstComment.length > commentLimit!) {
     throw new Error(
-      `First comments can contain at most ${firstCommentLimit} characters`,
+      `First comments can contain at most ${commentLimit} characters`,
     );
   }
 
@@ -396,7 +465,7 @@ export function deliveryPayload(input: {
   };
 }
 
-async function loadSocialSpot(platformPostId: string) {
+async function loadSocialSpot(platformPostId: string, resolveMentions = false) {
   const spot = await db.query.platformPostTable.findFirst({
     where: eq(platformPostTable.id, platformPostId),
     with: {
@@ -407,6 +476,7 @@ async function loadSocialSpot(platformPostId: string) {
         columns: {
           id: true,
           text: true,
+          metadata: true,
           media: true,
           sequence: true,
           deliveryExternalId: true,
@@ -479,38 +549,45 @@ async function loadSocialSpot(platformPostId: string) {
     );
   }
 
-  const unsorted: DeliveryItem[] = await Promise.all(
-    [
-      {
-        id: spot.id,
-        text: spot.text,
-        media: spot.media,
-        sequence: spot.sequence,
-        deliveryExternalId: spot.deliveryExternalId,
-        deliveryStatus: spot.deliveryStatus,
-        deliveryError: spot.deliveryError,
-      },
-      ...spot.children,
-    ].map(async (item) => ({
-      ...item,
-      media: item.media ? await deliveryMediaFor(item.media) : item.media,
-    })),
-  );
-  const items = unsorted.sort(
+  const sourceItems = [spot, ...spot.children].sort(
     (a, b) =>
       (a.sequence ?? Number.MAX_SAFE_INTEGER) -
       (b.sequence ?? Number.MAX_SAFE_INTEGER),
   );
-  const payload = story
-    ? null
-    : deliveryPayload({
-        platform,
-        format: spot.format,
-        items,
-        firstComment: spot.firstCommentText,
-        publishSettings: spot.publishSettings,
-      });
-  if (story) {
+  const connectedAccountId = channel.externalId;
+  const items: DeliveryItem[] = await Promise.all(
+    sourceItems.map(async (item) => ({
+      id: item.id,
+      text: resolveMentions
+        ? await providerReadyText({
+            metadata: item.metadata,
+            text: item.text,
+            platform,
+            connectedAccountId,
+          })
+        : platformPostText({
+            metadata: item.metadata,
+            text: item.text,
+            platform,
+          }),
+      media: item.media ? await deliveryMediaFor(item.media) : item.media,
+      sequence: item.sequence,
+      deliveryExternalId: item.deliveryExternalId,
+      deliveryStatus: item.deliveryStatus,
+      deliveryError: item.deliveryError,
+    })),
+  );
+  const payload =
+    story || !resolveMentions
+      ? null
+      : deliveryPayload({
+          platform,
+          format: spot.format,
+          items,
+          firstComment: spot.firstCommentText,
+          publishSettings: spot.publishSettings,
+        });
+  if (story && resolveMentions) {
     items.forEach((item, index) => validateStoryFrame(item, index + 1));
   }
 
@@ -643,7 +720,7 @@ export async function deliverSocialPost(input: {
   mode: SocialDeliveryMode;
   accountValidated?: boolean;
 }) {
-  const loaded = await loadSocialSpot(input.platformPostId);
+  const loaded = await loadSocialSpot(input.platformPostId, true);
   const {
     spot,
     channel,
@@ -836,9 +913,7 @@ export async function saveSocialFirstComment(input: {
   if (spot.parentPlatformPostId) {
     throw new Error("Prepare the first comment on the root post");
   }
-  const limit = isStoryFormat(spot.format)
-    ? null
-    : (FIRST_COMMENT_LIMIT[spot.platform] ?? null);
+  const limit = firstCommentLimit(spot.platform, spot.format);
   if (limit === null) {
     throw new Error("This platform format does not support a first comment");
   }
@@ -1054,7 +1129,7 @@ export async function approveAndScheduleSocialPost(input: {
     throw new Error("Choose a future publish time");
   }
   const { spot, channel, connectedAccountId, items, platform, story } =
-    await loadSocialSpot(input.platformPostId);
+    await loadSocialSpot(input.platformPostId, true);
   if (!story && spot.deliveryExternalId) {
     throw new Error("This post has already been handed to Zernio");
   }

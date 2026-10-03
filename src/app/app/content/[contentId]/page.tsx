@@ -21,6 +21,7 @@ import { getSession } from "@/server/better-auth/server";
 import { PILLAR_BY_SLUG } from "@/lib/pillars";
 import { getContentReadiness } from "@/lib/content-readiness";
 import { supportsNativeLinkPreview } from "@/lib/platform-link-preview";
+import { readCurrentPlatformPostDocument } from "@/lib/platform-post-document";
 import { groupPlatformThreads } from "@/lib/platform-thread";
 import { IdeaOwnerControl } from "./OwnerControls";
 import { CommentThread } from "./CommentThread";
@@ -509,6 +510,9 @@ export default async function ContentDetailPage({
                 deliveryExternalId: p.deliveryExternalId,
                 deliveryStatus: p.deliveryStatus,
                 deliveryError: p.deliveryError,
+                firstCommentText: p.firstCommentText,
+                firstCommentStatus: p.firstCommentStatus,
+                firstCommentError: p.firstCommentError,
                 publishingConnected: connectedPlatforms.has(p.platform),
                 assetLinks: p.assetLinks,
                 media: p.media,
@@ -519,6 +523,11 @@ export default async function ContentDetailPage({
                   id: item.id,
                   updatedAtISO: item.updatedAt.toISOString(),
                   text: item.text,
+                  textDocument: readCurrentPlatformPostDocument({
+                    metadata: item.metadata,
+                    text: item.text,
+                    platform: item.platform,
+                  }),
                   media: item.media,
                   assetLinks: item.assetLinks,
                   sequence: item.sequence,

@@ -161,3 +161,18 @@ receipts are validated against the same contract; replay rechecks current
 membership and surface policy before reading the receipt. Reused call IDs with
 different tools or inputs are rejected without repeating the operation. Output
 contract failures require inspecting saved state before repeating a write.
+
+### Manual browser listening evidence
+
+`listeningWrite.importBrowserRun` retains one immutable brand-scoped audit record
+in the existing content ingest store. The operator supplies the run window,
+report, observations, decisions, optional drafts, and any posting receipts with
+their authorization. Canonical URL checks reject duplicate post identities,
+wrong parent links, and mismatched X receipt accounts. These checks validate the
+supplied record; they do not verify public delivery.
+
+`listeningRead.browserRuns` returns recent summaries. Passing `runId` includes
+that run's captures. Both actions verify that the selected brand belongs to the
+current workspace. A run key replays identical evidence and rejects changed
+input. Browser capture, posting, Slack notification, and the global mention
+queue remain separate operations. This feature adds no database columns.

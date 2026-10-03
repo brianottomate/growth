@@ -23,6 +23,7 @@ import {
 import { ContentService } from "@/server/services/content.service";
 import { displayPoster } from "@/lib/utils/media";
 import { groupPlatformThreads } from "@/lib/platform-thread";
+import { platformPostDocumentSchema } from "@/lib/platform-post-document";
 import {
   deliverSocialPost,
   refreshSocialDelivery,
@@ -92,6 +93,7 @@ const mediaItemInput = z.object({
 const spotThreadItemInput = z.object({
   id: z.string().optional(),
   text: z.string().max(10_000).nullable(),
+  textDocument: platformPostDocumentSchema.optional(),
   media: z.array(mediaItemInput).max(300),
   assetLinks: z.array(z.string().trim().min(1).max(2000)).max(30),
 });
@@ -706,6 +708,7 @@ export const contentRouter = {
         rootPlatformPostId: z.string(),
         expectedUpdatedAt: z.string().datetime(),
         items: z.array(spotThreadItemInput).min(1).max(25),
+        firstComment: z.string().max(2_200).nullable().optional(),
       }),
     )
     .handler(async ({ context: ctx, input }) => {

@@ -18,7 +18,11 @@ import { createId } from "@/server/db/utils";
 import { scanAccountWatchSources } from "@/server/services/instagram-watch.service";
 import { evaluateSubreddit as evaluateSubredditProfile } from "@/server/services/subreddit-eval.service";
 
-import { protectedProcedure } from "@/server/api/orpc";
+import {
+  importBrowserEvidence,
+  getBrowserEvidence,
+} from "@/server/ai/capabilities/browser-evidence";
+import { actionProcedure, protectedProcedure } from "@/server/api/orpc";
 
 // Listening STRATEGY config: the editable brand "story" (shared signal + reply
 // judgment) and the per-source rows. Voice itself is read from brandFingerprint
@@ -194,6 +198,8 @@ function slugifyKey(label: string, fallback: string): string {
 }
 
 export const listeningRouter = {
+  importBrowserRun: actionProcedure(importBrowserEvidence),
+  browserRuns: actionProcedure(getBrowserEvidence),
   /** Brand story + voice + all listening sources for the strategic view. */
   overview: protectedProcedure
     .input(z.object({ brandId: z.string().optional() }).optional())

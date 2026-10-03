@@ -21,6 +21,7 @@ import { SocialDeliveryControl } from "./SocialDeliveryControl";
 import { StoryDeliveryControl } from "./StoryDeliveryControl";
 import { getPlatformFormat } from "@/server/content/formats";
 import { isStoryFormat, sequenceNoun } from "@/lib/platform-sequence";
+import { firstCommentStatusLabel } from "@/lib/first-comment";
 import {
   CompactPlatformPreview,
   type CompactPreviewLinkCard,
@@ -114,6 +115,9 @@ export type SpotCardData = {
   deliveryExternalId: string | null;
   deliveryStatus: string | null;
   deliveryError: string | null;
+  firstCommentText: string | null;
+  firstCommentStatus: string | null;
+  firstCommentError: string | null;
   publishingConnected: boolean;
   assetLinks: string[] | null;
   media: MediaItem[] | null;
@@ -435,6 +439,8 @@ export function SpotCard({
                 text={spot.text}
                 media={spot.media ?? []}
                 assetLinks={spot.assetLinks ?? []}
+                firstComment={spot.firstCommentText}
+                deliveryExternalId={spot.deliveryExternalId}
                 threadItems={threadItems}
                 linkCard={spot.linkCard}
                 scheduled={scheduled}
@@ -517,6 +523,34 @@ export function SpotCard({
                 </p>
               )}
             </section>
+
+            {spot.firstCommentText?.trim() && (
+              <section className="rounded-xl border bg-background p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
+                    First comment
+                  </h3>
+                  <span
+                    title={spot.firstCommentError ?? undefined}
+                    className={cn(
+                      "rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                      spot.firstCommentStatus === "posted"
+                        ? "border-emerald-500/40 text-emerald-400"
+                        : spot.firstCommentStatus === "failed"
+                          ? "border-red-500/40 text-red-400"
+                          : spot.firstCommentStatus === "queued"
+                            ? "border-sky-500/40 text-sky-400"
+                            : "border-border text-muted-foreground",
+                    )}
+                  >
+                    {firstCommentStatusLabel(spot.firstCommentStatus)}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm leading-6 whitespace-pre-wrap">
+                  {spot.firstCommentText}
+                </p>
+              </section>
+            )}
 
             {media.length > 0 && (
               <section className="rounded-xl border bg-background p-4">
@@ -606,6 +640,7 @@ export function SpotCard({
               media: item.media ?? [],
             }))}
             linkCard={spot.linkCard}
+            firstComment={spot.firstCommentText}
             scheduled={scheduled}
           />
         </div>

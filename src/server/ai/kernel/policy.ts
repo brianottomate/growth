@@ -621,7 +621,10 @@ export const growthActionPolicies = {
     archiveProgram: write({ idempotent: true }),
     restoreProgram: write({ idempotent: true }),
   },
-  listeningRead: { recent: read() },
+  listeningRead: { recent: read(), browserRuns: read() },
+  listeningWrite: {
+    importBrowserRun: write({ idempotent: true, reversible: false }),
+  },
 } as const satisfies {
   [Capability in GrowthCapabilityId]: Record<
     (typeof GROWTH_CAPABILITY_ACTIONS)[Capability][number],

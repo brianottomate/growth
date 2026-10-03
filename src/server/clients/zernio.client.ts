@@ -73,6 +73,30 @@ export async function listZernioAccounts(): Promise<ZernioAccount[]> {
   return unwrapList<ZernioAccount>(data, "accounts", "data");
 }
 
+export type ZernioLinkedInMention = {
+  urn: string;
+  type: "person" | "organization";
+  displayName: string;
+  mentionFormat: string;
+};
+
+/** Resolve a LinkedIn profile URL into the native URN syntax embedded in post
+ * content. Resolution failures stay explicit because a guessed URN would turn
+ * the mention into misleading plain text at delivery time. */
+export async function resolveZernioLinkedInMention(input: {
+  accountId: string;
+  url: string;
+  displayName: string;
+}): Promise<ZernioLinkedInMention> {
+  const params = new URLSearchParams({
+    url: input.url,
+    displayName: input.displayName,
+  });
+  return zernioFetch<ZernioLinkedInMention>(
+    `/accounts/${encodeURIComponent(input.accountId)}/linkedin-mentions?${params.toString()}`,
+  );
+}
+
 // Zernio platform strings → our `channelPlatformEnum` values. Social names
 // are 1:1 apart from twitter→x (verified against live /accounts data); the
 // ads connections (metaads, googleads, linkedinads, …) come from the platform

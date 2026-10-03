@@ -147,6 +147,7 @@ export function CompactPlatformPreview({
   media,
   threadItems,
   linkCard,
+  firstComment,
   scheduled,
   caption,
   readiness,
@@ -165,6 +166,7 @@ export function CompactPlatformPreview({
   media: MediaItem[];
   threadItems?: CompactPreviewItem[];
   linkCard?: CompactPreviewLinkCard | null;
+  firstComment?: string | null;
   scheduled: boolean;
   /** Header note; defaults to the plan-mode "Representative" / item count. */
   caption?: string;
@@ -321,6 +323,14 @@ export function CompactPlatformPreview({
               </div>
             </div>
           )}
+        </div>
+      )}
+      {firstComment?.trim() && (
+        <div className="mt-2 rounded-lg border p-3">
+          <p className="text-[9px] font-medium text-muted-foreground">
+            First comment
+          </p>
+          <p className="mt-1 text-[10px] whitespace-pre-wrap">{firstComment}</p>
         </div>
       )}
 

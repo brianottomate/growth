@@ -11,6 +11,12 @@ import {
   threadFormatForPlatform,
 } from "@/lib/platform-thread";
 import { isStoryFormat, sequenceScheduledAt } from "@/lib/platform-sequence";
+import { firstCommentDraftPatch, firstCommentLimit } from "@/lib/first-comment";
+import {
+  serializePlatformPostDocument,
+  writePlatformPostDocument,
+  type PlatformPostDocument,
+} from "@/lib/platform-post-document";
 import {
   type channelPlatformEnum,
   channelTable,
@@ -316,6 +322,7 @@ async function updateBrief(input: UpdateBriefInput): Promise<{ id: string }> {
 export type SaveSpotThreadItemInput = {
   id?: string;
   text: string | null;
+  textDocument?: PlatformPostDocument;
   media: MediaItem[];
   assetLinks: string[];
 };
@@ -324,6 +331,7 @@ export type SaveSpotThreadInput = {
   rootPlatformPostId: string;
   expectedUpdatedAt: string;
   items: SaveSpotThreadItemInput[];
+  firstComment?: string | null;
 };
 
 const cleanThreadItem = (item: SaveSpotThreadItemInput) => {
@@ -336,6 +344,7 @@ const cleanThreadItem = (item: SaveSpotThreadItemInput) => {
   });
   return {
     text: item.text?.trim() || null,
+    textDocument: item.textDocument,
     media: media.length ? media : null,
     assetLinks: [
       ...new Set(item.assetLinks.map((link) => link.trim()).filter(Boolean)),
@@ -363,6 +372,29 @@ async function saveSpotThread(
       .limit(1);
     if (!root || root.parentPlatformPostId) {
       throw new Error("Thread editing must start from the root platform post.");
+    }
+    const firstComment =
+      input.firstComment === undefined
+        ? undefined
+        : input.firstComment?.trim() || null;
+    const firstCommentMax = firstCommentLimit(root.platform, root.format);
+    if (firstComment && firstCommentMax === null) {
+      throw new Error("This platform format does not support a first comment.");
+    }
+    if (firstComment && firstComment.length > firstCommentMax!) {
+      throw new Error(
+        `First comments can contain at most ${firstCommentMax} characters.`,
+      );
+    }
+    if (
+      input.firstComment !== undefined &&
+      root.deliveryExternalId &&
+      root.firstCommentText &&
+      !firstComment
+    ) {
+      throw new Error(
+        "Removing a first comment from an existing Zernio job needs an approved provider update.",
+      );
     }
     const formatDefinition = root.format
       ? getPlatformFormat(root.format)
@@ -401,6 +433,17 @@ async function saveSpotThread(
         `${root.platform === "x" ? "X" : "Threads"} posts must be ${characterLimit} characters or fewer.`,
       );
     }
+    for (const item of input.items) {
+      if (
+        item.textDocument &&
+        serializePlatformPostDocument(item.textDocument, root.platform) !==
+          (item.text ?? "").replace(/\r\n?/g, "\n").trim()
+      ) {
+        throw new Error(
+          "The structured editor document does not match the platform copy.",
+        );
+      }
+    }
 
     const existingChildren = await tx
       .select()
@@ -422,13 +465,22 @@ async function saveSpotThread(
     const threadFormat = isStory
       ? { format: root.format ?? undefined, archetype: "story" }
       : threadFormatForPlatform(root.platform, input.items.length);
+    const firstCommentPatch = firstCommentDraftPatch(
+      root.firstCommentText,
+      input.firstComment,
+      now,
+    );
     const [savedRoot] = await tx
       .update(platformPostTable)
       .set({
         text: rootItem.text,
+        metadata: rootItem.textDocument
+          ? writePlatformPostDocument(root.metadata, rootItem.textDocument)
+          : root.metadata,
         media: rootItem.media,
         assetLinks: rootItem.assetLinks.length ? rootItem.assetLinks : null,
         ...threadFormat,
+        ...firstCommentPatch,
         parentPlatformPostId: null,
         sequence: 0,
         updatedAt: now,
@@ -455,7 +507,12 @@ async function saveSpotThread(
         const [saved] = await tx
           .update(platformPostTable)
           .set({
-            ...item,
+            text: item.text,
+            media: item.media,
+            assetLinks: item.assetLinks.length ? item.assetLinks : null,
+            metadata: item.textDocument
+              ? writePlatformPostDocument(existing.metadata, item.textDocument)
+              : existing.metadata,
             format: threadFormat.format,
             archetype: threadFormat.archetype,
             sequence: index + 1,
@@ -491,12 +548,22 @@ async function saveSpotThread(
           assetLinks: item.assetLinks.length ? item.assetLinks : null,
           scheduledAt: root.scheduledAt,
           isSeed: root.isSeed,
-          metadata: {
-            ...(typeof root.metadata === "object" && root.metadata
-              ? root.metadata
-              : {}),
-            sequenceRootPlatformPostId: root.id,
-          },
+          metadata: item.textDocument
+            ? writePlatformPostDocument(
+                {
+                  ...(typeof root.metadata === "object" && root.metadata
+                    ? root.metadata
+                    : {}),
+                  sequenceRootPlatformPostId: root.id,
+                },
+                item.textDocument,
+              )
+            : {
+                ...(typeof root.metadata === "object" && root.metadata
+                  ? root.metadata
+                  : {}),
+                sequenceRootPlatformPostId: root.id,
+              },
         })
         .returning({ id: platformPostTable.id });
       if (created) keptChildIds.push(created.id);

@@ -95,7 +95,8 @@
 
 /* Tiptap Editor Styles */
 .tiptap-editor .ProseMirror,
-.tiptap-viewer .ProseMirror {
+.tiptap-viewer .ProseMirror,
+.platform-post-editor .ProseMirror {
   outline: none;
 }
 
@@ -120,6 +121,45 @@
 [data-theme="dark"] .tiptap-viewer .ProseMirror .mention {
   background-color: oklch(0.28 0.08 85);
   color: oklch(0.75 0.12 85);
+}
+
+.platform-post-editor .ProseMirror p {
+  margin: 0;
+}
+
+.platform-post-editor .ProseMirror p + p {
+  margin-top: 1rem;
+}
+
+.platform-post-editor .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  color: hsl(var(--muted-foreground));
+  pointer-events: none;
+}
+
+.platform-post-editor .social-mention {
+  border-radius: 0.25rem;
+  background-color: oklch(0.92 0.08 85);
+  padding: 0.125rem 0.25rem;
+  color: oklch(0.45 0.12 85);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+[data-theme="dark"] .platform-post-editor .social-mention {
+  background-color: oklch(0.28 0.08 85);
+  color: oklch(0.75 0.12 85);
+}
+
+.platform-post-editor .social-mention[href]:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.platform-post-editor .social-mention-pending {
+  box-shadow: inset 0 -1px currentcolor;
 }
 
 .tiptap-editor .ProseMirror ul,

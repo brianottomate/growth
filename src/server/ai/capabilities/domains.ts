@@ -154,6 +154,7 @@ import {
 import { EMAIL_TOOLS } from "./email";
 import { leadsRewriteSequence, leadsSequence, leadsSummary } from "./leads";
 import { recentMentions } from "./listening";
+import { importBrowserEvidence, getBrowserEvidence } from "./browser-evidence";
 import { nextForBrand } from "./next";
 import {
   analyzeMediaAsset,
@@ -699,7 +700,13 @@ export const leadsWrite = growthDomainTool({
 
 export const listeningRead = growthDomainTool({
   description: "Read recent brand mentions and listening triage.",
-  actions: { recent: recentMentions },
+  actions: { recent: recentMentions, browserRuns: getBrowserEvidence },
+});
+
+export const listeningWrite = growthDomainTool({
+  description:
+    "Record manual browser listening evidence in brand-scoped audit artifacts.",
+  actions: { importBrowserRun: importBrowserEvidence },
 });
 
 export const DOMAIN_CAPABILITY_TOOLS = {
@@ -741,5 +748,6 @@ export const DOMAIN_CAPABILITY_TOOLS = {
   leadsRead,
   leadsWrite,
   listeningRead,
+  listeningWrite,
   playbookRead,
 } as const;
