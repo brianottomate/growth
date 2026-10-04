@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -57,11 +57,15 @@ type Target = {
 export function HomeGroupsWorkspace({
   brandId,
   brandSlug,
+  featuredContent,
+  betweenSections,
   setupHref = `/app/brands/${brandSlug}/setup`,
 }: {
   brandId: string;
   brandSlug: string;
   setupHref?: string;
+  featuredContent?: ReactNode;
+  betweenSections?: ReactNode;
 }) {
   const client = useQueryClient();
   const context = useQuery(
@@ -93,90 +97,103 @@ export function HomeGroupsWorkspace({
           <Button onClick={() => setGroupEditor("new")}>New group</Button>
         </div>
         <div className="grid grid-cols-1 gap-4 @3xl:grid-cols-2">
-          {data.groups.map((group) => (
-            <div
-              key={group.id}
-              className="min-w-0 space-y-3 rounded-xl border bg-card p-4"
-            >
-              <div>
-                <h3 className="font-medium [overflow-wrap:anywhere]">
-                  {group.name}
-                  {group.kind === "featured" && (
-                    <span className="ml-2 inline-block rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                      Default
-                    </span>
-                  )}
-                </h3>
-                {group.description && (
-                  <p className="text-sm text-muted-foreground">
-                    {group.description}
-                  </p>
-                )}
-              </div>
-              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Layers className="size-3.5" />
-                {group.homeIds.length}{" "}
-                {group.homeIds.length === 1 ? "home" : "homes"}
-              </p>
-              <ol className="grid grid-cols-1 gap-2 @xl:grid-cols-2">
-                {group.homeIds.slice(0, 4).map((id) => (
-                  <li key={id} className="min-w-0">
-                    <HomeSummary home={data.homes.find((h) => h.id === id)} />
-                  </li>
-                ))}
-              </ol>
-              {group.homeIds.length > 4 && (
-                <details className="text-sm">
-                  <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
-                    Show {group.homeIds.length - 4} more homes
-                  </summary>
-                  <ol className="mt-2 grid grid-cols-1 gap-2 @xl:grid-cols-2">
-                    {group.homeIds.slice(4).map((id) => (
-                      <li key={id} className="min-w-0">
-                        <HomeSummary
-                          home={data.homes.find((h) => h.id === id)}
-                        />
-                      </li>
-                    ))}
-                  </ol>
-                </details>
-              )}
-              {!group.homeIds.length && (
-                <p className="text-sm text-muted-foreground">
-                  No homes selected.
-                </p>
-              )}
-              <div className="flex gap-2">
+          {data.groups.map((group) =>
+            group.kind === "featured" && featuredContent ? (
+              <div key={group.id} className="space-y-2 @3xl:col-span-2">
+                {featuredContent}
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => setGroupEditor(group)}
                 >
-                  Edit group
+                  Edit featured group
                 </Button>
-                {group.kind === "custom" && (
+              </div>
+            ) : (
+              <div
+                key={group.id}
+                className="min-w-0 space-y-3 rounded-xl border bg-card p-4"
+              >
+                <div>
+                  <h3 className="font-medium [overflow-wrap:anywhere]">
+                    {group.name}
+                    {group.kind === "featured" && (
+                      <span className="ml-2 inline-block rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                        Default
+                      </span>
+                    )}
+                  </h3>
+                  {group.description && (
+                    <p className="text-sm text-muted-foreground">
+                      {group.description}
+                    </p>
+                  )}
+                </div>
+                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Layers className="size-3.5" />
+                  {group.homeIds.length}{" "}
+                  {group.homeIds.length === 1 ? "home" : "homes"}
+                </p>
+                <ol className="grid grid-cols-1 gap-2 @xl:grid-cols-2">
+                  {group.homeIds.slice(0, 4).map((id) => (
+                    <li key={id} className="min-w-0">
+                      <HomeSummary home={data.homes.find((h) => h.id === id)} />
+                    </li>
+                  ))}
+                </ol>
+                {group.homeIds.length > 4 && (
+                  <details className="text-sm">
+                    <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                      Show {group.homeIds.length - 4} more homes
+                    </summary>
+                    <ol className="mt-2 grid grid-cols-1 gap-2 @xl:grid-cols-2">
+                      {group.homeIds.slice(4).map((id) => (
+                        <li key={id} className="min-w-0">
+                          <HomeSummary
+                            home={data.homes.find((h) => h.id === id)}
+                          />
+                        </li>
+                      ))}
+                    </ol>
+                  </details>
+                )}
+                {!group.homeIds.length && (
+                  <p className="text-sm text-muted-foreground">
+                    No homes selected.
+                  </p>
+                )}
+                <div className="flex gap-2">
                   <Button
                     size="sm"
-                    variant="ghost"
-                    disabled={remove.isPending}
-                    onClick={() => remove.mutate({ groupId: group.id })}
+                    variant="outline"
+                    onClick={() => setGroupEditor(group)}
                   >
-                    Delete group
+                    Edit group
                   </Button>
-                )}
+                  {group.kind === "custom" && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={remove.isPending}
+                      onClick={() => remove.mutate({ groupId: group.id })}
+                    >
+                      Delete group
+                    </Button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            ),
+          )}
         </div>
         {!data.homes.length && (
           <p className="text-sm text-muted-foreground">
-            Add homes through the brand’s existing Homes setup or ask the
-            assistant to add a property. Groups support manually maintained
-            homes too.
+            Add homes to the inventory or ask the assistant to add a property.
+            Groups support manually maintained homes too.
           </p>
         )}
       </section>
-      <section className="space-y-4">
+      {betweenSections}
+      <section id="booking-targets" className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold">Booking targets</h2>
           <Button

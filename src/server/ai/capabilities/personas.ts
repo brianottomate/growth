@@ -10,11 +10,15 @@ import {
 import "server-only";
 
 import { z } from "zod";
+import { anthropic } from "@ai-sdk/anthropic";
+import { generateText, Output } from "ai";
+import { personaSuggestionsPrompt } from "@/server/ai/prompts";
+import { newPersonaSuggestions } from "@/lib/persona-suggestions";
 
 import { and, asc, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/server/db";
-import { brandTable, personaTable } from "@/server/db/schema";
+import { brandTable, homeTable, personaTable } from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
 import { demandGeographySchema } from "@/lib/persona-geography";
 import {
@@ -221,4 +225,71 @@ export const assignPersonaAudienceAction = growthAction({
   }),
   execute: async (input, ctx) =>
     assignPersonaAudience({ ...input, organizationId: ctx.orgId }),
+});
+
+const suggestionSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  description: z.string().trim().min(1).max(2000),
+});
+
+/** Read and reason separately from creation, so Shape can discuss the same proposals. */
+export const suggestPersonas = growthAction({
+  description:
+    "Suggest up to three missing brand-level guest personas from the brand story and homes, preserving the existing set. Read-only; return planning hypotheses, not measured booking facts. The UI can create them immediately when the operator clicks Define personas; chat can discuss before personaWrite.create.",
+  inputSchema: z.object({ brandId: z.string().trim().min(1) }),
+  outputSchema: z.object({ suggestions: z.array(suggestionSchema).max(3) }),
+  execute: async (input, ctx) => {
+    await requireOwnedBrand(input.brandId, ctx.orgId);
+    const [brand, homes, existing] = await Promise.all([
+      db.query.brandTable.findFirst({
+        where: eq(brandTable.id, input.brandId),
+        columns: { name: true, description: true, story: true },
+      }),
+      db.query.homeTable.findMany({
+        where: and(
+          eq(homeTable.brandId, input.brandId),
+          isNull(homeTable.deletedAt),
+        ),
+        columns: {
+          name: true,
+          city: true,
+          state: true,
+          bedrooms: true,
+          guests: true,
+          amenities: true,
+        },
+        limit: 25,
+      }),
+      db.query.personaTable.findMany({
+        where: and(
+          eq(personaTable.brandId, input.brandId),
+          isNull(personaTable.deletedAt),
+        ),
+        columns: { name: true, description: true },
+      }),
+    ]);
+    if (!brand?.story && !brand?.description && !homes.length)
+      throw new Error("Add a brand story or homes before defining personas.");
+    const { system, prompt } = personaSuggestionsPrompt(
+      JSON.stringify({ brand, homes, existing }),
+    );
+    const { output } = await generateText({
+      model: anthropic("claude-sonnet-5"),
+      system,
+      prompt,
+      output: Output.object({
+        schema: z.object({ suggestions: z.array(suggestionSchema).max(3) }),
+      }),
+    });
+    if (!output)
+      throw new Error(
+        "No persona suggestions were returned. Try again or Shape them in conversation.",
+      );
+    return {
+      suggestions: newPersonaSuggestions(
+        output.suggestions,
+        existing.map((row) => row.name),
+      ),
+    };
+  },
 });

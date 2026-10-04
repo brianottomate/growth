@@ -78,6 +78,8 @@ export const growthActionPolicies = {
     get: read("local-read", ALL),
     getMap: read("local-read", ALL),
     next: read("local-read", ALL),
+    identity: read("local-read", ALL),
+    recommendMark: read("model-read", ALL),
   },
   brandWrite: {
     create: write(),
@@ -123,7 +125,7 @@ export const growthActionPolicies = {
     }),
     removeReference: write({ reversible: false }),
   },
-  personaRead: { list: read() },
+  personaRead: { list: read(), suggest: read("model-read") },
   performanceRead: {
     pitch: read(),
     draftPitch: read("model-read"),

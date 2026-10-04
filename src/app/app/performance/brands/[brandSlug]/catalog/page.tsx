@@ -1,11 +1,6 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
-import { and, eq, isNull } from "drizzle-orm";
-
-import { db } from "@/server/db";
-import { homeTable } from "@/server/db/schema";
-
 import { loadPerformanceBrand } from "../_data";
 import { CatalogCards } from "./CatalogCards";
 
@@ -25,21 +20,5 @@ export default async function PerformanceBrandCatalogPage({
     return <div className="text-muted-foreground">No organization found.</div>;
   if (!brand) notFound();
 
-  const hero = brand.featuredListingUrl
-    ? await db.query.homeTable.findFirst({
-        where: and(
-          eq(homeTable.brandId, brand.id),
-          eq(homeTable.url, brand.featuredListingUrl),
-          isNull(homeTable.deletedAt),
-        ),
-        columns: { externalId: true },
-      })
-    : null;
-  return (
-    <CatalogCards
-      brandId={brand.id}
-      brandName={brand.name}
-      heroHomeId={hero?.externalId ?? null}
-    />
-  );
+  return <CatalogCards brandId={brand.id} brandName={brand.name} />;
 }

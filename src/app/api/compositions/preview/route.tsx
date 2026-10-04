@@ -46,15 +46,18 @@ export async function GET(request: NextRequest) {
     );
     // A draft font from the setup page's preview strip. Only Google families
     // reach the font loader; anything else renders in the brand's own font.
-    const fontParam = params.get("fontFamily")?.trim().slice(0, 80) || null;
-    const fontFamily =
-      fontParam &&
-      (await googleFontCatalog()).some((font) => font.family === fontParam)
-        ? fontParam
+    const fontCatalog = await googleFontCatalog();
+    const draftFont = (key: string) => {
+      const family = params.get(key)?.trim().slice(0, 80);
+      return family && fontCatalog.some((font) => font.family === family)
+        ? family
         : null;
+    };
+    const fontFamily = draftFont("fontFamily");
+    const bodyFontFamily = draftFont("bodyFontFamily");
     const image = renderComposition(
       parsed.data,
-      await loadCompositionSource(context, { fontFamily }),
+      await loadCompositionSource(context, { fontFamily, bodyFontFamily }),
     );
     // The URL is the whole recipe, so a reload reuses the render. Brand-level
     // changes (mark, fonts) show within the hour.

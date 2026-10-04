@@ -29,6 +29,7 @@ import {
   previewIntakeApplyAction,
   applyIntakeAction,
   verifyIntakeAccessAction,
+  suggestFeaturedHomesAction,
 } from "@/server/ai/capabilities/performance";
 
 // Performance accounts (/app/performance/accounts) — the clients paying for
@@ -57,6 +58,7 @@ export const performanceRouter = {
   savePitch: actionProcedure(savePitchAction),
   draftPitch: actionProcedure(draftPitchAction),
   list: actionProcedure(listPerformanceAccountsAction),
+  suggestFeaturedHomes: actionProcedure(suggestFeaturedHomesAction),
 
   get: actionProcedure(getPerformanceAccountAction),
 

@@ -2,14 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { and, eq, isNull } from "drizzle-orm";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Users, ContactRound, Images } from "lucide-react";
 
 import { db } from "@/server/db";
 import {
   performanceAccountTable,
   performanceIntakeTable,
 } from "@/server/db/schema";
-import { cn } from "@/components/ui/lib/utils";
+import { Button } from "@/components/ui/button";
 import { loadBrandContacts } from "@/server/services/brand-contacts.service";
 import { listMedia } from "@/server/services/media.service";
 import {
@@ -17,7 +17,6 @@ import {
   readinessLinks,
 } from "@/server/services/performance-readiness.service";
 
-import { panel, SectionLabel } from "../../_components";
 import { ReadinessChecklist } from "../../ReadinessChecklist";
 import { PerformanceClientCard } from "../../PerformanceClientCard";
 import { performanceCardFromBrand } from "@/lib/performance-card";
@@ -136,22 +135,21 @@ export default async function PerformanceBrandPage({
     : null;
 
   return (
-    <div className="space-y-7">
+    <div className="space-y-4">
       {deskBrand && (
         <section className="space-y-2.5">
-          <SectionLabel>Recorded client progress</SectionLabel>
-          <PerformanceClientCard card={performanceCardFromBrand(deskBrand)} />
-          <p className="text-xs text-muted-foreground">
-            The same recorded state shown on the Performance pipeline.
-            Operational checks below are separate.
-          </p>
+          <PerformanceClientCard
+            card={performanceCardFromBrand(deskBrand)}
+            context="client"
+          />
         </section>
       )}
       {deskBrand && brandReadiness ? (
-        <section className={cn(panel, "px-4 pb-1")}>
+        <section className="rounded-xl border px-4">
           <ReadinessChecklist
             checklist={brandReadiness.checklist}
             links={readinessLinks(deskBrand)}
+            defaultOpen
           />
         </section>
       ) : null}
@@ -162,70 +160,29 @@ export default async function PerformanceBrandPage({
         intakeUrl={deskBrand?.intakeUrl ?? null}
       />
 
-      <section className="space-y-2.5">
-        <div className="flex items-baseline justify-between">
-          <SectionLabel>
-            Media library{shown.length ? ` · ${shown.length}` : ""}
-          </SectionLabel>
-          <div className="flex items-center gap-3 text-[11.5px]">
-            <Link
-              href={`/app/compositions?brandId=${encodeURIComponent(brand.id)}`}
-              className="text-sky-300 hover:underline"
-            >
-              Studio
-            </Link>
-            <Link
-              href={`/app/media?brand=${encodeURIComponent(slug)}`}
-              className="text-sky-300 hover:underline"
-            >
-              Open library
-            </Link>
-          </div>
+      <section
+        aria-labelledby="contacts-heading"
+        className="space-y-4 rounded-xl border p-4"
+      >
+        <div className="flex items-center gap-2">
+          <Users aria-hidden="true" className="size-4 text-muted-foreground" />
+          <h2 id="contacts-heading" className="text-base font-semibold">
+            Contacts
+          </h2>
         </div>
-        {images.length === 0 ? (
-          <p
-            className={cn(
-              panel,
-              "px-4 py-6 text-center text-xs text-muted-foreground",
-            )}
-          >
-            Nothing in the library yet.
-          </p>
-        ) : (
-          <MediaStrip
-            images={images.map((asset) => ({
-              id: asset.id,
-              url: asset.url!,
-              thumbnailUrl: asset.thumbnailUrl ?? null,
-              title: asset.title ?? asset.filename ?? null,
-              alt: asset.alt ?? null,
-              width: asset.width ?? null,
-              height: asset.height ?? null,
-              isCard: isCard(asset),
-            }))}
-            brandId={brand.id}
-            brandSlug={brand.slug}
-          />
-        )}
-      </section>
-
-      <section className="space-y-2.5">
-        <SectionLabel>Contacts</SectionLabel>
         {contacts.length === 0 ? (
-          <p
-            className={cn(
-              panel,
-              "px-4 py-6 text-center text-xs text-muted-foreground",
-            )}
-          >
-            No contacts on record.
-          </p>
+          <div className="space-y-1 py-4">
+            <p className="text-sm font-medium">No contacts on record.</p>
+            <p className="text-xs text-muted-foreground">
+              Client, reporting, and invoice contacts appear here when supplied.
+            </p>
+          </div>
         ) : (
-          <ul className={cn(panel, "divide-y")}>
+          <ul className="divide-y">
             {contacts.map((contact) => (
               <li
                 key={`${contact.role}-${contact.email ?? contact.name}`}
-                className="flex flex-wrap items-center gap-x-3 px-4 py-2.5 text-xs"
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 py-3 text-xs"
               >
                 <span className="w-28 shrink-0 text-muted-foreground">
                   {contact.role}
@@ -248,14 +205,25 @@ export default async function PerformanceBrandPage({
       </section>
 
       {people ? (
-        <section className="space-y-2.5">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-            <SectionLabel>
-              CRM contacts
-              {people.contacts.length
-                ? ` · ${people.contacts.length + people.moreCount}`
-                : ""}
-            </SectionLabel>
+        <section
+          aria-labelledby="crm-contacts-heading"
+          className="space-y-4 rounded-xl border p-4"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <ContactRound
+                aria-hidden="true"
+                className="size-4 text-muted-foreground"
+              />
+              <h2 id="crm-contacts-heading" className="text-base font-semibold">
+                CRM contacts
+              </h2>
+              {people.contacts.length ? (
+                <span className="text-xs text-muted-foreground">
+                  {people.contacts.length + people.moreCount}
+                </span>
+              ) : null}
+            </div>
             {people.company ? (
               <div className="flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
                 {people.company.leadStatus ? (
@@ -292,22 +260,17 @@ export default async function PerformanceBrandPage({
             ) : null}
           </div>
           {people.contacts.length === 0 ? (
-            <p
-              className={cn(
-                panel,
-                "px-4 py-6 text-center text-xs text-muted-foreground",
-              )}
-            >
+            <p className="py-4 text-sm text-muted-foreground">
               No contacts on file for {people.domain}.
             </p>
           ) : (
-            <ul className={cn(panel, "divide-y")}>
+            <ul className="divide-y">
               {people.contacts.map((person) => (
                 <li
                   key={person.id}
-                  className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2.5 text-sm"
+                  className="flex min-w-0 flex-col items-start gap-x-4 gap-y-1 py-3 text-sm @lg:flex-row @lg:flex-wrap @lg:items-center"
                 >
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 @lg:flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       {/* A nameless contact is shown by email once, on the right. */}
                       <span
@@ -331,14 +294,14 @@ export default async function PerformanceBrandPage({
                   </div>
                   <a
                     href={`mailto:${person.email}`}
-                    className="text-xs text-muted-foreground hover:underline"
+                    className="text-xs [overflow-wrap:anywhere] text-muted-foreground hover:underline"
                   >
                     {person.email}
                   </a>
                   {person.phone ? (
                     <a
                       href={`tel:${person.phone}`}
-                      className="text-xs text-muted-foreground hover:underline"
+                      className="text-xs [overflow-wrap:anywhere] text-muted-foreground hover:underline"
                     >
                       {person.phone}
                     </a>
@@ -346,7 +309,7 @@ export default async function PerformanceBrandPage({
                 </li>
               ))}
               {people.moreCount > 0 ? (
-                <li className="px-4 py-2 text-xs text-muted-foreground">
+                <li className="py-2 text-xs text-muted-foreground">
                   {people.moreCount} more in HubSpot
                 </li>
               ) : null}
@@ -354,6 +317,65 @@ export default async function PerformanceBrandPage({
           )}
         </section>
       ) : null}
+
+      <section
+        aria-labelledby="media-library-heading"
+        className="space-y-4 rounded-xl border p-4"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Images
+              aria-hidden="true"
+              className="size-4 text-muted-foreground"
+            />
+            <h2 id="media-library-heading" className="text-base font-semibold">
+              Media library
+            </h2>
+            {shown.length ? (
+              <span className="text-xs text-muted-foreground">
+                {shown.length}
+              </span>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button asChild size="sm" variant="outline">
+              <Link
+                href={`/app/compositions?brandId=${encodeURIComponent(brand.id)}`}
+              >
+                Studio
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href={`/app/media?brand=${encodeURIComponent(slug)}`}>
+                Open library
+              </Link>
+            </Button>
+          </div>
+        </div>
+        {images.length === 0 ? (
+          <div className="space-y-1 py-4">
+            <p className="text-sm font-medium">Nothing in the library yet.</p>
+            <p className="text-xs text-muted-foreground">
+              Photos and saved creative previews appear here once added.
+            </p>
+          </div>
+        ) : (
+          <MediaStrip
+            images={images.map((asset) => ({
+              id: asset.id,
+              url: asset.url!,
+              thumbnailUrl: asset.thumbnailUrl ?? null,
+              title: asset.title ?? asset.filename ?? null,
+              alt: asset.alt ?? null,
+              width: asset.width ?? null,
+              height: asset.height ?? null,
+              isCard: isCard(asset),
+            }))}
+            brandId={brand.id}
+            brandSlug={brand.slug}
+          />
+        )}
+      </section>
     </div>
   );
 }

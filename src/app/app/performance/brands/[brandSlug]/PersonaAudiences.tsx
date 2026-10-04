@@ -3,8 +3,21 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { Plus, RefreshCw, Upload, Users } from "lucide-react";
+import {
+  MoreHorizontal,
+  Plus,
+  RefreshCw,
+  Sparkles,
+  Upload,
+  Users,
+} from "lucide-react";
 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,7 +27,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
-import { DefinePersonasButton } from "@/app/app/brands/[brandSlug]/ads/DefinePersonasButton";
+import { ShapeBrandButton } from "./ShapeBrandButton";
+import { toast } from "@/components/ui/toast";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SimpleSelect } from "@/components/ui/select";
@@ -75,6 +89,59 @@ export function PersonaAudiences({
 }) {
   const router = useRouter();
   const [creating, setCreating] = useState(false);
+  const [defining, setDefining] = useState(false);
+  const suggest = useMutation(orpc.persona.suggest.mutationOptions());
+  const add = useMutation(orpc.persona.create.mutationOptions());
+  const define = async () => {
+    setDefining(true);
+    try {
+      const { suggestions } = await suggest.mutateAsync({ brandId: brand.id });
+      const existingNames = new Set(
+        personas.map((row) =>
+          row.name.trim().toLowerCase().replace(/\s+/g, " "),
+        ),
+      );
+      let created = 0;
+      for (const suggestion of suggestions) {
+        if (
+          existingNames.has(
+            suggestion.name.trim().toLowerCase().replace(/\s+/g, " "),
+          )
+        )
+          continue;
+        await add.mutateAsync({ brandId: brand.id, ...suggestion });
+        created++;
+      }
+      toast.info(
+        created
+          ? `Created ${created} personas`
+          : "No additional personas needed.",
+      );
+    } catch (error) {
+      toast.error(errorText(error));
+    } finally {
+      setDefining(false);
+      router.refresh();
+    }
+  };
+  const actions = (primary = false) => (
+    <>
+      <Button
+        size="sm"
+        variant={primary ? "default" : "outline"}
+        disabled={defining}
+        onClick={() => void define()}
+      >
+        <Sparkles className="size-3.5" />
+        {defining ? "Defining…" : "Define personas"}
+      </Button>
+      <ShapeBrandButton
+        brandId={brand.id}
+        brandName={brand.name}
+        section="personas"
+      />
+    </>
+  );
   const refresh = useMutation(
     orpc.ads.pullAudiences.mutationOptions({
       onSuccess: () => router.refresh(),
@@ -84,24 +151,39 @@ export function PersonaAudiences({
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className={label}>Personas · {personas.length}</p>
+        <h2 className="flex items-center gap-2 text-base font-semibold">
+          <Users aria-hidden="true" className="size-4 text-muted-foreground" />
+          Personas{" "}
+          <span className="text-muted-foreground">· {personas.length}</span>
+        </h2>
         <div className="flex min-w-0 flex-wrap gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={refresh.isPending}
-            onClick={() => refresh.mutate({ brandSlug: brand.slug })}
-          >
-            <RefreshCw
-              className={cn("size-3.5", refresh.isPending && "animate-spin")}
-            />
-            Refresh from Meta
-          </Button>
-          <DefinePersonasButton brandId={brand.id} brandName={brand.name} />
-          <Button size="sm" onClick={() => setCreating(true)}>
-            <Plus className="size-3.5" />
-            New persona
-          </Button>
+          {actions()}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="sm"
+                variant="outline"
+                aria-label="More persona actions"
+              >
+                <MoreHorizontal className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => setCreating(true)}>
+                <Plus />
+                New persona
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={refresh.isPending}
+                onSelect={() => refresh.mutate({ brandSlug: brand.slug })}
+              >
+                <RefreshCw
+                  className={cn(refresh.isPending && "animate-spin")}
+                />
+                Refresh from Meta
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
       {refresh.error ? (
@@ -113,15 +195,12 @@ export function PersonaAudiences({
       {personas.length === 0 ? (
         <EmptyState
           icon={Users}
-          title="Add the first persona"
-          actions={
-            <Button size="sm" onClick={() => setCreating(true)}>
-              New persona
-            </Button>
-          }
+          title="Start with the people behind the booking"
+          description="Define and save a small set of guest personas from the brand story and homes, or Shape who the creative should speak to."
+          actions={actions(true)}
         />
       ) : (
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 @xl:grid-cols-2">
           {personas.map((persona) => (
             <PersonaCard key={persona.id} persona={persona} />
           ))}

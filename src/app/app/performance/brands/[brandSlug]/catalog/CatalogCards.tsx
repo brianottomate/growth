@@ -9,9 +9,12 @@ import {
   MessageSquare,
   ChevronDown,
   Sparkles,
+  Layers,
 } from "lucide-react";
 import { ORPCError } from "@orpc/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ShapeBrandButton } from "../ShapeBrandButton";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/components/ui/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -55,10 +58,7 @@ import { DeleteAlert } from "@/components/ui/alert-dialog";
 import { orpc, type RouterInputs } from "@/orpc/client";
 import { reviewInChat } from "../ReviewInChatButton";
 import { CatalogPreview } from "./CatalogPreview";
-import {
-  CatalogTemplateCard,
-  CatalogTemplateSummary,
-} from "../CatalogTemplateCard";
+import { CatalogTemplateCard } from "../CatalogTemplateCard";
 
 /** The server's own sentence, or the first input issue it refused. */
 function errorMessage(error: unknown, fallback: string) {
@@ -84,12 +84,10 @@ const preview = catalogCardPreviewUrl;
 export function CatalogCards({
   brandId,
   brandName = "",
-  heroHomeId = null,
 }: {
   brandId: string;
   brandName?: string;
   /** The brand's hero home, drawn in the card picker. */
-  heroHomeId?: string | null;
 }) {
   const client = useQueryClient();
   const state = orpc.catalog.state.queryOptions({ input: { brandId } });
@@ -187,7 +185,7 @@ export function CatalogCards({
           ? `Pick a better hero photo for ${homeName}`
           : focus === "copy"
             ? `Write a better catalog headline for ${homeName}`
-            : `Let's work on ${homeName}'s catalog card`,
+            : `Let's shape ${homeName}'s catalog card. Read the current card and home evidence, then discuss options before changing anything.`,
     });
   };
   async function setHero(card: CatalogCard, photoUrl: string) {
@@ -350,31 +348,57 @@ export function CatalogCards({
     if (done) void setView("exports");
     setBusy(false);
   }
+  const cardActions = (primary = false) => (
+    <>
+      <Button
+        size="sm"
+        variant={primary ? "default" : "outline"}
+        disabled={busy || Boolean(writing) || open.length === 0}
+        onClick={() => startWrite.mutate({ brandId, pass: "copy" })}
+      >
+        <Sparkles className="size-3.5" />
+        {writing ? `Writing ${writing.done}/${writing.total}` : "Write cards"}
+      </Button>
+      <Button size="sm" variant="outline" onClick={() => setPicker(true)}>
+        Choose template
+      </Button>
+      <ShapeBrandButton
+        brandId={brandId}
+        brandName={brandName}
+        section="catalog cards, copy and templates"
+      />
+    </>
+  );
   const activeExport = query.data?.exports.some((e) => running(e.status));
   return (
     <section className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">Catalog</h2>
-        <div className="flex gap-2">
-          <Button
-            variant={view === "studio" ? "secondary" : "ghost"}
-            onClick={() => setView("studio")}
-          >
-            Studio
-          </Button>
-          <Button
-            variant={view === "preview" ? "secondary" : "ghost"}
-            onClick={() => setView("preview")}
-          >
-            Preview
-          </Button>
-          <Button
-            variant={view === "exports" ? "secondary" : "ghost"}
-            onClick={() => setView("exports")}
-          >
-            Exports {query.data?.exports.length || ""}
-          </Button>
-        </div>
+        <div className="flex flex-wrap gap-2">{cardActions()}</div>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        Home cards with photography and copy, ready for review and export. Write
+        cards fills or rewrites every included, unapproved composed card.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant={view === "studio" ? "secondary" : "ghost"}
+          onClick={() => setView("studio")}
+        >
+          Studio
+        </Button>
+        <Button
+          variant={view === "preview" ? "secondary" : "ghost"}
+          onClick={() => setView("preview")}
+        >
+          Preview
+        </Button>
+        <Button
+          variant={view === "exports" ? "secondary" : "ghost"}
+          onClick={() => setView("exports")}
+        >
+          Exports {query.data?.exports.length || ""}
+        </Button>
       </div>
       {(error || query.error) && (
         <p role="alert" className="text-destructive">
@@ -485,34 +509,6 @@ export function CatalogCards({
               </Button>
             </div>
           </div>
-          <div className="rounded-xl border">
-            <button
-              type="button"
-              aria-expanded={picker}
-              onClick={() => setPicker((o) => !o)}
-              className="flex w-full items-center justify-between gap-3 p-3 text-left text-sm"
-            >
-              <CatalogTemplateSummary
-                brandId={brandId}
-                heroHomeId={heroHomeId}
-              />
-              <ChevronDown
-                aria-hidden="true"
-                className={cn(
-                  "size-4 transition-transform",
-                  picker && "rotate-180",
-                )}
-              />
-            </button>
-            {picker ? (
-              <div className="border-t p-3">
-                <CatalogTemplateCard
-                  brandId={brandId}
-                  heroHomeId={heroHomeId}
-                />
-              </div>
-            ) : null}
-          </div>
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <div className="flex rounded-lg border p-0.5">
               {(["grid", "list"] as const).map((l) => (
@@ -554,9 +550,12 @@ export function CatalogCards({
             </p>
           )}
           {!draft.cards.length && (
-            <p className="text-muted-foreground">
-              No homes with photos found on this brand’s WanderOS site.
-            </p>
+            <EmptyState
+              icon={Layers}
+              title="Build reusable home cards"
+              description="Add homes with photos to create catalog cards. Then choose a template and write their copy using the brand story, or Shape the creative direction."
+              actions={cardActions(true)}
+            />
           )}
           {layout === "grid" ? (
             <div className="grid grid-cols-1 gap-3 @xl:grid-cols-2 @2xl:gap-4 @4xl:grid-cols-3 @6xl:grid-cols-4">
@@ -643,7 +642,7 @@ export function CatalogCards({
                                 onClick={() => workInChat(card)}
                               >
                                 <MessageSquare className="size-3.5" />
-                                Work in chat
+                                Shape
                               </Button>
                               <Button
                                 size="sm"
@@ -922,6 +921,18 @@ export function CatalogCards({
         title="Delete this export?"
         description={`This deletes the export, its media library folder and ${deletingExport?.assets?.length ?? 0} images for good. Other exports keep their own copies.`}
       />
+      <Dialog open={picker} onOpenChange={setPicker}>
+        <DialogContent size="2xl" className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Choose a catalog template</DialogTitle>
+            <DialogDescription>
+              Choose the shared card layout. Existing copy stays as it is; use
+              Write cards when you want to write for the new layout.
+            </DialogDescription>
+          </DialogHeader>
+          <CatalogTemplateCard brandId={brandId} />
+        </DialogContent>
+      </Dialog>
       <Dialog
         open={layout === "grid" && !!details}
         onOpenChange={(open) => {

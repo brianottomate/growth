@@ -5,8 +5,9 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { Check, ImageOff, Loader2, Plus, Search, Star } from "lucide-react";
+import { Check, ImageOff, Loader2, Plus, Search } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { cn } from "@/components/ui/lib/utils";
 import { toast } from "@/components/ui/toast";
 import { orpc } from "@/orpc/client";
@@ -37,15 +38,13 @@ const SUGGESTED_MAX = 10;
 export function HomeRowsGrid({
   homes,
   brandSlug,
-  heroUrl,
 }: {
   homes: RowHome[];
   brandSlug: string;
-  /** The brand hero's listing URL; its tile carries a star. */
-  heroUrl: string | null;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
+  const [loadAll, setLoadAll] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -54,6 +53,7 @@ export function HomeRowsGrid({
       `${home.name} ${home.facts}`.toLowerCase().includes(q),
     );
   }, [homes, query]);
+  const visible = loadAll ? shown : shown.slice(0, 12);
   const featuredCount = homes.filter((home) => home.featured).length;
 
   const toggle = useMutation(
@@ -94,7 +94,7 @@ export function HomeRowsGrid({
         </p>
       ) : null}
       <ul className="grid grid-cols-2 gap-2.5 @xl:grid-cols-3 @4xl:grid-cols-6">
-        {shown.map((home) => {
+        {visible.map((home) => {
           const busy = busyId === home.id;
           return (
             <li
@@ -124,12 +124,6 @@ export function HomeRowsGrid({
                 )}
                 <span className="block px-2.5 py-2">
                   <span className="flex items-center gap-1 text-xs font-semibold">
-                    {home.url === heroUrl ? (
-                      <Star
-                        className="size-3 shrink-0 fill-current"
-                        aria-label="Brand hero"
-                      />
-                    ) : null}
                     <span className="truncate group-hover:underline">
                       {home.name}
                     </span>
@@ -172,6 +166,16 @@ export function HomeRowsGrid({
           );
         })}
       </ul>
+      {visible.length < shown.length ? (
+        <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
+          <span className="text-xs text-muted-foreground">
+            {visible.length} of {shown.length} homes
+          </span>
+          <Button size="sm" variant="outline" onClick={() => setLoadAll(true)}>
+            Load all
+          </Button>
+        </div>
+      ) : null}
     </>
   );
 }

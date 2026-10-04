@@ -26,3 +26,5 @@ export * from "./portfolio-review";
 export * from "./triggered-intents";
 
 export * from "./ad-copy-chat";
+
+export * from "./personas";

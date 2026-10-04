@@ -18,7 +18,6 @@ import { getBrandSurfaceSummary } from "@/server/services/brand-map.service";
 import { ContentStructureAssistantButton } from "@/components/content-structure-assistant-button";
 
 import { BrandBrandingCard } from "./BrandBrandingCard";
-import { BrandMarkCard } from "./BrandMarkCard";
 import { mediaAssetTable } from "@/server/db/schema";
 import { inArray } from "drizzle-orm";
 import { BrandCadence } from "./BrandStrategyClient";
@@ -64,6 +63,7 @@ export default async function BrandPage({
       brandIdentity: true,
       brandMark: true,
       websiteMeta: true,
+      previewSourceUrl: true,
       performanceSettings: true,
     },
   });
@@ -217,21 +217,16 @@ export default async function BrandPage({
       />
 
       <BrandBrandingCard
+        brandName={brand.name}
         brandId={brand.id}
         logo={brand.logo}
         identity={brand.brandIdentity ?? null}
         website={brand.website}
-      />
-
-      <BrandMarkCard
-        brandId={brand.id}
-        brandName={brand.name}
-        logo={brand.logo}
-        identity={brand.brandIdentity ?? null}
         mark={brand.brandMark ?? null}
         variants={markVariants}
         logoOnCreatives={brand.performanceSettings?.logoOnCreatives !== false}
         photo={
+          brand.previewSourceUrl ??
           brand.brandIdentity?.raw?.images?.ogImage ??
           brand.websiteMeta?.ogImage ??
           null

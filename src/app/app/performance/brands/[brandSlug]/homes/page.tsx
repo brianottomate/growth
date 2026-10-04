@@ -5,5 +5,5 @@ export default async function HomesRedirect({
   params: Promise<{ brandSlug: string }>;
 }) {
   const { brandSlug } = await params;
-  permanentRedirect(`/app/performance/brands/${brandSlug}/setup`);
+  permanentRedirect(`/app/performance/brands/${brandSlug}/wanderos`);
 }

@@ -116,6 +116,7 @@ export type BrandWebsiteMeta = {
  * a white silhouette for photos, a near-black one for light grounds.
  */
 export type BrandMark = {
+  previewCopy?: import("@/lib/brand-preview-copy").BrandPreviewCopy | null;
   source: "logo" | "favicon" | "lockup";
   /** Lockup only: the icon beside the name, a library asset. */
   iconAssetId?: string | null;

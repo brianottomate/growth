@@ -3,11 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { Sparkles } from "lucide-react";
+import { FileText, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import { orpc } from "@/orpc/client";
+import { BrandStoryContent } from "./brand-content";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ShapeBrandButton } from "./ShapeBrandButton";
 
 /**
  * The brand story: the short brief every creative prompt for this brand
@@ -16,9 +19,11 @@ import { orpc } from "@/orpc/client";
  */
 export function BrandStoryCard({
   brandId,
+  brandName,
   story,
 }: {
   brandId: string;
+  brandName: string;
   story: string | null;
 }) {
   const router = useRouter();
@@ -41,15 +46,41 @@ export function BrandStoryCard({
     }),
   );
 
+  const actions = (primary = false) => (
+    <>
+      {story ? (
+        <Button size="sm" variant="outline" onClick={() => setDraft(story)}>
+          Edit
+        </Button>
+      ) : (
+        <Button
+          size="sm"
+          variant={primary ? "default" : "outline"}
+          loading={write.isPending}
+          onClick={() => write.mutate({ brandId })}
+        >
+          <Sparkles className="size-3.5" />
+          Write story
+        </Button>
+      )}
+      <ShapeBrandButton
+        brandId={brandId}
+        brandName={brandName}
+        section="brand story"
+      />
+    </>
+  );
   return (
     <section className="space-y-3 rounded-xl border p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold">Brand story</h2>
-          <p className="text-xs text-muted-foreground">
-            What makes this brand itself, who books it, its voice and what to
-            avoid. Every headline, caption and review for the brand reads it.
-          </p>
+          <h2 className="flex items-center gap-2 text-base font-semibold">
+            <FileText
+              aria-hidden="true"
+              className="size-4 text-muted-foreground"
+            />
+            Brand story
+          </h2>
         </div>
         {editing ? (
           <div className="flex items-center gap-2">
@@ -70,26 +101,7 @@ export function BrandStoryCard({
             </Button>
           </div>
         ) : (
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              loading={write.isPending}
-              onClick={() => write.mutate({ brandId })}
-            >
-              <Sparkles className="size-3.5" />
-              {story ? "Redraft" : "Draft with AI"}
-            </Button>
-            {story ? (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setDraft(story)}
-              >
-                Edit
-              </Button>
-            ) : null}
-          </div>
+          <div className="flex flex-wrap gap-2">{actions()}</div>
         )}
       </div>
       {editing ? (
@@ -101,13 +113,19 @@ export function BrandStoryCard({
           className="w-full rounded-lg border bg-muted/30 p-3 text-sm outline-none focus:ring-2 focus:ring-ring"
         />
       ) : story ? (
-        <p className="text-sm whitespace-pre-line">{story}</p>
+        <BrandStoryContent story={story} />
       ) : (
-        <p className="text-sm text-muted-foreground">
-          {write.isPending
-            ? "Reading the site, the homes and what guests say…"
-            : "No story yet."}
-        </p>
+        <EmptyState
+          compact
+          icon={FileText}
+          title="Give the creative a shared direction"
+          description={
+            write.isPending
+              ? "Reading the site, homes and guest evidence…"
+              : "Write and save a story from the brand’s identity, homes and guest reviews, or Shape its direction together."
+          }
+          actions={actions(true)}
+        />
       )}
     </section>
   );

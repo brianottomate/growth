@@ -1,6 +1,7 @@
 import type { PerformanceSettings } from "@/server/db/brand-schema";
 import { pipelineStage, type PipelineStage } from "./performance-pipeline";
 import type { PerformanceCardState } from "./performance-card-state";
+import type { ReadinessChecklist, ReadinessFix } from "./performance-readiness";
 
 export type PerformancePipelineCard = {
   id: string;
@@ -21,6 +22,10 @@ export type PerformancePipelineCard = {
   note?: string | null;
   noteEditedAt?: string;
   noteEditedBy?: PerformanceSettings["noteEditedBy"];
+  readiness?: {
+    checklist: ReadinessChecklist;
+    links: Record<ReadinessFix, string | null>;
+  };
 };
 
 /** Recorded workflow state is never filled from campaigns, cycles, or the old delivery stage. */

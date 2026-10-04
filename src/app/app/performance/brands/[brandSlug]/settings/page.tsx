@@ -1,3 +1,5 @@
+import { WanderOsSiteCard } from "@/app/app/brands/[brandSlug]/WanderOsSiteCard";
+import { RefreshHomes } from "../RefreshHomes";
 import { ClientConnectCard } from "@/app/app/brands/[brandSlug]/ClientConnectCard";
 import { SharedAdsConnections } from "@/app/app/brands/[brandSlug]/SharedAdsConnections";
 import type { Metadata } from "next";
@@ -97,6 +99,15 @@ export default async function PerformanceBrandSettingsPage({
   return (
     <div className="space-y-3">
       <SectionLabel>Settings</SectionLabel>
+      <section id="wanderos" className="space-y-3 rounded-xl border p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-base font-semibold">
+            WanderOS connection & sync
+          </h2>
+          <RefreshHomes brandId={brand.id} />
+        </div>
+        <WanderOsSiteCard brandId={brand.id} />
+      </section>
       <ClientConnectCard brandId={brand.id} />
       <SharedAdsConnections brandId={brand.id} />
       <SettingsCard

@@ -13,7 +13,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
   presentNextOptions: ["present"],
   blogAgent: ["run"],
   newsletterAgent: ["run"],
-  brandRead: ["list", "get", "getMap", "next"],
+  brandRead: ["list", "get", "getMap", "next", "identity", "recommendMark"],
   brandWrite: [
     "create",
     "createProspect",
@@ -39,7 +39,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "captureReference",
     "removeReference",
   ],
-  personaRead: ["list"],
+  personaRead: ["list", "suggest"],
   performanceRead: [
     "pitch",
     "draftPitch",

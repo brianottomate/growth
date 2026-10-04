@@ -1,6 +1,9 @@
-import Link from "next/link";
-import type { ReactNode } from "react";
+"use client";
 
+import Link from "next/link";
+import { useState, type ReactNode } from "react";
+
+import { Button } from "@/components/ui/button";
 import { cn } from "@/components/ui/lib/utils";
 import { trackerDate } from "@/lib/performance-settings";
 import type { TrackerRow } from "@/server/services/performance-tracker.service";
@@ -9,18 +12,18 @@ import { TrackerChatButton } from "./TrackerChatButton";
 
 const COLUMNS = [
   "Client",
-  "Paid fee per month",
+  "Monthly management fee",
   "Effective date",
   "Terms",
   "End date",
   "WanderOS site live",
   "Agreed ad spend per month",
-  "Billed ad spend",
+  "Actual ad spend",
   "Onboarding link",
-  "FB connection",
+  "FB access (intake)",
   "Ad creative",
   "Ad copies",
-  "Ads live",
+  "Ad delivery (app records)",
   "CPB",
   "Wander newsletter",
   "Influencer",
@@ -28,11 +31,37 @@ const COLUMNS = [
   "Bookings",
 ] as const;
 
+const COLUMN_GROUPS = {
+  Commercial: [
+    "Monthly management fee",
+    "Effective date",
+    "Terms",
+    "End date",
+    "Agreed ad spend per month",
+  ],
+  Setup: ["WanderOS site live", "Onboarding link", "FB access (intake)"],
+  Creative: ["Ad creative", "Ad copies"],
+  Delivery: ["Ad delivery (app records)"],
+  Commitments: ["Wander newsletter", "Influencer", "Social media posts"],
+  Results: ["Actual ad spend", "CPB", "Bookings"],
+} as const;
+type TrackerView = "All columns" | keyof typeof COLUMN_GROUPS;
+const TRACKER_VIEWS: TrackerView[] = [
+  "All columns",
+  "Commercial",
+  "Setup",
+  "Creative",
+  "Delivery",
+  "Commitments",
+  "Results",
+];
+
 const usd = (dollars: number) =>
   new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
   }).format(dollars);
 
 /** Micaela's tracker sheet, filled from the app: one client per row. */
@@ -43,14 +72,21 @@ export function TrackerTable({
   rows: TrackerRow[];
   mobileCollapsed?: boolean;
 }) {
+  const [view, setView] = useState<TrackerView>("All columns");
+  const includesColumn = (label: string) =>
+    view === "All columns" ||
+    label === "Client" ||
+    (COLUMN_GROUPS[view] as readonly string[]).includes(label);
+  const fieldsOf = (row: TrackerRow) =>
+    trackerFields(row).filter(([label]) => includesColumn(label));
   const cards = (
     <div className="space-y-3">
       {rows.map((row) => {
-        const fields = trackerFields(row);
+        const fields = fieldsOf(row);
         const summary = new Set([
-          "Paid fee per month",
+          "Monthly management fee",
           "Agreed ad spend per month",
-          "Ads live",
+          "Ad delivery (app records)",
         ]);
         return (
           <article key={row.brandId} className="rounded-xl border bg-card p-4">
@@ -75,23 +111,27 @@ export function TrackerTable({
             </header>
             <dl className="mt-3 space-y-3">
               {fields
-                .filter(([label]) => summary.has(label))
+                .filter(
+                  ([label]) => view !== "All columns" || summary.has(label),
+                )
                 .map(([label, value]) => (
                   <TrackerField key={label} label={label} value={value} />
                 ))}
             </dl>
-            <details className="mt-3 border-t">
-              <summary className="min-h-11 cursor-pointer py-3 text-sm font-medium">
-                All tracker details
-              </summary>
-              <dl className="space-y-3 pb-1">
-                {fields
-                  .filter(([label]) => !summary.has(label))
-                  .map(([label, value]) => (
-                    <TrackerField key={label} label={label} value={value} />
-                  ))}
-              </dl>
-            </details>
+            {view === "All columns" ? (
+              <details className="mt-3 border-t">
+                <summary className="min-h-11 cursor-pointer py-3 text-sm font-medium">
+                  All tracker details
+                </summary>
+                <dl className="space-y-3 pb-1">
+                  {fields
+                    .filter(([label]) => !summary.has(label))
+                    .map(([label, value]) => (
+                      <TrackerField key={label} label={label} value={value} />
+                    ))}
+                </dl>
+              </details>
+            ) : null}
           </article>
         );
       })}
@@ -99,6 +139,29 @@ export function TrackerTable({
   );
   return (
     <>
+      <div className="space-y-2 pb-3">
+        <div
+          role="group"
+          aria-label="Tracker columns"
+          className="flex flex-wrap gap-1"
+        >
+          {TRACKER_VIEWS.map((item) => (
+            <Button
+              key={item}
+              variant={view === item ? "secondary" : "ghost"}
+              size="sm"
+              aria-pressed={view === item}
+              onClick={() => setView(item)}
+            >
+              {item}
+            </Button>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Fees show billed or agreed amounts, not payment confirmation. Delivery
+          and actual spend come from app campaign records.
+        </p>
+      </div>
       <div className="@3xl:hidden">
         {mobileCollapsed ? (
           <details className="rounded-xl border bg-card p-3">
@@ -115,7 +178,7 @@ export function TrackerTable({
         <table className="w-full min-w-max border-collapse text-xs">
           <thead>
             <tr className="border-b bg-muted/40 text-left text-[11px] text-muted-foreground">
-              {COLUMNS.map((label, index) => (
+              {COLUMNS.filter(includesColumn).map((label, index) => (
                 <th
                   key={label}
                   scope="col"
@@ -154,7 +217,7 @@ export function TrackerTable({
                     />
                   </span>
                 </th>
-                {trackerFields(row).map(([label, value]) => (
+                {fieldsOf(row).map(([label, value]) => (
                   <Cell key={label}>{value}</Cell>
                 ))}
               </tr>
@@ -179,7 +242,7 @@ function TrackerField({ label, value }: { label: string; value: ReactNode }) {
 // or report a different delivery/billing state.
 function trackerFields(row: TrackerRow): [string, ReactNode][] {
   return [
-    ["Paid fee per month", row.fee != null ? usd(row.fee) : null],
+    ["Monthly management fee", row.fee != null ? usd(row.fee) : null],
     ["Effective date", trackerDate(row.effectiveDate)],
     ["Terms", row.terms],
     ["End date", trackerDate(row.endDate)],
@@ -188,7 +251,7 @@ function trackerFields(row: TrackerRow): [string, ReactNode][] {
       "Agreed ad spend per month",
       row.agreedAdSpend != null ? usd(row.agreedAdSpend) : null,
     ],
-    ["Billed ad spend", row.spent > 0 ? usd(row.spent) : null],
+    ["Actual ad spend", row.spent > 0 ? usd(row.spent) : null],
     [
       "Onboarding link",
       row.onboardingLink ? (
@@ -198,7 +261,7 @@ function trackerFields(row: TrackerRow): [string, ReactNode][] {
       ) : null,
     ],
     [
-      "FB connection",
+      "FB access (intake)",
       row.fb === "verified" ? "Yes" : row.fb === "claimed" ? "Claimed" : null,
     ],
     [
@@ -222,9 +285,9 @@ function trackerFields(row: TrackerRow): [string, ReactNode][] {
       ) : null,
     ],
     [
-      "Ads live",
+      "Ad delivery (app records)",
       row.adsLive === "live"
-        ? "Yes"
+        ? "Live"
         : row.adsLive === "paused"
           ? "Built, paused"
           : row.adsLive === "draft"
@@ -270,7 +333,7 @@ function chatSnapshot(row: TrackerRow): Record<string, string | number | null> {
     endDate: row.endDate,
     siteLive: row.siteLive,
     agreedAdSpend: row.agreedAdSpend,
-    billedAdSpend: row.spent,
+    actualAdSpend: row.spent,
     fbConnection: row.fb,
     adCreative:
       row.creative.map((item) => `${item.label}: ${item.url}`).join(", ") ||

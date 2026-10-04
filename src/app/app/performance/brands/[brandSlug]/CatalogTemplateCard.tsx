@@ -24,24 +24,21 @@ import {
 import { orpc } from "@/orpc/client";
 
 /**
- * The card the templates are drawn on: the hero home's own photo, forced to
+ * An included home provides the template preview, forced to
  * Compose so a catalog of supplied artwork can still pick a template.
  */
-function useTemplatePreview(brandId: string, heroHomeId: string | null) {
+function useTemplatePreview(brandId: string, previewHomeId: string | null) {
   const query = useQuery(
     orpc.catalog.state.queryOptions({ input: { brandId } }),
   );
   const format = query.data?.format ?? DEFAULT_CATALOG_FORMAT;
-  const cards = query.data?.draft.cards ?? [];
+  const cards = (query.data?.draft.cards ?? []).filter((c) => c.included);
   const drawn = cards.filter((c) => c.mode !== "finished");
   const pick =
-    drawn.find((c) => c.homeId === heroHomeId) ??
-    drawn.find((c) => c.included) ??
-    cards.find((c) => c.homeId === heroHomeId) ??
-    cards.find((c) => c.included);
+    cards.find((c) => c.homeId === previewHomeId) ?? drawn[0] ?? cards[0];
   const card = pick && { ...pick, mode: "compose" as const };
   const current = query.data?.defaultTemplate ?? DEFAULT_CATALOG_TEMPLATE;
-  return { card, format, current };
+  return { card, format, current, cards, homes: query.data?.homes ?? [] };
 }
 
 const templateLabel = (templateId: CatalogTemplateId) =>
@@ -50,12 +47,12 @@ const templateLabel = (templateId: CatalogTemplateId) =>
 /** The brand's default card, closed: its thumbnail and the copy it asks for. */
 export function CatalogTemplateSummary({
   brandId,
-  heroHomeId,
+  previewHomeId = null,
 }: {
   brandId: string;
-  heroHomeId: string | null;
+  previewHomeId?: string | null;
 }) {
-  const { card, format, current } = useTemplatePreview(brandId, heroHomeId);
+  const { card, format, current } = useTemplatePreview(brandId, previewHomeId);
   const guide = CATALOG_COPY_INTENTS[current];
   const src = card
     ? previewAtWidth(
@@ -93,16 +90,16 @@ export function CatalogTemplateSummary({
 }
 
 /**
- * The catalog card every home uses unless it has its own: the hero home's
+ * The catalog card every home uses unless it has its own: an included home's
  * card drawn in each template, one click to make it the brand's default.
  */
 export function CatalogTemplateCard({
   brandId,
-  heroHomeId,
+  previewHomeId = null,
 }: {
   brandId: string;
-  /** The hero home's listing id; the first included card without one. */
-  heroHomeId: string | null;
+  /** Optional initial sample home; defaults to an included card. */
+  previewHomeId?: string | null;
 }) {
   const router = useRouter();
   const client = useQueryClient();
@@ -116,12 +113,33 @@ export function CatalogTemplateCard({
       },
     }),
   );
+  const [selectedHomeId, setSelectedHomeId] = useState<string | null>(
+    previewHomeId,
+  );
   const saving = save.isPending ? (save.variables?.templateId ?? null) : null;
-  const { card, format, current } = useTemplatePreview(brandId, heroHomeId);
+  const { card, format, current, cards, homes } = useTemplatePreview(
+    brandId,
+    selectedHomeId,
+  );
 
   if (!card) return null;
   return (
     <div className="space-y-3">
+      <label className="flex items-center gap-3 text-sm">
+        Preview home
+        <select
+          className="rounded-md border bg-background p-2"
+          value={card.homeId}
+          onChange={(event) => setSelectedHomeId(event.target.value)}
+        >
+          {cards.map((option) => (
+            <option key={option.homeId} value={option.homeId}>
+              {homes.find((home) => home.id === option.homeId)?.name ??
+                option.title}
+            </option>
+          ))}
+        </select>
+      </label>
       <div className="grid grid-cols-2 gap-3 @2xl:grid-cols-3 @5xl:grid-cols-4">
         {CATALOG_TEMPLATES.map((templateId) => {
           const label = templateLabel(templateId);

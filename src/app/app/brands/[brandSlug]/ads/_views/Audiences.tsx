@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { MessageSquare, Pencil, Trash2, Users } from "lucide-react";
+import { MessageSquare, Pencil, Sparkles, Trash2, Users } from "lucide-react";
 
 import { AudienceMap } from "@/components/audience-map";
 import { GeographyChips } from "@/components/geography-chips";
@@ -11,7 +11,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 import { orpc } from "@/orpc/client";
 
-import { SuggestAudiencesButton } from "./SuggestAudiencesButton";
+import { useSuggestedAudiences } from "./SuggestAudiencesButton";
 
 type AudienceRow = {
   id: string;
@@ -52,6 +52,7 @@ export function Audiences({
   metaTargets?: Record<string, { name: string; via: "audience" | "persona" }>;
 }) {
   const router = useRouter();
+  const { busy, run } = useSuggestedAudiences(campaignId);
   // A chat on this campaign's audiences; Suggest is the one-click add.
   const audienceChat = () =>
     sendAssistantIntent({
@@ -70,39 +71,45 @@ export function Audiences({
     }),
   );
 
-  return (
-    <div className="space-y-2">
-      <div
-        className={
-          audiences.length === 0
-            ? "hidden"
-            : "flex items-center justify-end gap-2"
-        }
+  const actions = (primary = false) => (
+    <>
+      <Button
+        size="sm"
+        variant={primary ? "default" : "outline"}
+        disabled={busy}
+        onClick={() => void run()}
       >
-        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-          <SuggestAudiencesButton campaignId={campaignId} />
-          <Button size="sm" variant="outline" onClick={audienceChat}>
-            <MessageSquare className="size-3.5" />
-            Start new chat
-          </Button>
-        </div>
+        <Sparkles className="size-3.5" />
+        {busy ? "Adding…" : "Add audiences"}
+      </Button>
+      <Button size="sm" variant="outline" onClick={audienceChat}>
+        <MessageSquare className="size-3.5" />
+        Shape
+      </Button>
+    </>
+  );
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <h2 className="text-sm font-semibold">
+          Audiences{" "}
+          <span className="text-muted-foreground">
+            · {audiences.length || "broad"}
+          </span>
+        </h2>
+        <div className="flex flex-wrap gap-2">{actions()}</div>
       </div>
-
+      <p className="text-sm text-muted-foreground">
+        Who this campaign reaches, using guest origins, markets and trip
+        motivations.
+      </p>
       {audiences.length === 0 ? (
         <EmptyState
           compact
           icon={Users}
           title="Broad, for now"
-          description="The push runs one broad ad set. Add an audience to narrow by age or place."
-          actions={
-            <>
-              <SuggestAudiencesButton campaignId={campaignId} />
-              <Button size="sm" variant="outline" onClick={audienceChat}>
-                <MessageSquare className="size-3.5" />
-                Start new chat
-              </Button>
-            </>
-          }
+          description="Keep broad targeting, or add audiences from the brand’s evidence to narrow by age or place. Shape lets you explore the targeting before changing it."
+          actions={actions(true)}
         />
       ) : (
         <div className="grid grid-cols-1 gap-4 @4xl:grid-cols-2">

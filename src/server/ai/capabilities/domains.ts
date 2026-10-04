@@ -102,6 +102,7 @@ import {
   createPersonaLookalikeAction,
   deletePersona,
   listPersonas,
+  suggestPersonas,
   updatePersona,
   uploadPersonaSeedListAction,
 } from "./personas";
@@ -115,6 +116,8 @@ import {
   setBrandRelationshipAction,
   setBrandMarkAction,
   suggestBrandMarkAction,
+  readBrandIdentityAction,
+  recommendBrandMarkAction,
   addBrandAdPreviewAction,
   setPerformanceSettingsAction,
   updateBrandAction,
@@ -252,6 +255,8 @@ export const brandRead = growthDomainTool({
     get: getBrand,
     getMap: getBrandMap,
     next: nextForBrand,
+    identity: readBrandIdentityAction,
+    recommendMark: recommendBrandMarkAction,
   },
 });
 
@@ -358,7 +363,7 @@ export const performanceWrite = growthDomainTool({
 export const personaRead = growthDomainTool({
   description:
     "Read a brand's personas — the stable 'who we talk to' layer that inspires campaign audiences and content.",
-  actions: { list: listPersonas },
+  actions: { list: listPersonas, suggest: suggestPersonas },
 });
 
 export const personaWrite = growthDomainTool({

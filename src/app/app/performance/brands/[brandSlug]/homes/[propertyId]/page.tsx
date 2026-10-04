@@ -57,7 +57,7 @@ export default async function PerformanceHomePage({
         {/* A way out, on its own line. Dressed as a section label beside the
             title it read as a heading, so the only way back was the tab. */}
         <Link
-          href={brandTabHref(slug, "setup")}
+          href={brandTabHref(slug, "wanderos")}
           className="-ml-1 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
         >
           <ChevronLeft className="size-3.5" />

@@ -1,6 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { Image } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ShapeBrandButton } from "./ShapeBrandButton";
 
 import { HeroHomePicker, type HeroOption } from "./HeroHomePicker";
 
@@ -23,12 +26,14 @@ type Hero = {
  */
 export function HeroCard({
   brandId,
+  brandName,
   hero,
   options,
   heroUrl,
   children,
 }: {
   brandId: string;
+  brandName: string;
   /** What the previews draw now, or null when no hero is chosen. */
   hero: Hero | null;
   options: HeroOption[];
@@ -40,21 +45,32 @@ export function HeroCard({
   const more = hero?.photoCount
     ? hero.photoCount - 1 - (hero.photos?.length ?? 0)
     : 0;
+  const actions = (primary = false) => (
+    <>
+      <HeroHomePicker
+        brandId={brandId}
+        options={options}
+        featuredUrl={heroUrl}
+        label={hero ? "Change hero" : "Choose hero"}
+        primary={primary}
+      />
+      <ShapeBrandButton
+        brandId={brandId}
+        brandName={brandName}
+        section="hero home and preview photo"
+      />
+    </>
+  );
   return (
     <section className="space-y-3 rounded-xl border p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold">Hero</h2>
+          <h2 className="text-base font-semibold">Hero home</h2>
           <p className="text-xs text-muted-foreground">
             The home that stands for the brand. The previews draw from it.
           </p>
         </div>
-        <HeroHomePicker
-          brandId={brandId}
-          options={options}
-          featuredUrl={heroUrl}
-          label={hero ? "Change hero" : "Choose hero"}
-        />
+        <div className="flex flex-wrap gap-2">{actions()}</div>
       </div>
       {hero ? (
         <div className="flex flex-wrap items-start gap-4">
@@ -103,7 +119,16 @@ export function HeroCard({
           </div>
         </div>
       ) : (
-        <p className="text-sm text-muted-foreground">No hero chosen yet.</p>
+        <EmptyState
+          icon={Image}
+          title="Put a real home behind the brand"
+          description={
+            options.length
+              ? "Choose a representative home and photo to save as the source for brand previews, or Shape which home should lead."
+              : "Add homes with photos before choosing a hero. Shape can help decide what the previews should express."
+          }
+          actions={actions(true)}
+        />
       )}
       {children}
     </section>

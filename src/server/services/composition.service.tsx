@@ -344,6 +344,7 @@ export async function loadCompositionSource(
   options: {
     /** Preview only: a family to try in place of the brand's own. */
     fontFamily?: string | null;
+    bodyFontFamily?: string | null;
   } = {},
 ): Promise<RenderContext> {
   const identity = context.brand.brandIdentity;
@@ -351,16 +352,14 @@ export async function loadCompositionSource(
   const headingWeight = options.fontFamily
     ? null
     : brandHeadingWeight(identity);
-  const body = options.fontFamily ? null : brandBodyFontFamily(identity);
+  const body = options.bodyFontFamily ?? brandBodyFontFamily(identity);
   // The logo and the font are best effort: a card without them is still the
   // card. The source is not; its failure is the render's failure.
   const [sourceImage, logo, headingFonts, bodyFonts] = await Promise.all([
     context.sourceUrl ? fetchSatoriImageSource(context.sourceUrl) : null,
     (context.brand.brandMark
       ? loadChosenMark(context.brand.brandMark)
-      : context.brand.logo
-        ? loadLogoImage(context.brand.logo)
-        : Promise.resolve(null)
+      : Promise.resolve(null)
     ).catch((error: unknown) => {
       console.error("brand mark unavailable", context.brand.id, error);
       return null;
@@ -598,37 +597,7 @@ function BrandMark({
       </div>
     );
   }
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 14,
-        color: inverse ? "#ffffff" : "#111111",
-        fontSize: textSize,
-        fontWeight: 700,
-        letterSpacing: "-0.02em",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          width: markSize,
-          height: markSize,
-          flexShrink: 0,
-          alignItems: "center",
-          justifyContent: "center",
-          borderRadius: Math.round(markSize * 0.34),
-          background: inverse ? "rgba(255,255,255,0.2)" : "#111111",
-          color: "#ffffff",
-          fontSize: Math.round(markSize * 0.48),
-        }}
-      >
-        {brandName.slice(0, 1).toUpperCase()}
-      </div>
-      {clamp(brandName, 32)}
-    </div>
-  );
+  return null;
 }
 
 function Message({
@@ -730,8 +699,9 @@ function renderInputs(
   return {
     ...getCompositionIdentity(spec),
     brandName: context.brand.name,
-    brandLogo:
-      context.brand.brandMark?.variants.color ?? context.brand.logo ?? null,
+    brandLogo: context.brand.brandMark?.variants.color ?? null,
+    // Do not reuse old renders that invented an initials badge without a mark.
+    ...(!context.brand.brandMark ? { markPolicy: "unbranded" } : {}),
     fontFamily: brandFontFamily(context.brand.brandIdentity),
     // Only when set, so cards of brands without them keep matching.
     ...(brandBodyFontFamily(context.brand.brandIdentity)

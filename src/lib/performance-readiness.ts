@@ -56,7 +56,6 @@ export type ReadinessFacts = {
   reportEmails: boolean;
   invoiceEmail: boolean;
   creativeFolder: boolean;
-  featuredHome: boolean;
   previewsKept: number;
   adsDrafted: number;
   campaigns: number;
@@ -156,15 +155,6 @@ export function readinessChecklist(f: ReadinessFacts): ReadinessChecklist {
         ? null
         : "No Drive or Dropbox link on the intake",
       action: unless(f.creativeFolder, INTAKE),
-    },
-    {
-      id: "featured",
-      label: "Featured home picked",
-      done: f.featuredHome,
-      detail: f.featuredHome
-        ? null
-        : "Previews fall back to the first home on their feed",
-      action: unless(f.featuredHome, { label: "Pick a home", to: "homes" }),
     },
     {
       id: "previews",

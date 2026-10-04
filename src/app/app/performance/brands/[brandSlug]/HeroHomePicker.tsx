@@ -29,11 +29,13 @@ export function HeroHomePicker({
   options,
   featuredUrl,
   label,
+  primary = false,
 }: {
   brandId: string;
   options: HeroOption[];
   featuredUrl: string | null;
   label: string;
+  primary?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -56,7 +58,11 @@ export function HeroHomePicker({
 
   return (
     <>
-      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+      <Button
+        size="sm"
+        variant={primary ? "default" : "outline"}
+        onClick={() => setOpen(true)}
+      >
         {label}
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>

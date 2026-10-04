@@ -13,6 +13,7 @@ import {
   MoreHorizontal,
   Check,
   MessageSquare,
+  BriefcaseBusiness,
 } from "lucide-react";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 import { orpc } from "@/orpc/client";
@@ -22,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { PerformanceNote } from "./PerformanceNote";
+import { ReadinessProgress, ReadinessNextStep } from "./ReadinessProgress";
 import {
   Dialog,
   DialogContent,
@@ -93,10 +95,12 @@ export function PerformanceClientCard({
   card,
   view = "All",
   detailSignal,
+  context = "board",
 }: {
   card: PerformancePipelineCard;
   view?: CardView;
   detailSignal?: { detail: CardDetail; revision: number };
+  context?: "board" | "client";
 }) {
   const [detail, setDetail] = useState<CardDetail>("Compact");
   const [editing, setEditing] = useState(false);
@@ -111,20 +115,42 @@ export function PerformanceClientCard({
   return (
     <article
       aria-label={`${card.name} client card`}
-      className="rounded-xl border bg-card p-3"
+      className={
+        context === "client"
+          ? "rounded-xl border p-4"
+          : "rounded-xl border bg-card p-3"
+      }
       style={cardTheme}
     >
-      <header className="grid grid-cols-[44px_minmax(0,1fr)_auto] items-start gap-x-2.5 gap-y-1">
-        <BrandLogo brand={card} className="row-span-2 size-11" />
-        <h3 className="col-start-2 row-start-1 min-w-0 self-center text-sm font-semibold">
-          <Link
-            href={card.href}
-            className="hover:underline focus-visible:outline-ring"
-          >
-            {card.name}
-          </Link>
+      <header
+        className={`grid ${context === "client" ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-[44px_minmax(0,1fr)_auto]"} items-start gap-x-2.5 gap-y-1`}
+      >
+        {context === "board" ? (
+          <BrandLogo brand={card} className="row-span-2 size-11" />
+        ) : null}
+        <h3
+          className={`${context === "client" ? "col-start-1" : "col-start-2"} row-start-1 min-w-0 self-center text-sm font-semibold`}
+        >
+          {context === "client" ? (
+            <span className="flex items-center gap-2 text-base">
+              <BriefcaseBusiness
+                aria-hidden="true"
+                className="size-4 text-muted-foreground"
+              />
+              Account summary
+            </span>
+          ) : (
+            <Link
+              href={card.href}
+              className="hover:underline focus-visible:outline-ring"
+            >
+              {card.name}
+            </Link>
+          )}
         </h3>
-        <div className="col-start-3 row-start-1 flex items-center gap-1">
+        <div
+          className={`${context === "client" ? "col-start-2" : "col-start-3"} row-start-1 flex items-center gap-1`}
+        >
           <Button
             variant="ghost"
             size="icon-xs"
@@ -142,32 +168,34 @@ export function PerformanceClientCard({
           >
             <MessageSquare className="size-3.5" />
           </Button>
-          <div
-            role="group"
-            aria-label={`${card.name} card detail`}
-            className="flex rounded-md border p-0.5"
-          >
-            {(
-              [
-                { name: "Compact", label: "Compact", icon: AlignJustify },
-                { name: "Overview", label: "Summary", icon: Rows3 },
-                { name: "Detailed", label: "Milestones", icon: ListChecks },
-              ] as const
-            ).map(({ name, label, icon: Icon }) => (
-              <Button
-                key={name}
-                variant={detail === name ? "secondary" : "ghost"}
-                size="icon-xs"
-                className="size-5"
-                title={label}
-                aria-label={`${label} ${card.name}`}
-                aria-pressed={detail === name}
-                onClick={() => setDetail(name)}
-              >
-                <Icon className="size-3" />
-              </Button>
-            ))}
-          </div>
+          {context === "board" ? (
+            <div
+              role="group"
+              aria-label={`${card.name} card detail`}
+              className="flex rounded-md border p-0.5"
+            >
+              {(
+                [
+                  { name: "Compact", label: "Compact", icon: AlignJustify },
+                  { name: "Overview", label: "Summary", icon: Rows3 },
+                  { name: "Detailed", label: "Milestones", icon: ListChecks },
+                ] as const
+              ).map(({ name, label, icon: Icon }) => (
+                <Button
+                  key={name}
+                  variant={detail === name ? "secondary" : "ghost"}
+                  size="icon-xs"
+                  className="size-5"
+                  title={label}
+                  aria-label={`${label} ${card.name}`}
+                  aria-pressed={detail === name}
+                  onClick={() => setDetail(name)}
+                >
+                  <Icon className="size-3" />
+                </Button>
+              ))}
+            </div>
+          ) : null}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -194,7 +222,7 @@ export function PerformanceClientCard({
         </div>
         {show("Commercial") && (
           <div
-            className="col-span-2 col-start-2 row-start-2 flex flex-wrap gap-x-3 gap-y-1"
+            className={`${context === "client" ? "col-start-1" : "col-start-2"} col-span-2 row-start-2 flex flex-wrap gap-x-3 gap-y-1`}
             title={
               state.billingPeriod
                 ? `Billing month · ${state.billingPeriod}`
@@ -207,14 +235,14 @@ export function PerformanceClientCard({
               status={state.managementPayment}
             />
             <Payment
-              label="Spend"
+              label="Ad budget"
               amount={card.spend}
               status={state.spendPayment}
             />
           </div>
         )}
       </header>
-      {!compact && (
+      {context === "board" && !compact && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           <Badge variant="outline" textSize="caption" className="h-6">
             {state.includedHomes == null
@@ -229,7 +257,30 @@ export function PerformanceClientCard({
           </Badge>
         </div>
       )}
-      {compact ? (
+      {context === "client" ? (
+        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 border-t pt-3 text-xs">
+          <Status label="Management payment" value={state.managementPayment} />
+          <Status label="Ad spend payment" value={state.spendPayment} />
+          {state.billingPeriod ? (
+            <span className="text-muted-foreground">
+              Billing month · {state.billingPeriod}
+            </span>
+          ) : null}
+          {card.effectiveDate ? (
+            <span className="text-muted-foreground">
+              Effective · {trackerDate(card.effectiveDate)}
+            </span>
+          ) : null}
+          {card.terms ? (
+            <span className="text-muted-foreground">Terms · {card.terms}</span>
+          ) : null}
+          {card.endDate ? (
+            <span className="text-muted-foreground">
+              Ends · {trackerDate(card.endDate)}
+            </span>
+          ) : null}
+        </div>
+      ) : compact ? (
         <div className="mt-2 space-y-1.5">
           {show("Creative") && (
             <div className="flex flex-wrap gap-1.5">
@@ -396,6 +447,27 @@ export function PerformanceClientCard({
           )}
         </>
       )}
+      {context === "board" && card.readiness ? (
+        <section
+          aria-label="Observed launch readiness"
+          className="mt-3 space-y-3 border-t pt-3"
+        >
+          <div className="flex items-baseline justify-between gap-2 text-[11px] text-muted-foreground">
+            <span>Launch checklist · app records</span>
+            <span className="whitespace-nowrap tabular-nums">
+              {card.readiness.checklist.done}/{card.readiness.checklist.total}
+            </span>
+          </div>
+          <ReadinessProgress checklist={card.readiness.checklist} compact />
+          {card.stage !== "paused" ? (
+            <ReadinessNextStep
+              checklist={card.readiness.checklist}
+              links={card.readiness.links}
+              compact
+            />
+          ) : null}
+        </section>
+      ) : null}
       <PerformanceNote
         text={card.note}
         editedBy={card.noteEditedBy}

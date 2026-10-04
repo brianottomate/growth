@@ -9,6 +9,7 @@ import {
 import "server-only";
 
 import { z } from "zod";
+import { brandPreviewCopySchema } from "@/lib/brand-preview-copy";
 import { and, eq, isNull, ilike, or } from "drizzle-orm";
 
 import { db } from "@/server/db";
@@ -23,6 +24,7 @@ import {
 } from "@/server/services/brand-relationship.service";
 import {
   chooseBrandMark,
+  recommendBrandMark,
   critiqueBrandMark,
   setBrandMark,
 } from "@/server/services/brand-mark.service";
@@ -204,7 +206,7 @@ export const addBrandAdPreviewAction = growthAction({
  */
 export const updateBrandAction = growthAction({
   description:
-    "Update an owned brand's fields. Send only the keys to change. story is the brand story: the short brief every creative prompt for this brand reads (what makes it itself, who books, voice, what to avoid); send the whole new text, keeping everything still true, and keep it brief. heroHomeId sets the brand's hero, the one home that stands for the brand in its previews; null clears it. heroImageUrl picks which photo the previews draw: one of the hero home's photos, or a library image; without it the hero home's own hero photo is used. Nothing is chosen on the brand's behalf, so a brand with no hero shows none until one is set.",
+    "Update an owned brand's fields. Send only the keys to change. story is the brief every creative prompt reads: distinguishing features, guests, voice and what to avoid. heroImageUrl sets the general brand preview image from website, library or home photos; null restores the website image. Choosing an image does not choose a representative home or import property facts. heroHomeId is retained for compatibility with older home-photo selections; prefer heroImageUrl for new changes.",
   inputSchema: z
     .object({
       brandId: z.string().min(1),
@@ -225,7 +227,12 @@ export const updateBrandAction = growthAction({
     heroImageUrl: z.string().nullable(),
     story: z.string().nullable(),
   }),
-  examples: [{ brandId: "brand_winterpark", heroHomeId: "home_01" }],
+  examples: [
+    {
+      brandId: "brand_winterpark",
+      heroImageUrl: "https://example.com/brand-preview.jpg",
+    },
+  ],
   execute: async (input, ctx) => {
     const brand = await db.query.brandTable.findFirst({
       where: and(
@@ -249,6 +256,8 @@ export const updateBrandAction = growthAction({
       input.heroImageUrl !== undefined
         ? input.heroImageUrl
         : brand.previewSourceUrl;
+    if (input.heroImageUrl !== undefined && input.heroHomeId === undefined)
+      listingUrl = null;
     if (input.heroHomeId === null) {
       listingUrl = null;
       sourceUrl = input.heroImageUrl ?? null;
@@ -463,6 +472,11 @@ export const setBrandMarkAction = growthAction({
       .describe(
         "Lockup only: tracking in em. Default -0.02. Spaced capitals like a luxury wordmark sit around 0.12 to 0.18.",
       ),
+    previewCopy: brandPreviewCopySchema
+      .nullish()
+      .describe(
+        "Short sample-creative headline, supporting line and CTA. Omit to keep existing copy.",
+      ),
     tuning: z
       .object({
         iconScale: z.number().min(0.7).max(1.4),
@@ -530,6 +544,7 @@ export const setBrandMarkAction = growthAction({
       userId: ctx.userId,
       recipe,
       tuning,
+      previewCopy: input.previewCopy,
     });
     return {
       brandId: brand.id,
@@ -541,14 +556,115 @@ export const setBrandMarkAction = growthAction({
   },
 });
 
+const markRecipeSchema = z.object({
+  source: z.enum(["logo", "favicon", "lockup"]),
+  iconAssetId: z.string().nullish(),
+  iconFrom: z.enum(["logo", "favicon", "logo-icon"]).nullish(),
+  text: z.string().nullish(),
+  fontFamily: z.string().nullish(),
+  fontWeight: z
+    .union([z.literal(400), z.literal(500), z.literal(600), z.literal(700)])
+    .nullish(),
+  letterSpacing: z.number().nullish(),
+});
+const markTuningSchema = z.object({
+  iconScale: z.number(),
+  iconShift: z.number(),
+  gapScale: z.number(),
+  note: z.string(),
+});
+
+const savedMarkSchema = markRecipeSchema.extend({
+  previewCopy: brandPreviewCopySchema.nullish(),
+  variants: z.object({
+    color: z.string(),
+    white: z.string(),
+    dark: z.string(),
+  }),
+  tuning: markTuningSchema.nullish(),
+  reason: z.string().nullish(),
+});
+
+export const readBrandIdentityAction = growthAction({
+  description:
+    "Read the brand's visual identity and current creative mark before discussing changes. Returns website logo, favicon, colors, fonts, current mark recipe and saved variant asset IDs. Does not change anything. Identity refresh uses brandWrite.enrich; mark changes use brandWrite.setMark after agreeing the direction.",
+  inputSchema: z.object({ brandId: z.string().trim().min(1) }),
+  outputSchema: z.object({
+    brandId: z.string(),
+    logo: z.string().nullable(),
+    favicon: z.string().nullable(),
+    colors: z.record(z.string(), z.string()),
+    fonts: z.array(
+      z.object({
+        family: z.string(),
+        role: z.enum(["body", "heading"]).optional(),
+      }),
+    ),
+    mark: savedMarkSchema.nullable(),
+    logoOnCreatives: z.boolean(),
+  }),
+  execute: async (input, ctx) => {
+    await assertOwnedBrand(input.brandId, ctx.orgId);
+    const brand = await db.query.brandTable.findFirst({
+      where: eq(brandTable.id, input.brandId),
+      columns: {
+        logo: true,
+        brandIdentity: true,
+        websiteMeta: true,
+        brandMark: true,
+        performanceSettings: true,
+      },
+    });
+    if (!brand) throw new Error("Brand not found");
+    return {
+      brandId: input.brandId,
+      logo: brand.brandIdentity?.logo ?? brand.logo,
+      favicon:
+        brand.brandIdentity?.favicon ?? brand.websiteMeta?.favicon ?? null,
+      colors: brand.brandIdentity?.colors ?? {},
+      fonts: (brand.brandIdentity?.fonts ?? []).map(({ family, role }) => ({
+        family,
+        ...(role ? { role } : {}),
+      })),
+      mark: brand.brandMark ? savedMarkSchema.parse(brand.brandMark) : null,
+      logoOnCreatives: brand.performanceSettings?.logoOnCreatives !== false,
+    };
+  },
+});
+
+export const recommendBrandMarkAction = growthAction({
+  description:
+    "Explore a creative mark without saving it. Renders candidates and recommends one, optionally following the operator's direction. Returns its recipe, optical tuning and alternatives. Discuss these first; only call brandWrite.setMark with the accepted recipe and tuning when asked to apply. For in-app previews, use /api/brands/mark-preview with brandId, source, tone and recipe query fields; this requires the signed-in browser session.",
+  inputSchema: z.object({
+    brandId: z.string().trim().min(1),
+    direction: z.string().trim().max(2000).optional(),
+  }),
+  outputSchema: z.object({
+    brandId: z.string(),
+    recipe: markRecipeSchema,
+    tuning: markTuningSchema.nullable(),
+    reason: z.string(),
+    alternatives: z.array(markRecipeSchema),
+    previewCopy: brandPreviewCopySchema,
+  }),
+  execute: async (input, ctx) => {
+    await assertOwnedBrand(input.brandId, ctx.orgId);
+    const recommendation = await recommendBrandMark(input);
+    if (!recommendation)
+      throw new Error("No logo, favicon or name to build a mark from.");
+    return { brandId: input.brandId, ...recommendation };
+  },
+});
+
 export const suggestBrandMarkAction = growthAction({
   description:
-    "Pick and save the brand mark, the same as Suggest on the Setup page: renders each candidate (the scraped logo, the icon cut from it, the favicon or the name set as a lockup) at card size, has the art director choose the one that reads best, and saves its three tones. Run brandWrite.enrich first. Re-running replaces the mark; use setMark to set a specific one.",
+    "Pick and save the brand mark, the same as Create mark on the Setup page: renders each candidate (the scraped logo, the icon cut from it, the favicon or the name set as a lockup) at card size, has the art director choose the one that reads best, and saves its three tones plus short sample-creative copy. Run brandWrite.enrich first. Re-running replaces the mark; use setMark to set a specific one.",
   inputSchema: z.object({ brandId: z.string().trim().min(1) }),
   outputSchema: z.object({
     brandId: z.string(),
     source: z.enum(["logo", "favicon", "lockup"]),
     reason: z.string(),
+    previewCopy: brandPreviewCopySchema,
   }),
   examples: [{ brandId: "brd_01" }],
   execute: async (input, ctx) => {
@@ -563,6 +679,7 @@ export const suggestBrandMarkAction = growthAction({
       brandId: brand.id,
       source: chosen.recipe.source,
       reason: chosen.reason,
+      previewCopy: chosen.previewCopy,
     };
   },
 });
@@ -573,6 +690,7 @@ async function assertOwnedBrand(brandId: string, orgId: string) {
     where: and(
       eq(brandTable.id, brandId),
       eq(brandTable.organizationId, orgId),
+      isNull(brandTable.deletedAt),
     ),
     columns: { id: true, name: true, slug: true },
   });

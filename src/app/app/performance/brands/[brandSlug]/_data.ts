@@ -46,6 +46,7 @@ export const loadPerformanceBrand = cache(async (brandSlug: string) => {
         leadDomain: true,
         featuredListingUrl: true,
         previewSourceUrl: true,
+        websiteMeta: true,
         story: true,
         markets: true,
         relationship: true,
@@ -94,11 +95,12 @@ export function brandTabHref(
     | ""
     | "setup"
     | "homes"
+    | "wanderos"
     | "booking"
     | "catalog"
     | "ads"
     | "campaigns"
     | "settings",
 ) {
-  return `/app/performance/brands/${slug}${tab ? `/${tab === "homes" ? "setup" : tab}` : ""}`;
+  return `/app/performance/brands/${slug}${tab ? `/${tab === "homes" ? "wanderos" : tab}` : ""}`;
 }

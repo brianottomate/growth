@@ -14,7 +14,6 @@ import {
   PenLine,
   Plus,
   Search,
-  Star,
   ZoomIn,
 } from "lucide-react";
 
@@ -51,26 +50,23 @@ const panel = "bg-card overflow-hidden rounded-2xl border";
 
 /**
  * The homes on their WanderOS site. Browse them as photos, pick the three to
- * ten a set runs on (a tick on each tile), choose the hero that stands for the
- * brand, or open a lightbox on the hero and design an ad from it. The
+ * ten a set runs on (a tick on each tile), or open a photo and design an ad. The
  * catalog-card view of the same roster lives at the foot of the Ads tab.
  */
 export function HomesStrip({
   homes,
   brandId,
   brandSlug,
-  featuredUrl,
   picked,
 }: {
   homes: StripHome[];
   brandId: string;
   brandSlug: string | null;
-  /** The home that stands for the brand; its tile and lightbox say so. */
-  featuredUrl: string | null;
   /** The committed set: feed id → its `home` row id. A tick toggles it. */
   picked: { externalId: string; homeId: string }[];
 }) {
   const [query, setQuery] = useState("");
+  const [loadAll, setLoadAll] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -83,10 +79,11 @@ export function HomesStrip({
         .includes(q),
     );
   }, [homes, query]);
+  const visible = loadAll ? shown : shown.slice(0, 12);
   // The lightbox steps through what is on screen, so it indexes the filtered
   // list rather than the whole roster.
   const [openIndex, setOpenIndex] = useState<number | null>(null);
-  const open = openIndex !== null ? (shown[openIndex] ?? null) : null;
+  const open = openIndex !== null ? (visible[openIndex] ?? null) : null;
   const router = useRouter();
   const design = useMutation(
     orpc.media.importUrls.mutationOptions({
@@ -99,21 +96,6 @@ export function HomesStrip({
         router.push(
           adPreviewStudioHref({ brandId, brandSlug, sourceAssetId: asset.id }),
         );
-      },
-      onError: (error) => toast.error(error.message),
-    }),
-  );
-
-  // The hero is a saved choice on the brand: the ad previews draw from it.
-  const feature = useMutation(
-    orpc.brand.setPreviewSource.mutationOptions({
-      onSuccess: (result) => {
-        toast.success(
-          result.featuredListingUrl
-            ? "Hero set. The ad previews draw from this home now."
-            : "Hero cleared",
-        );
-        router.refresh();
       },
       onError: (error) => toast.error(error.message),
     }),
@@ -149,11 +131,11 @@ export function HomesStrip({
   const step = useCallback(
     (delta: number) => {
       setOpenIndex((current) => {
-        if (current === null || shown.length === 0) return current;
-        return (current + delta + shown.length) % shown.length;
+        if (current === null || visible.length === 0) return current;
+        return (current + delta + visible.length) % visible.length;
       });
     },
-    [shown.length],
+    [visible.length],
   );
 
   useEffect(() => {
@@ -193,7 +175,7 @@ export function HomesStrip({
         </p>
       ) : null}
       <ul className="grid grid-cols-2 gap-2.5 @xl:grid-cols-3 @4xl:grid-cols-6">
-        {shown.map((home, index) => {
+        {visible.map((home, index) => {
           const isPicked = byExternal.has(home.id);
           const busy = busyId === home.id;
           return (
@@ -223,12 +205,6 @@ export function HomesStrip({
                 </span>
                 <span className="block px-2.5 py-2">
                   <span className="flex items-center gap-1 text-xs font-semibold">
-                    {home.url === featuredUrl ? (
-                      <Star
-                        className="size-3 shrink-0 fill-amber-300 text-amber-300"
-                        aria-label="Brand hero"
-                      />
-                    ) : null}
                     <span className="truncate group-hover:underline">
                       {home.name}
                     </span>
@@ -277,6 +253,16 @@ export function HomesStrip({
           );
         })}
       </ul>
+      {visible.length < shown.length ? (
+        <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
+          <span className="text-xs text-muted-foreground">
+            {visible.length} of {shown.length} homes
+          </span>
+          <Button size="sm" variant="outline" onClick={() => setLoadAll(true)}>
+            Load all
+          </Button>
+        </div>
+      ) : null}
       <Dialog
         open={open !== null}
         onOpenChange={(next) => !next && setOpenIndex(null)}
@@ -313,33 +299,6 @@ export function HomesStrip({
                     ? "Bringing the photo in…"
                     : "Design an ad from this photo"}
                 </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  tone="media-outline"
-                  className="h-7 shrink-0"
-                  loading={feature.isPending}
-                  onClick={() =>
-                    feature.mutate(
-                      open.url === featuredUrl
-                        ? { id: brandId, listingUrl: null, sourceUrl: null }
-                        : {
-                            id: brandId,
-                            listingUrl: open.url,
-                            sourceUrl: open.imageUrl,
-                          },
-                    )
-                  }
-                >
-                  <Star
-                    className={
-                      open.url === featuredUrl
-                        ? "size-3.5 fill-amber-300 text-amber-300"
-                        : "size-3.5"
-                    }
-                  />
-                  {open.url === featuredUrl ? "Hero" : "Use as hero"}
-                </Button>
                 <ButtonLink
                   href={open.url}
                   target="_blank"
@@ -355,7 +314,7 @@ export function HomesStrip({
               </DialogTitle>
               <DialogDescription tone="media" className="text-xs">
                 {[
-                  `${(openIndex ?? 0) + 1} of ${shown.length}`,
+                  `${(openIndex ?? 0) + 1} of ${visible.length}`,
                   open.facts || null,
                 ]
                   .filter(Boolean)
@@ -370,7 +329,7 @@ export function HomesStrip({
                 alt={open.name}
                 className="max-h-full max-w-full object-contain"
               />
-              {homes.length > 1 ? (
+              {visible.length > 1 ? (
                 <>
                   <button
                     type="button"

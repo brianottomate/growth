@@ -1,58 +1,104 @@
 "use client";
 
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { useMutation } from "@tanstack/react-query";
+import { Radio } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { PLANNABLE_AD_PLATFORMS } from "@/lib/ad-platforms";
-import { sendAssistantIntent } from "@/lib/assistant-events";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { toast } from "@/components/ui/toast";
+import { orpc } from "@/orpc/client";
 
-/**
- * One pill per platform not yet planned. A pill hands the whole step to the
- * chat: plan the platform, fill its setup from the brand's ad account,
- * tracking defaults and intake, and say what is still missing. Edit setup
- * stays the manual path; nothing reaches the platform until Push.
- */
+/** Create a local platform draft; account, budget and delivery are reviewed separately. */
 export function PlanPlatformButton({
-  brandId,
-  brandName,
   campaignId,
-  campaignName,
   planned,
+  primary = false,
 }: {
   brandId: string;
   brandName: string;
   campaignId: string;
   campaignName: string;
   planned: string[];
+  primary?: boolean;
 }) {
+  const [open, setOpen] = useState(false);
+  const [refreshing, startTransition] = useTransition();
+  const router = useRouter();
+  const plan = useMutation(
+    orpc.ads.planPlatform.mutationOptions({
+      onSuccess: () => {
+        setOpen(false);
+        startTransition(() => router.refresh());
+      },
+      onError: (error) => toast.error(error.message),
+    }),
+  );
   const remaining = PLANNABLE_AD_PLATFORMS.filter(
     (platform) => !planned.includes(platform),
   );
-  if (remaining.length === 0) return null;
+  if (!remaining.length) return null;
   return (
-    <div className="flex flex-wrap gap-2">
-      {remaining.map((platform) => (
+    <>
+      {!planned.includes("meta_ads") && (
         <Button
-          key={platform}
-          type="button"
           size="sm"
-          shape="round"
-          variant="outline"
-          onClick={() =>
-            sendAssistantIntent({
-              type: "work_ad_campaign",
-              brandId,
-              brandName,
-              campaignId,
-              campaignName,
-              focus: "platforms",
-              visibleText: `Plan ${platformLabel(platform)} for “${campaignName}” and set it up: the brand's allowlisted ad account, its tracking defaults, and the budget from the intake. Tell me what is still missing before it can push.\n\nBrand ID: ${brandId}\nCampaign ID: ${campaignId}`,
-            })
-          }
+          variant={primary ? "default" : "outline"}
+          disabled={plan.isPending || refreshing}
+          onClick={() => plan.mutate({ campaignId, platform: "meta_ads" })}
         >
-          <ChannelLogo platform={platform} className="size-4" />
-          {platformLabel(platform)}
+          <ChannelLogo platform="meta_ads" className="size-4" />
+          Create Meta plan
         </Button>
-      ))}
-    </div>
+      )}
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={plan.isPending || refreshing}
+        onClick={() => setOpen(true)}
+      >
+        <Radio className="size-3.5" />
+        Choose platform
+      </Button>
+      <Dialog
+        open={open}
+        onOpenChange={(value) => {
+          if (!plan.isPending) setOpen(value);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Choose a platform</DialogTitle>
+            <DialogDescription>
+              Create a local draft for its budget and settings. Review the
+              account, tracking and budget before pushing; creating a plan
+              starts no delivery.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-wrap gap-2">
+            {remaining.map((platform) => (
+              <Button
+                key={platform}
+                size="sm"
+                variant="outline"
+                disabled={plan.isPending}
+                onClick={() => plan.mutate({ campaignId, platform })}
+              >
+                <ChannelLogo platform={platform} className="size-4" />
+                {platformLabel(platform)}
+              </Button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

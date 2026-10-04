@@ -10,7 +10,7 @@ import { toast } from "@/components/ui/toast";
 import { orpc } from "@/orpc/client";
 
 /** Proposes audiences from the brand's evidence and adds them to the campaign. */
-export function SuggestAudiencesButton({ campaignId }: { campaignId: string }) {
+export function useSuggestedAudiences(campaignId: string) {
   const router = useRouter();
   const [refreshing, startTransition] = useTransition();
   const suggest = useMutation(
@@ -54,6 +54,12 @@ export function SuggestAudiencesButton({ campaignId }: { campaignId: string }) {
     startTransition(() => router.refresh());
   };
 
+  return { busy, run };
+}
+
+export function SuggestAudiencesButton({ campaignId }: { campaignId: string }) {
+  const { busy, run } = useSuggestedAudiences(campaignId);
+
   return (
     <Button
       size="sm"
@@ -62,7 +68,7 @@ export function SuggestAudiencesButton({ campaignId }: { campaignId: string }) {
       onClick={() => void run()}
     >
       <Sparkles className="size-3.5" />
-      {busy ? "Suggesting…" : "Suggest audiences"}
+      {busy ? "Adding…" : "Add audiences"}
     </Button>
   );
 }

@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import { Layers, Sparkles } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
+import { AskAssistantButton } from "./AskAssistantButton";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -27,29 +29,40 @@ import { orpc } from "@/orpc/client";
 export function AddStarterIdeasButton({
   campaignId,
   brandId,
+  brandName,
+  campaignName,
+  empty = false,
+  children,
 }: {
   campaignId: string;
   brandId: string;
+  brandName: string;
+  campaignName: string;
+  empty?: boolean;
+  children?: React.ReactNode;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [source, setSource] = useState<"blank" | "featured" | "shells">(
-    "featured",
+    "shells",
   );
   const [groupId, setGroupId] = useState("featured");
   const groups = useQuery({
     ...orpc.homeGroups.context.queryOptions({ input: { brandId } }),
     enabled: open,
   });
-  const [generate, setGenerate] = useState(true);
+  const [generate, setGenerate] = useState(false);
   const [refreshing, startTransition] = useTransition();
   const homes = useQuery({
     ...orpc.ads.starterIdeaHomes.queryOptions({
       input: { campaignId, ...(groupId === "featured" ? {} : { groupId }) },
     }),
-    enabled: open,
   });
   const available = homes.data ?? [];
+  const featuredHomes = useQuery(
+    orpc.ads.starterIdeaHomes.queryOptions({ input: { campaignId } }),
+  );
+  const featured = featuredHomes.data ?? [];
   const add = useMutation(
     orpc.ads.addStarterIdeas.mutationOptions({
       onSuccess: ({ created }) => {
@@ -101,17 +114,108 @@ export function AddStarterIdeasButton({
       (source === "featured" && !available.length) ||
       available.length > 10 ||
       (source === "featured" && available.some((home) => !home.photos.length)));
-  return (
+  const create = () => {
+    if (featured.length > 10) {
+      toast.error("Choose at most 10 featured homes before creating ads.");
+      return;
+    }
+    if (featured.some((home) => !home.photos.length)) {
+      toast.error("Add a photo to each featured home before creating ads.");
+      return;
+    }
+    generation.mutate({
+      campaignId,
+      source: featured.length ? "featured" : "brand",
+      homeIds: featured.map((home) => home.id),
+      intendedPlacements: [
+        "facebook-feed",
+        "instagram-feed",
+        ...(featured.length
+          ? (["facebook-story", "instagram-story"] as const)
+          : []),
+      ],
+    });
+  };
+  const actions = (primary = false) => (
     <>
+      <Button
+        size="sm"
+        variant={primary ? "default" : "outline"}
+        disabled={
+          pending ||
+          refreshing ||
+          generating ||
+          featuredHomes.isPending ||
+          featuredHomes.isError
+        }
+        onClick={create}
+      >
+        <Sparkles className="size-3.5" />
+        {generating ? "Creating ads…" : "Create ads"}
+      </Button>
       <Button
         size="sm"
         variant="outline"
         disabled={pending || refreshing || generating}
         onClick={() => setOpen(true)}
       >
-        <Plus className="size-3" />
-        Add starter ad ideas
+        <Layers className="size-3.5" />
+        From templates
       </Button>
+      <AskAssistantButton
+        brandId={brandId}
+        brandName={brandName}
+        campaignId={campaignId}
+        campaignName={campaignName}
+        focus="ads"
+        label="Shape"
+        newThread
+        ask={`Help me shape the ads for “${campaignName}”. Read the current creative, homes and brand story, then discuss directions with me before creating or changing ads.`}
+      />
+    </>
+  );
+  return (
+    <>
+      {empty ? (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <h2 id="ad-ideas-heading" className="text-sm font-semibold">
+              Ads <span className="text-muted-foreground">· 0</span>
+            </h2>
+            <div className="flex flex-wrap items-center gap-2">
+              {actions()}
+              {children}
+            </div>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Creative for this campaign, built from the brand’s homes, photos and
+            story.
+          </p>
+          <EmptyState
+            compact
+            icon={Sparkles}
+            title="Give the campaign its first creative"
+            description="Create editable ad drafts with copy and photos from featured homes. Without featured homes, start with brand-based copy. Choose templates for a starting layout, or Shape to explore a direction together."
+            actions={actions(true)}
+          />
+          {featuredHomes.isError && (
+            <p role="alert" className="text-sm text-destructive">
+              Could not load featured homes.{" "}
+              <Button
+                variant="link"
+                onClick={() => void featuredHomes.refetch()}
+              >
+                Try again
+              </Button>
+            </p>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          {actions()}
+          {children}
+        </div>
+      )}
       {/* A finished run has nothing left to say: its ideas are the list. */}
       {progress.data && (generating || progress.data.status === "error") && (
         <div
@@ -143,10 +247,10 @@ export function AddStarterIdeasButton({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add starter ad ideas</DialogTitle>
+            <DialogTitle>Create ads from templates</DialogTitle>
             <DialogDescription>
-              Create editable ideas in this campaign. Existing ideas are
-              preserved.
+              Choose a starter layout set and its home group. Create editable
+              drafts in this campaign. Existing ideas are preserved.
             </DialogDescription>
           </DialogHeader>
           <div className="flex gap-2">
@@ -169,7 +273,7 @@ export function AddStarterIdeasButton({
               disabled={pending}
               onClick={() => setSource("shells")}
             >
-              Empty shells
+              Layout set
             </Button>
           </div>
           {source === "blank" ? (
@@ -192,9 +296,8 @@ export function AddStarterIdeasButton({
             <div className="space-y-3">
               {source === "shells" ? (
                 <p className="text-sm text-muted-foreground">
-                  Empty ads for the featured homes, sized to push through Zernio
-                  with nothing to fix afterwards: statics in 4:5, 1:1 and 9:16,
-                  carousels in 1:1. Add the artwork.
+                  Start with static and carousel layouts for the selected homes.
+                  Add your artwork and copy in the ad studio.
                 </p>
               ) : (
                 <>
@@ -307,7 +410,7 @@ export function AddStarterIdeasButton({
                 add.mutate({
                   campaignId,
                   source,
-                  ...(source !== "blank"
+                  ...(source !== "blank" && available.length > 0
                     ? { homeIds: available.map((h) => h.id) }
                     : {}),
                 });

@@ -11,11 +11,15 @@ export function BrandingPanel({
   identity,
   logo,
   compact = false,
+  hideImages = false,
+  hideFonts = false,
 }: {
   identity: BrandIdentity | null;
   /** The brand row's logo, shown when the profile has none. */
   logo: string | null;
   compact?: boolean;
+  hideImages?: boolean;
+  hideFonts?: boolean;
 }) {
   const raw = identity?.raw;
   const colors = Object.entries(raw?.colors ?? identity?.colors ?? {}).filter(
@@ -29,11 +33,6 @@ export function BrandingPanel({
   const sizes = Object.entries(raw?.typography?.fontSizes ?? {}).filter(
     (entry): entry is [string, string] => typeof entry[1] === "string",
   );
-  const images = {
-    logo: raw?.images?.logo ?? raw?.logo ?? identity?.logo ?? logo,
-    favicon: raw?.images?.favicon ?? identity?.favicon ?? null,
-    ogImage: raw?.images?.ogImage ?? null,
-  };
   const buttons = raw?.components;
   const text = compact ? "text-[11px]" : "text-xs";
 
@@ -45,11 +44,7 @@ export function BrandingPanel({
         </span>
       </Row>
 
-      <div className={`grid gap-2 ${compact ? "grid-cols-3" : "grid-cols-3"}`}>
-        <ImageCell label="Logo" src={images.logo} />
-        <ImageCell label="Favicon" src={images.favicon} />
-        <ImageCell label="OG image" src={images.ogImage} cover />
-      </div>
+      {!hideImages && <BrandIdentityAssets identity={identity} logo={logo} />}
 
       {buttons?.buttonPrimary || buttons?.buttonSecondary ? (
         <Row label="Buttons">
@@ -102,7 +97,7 @@ export function BrandingPanel({
         )}
       </Row>
 
-      {fonts.length > 0 && (
+      {!hideFonts && fonts.length > 0 && (
         <Row label="Fonts">
           <div className="flex flex-col gap-0.5">
             {fonts.map((font) => (
@@ -168,6 +163,40 @@ export function BrandingPanel({
   );
 }
 
+export function BrandIdentityAssets({
+  identity,
+  logo,
+  previewImage,
+  large = false,
+}: {
+  identity: BrandIdentity | null;
+  logo: string | null;
+  previewImage?: string | null;
+  large?: boolean;
+}) {
+  const raw = identity?.raw;
+  return (
+    <div className="grid grid-cols-1 gap-3 @md:grid-cols-3">
+      <ImageCell
+        label="Logo"
+        src={raw?.images?.logo ?? raw?.logo ?? identity?.logo ?? logo}
+        large={large}
+      />
+      <ImageCell
+        label="Favicon"
+        src={raw?.images?.favicon ?? identity?.favicon ?? null}
+        large={large}
+      />
+      <ImageCell
+        label={large ? "Preview image" : "OG image"}
+        src={previewImage ?? raw?.images?.ogImage ?? null}
+        cover
+        large={large}
+      />
+    </div>
+  );
+}
+
 function Row({
   label,
   children,
@@ -187,15 +216,19 @@ function ImageCell({
   label,
   src,
   cover = false,
+  large = false,
 }: {
   label: string;
   src: string | null | undefined;
   cover?: boolean;
+  large?: boolean;
 }) {
   return (
     <div className="overflow-hidden rounded-md border">
       <div className="border-b px-2 py-1 text-muted-foreground">{label}</div>
-      <div className="flex h-16 items-center justify-center bg-white p-2">
+      <div
+        className={`flex items-center justify-center bg-white p-2 ${large ? "h-20" : "h-16"}`}
+      >
         {src ? (
           // oxlint-disable-next-line nextjs/no-img-element
           <img

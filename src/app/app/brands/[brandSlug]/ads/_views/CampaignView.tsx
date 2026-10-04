@@ -204,6 +204,31 @@ export async function CampaignView({
   const editableAds = ads.filter(
     (ad) => !("media" in ad.content) || !isImportedMetaCatalog(ad.content),
   );
+  const adActions = (empty: boolean) => (
+    <AddStarterIdeasButton
+      campaignId={campaign.id}
+      brandId={brand.id}
+      brandName={brandName}
+      campaignName={campaign.name}
+      empty={empty}
+    >
+      {plannedPlatforms.includes("google_ads") && (
+        <WriteSearchAdsButton campaignId={campaign.id} />
+      )}
+      <AddAdDialog brandId={brand.id} homes={homes} campaignId={campaign.id} />
+      <CampaignAssetsDrawer count={pool.length} brandId={brand.id}>
+        <CreativePool
+          campaignId={campaign.id}
+          brandId={brand.id}
+          pool={pool}
+          askAssistant={ask(
+            "photos",
+            `Fill the photo pool for “${campaign.name}”`,
+          )}
+        />
+      </CampaignAssetsDrawer>
+    </AddStarterIdeasButton>
+  );
   return (
     <div className="space-y-8">
       <header className="space-y-3">
@@ -321,33 +346,8 @@ export async function CampaignView({
 
       <section id="campaign-ads" className="scroll-mt-4 space-y-4">
         <AdIdeasList
-          actions={
-            <div className="flex flex-wrap items-center gap-2">
-              <AddStarterIdeasButton
-                campaignId={campaign.id}
-                brandId={brand.id}
-              />
-              {plannedPlatforms.includes("google_ads") && (
-                <WriteSearchAdsButton campaignId={campaign.id} />
-              )}
-              <AddAdDialog
-                brandId={brand.id}
-                homes={homes}
-                campaignId={campaign.id}
-              />
-              <CampaignAssetsDrawer count={pool.length} brandId={brand.id}>
-                <CreativePool
-                  campaignId={campaign.id}
-                  brandId={brand.id}
-                  pool={pool}
-                  askAssistant={ask(
-                    "photos",
-                    `Fill the photo pool for “${campaign.name}”`,
-                  )}
-                />
-              </CampaignAssetsDrawer>
-            </div>
-          }
+          actions={adActions(false)}
+          emptyState={adActions(true)}
           preparingHero={
             generation?.source === "featured" &&
             ["queued", "processing"].includes(generation.status)
@@ -397,6 +397,7 @@ export async function CampaignView({
         <ol className="space-y-8">
           <Step
             title="Audiences"
+            hideHeading
             meta={
               audiences.length > 0
                 ? `${audiences.length} ad set${audiences.length === 1 ? "" : "s"}`
@@ -420,8 +421,9 @@ export async function CampaignView({
                 ? planned.map((row) => platformLabel(row.platform)).join(", ")
                 : undefined
             }
+            description="Where this campaign runs, with a separate budget and delivery setup for each platform."
             actions={
-              planned.length > 0 ? (
+              <>
                 <PlanPlatformButton
                   brandId={brand.id}
                   brandName={brandName}
@@ -429,23 +431,46 @@ export async function CampaignView({
                   campaignName={campaign.name}
                   planned={plannedPlatforms}
                 />
-              ) : null
+                <AskAssistantButton
+                  brandId={brand.id}
+                  brandName={brandName}
+                  campaignId={campaign.id}
+                  campaignName={campaign.name}
+                  focus="platforms"
+                  label="Shape"
+                  newThread
+                  ask={`Help me shape the platform plan for “${campaign.name}”. Read its current setup and discuss platforms, budget and tracking with me before changing anything.`}
+                />
+              </>
             }
           >
             {planned.length === 0 ? (
               <EmptyState
                 compact
                 icon={Radio}
-                title="No platform yet"
-                description="Plan one to set its budget. Nothing reaches the platform until you push."
+                title="Choose where the campaign runs"
+                description="Create a Meta draft, or choose another platform. Review its account, tracking and budget before pushing. Shape lets you work through those choices together."
                 actions={
-                  <PlanPlatformButton
-                    brandId={brand.id}
-                    brandName={brandName}
-                    campaignId={campaign.id}
-                    campaignName={campaign.name}
-                    planned={plannedPlatforms}
-                  />
+                  <>
+                    <PlanPlatformButton
+                      brandId={brand.id}
+                      brandName={brandName}
+                      campaignId={campaign.id}
+                      campaignName={campaign.name}
+                      planned={plannedPlatforms}
+                      primary
+                    />
+                    <AskAssistantButton
+                      brandId={brand.id}
+                      brandName={brandName}
+                      campaignId={campaign.id}
+                      campaignName={campaign.name}
+                      focus="platforms"
+                      label="Shape"
+                      newThread
+                      ask={`Help me shape the platform plan for “${campaign.name}”. Read its current setup and discuss platforms, budget and tracking with me before changing anything.`}
+                    />
+                  </>
                 }
               />
             ) : (
@@ -526,8 +551,12 @@ function Step({
   meta,
   actions,
   children,
+  description,
+  hideHeading = false,
 }: {
   title: string;
+  description?: string;
+  hideHeading?: boolean;
   meta?: string;
   actions?: React.ReactNode;
   children: React.ReactNode;
@@ -537,19 +566,24 @@ function Step({
       id={`campaign-${title.toLowerCase()}`}
       className="scroll-mt-4 space-y-3"
     >
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <p className="text-[10.5px] font-semibold tracking-[0.09em] text-muted-foreground uppercase">
-          {title}
-          {meta ? (
-            <span className="ml-1.5 font-medium tracking-normal normal-case">
-              · {meta}
-            </span>
+      {!hideHeading && (
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <h2 className="text-sm font-semibold">
+            {title}
+            {meta ? (
+              <span className="ml-1.5 font-medium tracking-normal normal-case">
+                · {meta}
+              </span>
+            ) : null}
+          </h2>
+          {actions ? (
+            <div className="flex flex-wrap items-center gap-2">{actions}</div>
           ) : null}
-        </p>
-        {actions ? (
-          <div className="flex items-center gap-2">{actions}</div>
-        ) : null}
-      </div>
+        </div>
+      )}
+      {description && (
+        <p className="text-sm text-muted-foreground">{description}</p>
+      )}
       {children}
     </li>
   );

@@ -3,13 +3,16 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { Sparkles } from "lucide-react";
+import { MapPin, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 import type { BrandMarkets, Market } from "@/lib/markets";
 import { orpc } from "@/orpc/client";
+import { MarketDetails } from "./brand-content";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ShapeBrandButton } from "./ShapeBrandButton";
 
 /**
  * Where the brand's homes are, as guests think of it. Drafted by AI from the
@@ -19,10 +22,12 @@ import { orpc } from "@/orpc/client";
  */
 export function MarketsCard({
   brandId,
+  brandName,
   markets,
   towns,
 }: {
   brandId: string;
+  brandName: string;
   markets: BrandMarkets | null;
   /** Every town the brand's homes are in, with how many homes. */
   towns: { town: string; homes: number }[];
@@ -55,11 +60,40 @@ export function MarketsCard({
   const edit = (index: number, patch: Partial<Market>) =>
     setDraft(list.map((m, i) => (i === index ? { ...m, ...patch } : m)));
 
+  const actions = (primary = false) => (
+    <>
+      {list.length ? (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setDraft(markets?.markets ?? [])}
+        >
+          Edit
+        </Button>
+      ) : (
+        <Button
+          size="sm"
+          variant={primary ? "default" : "outline"}
+          loading={write.isPending}
+          disabled={!towns.length}
+          onClick={() => write.mutate({ brandId })}
+        >
+          <Sparkles className="size-3.5" />
+          Define destinations
+        </Button>
+      )}
+      <ShapeBrandButton
+        brandId={brandId}
+        brandName={brandName}
+        section="home destinations"
+      />
+    </>
+  );
   return (
     <section className="space-y-3 rounded-xl border p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <h2 className="text-base font-semibold">Markets</h2>
-        <div className="flex items-center gap-2">
+        <h2 className="text-base font-semibold">Destinations</h2>
+        <div className="flex flex-wrap items-center gap-2">
           {draft ? (
             <>
               <Button
@@ -79,29 +113,14 @@ export function MarketsCard({
               </Button>
             </>
           ) : (
-            <>
-              <Button
-                size="sm"
-                variant="outline"
-                loading={write.isPending}
-                onClick={() => write.mutate({ brandId })}
-              >
-                <Sparkles className="size-3.5" />
-                {markets ? "Redraft" : "Draft"}
-              </Button>
-              {markets ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setDraft(markets.markets)}
-                >
-                  Edit
-                </Button>
-              ) : null}
-            </>
+            actions()
           )}
         </div>
       </div>
+      <p className="text-xs text-muted-foreground">
+        Group the brand’s home locations into destinations that inform copy and
+        campaign targeting.
+      </p>
       {list.length ? (
         <div className="space-y-4">
           {list.map((market, index) => (
@@ -116,39 +135,22 @@ export function MarketsCard({
               ) : (
                 <p className="font-medium">{market.label}</p>
               )}
-              <p className="text-muted-foreground">
-                {market.towns.join(", ")} · {homesIn(market)} homes
-              </p>
-              {market.draws?.length ? (
-                <p>
-                  <span className="text-muted-foreground">Draws </span>
-                  {market.draws.join(", ")}
-                </p>
-              ) : null}
-              {market.seasons?.length ? (
-                <p>
-                  <span className="text-muted-foreground">Seasons </span>
-                  {market.seasons
-                    .map((s) => `${s.name} (${s.when})`)
-                    .join(", ")}
-                </p>
-              ) : null}
-              {market.feederCities?.length ? (
-                <p>
-                  <span className="text-muted-foreground">Guests from </span>
-                  {market.feederCities.join(", ")}
-                </p>
-              ) : null}
-              {market.notes ? (
-                <p className="text-muted-foreground">{market.notes}</p>
-              ) : null}
+              <MarketDetails market={market} homes={homesIn(market)} />
             </div>
           ))}
         </div>
       ) : (
-        <p className="text-sm text-muted-foreground">
-          Draft the markets from this brand&rsquo;s homes.
-        </p>
+        <EmptyState
+          compact
+          icon={MapPin}
+          title="Group homes into guest destinations"
+          description={
+            towns.length
+              ? "Define and save destinations from the brand’s homes, or Shape how nearby destinations should be grouped."
+              : "Add homes with their towns first, then define the brand’s destinations."
+          }
+          actions={actions(true)}
+        />
       )}
     </section>
   );

@@ -44,12 +44,14 @@ export function AdIdeasList({
   states,
   fallback,
   actions,
+  emptyState,
   plannedPlatforms = [],
 }: {
   /** The campaign's planned platforms; an idea can be narrowed to some. */
   plannedPlatforms?: ChannelPlatform[];
   /** Add starter ideas, Add ad, Assets: they act on the list below them. */
   actions?: React.ReactNode;
+  emptyState?: React.ReactNode;
   homeOrder: string[];
   homeLinks: Record<string, { name: string; url: string }>;
   preparingHero: boolean;
@@ -141,12 +143,14 @@ export function AdIdeasList({
     );
   return (
     <section aria-labelledby="ad-ideas-heading" className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="ad-ideas-heading" className="text-sm font-semibold">
-          Ads <span className="text-muted-foreground">· {ideas.length}</span>
-        </h2>
-        {actions}
-      </div>
+      {ideas.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 id="ad-ideas-heading" className="text-sm font-semibold">
+            Ads <span className="text-muted-foreground">· {ideas.length}</span>
+          </h2>
+          {actions}
+        </div>
+      )}
       {preparingHero && (
         <div
           className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground"
@@ -157,9 +161,9 @@ export function AdIdeasList({
         </div>
       )}
       {ideas.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No ads yet. Add an ad or a starter set to begin.
-        </p>
+        (emptyState ?? (
+          <p className="text-sm text-muted-foreground">No ads yet.</p>
+        ))
       ) : (
         <AdIdeaGroups
           groups={groups.map((group) => ({

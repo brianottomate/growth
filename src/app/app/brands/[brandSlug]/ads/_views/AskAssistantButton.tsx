@@ -22,6 +22,7 @@ export function AskAssistantButton({
   ask,
   label = "Continue in chat",
   variant = "outline",
+  newThread = false,
 }: {
   brandId: string;
   brandName: string;
@@ -32,6 +33,7 @@ export function AskAssistantButton({
   ask: string;
   label?: string;
   variant?: "outline" | "ghost" | "default";
+  newThread?: boolean;
 }) {
   return (
     <Button
@@ -41,6 +43,7 @@ export function AskAssistantButton({
       onClick={() =>
         sendAssistantIntent({
           type: "work_ad_campaign",
+          newThread,
           brandId,
           brandName,
           campaignId,

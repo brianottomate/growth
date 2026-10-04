@@ -37,13 +37,13 @@ export function WorkInChatButton({
           campaignId,
           campaignName,
           visibleText: hasAds
-            ? `Help me work on “${campaignName}”`
-            : `Draft the ads for “${campaignName}”`,
+            ? `Help me shape “${campaignName}”. Read the current campaign and discuss what I want to refine before making changes.`
+            : `Help me shape “${campaignName}”. Read the brand and campaign, then discuss the creative, audience and platforms before creating anything.`,
         })
       }
     >
       <MessageSquare className="size-3.5" />
-      Start new chat
+      Shape
     </Button>
   );
 }

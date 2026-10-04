@@ -1,6 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import {
+  brandPreviewFields,
+  type BrandPreviewCopy,
+} from "@/lib/brand-preview-copy";
 
 import { cn } from "@/components/ui/lib/utils";
 import {
@@ -13,7 +17,7 @@ import {
   type CompositionTemplateId,
 } from "@/lib/compositions";
 
-/** The photo the strip draws, and the listing facts that fill the copy. */
+/** Image and copy used for visual samples. Brand samples have no listing facts. */
 export type PreviewHome = {
   name: string;
   imageUrl: string;
@@ -21,7 +25,7 @@ export type PreviewHome = {
   facts: string | null;
   rating: number | null;
   /** The brand's hero home, or a library photo chosen with no home behind it. */
-  source: "hero" | "library";
+  source: "hero" | "library" | "brand";
 };
 
 // Hidden for now: the alternative blueprints and their aspect picker.
@@ -50,7 +54,7 @@ const STARTER: Card[] = [
     formatId: DEFAULT_CATALOG_FORMAT,
     label: "Catalog",
     fields: (home, brandName) => ({
-      eyebrow: "Your stay in",
+      eyebrow: home?.place ? "Your stay in" : "",
       title: home?.place ?? home?.name ?? brandName,
       subtitle: home?.facts ?? "",
     }),
@@ -90,7 +94,7 @@ const ALTERNATIVES: Card[] = [
     formatId: "portrait",
     label: "Place",
     fields: (home, brandName) => ({
-      eyebrow: "Your stay in",
+      eyebrow: home?.place ? "Your stay in" : "",
       title: home?.place ?? home?.name ?? brandName,
       subtitle: home?.facts ?? "",
       ...(home?.rating ? { rating: home.rating.toFixed(1) } : {}),
@@ -121,6 +125,8 @@ export function BrandPreviewStrip({
   brandName,
   home,
   fontFamily,
+  bodyFontFamily,
+  previewCopy,
   action,
 }: {
   brandId: string;
@@ -130,6 +136,8 @@ export function BrandPreviewStrip({
   action?: React.ReactNode;
   /** An unsaved heading font; null draws the brand's saved one. */
   fontFamily: string | null;
+  bodyFontFamily?: string | null;
+  previewCopy?: BrandPreviewCopy | null;
 }) {
   const [aspect, setAspect] = useState<Aspect>("portrait");
 
@@ -139,10 +147,11 @@ export function BrandPreviewStrip({
       templateId: card.templateId,
       formatId: card.formatId,
       mark: "white",
-      ...card.fields(home, brandName),
+      ...brandPreviewFields(card.fields(home, brandName), previewCopy),
     });
     if (home) params.set("sourceUrl", home.imageUrl);
     if (fontFamily) params.set("fontFamily", fontFamily);
+    if (bodyFontFamily) params.set("bodyFontFamily", bodyFontFamily);
     return `/api/compositions/preview?${params}`;
   };
 
@@ -152,13 +161,13 @@ export function BrandPreviewStrip({
         <span className="text-muted-foreground">
           {home
             ? `${home.name}${home.source === "library" ? " · library photo" : ""}`
-            : "No hero yet"}
+            : "No preview image"}
         </span>
         {action}
       </div>
       {home ? (
         <>
-          <Band label="Starter ads" cards={STARTER} src={src} />
+          <Band label="Sample creatives" cards={STARTER} src={src} />
           {SHOW_ALTERNATIVES ? (
             <Band
               label="Alternatives"
@@ -176,7 +185,7 @@ export function BrandPreviewStrip({
       ) : null}
       {home === null ? (
         <p className="text-muted-foreground">
-          Choose a hero above to preview cards.
+          Choose a preview image to see sample creatives.
         </p>
       ) : null}
     </div>

@@ -80,7 +80,6 @@ export async function loadBrandReadiness(
           where: inArray(brandTable.id, brandIds),
           columns: {
             id: true,
-            featuredListingUrl: true,
             adPreviews: true,
             performanceSettings: true,
           },
@@ -140,7 +139,6 @@ export async function loadBrandReadiness(
     previewRows.map((row) => [
       row.id,
       {
-        featured: Boolean(row.featuredListingUrl),
         kept: row.adPreviews?.length ?? 0,
         settings: row.performanceSettings ?? null,
       },
@@ -166,7 +164,6 @@ export async function loadBrandReadiness(
       ? (intakeByAccount.get(brand.account.id) ?? null)
       : null;
     const previews = previewByBrand.get(brand.id) ?? {
-      featured: false,
       kept: 0,
       settings: null,
     };
@@ -195,7 +192,6 @@ export async function loadBrandReadiness(
         invoiceEmail: Boolean(settings?.invoiceEmail ?? intake?.invoiceEmail),
         creativeFolder:
           Boolean(settings?.creativeDriveUrl) || (intake?.creative ?? false),
-        featuredHome: previews.featured,
         previewsKept: previews.kept,
         adsDrafted: brand.campaigns.reduce(
           (sum, campaign) => sum + campaign.adCount,
@@ -223,7 +219,7 @@ export function readinessLinks(
   return {
     intake: brand.intakeUrl,
     connect: `/app/performance/brands/${slug}#submission`,
-    homes: `/app/performance/brands/${slug}/setup`,
+    homes: `/app/performance/brands/${slug}/wanderos`,
     draw: `/app/performance/brands/${slug}/ads`,
     mark: `/app/performance/brands/${slug}/setup#brand-mark`,
     ads: `/app/performance/brands/${slug}/campaigns`,

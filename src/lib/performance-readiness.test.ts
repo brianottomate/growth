@@ -16,7 +16,6 @@ const nothing: ReadinessFacts = {
   reportEmails: false,
   invoiceEmail: false,
   creativeFolder: false,
-  featuredHome: false,
   previewsKept: 0,
   adsDrafted: 0,
   campaigns: 0,
@@ -30,7 +29,7 @@ describe("readinessChecklist", () => {
   test("a fresh client has nothing ticked", () => {
     const list = readinessChecklist(nothing);
     expect(list.done).toBe(0);
-    expect(list.total).toBe(14);
+    expect(list.total).toBe(13);
     expect(list.groups.map((group) => group.done)).toEqual([0, 0, 0]);
   });
 
@@ -72,7 +71,6 @@ describe("readinessChecklist", () => {
       ...onboarded,
       hasMark: true,
       creativeFolder: true,
-      featuredHome: true,
       previewsKept: 3,
       adsDrafted: 10,
       campaigns: 1,

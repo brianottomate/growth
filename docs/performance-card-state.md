@@ -52,6 +52,22 @@ legacy uses. The new client header shows the manual journey so those older
 tracks do not contradict the new cards visually. The operational readiness
 checklist on client Overview remains a separate source observation.
 
+Dashboard cards also show that observed checklist as phase counts and progress
+bars, alongside the recorded statuses. The suggested next step is the first
+unfinished checklist item with an available destination; it is a suggestion,
+not a dependency or a stage transition. Prospects have no readiness summary,
+and On hold cards show progress without suggesting an action. The client
+Overview uses the shared card's account-summary layout for amounts, payments,
+contract details, notes, and the existing staged editor. Its checklist starts
+expanded, with completed phases collapsed and repeated actions grouped in each
+phase header. Completion still follows the source records, never a manual tick.
+
+The Tracker retains its sheet order and adds column focus views. Its labels
+distinguish monthly management fee from paid status, actual campaign spend from
+billed spend, and intake FB access from recorded Zernio access. Delivery is
+explicitly labelled as app records; these observations do not overwrite manual
+card state. Dollar values retain cents in both Tracker layouts.
+
 ## Tracker details on the cards
 
 Summary and Milestones show the existing configured contract effective date, terms,

@@ -1,13 +1,11 @@
 import type { ReactNode } from "react";
-import { CheckCircle2, CircleDashed } from "lucide-react";
+import { CheckCircle2, CircleDashed, ClipboardList } from "lucide-react";
 import { desc, eq } from "drizzle-orm";
 
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/components/ui/lib/utils";
 import { db } from "@/server/db";
 import { homeTable, performanceIntakeTable } from "@/server/db/schema";
 
-import { panel, SectionLabel } from "../../_components";
 import { IntakeAnswers, type IntakeHome } from "../../IntakeAnswers";
 import { SendLink } from "../../SendLink";
 import { IntakeActions } from "./IntakeActions";
@@ -80,12 +78,26 @@ export async function SubmissionSection({
   const [latest, ...earlier] = intakes;
 
   return (
-    <section id="submission" className="scroll-mt-6 space-y-2.5">
+    <section
+      id="submission"
+      aria-labelledby="submission-heading"
+      className="scroll-mt-6 space-y-4 rounded-xl border p-4"
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <SectionLabel>
-          Submission
-          {latest ? ` · ${dateOf(latest.submittedAt)}` : ""}
-        </SectionLabel>
+        <div className="flex flex-wrap items-center gap-2">
+          <ClipboardList
+            aria-hidden="true"
+            className="size-4 text-muted-foreground"
+          />
+          <h2 id="submission-heading" className="text-base font-semibold">
+            Submission
+          </h2>
+          {latest ? (
+            <span className="text-xs text-muted-foreground">
+              {dateOf(latest.submittedAt)}
+            </span>
+          ) : null}
+        </div>
         <div className="flex flex-wrap items-center gap-1.5">
           {pitchUrl ? <SendLink label="Pitch page" url={pitchUrl} /> : null}
           {intakeUrl ? <SendLink label="Intake form" url={intakeUrl} /> : null}
@@ -150,14 +162,13 @@ export async function SubmissionSection({
           ))}
         </>
       ) : (
-        <p
-          className={cn(
-            panel,
-            "px-4 py-6 text-center text-xs text-muted-foreground",
-          )}
-        >
-          No submission yet.
-        </p>
+        <div className="space-y-1 py-4">
+          <p className="text-sm font-medium">No submission yet.</p>
+          <p className="text-xs text-muted-foreground">
+            Share the intake form to collect the client&apos;s brief, budget,
+            and creative assets.
+          </p>
+        </div>
       )}
     </section>
   );

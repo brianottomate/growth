@@ -5,13 +5,15 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { Loader2, MessageSquare, Trash2 } from "lucide-react";
+import { House, Loader2, Sparkles, Trash2 } from "lucide-react";
 
 import { Button, ButtonLink } from "@/components/ui/button";
 import { DeleteAlert } from "@/components/ui/alert-dialog";
 import { cn } from "@/components/ui/lib/utils";
 import { toast } from "@/components/ui/toast";
-import { sendAssistantIntent } from "@/lib/assistant-events";
+import { ShapeBrandButton } from "./ShapeBrandButton";
+import { EmptyState } from "@/components/ui/empty-state";
+import { featuredHomeAdditions } from "@/lib/featured-home-selection";
 import { orpc } from "@/orpc/client";
 
 /** A committed home (a `home` row), enriched from its feed listing when matched. */
@@ -74,6 +76,54 @@ export function PickedHomes({
 }) {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [selecting, setSelecting] = useState(false);
+  const suggest = useMutation(
+    orpc.performance.suggestFeaturedHomes.mutationOptions(),
+  );
+  const feature = useMutation(orpc.brand.homesSetFeatured.mutationOptions());
+  const select = async () => {
+    setSelecting(true);
+    try {
+      const { picks } = await suggest.mutateAsync({ brandId, count: 5 });
+      const additions = featuredHomeAdditions(
+        picks,
+        picked.map((home) => home.id),
+        MAX,
+      );
+      for (const homeId of additions)
+        await feature.mutateAsync({ homeId, featured: true });
+      toast.info(
+        additions.length
+          ? `Featured ${additions.length} homes`
+          : "The recommended homes are already featured.",
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not select homes.",
+      );
+    } finally {
+      setSelecting(false);
+      router.refresh();
+    }
+  };
+  const actions = (primary = false) => (
+    <>
+      <Button
+        size="sm"
+        variant={primary ? "default" : "outline"}
+        disabled={selecting || picked.length >= MAX}
+        onClick={() => void select()}
+      >
+        <Sparkles className="size-3.5" />
+        {selecting ? "Selecting…" : "Select homes"}
+      </Button>
+      <ShapeBrandButton
+        brandId={brandId}
+        brandName={brandName}
+        section="featured homes"
+      />
+    </>
+  );
   const [confirming, setConfirming] = useState<PickedHome | null>(null);
 
   const count = picked.length;
@@ -99,58 +149,50 @@ export function PickedHomes({
 
   return (
     <section className="space-y-3 rounded-xl border p-4">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-baseline gap-2">
-          <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-            Featured homes
-          </span>
+          <h2 className="text-base font-semibold">Featured homes</h2>
           <span
             className={cn(
               "text-[11px]",
-              ready ? "text-emerald-400" : "text-muted-foreground",
+              ready ? "text-foreground" : "text-muted-foreground",
             )}
           >
             {count}/{MAX}
             {count < MIN ? " · pick at least three" : ""}
           </span>
         </div>
-        {ready ? (
-          <ButtonLink href={campaignsHref} size="sm" variant="outline">
-            Continue to Campaigns
-          </ButtonLink>
-        ) : (
-          <Button
-            size="sm"
-            variant="outline"
-            disabled
-            title="Pick at least three homes"
-          >
-            Continue to Campaigns
-          </Button>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {actions()}
+          {ready ? (
+            <ButtonLink href={campaignsHref} size="sm" variant="outline">
+              Continue to Campaigns
+            </ButtonLink>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled
+              title="Pick at least three homes"
+            >
+              Continue to Campaigns
+            </Button>
+          )}
+        </div>
       </div>
 
+      <p className="text-xs text-muted-foreground">
+        A small set of homes to lead the brand’s advertising and creative.
+        Selecting homes adds to your existing set.
+      </p>
       {picked.length === 0 ? (
-        <div className="space-y-3 rounded-xl border border-dashed px-3 py-6 text-center text-xs text-muted-foreground">
-          <p>
-            No featured homes yet. Tick homes below, or let the chat rank them
-            on bookings and reviews and suggest a set.
-          </p>
-          <Button
-            size="sm"
-            onClick={() =>
-              sendAssistantIntent({
-                type: "suggest_featured_homes",
-                brandId,
-                brandName,
-                visibleText: `Suggest which ${brandName} homes to feature.`,
-              })
-            }
-          >
-            <MessageSquare className="size-3.5" />
-            Suggest featured homes
-          </Button>
-        </div>
+        <EmptyState
+          compact
+          icon={House}
+          title="Choose the homes that lead"
+          description="Rank homes using bookings, reviews and photography, then save an initial featured set. Shape lets you discuss the selection first; you can also tick homes in the grid below."
+          actions={actions(true)}
+        />
       ) : (
         <div className="grid grid-cols-1 gap-2.5 @xl:grid-cols-2">
           {picked.map((home) => {

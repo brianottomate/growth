@@ -5,12 +5,14 @@ import {
   createPersonaLookalikeAction,
   deletePersona,
   listPersonas,
+  suggestPersonas,
   updatePersona,
   uploadPersonaSeedListAction,
 } from "@/server/ai/capabilities/personas";
 
 export const personaRouter = {
   list: actionProcedure(listPersonas),
+  suggest: actionProcedure(suggestPersonas),
   create: actionProcedure(createPersona),
   update: actionProcedure(updatePersona),
   delete: actionProcedure(deletePersona),
