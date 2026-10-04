@@ -251,8 +251,15 @@ export const growthActionPolicies = {
     importRemoteImages: write({ consequence: "provider-write" }),
     importFromDrive: write({ consequence: "provider-write" }),
   },
-  emailRead: { get: read() },
+  emailRead: {
+    get: read(),
+    audiences: read(),
+    previewAudience: read(),
+    audienceSnapshot: read(),
+  },
   emailWrite: {
+    saveAudience: write(),
+    compileAudience: write({ consequence: "background-run" }),
     createSlot: write(),
     createDigestFromRow: write(),
     draftFromTemplate: write({ consequence: "model-write" }),

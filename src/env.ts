@@ -68,6 +68,10 @@ export const env = createEnv({
     CUSTOMERIO_WEBHOOK_SECRET: z.string().min(1), // HMAC-SHA256 for CIO reporting webhooks
     CUSTOMERIO_WEBHOOK_BEARER_TOKEN: z.string().min(1), // Bearer token auth for CIO workflow HTTP Request actions
     // BigQuery
+    EMAIL_AUDIENCE_DEV_SCHEMA: z
+      .string()
+      .regex(/^email_audience_dev_[a-z0-9_]+$/)
+      .optional(),
     BIGQUERY_PROJECT_ID: z.string().min(1), // GCP project ID (required)
     BIGQUERY_DATASET_ID: z.string().optional(), // Default dataset
     GOOGLE_APPLICATION_CREDENTIALS_JSON: z.string().optional(), // Service account JSON (as string)
@@ -223,6 +227,7 @@ export const env = createEnv({
     CUSTOMERIO_WEBHOOK_BEARER_TOKEN:
       process.env.CUSTOMERIO_WEBHOOK_BEARER_TOKEN,
     // BigQuery
+    EMAIL_AUDIENCE_DEV_SCHEMA: process.env.EMAIL_AUDIENCE_DEV_SCHEMA,
     BIGQUERY_PROJECT_ID: process.env.BIGQUERY_PROJECT_ID,
     BIGQUERY_DATASET_ID: process.env.BIGQUERY_DATASET_ID,
     GOOGLE_APPLICATION_CREDENTIALS_JSON:

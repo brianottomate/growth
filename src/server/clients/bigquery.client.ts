@@ -59,7 +59,7 @@ function parseServiceAccountCredentialsFromBase64(
   return parseServiceAccountCredentials(decoded);
 }
 
-async function getClient(): Promise<BigQueryClient> {
+export async function getBigQueryClient(): Promise<BigQueryClient> {
   if (_client) return _client;
 
   const { BigQuery } = await import("@google-cloud/bigquery");
@@ -103,7 +103,7 @@ export async function executeQuery<T = Record<string, unknown>>(
   params?: BigQueryParams,
   types?: BigQueryParamTypes,
 ): Promise<T[]> {
-  const client = await getClient();
+  const client = await getBigQueryClient();
 
   const [rows] = await client.query({
     query: sql,
@@ -608,7 +608,7 @@ export async function insertRows(
 ): Promise<void> {
   if (rows.length === 0) return;
 
-  const client = await getClient();
+  const client = await getBigQueryClient();
   const table = client.dataset(datasetId).table(tableId);
 
   // table.insert() throws PartialFailureError if any rows fail

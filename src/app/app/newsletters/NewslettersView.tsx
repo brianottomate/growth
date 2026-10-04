@@ -307,6 +307,16 @@ export async function NewslettersView({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={
+              basePath.startsWith("/app/performance/brands/")
+                ? `${basePath}#email-audiences`
+                : "/app/newsletters/audiences"
+            }
+            className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted"
+          >
+            Email audiences
+          </Link>
           <NewsletterChatStart
             brandId={selectedBrand?.id}
             brandName={selectedBrand?.name}

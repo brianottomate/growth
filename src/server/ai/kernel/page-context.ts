@@ -42,6 +42,8 @@ function guidanceForPath(pathname: string): string | null {
     return "This is a publishing surface. Use publishingRead and contentRead for live workspace state.";
   if (pathname.startsWith("/app/blog"))
     return "This is the Growth blog workspace. Use contentRead for canonical work and contentWrite action publishBlogDraft only for an explicitly requested DatoCMS draft.";
+  if (pathname === "/app/newsletters/audiences")
+    return "This is the warehouse email audience builder. Use emailRead actions audiences and previewAudience for counts and samples, and emailWrite saveAudience or compileAudience only for requested changes. Compiled candidate lists never authorize sending.";
   if (pathname.startsWith("/app/newsletters"))
     return "This is the editorial newsletter workspace. Use emailRead before emailWrite.";
   if (pathname.startsWith("/app/transactional"))

@@ -115,8 +115,10 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "importRemoteImages",
     "importFromDrive",
   ],
-  emailRead: ["get"],
+  emailRead: ["get", "audiences", "previewAudience", "audienceSnapshot"],
   emailWrite: [
+    "saveAudience",
+    "compileAudience",
     "createSlot",
     "createDigestFromRow",
     "draftFromTemplate",

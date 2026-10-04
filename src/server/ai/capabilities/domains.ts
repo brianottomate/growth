@@ -1,4 +1,11 @@
 import {
+  listEmailAudiencesAction,
+  previewEmailAudienceAction,
+  saveEmailAudienceAction,
+  compileEmailAudienceAction,
+  emailAudienceSnapshotAction,
+} from "./email-audiences";
+import {
   listMediaSuggestionsAction,
   discoverMediaSuggestionsAction,
   reviewMediaSuggestionAction,
@@ -429,14 +436,21 @@ export const contentMediaWrite = growthDomainTool({
 });
 
 export const emailRead = growthDomainTool({
-  description: "Read one email draft.",
-  actions: { get: EMAIL_TOOLS.getEmailDraft },
+  description: "Read email drafts and preview warehouse recipient audiences.",
+  actions: {
+    get: EMAIL_TOOLS.getEmailDraft,
+    audiences: listEmailAudiencesAction,
+    previewAudience: previewEmailAudienceAction,
+    audienceSnapshot: emailAudienceSnapshotAction,
+  },
 });
 
 export const emailWrite = growthDomainTool({
   description:
-    "Create, revise, deliberately generate, or permanently delete an email draft.",
+    "Create, revise, deliberately generate, or permanently delete an email draft; save and compile warehouse recipient audiences without sending.",
   actions: {
+    saveAudience: saveEmailAudienceAction,
+    compileAudience: compileEmailAudienceAction,
     createSlot: EMAIL_TOOLS.createEmailSlot,
     createDigestFromRow: EMAIL_TOOLS.createDigestFromRow,
     draftFromTemplate: EMAIL_TOOLS.draftEmailFromTemplate,

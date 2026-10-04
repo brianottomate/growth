@@ -1,3 +1,11 @@
+import { previewEmailAudience } from "@/server/services/email-audience.service";
+import { emailAudienceDefinitionSchema } from "@/lib/email-audience";
+import {
+  listEmailAudiencesAction,
+  saveEmailAudienceAction,
+  compileEmailAudienceAction,
+  emailAudienceSnapshotAction,
+} from "@/server/ai/capabilities/email-audiences";
 import {
   emailHeaderFormatIdSchema,
   emailHeaderTemplateIdSchema,
@@ -10,6 +18,7 @@ import {
   protectedProcedure,
   publicProcedure,
   actionProcedure,
+  workspaceProcedure,
 } from "@/server/api/orpc";
 import { memberTable } from "@/server/db/schema";
 import type { db } from "@/server/db";
@@ -84,6 +93,23 @@ async function deliveryOrganizationIdForUser(
 }
 
 export const newsletterRouter = {
+  audiences: actionProcedure(listEmailAudiencesAction),
+  previewAudience: workspaceProcedure
+    .input(
+      z.object({
+        brandId: z.string(),
+        definition: emailAudienceDefinitionSchema,
+      }),
+    )
+    .handler(({ input, context }) =>
+      previewEmailAudience(input, {
+        organizationId: context.workspace.orgId,
+        userId: context.workspace.userId,
+      }),
+    ),
+  saveAudience: actionProcedure(saveEmailAudienceAction),
+  compileAudience: actionProcedure(compileEmailAudienceAction),
+  audienceSnapshot: actionProcedure(emailAudienceSnapshotAction),
   workspace: actionProcedure(getEmailDraftAction),
 
   generateDraft: actionProcedure(generateEmailDraftAction),

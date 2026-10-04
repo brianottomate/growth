@@ -35,3 +35,5 @@ export * from "./website-schema";
 
 export * from "./home-group-schema";
 export * from "./client-page-schema";
+
+export * from "./email-audience-schema";

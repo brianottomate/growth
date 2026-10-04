@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
+import { EmailAudiencesClient } from "@/app/app/newsletters/audiences/EmailAudiencesClient";
 import { NewslettersView } from "@/app/app/newsletters/NewslettersView";
 
 import { loadPerformanceBrand } from "../_data";
@@ -37,7 +38,7 @@ export default async function PerformanceBrandNewslettersPage({
       eq(brandTable.organizationId, org.id),
       isNull(brandTable.deletedAt),
     ),
-    columns: { emailSender: true },
+    columns: { emailSender: true, wanderOsWebsiteId: true },
   });
   const setup = sender?.emailSender?.marketingDomain;
   return (
@@ -53,6 +54,18 @@ export default async function PerformanceBrandNewslettersPage({
         basePath={`/app/performance/brands/${slug}/newsletters`}
         kindFilter={kind}
         view={view === "wall" || view === "read" ? view : "list"}
+      />
+      <EmailAudiencesClient
+        key={brand.id}
+        embedded
+        brands={[
+          {
+            id: brand.id,
+            name: brand.name,
+            slug: brand.slug,
+            wanderOsWebsiteId: sender?.wanderOsWebsiteId ?? null,
+          },
+        ]}
       />
     </div>
   );
