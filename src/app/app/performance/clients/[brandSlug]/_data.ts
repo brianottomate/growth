@@ -102,5 +102,5 @@ export function brandTabHref(
     | "campaigns"
     | "settings",
 ) {
-  return `/app/performance/brands/${slug}${tab ? `/${tab === "homes" ? "wanderos" : tab}` : ""}`;
+  return `/app/performance/clients/${slug}${tab ? `/${tab === "homes" ? "wanderos" : tab}` : ""}`;
 }

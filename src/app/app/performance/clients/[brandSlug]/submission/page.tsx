@@ -7,5 +7,5 @@ export default async function PerformanceBrandSubmissionPage({
   params: Promise<{ brandSlug: string }>;
 }) {
   const { brandSlug } = await params;
-  redirect(`/app/performance/brands/${brandSlug}#submission`);
+  redirect(`/app/performance/clients/${brandSlug}#submission`);
 }

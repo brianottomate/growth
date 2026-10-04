@@ -71,7 +71,7 @@ export async function SubmissionSection({
           .filter(Boolean)
           .join(" · "),
         thumbUrl: home.galleryCache?.[0]?.thumbUrl ?? home.heroSourceUrl,
-        href: `/app/performance/brands/${slug}/homes/${home.externalId}`,
+        href: `/app/performance/clients/${slug}/homes/${home.externalId}`,
       },
     ]),
   );

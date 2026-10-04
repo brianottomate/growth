@@ -3,19 +3,19 @@ import { performanceClientDestination } from "./performance-navigation";
 
 test("client navigation distinguishes Setup, Settings, and Overview", () => {
   expect(performanceClientDestination("porchlit-properties", "setup")).toEqual({
-    href: "/app/performance/brands/porchlit-properties/setup",
+    href: "/app/performance/clients/porchlit-properties/setup",
     pageLabel: "Setup",
   });
   expect(
     performanceClientDestination("porchlit-properties", "settings"),
   ).toEqual({
-    href: "/app/performance/brands/porchlit-properties/settings",
+    href: "/app/performance/clients/porchlit-properties/settings",
     pageLabel: "Settings",
   });
   expect(
     performanceClientDestination("porchlit-properties", "overview"),
   ).toEqual({
-    href: "/app/performance/brands/porchlit-properties",
+    href: "/app/performance/clients/porchlit-properties",
     pageLabel: "Overview",
   });
 });

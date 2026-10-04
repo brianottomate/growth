@@ -106,7 +106,7 @@ export function HomeRowsGrid({
               )}
             >
               <Link
-                href={`/app/performance/brands/${brandSlug}/homes/${home.externalId}`}
+                href={`/app/performance/clients/${brandSlug}/homes/${home.externalId}`}
                 className="block"
               >
                 {home.heroThumbUrl ? (

@@ -111,6 +111,11 @@ const config: NextConfig = {
   async redirects() {
     return [
       {
+        source: "/app/performance/brands/:path*",
+        destination: "/app/performance/clients/:path*",
+        permanent: true,
+      },
+      {
         // Campaign drafts lived at /ads/draft/<id> until the ads routes were
         // collapsed onto /ads/<id>. Those links are in chat history and Slack.
         source: "/app/brands/:brandSlug/ads/draft/:campaignId",

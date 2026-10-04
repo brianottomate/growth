@@ -29,7 +29,7 @@ export function BrandWorkspaceNav({
           All brands
         </Link>
         {performance && (
-          <Link href={`/app/performance/brands/${slug}`} className="underline">
+          <Link href={`/app/performance/clients/${slug}`} className="underline">
             Open Performance workspace
           </Link>
         )}

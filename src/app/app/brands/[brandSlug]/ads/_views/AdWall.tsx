@@ -52,7 +52,7 @@ import { orpc } from "@/orpc/client";
 import {
   HomePicker,
   type PickableHome,
-} from "@/app/app/performance/brands/[brandSlug]/HomePicker";
+} from "@/app/app/performance/clients/[brandSlug]/HomePicker";
 
 export { groupWall } from "@/lib/ad-wall";
 export type { WallAd } from "@/lib/ad-wall";
@@ -169,7 +169,7 @@ export function AdWall({
               <p className="text-[13px] font-semibold">
                 {group.homeId ? (
                   <Link
-                    href={`/app/performance/brands/${brandSlug}/homes/${group.homeId}`}
+                    href={`/app/performance/clients/${brandSlug}/homes/${group.homeId}`}
                     className="hover:underline"
                   >
                     {group.homeName}

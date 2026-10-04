@@ -49,7 +49,7 @@ export function NewAccountDialog() {
         const slug = brands.data?.brands.find(
           (row) => row.id === result.account.brandId,
         )?.slug;
-        if (slug) router.push(`/app/performance/brands/${slug}`);
+        if (slug) router.push(`/app/performance/clients/${slug}`);
       },
     }),
   );

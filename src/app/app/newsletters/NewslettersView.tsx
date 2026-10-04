@@ -309,7 +309,7 @@ export async function NewslettersView({
         <div className="flex flex-wrap items-center gap-2">
           <Link
             href={
-              basePath.startsWith("/app/performance/brands/")
+              basePath.startsWith("/app/performance/clients/")
                 ? `${basePath}#email-audiences`
                 : "/app/newsletters/audiences"
             }

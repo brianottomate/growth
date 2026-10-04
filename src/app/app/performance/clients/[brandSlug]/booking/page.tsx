@@ -5,5 +5,5 @@ export default async function BookingRedirect({
   params: Promise<{ brandSlug: string }>;
 }) {
   const { brandSlug } = await params;
-  redirect(`/app/performance/brands/${brandSlug}/wanderos#booking-targets`);
+  redirect(`/app/performance/clients/${brandSlug}/wanderos#booking-targets`);
 }

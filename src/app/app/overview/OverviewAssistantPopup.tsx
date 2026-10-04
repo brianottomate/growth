@@ -442,7 +442,7 @@ export function OverviewAssistantPopup({
                 <Link
                   href={
                     pinnedCatalog && effectiveBrand?.slug
-                      ? `/app/performance/brands/${effectiveBrand.slug}/homes/${pinnedCatalog.homeId}`
+                      ? `/app/performance/clients/${effectiveBrand.slug}/homes/${pinnedCatalog.homeId}`
                       : pinnedWork
                         ? pinnedWork.platform === "newsletter" &&
                           pinnedWork.platformPostId
@@ -450,8 +450,8 @@ export function OverviewAssistantPopup({
                           : `/app/content/${pinnedWork.contentPostId}`
                         : pinnedCampaign && effectiveBrand?.slug
                           ? pinnedCampaign.campaignId
-                            ? `/app/performance/brands/${effectiveBrand.slug}/campaigns/${pinnedCampaign.campaignId}`
-                            : `/app/performance/brands/${effectiveBrand.slug}/ads`
+                            ? `/app/performance/clients/${effectiveBrand.slug}/campaigns/${pinnedCampaign.campaignId}`
+                            : `/app/performance/clients/${effectiveBrand.slug}/ads`
                           : `/app/brands/${effectiveBrand?.slug ?? ""}`
                   }
                   title={pinnedLabel}

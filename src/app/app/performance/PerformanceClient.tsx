@@ -108,7 +108,7 @@ export function PerformanceClient() {
                     <td>
                       {account.brandId && slugOf.get(account.brandId) ? (
                         <Link
-                          href={`/app/performance/brands/${slugOf.get(account.brandId)}/settings`}
+                          href={`/app/performance/clients/${slugOf.get(account.brandId)}/settings`}
                           className="font-medium hover:underline"
                         >
                           {account.name}

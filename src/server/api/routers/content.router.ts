@@ -209,7 +209,7 @@ export const contentRouter = {
         relationship: client.relationship,
         business: client.businessStage,
         delivery: client.deliveryStage,
-        href: `/app/performance/brands/${client.slug ?? client.id}`,
+        href: `/app/performance/clients/${client.slug ?? client.id}`,
       })),
     };
   }),

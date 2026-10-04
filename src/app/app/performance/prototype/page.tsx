@@ -13,7 +13,7 @@ import { DELIVERY_LABEL } from "@/lib/performance-stage";
 import {
   loadPerformanceBrand,
   brandAvatarUrl,
-} from "../brands/[brandSlug]/_data";
+} from "../clients/[brandSlug]/_data";
 import { PipelineBoard } from "./PipelineBoard";
 import { ClientWorkspace, type WorkspaceData } from "./ClientWorkspace";
 

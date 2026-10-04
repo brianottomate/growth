@@ -2,12 +2,12 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { House, Loader2, Sparkles, Trash2 } from "lucide-react";
 
-import { Button, ButtonLink } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { DeleteAlert } from "@/components/ui/alert-dialog";
 import { cn } from "@/components/ui/lib/utils";
 import { toast } from "@/components/ui/toast";
@@ -68,12 +68,17 @@ export function PickedHomes({
   brandName,
   brandSlug,
   picked,
+  embedded = false,
+  groupActions,
 }: {
   brandId: string;
   brandName: string;
   brandSlug: string;
   picked: PickedHome[];
+  embedded?: boolean;
+  groupActions?: ReactNode;
 }) {
+  const TitleTag = embedded ? "h3" : "h2";
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [selecting, setSelecting] = useState(false);
@@ -144,14 +149,15 @@ export function PickedHomes({
     setConfirming(null);
   }
 
-  // New ads start in a campaign; the per-home ad wall is Ads (old).
-  const campaignsHref = `/app/performance/brands/${brandSlug}/campaigns`;
-
   return (
-    <section className="space-y-3 rounded-xl border p-4">
+    <section
+      className={embedded ? "space-y-3" : "space-y-3 rounded-xl border p-4"}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-baseline gap-2">
-          <h2 className="text-base font-semibold">Featured homes</h2>
+          <TitleTag className="text-base font-semibold">
+            Featured homes
+          </TitleTag>
           <span
             className={cn(
               "text-[11px]",
@@ -164,27 +170,10 @@ export function PickedHomes({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {actions()}
-          {ready ? (
-            <ButtonLink href={campaignsHref} size="sm" variant="outline">
-              Continue to Campaigns
-            </ButtonLink>
-          ) : (
-            <Button
-              size="sm"
-              variant="outline"
-              disabled
-              title="Pick at least three homes"
-            >
-              Continue to Campaigns
-            </Button>
-          )}
+          {groupActions}
         </div>
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        A small set of homes to lead the brand’s advertising and creative.
-        Selecting homes adds to your existing set.
-      </p>
       {picked.length === 0 ? (
         <EmptyState
           compact
@@ -234,7 +223,7 @@ export function PickedHomes({
                     </div>
                     <div className="flex shrink-0 items-center gap-0.5">
                       <Link
-                        href={`/app/performance/brands/${brandSlug}/homes/${encodeURIComponent(home.externalId)}`}
+                        href={`/app/performance/clients/${brandSlug}/homes/${encodeURIComponent(home.externalId)}`}
                         aria-label={`Edit ${home.name}`}
                         className="mr-1 text-xs text-muted-foreground hover:text-foreground hover:underline"
                       >

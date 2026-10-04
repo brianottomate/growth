@@ -26,7 +26,7 @@ const CONTEXT: Record<string, JourneyContext> = {
         name: "Pitch workspace",
         reference: {
           kind: "route",
-          value: "/app/performance/brands/{slug}/pitch",
+          value: "/app/performance/clients/{slug}/pitch",
         },
       },
     ],
@@ -43,16 +43,33 @@ const CONTEXT: Record<string, JourneyContext> = {
         name: "Setup",
         reference: {
           kind: "route",
-          value: "/app/performance/brands/{slug}/setup",
+          value: "/app/performance/clients/{slug}/setup",
+        },
+      },
+    ],
+  },
+  wanderos: {
+    job: {
+      id: "prepare-homes-and-destinations",
+      name: "Prepare home inventory, featured homes, destinations and booking targets",
+    },
+    views: [
+      {
+        id: "wanderos",
+        surfaceId: "growth-web",
+        name: "WanderOS",
+        reference: {
+          kind: "route",
+          value: "/app/performance/clients/{slug}/wanderos",
         },
       },
       {
-        id: "booking",
+        id: "connection-settings",
         surfaceId: "growth-web",
-        name: "Homes & targets",
+        name: "Connection & sync settings",
         reference: {
           kind: "route",
-          value: "/app/performance/brands/{slug}/booking",
+          value: "/app/performance/clients/{slug}/settings#wanderos",
         },
       },
     ],
@@ -69,7 +86,7 @@ const CONTEXT: Record<string, JourneyContext> = {
         name: "Catalog",
         reference: {
           kind: "route",
-          value: "/app/performance/brands/{slug}/catalog",
+          value: "/app/performance/clients/{slug}/catalog",
         },
       },
       {
@@ -78,7 +95,7 @@ const CONTEXT: Record<string, JourneyContext> = {
         name: "Ad studio",
         reference: {
           kind: "route",
-          value: "/app/performance/brands/{slug}/ads",
+          value: "/app/performance/clients/{slug}/ads",
         },
       },
     ],
@@ -95,7 +112,7 @@ const CONTEXT: Record<string, JourneyContext> = {
         name: "Client campaigns",
         reference: {
           kind: "route",
-          value: "/app/performance/brands/{slug}/campaigns",
+          value: "/app/performance/clients/{slug}/campaigns",
         },
       },
       {
@@ -118,7 +135,7 @@ const CONTEXT: Record<string, JourneyContext> = {
         name: "Ad studio",
         reference: {
           kind: "route",
-          value: "/app/performance/brands/{slug}/ads",
+          value: "/app/performance/clients/{slug}/ads",
         },
       },
     ],
@@ -135,7 +152,7 @@ const CONTEXT: Record<string, JourneyContext> = {
         name: "Client email",
         reference: {
           kind: "route",
-          value: "/app/performance/brands/{slug}/newsletters",
+          value: "/app/performance/clients/{slug}/newsletters",
         },
       },
       {

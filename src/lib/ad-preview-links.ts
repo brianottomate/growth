@@ -16,7 +16,7 @@ export function performanceBrandPath(brand: {
   id: string;
   slug: string | null;
 }) {
-  return `/app/performance/brands/${brand.slug ?? brand.id}`;
+  return `/app/performance/clients/${brand.slug ?? brand.id}`;
 }
 
 /** The Studio, opened to design an ad preview for this brand and come back. */

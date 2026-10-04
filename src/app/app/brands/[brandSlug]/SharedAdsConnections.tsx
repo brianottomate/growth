@@ -82,7 +82,7 @@ export function SharedAdsConnections({ brandId }: { brandId: string }) {
               Ads managed through{" "}
               <Link
                 className="underline"
-                href={`/app/performance/brands/${data.managingBrandSlug}/settings`}
+                href={`/app/performance/clients/${data.managingBrandSlug}/settings`}
               >
                 {data.managingBrandName}
               </Link>{" "}

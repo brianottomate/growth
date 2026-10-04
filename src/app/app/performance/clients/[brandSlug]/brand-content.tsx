@@ -5,7 +5,7 @@ export function BrandStoryContent({ story }: { story: string }) {
   return <p className="text-sm whitespace-pre-line">{story}</p>;
 }
 
-export function MarketDetails({
+export function DestinationDetails({
   market,
   homes,
 }: {

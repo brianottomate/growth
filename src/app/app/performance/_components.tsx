@@ -136,13 +136,13 @@ function initials(name: string) {
 }
 
 export function brandAdsHref(brand: Pick<DeskBrand, "id" | "slug">) {
-  return `/app/performance/brands/${brand.slug ?? brand.id}/campaigns`;
+  return `/app/performance/clients/${brand.slug ?? brand.id}/campaigns`;
 }
 export function campaignHref(
   brand: Pick<DeskBrand, "id" | "slug">,
   campaign: Pick<DeskCampaign, "id">,
 ) {
-  return `/app/performance/brands/${brand.slug ?? brand.id}/campaigns/${campaign.id}`;
+  return `/app/performance/clients/${brand.slug ?? brand.id}/campaigns/${campaign.id}`;
 }
 
 /** Spend against budget: the figure bold, its qualifier muted. */

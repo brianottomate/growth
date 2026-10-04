@@ -20,6 +20,21 @@ const page: AdCampaignWorkContext = {
   campaignName: "B launch",
 };
 
+test("legacy Performance links resolve the same assistant focus as client links", () => {
+  for (const suffix of [
+    "",
+    "/setup",
+    "/campaigns/camp_example",
+    "/homes/home_a",
+  ]) {
+    expect(
+      assistantPageRoute(`/app/performance/brands/legacy-rnr${suffix}`),
+    ).toEqual(
+      assistantPageRoute(`/app/performance/clients/legacy-rnr${suffix}`),
+    );
+  }
+});
+
 describe("assistant focus across client navigation", () => {
   test("following the new client's page drops the previous ad target", () => {
     expect(
@@ -62,13 +77,13 @@ describe("campaign navigation", () => {
         .campaignId,
     ).toBeUndefined();
     expect(
-      assistantPageRoute("/app/performance/brands/legacy-rnr/campaigns")
+      assistantPageRoute("/app/performance/clients/legacy-rnr/campaigns")
         .campaignId,
     ).toBeUndefined();
   });
   test("home and billing deep links identify their own records", () => {
     expect(
-      assistantPageRoute("/app/performance/brands/legacy-rnr/homes/home_a"),
+      assistantPageRoute("/app/performance/clients/legacy-rnr/homes/home_a"),
     ).toMatchObject({ brandSlug: "legacy-rnr", homeId: "home_a" });
     expect(assistantPageRoute("/app/performance/perf_a").accountId).toBe(
       "perf_a",

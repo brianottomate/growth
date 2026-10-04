@@ -25,7 +25,7 @@ export function performanceClientDestination(
   slug: string,
   tab: (typeof PERFORMANCE_CLIENT_TABS)[number],
 ) {
-  const base = `/app/performance/brands/${encodeURIComponent(slug)}`;
+  const base = `/app/performance/clients/${encodeURIComponent(slug)}`;
   return {
     href: tab === "overview" ? base : `${base}/${tab}`,
     pageLabel: PERFORMANCE_CLIENT_TAB_LABELS[tab],

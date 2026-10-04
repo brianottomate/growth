@@ -122,7 +122,7 @@ describe("Performance onboarding alerts", () => {
     expect(message).toContain("<@U0574R1RCD9>");
     expect(message).toContain("Acme Rentals");
     expect(message).toContain(
-      "https://growth.example.com/app/performance/brands/acme-rentals#submission",
+      "https://growth.example.com/app/performance/clients/acme-rentals#submission",
     );
     expect(
       message.includes(submittedAt.toISOString()) ||

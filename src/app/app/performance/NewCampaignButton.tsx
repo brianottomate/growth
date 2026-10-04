@@ -19,7 +19,7 @@ export function NewCampaignButton({ brandSlug }: { brandSlug: string }) {
         toast.success("Campaign created");
         startTransition(() =>
           router.push(
-            `/app/performance/brands/${brandSlug}/campaigns/${result.campaign.id}`,
+            `/app/performance/clients/${brandSlug}/campaigns/${result.campaign.id}`,
           ),
         );
       },

@@ -856,7 +856,7 @@ export async function POST(req: Request): Promise<Response> {
       pitch: Boolean(
         brand &&
         (assistantIntent?.type === "work_pitch" ||
-          /^\/app\/performance\/brands\/[^/]+\/pitch(?:[?#]|$)/.test(
+          /^\/app\/performance\/(?:clients|brands)\/[^/]+\/pitch(?:[?#]|$)/.test(
             pagePath ?? "",
           )),
       ),

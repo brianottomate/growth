@@ -136,7 +136,7 @@ function ClientRow({
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <Link
-              href={`/app/performance/brands/${brand.slug ?? brand.id}`}
+              href={`/app/performance/clients/${brand.slug ?? brand.id}`}
               className="text-[15px] font-semibold hover:underline"
             >
               {brand.name}
@@ -202,7 +202,7 @@ function ClientRow({
               url={brand.intakeUrl}
               viewHref={
                 intake
-                  ? `/app/performance/brands/${brand.slug ?? brand.id}#submission`
+                  ? `/app/performance/clients/${brand.slug ?? brand.id}#submission`
                   : undefined
               }
               viewLabel="View submission"

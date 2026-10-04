@@ -28,7 +28,7 @@ export function BookingTargetPicker({
   const router = useRouter();
   const pathname = usePathname();
   const manageHref = pathname.startsWith("/app/performance/")
-    ? `/app/performance/brands/${brandSlug}/booking`
+    ? `/app/performance/clients/${brandSlug}/booking`
     : `/app/brands/${brandSlug}/homes`;
   const [selected, setSelected] = useState(targetId ?? "none");
   const targets = useQuery(

@@ -5,7 +5,7 @@ export function campaignListPath(
   workspace: CampaignWorkspace = "brand",
 ) {
   return workspace === "performance"
-    ? `/app/performance/brands/${encodeURIComponent(brandSlug)}/campaigns`
+    ? `/app/performance/clients/${encodeURIComponent(brandSlug)}/campaigns`
     : `/app/brands/${encodeURIComponent(brandSlug)}/ads`;
 }
 

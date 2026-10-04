@@ -191,7 +191,7 @@ export function HomesStrip({
                 it, so zooming is a control ON the card rather than the whole
                 point of it. Siblings, so no interactive nests in another. */}
               <Link
-                href={`/app/performance/brands/${brandSlug ?? brandId}/homes/${home.id}`}
+                href={`/app/performance/clients/${brandSlug ?? brandId}/homes/${home.id}`}
                 className="block"
               >
                 <span className="relative block">

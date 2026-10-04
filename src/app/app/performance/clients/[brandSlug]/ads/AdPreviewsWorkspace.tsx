@@ -120,7 +120,7 @@ export function AdPreviewsWorkspace({
           `${result.attached} ad${result.attached === 1 ? "" : "s"} now in ${result.campaignName}.`,
         );
         router.push(
-          `/app/performance/brands/${brandSlug}/campaigns/${result.campaignId}`,
+          `/app/performance/clients/${brandSlug}/campaigns/${result.campaignId}`,
         );
       },
       onError: (error) => toast.error(error.message),

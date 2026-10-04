@@ -139,7 +139,7 @@ export default async function PerformanceBrandAdsPage({
           ) : null}
           <Link
             className="text-sm underline"
-            href={`/app/performance/brands/${slug}/campaigns`}
+            href={`/app/performance/clients/${slug}/campaigns`}
           >
             View campaign ads
           </Link>

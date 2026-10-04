@@ -37,7 +37,7 @@ export function BrandTabs({ slug }: { slug: string }) {
       nav.scrollLeft += tab.left - strip.left - (strip.width - tab.width) / 2;
     }
   }, [pathname]);
-  const base = `/app/performance/brands/${slug}`;
+  const base = `/app/performance/clients/${slug}`;
   return (
     <nav
       ref={navRef}

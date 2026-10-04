@@ -51,7 +51,7 @@ export default async function PerformanceBrandNewslettersPage({
       <NewslettersView
         brands={[{ id: brand.id, name: brand.name, slug: brand.slug }]}
         brand={{ id: brand.id, name: brand.name, slug: brand.slug }}
-        basePath={`/app/performance/brands/${slug}/newsletters`}
+        basePath={`/app/performance/clients/${slug}/newsletters`}
         kindFilter={kind}
         view={view === "wall" || view === "read" ? view : "list"}
       />

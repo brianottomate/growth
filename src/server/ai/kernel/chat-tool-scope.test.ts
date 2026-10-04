@@ -29,7 +29,7 @@ const tools = Object.fromEntries(
 test("catalog pages show catalog actions and can explicitly enable a different domain", async () => {
   const scope = createChatToolScope({
     tools,
-    pagePath: "/app/performance/brands/cabins/catalog",
+    pagePath: "/app/performance/clients/cabins/catalog",
     continuation: { id: "u", role: "user", parts: [] },
   });
   expect(scope.activeTools()).toContain("adsWrite__editCatalogCard");

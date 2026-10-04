@@ -27,7 +27,7 @@ test("brand reads and status receipts preserve enriched home amenities", () => {
       brandId: "brand",
       changed: ["pipelineStage"],
       ok: true,
-      path: "/app/performance/brands/client",
+      path: "/app/performance/clients/client",
       settings,
     });
     const read = getBrandOutputSchema.parse({

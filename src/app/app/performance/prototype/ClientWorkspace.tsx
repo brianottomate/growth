@@ -137,7 +137,7 @@ export function ClientWorkspace({ data }: { data: WorkspaceData }) {
             </a>
           ) : null}
           <ButtonLink
-            href={`/app/performance/brands/${brand.slug}/ads`}
+            href={`/app/performance/clients/${brand.slug}/ads`}
             size="sm"
           >
             Open in the real Ads desk

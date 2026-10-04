@@ -118,7 +118,7 @@ export async function PlatformCampaignView({
           <Link
             href={
               workspace === "performance"
-                ? `/app/performance/brands/${brandSlug}`
+                ? `/app/performance/clients/${brandSlug}`
                 : `/app/brands/${brandSlug}`
             }
             className="hover:underline"

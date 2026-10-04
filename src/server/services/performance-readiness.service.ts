@@ -218,10 +218,10 @@ export function readinessLinks(
   const slug = brand.slug ?? brand.id;
   return {
     intake: brand.intakeUrl,
-    connect: `/app/performance/brands/${slug}#submission`,
-    homes: `/app/performance/brands/${slug}/wanderos`,
-    draw: `/app/performance/brands/${slug}/ads`,
-    mark: `/app/performance/brands/${slug}/setup#brand-mark`,
-    ads: `/app/performance/brands/${slug}/campaigns`,
+    connect: `/app/performance/clients/${slug}#submission`,
+    homes: `/app/performance/clients/${slug}/wanderos`,
+    draw: `/app/performance/clients/${slug}/ads`,
+    mark: `/app/performance/clients/${slug}/setup#brand-mark`,
+    ads: `/app/performance/clients/${slug}/campaigns`,
   };
 }

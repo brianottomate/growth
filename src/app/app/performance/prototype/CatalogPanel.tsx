@@ -1,6 +1,6 @@
 "use client";
 
-import { CatalogCards } from "../brands/[brandSlug]/catalog/CatalogCards";
+import { CatalogCards } from "../clients/[brandSlug]/catalog/CatalogCards";
 
 import type { WorkspaceHome } from "./ClientWorkspace";
 

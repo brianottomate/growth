@@ -45,7 +45,7 @@ export function performanceCardFromBrand(brand: {
     name: brand.name,
     logo: brand.logo,
     website: brand.website,
-    href: `/app/performance/brands/${brand.slug ?? brand.id}`,
+    href: `/app/performance/clients/${brand.slug ?? brand.id}`,
     stage: pipelineStage({
       relationship: brand.relationship,
       pipelineStage: brand.settings?.pipelineStage,

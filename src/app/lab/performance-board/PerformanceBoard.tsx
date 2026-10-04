@@ -9,12 +9,12 @@ import { AtlasContext } from "./atlas-context";
 function sourceHref(path: string, group: string, slug: string) {
   if (path.includes("{")) return null;
   if (group === "client" || group === "detail")
-    return `/app/performance/brands/${encodeURIComponent(slug)}${path}`;
+    return `/app/performance/clients/${encodeURIComponent(slug)}${path}`;
   return path || null;
 }
 
 export function PerformanceBoard() {
-  const [slug, setSlug] = useState("chalets-hh");
+  const [slug, setSlug] = useState("porchlit-properties");
   return (
     <main className="flex h-dvh flex-col bg-background text-foreground">
       <header className="shrink-0 border-b px-8 py-6">
@@ -41,8 +41,8 @@ export function PerformanceBoard() {
           </label>
         </div>
         <p className="mt-3 text-sm text-muted-foreground">
-          A place to think together about surfaces, navigation, and what belongs
-          where.
+          Current client navigation and workflow responsibilities, alongside
+          planning notes for what comes next.
         </p>
         <Link
           href="/lab/performance-board/pipeline"
@@ -105,14 +105,12 @@ export function PerformanceBoard() {
             >
               <h2 className="text-lg font-semibold">00 · Dashboard</h2>
               <article className="mt-4 rounded-xl border bg-card p-3">
-                <h3 className="font-semibold">
-                  Client journey · implemented locally
-                </h3>
+                <h3 className="font-semibold">Client journey · implemented</h3>
                 <span className="mt-2 inline-flex rounded-full border px-2 py-0.5 text-[10px]">
                   Human
                 </span>
                 <p className="mt-2 text-muted-foreground">
-                  Overview now shows the shared journey: Prospects → Signed →
+                  Dashboard shows the shared journey: Prospects → Signed →
                   Onboarding → Launch prep → First month → Ongoing, with On hold
                   separate. First month means initial launch and settling in,
                   selected by the team. Stages are manual and chat-driven;
@@ -128,12 +126,10 @@ export function PerformanceBoard() {
                 </Link>
               </article>
               <article className="mt-3 rounded-xl border bg-card p-3">
-                <h3 className="font-semibold">
-                  Card views · implemented locally
-                </h3>
+                <h3 className="font-semibold">Card views · implemented</h3>
                 <p className="mt-2 text-muted-foreground">
                   All, Commercial, Creative, and Delivery filter details on the
-                  same journey. Choose Compact, Summary, or Milestones per card,
+                  same journey. Choose Compact, Overview, or Detailed per card,
                   or apply a detail mode to every card. Search finds clients or
                   sites, and journey columns can be collapsed.
                 </p>
@@ -286,9 +282,10 @@ export function PerformanceBoard() {
               <h2 className="text-xl font-semibold">02 · Brand setup</h2>
               <p className="mt-2 text-muted-foreground">Mikayla</p>
               <p className="mt-2 text-sm text-muted-foreground">
-                Sil or Kristian prepares the brand. Assume WanderOS is
-                connected. Client intake can arrive along the way; billing is a
-                separate workflow to map later.
+                Sil or Kristian prepares the shared creative foundations here.
+                Homes and destinations live in WanderOS; connection and sync
+                controls live in Settings. Client intake is reviewed on
+                Overview.
               </p>
               <AtlasContext journey="setup" slug={slug} />
               <div className="mt-4 space-y-2">
@@ -298,20 +295,12 @@ export function PerformanceBoard() {
                     "Branding is a readout of the initial Firecrawl enrichment. The brand mark defines how the identity appears in creative.",
                   ],
                   [
-                    "Story, markets & personas",
-                    "Generated separately today. Proposed: a fuller enrichment workflow that runs these together, alongside the existing light scrape.",
+                    "Brand story & personas",
+                    "Write the brand story and define guest personas. Direct workflows save starter context; Shape supports discussion and refinement. Seed lists remain with personas.",
                   ],
                   [
-                    "Hero & visual check",
-                    "Choose a representative home, set heading and body fonts, then inspect the brand mark and typography across starter ad formats.",
-                  ],
-                  [
-                    "Home groups & booking targets",
-                    "Setup links to the separate Homes & targets workspace. Reusable groups and stay-date links can be explicitly attached to campaigns.",
-                  ],
-                  [
-                    "Featured homes & inventory",
-                    "Select starting homes from the inventory. Individual home workbenches contain photos and creative details; their contents need a closer review.",
+                    "Brand preview & typography",
+                    "Choose a general brand image from the website, library or home photos. Check heading/body fonts and the creative mark. The image does not select a representative home or import property facts.",
                   ],
                 ].map(([title, description]) => (
                   <article
@@ -319,18 +308,6 @@ export function PerformanceBoard() {
                     className="rounded-xl border bg-card p-4"
                   >
                     <h3 className="font-semibold">{title}</h3>
-                    {[
-                      "Hero & visual check",
-                      "Home groups & booking targets",
-                      "Featured homes & inventory",
-                    ].includes(title ?? "") ? (
-                      <span className="mt-2 inline-flex rounded-full border bg-accent px-2 py-0.5 text-[10px] font-medium text-accent-foreground">
-                        WanderOS ·{" "}
-                        {title === "Home groups & booking targets"
-                          ? "required for booking targets"
-                          : "home feed"}
-                      </span>
-                    ) : null}
                     <p className="mt-2 text-sm leading-6 text-muted-foreground">
                       {description}
                     </p>
@@ -339,21 +316,12 @@ export function PerformanceBoard() {
               </div>
               <div className="mt-4 space-y-2 text-sm">
                 <aside className="rounded-xl border border-dashed p-4">
-                  <h3 className="font-medium">Observation · possible move</h3>
+                  <h3 className="font-medium">Current split</h3>
                   <p className="mt-2 text-muted-foreground">
-                    Client page activity currently lives in Setup. Consider
-                    Overview or Pitch instead. Capture the idea here; no
-                    navigation changes yet.
-                  </p>
-                </aside>
-                <aside className="rounded-xl border border-dashed p-4">
-                  <h3 className="font-medium">Clarify targets</h3>
-                  <p className="mt-2 text-muted-foreground">
-                    A booking target selects homes, dates, or both and builds a
-                    storefront link. Groups and featured selections can also use
-                    manually added homes. The automatic home feed and
-                    booking-target links depend on WanderOS. This is not a live
-                    availability report; the booking site handles availability.
+                    Overview holds account facts, observed launch progress,
+                    intake, contacts and media. Setup holds identity, story and
+                    personas. Extra holds client page activity until it has a
+                    permanent home.
                   </p>
                 </aside>
                 <aside className="rounded-xl border border-dashed p-4">
@@ -365,6 +333,58 @@ export function PerformanceBoard() {
                   </p>
                 </aside>
               </div>
+            </section>
+            <section
+              aria-label="WanderOS: homes and destinations"
+              className="rounded-2xl border bg-background/60 p-6"
+            >
+              <h2 className="text-xl font-semibold">02b · WanderOS</h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Prepare the property context used by Catalog and Campaigns. The
+                tab owns homes and destinations; Settings owns connection and
+                sync.
+              </p>
+              <AtlasContext journey="wanderos" slug={slug} />
+              <div className="mt-4 space-y-2">
+                {[
+                  [
+                    "Featured homes & groups",
+                    "Choose the homes that lead advertising and creative. Starter recommendations add to the current featured set; reusable groups organize other selections.",
+                  ],
+                  [
+                    "Destinations",
+                    "Group home locations into destinations that inform copy and campaign targeting. Guest personas remain in Setup.",
+                  ],
+                  [
+                    "Booking targets",
+                    "Choose homes, stay dates, or both to build reusable storefront destinations. Apply them explicitly to campaigns or ads; the booking site handles availability.",
+                  ],
+                  [
+                    "All homes & workbenches",
+                    "Browse the inventory, feature homes, and open an individual home for photos and booking context. Manually added homes can also be grouped.",
+                  ],
+                ].map(([title, description]) => (
+                  <article
+                    key={title}
+                    className="rounded-xl border bg-card p-4"
+                  >
+                    <h3 className="font-semibold">{title}</h3>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      {description}
+                    </p>
+                  </article>
+                ))}
+              </div>
+              <aside className="mt-4 rounded-xl border border-dashed p-4">
+                <h3 className="font-medium">Connection & sync</h3>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Configure the WanderOS booking site and refresh the home feed
+                  in Settings. Legacy Homes and Booking routes redirect to this
+                  tab. Automatic feed and booking links depend on WanderOS;
+                  selection does not establish live availability or launch a
+                  campaign.
+                </p>
+              </aside>
             </section>
             <section
               aria-label="Workflow three: catalog"
@@ -386,7 +406,7 @@ export function PerformanceBoard() {
                   ],
                   [
                     "Choose the catalog card",
-                    "Start in Studio with the catalog card selector at the top. The current page defaults to a list of home cards; a grid view is also available.",
+                    "Start in Catalog with the card template selector at the top. Work from the list of home cards or switch to the grid view.",
                   ],
                   [
                     "Work through each home",
@@ -478,7 +498,7 @@ export function PerformanceBoard() {
                 steps: [
                   [
                     "Booking targets · WanderOS",
-                    "Attach a reusable homes/dates booking target as the campaign’s fallback destination for Meta and Google. Existing ad-specific links are preserved. Manage targets in Homes & targets; this is not an availability report.",
+                    "Attach a reusable homes/dates booking target as the campaign’s fallback destination for Meta and Google. Existing ad-specific links are preserved. Manage targets in WanderOS; this is not an availability report.",
                   ],
                   [
                     "Ads · inline studio",
@@ -505,7 +525,7 @@ export function PerformanceBoard() {
                 steps: [
                   [
                     "Marketing domain & setup",
-                    "The Email page combines marketing email domain connection and setup with email production. Map Brian’s sender, DNS, and audience workflow.",
+                    "The Email page combines sender/domain setup and email production, with warehouse-backed audience preparation. Lifecycle planning stays separate.",
                   ],
                   [
                     "Plan & style marketing emails",

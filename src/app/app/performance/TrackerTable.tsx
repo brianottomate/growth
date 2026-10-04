@@ -95,7 +95,7 @@ export function TrackerTable({
                 {row.slug ? (
                   <Link
                     className="inline-flex min-h-11 items-center hover:underline"
-                    href={`/app/performance/brands/${row.slug}/settings`}
+                    href={`/app/performance/clients/${row.slug}/settings`}
                   >
                     {row.name}
                   </Link>
@@ -202,7 +202,7 @@ export function TrackerTable({
                   <span className="flex items-center justify-between gap-3">
                     {row.slug ? (
                       <Link
-                        href={`/app/performance/brands/${row.slug}/settings`}
+                        href={`/app/performance/clients/${row.slug}/settings`}
                         className="hover:underline"
                       >
                         {row.name}

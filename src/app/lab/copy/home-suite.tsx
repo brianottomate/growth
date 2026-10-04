@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { CatalogCollectionPreview } from "@/app/app/performance/brands/[brandSlug]/catalog/CatalogPreview";
+import { CatalogCollectionPreview } from "@/app/app/performance/clients/[brandSlug]/catalog/CatalogPreview";
 import { AdMock } from "@/components/ad-mock";
 import {
   ideaPreviewUrl,

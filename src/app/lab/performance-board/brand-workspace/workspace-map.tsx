@@ -69,9 +69,9 @@ export function WorkspaceMap() {
           </span>
         </div>
         <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-          A proposed split for discussing what belongs where. All columns are
-          visible together; scroll sideways to compare. Summit Stays and every
-          fact below are illustrative.
+          The current client-tab split, illustrated with example data. All
+          columns are visible together; scroll sideways to compare. Summit Stays
+          and every fact below are illustrative.
         </p>
       </header>
       <div className="min-h-0 flex-1 overflow-auto bg-muted/20 p-6">
@@ -92,7 +92,7 @@ export function WorkspaceMap() {
         <div className="flex w-max items-start gap-4">
           <Column
             title="Overview"
-            purpose="The brand’s home. Understand the client and where things stand."
+            purpose="Account summary, observed readiness, submission, contacts and media."
           >
             <Block title="At a glance">
               <div className="grid grid-cols-2 gap-3">
@@ -102,26 +102,16 @@ export function WorkspaceMap() {
                 <Fact label="Meta">Not recorded</Fact>
               </div>
             </Block>
-            <Block title="The brand in a few lines">
-              <p>
-                Room to reconnect. Thoughtful mountain homes for families and
-                friends who want a slower stay, with trails nearby and space to
-                gather.
-              </p>
-              <Fact label="Voice">Warm, specific, quietly confident</Fact>
-              <div className="flex gap-2" aria-label="Brand palette">
-                <span className="size-6 rounded-full border bg-[#28443b]" />
-                <span className="size-6 rounded-full border bg-[#e8dfcc]" />
-                <span className="size-6 rounded-full border bg-[#b47c54]" />
-              </div>
-            </Block>
-            <Block title="Markets & guests">
-              <Fact label="Markets">Blue Ridge · Smoky Mountains</Fact>
-              <Fact label="Personas">
-                Families reconnecting · Friends on a long weekend
+            <Block title="Launch checklist">
+              <Fact label="Observed progress">
+                Onboarding · Creative · Launch
               </Fact>
-              <p className="text-xs">
-                A concise readout of the same context prepared in Setup.
+              <Fact label="Suggested next action">
+                Review the submitted intake
+              </Fact>
+              <p>
+                Progress follows app records. It does not move the client’s
+                manual journey stage.
               </p>
             </Block>
             <Block title="Client intake">
@@ -149,7 +139,13 @@ export function WorkspaceMap() {
             </Block>
             <Block title="Client context">
               <Fact label="Client contact">Alex · example contact</Fact>
-              <Fact label="Pitch engagement">Viewed · example activity</Fact>
+              <Fact label="CRM contacts">
+                Linked HubSpot company and contacts
+              </Fact>
+            </Block>
+            <Block title="Media library">
+              <Fact label="Assets">Photos and saved creative previews</Fact>
+              <p>Open Studio or the library to continue production.</p>
             </Block>
           </Column>
           <Column
@@ -164,8 +160,8 @@ export function WorkspaceMap() {
                 Serif headings · clean sans-serif body
               </Fact>
               <Fact label="Visual check">
-                Representative cabin selected for checking the brand mark and
-                starter formats
+                General brand image selected for checking the mark and fonts; no
+                representative home or property facts implied
               </Fact>
             </Block>
             <Block title="Story & positioning">
@@ -175,12 +171,11 @@ export function WorkspaceMap() {
               </p>
               <Fact label="Preparation">Draft ready for team review</Fact>
               <p className="text-xs">
-                Refine the story here. Overview carries the summary; Studio uses
-                the context.
+                Refine the story here; creative workflows use the shared
+                context.
               </p>
             </Block>
-            <Block title="Markets & personas">
-              <Fact label="Supply markets">Blue Ridge · Smoky Mountains</Fact>
+            <Block title="Personas & seed lists">
               <Fact label="Guest motivations">
                 Togetherness · Easy outdoor access · Space and privacy
               </Fact>
@@ -191,22 +186,15 @@ export function WorkspaceMap() {
                 Brand-level context. Campaign targeting is chosen separately.
               </p>
             </Block>
-            <Block title="Connections">
-              <Fact label="WanderOS">Connected · home source available</Fact>
-              <Fact label="Email DNS">Not recorded</Fact>
-              <p className="text-xs">
-                Connection readiness stays separate from creative approval and
-                live delivery.
-              </p>
-            </Block>
             <p className="px-1 text-xs leading-5 text-muted-foreground">
-              Story, markets, and personas are expected preparation. Only the
-              inputs needed for a particular task should block that task.
+              Identity, story and personas inform creative. Only the inputs
+              needed for a particular task should block that task. Destinations
+              live in WanderOS.
             </p>
           </Column>
           <Column
-            title="Homes & targets"
-            purpose="Maintain the inventory and reusable destinations that production draws from."
+            title="WanderOS"
+            purpose="Featured homes, groups, destinations, booking targets and inventory."
           >
             <Block title="Home inventory">
               <Fact label="Source">WanderOS · 12 example homes</Fact>
@@ -223,6 +211,10 @@ export function WorkspaceMap() {
               <Fact label="Family escapes">
                 4 homes · space for larger groups
               </Fact>
+            </Block>
+            <Block title="Destinations">
+              <Fact label="Destinations">Blue Ridge · Smoky Mountains</Fact>
+              <p>Group home locations for creative and campaign planning.</p>
             </Block>
             <Block title="Booking targets">
               <Fact label="Autumn mountain stays">
@@ -259,33 +251,6 @@ export function WorkspaceMap() {
             </Block>
           </Column>
           <Column
-            title="Ad studio"
-            purpose="Turn shared brand context into creative, before deciding how it runs."
-          >
-            <Block title="Creative brief">
-              <Fact label="Brand idea">Room to reconnect</Fact>
-              <Fact label="Guest">Families reconnecting</Fact>
-              <Fact label="Homes">Family escapes group</Fact>
-              <p className="text-xs">
-                Story, markets, personas, and identity inform the work here.
-              </p>
-            </Block>
-            <Block title="Ad creative">
-              <Fact label="Concept">
-                Trade the group chat for a weekend together.
-              </Fact>
-              <Fact label="Production">
-                Copy · photos · composition · size variants
-              </Fact>
-              <Fact label="Status">In review</Fact>
-            </Block>
-            <div className="flex items-center gap-2 rounded-xl border border-dashed p-4 text-xs text-muted-foreground">
-              Approved creative{" "}
-              <ArrowRight className="size-3.5" aria-hidden="true" /> campaign
-              selection
-            </div>
-          </Column>
-          <Column
             title="Campaigns"
             purpose="Choose the goal, creative, destination, and targeting; manage launch and delivery."
           >
@@ -318,6 +283,83 @@ export function WorkspaceMap() {
               <p>
                 Use the same Studio tools for campaign-specific edits. Keep
                 reusable production and delivery decisions distinct.
+              </p>
+            </Block>
+          </Column>
+          <Column
+            title="Email"
+            purpose="Sender setup, newsletter production and email audiences."
+          >
+            <Block title="Sender & DNS">
+              <Fact label="Readiness">Not recorded</Fact>
+              <p>Connect the sender and verify its marketing domain.</p>
+            </Block>
+            <Block title="Newsletters & audiences">
+              <p>
+                Plan and preview newsletters; prepare warehouse-backed audience
+                snapshots for email work.
+              </p>
+            </Block>
+          </Column>
+          <Column
+            title="Settings"
+            purpose="Connection controls, home sync, access and commercial inputs."
+          >
+            <Block title="WanderOS connection & sync">
+              <Fact label="Connection">Connected · example site</Fact>
+              <p>Configure the booking site and refresh the home feed here.</p>
+            </Block>
+            <Block title="Access & commercial settings">
+              <p>
+                Account connection links, ad-account access, recorded terms and
+                applied intake values.
+              </p>
+            </Block>
+          </Column>
+          <Column
+            title="Ad studio"
+            purpose="Turn shared brand context into creative, before deciding how it runs."
+          >
+            <Block title="Creative brief">
+              <Fact label="Brand idea">Room to reconnect</Fact>
+              <Fact label="Guest">Families reconnecting</Fact>
+              <Fact label="Homes">Family escapes group</Fact>
+              <p className="text-xs">
+                Story, destinations, personas, and identity inform the work
+                here.
+              </p>
+            </Block>
+            <Block title="Ad creative">
+              <Fact label="Concept">
+                Trade the group chat for a weekend together.
+              </Fact>
+              <Fact label="Production">
+                Copy · photos · composition · size variants
+              </Fact>
+              <Fact label="Status">In review</Fact>
+            </Block>
+            <div className="flex items-center gap-2 rounded-xl border border-dashed p-4 text-xs text-muted-foreground">
+              Approved creative{" "}
+              <ArrowRight className="size-3.5" aria-hidden="true" /> campaign
+              selection
+            </div>
+          </Column>
+          <Column title="Pitch" purpose="Prepare the client-facing sales page.">
+            <Block title="Pitch editor">
+              <p>
+                Refine the pitch, choose media and inspect the visual preview.
+              </p>
+            </Block>
+          </Column>
+          <Column
+            title="Extra"
+            purpose="Additional tools awaiting a permanent home."
+          >
+            <Block title="Client page activity">
+              <Fact label="Example activity">Pitch viewed</Fact>
+              <p>
+                Activity is currently here, separate from brand preparation in
+                Setup.
               </p>
             </Block>
           </Column>

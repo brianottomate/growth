@@ -14,8 +14,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { toast } from "@/components/ui/toast";
 import type { BrandIdentity, BrandMark } from "@/server/db/brand-schema";
 import { orpc } from "@/orpc/client";
-import { ShapeBrandButton } from "@/app/app/performance/brands/[brandSlug]/ShapeBrandButton";
-import { BrandPreviewCard } from "@/app/app/performance/brands/[brandSlug]/BrandPreviewCard";
+import { ShapeBrandButton } from "@/app/app/performance/clients/[brandSlug]/ShapeBrandButton";
+import { BrandPreviewCard } from "@/app/app/performance/clients/[brandSlug]/BrandPreviewCard";
 import {
   BrandPreviewImagePicker,
   type PreviewImageOption,

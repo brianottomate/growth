@@ -169,7 +169,7 @@ export function BrandCard({
           )}
           {readiness && brand.slug && (
             <Link
-              href={`/app/performance/brands/${brand.slug}`}
+              href={`/app/performance/clients/${brand.slug}`}
               className={TAB}
             >
               Performance
@@ -370,7 +370,7 @@ function ReadinessChecklist({
   const done = items.filter((i) => i.done);
   const missing = items.filter((i) => !i.done);
   const fixHref = slug
-    ? `/app/performance/brands/${slug}`
+    ? `/app/performance/clients/${slug}`
     : "/app/performance/clients";
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">

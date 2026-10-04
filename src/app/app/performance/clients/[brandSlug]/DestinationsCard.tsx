@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 import type { BrandMarkets, Market } from "@/lib/markets";
 import { orpc } from "@/orpc/client";
-import { MarketDetails } from "./brand-content";
+import { DestinationDetails } from "./brand-content";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ShapeBrandButton } from "./ShapeBrandButton";
 
@@ -20,7 +20,7 @@ import { ShapeBrandButton } from "./ShapeBrandButton";
  * redrafts to overwrite. Only the label and towns change a card; the rest is
  * context for the prompts.
  */
-export function MarketsCard({
+export function DestinationsCard({
   brandId,
   brandName,
   markets,
@@ -92,7 +92,10 @@ export function MarketsCard({
   return (
     <section className="space-y-3 rounded-xl border p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <h2 className="text-base font-semibold">Destinations</h2>
+        <h2 className="flex items-center gap-2 text-base font-semibold">
+          <MapPin className="size-4 text-muted-foreground" />
+          Destinations
+        </h2>
         <div className="flex flex-wrap items-center gap-2">
           {draft ? (
             <>
@@ -117,10 +120,6 @@ export function MarketsCard({
           )}
         </div>
       </div>
-      <p className="text-xs text-muted-foreground">
-        Group the brand’s home locations into destinations that inform copy and
-        campaign targeting.
-      </p>
       {list.length ? (
         <div className="space-y-4">
           {list.map((market, index) => (
@@ -135,7 +134,7 @@ export function MarketsCard({
               ) : (
                 <p className="font-medium">{market.label}</p>
               )}
-              <MarketDetails market={market} homes={homesIn(market)} />
+              <DestinationDetails market={market} homes={homesIn(market)} />
             </div>
           ))}
         </div>

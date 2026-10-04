@@ -69,7 +69,7 @@ export function AddHomesByHand({
               className="flex items-center justify-between gap-3 rounded-xl border bg-card px-3 py-2.5"
             >
               <Link
-                href={`/app/performance/brands/${brandSlug}/homes/${home.id}`}
+                href={`/app/performance/clients/${brandSlug}/homes/${home.id}`}
                 className="min-w-0"
               >
                 <div className="truncate text-xs font-medium hover:underline">

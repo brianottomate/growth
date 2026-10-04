@@ -3,7 +3,7 @@
 `/app/performance/pitch?q=company` is the bookmarkable sales entrance. It searches
 prospect/client brands first, then reuses the existing leads search (including
 mirrored HubSpot companies). Choosing a lead creates/reuses a prospect and opens
-`/app/performance/brands/[brandSlug]/pitch`; enrichment runs in the background.
+`/app/performance/clients/[brandSlug]/pitch`; enrichment runs in the background.
 The existing Prospects page and each brand's Pitch tab also link to the editor.
 This does not add live HubSpot search or CRM writes.
 

@@ -1,5 +1,5 @@
 "use client";
-import { useState, type ReactNode } from "react";
+import { useState, type ReactNode, type ComponentProps } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -31,6 +31,8 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/toast";
 import { orpc } from "@/orpc/client";
+import { ShapeBrandButton } from "@/app/app/performance/clients/[brandSlug]/ShapeBrandButton";
+import { PickedHomes } from "@/app/app/performance/clients/[brandSlug]/PickedHomes";
 
 type Home = {
   id: string;
@@ -57,14 +59,16 @@ type Target = {
 export function HomeGroupsWorkspace({
   brandId,
   brandSlug,
-  featuredContent,
+  brandName,
+  featuredHomes,
   betweenSections,
   setupHref = `/app/brands/${brandSlug}/setup`,
 }: {
   brandId: string;
   brandSlug: string;
+  brandName: string;
   setupHref?: string;
-  featuredContent?: ReactNode;
+  featuredHomes?: ComponentProps<typeof PickedHomes>;
   betweenSections?: ReactNode;
 }) {
   const client = useQueryClient();
@@ -90,100 +94,133 @@ export function HomeGroupsWorkspace({
   const data = context.data;
   if (!data) return null;
   return (
-    <div className="space-y-8">
-      <section className="space-y-4">
+    <div className="space-y-4">
+      <section className="space-y-4 rounded-xl border p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold">Home groups</h2>
-          <Button onClick={() => setGroupEditor("new")}>New group</Button>
+          <h2 className="flex items-center gap-2 text-base font-semibold">
+            <Layers className="size-4 text-muted-foreground" />
+            Home groups{" "}
+            <span className="font-normal text-muted-foreground">
+              {data.groups.length}
+            </span>
+          </h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setGroupEditor("new")}
+            >
+              New group
+            </Button>
+            <ShapeBrandButton
+              brandId={brandId}
+              brandName={brandName}
+              section="home groups"
+            />
+          </div>
         </div>
-        <div className="grid grid-cols-1 gap-4 @3xl:grid-cols-2">
-          {data.groups.map((group) =>
-            group.kind === "featured" && featuredContent ? (
-              <div key={group.id} className="space-y-2 @3xl:col-span-2">
-                {featuredContent}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setGroupEditor(group)}
+        <div className="space-y-4">
+          {[...data.groups]
+            .sort(
+              (a, b) =>
+                Number(b.kind === "featured") - Number(a.kind === "featured"),
+            )
+            .map((group) =>
+              group.kind === "featured" && featuredHomes ? (
+                <div
+                  key={group.id}
+                  className="border-t pt-4 first:border-t-0 first:pt-0"
                 >
-                  Edit featured group
-                </Button>
-              </div>
-            ) : (
-              <div
-                key={group.id}
-                className="min-w-0 space-y-3 rounded-xl border bg-card p-4"
-              >
-                <div>
-                  <h3 className="font-medium [overflow-wrap:anywhere]">
-                    {group.name}
-                    {group.kind === "featured" && (
-                      <span className="ml-2 inline-block rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                        Default
+                  <PickedHomes
+                    {...featuredHomes}
+                    embedded
+                    groupActions={
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setGroupEditor(group)}
+                      >
+                        Edit group
+                      </Button>
+                    }
+                  />
+                </div>
+              ) : (
+                <div
+                  key={group.id}
+                  className="min-w-0 space-y-3 border-t pt-4 first:border-t-0 first:pt-0"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h3 className="text-base font-semibold [overflow-wrap:anywhere]">
+                      {group.name}
+                      <span className="ml-2 text-xs font-normal text-muted-foreground">
+                        {group.homeIds.length}{" "}
+                        {group.homeIds.length === 1 ? "home" : "homes"}
                       </span>
-                    )}
-                  </h3>
+                      {group.kind === "featured" && (
+                        <span className="ml-2 inline-block rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                          Default
+                        </span>
+                      )}
+                    </h3>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setGroupEditor(group)}
+                      >
+                        Edit group
+                      </Button>
+                      {group.kind === "custom" && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={remove.isPending}
+                          onClick={() => remove.mutate({ groupId: group.id })}
+                        >
+                          Delete group
+                        </Button>
+                      )}
+                    </div>
+                  </div>
                   {group.description && (
                     <p className="text-sm text-muted-foreground">
                       {group.description}
                     </p>
                   )}
-                </div>
-                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Layers className="size-3.5" />
-                  {group.homeIds.length}{" "}
-                  {group.homeIds.length === 1 ? "home" : "homes"}
-                </p>
-                <ol className="grid grid-cols-1 gap-2 @xl:grid-cols-2">
-                  {group.homeIds.slice(0, 4).map((id) => (
-                    <li key={id} className="min-w-0">
-                      <HomeSummary home={data.homes.find((h) => h.id === id)} />
-                    </li>
-                  ))}
-                </ol>
-                {group.homeIds.length > 4 && (
-                  <details className="text-sm">
-                    <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
-                      Show {group.homeIds.length - 4} more homes
-                    </summary>
-                    <ol className="mt-2 grid grid-cols-1 gap-2 @xl:grid-cols-2">
-                      {group.homeIds.slice(4).map((id) => (
-                        <li key={id} className="min-w-0">
-                          <HomeSummary
-                            home={data.homes.find((h) => h.id === id)}
-                          />
-                        </li>
-                      ))}
-                    </ol>
-                  </details>
-                )}
-                {!group.homeIds.length && (
-                  <p className="text-sm text-muted-foreground">
-                    No homes selected.
-                  </p>
-                )}
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setGroupEditor(group)}
-                  >
-                    Edit group
-                  </Button>
-                  {group.kind === "custom" && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled={remove.isPending}
-                      onClick={() => remove.mutate({ groupId: group.id })}
-                    >
-                      Delete group
-                    </Button>
+                  <ol className="grid grid-cols-1 gap-2 @xl:grid-cols-2">
+                    {group.homeIds.slice(0, 4).map((id) => (
+                      <li key={id} className="min-w-0">
+                        <HomeSummary
+                          home={data.homes.find((h) => h.id === id)}
+                        />
+                      </li>
+                    ))}
+                  </ol>
+                  {group.homeIds.length > 4 && (
+                    <details className="text-sm">
+                      <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                        Show {group.homeIds.length - 4} more homes
+                      </summary>
+                      <ol className="mt-2 grid grid-cols-1 gap-2 @xl:grid-cols-2">
+                        {group.homeIds.slice(4).map((id) => (
+                          <li key={id} className="min-w-0">
+                            <HomeSummary
+                              home={data.homes.find((h) => h.id === id)}
+                            />
+                          </li>
+                        ))}
+                      </ol>
+                    </details>
+                  )}
+                  {!group.homeIds.length && (
+                    <p className="text-sm text-muted-foreground">
+                      No homes selected.
+                    </p>
                   )}
                 </div>
-              </div>
-            ),
-          )}
+              ),
+            )}
         </div>
         {!data.homes.length && (
           <p className="text-sm text-muted-foreground">
@@ -193,20 +230,24 @@ export function HomeGroupsWorkspace({
         )}
       </section>
       {betweenSections}
-      <section id="booking-targets" className="space-y-4">
+      <section id="booking-targets" className="space-y-4 rounded-xl border p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold">Booking targets</h2>
+          <h2 className="flex items-center gap-2 text-base font-semibold">
+            <CalendarDays className="size-4 text-muted-foreground" />
+            Booking targets{" "}
+            <span className="font-normal text-muted-foreground">
+              {targets.data?.targets.length ?? 0}
+            </span>
+          </h2>
           <Button
+            size="sm"
+            variant="outline"
             disabled={!data.connected}
             onClick={() => setTargetEditor("new")}
           >
             New booking target
           </Button>
         </div>
-        <p className="text-sm text-muted-foreground">
-          Choose homes, dates, or both. Apply a target explicitly to a campaign
-          or draft ad; later edits leave reviewed URLs intact.
-        </p>
         {!data.connected && (
           <p className="text-sm">
             <Link className="underline" href={setupHref}>
@@ -216,6 +257,11 @@ export function HomeGroupsWorkspace({
           </p>
         )}
         {targets.error && <p role="alert">{targets.error.message}</p>}
+        {targets.data && !targets.data.targets.length && (
+          <p className="text-sm text-muted-foreground">
+            No booking targets yet.
+          </p>
+        )}
         {targets.data?.targets.map((target) => (
           <div key={target.id} className="space-y-2 rounded-xl border p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -349,6 +395,17 @@ function GroupEditor({
   const [name, setName] = useState(group?.name ?? "");
   const [description, setDescription] = useState(group?.description ?? "");
   const [ids, setIds] = useState(group?.homeIds ?? []);
+  const [search, setSearch] = useState("");
+  const query = search.trim().toLocaleLowerCase();
+  const orderedHomes = [
+    ...ids
+      .map((id) => homes.find((home) => home.id === id))
+      .filter((home): home is Home => Boolean(home)),
+    ...homes.filter((home) => !ids.includes(home.id)),
+  ];
+  const visibleHomes = orderedHomes.filter((home) =>
+    home.name.toLocaleLowerCase().includes(query),
+  );
   const save = useMutation({
     mutationFn: async () => {
       const result = await orpc.homeGroups.save.call({
@@ -392,13 +449,28 @@ function GroupEditor({
           onChange={(e) => setDescription(e.target.value)}
         />
       </div>
+      <div className="space-y-2">
+        <Label htmlFor="group-home-search">Find homes</Label>
+        <Input
+          id="group-home-search"
+          type="search"
+          placeholder="Search home names…"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+        <p className="text-xs text-muted-foreground" role="status">
+          {visibleHomes.length} of {homes.length} homes · {ids.length} selected
+        </p>
+      </div>
       <div className="max-h-64 space-y-2 overflow-y-auto">
-        {[
-          ...ids
-            .map((id) => homes.find((h) => h.id === id))
-            .filter((h): h is Home => Boolean(h)),
-          ...homes.filter((h) => !ids.includes(h.id)),
-        ].map((home) => {
+        {visibleHomes.length === 0 && (
+          <p className="py-4 text-sm text-muted-foreground">
+            {homes.length
+              ? "No homes match your search."
+              : "No homes in the inventory yet."}
+          </p>
+        )}
+        {visibleHomes.map((home) => {
           const index = ids.indexOf(home.id);
           return (
             <div key={home.id} className="flex items-center gap-2">

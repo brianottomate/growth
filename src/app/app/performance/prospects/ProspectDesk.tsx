@@ -75,7 +75,7 @@ export function ProspectDesk({
                 <div className="min-w-0 flex-1 basis-[calc(100%-3rem)] @3xl:basis-0">
                   <div className="flex flex-wrap items-baseline gap-x-2">
                     <Link
-                      href={`/app/performance/brands/${brand.slug ?? brand.id}`}
+                      href={`/app/performance/clients/${brand.slug ?? brand.id}`}
                       className="text-[13px] font-semibold hover:underline"
                     >
                       {brand.name}
@@ -106,7 +106,7 @@ export function ProspectDesk({
                 <div className="flex w-full flex-wrap items-center gap-3 @3xl:w-auto">
                   <Link
                     className="text-xs hover:underline"
-                    href={`/app/performance/brands/${brand.slug ?? brand.id}/pitch`}
+                    href={`/app/performance/clients/${brand.slug ?? brand.id}/pitch`}
                   >
                     Open pitch
                   </Link>

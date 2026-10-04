@@ -32,8 +32,8 @@ import {
 import { WorkspaceMap } from "./workspace-map";
 import {
   BrandStoryContent,
-  MarketDetails,
-} from "@/app/app/performance/brands/[brandSlug]/brand-content";
+  DestinationDetails,
+} from "@/app/app/performance/clients/[brandSlug]/brand-content";
 
 type Section = {
   id: string;
@@ -90,14 +90,14 @@ const sections: Section[] = [
   {
     id: "markets",
     group: "Brand foundations",
-    title: "Markets",
+    title: "Destinations",
     icon: MapPin,
     description:
-      "Group the brand’s home locations into markets that inform copy and campaign targeting.",
-    empty: "Turn home locations into useful markets",
+      "Group the brand’s home locations into destinations that inform copy and campaign targeting.",
+    empty: "Turn home locations into guest destinations",
     detail:
-      "Use the 12 available homes to draft and save an initial set of markets.",
-    action: "Define markets",
+      "Use the 12 available homes to draft and save an initial set of destinations.",
+    action: "Define destinations",
     result: ["Blue Ridge · 8 homes", "Smoky Mountains · 4 homes"],
     question:
       "Should we group nearby towns together, or keep each destination distinct?",
@@ -197,10 +197,10 @@ const sections: Section[] = [
     title: "Audiences",
     icon: Users,
     description:
-      "Define who this campaign should reach using guest origins, markets and trip motivations.",
+      "Define who this campaign should reach using guest origins, destinations and trip motivations.",
     empty: "Reach the right guests",
     detail:
-      "Broad targeting is available. Add an initial audience using the brand’s markets and booking history.",
+      "Broad targeting is available. Add an initial audience using the brand’s destinations and booking history.",
     action: "Add audience",
     result: [
       "Regional family trips · ages 30–65",
@@ -361,7 +361,7 @@ export function EmptyStatesFixture() {
                   return (
                     <div key={line} className="space-y-1.5 text-sm">
                       <p className="font-medium">{name}</p>
-                      <MarketDetails
+                      <DestinationDetails
                         market={{
                           id: String(index),
                           label: name ?? line,
@@ -461,9 +461,9 @@ export function EmptyStatesFixture() {
           </div>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
             One workflow to create a starting point. One conversation to shape
-            it together. Story and markets share their content rendering with
-            the workspace. Other filled sections remain examples. Every change
-            stays in this fixture.
+            it together. Story and destinations share their content rendering
+            with the workspace. Other filled sections remain examples. Every
+            change stays in this fixture.
           </p>
         </div>
       </header>

@@ -32,7 +32,11 @@ export default async function HomeGroupsPage({
         Reusable home groups for {brand.name}. Featured homes is your default
         selection.
       </p>
-      <HomeGroupsWorkspace brandId={brand.id} brandSlug={brandSlug} />
+      <HomeGroupsWorkspace
+        brandId={brand.id}
+        brandName={brand.name}
+        brandSlug={brandSlug}
+      />
     </div>
   );
 }

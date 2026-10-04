@@ -1,5 +1,5 @@
 import { HomeGroupsWorkspace } from "@/app/app/brands/[brandSlug]/homes/HomeGroupsWorkspace";
-import { MarketsCard } from "../MarketsCard";
+import { DestinationsCard } from "../DestinationsCard";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
@@ -9,11 +9,11 @@ import {
   listBrandHomes,
 } from "@/server/services/homes.service";
 
-import { SectionLabel } from "../../../_components";
+import { House } from "lucide-react";
 import { HomeRowsGrid } from "../HomeRowsGrid";
 import { HomesStrip } from "../HomesStrip";
 import { AddHomesByHand } from "../AddHomesByHand";
-import { PickedHomes, type PickedHome } from "../PickedHomes";
+import { type PickedHome } from "../PickedHomes";
 import { brandTabHref, loadPerformanceBrand } from "../_data";
 import { ButtonLink } from "@/components/ui/button";
 
@@ -123,20 +123,6 @@ export default async function PerformanceWanderOsPage({
 
   return (
     <div className="space-y-4">
-      <div className="space-y-1">
-        <h2 className="text-lg font-semibold">WanderOS</h2>
-        <p className="text-sm text-muted-foreground">
-          Organize homes and destinations, and create booking targets for
-          campaigns.
-        </p>
-        <ButtonLink
-          size="sm"
-          variant="outline"
-          href={`${brandTabHref(slug, "settings")}#wanderos`}
-        >
-          Connection & sync settings
-        </ButtonLink>
-      </div>
       {inventory?.enrichmentError && (
         <p className="text-sm text-muted-foreground">
           {inventory.enrichmentError}
@@ -144,18 +130,17 @@ export default async function PerformanceWanderOsPage({
       )}
       <HomeGroupsWorkspace
         brandId={brand.id}
+        brandName={brand.name}
         brandSlug={slug}
         setupHref={`${brandTabHref(slug, "settings")}#wanderos`}
-        featuredContent={
-          <PickedHomes
-            brandId={brand.id}
-            brandName={brand.name}
-            brandSlug={slug}
-            picked={pickedHomes}
-          />
-        }
+        featuredHomes={{
+          brandId: brand.id,
+          brandName: brand.name,
+          brandSlug: slug,
+          picked: pickedHomes,
+        }}
         betweenSections={
-          <MarketsCard
+          <DestinationsCard
             brandId={brand.id}
             brandName={brand.name}
             markets={brand.markets ?? null}
@@ -171,12 +156,13 @@ export default async function PerformanceWanderOsPage({
       />
       <section className="space-y-3 rounded-xl border p-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <SectionLabel>
+          <h2 className="flex items-center gap-2 text-base font-semibold">
+            <House className="size-4 text-muted-foreground" />
             All homes
             {(rows.length || homes.length) > 0
               ? ` · ${rows.length || homes.length}`
               : ""}
-          </SectionLabel>
+          </h2>
           <div className="flex items-center gap-2">
             <ButtonLink
               href={brandTabHref(slug, "catalog")}

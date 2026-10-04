@@ -31,7 +31,7 @@ export async function notifyPerformanceIntakeSubmission(
       const brandName = escapeSlackMrkdwn(brand.name).replace(/@/g, "@\u200b");
       const micaela = envSelect({ prod: "<@U0574R1RCD9>", test: "Micaela" });
       const url = brand.slug
-        ? `${env.NEXT_PUBLIC_BASE_URL}/app/performance/brands/${encodeURIComponent(brand.slug)}#submission`
+        ? `${env.NEXT_PUBLIC_BASE_URL}/app/performance/clients/${encodeURIComponent(brand.slug)}#submission`
         : `${env.NEXT_PUBLIC_BASE_URL}/app/performance/clients`;
       const linkLabel = brand.slug ? "View submission" : "View clients";
       const timestamp = `<!date^${Math.floor(submittedAt.getTime() / 1000)}^{date_short_pretty} at {time}|${submittedAt.toISOString()}>`;

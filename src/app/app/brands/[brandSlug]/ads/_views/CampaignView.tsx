@@ -25,11 +25,11 @@ import { getDraftCampaign } from "@/server/services/ads-draft.service";
 import { brandListings } from "@/server/services/wanderos-listings.service";
 import { toWallAd, type AdState, type WallAd } from "@/lib/ad-wall";
 import { targetedAsset } from "@/lib/audience-asset";
-import { AddAdDialog } from "@/app/app/performance/brands/[brandSlug]/ads/AddAdDialog";
+import { AddAdDialog } from "@/app/app/performance/clients/[brandSlug]/ads/AddAdDialog";
 import { AdIdeasList } from "./AdIdeasList";
 import { AdTile } from "./AdWall";
 import { CampaignAssetsDrawer } from "./CampaignAssetsDrawer";
-import type { PickableHome } from "@/app/app/performance/brands/[brandSlug]/HomePicker";
+import type { PickableHome } from "@/app/app/performance/clients/[brandSlug]/HomePicker";
 
 import { AskAssistantButton } from "./AskAssistantButton";
 import { Audiences } from "./Audiences";

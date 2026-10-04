@@ -111,7 +111,7 @@ existing wall still shows story variants; `ai:contracts` green.
 
 ### PR 3. The matrix view
 
-`/app/performance/brands/[brandSlug]/ads` grows the matrix, or it becomes a
+`/app/performance/clients/[brandSlug]/ads` grows the matrix, or it becomes a
 sibling route if the wall must stay as is. Behaviour:
 
 - Loads homes from `?homes=` exactly like Continue to Ads; one row per home,
