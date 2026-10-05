@@ -756,27 +756,62 @@ const HOOK_PREPOSITIONS = new Set([
  * The place card's one headline: the hook and the place read as a single
  * statement, set on two lines that break where the sense does ("A 4-bedroom
  * villa sleeping 8" / "in Winter Park, CO"), never mid-phrase by character
- * count. A hook too long for one line wraps first and the place still takes
- * its own line. Exported so the art director is told the same breaks.
+ * count. A hook too long for its own line sets the whole statement on two
+ * balanced lines, smaller if it must; never three. Exported so the art
+ * director is told the same breaks.
  */
 export function placeStatement(
   spec: Pick<CompositionSpec, "title" | "formatId"> &
     Partial<Pick<CompositionSpec, "eyebrow">>,
 ) {
-  // Characters that fit one line at the card's headline size: the copy rules
-  // allow a 28-character lead, so a square card must hold it on one line.
-  const perLine = spec.formatId === "square" ? 30 : 28;
+  const perLine = placeLineCharacters(spec.formatId);
   const place = clamp(spec.title.trim(), 40);
   const hook = clamp(spec.eyebrow?.trim() ?? "", 60);
-  if (!hook) return wrapText(place, perLine);
+  if (!hook) return twoLines(place, perLine);
   const words = hook.split(/\s+/);
   const last = words.at(-1)?.toLowerCase() ?? "";
   const handover = HOOK_PREPOSITIONS.has(last) ? words.pop()! : null;
+  const lead = words.join(" ");
   const placeLine = handover ? `${handover} ${place}` : place;
-  return [
-    ...wrapText(words.join(" "), perLine),
-    ...wrapText(placeLine, perLine),
-  ].slice(0, 3);
+  // Break where the sense does, a little smaller if the lead runs long.
+  const widest = Math.floor(perLine / PLACE_MIN_SCALE);
+  if (lead.length <= widest && placeLine.length <= widest)
+    return [lead, placeLine];
+  // Too long even then: one statement on two balanced lines.
+  return twoLines(`${lead} ${placeLine}`, perLine);
+}
+
+/**
+ * Characters that fit one line at the place card's headline size: the copy
+ * rules allow a 28-character lead, so a square card must hold it on one line.
+ */
+function placeLineCharacters(formatId: CompositionSpec["formatId"]) {
+  return formatId === "square" ? 30 : 28;
+}
+
+/** The longest a line may run before the place card gives up shrinking. */
+const PLACE_MIN_SCALE = 0.75;
+
+/**
+ * Balanced lines, never more than two while the headline can shrink to fit:
+ * lines longer than `perLine` are drawn at a smaller size (placeHeadlineScale).
+ */
+function twoLines(value: string, perLine: number) {
+  const widest = Math.floor(perLine / PLACE_MIN_SCALE);
+  for (let width = perLine; width <= widest; width++) {
+    if (wrapText(value, width).length <= 2) return balancedLines(value, width);
+  }
+  return wrapText(value, widest);
+}
+
+/** How much a place headline shrinks so its longest line fits the card. */
+function placeHeadlineScale(
+  lines: readonly string[],
+  formatId: CompositionSpec["formatId"],
+) {
+  const longest = Math.max(...lines.map((line) => line.length));
+  const perLine = placeLineCharacters(formatId);
+  return longest > perLine ? Math.max(perLine / longest, PLACE_MIN_SCALE) : 1;
 }
 
 export function renderComposition(
@@ -1591,7 +1626,7 @@ export function renderComposition(
       spec.templateId === "catalog-destination" || headlineOnly;
     // A face set regular reads smaller than the house bold at the same size.
     const regular = context.headingWeight && context.headingWeight < 600;
-    const headlineSize = Math.round(
+    const baseHeadlineSize = Math.round(
       (headlineOnly ? 84 : destination ? 76 : amenities ? 68 : 60) *
         scale *
         (regular ? 1.3 : 1),
@@ -1599,9 +1634,14 @@ export function renderComposition(
     const statement = amenities
       ? balancedLines(
           clamp(spec.title, 90),
-          Math.round(((square ? 26 : 24) * 60 * scale) / headlineSize),
+          Math.round(((square ? 26 : 24) * 60 * scale) / baseHeadlineSize),
         )
       : placeStatement(spec);
+    const headlineSize = amenities
+      ? baseHeadlineSize
+      : Math.round(
+          baseHeadlineSize * placeHeadlineScale(statement, spec.formatId),
+        );
     const facts = headlineOnly ? "" : clamp(spec.subtitle, 80);
     // The amenities cards leave the rating out; the place variant leads its
     // pill row with the location instead.
