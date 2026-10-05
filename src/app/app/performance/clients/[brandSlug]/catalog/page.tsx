@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
@@ -44,5 +45,27 @@ export default async function PerformanceBrandCatalogPage({
     );
   }
 
-  return <CatalogCards brandId={brand.id} brandName={brand.name} />;
+  const path = `/app/performance/clients/${brand.slug ?? brand.id}`;
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2 text-sm">
+        <p className="text-muted-foreground">
+          Prepare and approve one catalog card per home, then export a frozen
+          feed and its images for your platform catalog.
+        </p>
+        <div className="flex flex-wrap gap-4 text-xs">
+          <Link href={`${path}/ads`} className="underline underline-offset-4">
+            Create custom ads in Ad Studio
+          </Link>
+          <Link
+            href={`${path}/campaigns`}
+            className="underline underline-offset-4"
+          >
+            Open campaigns
+          </Link>
+        </div>
+      </div>
+      <CatalogCards brandId={brand.id} brandName={brand.name} />
+    </div>
+  );
 }
