@@ -24,6 +24,7 @@ import {
   registerBrandChannelOutputSchema,
 } from "./outputs/operations";
 import "server-only";
+import { primaryHomeIds } from "@/server/services/home-groups.service";
 
 import { z } from "zod";
 
@@ -1183,7 +1184,7 @@ export const listListingPhotos = growthAction({
             .includes(query.toLowerCase()),
       );
     const listings = matching.slice(offset, offset + limit);
-    const [imported, homeRows] = await Promise.all([
+    const [imported, homeRows, primary] = await Promise.all([
       Promise.all(
         listings.map((row) =>
           findImportedImage({ brandId: brand.id, url: row.imageUrl! }),
@@ -1197,10 +1198,10 @@ export const listListingPhotos = growthAction({
         columns: {
           id: true,
           externalId: true,
-          featured: true,
           heroSourceUrl: true,
         },
       }),
+      primaryHomeIds(brand.id),
     ]);
     const rowByListing = new Map(homeRows.map((row) => [row.externalId, row]));
     return {
@@ -1220,7 +1221,7 @@ export const listListingPhotos = growthAction({
         thumbUrl: row.thumbUrl ?? row.imageUrl!,
         place: [row.city, row.state].filter(Boolean).join(", "),
         mediaAssetId: imported[index]?.id ?? null,
-        featured: rowByListing.get(row.id)?.featured ?? false,
+        featured: primary.has(rowByListing.get(row.id)?.id ?? ""),
         heroSourceUrl: rowByListing.get(row.id)?.heroSourceUrl ?? null,
       })),
     };

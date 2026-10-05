@@ -16,7 +16,7 @@ import {
 const brandInput = z.object({ brandId: z.string().min(1) });
 export const homeGroupsAction = growthAction({
   description:
-    "Read a brand's named home groups, ordered membership, all active homes and WanderOS connection readiness. Each group says where its homes came from (source: suggested by us, intake from the client's form, or manual) and whether it is the brand's primary group, the one ads, previews and newsletters draw from by default; home.featured mirrors the primary group. Groups work for brands without WanderOS; use returned Growth home IDs to edit membership.",
+    "Read a brand's named home groups, ordered membership, all active homes and WanderOS connection readiness. Each group says where its homes came from (source: suggested by us, intake from the client's form, or custom when a person made it) and whether it is the brand's primary group, the one ads, previews and newsletters draw from by default; home.featured mirrors the primary group. Groups work for brands without WanderOS; use returned Growth home IDs to edit membership.",
   inputSchema: brandInput,
   outputSchema: z.object({
     wanderOsEnabled: z.boolean(),
@@ -26,7 +26,7 @@ export const homeGroupsAction = growthAction({
         id: z.string(),
         name: z.string(),
         isPrimary: z.boolean(),
-        source: z.enum(["suggested", "intake", "manual"]),
+        source: z.enum(["suggested", "intake", "custom"]),
         description: z.string().nullable(),
         homeIds: z.array(z.string()),
       }),

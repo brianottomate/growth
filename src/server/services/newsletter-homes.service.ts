@@ -1,4 +1,5 @@
 import "server-only";
+import { inPrimaryGroup } from "./home-groups.service";
 
 import type {
   EmailHeaderFormatId,
@@ -445,7 +446,7 @@ export async function listBrandEmailHomes(input: {
       bedrooms: homeTable.bedrooms,
       nightlyFrom: homeTable.nightlyFrom,
       heroUrl: homeTable.heroSourceUrl,
-      featured: homeTable.featured,
+      featured: inPrimaryGroup(homeTable.id),
     })
     .from(homeTable)
     .where(
@@ -456,7 +457,7 @@ export async function listBrandEmailHomes(input: {
       ),
     )
     .orderBy(
-      desc(homeTable.featured),
+      desc(inPrimaryGroup(homeTable.id)),
       asc(homeTable.sortOrder),
       asc(homeTable.name),
     );

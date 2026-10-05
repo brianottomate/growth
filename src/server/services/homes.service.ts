@@ -6,6 +6,7 @@ import { generateText, Output } from "ai";
 import { z } from "zod";
 
 import { db } from "@/server/db";
+import { primaryHomeIds, setInPrimaryGroup } from "./home-groups.service";
 import {
   brandTable,
   homeMediaTable,
@@ -437,28 +438,31 @@ export type BrandHome = {
 
 /** Every home on the record for a brand, featured or not, for the setup grid. */
 export async function listAllBrandHomes(brandId: string) {
-  return db.query.homeTable.findMany({
-    where: and(eq(homeTable.brandId, brandId), isNull(homeTable.deletedAt)),
-    orderBy: (home, { asc: a }) => [a(home.createdAt), a(home.name)],
-    columns: {
-      id: true,
-      source: true,
-      externalId: true,
-      name: true,
-      url: true,
-      city: true,
-      state: true,
-      country: true,
-      bedrooms: true,
-      bathrooms: true,
-      guests: true,
-      rating: true,
-      nightlyFrom: true,
-      heroSourceUrl: true,
-      featured: true,
-      galleryCache: true,
-    },
-  });
+  const [rows, primary] = await Promise.all([
+    db.query.homeTable.findMany({
+      where: and(eq(homeTable.brandId, brandId), isNull(homeTable.deletedAt)),
+      orderBy: (home, { asc: a }) => [a(home.createdAt), a(home.name)],
+      columns: {
+        id: true,
+        source: true,
+        externalId: true,
+        name: true,
+        url: true,
+        city: true,
+        state: true,
+        country: true,
+        bedrooms: true,
+        bathrooms: true,
+        guests: true,
+        rating: true,
+        nightlyFrom: true,
+        heroSourceUrl: true,
+        galleryCache: true,
+      },
+    }),
+    primaryHomeIds(brandId),
+  ]);
+  return rows.map((row) => ({ ...row, featured: primary.has(row.id) }));
 }
 
 /** The homes in the brand's primary group, in group order, for the setup grid. */
@@ -532,10 +536,7 @@ export async function addWanderOsHome(input: {
   const listing = listings.find((row) => row.id === input.externalId);
   if (!listing) throw new HomeError(404, "That home is not on their feed");
   const row = await ensureHome({ brandId: input.brandId, listing });
-  await db
-    .update(homeTable)
-    .set({ featured: true })
-    .where(eq(homeTable.id, row.id));
+  await setInPrimaryGroup(input.brandId, row.id, true);
   // Picking a home is a deliberate, one-at-a-time act, so the extra detail
   // fetch here is off the render path. It caches the full gallery the search
   // feed does not carry, so the setup cards show the real photo count.
@@ -560,10 +561,7 @@ export async function setHomeFeatured(input: {
   featured: boolean;
 }) {
   const home = await ownedHome(input);
-  await db
-    .update(homeTable)
-    .set({ featured: input.featured })
-    .where(eq(homeTable.id, home.id));
+  await setInPrimaryGroup(home.brandId, home.id, input.featured);
   return { homeId: home.id, featured: input.featured };
 }
 
@@ -742,14 +740,14 @@ export async function createManualHomes(input: {
         brandId: input.brandId,
         source: "manual",
         externalId,
-        featured: true,
         ...facts,
       })
       .onConflictDoUpdate({
         target: [homeTable.brandId, homeTable.externalId],
-        set: { ...facts, featured: true },
+        set: facts,
       })
       .returning();
+    await setInPrimaryGroup(input.brandId, row!.id, true);
     rows.push(row!);
   }
   return rows;
@@ -763,12 +761,7 @@ export async function removeBrandHome(input: {
   brandId: string;
   homeId: string;
 }) {
-  await db
-    .update(homeTable)
-    .set({ featured: false })
-    .where(
-      and(eq(homeTable.id, input.homeId), eq(homeTable.brandId, input.brandId)),
-    );
+  await setInPrimaryGroup(input.brandId, input.homeId, false);
   return { homeId: input.homeId };
 }
 

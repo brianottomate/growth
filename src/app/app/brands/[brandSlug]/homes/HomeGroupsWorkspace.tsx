@@ -46,7 +46,7 @@ type Group = {
   name: string;
   description: string | null;
   isPrimary: boolean;
-  source: "suggested" | "intake" | "manual";
+  source: "suggested" | "intake" | "custom";
   homeIds: string[];
 };
 type Target = {
@@ -714,7 +714,7 @@ function HomeSummary({ home }: { home?: Home }) {
 const SOURCE_LABEL: Record<Group["source"], string> = {
   suggested: "Suggested",
   intake: "From client",
-  manual: "Hand-picked",
+  custom: "Custom",
 };
 
 function GroupLabel({ group }: { group: Group }) {

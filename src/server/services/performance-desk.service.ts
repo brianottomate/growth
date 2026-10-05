@@ -1,4 +1,5 @@
 import "server-only";
+import { inPrimaryGroup } from "./home-groups.service";
 
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 
@@ -217,7 +218,8 @@ export async function loadPerformanceDesk(
     db.query.homeTable.findMany({
       where: and(
         inArray(homeTable.brandId, brandIds),
-        eq(homeTable.featured, true),
+        isNull(homeTable.deletedAt),
+        inPrimaryGroup(homeTable.id),
       ),
       columns: { id: true, brandId: true, name: true, heroSourceUrl: true },
       orderBy: (home, { asc }) => [asc(home.name)],

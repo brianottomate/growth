@@ -1,6 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises";
 
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 
 import { brandWideAmenities } from "../../src/lib/catalog-copy";
 import type {
@@ -60,7 +60,12 @@ for (const slug of hasBrand ? [requestedBrand!] : BRANDS) {
     .select()
     .from(homeTable)
     .where(and(eq(homeTable.brandId, brand.id), isNull(homeTable.deletedAt)))
-    .orderBy(desc(homeTable.featured), homeTable.name);
+    .orderBy(
+      desc(
+        sql`exists (select 1 from home_group_member m join home_group g on g.id = m.group_id where g.is_primary and m.home_id = ${homeTable.id})`,
+      ),
+      homeTable.name,
+    );
   // Featured homes first, one with an approved headline when the brand has any.
   const approvedRows = rows.filter((r) => r.catalogApproval && r.catalogTitle);
   const picked = [

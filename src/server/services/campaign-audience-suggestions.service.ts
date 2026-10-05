@@ -1,4 +1,5 @@
 import "server-only";
+import { primaryHomeIds } from "./home-groups.service";
 
 import { anthropic } from "@ai-sdk/anthropic";
 import { generateText, Output } from "ai";
@@ -164,21 +165,27 @@ export async function suggestCampaignAudiences(input: {
         .filter((state): state is string => Boolean(state)),
     ),
   );
-  const homes = await db.query.homeTable.findMany({
-    where: and(eq(homeTable.brandId, brand.id), isNull(homeTable.deletedAt)),
-    columns: {
-      id: true,
-      name: true,
-      externalId: true,
-      source: true,
-      city: true,
-      state: true,
-      bedrooms: true,
-      guests: true,
-      amenities: true,
-      featured: true,
-    },
-  });
+  const [rows, primary] = await Promise.all([
+    db.query.homeTable.findMany({
+      where: and(eq(homeTable.brandId, brand.id), isNull(homeTable.deletedAt)),
+      columns: {
+        id: true,
+        name: true,
+        externalId: true,
+        source: true,
+        city: true,
+        state: true,
+        bedrooms: true,
+        guests: true,
+        amenities: true,
+      },
+    }),
+    primaryHomeIds(brand.id),
+  ]);
+  const homes = rows.map((home) => ({
+    ...home,
+    featured: primary.has(home.id),
+  }));
 
   // Every market the brand has, drafted or edited.
   const markets = new Map<string, Market>();

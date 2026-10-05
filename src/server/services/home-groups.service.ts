@@ -1,5 +1,15 @@
 import "server-only";
-import { and, asc, eq, inArray, isNull, ne } from "drizzle-orm";
+import {
+  type AnyColumn,
+  and,
+  asc,
+  desc,
+  eq,
+  inArray,
+  isNull,
+  ne,
+  sql,
+} from "drizzle-orm";
 import { db, withTransaction, type TransactionClient } from "@/server/db";
 import {
   adTable,
@@ -206,8 +216,7 @@ export async function deleteHomeGroup(groupId: string, orgId: string) {
 }
 /**
  * Make one group the brand's primary. Clears the old one first: the unique
- * index allows one primary per brand at a time. A trigger then hands the new
- * group's members to `home.featured`.
+ * index allows one primary per brand at a time.
  */
 export async function makePrimaryGroup(
   tx: TransactionClient,
@@ -269,6 +278,87 @@ export async function sourceGroup(
     })
     .returning();
   return created!;
+}
+
+/**
+ * Is this home in its brand's primary group? For selects and ordering where
+ * a home used to carry its own `featured` flag.
+ */
+export function inPrimaryGroup(homeId: AnyColumn) {
+  return sql<boolean>`exists (select 1 from ${homeGroupMemberTable} join ${homeGroupTable} on ${homeGroupTable.id} = ${homeGroupMemberTable.groupId} where ${homeGroupTable.isPrimary} and ${homeGroupMemberTable.homeId} = ${homeId})`;
+}
+
+/** The ids of a brand's primary-group homes. */
+export async function primaryHomeIds(brandId: string) {
+  const rows = await db
+    .select({ homeId: homeGroupMemberTable.homeId })
+    .from(homeGroupMemberTable)
+    .innerJoin(
+      homeGroupTable,
+      eq(homeGroupTable.id, homeGroupMemberTable.groupId),
+    )
+    .where(
+      and(
+        eq(homeGroupTable.brandId, brandId),
+        eq(homeGroupTable.isPrimary, true),
+      ),
+    );
+  return new Set(rows.map((row) => row.homeId));
+}
+
+/**
+ * Put a home in its brand's primary group or take it out: the featured tick.
+ * A brand without a primary group gets a custom one first.
+ */
+export async function setInPrimaryGroup(
+  brandId: string,
+  homeId: string,
+  featured: boolean,
+) {
+  await withTransaction(async (tx) => {
+    let [primary] = await tx
+      .select()
+      .from(homeGroupTable)
+      .where(
+        and(
+          eq(homeGroupTable.brandId, brandId),
+          eq(homeGroupTable.isPrimary, true),
+        ),
+      )
+      .for("update");
+    if (!primary && !featured) return;
+    if (!primary) {
+      [primary] = await tx
+        .insert(homeGroupTable)
+        .values({ brandId, name: "Featured homes", isPrimary: true })
+        .returning();
+    }
+    if (!featured) {
+      await tx
+        .delete(homeGroupMemberTable)
+        .where(
+          and(
+            eq(homeGroupMemberTable.groupId, primary!.id),
+            eq(homeGroupMemberTable.homeId, homeId),
+          ),
+        );
+      return;
+    }
+    const [last] = await tx
+      .select({ sortOrder: homeGroupMemberTable.sortOrder })
+      .from(homeGroupMemberTable)
+      .where(eq(homeGroupMemberTable.groupId, primary!.id))
+      .orderBy(desc(homeGroupMemberTable.sortOrder))
+      .limit(1);
+    await tx
+      .insert(homeGroupMemberTable)
+      .values({
+        groupId: primary!.id,
+        homeId,
+        sortOrder: (last?.sortOrder ?? -1) + 1,
+      })
+      .onConflictDoNothing();
+  });
 }
 
 export async function setWanderOsEnabled(

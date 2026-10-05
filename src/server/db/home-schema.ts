@@ -19,8 +19,8 @@ import { createId } from "./utils";
 // ads draw on, which order the gallery runs in, where a crop sits.
 //
 // Every listing on a brand's feed gets a row at ingestion, so the catalog can
-// hang its per-home overrides here. `featured` marks the handful the operator
-// picked on setup; the ads and the setup grid read only those.
+// hang its per-home overrides here. Which homes lead is not a home fact: it
+// is membership of the brand's primary home group.
 
 export const homeSourceEnum = pgEnum("home_source", [
   "wanderos", // read off the client's own booking site
@@ -109,9 +109,6 @@ export const homeTable = pgTable(
      * chosen the same way once its asset has a URL.
      */
     heroSourceUrl: t.text(),
-
-    /** Picked on setup. Ads and the setup grid work on featured homes only. */
-    featured: t.boolean().default(false).notNull(),
 
     /** WanderOS amenity labels from the listing detail, cached at ingestion. */
     amenities: t.jsonb().$type<string[]>(),
