@@ -14,8 +14,10 @@ import { loadPerformanceBrand } from "../_data";
 import { resolvePreviewHome } from "../_preview-home";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ButtonLink } from "@/components/ui/button";
-import { Globe } from "lucide-react";
+import { Globe, Palette } from "lucide-react";
 import { PreparationAction } from "../PreparationAction";
+import { ShapeBrandButton } from "../ShapeBrandButton";
+import { WorkspaceCard } from "../../../WorkspaceCard";
 
 export const metadata: Metadata = { title: "Setup · Wander Performance" };
 export const dynamic = "force-dynamic";
@@ -39,32 +41,43 @@ export default async function PerformanceBrandSetupPage({
     !brand.logo &&
     !brand.brandMark
   ) {
+    const action = brand.website ? (
+      <PreparationAction
+        brandId={brand.id}
+        kind="website"
+        label="Read website"
+      />
+    ) : (
+      <ButtonLink
+        size="sm"
+        href={`/app/performance/clients/${brand.slug ?? brand.id}/settings`}
+      >
+        Add website
+      </ButtonLink>
+    );
     return (
-      <section className="rounded-xl border p-6">
+      <WorkspaceCard title="Brand identity" icon={Palette}>
         <EmptyState
+          compact
           icon={Globe}
           title={
             brand.website
               ? "Read the brand’s website"
               : "Add the brand’s website"
           }
+          description="Pull the logo, colors, fonts and tagline from the brand’s website."
           actions={
-            brand.website ? (
-              <PreparationAction
+            <>
+              {action}
+              <ShapeBrandButton
                 brandId={brand.id}
-                kind="website"
-                label="Read website"
+                brandName={brand.name}
+                section="brand identity"
               />
-            ) : (
-              <ButtonLink
-                href={`/app/performance/clients/${brand.slug ?? brand.id}/settings`}
-              >
-                Add website
-              </ButtonLink>
-            )
+            </>
           }
         />
-      </section>
+      </WorkspaceCard>
     );
   }
 

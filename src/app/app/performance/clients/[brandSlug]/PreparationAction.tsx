@@ -20,14 +20,16 @@ export function PreparationAction({
     },
   });
   return (
-    <div className="space-y-2">
-      <Button loading={action.isPending} onClick={() => action.mutate()}>
-        {action.isPending
-          ? kind === "website"
-            ? "Reading website…"
-            : "Checking WanderOS…"
-          : label}
-      </Button>
-    </div>
+    <Button
+      size="sm"
+      loading={action.isPending}
+      onClick={() => action.mutate()}
+    >
+      {action.isPending
+        ? kind === "website"
+          ? "Reading website…"
+          : "Checking WanderOS…"
+        : label}
+    </Button>
   );
 }
