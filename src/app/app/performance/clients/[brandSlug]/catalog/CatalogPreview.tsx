@@ -1,15 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { toast } from "@/components/ui/toast";
 import {
   catalogCardPreviewUrl,
+  defaultCatalogAdCopy,
+  fillCatalogTags,
+  type CatalogAdCopy,
   type CatalogDraft,
   type CatalogHome,
 } from "@/lib/catalog-studio";
 import { previewAtWidth } from "@/lib/compositions";
+import { orpc } from "@/orpc/client";
 
 export type CatalogPreviewCard = {
   key: string;
@@ -47,8 +55,29 @@ export function CatalogPreview({
       home: byId.get(card.homeId),
       name: byId.get(card.homeId)?.name ?? card.homeId,
     }));
+  const client = useQueryClient();
+  const save = useMutation(
+    orpc.catalog.setAdCopy.mutationOptions({
+      onSuccess: async () => {
+        await client.invalidateQueries({
+          queryKey: orpc.catalog.state.queryOptions({ input: { brandId } })
+            .queryKey,
+        });
+        toast.success("Ad copy saved");
+      },
+      onError: (error) => toast.error(error.message),
+    }),
+  );
 
-  return <CatalogCollectionPreview brandName={brandName} cards={cards} />;
+  return (
+    <CatalogCollectionPreview
+      brandName={brandName}
+      cards={cards}
+      ad={draft.ad}
+      saving={save.isPending}
+      onSave={(ad) => save.mutate({ brandId, ad })}
+    />
+  );
 }
 
 /** Shared catalog mock for Studio and local experiments; cards are already resolved. */
@@ -56,14 +85,30 @@ export function CatalogCollectionPreview({
   brandName,
   cards,
   compact = false,
+  ad: saved,
+  saving = false,
+  onSave,
 }: {
   brandName: string;
   cards: CatalogPreviewCard[];
   compact?: boolean;
+  /** The saved ad copy; the mock falls back to the default. */
+  ad?: CatalogAdCopy;
+  saving?: boolean;
+  /** Without it the copy is a scratch field, as in the lab mocks. */
+  onSave?: (ad: CatalogAdCopy) => void;
 }) {
-  const [text, setText] = useState(
-    `Find your next ${brandName} escape. Private homes, booked direct.`,
-  );
+  const initial = saved ?? defaultCatalogAdCopy(brandName);
+  const [ad, setAd] = useState(initial);
+  useEffect(
+    () => setAd(initial),
+    [initial.primaryText, initial.headline, initial.description],
+  ); // oxlint-disable-line react-hooks/exhaustive-deps
+  const changed =
+    ad.primaryText !== initial.primaryText ||
+    ad.headline !== initial.headline ||
+    ad.description !== initial.description;
+  const text = ad.primaryText;
 
   return (
     <div className="space-y-5">
@@ -71,12 +116,45 @@ export function CatalogCollectionPreview({
         <label className="block space-y-1.5 text-sm">
           <span className="text-muted-foreground">Primary text</span>
           <Textarea
-            value={text}
+            value={ad.primaryText}
             rows={3}
-            onChange={(e) => setText(e.target.value)}
+            maxLength={2200}
+            onChange={(e) => setAd({ ...ad, primaryText: e.target.value })}
           />
         </label>
-        <p className="text-sm text-muted-foreground">{cards.length} cards</p>
+        <div className="grid grid-cols-1 gap-3 @xl:grid-cols-2">
+          <label className="block space-y-1.5 text-sm">
+            <span className="text-muted-foreground">Headline</span>
+            <Input
+              value={ad.headline}
+              maxLength={255}
+              placeholder="{{hotel.name}}"
+              onChange={(e) => setAd({ ...ad, headline: e.target.value })}
+            />
+          </label>
+          <label className="block space-y-1.5 text-sm">
+            <span className="text-muted-foreground">Description</span>
+            <Input
+              value={ad.description}
+              maxLength={255}
+              placeholder="From the price in the feed"
+              onChange={(e) => setAd({ ...ad, description: e.target.value })}
+            />
+          </label>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-muted-foreground">{cards.length} cards</p>
+          {onSave && (
+            <Button
+              size="sm"
+              disabled={!changed || saving}
+              loading={saving}
+              onClick={() => onSave(ad)}
+            >
+              Save ad copy
+            </Button>
+          )}
+        </div>
       </div>
       <div
         className={
@@ -87,7 +165,12 @@ export function CatalogCollectionPreview({
       >
         <div className={compact ? "w-80 max-w-full space-y-2" : ""}>
           {compact && <h4 className="text-sm font-medium">Feed carousel</h4>}
-          <FeedPreview brandName={brandName} text={text} cards={cards} />
+          <FeedPreview
+            brandName={brandName}
+            text={text}
+            ad={ad}
+            cards={cards}
+          />
         </div>
         <div className={compact ? "w-80 max-w-full space-y-2" : ""}>
           {compact && <h4 className="text-sm font-medium">Catalog story</h4>}
@@ -107,10 +190,12 @@ export function CatalogCollectionPreview({
 function FeedPreview({
   brandName,
   text,
+  ad,
   cards,
 }: {
   brandName: string;
   text: string;
+  ad: CatalogAdCopy;
   cards: CatalogPreviewCard[];
 }) {
   return (
@@ -135,12 +220,19 @@ function FeedPreview({
             <div className="flex items-center gap-2 px-2.5 py-2">
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[13px] font-semibold">
-                  {card.name}
+                  {fillCatalogTags(ad.headline, {
+                    name: card.name,
+                    brand: brandName,
+                  }) || card.name}
                 </p>
                 <p className="truncate text-xs text-muted-foreground">
-                  {card.home?.nightlyFrom
-                    ? `From $${card.home.nightlyFrom.toLocaleString("en-US")} a night`
-                    : (card.home?.city ?? "")}
+                  {fillCatalogTags(ad.description, {
+                    name: card.name,
+                    brand: brandName,
+                  }) ||
+                    (card.home?.nightlyFrom
+                      ? `From $${card.home.nightlyFrom.toLocaleString("en-US")} a night`
+                      : (card.home?.city ?? ""))}
                 </p>
               </div>
               <span className="shrink-0 rounded-md bg-muted px-2.5 py-1 text-xs font-medium">

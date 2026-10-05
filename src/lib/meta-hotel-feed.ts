@@ -30,6 +30,10 @@ export type HotelFeedHome = {
   nightlyFrom?: number | null;
   /** WanderOS amenity labels, when the listing detail was read. */
   amenities?: string[] | null;
+  /** The brand market the home is in, for product sets. */
+  market?: string | null;
+  /** The home group it leads in, e.g. "Client’s picks", for product sets. */
+  group?: string | null;
 };
 
 export type HotelFeedRow = {
@@ -54,6 +58,8 @@ export type HotelFeedRow = {
   /** Bedrooms and guests ride along as custom fields so product sets can filter on them. */
   bedrooms: number | null;
   guests: number | null;
+  market?: string | null;
+  group?: string | null;
 };
 
 /**
@@ -80,6 +86,8 @@ export const HOTEL_FEED_COLUMNS = [
   "neighborhood[0]",
   "custom_label_0",
   "custom_label_1",
+  "custom_label_2",
+  "custom_label_3",
   "custom_number_0",
   "custom_number_1",
   "price",
@@ -160,6 +168,8 @@ export function hotelFeedRows(
         price: home.nightlyFrom ? `${home.nightlyFrom.toFixed(2)} USD` : "",
         bedrooms: home.bedrooms ?? null,
         guests: home.guests ?? null,
+        market: home.market ?? null,
+        group: home.group ?? null,
       },
     ];
   });
@@ -186,6 +196,8 @@ export function hotelFeedCells(row: HotelFeedRow): (string | number | null)[] {
     "neighborhood[0]": row.city,
     custom_label_0: row.region,
     custom_label_1: row.bedrooms ? `${row.bedrooms} bedrooms` : "",
+    custom_label_2: row.market ?? "",
+    custom_label_3: row.group ?? "",
     custom_number_0: row.guests ?? null,
     custom_number_1: row.bedrooms ?? null,
     price: row.price,

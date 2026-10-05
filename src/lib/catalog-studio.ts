@@ -44,10 +44,40 @@ export type CatalogCard = z.infer<typeof catalogCardSchema>;
 export const CATALOG_FORMATS = ["square"] as const;
 export type CatalogFormatId = (typeof CATALOG_FORMATS)[number];
 
+/**
+ * The ad a catalog runs in, set once per catalog: Meta fills each card's
+ * headline and description from the item, so these are templates that may
+ * carry tags such as {{hotel.name}}. Primary text is the same on every card.
+ */
+export const catalogAdCopySchema = z.strictObject({
+  primaryText: z.string().trim().max(2200),
+  headline: z.string().trim().max(255),
+  description: z.string().trim().max(255),
+});
+export type CatalogAdCopy = z.infer<typeof catalogAdCopySchema>;
+export const defaultCatalogAdCopy = (brandName: string): CatalogAdCopy => ({
+  primaryText: `Find your next ${brandName} escape. Private homes, booked direct.`,
+  headline: "{{hotel.name}}",
+  description: "",
+});
+/** A template line for one card: the tags the preview can fill, filled. */
+export function fillCatalogTags(
+  template: string,
+  item: { name: string; description?: string | null; brand: string },
+) {
+  return template
+    .replaceAll("{{hotel.name}}", item.name)
+    .replaceAll("{{hotel.description}}", item.description ?? "")
+    .replaceAll("{{hotel.brand}}", item.brand)
+    .trim();
+}
+
 export type CatalogDraft = {
   cards: CatalogCard[];
   formats: CompositionFormatId[];
   primaryFormat: CompositionFormatId;
+  /** Absent on exports frozen before ad copy was saved. */
+  ad?: CatalogAdCopy;
 };
 /**
  * One home's catalog decisions, as its `home` row stores them. Anything null
@@ -122,10 +152,14 @@ export const catalogExportSchema = z.strictObject({
         price: z.string(),
         bedrooms: z.number().nullable(),
         guests: z.number().nullable(),
+        market: z.string().nullable().optional(),
+        group: z.string().nullable().optional(),
       }),
     )
     .optional(),
   label: z.string().optional(),
+  /** The ad copy the export froze with its cards. */
+  ad: catalogAdCopySchema.optional(),
 });
 
 export type CatalogExport = z.output<typeof catalogExportSchema>;
@@ -277,10 +311,13 @@ export function catalogDraft(
   format: CatalogFormatId = DEFAULT_CATALOG_FORMAT,
   /** The brand's default for the mark on a card that has not chosen. */
   showLogo = true,
+  /** The ad the catalog runs in. */
+  ad?: CatalogAdCopy,
 ): CatalogDraft {
   return {
     formats: [format],
     primaryFormat: format,
+    ...(ad ? { ad } : {}),
     cards: homes
       .filter((h) => h.imageUrl)
       .map((home): CatalogCard => {
@@ -417,6 +454,11 @@ export function catalogExportRows(
   draft: CatalogDraft,
   assets: NonNullable<CatalogExport["assets"]>,
   brandName: string,
+  /** Product-set labels per home: its market and its lead home group. */
+  labels: ReadonlyMap<
+    string,
+    { market?: string | null; group?: string | null }
+  > = new Map(),
 ) {
   return hotelFeedRows(
     draft.cards
@@ -428,7 +470,7 @@ export function catalogExportRows(
         );
         if (!home || !asset)
           throw new Error("A catalog home is missing its frozen primary image");
-        return { ...home, imageUrl: asset.url };
+        return { ...home, imageUrl: asset.url, ...labels.get(home.id) };
       }),
     brandName,
   );

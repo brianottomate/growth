@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import {
+  catalogAdCopySchema,
   CATALOG_TEMPLATES,
   CATALOG_WRITE_PASSES,
   catalogCardSchema,
@@ -58,6 +59,7 @@ export const catalogStateActionOutputSchema = z.strictObject({
     cards: z.array(catalogCardSchema),
     formats: z.array(compositionFormatIdSchema),
     primaryFormat: compositionFormatIdSchema,
+    ad: catalogAdCopySchema.optional(),
   }),
   unwritten: z
     .array(z.string())
@@ -119,6 +121,11 @@ export const setCatalogApprovalActionOutputSchema = z.strictObject({
 export const setCatalogIncludedActionOutputSchema = z.strictObject({
   brandId: z.string(),
   included: z.boolean(),
+});
+
+export const setCatalogAdCopyActionOutputSchema = z.strictObject({
+  brandId: z.string(),
+  ad: catalogAdCopySchema,
 });
 
 export const setCatalogDefaultTemplateActionOutputSchema = z.strictObject({

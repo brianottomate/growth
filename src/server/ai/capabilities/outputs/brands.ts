@@ -1,3 +1,4 @@
+import { catalogAdCopySchema } from "@/lib/catalog-studio";
 import { homesSchema, metaReportingConversionsSchema } from "./shared";
 import { z } from "zod";
 import { STORED_PIPELINE_STAGES } from "@/lib/performance-pipeline";
@@ -77,6 +78,7 @@ const performanceSettingsShape = {
   metaReportingConversions: metaReportingConversionsSchema,
   agreedAdSpend: z.number().nullable().optional(),
   catalogFormatId: z.enum(["portrait", "square"]).nullable().optional(),
+  catalogAd: catalogAdCopySchema.nullable().optional(),
   catalogTemplateId: z
     .enum([
       "catalog-place",

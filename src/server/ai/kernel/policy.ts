@@ -372,6 +372,7 @@ export const growthActionPolicies = {
     }),
     setCatalogIncluded: write({ idempotent: true }),
     setCatalogDefaultTemplate: write({ idempotent: true }),
+    setCatalogAdCopy: write({ idempotent: true }),
     exportCatalog: write({ consequence: "background-run" }),
     // Real delete of the run, its library folder and its images. An export is
     // a frozen copy that can be made again, so there is no trash.

@@ -116,6 +116,7 @@ import {
   refreshCatalogHomesAction,
   setCatalogApprovalAction,
   setCatalogDefaultTemplateAction,
+  setCatalogAdCopyAction,
   setCatalogIncludedAction,
   writeCatalogCardsAction,
 } from "./catalog";
@@ -598,6 +599,7 @@ export const adsWrite = growthDomainTool({
     setCatalogApproval: setCatalogApprovalAction,
     setCatalogIncluded: setCatalogIncludedAction,
     setCatalogDefaultTemplate: setCatalogDefaultTemplateAction,
+    setCatalogAdCopy: setCatalogAdCopyAction,
     exportCatalog: exportCatalogAction,
     deleteCatalogExport: deleteCatalogExportAction,
     editAdCards: editAdCardsAction,

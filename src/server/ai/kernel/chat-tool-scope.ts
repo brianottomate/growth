@@ -95,6 +95,7 @@ const batchEdits = new Set([
   "adsWrite__buildAdSet",
   "adsWrite__generateStarterIdeas",
   "adsWrite__setCatalogDefaultTemplate",
+  "adsWrite__setCatalogAdCopy",
 ]);
 
 export function createChatToolScope(input: {
@@ -181,6 +182,8 @@ export function createChatToolScope(input: {
       "adsWrite__newCatalogPhoto",
       "adsWrite__freezeCatalog",
       "adsWrite__setCatalogDefaultTemplate",
+      "adsWrite__setCatalogAdCopy",
+      "adsWrite__setCatalogAdCopy",
       "performanceRead__reviewPortfolio",
     ],
     creative: [

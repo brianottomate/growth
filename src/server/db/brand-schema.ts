@@ -312,6 +312,8 @@ export type PerformanceSettings = {
   logoOnCreatives?: boolean | null;
   /** The catalog card every home uses unless it has its own. */
   catalogTemplateId?: import("@/lib/catalog-studio").CatalogTemplateId | null;
+  /** The ad the catalog runs in: primary text, headline and description templates. */
+  catalogAd?: import("@/lib/catalog-studio").CatalogAdCopy | null;
   /** Retired: catalogs are square. Old rows still carry "portrait". */
   catalogFormatId?: "portrait" | "square" | null;
   updatedAt?: string;

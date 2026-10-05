@@ -1,4 +1,5 @@
 "use client";
+import { CopyButton } from "@/components/copy-button";
 import { toast } from "@/components/ui/toast";
 import { ImagePickerDialog } from "@/components/image-picker-dialog";
 import { CompositionSelector } from "@/components/composition-picker";
@@ -1151,6 +1152,29 @@ export function CatalogCards({
                       ? catalogAddressIssues(item.rows ?? []).join(" · ")
                       : "Addresses and coordinates saved with this export."}
                   </p>
+                )}
+                {item.ad && (
+                  <dl className="grid grid-cols-1 gap-2 rounded-lg bg-muted/40 p-3 text-sm @xl:grid-cols-[8rem_minmax(0,1fr)_auto]">
+                    {(
+                      [
+                        ["Primary text", item.ad.primaryText],
+                        ["Headline", item.ad.headline],
+                        ["Description", item.ad.description],
+                      ] as const
+                    )
+                      .filter(([, value]) => value)
+                      .map(([label, value]) => (
+                        <div key={label} className="contents [&>*]:min-w-0">
+                          <dt className="text-muted-foreground">{label}</dt>
+                          <dd className="[overflow-wrap:anywhere] whitespace-pre-wrap">
+                            {value}
+                          </dd>
+                          <dd>
+                            <CopyButton text={value} size="sm" />
+                          </dd>
+                        </div>
+                      ))}
+                  </dl>
                 )}
                 <div
                   className={

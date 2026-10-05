@@ -119,6 +119,8 @@ const homeShape = {
   imageUrl: z.string().nullable().optional(),
   latitude: z.number().nullable().optional(),
   longitude: z.number().nullable().optional(),
+  market: z.string().nullable().optional(),
+  group: z.string().nullable().optional(),
   name: z.string(),
   slug: z.string().optional(),
   reviewCount: z.number().nullable().optional(),

@@ -22,6 +22,8 @@ import {
   mediaFolderTable,
   mediaAssetTable,
   homeTable,
+  homeGroupTable,
+  homeGroupMemberTable,
 } from "@/server/db/schema";
 import { fetchWanderOsListingDetail } from "@/server/clients/wanderos-site.client";
 import {
@@ -33,6 +35,9 @@ import {
   catalogDraft,
   catalogHeadlineIssue,
   catalogExportRows,
+  catalogAdCopySchema,
+  defaultCatalogAdCopy,
+  type CatalogAdCopy,
   type CatalogCard,
   type CatalogDraft,
   type CatalogExport,
@@ -297,6 +302,7 @@ async function catalogHomes(brand: CatalogBrand, refresh = false) {
     brand.markets,
     DEFAULT_CATALOG_FORMAT,
     brand.settings?.logoOnCreatives !== false,
+    brand.settings?.catalogAd ?? defaultCatalogAdCopy(brand.name),
   );
   for (const card of draft.cards) {
     const review = rows.get(card.homeId)?.aiNotes?.catalog;
@@ -357,6 +363,9 @@ export async function catalogState(
       error: null,
       createdAt: run.createdAt.toISOString(),
       label: exportLabel(run.input),
+      ...((run.input as { draft?: CatalogDraft } | null)?.draft?.ad
+        ? { ad: (run.input as { draft: CatalogDraft }).draft.ad }
+        : {}),
     })),
   };
 }
@@ -760,6 +769,23 @@ export async function setCatalogDefaultTemplate(input: {
     .where(eq(brandTable.id, brand.id));
 }
 
+/** The ad the catalog runs in; each export freezes it with the cards. */
+export async function setCatalogAdCopy(input: {
+  userId: string;
+  brandId: string;
+  ad: CatalogAdCopy;
+}) {
+  const brand = await catalogBrand(input.userId, input.brandId);
+  const ad = catalogAdCopySchema.parse(input.ad);
+  await db
+    .update(brandTable)
+    .set({
+      performanceSettings: sql`coalesce(${brandTable.performanceSettings}, '{}'::jsonb) || ${JSON.stringify({ catalogAd: ad, updatedAt: new Date().toISOString(), updatedBy: input.userId })}::jsonb`,
+    })
+    .where(eq(brandTable.id, brand.id));
+  return ad;
+}
+
 /** Include or exclude every home in the brand's catalog at once. */
 export async function setCatalogIncluded(input: {
   userId: string;
@@ -930,7 +956,13 @@ export async function renderCatalogExport(
         });
       }
     }
-    const rows = catalogExportRows(homes, draft, assets, brand.name);
+    const rows = catalogExportRows(
+      homes,
+      draft,
+      assets,
+      brand.name,
+      await feedLabels(brand.id, brand.markets, homes),
+    );
     await withTransaction(async (tx) => {
       const [finished] = await tx
         .update(workflowRunTable)
@@ -963,6 +995,41 @@ export async function renderCatalogExport(
     await failWorkflowRun(run, error);
   }
 }
+/**
+ * Each home's product-set labels, frozen into the feed: the market it sells
+ * in and the brand's lead home group when it is in it.
+ */
+async function feedLabels(
+  brandId: string,
+  markets: Parameters<typeof marketOf>[0],
+  homes: readonly CatalogHome[],
+) {
+  const lead = await db
+    .select({ listingId: homeTable.externalId, group: homeGroupTable.name })
+    .from(homeGroupMemberTable)
+    .innerJoin(
+      homeGroupTable,
+      eq(homeGroupTable.id, homeGroupMemberTable.groupId),
+    )
+    .innerJoin(homeTable, eq(homeTable.id, homeGroupMemberTable.homeId))
+    .where(
+      and(
+        eq(homeGroupTable.brandId, brandId),
+        eq(homeGroupTable.isPrimary, true),
+      ),
+    );
+  const groupOf = new Map(lead.map((row) => [row.listingId, row.group]));
+  return new Map(
+    homes.map((home) => [
+      home.id,
+      {
+        market: marketOf(markets, home.city)?.label ?? null,
+        group: groupOf.get(home.id) ?? null,
+      },
+    ]),
+  );
+}
+
 /** The last ready export's images by what they were drawn from. */
 async function previousRenders(brandId: string, fresh = false) {
   const none = new Map<string, typeof mediaAssetTable.$inferSelect>();
@@ -1015,6 +1082,7 @@ export async function catalogExport(
     >),
     brand,
     formats: draft.formats,
+    ad: draft.ad ?? null,
     createdAt: run.createdAt,
   };
 }

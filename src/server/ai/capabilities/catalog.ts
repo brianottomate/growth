@@ -3,7 +3,11 @@ import "server-only";
 import { after } from "next/server";
 import { z } from "zod";
 
-import { CATALOG_TEMPLATES, CATALOG_WRITE_PASSES } from "@/lib/catalog-studio";
+import {
+  CATALOG_TEMPLATES,
+  CATALOG_WRITE_PASSES,
+  catalogAdCopySchema,
+} from "@/lib/catalog-studio";
 import {
   newCatalogCopy,
   newCatalogPhoto,
@@ -19,6 +23,7 @@ import {
   deleteCatalogExport,
   renderCatalogExport,
   setCatalogApproval,
+  setCatalogAdCopy,
   setCatalogDefaultTemplate,
   setCatalogIncluded,
   startCatalogExport,
@@ -33,6 +38,7 @@ import {
   newCatalogCopyActionOutputSchema,
   newCatalogPhotoActionOutputSchema,
   setCatalogApprovalActionOutputSchema,
+  setCatalogAdCopyActionOutputSchema,
   setCatalogDefaultTemplateActionOutputSchema,
   setCatalogIncludedActionOutputSchema,
   writeCatalogCardsActionOutputSchema,
@@ -255,6 +261,27 @@ export const setCatalogDefaultTemplateAction = growthAction({
     await setCatalogDefaultTemplate({ ...input, userId: ctx.userId });
     return input;
   },
+});
+
+export const setCatalogAdCopyAction = growthAction({
+  outputSchema: setCatalogAdCopyActionOutputSchema,
+  description:
+    "Save the ad a Performance client's catalog runs in: primary text (the same above every card), and the headline and description each card shows, which Meta fills per home and may use tags such as {{hotel.name}}, {{hotel.description}} or {{hotel.brand}}. Each export freezes this copy with its cards for the operator to paste into Meta. Nothing reaches Meta.",
+  inputSchema: brandInput.extend({ ad: catalogAdCopySchema }),
+  examples: [
+    {
+      brandId: "brd_01",
+      ad: {
+        primaryText: "Find your next escape. Private homes, booked direct.",
+        headline: "{{hotel.name}}",
+        description: "",
+      },
+    },
+  ],
+  execute: async (input, ctx) => ({
+    brandId: input.brandId,
+    ad: await setCatalogAdCopy({ ...input, userId: ctx.userId }),
+  }),
 });
 
 export const exportCatalogAction = growthAction({
