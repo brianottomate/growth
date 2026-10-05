@@ -1,11 +1,10 @@
+import type { EmailAudienceRecipient } from "./email-audience";
 import { describe, expect, test } from "bun:test";
 import {
   assertEmailAudienceSource,
-  emailAudienceDefinitionKey,
   emailAudienceDefinitionSchema,
   filterEmailAudienceBatch,
   emailAudienceCsvRow,
-  type EmailAudienceRecipient,
 } from "./email-audience";
 import { buildEmailAudienceQuery } from "@/server/services/email-audience-query";
 const definition = emailAudienceDefinitionSchema.parse({
@@ -39,30 +38,28 @@ describe("warehouse audience boundaries", () => {
       clickedWithinDays: null,
     };
     expect(() =>
-      assertEmailAudienceSource(wos, { slug: "wpe", websiteId: null }),
+      assertEmailAudienceSource(wos, {
+        slug: "wpe",
+        websiteId: null,
+      }),
     ).toThrow("no WanderOS");
     expect(() =>
       assertEmailAudienceSource(
-        { ...wos, clickedWithinDays: 90 },
-        { slug: "wpe", websiteId: "wpe" },
+        {
+          ...wos,
+          clickedWithinDays: 90,
+        },
+        {
+          slug: "wpe",
+          websiteId: "wpe",
+        },
       ),
     ).toThrow("Click history");
     const query = buildEmailAudienceQuery(wos, "website-a");
-    expect(query.params).toEqual({ websiteId: "website-a" });
+    expect(query.params).toEqual({
+      websiteId: "website-a",
+    });
     expect(query.sql).not.toContain("website-a");
-  });
-  test("invalid engagement and empty recipient sources are rejected", () => {
-    expect(
-      emailAudienceDefinitionSchema.safeParse({
-        ...definition,
-        clickedWithinDays: 0,
-      }).success,
-    ).toBe(false);
-    expect(
-      emailAudienceDefinitionSchema.safeParse({ ...definition, guestKinds: [] })
-        .success,
-    ).toBe(false);
-    expect(definition.consentConfirmed).toBe(false);
   });
 });
 describe("current send eligibility", () => {
@@ -103,7 +100,12 @@ describe("current send eligibility", () => {
       ),
     ).toBe("Unavailable");
     const oversized = filterEmailAudienceBatch(
-      Array.from({ length: 501 }, () => row("a@example.com")),
+      Array.from(
+        {
+          length: 501,
+        },
+        () => row("a@example.com"),
+      ),
       async () => new Map(),
     );
     expect(
@@ -122,15 +124,4 @@ describe("current send eligibility", () => {
       '"a@example.com","\'=1+1","user-1","one,""two""\nthree"\r\n',
     );
   });
-});
-
-test("saved JSONB ordering does not disable compilation", () => {
-  expect(emailAudienceDefinitionKey(definition)).toBe(
-    emailAudienceDefinitionKey({
-      consentConfirmed: definition.consentConfirmed,
-      guestKinds: [...definition.guestKinds].reverse(),
-      clickedWithinDays: definition.clickedWithinDays,
-      source: definition.source,
-    }),
-  );
 });

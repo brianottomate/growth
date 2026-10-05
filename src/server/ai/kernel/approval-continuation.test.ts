@@ -1,51 +1,63 @@
+import type { ModelMessage } from "ai";
 import { describe, expect, test } from "bun:test";
-import { generateText, tool, type ModelMessage, type UIMessage } from "ai";
+import { generateText, tool, type UIMessage } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
 import { z } from "zod";
-
 import {
   approvalHasExpired,
   isApprovalDenial,
   validateApprovalContinuation,
   withRequestContext,
 } from "./approval-continuation";
-
 const pending = {
   id: "assistant-1",
   role: "assistant",
   parts: [
-    { type: "step-start" },
+    {
+      type: "step-start",
+    },
     {
       type: "tool-publishingWrite",
       toolCallId: "call-1",
       state: "approval-requested",
-      input: { action: "scheduleSocialPost", timeZone: "Europe/Oslo" },
-      approval: { id: "approval-1" },
+      input: {
+        action: "scheduleSocialPost",
+        timeZone: "Europe/Oslo",
+      },
+      approval: {
+        id: "approval-1",
+      },
     },
   ],
 } as UIMessage;
-
 describe("validateApprovalContinuation", () => {
   test("accepts an approval response that changes only approval state", () => {
     const incoming = structuredClone(pending);
     const part = incoming.parts[1] as Record<string, unknown>;
     part.state = "approval-responded";
-    part.approval = { id: "approval-1", approved: true };
+    part.approval = {
+      id: "approval-1",
+      approved: true,
+    };
     expect(validateApprovalContinuation(pending, incoming)).toBeNull();
   });
-
   test("rejects changed tool input", () => {
     const incoming = structuredClone(pending);
     const part = incoming.parts[1] as Record<string, unknown>;
     part.state = "approval-responded";
-    part.approval = { id: "approval-1", approved: true };
-    part.input = { action: "scheduleSocialPost", timeZone: "UTC" };
+    part.approval = {
+      id: "approval-1",
+      approved: true,
+    };
+    part.input = {
+      action: "scheduleSocialPost",
+      timeZone: "UTC",
+    };
     expect(validateApprovalContinuation(pending, incoming)).toContain(
       "changed the requested action",
     );
   });
 });
-
 describe("approvalHasExpired", () => {
   test("expires after thirty minutes", () => {
     expect(
@@ -56,7 +68,6 @@ describe("approvalHasExpired", () => {
     ).toBe(true);
   });
 });
-
 test("expired actions may be denied, while mixed or approved responses still require a fresh approval", () => {
   const denial = {
     id: "m",
@@ -66,8 +77,13 @@ test("expired actions may be denied, while mixed or approved responses still req
         type: "tool-adsWrite__push",
         toolCallId: "c",
         state: "approval-responded",
-        input: { campaignId: "x" },
-        approval: { id: "a", approved: false },
+        input: {
+          campaignId: "x",
+        },
+        approval: {
+          id: "a",
+          approved: false,
+        },
       },
     ],
   } as UIMessage;
@@ -78,22 +94,36 @@ test("expired actions may be denied, while mixed or approved responses still req
       parts: [
         {
           ...denial.parts[0],
-          approval: { id: "a", approved: true },
+          approval: {
+            id: "a",
+            approved: true,
+          },
         } as UIMessage["parts"][number],
       ],
     }),
   ).toBe(false);
-  expect(isApprovalDenial({ id: "m", role: "assistant", parts: [] })).toBe(
-    false,
-  );
+  expect(
+    isApprovalDenial({
+      id: "m",
+      role: "assistant",
+      parts: [],
+    }),
+  ).toBe(false);
 });
-
 describe("withRequestContext", () => {
   const sheet: ModelMessage = {
     role: "user",
-    content: [{ type: "text", text: "Current ad images." }],
+    content: [
+      {
+        type: "text",
+        text: "Current ad images.",
+      },
+    ],
   };
-  const prompt: ModelMessage = { role: "user", content: "Reopen the ad" };
+  const prompt: ModelMessage = {
+    role: "user",
+    content: "Reopen the ad",
+  };
   const call: ModelMessage = {
     role: "assistant",
     content: [
@@ -101,7 +131,9 @@ describe("withRequestContext", () => {
         type: "tool-call",
         toolCallId: "call-1",
         toolName: "setAdStatus",
-        input: { status: "drawn" },
+        input: {
+          status: "drawn",
+        },
       },
       {
         type: "tool-approval-request",
@@ -120,27 +152,21 @@ describe("withRequestContext", () => {
       },
     ],
   };
-
-  test("appends after a user turn", () => {
-    expect(withRequestContext([prompt], [sheet])).toEqual([prompt, sheet]);
-  });
-
-  test("keeps an approval continuation ending on the tool message", () => {
-    expect(withRequestContext([prompt, call, approval], [sheet])).toEqual([
-      prompt,
-      sheet,
-      call,
-      approval,
-    ]);
-  });
-
   test("runs the approved call the SDK would otherwise skip", async () => {
     const run = async (messages: ModelMessage[]) => {
       let executed = false;
       const model = new MockLanguageModelV4({
         doGenerate: {
-          content: [{ type: "text", text: "Reopened." }],
-          finishReason: { unified: "stop", raw: undefined },
+          content: [
+            {
+              type: "text",
+              text: "Reopened.",
+            },
+          ],
+          finishReason: {
+            unified: "stop",
+            raw: undefined,
+          },
           usage: {
             inputTokens: {
               total: 1,
@@ -148,7 +174,11 @@ describe("withRequestContext", () => {
               cacheRead: undefined,
               cacheWrite: undefined,
             },
-            outputTokens: { total: 1, text: 1, reasoning: undefined },
+            outputTokens: {
+              total: 1,
+              text: 1,
+              reasoning: undefined,
+            },
           },
           warnings: [],
         },
@@ -158,10 +188,14 @@ describe("withRequestContext", () => {
         messages,
         tools: {
           setAdStatus: tool({
-            inputSchema: z.object({ status: z.string() }),
+            inputSchema: z.object({
+              status: z.string(),
+            }),
             execute: async () => {
               executed = true;
-              return { status: "drawn" };
+              return {
+                status: "drawn",
+              };
             },
           }),
         },

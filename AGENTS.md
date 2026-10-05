@@ -52,10 +52,19 @@ bun run build           # velite build + next build
 See `docs/quality-tooling.md` for the staged-format/pre-push hooks and shadcn policies.
 Use the full `ai:gauntlet` only with a current non-production Neon branch.
 
-Tests must protect a business rule, operator outcome, security boundary, or
-integration contract. Do not add tests solely to increase coverage, exercise
-mock wiring, or freeze a private implementation detail. See
-`docs/testing-principles.md` for the repository standard and review checklist.
+**Apply the 10% rule to tests:** write or retain only the highest-value roughly
+10% of plausible unit tests; default to omitting the other 90%. Routine UI,
+formatting, helper, and reversible implementation changes do not need new unit
+tests. Use the existing validation gates instead.
+
+Spend the test budget on unauthorized access, unintended spend/sends,
+cross-brand data, destructive writes, lost operator work, and consequential
+provider contracts. A real bug can earn a focused regression test. Before
+adding one, explain the concrete failure and why existing tests do not catch it;
+prefer replacing a weaker or duplicate test over growing the suite. Never add
+tests solely for coverage, mock wiring, prompt wording, or private implementation
+details. The 10% rule is a selection discipline, not a hard count cap or a reason
+to delete essential protection. See `docs/testing-principles.md` for the standard.
 
 One-off scripts live in `scripts/` (run via `bun run scripts/<file>.ts`) and
 `src/scripts/` (operational tooling, e.g. CIO sync/repair — see `cio:diagnose`/`cio:repair`).

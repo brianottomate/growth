@@ -1,11 +1,9 @@
+import type { MdxArticleRun } from "./mdx";
 import { describe, expect, test } from "bun:test";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-
 import { syncBlogDraft } from "./draft-mirror";
-import { serializeArticleMdx, type MdxArticleRun } from "./mdx";
-
 const run: MdxArticleRun = {
   runId: "fixture-first",
   stages: {
@@ -29,7 +27,6 @@ const run: MdxArticleRun = {
     },
   },
 };
-
 describe("Velite draft mirror", () => {
   test("updates an unchanged draft from a new run but preserves operator edits", async () => {
     const root = await mkdtemp(path.join(tmpdir(), "blog-mirror-"));
@@ -55,10 +52,12 @@ describe("Velite draft mirror", () => {
         "My manual edit.",
       );
     } finally {
-      await rm(root, { recursive: true, force: true });
+      await rm(root, {
+        recursive: true,
+        force: true,
+      });
     }
   });
-
   test("never resets an operator's publication date", async () => {
     const root = await mkdtemp(path.join(tmpdir(), "blog-mirror-"));
     try {
@@ -71,18 +70,10 @@ describe("Velite draft mirror", () => {
       expect(refusal).toBeInstanceOf(Error);
       expect((refusal as Error).message).toContain("publication date");
     } finally {
-      await rm(root, { recursive: true, force: true });
+      await rm(root, {
+        recursive: true,
+        force: true,
+      });
     }
-  });
-
-  test("exports model prose as inert Markdown and exposes synthetic evidence", () => {
-    const record = structuredClone(run);
-    record.stages.article.sections[0]!.markdown = "<script>{danger()}</script>";
-    const mdx = serializeArticleMdx(record);
-    expect(mdx).toContain("&lt;script>&#123;danger()&#125;");
-    expect(mdx).toContain("Synthetic facts for layout review only.");
-    expect(mdx).toContain('publishedAt: "9999-12-31"');
-    record.stages.article.sections[0]!.markdown = 'export const secret = "bad"';
-    expect(() => serializeArticleMdx(record)).toThrow("module statement");
   });
 });

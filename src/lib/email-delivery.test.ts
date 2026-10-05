@@ -1,12 +1,10 @@
+import type { MessageSendSnapshot } from "./email-delivery";
 import { describe, expect, test } from "bun:test";
-
 import {
   assertCustomerIoDeliveryTarget,
   assertProductUpdateReadyForDelivery,
   customerIoBroadcastData,
-  type MessageSendSnapshot,
 } from "./email-delivery";
-
 const snapshot: MessageSendSnapshot = {
   schema: "wander-growth.message-send.v1",
   format: "newsletter.broadcast",
@@ -34,11 +32,9 @@ const snapshot: MessageSendSnapshot = {
     text: "preview",
   },
 };
-
 describe("customerIoBroadcastData", () => {
   test("exposes approved content without copying recipients or preview HTML", () => {
     const data = customerIoBroadcastData("msg_123", snapshot);
-
     expect(data).toEqual({
       schema: "wander-growth.customerio-broadcast.v1",
       messageSendId: "msg_123",
@@ -54,7 +50,6 @@ describe("customerIoBroadcastData", () => {
     expect(data.growth.email.bodyHtml).toBe("<p>The product update.</p>");
   });
 });
-
 describe("assertProductUpdateReadyForDelivery", () => {
   const productUpdate = {
     periodStart: "2026-07-13T00:00:00.000Z",
@@ -71,16 +66,6 @@ describe("assertProductUpdateReadyForDelivery", () => {
       },
     ],
   };
-
-  test("accepts shipped operator updates", () => {
-    expect(() =>
-      assertProductUpdateReadyForDelivery({
-        productUpdate,
-        audienceKind: "wanderos_operators",
-      }),
-    ).not.toThrow();
-  });
-
   test("rejects the wrong audience and merged-only evidence", () => {
     expect(() =>
       assertProductUpdateReadyForDelivery({
@@ -88,7 +73,6 @@ describe("assertProductUpdateReadyForDelivery", () => {
         audienceKind: "subscribers",
       }),
     ).toThrow("only target the operator audience");
-
     expect(() =>
       assertProductUpdateReadyForDelivery({
         productUpdate: {
@@ -106,33 +90,26 @@ describe("assertProductUpdateReadyForDelivery", () => {
     ).toThrow("Verify these changes as shipped");
   });
 });
-
 describe("assertCustomerIoDeliveryTarget", () => {
-  const broadcast = { type: "api", state: "running", active: true };
-  const dynamicSegment = { type: "dynamic", state: "finished" };
-
-  test("accepts an active API broadcast and dynamic operator segment", () => {
-    expect(() =>
-      assertCustomerIoDeliveryTarget({
-        productUpdate: {
-          periodStart: "2026-07-13T00:00:00.000Z",
-          periodEnd: "2026-07-15T23:59:59.000Z",
-          changes: [],
-        },
-        broadcast,
-        segment: dynamicSegment,
-      }),
-    ).not.toThrow();
-  });
-
+  const broadcast = {
+    type: "api",
+    state: "running",
+    active: true,
+  };
+  const dynamicSegment = {
+    type: "dynamic",
+    state: "finished",
+  };
   test("rejects a normal campaign and a manual product-update segment", () => {
     expect(() =>
       assertCustomerIoDeliveryTarget({
-        broadcast: { ...broadcast, type: "event" },
+        broadcast: {
+          ...broadcast,
+          type: "event",
+        },
         segment: dynamicSegment,
       }),
     ).toThrow("API-triggered broadcast");
-
     expect(() =>
       assertCustomerIoDeliveryTarget({
         productUpdate: {
@@ -141,7 +118,10 @@ describe("assertCustomerIoDeliveryTarget", () => {
           changes: [],
         },
         broadcast,
-        segment: { type: "manual", state: "finished" },
+        segment: {
+          type: "manual",
+          state: "finished",
+        },
       }),
     ).toThrow("require a dynamic Customer.io segment");
   });

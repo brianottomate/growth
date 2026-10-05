@@ -1,22 +1,11 @@
+import type { CreateZernioStandaloneAdInput } from "@/server/clients/zernio.client";
 import { describe, expect, it } from "bun:test";
-
 import {
   assertMetaAdPayload,
-  estimateMonthlyKeywordCost,
-  extractPreviewFrames,
-  metaPageIdFromConnection,
   connectionRunsAsBrandPage,
   googlePauseOutcome,
-  googleDisplayImages,
   metaPromotedObjectFor,
-  tagMetaAdUtms,
-  videoPayloadFor,
-  withMetaAttribution,
-  metaPlacementAssetsFor,
 } from "@/server/services/ads-write.service";
-import { metaCallToActionType } from "@/lib/zernio-ads";
-import type { CreateZernioStandaloneAdInput } from "@/server/clients/zernio.client";
-
 /**
  * The provider contract for a Meta create. Both live failures this guards
  * against were rules Zernio documents and one of our three payload builders
@@ -35,95 +24,41 @@ const base: CreateZernioStandaloneAdInput = {
   linkUrl: "https://example.com",
   imageUrl: "https://cdn.example.com/a.jpg",
 };
-const account = { currency: "USD", minimumDailyBudget: 10 };
-const creative = {
-  name: "a",
-  headline: "A",
-  body: "b",
-  imageUrl: "https://cdn.example.com/a.jpg",
+const account = {
+  currency: "USD",
+  minimumDailyBudget: 10,
 };
-
-describe("tagMetaAdUtms", () => {
-  it("puts the house UTMs on the creative's URL parameters and leaves links clean", () => {
-    const out = tagMetaAdUtms({
-      ...base,
-      linkUrl: "https://winterparkescapes.com/",
-      carouselCards: [
-        {
-          imageUrl: "https://cdn.example.com/a.jpg",
-          linkUrl: "https://x.com/",
-        },
-      ],
-    });
-    expect(out.linkUrl).toBe("https://winterparkescapes.com/");
-    expect(out.carouselCards?.[0]?.linkUrl).toBe("https://x.com/");
-    expect(out.tracking?.urlTags).toEqual([
-      { key: "utm_source", value: "facebook" },
-      { key: "utm_medium", value: "paid_social" },
-      { key: "utm_campaign", value: "{{campaign.name}}" },
-      { key: "utm_term", value: "{{adset.name}}" },
-      { key: "utm_content", value: "{{ad.name}}" },
-    ]);
-  });
-});
-
 describe("assertMetaAdPayload", () => {
-  it("accepts a minimal single-creative ad", () => {
-    expect(() => assertMetaAdPayload(base, account)).not.toThrow();
-  });
-
-  it("requires a call to action, which Zernio rejects a Meta ad without", () => {
-    expect(() =>
-      assertMetaAdPayload({ ...base, callToAction: undefined }, account),
-    ).toThrow(/callToAction/);
-    // The attach shape inherits the ad set's button.
-    expect(() =>
-      assertMetaAdPayload(
-        { ...base, callToAction: undefined, adSetId: "set_1" },
-        account,
-      ),
-    ).not.toThrow();
-  });
-
   it("requires an end date for a lifetime budget", () => {
     expect(() =>
-      assertMetaAdPayload({ ...base, budgetType: "lifetime" }, account),
+      assertMetaAdPayload(
+        {
+          ...base,
+          budgetType: "lifetime",
+        },
+        account,
+      ),
     ).toThrow(/endDate/);
     expect(() =>
       assertMetaAdPayload(
-        { ...base, budgetType: "lifetime", endDate: "2026-09-30" },
+        {
+          ...base,
+          budgetType: "lifetime",
+          endDate: "2026-09-30",
+        },
         account,
       ),
     ).not.toThrow();
   });
-
-  it("requires headline and body on every creative", () => {
-    const payload = {
-      ...base,
-      imageUrl: undefined,
-      creatives: [creative, { ...creative, headline: "" }],
-    };
-    expect(() => assertMetaAdPayload(payload, account)).toThrow(
-      "creatives[1].headline is required",
-    );
-  });
-
-  it("rejects mixing creative shapes and requires one of them", () => {
-    expect(() =>
-      assertMetaAdPayload({ ...base, creatives: [creative] }, account),
-    ).toThrow(/one creative shape/);
-    expect(() =>
-      assertMetaAdPayload({ ...base, imageUrl: undefined }, account),
-    ).toThrow(/image, a video, a carousel, or a creatives array/);
-  });
-
   it("accepts a conversions goal backed by a custom conversion on its own, never beside a pixel", () => {
     expect(() =>
       assertMetaAdPayload(
         {
           ...base,
           goal: "conversions",
-          promotedObject: { customConversionId: "cc_1" },
+          promotedObject: {
+            customConversionId: "cc_1",
+          },
         },
         account,
       ),
@@ -134,16 +69,24 @@ describe("assertMetaAdPayload", () => {
         {
           ...base,
           goal: "conversions",
-          promotedObject: { pixelId: "px_1", customConversionId: "cc_1" },
+          promotedObject: {
+            pixelId: "px_1",
+            customConversionId: "cc_1",
+          },
         },
         account,
       ),
     ).toThrow(/without pixelId/);
     expect(() =>
-      assertMetaAdPayload({ ...base, goal: "conversions" }, account),
+      assertMetaAdPayload(
+        {
+          ...base,
+          goal: "conversions",
+        },
+        account,
+      ),
     ).toThrow(/pixelId/);
   });
-
   it("lets an ad set inherit its budget rather than restating it", () => {
     const { budgetAmount: _a, budgetType: _b, ...noBudget } = base;
     // Standalone: nothing owns the money, so this is a mistake.
@@ -153,188 +96,34 @@ describe("assertMetaAdPayload", () => {
     // Attaching to an existing ad set, and joining a CBO campaign, both have
     // an owner above them.
     expect(() =>
-      assertMetaAdPayload({ ...noBudget, adSetId: "1202500" }, account),
+      assertMetaAdPayload(
+        {
+          ...noBudget,
+          adSetId: "1202500",
+        },
+        account,
+      ),
     ).not.toThrow();
     expect(() =>
       assertMetaAdPayload(
-        { ...noBudget, existingCampaignId: "23850" },
+        {
+          ...noBudget,
+          existingCampaignId: "23850",
+        },
         account,
       ),
     ).not.toThrow();
   });
-
-  it("treats a carousel as its own creative shape", () => {
-    const cards = [
-      { imageUrl: "https://cdn.example.com/1.jpg", headline: "One" },
-      { imageUrl: "https://cdn.example.com/2.jpg", headline: "Two" },
-    ];
-    expect(() =>
-      assertMetaAdPayload(
-        { ...base, imageUrl: undefined, carouselCards: cards },
-        account,
-      ),
-    ).not.toThrow();
-    // Mixing shapes in one call is what Meta rejects.
-    expect(() =>
-      assertMetaAdPayload({ ...base, carouselCards: cards }, account),
-    ).toThrow(/one creative shape/);
-    expect(() =>
-      assertMetaAdPayload(
-        { ...base, imageUrl: undefined, carouselCards: cards.slice(0, 1) },
-        account,
-      ),
-    ).toThrow(/2\u201310 cards/);
-  });
-
   it("enforces the ad account's daily minimum", () => {
     expect(() =>
-      assertMetaAdPayload({ ...base, budgetAmount: 5 }, account),
+      assertMetaAdPayload(
+        {
+          ...base,
+          budgetAmount: 5,
+        },
+        account,
+      ),
     ).toThrow(/at least 10 USD/);
-  });
-});
-
-/**
- * This number caps the Google budget, so a wrong one either starves the brand
- * campaign or spends past the point of owning the terms.
- */
-describe("assertMetaAdPayload video rules", () => {
-  it("accepts a top-level video as its own creative shape", () => {
-    expect(() =>
-      assertMetaAdPayload(
-        {
-          ...base,
-          imageUrl: undefined,
-          video: {
-            url: "https://cdn.example.com/a.mp4",
-            thumbnailUrl: "https://cdn.example.com/a.jpg",
-          },
-        },
-        account,
-      ),
-    ).not.toThrow();
-  });
-
-  it("rejects a creative carrying both an image and a video", () => {
-    expect(() =>
-      assertMetaAdPayload(
-        {
-          ...base,
-          imageUrl: undefined,
-          creatives: [
-            {
-              ...creative,
-              video: {
-                url: "https://cdn.example.com/a.mp4",
-                thumbnailUrl: "https://cdn.example.com/a.jpg",
-              },
-            },
-          ],
-        },
-        account,
-      ),
-    ).toThrow(/exactly one of imageUrl or video/);
-  });
-
-  it("requires the still thumbnail on a video creative", () => {
-    expect(() =>
-      assertMetaAdPayload(
-        {
-          ...base,
-          imageUrl: undefined,
-          creatives: [
-            {
-              name: "v",
-              headline: "V",
-              body: "clip",
-              video: { url: "https://cdn.example.com/a.mp4" },
-            },
-          ],
-        },
-        account,
-      ),
-    ).toThrow(/thumbnailUrl is required/);
-  });
-});
-
-describe("videoPayloadFor", () => {
-  const content = (media: { url: string; thumbnail?: string }) => ({
-    headline: "V",
-    body: "clip",
-    media: [{ ...media, type: "video" as const }],
-  });
-
-  it("compiles the clip plus its still", () => {
-    expect(
-      videoPayloadFor(
-        "Concept A",
-        content({
-          url: "https://cdn.example.com/a.mp4",
-          thumbnail: "https://cdn.example.com/a.mp4.thumb.webp",
-        }),
-      ),
-    ).toEqual({
-      url: "https://cdn.example.com/a.mp4",
-      thumbnailUrl: "https://cdn.example.com/a.mp4.thumb.webp",
-    });
-  });
-
-  it("refuses a clip with no still", () => {
-    expect(() =>
-      videoPayloadFor("Concept A", content({ url: "https://x.test/a.mp4" })),
-    ).toThrow(/needs a still thumbnail/);
-  });
-
-  /**
-   * A poster-less pick used to carry the clip's own url as its thumbnail, which
-   * satisfies a presence check and is then rejected by Meta after the operator
-   * has already approved the push.
-   */
-  it("refuses a clip standing in as its own still", () => {
-    expect(() =>
-      videoPayloadFor(
-        "Concept A",
-        content({
-          url: "https://x.test/a.mp4",
-          thumbnail: "https://x.test/a.mp4",
-        }),
-      ),
-    ).toThrow(/needs a still thumbnail/);
-  });
-});
-
-describe("estimateMonthlyKeywordCost", () => {
-  const row = (
-    avgMonthlySearches: number | null,
-    averageCpc: number | null,
-    highTopOfPageBid: number | null = null,
-  ) => ({ avgMonthlySearches, averageCpc, highTopOfPageBid });
-
-  it("prices searches as clicks, not as impressions", () => {
-    // 1,000 searches at 35% CTR is 350 clicks, at $2 each.
-    expect(estimateMonthlyKeywordCost([row(1_000, 2)]).dollars).toBe(700);
-  });
-
-  it("falls back to the top-of-page bid when there is no average CPC", () => {
-    expect(estimateMonthlyKeywordCost([row(1_000, null, 4)]).dollars).toBe(
-      1_400,
-    );
-  });
-
-  it("reports what it could not price rather than treating it as free", () => {
-    const result = estimateMonthlyKeywordCost([
-      row(1_000, 2),
-      row(null, 2),
-      row(500, null),
-    ]);
-    expect(result.priced).toBe(1);
-    expect(result.unpriced).toBe(2);
-    expect(result.dollars).toBe(700);
-  });
-
-  it("carries the CTR assumption out with the number", () => {
-    const result = estimateMonthlyKeywordCost([row(1_000, 2)], 0.5);
-    expect(result.dollars).toBe(1_000);
-    expect(result.ctrAssumption).toBe(0.5);
   });
 });
 
@@ -344,13 +133,6 @@ describe("estimateMonthlyKeywordCost", () => {
  * over a delivering campaign is spend nobody is looking at.
  */
 describe("googlePauseOutcome", () => {
-  it("records paused only when the pause actually landed", () => {
-    expect(googlePauseOutcome({ paused: true })).toEqual({
-      status: "paused",
-      warnings: [],
-    });
-  });
-
   it("records live, with a warning, when there was no id to pause", () => {
     const outcome = googlePauseOutcome({
       paused: false,
@@ -359,7 +141,6 @@ describe("googlePauseOutcome", () => {
     expect(outcome.status).toBe("live");
     expect(outcome.warnings[0]).toMatch(/before it spends/);
   });
-
   it("carries the provider's reason out when the pause failed", () => {
     const outcome = googlePauseOutcome({
       paused: false,
@@ -373,70 +154,12 @@ describe("googlePauseOutcome", () => {
 });
 
 /**
- * Meta's preview response shape is the part most likely to drift, so the
- * extractor is pure and shape-agnostic: any string carrying an iframe counts.
- */
-describe("extractPreviewFrames", () => {
-  it("finds iframes at any nesting and decodes the src", () => {
-    const frames = extractPreviewFrames({
-      previews: [
-        {
-          format: "DESKTOP_FEED_STANDARD",
-          body: '<iframe src="https://www.facebook.com/ads/api/preview_iframe.php?d=abc&amp;t=1" width="500"></iframe>',
-        },
-      ],
-      nested: {
-        deep: ['<iframe src="https://fb.com/x?a=1&amp;b=2"></iframe>'],
-      },
-    });
-    expect(frames).toHaveLength(2);
-    expect(frames[0]?.src).toBe(
-      "https://www.facebook.com/ads/api/preview_iframe.php?d=abc&t=1",
-    );
-    expect(frames[1]?.src).toBe("https://fb.com/x?a=1&b=2");
-  });
-
-  it("returns empty for a response with no iframes, never throws", () => {
-    expect(extractPreviewFrames({ error: "nope" })).toEqual([]);
-    expect(extractPreviewFrames(null)).toEqual([]);
-    expect(extractPreviewFrames("plain text")).toEqual([]);
-  });
-
-  it("keeps an iframe with no src, flagged by the null", () => {
-    const frames = extractPreviewFrames(["<iframe></iframe>"]);
-    expect(frames).toHaveLength(1);
-    expect(frames[0]?.src).toBeNull();
-  });
-});
-
-describe("metaPageIdFromConnection", () => {
-  it("mines the page id out of Zernio's composite identity", () => {
-    expect(
-      metaPageIdFromConnection("27501783656071882:page:774615929078512"),
-    ).toBe("774615929078512");
-  });
-
-  it("returns null rather than guessing when there is no page segment", () => {
-    expect(metaPageIdFromConnection("27501783656071882")).toBeNull();
-    expect(metaPageIdFromConnection(undefined)).toBeNull();
-    expect(metaPageIdFromConnection(null)).toBeNull();
-  });
-});
-
-/**
  * Per-ad Page overrides must remain limited to verified connection grants.
  */
 describe("connectionRunsAsBrandPage", () => {
-  const winterPark = { metaPageId: "410431762630458" };
-
-  it("passes a connection bound to the brand's Page", () => {
-    expect(
-      connectionRunsAsBrandPage(winterPark, {
-        platformUserId: "27501783656071882:page:410431762630458",
-      }),
-    ).toBe(true);
-  });
-
+  const winterPark = {
+    metaPageId: "410431762630458",
+  };
   it("refuses a connection bound to another Page", () => {
     expect(
       connectionRunsAsBrandPage(winterPark, {
@@ -444,7 +167,6 @@ describe("connectionRunsAsBrandPage", () => {
       }),
     ).toBe(false);
   });
-
   it("allows a shared connection only for an explicitly granted brand Page", () => {
     const connection = {
       platformUserId: "27501783656071882:page:101399685529192",
@@ -456,285 +178,37 @@ describe("connectionRunsAsBrandPage", () => {
       connectionRunsAsBrandPage(winterPark, connection, ["1247371591803872"]),
     ).toBe(false);
   });
-
   it("refuses an unreadable identity rather than assuming", () => {
     expect(
-      connectionRunsAsBrandPage(winterPark, { platformUserId: undefined }),
+      connectionRunsAsBrandPage(winterPark, {
+        platformUserId: undefined,
+      }),
     ).toBe(false);
   });
-
-  it("passes any connection while the brand has no Page bound", () => {
-    expect(
-      connectionRunsAsBrandPage(
-        { metaPageId: null },
-        { platformUserId: "27501783656071882:page:101399685529192" },
-      ),
-    ).toBe(true);
-  });
 });
-
 describe("what a Meta ad set optimises toward", () => {
   const client = {
     name: "Winter Park Escapes",
     relationship: "client" as const,
   };
-  const purchase = { pixelId: "340252052212435", customEventType: "PURCHASE" };
-
-  it("runs a client on the shared pixel event by default", () => {
-    expect(metaPromotedObjectFor({ brand: client, meta: purchase })).toEqual(
-      purchase,
-    );
-  });
-
-  it("optimises on the brand's reporting conversion under host scope", () => {
-    expect(
-      metaPromotedObjectFor({
-        brand: client,
-        meta: { ...purchase, conversionScope: "host" },
-        reporting: {
-          customConversionId: "cc_wpe",
-          host: "winterparkescapes.com",
-        },
-        host: "winterparkescapes.com",
-      }),
-    ).toEqual({ customConversionId: "cc_wpe" });
-  });
-
-  it("refuses host scope before the brand has a reporting conversion", () => {
-    expect(() =>
-      metaPromotedObjectFor({
-        brand: client,
-        meta: { ...purchase, conversionScope: "host" },
-      }),
-    ).toThrow(/reporting conversion/);
-  });
-
+  const purchase = {
+    pixelId: "340252052212435",
+    customEventType: "PURCHASE",
+  };
   it("refuses a reporting conversion made for a previous website", () => {
     expect(() =>
       metaPromotedObjectFor({
         brand: client,
-        meta: { ...purchase, conversionScope: "host" },
-        reporting: { customConversionId: "cc_old", host: "old-site.com" },
+        meta: {
+          ...purchase,
+          conversionScope: "host",
+        },
+        reporting: {
+          customConversionId: "cc_old",
+          host: "old-site.com",
+        },
         host: "winterparkescapes.com",
       }),
     ).toThrow(/Recreate/);
-  });
-
-  it("lets an explicit custom conversion in the settings win", () => {
-    expect(
-      metaPromotedObjectFor({
-        brand: client,
-        meta: { ...purchase, customConversionId: "cc_pinned" },
-      }),
-    ).toEqual({ customConversionId: "cc_pinned" });
-  });
-
-  it("sends no promoted object when the settings name neither a pixel nor an event", () => {
-    expect(metaPromotedObjectFor({ brand: client, meta: {} })).toBeUndefined();
-  });
-});
-
-it("attaches a carousel to a conversion ad set without resending its pixel and budget", () => {
-  const payload: CreateZernioStandaloneAdInput = {
-    ...base,
-    adSetId: "existing_set",
-    goal: "conversions",
-    budgetAmount: undefined,
-    budgetType: undefined,
-    imageUrl: undefined,
-    carouselCards: [
-      { imageUrl: "https://example.com/1.jpg" },
-      { imageUrl: "https://example.com/2.jpg" },
-    ],
-  };
-  expect(() => assertMetaAdPayload(payload, account)).not.toThrow();
-  expect(() =>
-    assertMetaAdPayload(
-      { ...payload, adSetId: undefined, budgetAmount: 50 },
-      account,
-    ),
-  ).toThrow(/pixelId/);
-  expect(() =>
-    assertMetaAdPayload(
-      {
-        ...payload,
-        carouselCards: undefined,
-        existingCreativeId: "creative_1",
-      },
-      account,
-    ),
-  ).not.toThrow();
-});
-
-describe("Google draft display crops", () => {
-  it("preserves distinct reviewed crops instead of overwriting them with the ad image", () => {
-    const images = {
-      landscape: "https://example.com/wide.jpg",
-      square: "https://example.com/square.jpg",
-    };
-    expect(
-      googleDisplayImages(images, "https://example.com/creative.jpg"),
-    ).toEqual(images);
-    expect(googleDisplayImages(images, undefined)).toEqual(images);
-  });
-  it("keeps existing single-image drafts usable and rejects missing media", () => {
-    expect(
-      googleDisplayImages(undefined, "https://example.com/ad.jpg"),
-    ).toEqual({
-      landscape: "https://example.com/ad.jpg",
-      square: "https://example.com/ad.jpg",
-    });
-    expect(() => googleDisplayImages(undefined, undefined)).toThrow(
-      "needs landscape and square",
-    );
-  });
-});
-
-describe("metaCallToActionType", () => {
-  it("sends Meta's Book now button, never the type Ads Manager reads as Unknown", () => {
-    expect(metaCallToActionType("BOOK_NOW")).toBe("BOOK_TRAVEL");
-    expect(metaCallToActionType("LEARN_MORE")).toBe("LEARN_MORE");
-  });
-});
-
-describe("withMetaAttribution", () => {
-  const base = {
-    accountId: "acc",
-    adAccountId: "act_1",
-    name: "Ad",
-    goal: "conversions" as const,
-    headline: "Stay",
-    body: "Book direct",
-  };
-
-  it("gives every new ad set 7-day click and 1-day view", () => {
-    expect(withMetaAttribution(base).attributionSpec).toEqual([
-      { eventType: "CLICK_THROUGH", windowDays: 7 },
-      { eventType: "VIEW_THROUGH", windowDays: 1 },
-    ]);
-  });
-
-  it("sends no window on an attach, which Zernio refuses", () => {
-    expect(
-      withMetaAttribution({ ...base, adSetId: "123" }).attributionSpec,
-    ).toBeUndefined();
-  });
-});
-
-describe("metaPlacementAssetsFor", () => {
-  const plan = ["facebook-feed", "instagram-feed", "instagram-reel"] as const;
-  it("pins an image's square to Facebook and its 9:16 to Reels, Instagram feed keeps the default", () => {
-    const assets = metaPlacementAssetsFor(
-      {
-        format: "static",
-        headline: "Falls",
-        body: "A hidden chalet",
-        media: [
-          {
-            type: "image",
-            url: "https://r2.test/portrait.png",
-            story: {
-              type: "image",
-              url: "https://r2.test/story.png",
-              via: "upload",
-            },
-          },
-        ],
-        ideaStudio: {
-          document: {} as never,
-          approval: {
-            approvedAt: "now",
-            approvedBy: "u",
-            sourceVersion: "v",
-            renders: {
-              square: [{ assetId: "a", url: "https://r2.test/square.png" }],
-            },
-          },
-        },
-      },
-      [...plan],
-    );
-    expect(assets).toEqual({
-      defaultImageUrl: "https://r2.test/portrait.png",
-      rules: [
-        {
-          imageUrl: "https://r2.test/story.png",
-          placements: {
-            publisherPlatforms: ["instagram"],
-            instagramPositions: ["reels"],
-          },
-        },
-        {
-          imageUrl: "https://r2.test/square.png",
-          placements: {
-            publisherPlatforms: ["facebook"],
-            facebookPositions: ["feed"],
-          },
-        },
-      ],
-    });
-  });
-
-  it("pins a video ad's 9:16 cut to Reels in an all-video block", () => {
-    const assets = metaPlacementAssetsFor(
-      {
-        format: "video",
-        headline: "Falls",
-        body: "A hidden chalet",
-        media: [
-          {
-            type: "video",
-            url: "https://r2.test/feed.mp4",
-            thumbnail: "https://r2.test/feed.jpg",
-            story: {
-              type: "video",
-              url: "https://r2.test/delivery.mp4",
-              thumbnail: "https://r2.test/delivery.jpg",
-              via: "crop",
-            },
-          },
-        ],
-      },
-      [...plan],
-    );
-    expect(assets).toEqual({
-      defaultVideoUrl: "https://r2.test/feed.mp4",
-      defaultThumbnailUrl: "https://r2.test/feed.jpg",
-      rules: [
-        {
-          videoUrl: "https://r2.test/delivery.mp4",
-          thumbnailUrl: "https://r2.test/delivery.jpg",
-          placements: {
-            publisherPlatforms: ["instagram"],
-            instagramPositions: ["reels"],
-          },
-        },
-      ],
-    });
-    expect(JSON.stringify(assets)).not.toContain("imageUrl");
-  });
-
-  it("sends no block for a video whose story is a still", () => {
-    expect(
-      metaPlacementAssetsFor(
-        {
-          format: "video",
-          headline: "Falls",
-          body: "A hidden chalet",
-          media: [
-            {
-              type: "video",
-              url: "https://r2.test/feed.mp4",
-              story: {
-                type: "image",
-                url: "https://r2.test/story.jpg",
-                via: "upload",
-              },
-            },
-          ],
-        },
-        [...plan],
-      ),
-    ).toBeUndefined();
   });
 });

@@ -120,7 +120,8 @@ stateless and safe to distribute across Vercel instances. Existing clients can
 continue negotiating the stateless 2025 transport while ChatGPT and Claude
 migrate independently. No server-side MCP session store is required.
 
-Local protocol checks pin both paths and verify the connector-safe catalog:
+The retained local protocol smoke test covers one modern SDK round trip and
+verifies the connector-safe catalog. It does not exercise the legacy fallback:
 
 ```sh
 bun run test:mcp:protocol

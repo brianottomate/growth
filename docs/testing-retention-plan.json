@@ -1,0 +1,2802 @@
+{
+  "status": "applied with 10 approved restorations and 15 newly added upstream cases preserved",
+  "baseline": "df9f28f55d60e2219e86de6425fb02284802730a",
+  "branch": "audit/test-value",
+  "denominator": "Executed top-level Bun cases; expanded test.each/loop cases count individually. Child fixture assertions are not separate cases. Lines and files are not the 10% denominator.",
+  "counts": {
+    "baselineCases": 992,
+    "keepCases": 109,
+    "purgeCases": 883,
+    "keepPercent": 10.99,
+    "baselineFiles": 185,
+    "retainedFiles": 27,
+    "deleteFiles": 158,
+    "keepAllFiles": 8,
+    "trimFiles": 19
+  },
+  "method": "Inventory all executed names; inspect selected test code and boundaries; prioritize unauthorized access, unintended external changes, money, cross-brand data, irreversible operator data loss. No coverage target. Not a complete mutation audit or measured estimate of future incident rate.",
+  "otherGatesToRetain": [
+    "bun run check (including scripts/quality-toolchain.mjs)",
+    "bun run ai:contracts",
+    "Vercel preview build before merge"
+  ],
+  "importantLostProtection": [
+    "Google/LinkedIn payload edge cases and social publishing formats",
+    "BDR routing/round-robin and guest import normalization",
+    "Most Performance intake/settings regressions (partial updates and concurrency restored)",
+    "Most creative sizing, layout, editing and export correctness",
+    "Voice lifecycle regressions (admission restored)",
+    "Email DNS policy cases other than the selected DMARC guard",
+    "Blog grounding checks other than the selected layout cases"
+  ],
+  "cleanupOrder": [
+    "Remove prompt phrase, markup syntax, static table restatement and presentation-only tests first.",
+    "Apply the exact remaining budget decisions including partial-file trims.",
+    "Keep test/setup.ts and required dependencies of retained tests. Remove child-only fixture files only after checking references.",
+    "Make retained suite and AI contract gate enforceable in CI, and make pure checks independent of real credentials."
+  ],
+  "files": [
+    {
+      "file": "agents/gdpr-scan/agent/lib/trackers.test.ts",
+      "decision": "delete-file",
+      "currentLines": 90,
+      "keep": [],
+      "purge": [
+        "catalogFor > resolves www. and subdomains to the apex catalog",
+        "catalogFor > unknown merchant hosts fall back to the WanderOS default",
+        "matchTracker > matches vendor subdomains",
+        "matchTracker > does not flag ordinary facebook.com links as a pixel",
+        "matchTracker > leaves non-tracking hosts alone",
+        "matchTrackerUrl > catches first-party reverse-proxied trackers",
+        "matchTrackerUrl > still catches direct third-party hosts",
+        "matchTrackerUrl > does not flag ordinary first-party assets",
+        "matchTrackerUrl > survives unparsable input",
+        "INLINE_SIGNATURES > Osano matches script/API usage but not prose",
+        "INLINE_SIGNATURES > gtag and fbq fire on calls, not on the bare word"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "scripts/copy-eval/schemas.test.ts",
+      "decision": "delete-file",
+      "currentLines": 45,
+      "keep": [],
+      "purge": [
+        "photo edits preserve extraction evidence when writing the JSON back",
+        "malformed card identity and crop are rejected before downstream writes"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "scripts/production-schema-contract.test.ts",
+      "decision": "keep-all",
+      "currentLines": 33,
+      "keep": [
+        "a zero-exit database failure must stop the production release",
+        "normal schema completion and SQL error columns are accepted",
+        "a nonzero schema process always blocks deployment"
+      ],
+      "purge": [],
+      "category": "Release safety",
+      "reason": "A failed schema push cannot proceed into a production release even when the child exit code is zero."
+    },
+    {
+      "file": "src/app/api/webhooks/pregen/route.test.ts",
+      "decision": "delete-file",
+      "currentLines": 58,
+      "keep": [],
+      "purge": [
+        "hostFromUrl > normalises the shapes WanderOS will send",
+        "hostFromUrl > keeps a real subdomain, which is a different lead",
+        "hostFromUrl > returns null rather than guessing at an unparseable source",
+        "tokenFromPreviewUrl > extracts the t param from a canonical preview URL",
+        "tokenFromPreviewUrl > returns null when there is no token to extract"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/app/app/newsletters/[id]/email-blocks.test.ts",
+      "decision": "delete-file",
+      "currentLines": 60,
+      "keep": [],
+      "purge": [
+        "email image edits retain the original photo, template and exact copy across reopening"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/app/app/newsletters/[id]/email-field-html.test.ts",
+      "decision": "delete-file",
+      "currentLines": 34,
+      "keep": [],
+      "purge": [
+        "field editing preserves escaped fallbacks, URLs and unknown tokens"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/app/app/performance/clients/[brandSlug]/_preview-home.test.ts",
+      "decision": "delete-file",
+      "currentLines": 47,
+      "keep": [],
+      "purge": [
+        "website image previews need no representative home",
+        "previously selected home photos survive without importing property claims",
+        "explicit image wins; no available image leaves the preview empty"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/app/lab/design-system/chat/fixtures.test.ts",
+      "decision": "delete-file",
+      "currentLines": 13,
+      "keep": [],
+      "purge": [
+        "assistant gallery contract > every result previews an advertised Growth action"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/ad-approval-assets.test.ts",
+      "decision": "delete-file",
+      "currentLines": 70,
+      "keep": [],
+      "purge": [
+        "approval reuses exact supplied artwork with canonical URL and preserves original ownership",
+        "Story approval uses its own supplied asset rather than the portrait source",
+        "compositions and artwork requiring transformation still render"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/ad-idea-studio.test.ts",
+      "decision": "trim",
+      "currentLines": 378,
+      "keep": [
+        "approval projects frozen assets into every delivery surface and reopening preserves recipes",
+        "a damaged approval never falls back to mutable preview URLs",
+        "saved approval images > an approval counts as saved only when every size has every card",
+        "changing only the second carousel card's Story image text preserves its feed and every other card",
+        "card booking links survive saving, approval and every placement projection"
+      ],
+      "purge": [
+        "editable ad ideas > retains editable recipes and separate copy through save and reload",
+        "editable ad ideas > uses shape overrides without changing other shapes or supplied artwork",
+        "editable ad ideas > a size-specific replacement leaves the base and other sizes alone",
+        "editable ad ideas > explicitly blank sizes survive saving, never preview a crop, and block readiness only when included",
+        "editable ad ideas > allows incomplete shells but rejects multiple static images and duplicate slides",
+        "deselecting a slide retains its base and size artwork in the pool without duplicates",
+        "a pool can exceed the slide limit for both statics and carousels",
+        "retains export selection independently of editable sizes and compositions",
+        "Meta copy per card > a card's own headline and description reach the ad; blanks inherit",
+        "Meta copy per card > clearing the description in the idea clears it on the ad",
+        "Meta copy per card > old documents without card copy still parse"
+      ],
+      "category": "Content and operator data",
+      "reason": "Delivery uses approved assets and preserves booking destinations; damaged approval does not fall back to mutable images."
+    },
+    {
+      "file": "src/lib/ad-placement-edits.test.ts",
+      "decision": "delete-file",
+      "currentLines": 142,
+      "keep": [],
+      "purge": [
+        "withCopy > writes an override on an empty map",
+        "withCopy > merges fields and leaves untouched ones alone",
+        "withCopy > a null clears one field back to the base",
+        "withCopy > clearing the last override drops the cell entirely",
+        "withCopy > does not mutate the input map",
+        "withCard > sets one card and pads the array to the card count",
+        "withCard > clearing the only card drops the cell",
+        "withCard > an out-of-range index throws",
+        "withCard > a card and a copy override coexist in one cell",
+        "withFrozen / withUnfrozen > freeze stamps the cell and pins copy and cards",
+        "withFrozen / withUnfrozen > a frozen cell with no copy or cards is still kept, never pruned",
+        "withFrozen / withUnfrozen > unfreeze removes the stamp but keeps the files",
+        "withFrozen / withUnfrozen > unfreeze of a cell whose only content was the stamp drops it",
+        "withFrozen / withUnfrozen > unfreeze is a no-op on a cell that is not frozen",
+        "withoutKey > drops the key and does not touch the input"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/ad-placements.test.ts",
+      "decision": "delete-file",
+      "currentLines": 203,
+      "keep": [],
+      "purge": [
+        "resolveCell > an ad with no placements renders the base into every cell",
+        "resolveCell > a selective copy edit changes one cell and leaves the base alone",
+        "resolveCell > a cell's own file wins for that card only; the rest crop the base",
+        "resolveCell > frozen outranks overridden and carries its timestamp",
+        "resolveCell > an entry with nothing decided in it still renders",
+        "legacy story slot > card.story resolves as the story cell so old ads look unchanged",
+        "legacy story slot > an explicit story entry wins over the legacy slot",
+        "copy fit > flags copy over the placement's limits and a missing required button",
+        "copy fit > copy within limits is fit",
+        "coverage > counts each state and the unfit cells for the collapsed row"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/ad-platforms.test.ts",
+      "decision": "delete-file",
+      "currentLines": 110,
+      "keep": [],
+      "purge": [
+        "ad platform table > the literal tuples restate the table",
+        "ad platform table > platforms, keys and Zernio names are unique",
+        "ad platform table > no ads connection name is a social platform name",
+        "ad platform table > a pushable platform is reachable through Zernio and offers goals",
+        "ad platform table > maps every Zernio spelling of a paid platform, and no social one",
+        "ad platform table > round-trips between channel platform and Zernio key",
+        "ad platform table > LinkedIn deep links point at Campaign Manager for the numeric account"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/ad-preview-links.test.ts",
+      "decision": "delete-file",
+      "currentLines": 32,
+      "keep": [],
+      "purge": [
+        "home links preserve existing absolute http(s) listing destinations",
+        "missing, malformed and unsafe home destinations do not become links"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/adapt-homes-prompt.test.ts",
+      "decision": "delete-file",
+      "currentLines": 25,
+      "keep": [],
+      "purge": [
+        "adaptHomesPrompt > carries the issue and asks for a reply the paste reader can take",
+        "adaptHomesPrompt > asks for one shared stay, written into each price line"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/amplification-slack.test.ts",
+      "decision": "delete-file",
+      "currentLines": 36,
+      "keep": [],
+      "purge": [
+        "amplification Slack handoff > accepts Slack member ids and rejects handles",
+        "amplification Slack handoff > formats a tagged, actionable request"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/assistant-focus.test.ts",
+      "decision": "delete-file",
+      "currentLines": 138,
+      "keep": [],
+      "purge": [
+        "assistant focus across client navigation > following the new client's page drops the previous ad target",
+        "assistant focus across client navigation > a page without a campaign never revives a saved campaign",
+        "assistant focus across client navigation > pinning a brand or content item clears an older ad focus",
+        "assistant focus across client navigation > a deliberate pin stays selected while browsing another client",
+        "assistant focus across client navigation > an explicit new campaign intent takes precedence over the old pin",
+        "campaign navigation > both campaign routes and their by-home views identify the same record",
+        "campaign navigation > platform campaign and list routes do not masquerade as authored campaigns",
+        "campaign navigation > home and billing deep links identify their own records",
+        "a cleared catalog focus survives persistence and ordinary follow-ups",
+        "switching intent or following the page ends catalog focus",
+        "a correction may follow the selected home across navigation but cannot change homes",
+        "legacy Performance links resolve the same assistant focus as client links"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless.",
+      "upstreamPurged": [
+        "legacy Performance links resolve the same assistant focus as client links"
+      ]
+    },
+    {
+      "file": "src/lib/assistant-route-behavior.test.ts",
+      "decision": "delete-file",
+      "currentLines": 17,
+      "keep": [],
+      "purge": [
+        "assistant route behavior > opens on the assistant's own home",
+        "assistant route behavior > opens beside an individual blog article without changing other blog surfaces"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/assistant-thread-markdown.test.ts",
+      "decision": "delete-file",
+      "currentLines": 45,
+      "keep": [],
+      "purge": [
+        "assistantThreadAsMarkdown > exports readable text plus tool activity and the durable thread id"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/assistant-voice.test.ts",
+      "decision": "delete-file",
+      "currentLines": 155,
+      "keep": [],
+      "purge": [
+        "readable voice transcripts > a long call keeps its beginning and final words",
+        "readable voice transcripts > token boundaries preserve words while speech cues and speaker changes render cleanly",
+        "spoken workspace requests > late and duplicate captions stay ordered without submitting a request twice",
+        "spoken workspace requests > a rejected request remains recoverable as an editable draft",
+        "verified spoken results > a pending approval cannot be spoken as a completed campaign change",
+        "verified spoken results > tool JSON and model reasoning never become spoken commentary",
+        "verified spoken results > an interrupted approval continuation cannot be spoken as a completed action",
+        "verified spoken results > a failed tool prevents unqualified success wording"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/assistant-write-effect.test.ts",
+      "decision": "delete-file",
+      "currentLines": 35,
+      "keep": [],
+      "purge": [
+        "assistant write reconciliation > keeps direct write capabilities refreshing their surrounding page",
+        "assistant write reconciliation > refreshes after a blog sub-agent changes or reconciles an article",
+        "assistant write reconciliation > does not refresh for read-only blog work or an unattached upload"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/audience-asset.test.ts",
+      "decision": "delete-file",
+      "currentLines": 53,
+      "keep": [],
+      "purge": [
+        "targetedAsset > an asset linked to the campaign audience beats the persona's",
+        "targetedAsset > a persona's lookalike reaches every campaign audience derived from it",
+        "targetedAsset > ignores assets on other platforms and ones Meta has not given an id"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/audience-map.test.ts",
+      "decision": "delete-file",
+      "currentLines": 46,
+      "keep": [],
+      "purge": [
+        "broad US highlights every US state but not foreign countries",
+        "Colorado saved as a region narrows US coverage and marks the world view partial",
+        "city-only and unresolved regions never imply state-wide targeting",
+        "foreign region codes are not confused with US states; empty targeting is not worldwide",
+        "combined broad and narrow audiences show their union"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/audience-model.test.js",
+      "decision": "delete-file",
+      "currentLines": 47,
+      "keep": [],
+      "purge": [
+        "audience model > keeps global and specific geography distinct",
+        "audience model > rejects a specific scope without included markets",
+        "audience model > rejects inverted demographic ranges",
+        "audience model > creates stable profile slugs"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/auth-utils.test.ts",
+      "decision": "keep-all",
+      "currentLines": 43,
+      "keep": [
+        "auth return paths > accepts internal paths and rejects external or protocol-relative URLs",
+        "auth return paths > keeps safe context between auth pages",
+        "auth return paths > uses a safe fallback for external callback parameters"
+      ],
+      "purge": [],
+      "category": "Access and privacy",
+      "reason": "Authentication return URLs cannot redirect operators to external origins."
+    },
+    {
+      "file": "src/lib/booking-target.test.ts",
+      "decision": "delete-file",
+      "currentLines": 64,
+      "keep": [],
+      "purge": [
+        "date-only targets let availability choose homes without copying search identity",
+        "group targets use stable external unit IDs alongside dates",
+        "property targets preserve the property path and reject other brands",
+        "booking targets reject impossible dates, partial stays and ambiguous selections"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/brand-preview-copy.test.ts",
+      "decision": "delete-file",
+      "currentLines": 41,
+      "keep": [],
+      "purge": [
+        "sample creatives use the generated copy in the fields their template supports",
+        "older marks without sample copy still preview",
+        "generated sample copy must fit the small creative previews"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/browser-evidence.test.ts",
+      "decision": "delete-file",
+      "currentLines": 89,
+      "keep": [],
+      "purge": [
+        "public identities discard tracking and reject credentials or unrelated hosts",
+        "a draft remains distinct from a posted receipt",
+        "duplicate identities and observations outside the run are rejected"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/carousel-import.test.ts",
+      "decision": "delete-file",
+      "currentLines": 66,
+      "keep": [],
+      "purge": [
+        "carousel import > naturally sorts nested folder and ZIP paths",
+        "carousel import > ignores metadata and non-image ZIP entries",
+        "carousel import > enforces count and warns about platform cropping"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/catalog-addresses.test.ts",
+      "decision": "delete-file",
+      "currentLines": 76,
+      "keep": [],
+      "purge": [
+        "warehouse enrichment joins exact string IDs and freezes addresses in feed cells",
+        "missing street stays blank and is flagged without discarding coordinates"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/catalog-copy.test.ts",
+      "decision": "delete-file",
+      "currentLines": 36,
+      "keep": [],
+      "purge": [
+        "amenities on nearly every home are the brand's",
+        "a small catalog has no brand-wide amenities",
+        "a label listed twice on one home counts once",
+        "em dashes are caught, hyphens and en dashes are not"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/catalog-studio.test.ts",
+      "decision": "delete-file",
+      "currentLines": 262,
+      "keep": [],
+      "purge": [
+        "a card is its defaults until its row overrides a field",
+        "a card draws on the home's hero unless it has its own library image",
+        "export has one row per included home and uses its frozen primary artwork",
+        "finished artwork keeps the composition underneath it",
+        "finished artwork requires an original and cannot silently generate other export sizes",
+        "catalog-place splits the headline into lead-in and place",
+        "an unedited card says only what is never wrong",
+        "approval holds until what the card shows changes",
+        "an excluded card never holds the export",
+        "finished artwork stays approved when fields it does not draw change",
+        "a catalog-place headline the card cannot draw is refused, others pass",
+        "a card names its market as soon as it is drafted, else the town",
+        "a frozen amenities card keeps its pills and location",
+        "4:5 supplied artwork on a square catalog is caught before export",
+        "artwork is labelled by its pixels, or not at all"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/chat-approval-state.test.ts",
+      "decision": "delete-file",
+      "currentLines": 20,
+      "keep": [],
+      "purge": [
+        "isApprovalSuperseded > supersedes an approval after the operator sends another message",
+        "isApprovalSuperseded > keeps the latest approval actionable"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/chat-attachment.test.ts",
+      "decision": "trim",
+      "currentLines": 210,
+      "keep": [
+        "isOwnedChatImageUrl > accepts the operator's own public chat upload",
+        "isOwnedChatImageUrl > rejects another operator's chat upload",
+        "isOwnedChatImageUrl > rejects lookalike hosts and non-https URLs",
+        "isOwnedChatImageUrl > fails closed when the public base URL is unset",
+        "isOwnedChatImagePath > accepts only a direct file in the operator's chat folder"
+      ],
+      "purge": [
+        "findLatestOwnedChatImages > returns the complete newest image set in message order",
+        "findLatestOwnedChatImages > filters foreign and non-image files without dropping owned images",
+        "findLatestOwnedChatImages > keeps the singular lookup compatible",
+        "chat video attachments > accepts supported video MIME types with the larger video limit",
+        "chat video attachments > resolves the newest owned image and video set"
+      ],
+      "category": "Access and privacy",
+      "reason": "Assistant attachment identities remain scoped to the uploading operator and configured origin."
+    },
+    {
+      "file": "src/lib/chat-turns.test.ts",
+      "decision": "delete-file",
+      "currentLines": 66,
+      "keep": [],
+      "purge": [
+        "pending provider approval blocks a queue until answered or superseded",
+        "queue accepts user messages and rejects forged assistant approvals",
+        "next options tolerate the implicit single action while bounding suggestions"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/compositions.test.ts",
+      "decision": "delete-file",
+      "currentLines": 315,
+      "keep": [],
+      "purge": [
+        "composition blueprints > keeps blueprint and canvas identifiers unique",
+        "composition blueprints > registers exact publishing dimensions",
+        "composition blueprints > resolves every registered blueprint and canvas",
+        "composition blueprints > accepts a reproducible owned-media composition spec",
+        "composition blueprints > requires owned media for every image-led blueprint",
+        "composition blueprints > rejects unbounded text, invalid accents, and blank asset titles",
+        "composition blueprints > preserves the versioned recipe saved with a frozen asset",
+        "composition blueprints > a focal point and a scrim tint are part of what makes a render",
+        "composition identity > is the metadata without the render time, so a rerun can find it",
+        "the fields a blueprint declares > every blueprint declares its fields, and only photo only draws none",
+        "the fields a blueprint declares > a blueprint that requires a headline declares a title field, and vice versa",
+        "the fields a blueprint declares > the place and review cards are the ones with a rating",
+        "photo only > is the one blueprint that renders without a headline",
+        "home preview copy > brings a ten-point feed rating onto the card's five-point pill",
+        "home preview copy > writes the place with the state code the cards use",
+        "home preview copy > leads the catalog headline on the home's best amenities",
+        "tier badge > draws no headline but needs a tier",
+        "tier badge > a Luxury and an Iconic card of one photo are two renders"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/content-readiness.test.ts",
+      "decision": "delete-file",
+      "currentLines": 64,
+      "keep": [],
+      "purge": [
+        "getContentReadiness > does not require media for a text rendering",
+        "getContentReadiness > requires production media for image and video renderings",
+        "getContentReadiness > treats Story copy as internal notes while still requiring media",
+        "getContentReadiness > recognizes an item already in review"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/conversion-reality.test.ts",
+      "decision": "delete-file",
+      "currentLines": 86,
+      "keep": [],
+      "purge": [
+        "conversion reality findings > flags missing primary mappings without mutating provider state",
+        "conversion reality findings > recognizes cleanup labels and implementation status",
+        "conversion reality findings > detects duplicate provider IDs and similarly named actions",
+        "conversion reality findings > returns no findings for one verified mapped primary"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/copy-lab.test.ts",
+      "decision": "delete-file",
+      "currentLines": 147,
+      "keep": [],
+      "purge": [
+        "copy lab fixture render boundary > allows the selected home's frozen photos and thumbnails",
+        "copy lab fixture render boundary > refuses arbitrary URLs, other homes, other brands and library assets",
+        "a whole-home experiment requires a nonempty placement and template set",
+        "portable experiments retain partial results and inspiration"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/copy-variation.test.ts",
+      "decision": "delete-file",
+      "currentLines": 15,
+      "keep": [],
+      "purge": [
+        "regeneration cannot count punctuation and casing changes as a new hook"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/creative-image-prompt.test.ts",
+      "decision": "delete-file",
+      "currentLines": 55,
+      "keep": [],
+      "purge": [
+        "buildCreativeImagePrompt > carries the reviewed brief and negative prompt into generation",
+        "buildCreativeImagePrompt > treats reference images as factual source material",
+        "buildCreativeImagePrompt > offers grounded alternatives for unreferenced property imagery"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/dato-markdown.test.ts",
+      "decision": "delete-file",
+      "currentLines": 26,
+      "keep": [],
+      "purge": [
+        "Dato Markdown conversion > preserves a complete article body in readable order"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/dato-structured-text.test.ts",
+      "decision": "delete-file",
+      "currentLines": 32,
+      "keep": [],
+      "purge": [
+        "Dato structured text > keeps the complete draft prose in reading order for analysis"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/design-studio-export.test.ts",
+      "decision": "delete-file",
+      "currentLines": 104,
+      "keep": [],
+      "purge": [
+        "Design Studio export > prints a featured home the way the weekly issue does",
+        "Design Studio export > a listed home is a 40/60 row, New when unrated, shorter savings line",
+        "Design Studio export > escapes the ampersands in its links",
+        "Design Studio export > one block per market, a divider between, Explore only where known",
+        "Design Studio export > headings read as titles",
+        "the intro > sits above the markets with her greeting, minus the model's salutation",
+        "the intro > no intro, no greeting section"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/dropped-files.test.ts",
+      "decision": "delete-file",
+      "currentLines": 74,
+      "keep": [],
+      "purge": [
+        "droppedFiles > reads a flat drop straight off the DataTransfer",
+        "droppedFiles > still returns the files when no entry is available",
+        "droppedFiles > falls back to the flat list when a directory walk yields nothing",
+        "droppedFiles > reads a file-input change event",
+        "droppedFiles > returns nothing for an event carrying neither"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/email-audience.test.ts",
+      "decision": "trim",
+      "currentLines": 136,
+      "keep": [
+        "warehouse audience boundaries > Customer.io population cannot be selected for a property manager",
+        "warehouse audience boundaries > WanderOS needs a linked website and cannot claim click-history filtering",
+        "current send eligibility > case duplicates collapse and only explicit current approval passes",
+        "current send eligibility > suppression service failure and oversized batches cannot bypass the gate",
+        "current send eligibility > CSV escapes quotes, embedded line breaks and spreadsheet formulas"
+      ],
+      "purge": [
+        "warehouse audience boundaries > invalid engagement and empty recipient sources are rejected",
+        "saved JSONB ordering does not disable compilation"
+      ],
+      "category": "Email safety",
+      "reason": "Audience scope, current suppression checks and safe export are preserved."
+    },
+    {
+      "file": "src/lib/email-delivery.test.ts",
+      "decision": "trim",
+      "currentLines": 148,
+      "keep": [
+        "customerIoBroadcastData > exposes approved content without copying recipients or preview HTML",
+        "assertProductUpdateReadyForDelivery > rejects the wrong audience and merged-only evidence",
+        "assertCustomerIoDeliveryTarget > rejects a normal campaign and a manual product-update segment"
+      ],
+      "purge": [
+        "assertProductUpdateReadyForDelivery > accepts shipped operator updates",
+        "assertCustomerIoDeliveryTarget > accepts an active API broadcast and dynamic operator segment"
+      ],
+      "category": "Email safety",
+      "reason": "Approved handoff does not expose recipient selectors; wrong delivery targets and unshipped claims are blocked."
+    },
+    {
+      "file": "src/lib/email-dmarc.test.ts",
+      "decision": "trim",
+      "currentLines": 76,
+      "keep": [
+        "existing inherited protection is preserved even when a starter is requested",
+        "failed lookups and ambiguous or malformed policies never authorize a replacement"
+      ],
+      "purge": [
+        "direct marketing policy takes precedence and root sp governs inheritance",
+        "a missing policy produces a marketing-only record requiring consent"
+      ],
+      "category": "Email safety",
+      "reason": "DNS lookup errors and ambiguous policies cannot authorize replacement of existing email protection."
+    },
+    {
+      "file": "src/lib/email-dns.test.ts",
+      "decision": "delete-file",
+      "currentLines": 101,
+      "keep": [],
+      "purge": [
+        "marketing email DNS scope > accepts configurable subdomains and rejects URLs, IPs and nested labels",
+        "marketing email DNS scope > uses the pending rotation key and only email records relative to the explicit DNS zone",
+        "marketing email DNS scope > rejects missing keys, a mismatched provider domain and records outside the marketing subdomain"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/email-document.test.ts",
+      "decision": "delete-file",
+      "currentLines": 126,
+      "keep": [],
+      "purge": [
+        "formatEmailImplementationHandoff > exports a deterministic product implementation brief",
+        "formatEmailImplementationHandoff > does not invent or export recipient and credential data",
+        "formatEmailImplementationHandoff > carries exact release evidence into the implementation handoff",
+        "formatEmailImplementationHandoff > rejects inverted windows and unverified shipped evidence"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/featured-home-selection.test.ts",
+      "decision": "delete-file",
+      "currentLines": 13,
+      "keep": [],
+      "purge": [
+        "ranked recommendations add new homes in order without replacing selections",
+        "the featured set stays within capacity"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/first-comment.test.ts",
+      "decision": "delete-file",
+      "currentLines": 49,
+      "keep": [],
+      "purge": [
+        "first comments > caption edits preserve queued and posted first-comment receipts",
+        "first comments > allows supported feed posts and excludes stories",
+        "first comments > labels receipt states for the content card"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/google-drive.test.ts",
+      "decision": "delete-file",
+      "currentLines": 77,
+      "keep": [],
+      "purge": [
+        "drive query > excludes trash and restricts to rehostable image types",
+        "drive query > includes folders only when browsing",
+        "drive query > scopes to a parent folder and a name search",
+        "drive query > escapes quotes so a crafted name cannot break out of the query",
+        "thumbnails > swaps Drive's size suffix",
+        "thumbnails > leaves an unsized link alone",
+        "ordering > sorts numerically the way a person reads a folder",
+        "ordering > puts folders ahead of files"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/home-amenities.test.ts",
+      "decision": "delete-file",
+      "currentLines": 44,
+      "keep": [],
+      "purge": [
+        "home amenities > utilities never headline, selling amenities rank first",
+        "home amenities > a description only vouches for in-home features it plainly names",
+        "home amenities > a city view outranks a workspace",
+        "home amenities > the listing's own labels win over its description"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/marketplace-content.test.ts",
+      "decision": "delete-file",
+      "currentLines": 45,
+      "keep": [],
+      "purge": [
+        "marketplace content > keeps source proof separate from open placements",
+        "marketplace content > puts missing work before verification"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/media-accept.test.ts",
+      "decision": "delete-file",
+      "currentLines": 62,
+      "keep": [],
+      "purge": [
+        "media accept table > advertises no type the uploader will not take",
+        "media accept table > carries no wildcard, which would let HEIC and SVG past the zone",
+        "media accept table > gives every advertised type at least one extension, for folder picks",
+        "media accept table > offers video only in the media map, not the stills-only one",
+        "media accept table > keeps GIF a kind of its own, as kindForMime expects",
+        "media accept table > caps video at the ceiling createUploadUrl enforces"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/media-export-bundles.test.ts",
+      "decision": "delete-file",
+      "currentLines": 39,
+      "keep": [],
+      "purge": [
+        "an approval occupies one library entry while source photos remain separate",
+        "different ads and approval revisions never share a bundle",
+        "filtered results contain only matching exports and malformed metadata stays accessible"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/media-review.test.ts",
+      "decision": "delete-file",
+      "currentLines": 37,
+      "keep": [],
+      "purge": [
+        "website photo candidates > removes obvious interface assets, malformed URLs, and insecure images",
+        "website photo candidates > deduplicates fragments without collapsing distinct CDN source photos",
+        "website photo candidates > bounds the review inbox per scraped page"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/media-url.test.ts",
+      "decision": "delete-file",
+      "currentLines": 21,
+      "keep": [],
+      "purge": [
+        "mediaTypeForUrl > reads video containers off the path, query strings included",
+        "mediaTypeForUrl > everything else is an image"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/meta-hotel-feed.test.ts",
+      "decision": "delete-file",
+      "currentLines": 75,
+      "keep": [],
+      "purge": [
+        "hotel feed > a home without a photo is not a row; the caller reports it",
+        "hotel feed > price is Meta's number-then-currency form, and absent when the feed had none",
+        "hotel feed > the description is written from the facts only",
+        "hotel feed > CSV keeps the template's column order and quotes commas and quotes",
+        "hotel feed > XML is the hotel listings document, with markup in names escaped"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/meta-import.test.ts",
+      "decision": "delete-file",
+      "currentLines": 62,
+      "keep": [],
+      "purge": [
+        "imported catalog classification > recognizes product-backed templates even without recovered images",
+        "imported catalog classification > does not label an ordinary carousel or an unresolved image ad as catalog",
+        "imported Meta copy > keeps the description and each card's own words"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/meta-leadgen.test.ts",
+      "decision": "delete-file",
+      "currentLines": 156,
+      "keep": [],
+      "purge": [
+        "parseUnitCount — who counts as a qualified (10+) lead > Sept conditional form buckets: 1-10 is not qualified, 10-199 is",
+        "parseUnitCount — who counts as a qualified (10+) lead > free-text ranges count by their low end",
+        "parseUnitCount — who counts as a qualified (10+) lead > a Yes/No gate carries no count; the free-text follow-up does",
+        "parseUnitCount — who counts as a qualified (10+) lead > an upper bound is not a count at that bound",
+        "parseUnitCount — who counts as a qualified (10+) lead > phone-number-sized junk is ignored",
+        "verifyMetaSignature > accepts Meta's signature and rejects anything else",
+        "parseLeadgenWebhook keeps leadgen changes only",
+        "leadContact reads work_email, which the Spanish long form uses instead of email",
+        "guest waitlist leads are not operator leads, so they are never routed",
+        "only a real booking site reaches HubSpot's company lookup"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/meta-placement-plan.test.ts",
+      "decision": "delete-file",
+      "currentLines": 286,
+      "keep": [],
+      "purge": [
+        "Meta placement delivery > an approval waiting for its push is pending, not a blocker",
+        "Meta placement delivery > sends exactly the selected publisher positions",
+        "Meta placement delivery > defaults to every Facebook and Instagram surface but in-stream and search",
+        "Meta placement delivery > gives feed-shaped surfaces the baseline card",
+        "Meta placement delivery > does not substitute a feed crop for missing vertical artwork",
+        "Meta placement delivery > sends a video ad's 9:16 cut to Stories and Reels, and never its feed crop",
+        "Meta placement delivery > uses canonical carousel cards for vertical delivery",
+        "Meta source reconstruction > keeps placement variants on one static ad and recovers the designated base",
+        "Meta source reconstruction > recovers ordered carousel artwork separately for Feed and Stories",
+        "Meta source reconstruction > flags ambiguous dynamic pools and malformed live destinations for review",
+        "Meta source reconstruction > uses child attachment order for real carousels",
+        "metaPlacementFits > marks a carousel's stories and reels as fitted by Meta",
+        "metaPlacementFits > needs a 9:16 before a static reaches stories"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/meta-preview.test.ts",
+      "decision": "delete-file",
+      "currentLines": 148,
+      "keep": [],
+      "purge": [
+        "does not invent placements before delivery is configured",
+        "never previews recovered but unapproved artwork",
+        "previews a draft live but never publishes it, and rejects stale frozen assets",
+        "labels automatic source settings without pretending manual selection or observed delivery",
+        "previews a carousel's feed cards in feeds and its 9:16 cards in Stories, as the push delivers them",
+        "previews an approval waiting for its push live, while publishing still refuses it"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/meta-schedule.test.ts",
+      "decision": "delete-file",
+      "currentLines": 38,
+      "keep": [],
+      "purge": [
+        "daily campaigns can launch without dates and lifetime budgets need an end",
+        "existing inherited dates survive unless operator explicitly chooses no schedule",
+        "expired and reversed schedules cannot be pushed"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/meta-tracking.test.ts",
+      "decision": "delete-file",
+      "currentLines": 15,
+      "keep": [],
+      "purge": [
+        "blank draft tracking inherits verified defaults, explicit choices win"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/newsletter-review-source.test.ts",
+      "decision": "trim",
+      "currentLines": 39,
+      "keep": [
+        "newsletter review snapshot > capture blocks script, event handlers, forms and navigation"
+      ],
+      "purge": [
+        "newsletter review snapshot > preserves footer copy and destinations without executable source",
+        "newsletter review snapshot > uses declared template image defaults without fabricating guest data"
+      ],
+      "category": "Content and operator data",
+      "reason": "Imported HTML capture removes active scripting and navigation."
+    },
+    {
+      "file": "src/lib/og-studio.test.ts",
+      "decision": "delete-file",
+      "currentLines": 64,
+      "keep": [],
+      "purge": [
+        "public OG rendering contract > image input cannot select external URLs or filesystem paths",
+        "public OG rendering contract > metadata requests use square cards by default",
+        "public OG rendering contract > copied designs round-trip punctuation and square dimensions",
+        "public OG rendering contract > public requests bound copy and ignore unsupported layout values"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/onboarding-slack.test.ts",
+      "decision": "delete-file",
+      "currentLines": 29,
+      "keep": [],
+      "purge": [
+        "resolveOnboardingSlackHeadline > a pre-auth lead with no org yet reads as started, not stuck",
+        "resolveOnboardingSlackHeadline > an org that exists but hasn't finished onboarding reads as stuck",
+        "resolveOnboardingSlackHeadline > onboardingComplete wins regardless of orgId"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/ota-savings.test.ts",
+      "decision": "delete-file",
+      "currentLines": 32,
+      "keep": [],
+      "purge": [
+        "otaSavingsUsd > matches the site for 401554 cents",
+        "otaSavingsUsd > matches the site for 60804 cents",
+        "otaSavingsUsd > matches the site for 248585 cents",
+        "otaSavingsUsd > matches the site for 172895 cents",
+        "otaSavingsUsd > shows nothing outside the US",
+        "otaSavingsUsd > takes a country code",
+        "stayTotalUsd > rounds up to the dollar, like the card"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/performance-ads.test.ts",
+      "decision": "delete-file",
+      "currentLines": 556,
+      "keep": [],
+      "purge": [
+        "naming > names a client campaign by sale, purchase and month",
+        "naming > defaults the period to the current month",
+        "naming > keeps PERF+ off Wander's own brands",
+        "naming > names an ad set by audience family and booking states",
+        "naming > maps audiences onto the three families",
+        "naming > names an ad by format and property, property kept readable",
+        "naming > reads the format off the ad's media",
+        "business key > is stable across surfaces for the same ad",
+        "business key > separates the same ad across cycles, so a relaunch is a new ad",
+        "audience count follows budget > runs a single lookalike at Away & Stay's budget",
+        "audience count follows budget > adds the prospecting list once there is money to split",
+        "audience count follows budget > opens up the full set at agency-scale budgets",
+        "daily budget > derives from media budget, not the billed amount",
+        "daily budget > splits across ad sets so a multi-audience build stays in plan",
+        "daily budget > never rounds a customer's budget up",
+        "daily budget > floors at the account minimum",
+        "daily budget > rejects a zero-day period",
+        "ad plan > draws a static, a carousel and a catalog card per home, plus the three set slices",
+        "ad plan > keeps the portfolio carousel and the catalog ad as separate ads",
+        "ad plan > scales to a portfolio without changing shape",
+        "ad plan > refuses an empty portfolio",
+        "the name a draft is born with > leads with the finance prefix for a paying client",
+        "the name a draft is born with > keeps the same shape without PERF+ for Wander's own brands",
+        "conversion scoping > names the custom conversion with the Performance prefix and the event",
+        "conversion scoping > filters on the pixel event as well as the host",
+        "conversion scoping > reuses a live conversion with the same rule under any name",
+        "conversion scoping > refuses to reuse our name when its rule is different",
+        "what an ad is > believes the declared format over the cards",
+        "what an ad is > reads an undeclared ad the way the push always has",
+        "what an ad is > names every multi-card shape a carousel in Ads Manager",
+        "the home a file is about > reads Brooke's export names",
+        "the home a file is about > gives nothing rather than a guess for a file that does not read that way",
+        "editing an ad's cards > fills a shell one card at a time",
+        "editing an ad's cards > keeps a static to one card",
+        "editing an ad's cards > refuses a clip on an image ad and an image on a video ad",
+        "editing an ad's cards > stops at Meta's ten",
+        "editing an ad's cards > moves and removes by position",
+        "which homes a set built by count runs on > puts the homes on the client's record first, in their order",
+        "which homes a set built by count runs on > skips a home with no photo and stops at the count",
+        "a finished creative's filename, read whole > reads brand, home, format, headline and size",
+        "a finished creative's filename, read whole > pairs a feed file with its story twin by everything but the size",
+        "a finished creative's filename, read whole > drops the slide number from a carousel's headline and copes with no size",
+        "a finished creative's filename, read whole > names the placement a ratio fits"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/performance-billing.test.ts",
+      "decision": "delete-file",
+      "currentLines": 42,
+      "keep": [],
+      "purge": [
+        "billing period > keys the cycle by UTC month so a late-night US payment lands in the right month",
+        "billing lines > fee and media settle independently",
+        "billing lines > an unknown amount still reports its state"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/performance-card.test.ts",
+      "decision": "delete-file",
+      "currentLines": 146,
+      "keep": [],
+      "purge": [
+        "Recorded Performance card state > catalog rework preserves a live platform and the manual journey",
+        "Recorded Performance card state > pausing delivery and clearing a fact do not reset other recorded work",
+        "Recorded Performance card state > campaign counts do not imply delivery, payment, or client progression",
+        "Recorded Performance card state > configured amounts and zero spend survive without billing-cycle defaults",
+        "Recorded Performance card state > Zernio access is independently recorded and survives creative updates",
+        "Recorded Performance card state > not-created platforms stay hidden without hiding draft and paused work",
+        "Recorded Performance card state > state input rejects unsupported statuses and invalid recorded facts",
+        "Recorded Performance card state > confirmed fees retain cents instead of rounding to a fixture amount",
+        "Recorded Performance card state > external website links allow only web protocols"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/performance-navigation.test.ts",
+      "decision": "delete-file",
+      "currentLines": 21,
+      "keep": [],
+      "purge": [
+        "client navigation distinguishes Setup, Settings, and Overview"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/performance-pipeline.test.ts",
+      "decision": "delete-file",
+      "currentLines": 40,
+      "keep": [],
+      "purge": [
+        "Manual Performance pipeline > an explicitly assigned stage wins over relationship defaults",
+        "Manual Performance pipeline > legacy review stays pre-launch in onboarding",
+        "Manual Performance pipeline > unassigned records start at their relationship entry column",
+        "Manual Performance pipeline > campaign activity does not move an explicitly onboarding client",
+        "Manual Performance pipeline > launch prep remains manual even with live delivery"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/performance-readiness.test.ts",
+      "decision": "delete-file",
+      "currentLines": 95,
+      "keep": [],
+      "purge": [
+        "readinessChecklist > a fresh client has nothing ticked",
+        "readinessChecklist > 'all of them' on the intake is not homes on record",
+        "readinessChecklist > access claimed on the intake does not count as verified",
+        "readinessChecklist > a finished phase reads as done, and so does a finished list",
+        "readinessChecklist > an audience without a lookalike says so, because the lookalike goes first"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/performance-stage.test.ts",
+      "decision": "delete-file",
+      "currentLines": 70,
+      "keep": [],
+      "purge": [
+        "legacy split > every old stage lands on a real pair",
+        "legacy split > everything past signed keeps the signature",
+        "legacy split > closed stages stay closed and nothing before signed becomes a client",
+        "laterStage > never walks backwards within one lifecycle",
+        "client line > signed, paid and paused are clients; the rest are not"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/persona-suggestions.test.ts",
+      "decision": "delete-file",
+      "currentLines": 29,
+      "keep": [],
+      "purge": [
+        "persona starter suggestions > preserves existing personas across case and spacing variants",
+        "persona starter suggestions > removes repeated suggestions and blank names",
+        "persona starter suggestions > keeps a starter set small"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/pitch-settings.test.ts",
+      "decision": "delete-file",
+      "currentLines": 82,
+      "keep": [],
+      "purge": [
+        "pitch exports contain presentation settings, never the writer identity or private CRM fields",
+        "persisted media is shareable and proposed pricing retains a deliberate zero",
+        "the public pitch includes only selected homes from this brand, or all when unset",
+        "storage keeps explicit overrides sparse and inherits updated brand/default values"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/platform-link-preview.test.ts",
+      "decision": "delete-file",
+      "currentLines": 18,
+      "keep": [],
+      "purge": [
+        "supportsNativeLinkPreview > matches platforms that render article cards from post URLs",
+        "supportsNativeLinkPreview > does not promise an unfurl for caption-only platforms"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/platform-post-document.test.ts",
+      "decision": "delete-file",
+      "currentLines": 186,
+      "keep": [],
+      "purge": [
+        "platform post documents > round-trips paragraphs, hard breaks, and X mentions",
+        "platform post documents > round-trips native LinkedIn mentions as atomic nodes",
+        "platform post documents > does not parse email addresses or overlong X handles as mentions",
+        "platform post documents > normalizes X profile URLs and rejects invalid handles",
+        "platform post documents > keeps LinkedIn profiles structured until provider resolution",
+        "platform post documents > accepts only LinkedIn profile and company URLs",
+        "platform post documents > uses stored structure only while it matches the current text",
+        "canonical editor equality ignores framework attributes while retaining mention identity",
+        "empty LinkedIn slugs are rejected before provider resolution"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/platform-post-link.test.ts",
+      "decision": "delete-file",
+      "currentLines": 15,
+      "keep": [],
+      "purge": ["appendLiveUrlToPlatformPost > adds a source URL once"],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/platform-sequence.test.ts",
+      "decision": "delete-file",
+      "currentLines": 41,
+      "keep": [],
+      "purge": [
+        "platform publishing sequences > recognizes the Story formats the connected publishing surfaces support",
+        "platform publishing sequences > models each provider Story as one media frame inside an ordered unit",
+        "platform publishing sequences > gives ordered provider jobs deterministic one-minute offsets",
+        "platform publishing sequences > uses Story language without changing thread language"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/platform-thread.test.ts",
+      "decision": "delete-file",
+      "currentLines": 53,
+      "keep": [],
+      "purge": [
+        "platform thread grouping > keeps an ordered reply chain inside one publishing unit",
+        "platform thread grouping > keeps orphaned replies visible for repair",
+        "platform thread grouping > uses thread formats only while a sequence has multiple posts",
+        "platform thread grouping > uses X's fixed t.co length for URLs"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/product-atlas.test.ts",
+      "decision": "delete-file",
+      "currentLines": 152,
+      "keep": [],
+      "purge": [
+        "Product Atlas document > accepts the empty v1 graph",
+        "Product Atlas document > rejects broken story to view links",
+        "Product Atlas document > rejects views whose surface is absent",
+        "Storefront reference snapshots > accepts a bounded marketplace comparison snapshot",
+        "Storefront reference snapshots > rejects unbounded or invalid image evidence",
+        "Storefront content > keeps screenshots separate and distinguishes marketing composites",
+        "Storefront content > groups ChatGPT and Claude without sharing their records"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/scheduling-time.test.ts",
+      "decision": "delete-file",
+      "currentLines": 45,
+      "keep": [],
+      "purge": [
+        "resolveZonedDateTime > resolves Oslo summer wall-clock time to UTC",
+        "resolveZonedDateTime > rejects a missing spring-forward time",
+        "resolveZonedDateTime > rejects an ambiguous fall-back time",
+        "resolveZonedDateTime > renders the agreed timezone and canonical UTC"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/seed-list.test.ts",
+      "decision": "delete-file",
+      "currentLines": 36,
+      "keep": [],
+      "purge": [
+        "parseSeedList > reads Meta's template, where email repeats, by its first email column",
+        "parseSeedList > keeps quoted fields with commas intact and skips rows with nothing to match",
+        "parseSeedList > dedupes repeated contacts so the upload count is people, not rows"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/series-runway.test.ts",
+      "decision": "delete-file",
+      "currentLines": 45,
+      "keep": [],
+      "purge": [
+        "series runway > uses the fastest cross-post cadence",
+        "series runway > keeps unscheduled drafts as reserve rather than coverage",
+        "series runway > has no runway until cadence exists"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/social-post-preview.test.ts",
+      "decision": "delete-file",
+      "currentLines": 54,
+      "keep": [],
+      "purge": [
+        "social post preview model > keeps the requested post identity and strips excess media",
+        "social post preview model > falls back to the post username and safe empty copy"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/starter-ad-generation.test.ts",
+      "decision": "delete-file",
+      "currentLines": 143,
+      "keep": [],
+      "purge": [
+        "generated statics and carousels share copy and use selected real photos with editable story layouts",
+        "feed-only requests do not imply vertical creative support",
+        "a generated reference cannot select a photo outside the home contact sheet",
+        "starter compositions follow ad roles instead of model-selected templates",
+        "trimHomeCards > keeps the opener and the close when the model returns too many",
+        "trimHomeCards > leaves a carousel at or under the count alone"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/starter-ad-ideas.test.ts",
+      "decision": "delete-file",
+      "currentLines": 156,
+      "keep": [],
+      "purge": [
+        "starter package has a hero carousel and four paired static/carousel ideas, without a catalog",
+        "starter ideas require no photos, destination or generated copy",
+        "starter workflow creates the hero first, then statics, then home carousels",
+        "featured homes produce the shared hero and ordered per-home drafts with source photos and links",
+        "featured starter identity survives reordering homes and starts with six carousel images",
+        "WanderOS fills static pools with heroes and home carousel pools with the first six gallery images",
+        "curated home photos keep their order beyond the default six-card starter",
+        "blank and featured starters include every creative size for export"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/upload-with-progress.test.ts",
+      "decision": "delete-file",
+      "currentLines": 132,
+      "keep": [],
+      "purge": [
+        "putWithProgress > re-arms the inactivity timeout whenever bytes move",
+        "putWithProgress > distinguishes an operator cancellation from an idle timeout",
+        "putWithProgress > reports progress and clears the default timer after success"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/us-states.test.ts",
+      "decision": "delete-file",
+      "currentLines": 35,
+      "keep": [],
+      "purge": [
+        "usStateCode > collapses a name and its code to one value",
+        "usStateCode > tolerates the whitespace and casing real rows arrive with",
+        "usStateCode > returns null rather than guessing at anything it does not know",
+        "usStateCode > round-trips against usStateName"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/video-renditions.test.ts",
+      "decision": "delete-file",
+      "currentLines": 83,
+      "keep": [],
+      "purge": [
+        "parseFfmpegProbe > reads size, length, codec and audio off an editor export",
+        "parseFfmpegProbe > reports the displayed size of a phone clip stored sideways",
+        "parseFfmpegProbe > returns null when ffmpeg found no video",
+        "renditionPlan > scales a 4K 9:16 master to 1080x1920 and cuts a 1080x1350 feed crop",
+        "renditionPlan > never upscales, and keeps a landscape clip landscape with no feed crop",
+        "renditionPlan > does not call a 4:5 clip vertical, and has nothing to crop",
+        "renditionPlan > decodes once and writes the feed crop from the same pass"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/wanderos-site-detection.test.ts",
+      "decision": "delete-file",
+      "currentLines": 33,
+      "keep": [],
+      "purge": [
+        "generic numeric HTML and lookalike origins never mark a site as WanderOS",
+        "Wander-owned website asset URLs supply the site id"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/web-page-preview.test.ts",
+      "decision": "delete-file",
+      "currentLines": 81,
+      "keep": [],
+      "purge": [
+        "page read unfurls > shows the site's social copy and resolves relative image assets",
+        "page read unfurls > falls back to ordinary metadata without inventing a scraped-text description",
+        "page read unfurls > does not load private, credential-bearing or executable image URLs",
+        "page read unfurls > saved results remain readable and new unfurls survive the wire contract"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/workspace-changes.test.ts",
+      "decision": "delete-file",
+      "currentLines": 16,
+      "keep": [],
+      "purge": [
+        "operation and saved grouped receipts invalidate the same dependent domains"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/workspace-navigation.test.ts",
+      "decision": "delete-file",
+      "currentLines": 25,
+      "keep": [],
+      "purge": [
+        "workspace navigation > keeps named destinations on real app routes",
+        "workspace navigation > allows safe app paths as a forward-compatible fallback",
+        "workspace navigation > rejects external and non-workspace paths"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/zernio-ads.test.ts",
+      "decision": "delete-file",
+      "currentLines": 212,
+      "keep": [],
+      "purge": [
+        "Zernio ad account boundaries > matches Meta account ids with or without act_",
+        "Zernio ad account boundaries > matches formatted Google customer ids to the allowlist form",
+        "Zernio ad account boundaries > keeps Meta and Google connections explicit",
+        "Zernio ad account boundaries > forces every Meta standalone tree to stay paused",
+        "Zernio ad account boundaries > enforces the platform-specific Google creative requirements",
+        "LinkedIn boundaries > matches sponsored accounts by number or URN",
+        "LinkedIn boundaries > keeps the ads connection apart from the Company Page connection",
+        "LinkedIn boundaries > pauses the whole hierarchy and never asks for a dry run",
+        "LinkedIn boundaries > states what a from-scratch LinkedIn campaign cannot be",
+        "provider-write idempotency > a business key survives a different run, so a re-run cannot double-create",
+        "provider-write idempotency > a business key ignores payload drift, so a corrected budget replays the original create",
+        "provider-write idempotency > campaign type separates keys for the same deal and PM",
+        "provider-write idempotency > without a business key the key stays run-scoped and payload-sensitive",
+        "provider-write idempotency > business keys normalize casing and whitespace across surfaces",
+        "Meta uses Book now by default and respects the selected CTA"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/zernio-reschedule.test.ts",
+      "decision": "delete-file",
+      "currentLines": 30,
+      "keep": [],
+      "purge": [
+        "Zernio reschedule payload > preserves provider copy, media, target settings, and metadata"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/lib/zernio-webhook.test.ts",
+      "decision": "delete-file",
+      "currentLines": 30,
+      "keep": [],
+      "purge": [
+        "Zernio webhook > parses delivery envelopes and classifies events",
+        "Zernio webhook > verifies the raw request body"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/ai/capabilities/catalog-retirement.test.ts",
+      "decision": "delete-file",
+      "currentLines": 88,
+      "keep": [],
+      "purge": [
+        "retired actions are rejected by executable schemas",
+        "specialized Meta creation rejects standard campaign goals",
+        "Google draft input and output preserve separate crops"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/ai/capabilities/outputs/brands.test.ts",
+      "decision": "delete-file",
+      "currentLines": 51,
+      "keep": [],
+      "purge": [
+        "brand reads and status receipts preserve enriched home amenities"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/ai/kernel/ads-policy.test.ts",
+      "decision": "trim",
+      "currentLines": 80,
+      "keep": [
+        "ads action policy > push requires operator approval and stays off MCP",
+        "ads action policy > setDelivery requires operator approval and stays off MCP",
+        "ads action policy > deletePlatformCampaign requires operator approval and stays off MCP",
+        "ads action policy > createSpecializedMetaDraft requires operator approval and stays off MCP",
+        "ads action policy > boostMetaPost requires operator approval and stays off MCP",
+        "ads action policy > duplicateMetaCampaign requires operator approval and stays off MCP",
+        "ads action policy > approving an ad is the operator's sign-off, not the model's"
+      ],
+      "purge": [
+        "ads action policy > planPlatform stays a local write needing no approval",
+        "ads action policy > draftCampaign stays a local write needing no approval",
+        "ads action policy > draftAd stays a local write needing no approval",
+        "ads action policy > addAudience stays a local write needing no approval",
+        "ads action policy > setCreativePool stays a local write needing no approval",
+        "ads action policy > setPlatformDraft stays a local write needing no approval",
+        "ads action policy > attachCampaign stays a local write needing no approval",
+        "ads action policy > importMetaCampaign stays a local write needing no approval",
+        "ads action policy > deleteCampaignDraft stays a local write needing no approval",
+        "ads action policy > deleteAudience stays a local write needing no approval",
+        "ads action policy > deleteAdDraft stays a local write needing no approval",
+        "ads action policy > deleting a live campaign is irreversible, unlike pausing it",
+        "ads action policy > pushing retains its receipt and explicit deletion recovery",
+        "ads action policy > reading a campaign needs no approval and reaches every surface"
+      ],
+      "category": "AI writes",
+      "reason": "Spend-capable actions and approval of artwork remain operator controlled."
+    },
+    {
+      "file": "src/server/ai/kernel/approval-continuation.test.ts",
+      "decision": "trim",
+      "currentLines": 177,
+      "keep": [
+        "validateApprovalContinuation > accepts an approval response that changes only approval state",
+        "validateApprovalContinuation > rejects changed tool input",
+        "approvalHasExpired > expires after thirty minutes",
+        "expired actions may be denied, while mixed or approved responses still require a fresh approval",
+        "withRequestContext > runs the approved call the SDK would otherwise skip"
+      ],
+      "purge": [
+        "withRequestContext > appends after a user turn",
+        "withRequestContext > keeps an approval continuation ending on the tool message"
+      ],
+      "category": "AI writes",
+      "reason": "Operator approval binds to the actual action and the SDK executes the approved continuation."
+    },
+    {
+      "file": "src/server/ai/kernel/chat-context.test.ts",
+      "decision": "delete-file",
+      "currentLines": 223,
+      "keep": [],
+      "purge": [
+        "future chat recovery > an interrupted approval is evidence of uncertainty, never a replayable call on a new user turn",
+        "future chat recovery > a validated trailing approval remains executable and retains its exact input",
+        "model context > follow-up instructions retain earlier uploaded images without restoring other file types",
+        "model context > a large individual editable document remains complete within the expanded guardrail",
+        "model context > catalog inventory preserves every editable card and ID without loading galleries or export rows",
+        "model context > campaign inventory directs edits to an individual document and keeps versions and all ad IDs",
+        "model context > oversized documents are explicitly omitted, never truncated into an editable partial document",
+        "model context > per-step compaction keeps user corrections and matching recent call/result IDs"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/ai/kernel/chat-token-budget.test.ts",
+      "decision": "delete-file",
+      "currentLines": 150,
+      "keep": [],
+      "purge": [
+        "the provider budget counts system and tool definitions, reserves output, and removes complete old pairs",
+        "a smaller model cannot exceed its context with user text after reserving response tokens",
+        "unsupported counting inputs reserve space and a counting outage still allows an ordinary chat"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/ai/kernel/chat-tool-scope.test.ts",
+      "decision": "delete-file",
+      "currentLines": 109,
+      "keep": [],
+      "purge": [
+        "catalog pages show catalog actions and can explicitly enable a different domain",
+        "a scoped page can continue an already approved action without exposing batch edits",
+        "a step can read freely but cannot execute two mutations from the same model response",
+        "a pinned pitch conversation can read and save copy without enabling unrelated performance work"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/ai/kernel/errors.test.ts",
+      "decision": "delete-file",
+      "currentLines": 40,
+      "keep": [],
+      "purge": [
+        "compactGrowthError > a guard's declared code survives, so the model gets a recovery path",
+        "compactGrowthError > an untyped guard message with no trigger words degrades to tool_failed",
+        "compactGrowthError > the fallback lets the model act on a correction the message names"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/ai/kernel/operations.test.ts",
+      "decision": "trim",
+      "currentLines": 168,
+      "keep": [
+        "operation discovery > approval-required work cannot bypass approval through job scheduling"
+      ],
+      "purge": [
+        "operation discovery > advertises operation-specific required fields and returns the domain result",
+        "operation discovery > the receipt adapter retains each operation's input and output contract",
+        "operation discovery > MCP excludes provider-spend operations individually",
+        "operation discovery > provider search preserves wrapped execution hooks",
+        "saved grouped approvals retain only their pending action",
+        "pitch edits advertise their read and save schemas directly to the assistant"
+      ],
+      "category": "AI writes",
+      "reason": "Background scheduling cannot bypass operator approval."
+    },
+    {
+      "file": "src/server/ai/kernel/output.test.ts",
+      "decision": "delete-file",
+      "currentLines": 216,
+      "keep": [],
+      "purge": [
+        "Growth output boundary > normalizes persisted dates and validates nullable persona fields",
+        "Growth output boundary > a successful result may carry its own error field",
+        "Growth output boundary > provider extension JSON survives alongside declared fields",
+        "output gate rejects unconstrained success data and nested placeholders",
+        "ad push output distinguishes platform-specific receipts and rejects bad counts",
+        "lifecycle output binds each action to its result shape",
+        "brand projections exclude connection credentials and issuance details",
+        "brand projections retain current marketing DNS settings"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/ai/kernel/prompt-cache.test.ts",
+      "decision": "delete-file",
+      "currentLines": 97,
+      "keep": [],
+      "purge": [
+        "withGrowthRollingCache > moves a one-hour breakpoint to the current conversation tail",
+        "withGrowthRollingCache > preserves provider options on the tail",
+        "withGrowthRollingCache > removes the previous rolling marker while preserving static system cache",
+        "withGrowthRollingCache > handles an empty conversation",
+        "withGrowthRollingCache > uses the long cache once and cheaper writes inside the tool loop"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/ai/kernel/receipt-execution.test.ts",
+      "decision": "keep-all",
+      "currentLines": 183,
+      "keep": [
+        "receipt authorization and write replay > a completed write replays once even when jsonb reorders input keys",
+        "receipt authorization and write replay > revoked membership cannot read a previously completed result",
+        "receipt authorization and write replay > surface restrictions apply before replay",
+        "receipt authorization and write replay > a reused call ID cannot replay another payload or tool",
+        "receipt authorization and write replay > a malformed fresh result is recorded as failed and never executes again",
+        "receipt authorization and write replay > a malformed old receipt is rejected without repeating the write",
+        "receipt authorization and write replay > an interrupted claimed write stays uncertain and is not repeated"
+      ],
+      "purge": [],
+      "category": "AI writes",
+      "reason": "Writes execute once, replay is authorized, and interrupted writes remain uncertain."
+    },
+    {
+      "file": "src/server/ai/kernel/runtime-clock.test.ts",
+      "decision": "delete-file",
+      "currentLines": 24,
+      "keep": [],
+      "purge": [
+        "runtimeClockSection > includes one UTC instant and the operator wall clock",
+        "runtimeClockSection > falls back to UTC for an invalid timezone"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/ai/kernel/stream-error.test.ts",
+      "decision": "delete-file",
+      "currentLines": 99,
+      "keep": [],
+      "purge": [
+        "streamErrorMessage > extracts nested provider errors instead of showing object Object",
+        "streamErrorMessage > does not expose arbitrary payloads when an error has no readable message",
+        "streamErrorMessage > turns provider overflow into an actionable recovery message",
+        "streamErrorMessage > explains interrupted tool history without telling the operator to redo saved edits",
+        "streamErrorMessage > extracts the discriminator sentence from a wrong-action call",
+        "streamErrorMessage > lists at most three issues and counts the rest",
+        "streamErrorMessage > truncates when there is no issues array to mine"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/ai/kernel/usage.test.ts",
+      "decision": "delete-file",
+      "currentLines": 51,
+      "keep": [],
+      "purge": [
+        "summarizeGrowthUsage > attributes Anthropic cache writes to TTL buckets",
+        "summarizeGrowthUsage > keeps missing provider detail explicit"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/ai/prompts/ad-copy-chat.test.ts",
+      "decision": "delete-file",
+      "currentLines": 164,
+      "keep": [],
+      "purge": [
+        "chat proposes complete sets before saving and uses the chosen words with current versions",
+        "MCP context preserves captions, placement descriptions and individual carousel card text",
+        "copy chat discusses one ad without changing its artwork"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/ai/url-safety.test.js",
+      "decision": "keep-all",
+      "currentLines": 25,
+      "keep": [
+        "classifyFetchUrl > accepts and canonicalizes public web URLs",
+        "classifyFetchUrl > rejects unsafe target http://localhost:3000",
+        "classifyFetchUrl > rejects unsafe target http://127.0.0.1/private",
+        "classifyFetchUrl > rejects unsafe target http://169.254.169.254/latest/meta-data",
+        "classifyFetchUrl > rejects unsafe target http://10.0.0.2",
+        "classifyFetchUrl > rejects unsafe target http://service.internal",
+        "classifyFetchUrl > rejects unsafe target file:///etc/passwd",
+        "classifyFetchUrl > rejects unsafe target https://user:pass@example.com"
+      ],
+      "purge": [],
+      "category": "Access and privacy",
+      "reason": "URL classification rejects local, private, metadata and credential-bearing targets; this is not complete DNS-rebinding protection."
+    },
+    {
+      "file": "src/server/better-auth/oauth-continuation.test.ts",
+      "decision": "keep-all",
+      "currentLines": 203,
+      "keep": [
+        "OAuth defaults to Wander despite another active org and rejects tampered requests",
+        "token issuance rejects non-Wander grants and revoked membership"
+      ],
+      "purge": [],
+      "category": "Access and privacy",
+      "reason": "Actual OAuth flows bind tokens to Wander and reject tampering and revoked membership."
+    },
+    {
+      "file": "src/server/clients/brightdata.client.test.ts",
+      "decision": "delete-file",
+      "currentLines": 19,
+      "keep": [],
+      "purge": [
+        "linkedinProfileDatasetFor > uses the people dataset for personal profiles",
+        "linkedinProfileDatasetFor > uses the company dataset for company pages"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/clients/fal-request.test.ts",
+      "decision": "delete-file",
+      "currentLines": 66,
+      "keep": [],
+      "purge": [
+        "buildFalImageRequest > keeps the existing Flux text-to-image request",
+        "buildFalImageRequest > does not silently send the direct Google profile through Fal",
+        "isTrustedFalAssetUrl > accepts Fal media and Fal's Google Storage output bucket",
+        "isTrustedFalAssetUrl > does not broaden trust to arbitrary Google Storage or lookalike hosts"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/clients/google-ads.transport.test.ts",
+      "decision": "trim",
+      "currentLines": 112,
+      "keep": [
+        "Google Ads server authentication > invalid service credentials never fall back to a personal OAuth identity",
+        "Google Ads server authentication > invalid customer IDs cannot alter the Google request path"
+      ],
+      "purge": [
+        "Google Ads server authentication > service identity signs only the Ads scope and queries through the configured manager",
+        "Google Ads server authentication > existing user OAuth remains supported and token failures do not expose provider bodies"
+      ],
+      "category": "Ad provider safety",
+      "reason": "Invalid service credentials cannot fall back to another identity and IDs cannot alter request paths."
+    },
+    {
+      "file": "src/server/clients/zernio.carousel.test.ts",
+      "decision": "delete-file",
+      "currentLines": 110,
+      "keep": [],
+      "purge": [
+        "reuses a verified client-Page carousel and removes only its paused preparation campaign",
+        "never attaches a carousel with the managing Page identity",
+        "cleans up preparation when attachment fails"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/content/formats.test.ts",
+      "decision": "delete-file",
+      "currentLines": 63,
+      "keep": [],
+      "purge": [
+        "email content formats > models a blast as a newsletter-surface one-off",
+        "email content formats > keeps newsletter issues and legacy values in recurring cadence",
+        "facebook formats > a multi-photo Page post is a carousel spot",
+        "facebook formats > classifies Zernio media types and scraped attachments"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/dev-login-access.test.ts",
+      "decision": "keep-all",
+      "currentLines": 81,
+      "keep": [
+        "dev login gate > local dev is open without a token",
+        "dev login gate > preview requires the admin token",
+        "dev login gate > preview accepts the token as bearer, query, or x-admin-token",
+        "dev login gate > production is closed even with a valid token",
+        "dev login gate > non-Vercel production builds are closed",
+        "dev login gate > a preview with no admin token configured stays closed"
+      ],
+      "purge": [],
+      "category": "Access and privacy",
+      "reason": "Development login cannot open a production authentication bypass."
+    },
+    {
+      "file": "src/server/email/newsletter-renderer-core.test.ts",
+      "decision": "delete-file",
+      "currentLines": 69,
+      "keep": [],
+      "purge": [
+        "brand email identity > uses only the selected brand's copy guide",
+        "brand email identity > keeps configured identity local to its brand and falls back to neutral"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/mcp/result-contract.test.ts",
+      "decision": "delete-file",
+      "currentLines": 129,
+      "keep": [],
+      "purge": [
+        "MCP results describe action-specific data and every failure envelope",
+        "MCP executes a nested, referenced output schema without losing provider fields"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/mcp/server.protocol.test.ts",
+      "decision": "trim",
+      "currentLines": 143,
+      "keep": [
+        "Growth MCP protocol compatibility > serves MCP 2026-07-28 stateless requests"
+      ],
+      "purge": [
+        "Growth MCP protocol compatibility > advertises OAuth resource discovery to unauthenticated clients",
+        "Growth MCP protocol compatibility > reads organization identity from the official SDK HTTP context",
+        "Growth MCP protocol compatibility > retains the stateless 2025 fallback"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/mcp/social-post-preview-ui.test.ts",
+      "decision": "delete-file",
+      "currentLines": 25,
+      "keep": [],
+      "purge": [
+        "social post MCP App resource > uses a versioned UI resource and the MCP Apps MIME type",
+        "social post MCP App resource > supports the MCP Apps lifecycle and ChatGPT compatibility data"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/ad-creative-copy.service.test.ts",
+      "decision": "delete-file",
+      "currentLines": 117,
+      "keep": [],
+      "purge": [
+        "a complete creative rewrite changes caption and image text while preserving sources, layouts, crops and supplied artwork",
+        "regeneration rejects unchanged copy and invented or missing carousel cards"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/ad-set-copy.service.test.ts",
+      "decision": "delete-file",
+      "currentLines": 95,
+      "keep": [],
+      "purge": [
+        "the fallback set copy writes descriptions from the facts",
+        "repeated Write copy rejects an unchanged hook and accepts a different supported angle",
+        "collection rewrites also reject their current hook without forcing factual descriptions to change"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/ad-set.service.test.ts",
+      "decision": "delete-file",
+      "currentLines": 24,
+      "keep": [],
+      "purge": [
+        "the story twin of a preview card > swaps the canvas and keeps everything else",
+        "the story twin of a preview card > gives nothing for a file"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/ads-alignment.service.test.ts",
+      "decision": "delete-file",
+      "currentLines": 205,
+      "keep": [],
+      "purge": [
+        "scoreSuggestion > does not suggest a campaign that ran outside the campaign window",
+        "scoreSuggestion > ranks eligible campaigns by meaningful campaign-name overlap",
+        "scoreSuggestion > keeps open-ended campaigns eligible when their active dates overlap",
+        "diffCampaign > verdicts: ok when live, inactive when pushed but paused",
+        "diffCampaign > missing when a platform is planned but every row is still a draft",
+        "diffCampaign > no channels at all when nothing is planned",
+        "diffCampaign > budget rollup prefers the precise stats snapshot and flags overrun",
+        "diffCampaign > no utilization without an intended budget",
+        "diffCampaign > date drift: live campaigns ending after the campaign end",
+        "diffCampaign > suggestions ranked by score then spend, capped at 10"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/ads-draft.service.test.ts",
+      "decision": "delete-file",
+      "currentLines": 47,
+      "keep": [],
+      "purge": [
+        "creativeSourceKey > ignores the signature and expiry query params",
+        "creativeSourceKey > survives Meta rotating the edge subdomain",
+        "creativeSourceKey > keeps different creatives, and different providers, apart",
+        "creativeSourceKey > falls back to the raw string rather than throwing"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/ads-draft.test.ts",
+      "decision": "delete-file",
+      "currentLines": 39,
+      "keep": [],
+      "purge": [
+        "draft ad business keys > gives the same ad the same key however the name is typed",
+        "draft ad business keys > keeps the same name on two campaigns apart",
+        "draft ad business keys > keeps the homes drafter's per-listing keys distinct"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/ads-sync.service.test.ts",
+      "decision": "keep-all",
+      "currentLines": 95,
+      "keep": [
+        "treeIsCompleteEnoughToReconcile > reconciles only a clean, unfiltered sync",
+        "treeIsCompleteEnoughToReconcile > refuses to reconcile after a campaign the window dropped",
+        "treeIsCompleteEnoughToReconcile > refuses to reconcile after an error mid-sync",
+        "treeIsCompleteEnoughToReconcile > refuses to reconcile after a sync narrowed to one ad account",
+        "treeIsCompleteEnoughToReconcile > refuses to reconcile after a page limit",
+        "treeIsCompleteEnoughToReconcile > refuses to reconcile after a date window",
+        "treeIsCompleteEnoughToReconcile > refuses to reconcile after a spend floor",
+        "treeIsCompleteEnoughToReconcile > refuses to reconcile after a status filter",
+        "campaignBelongsToBrand > keeps a campaign the brand already claims, shared account or not",
+        "campaignBelongsToBrand > never takes a campaign another brand claims",
+        "campaignBelongsToBrand > gives unclaimed campaigns to the owner only"
+      ],
+      "purge": [],
+      "category": "Ad reconciliation",
+      "reason": "Partial provider trees never mark unseen campaigns ended; campaigns stay assigned to their owning brand."
+    },
+    {
+      "file": "src/server/services/ads-write.google.test.ts",
+      "decision": "trim",
+      "currentLines": 144,
+      "keep": [
+        "planGoogleCompile > refuses a search ad Google would reject, naming it"
+      ],
+      "purge": [
+        "parseSearchTerm > reads match type from the shared notation",
+        "Zernio keyword request contract > preserves exact and phrase intent using the API's lowercase match types",
+        "planGoogleCompile > makes one search ad group per audience with terms and leaves the rest out",
+        "planGoogleCompile > falls back to the draft's keywords when no audience has terms",
+        "planGoogleCompile > sends image ideas to display, one ad group per audience",
+        "automatic Google campaign pause > pauses the native campaign from a legacy single-ad creation response"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/ads-write.linkedin.test.ts",
+      "decision": "delete-file",
+      "currentLines": 219,
+      "keep": [],
+      "purge": [
+        "assertLinkedInAdPayload > accepts a paused single-image traffic campaign",
+        "assertLinkedInAdPayload > holds the daily floor at LinkedIn's $10, or the account's own",
+        "assertLinkedInAdPayload > lifetime budgets need an end date and $100",
+        "assertLinkedInAdPayload > refuses Meta-only shapes",
+        "assertLinkedInAdPayload > wants exactly one creative shape",
+        "assertLinkedInAdPayload > ties goals to what the creative can do",
+        "assertLinkedInAdPayload > checks carousel cards and their landing pages",
+        "assertLinkedInAdPayload > a manual bid needs its cost type, and the CTA must be LinkedIn's",
+        "assertLinkedInAdPayload > an attach inherits everything the campaign owns"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/ads-write.service.test.ts",
+      "decision": "trim",
+      "currentLines": 740,
+      "keep": [
+        "assertMetaAdPayload > requires an end date for a lifetime budget",
+        "assertMetaAdPayload > accepts a conversions goal backed by a custom conversion on its own, never beside a pixel",
+        "assertMetaAdPayload > lets an ad set inherit its budget rather than restating it",
+        "assertMetaAdPayload > enforces the ad account's daily minimum",
+        "googlePauseOutcome > records live, with a warning, when there was no id to pause",
+        "googlePauseOutcome > carries the provider's reason out when the pause failed",
+        "connectionRunsAsBrandPage > refuses a connection bound to another Page",
+        "connectionRunsAsBrandPage > allows a shared connection only for an explicitly granted brand Page",
+        "connectionRunsAsBrandPage > refuses an unreadable identity rather than assuming",
+        "what a Meta ad set optimises toward > refuses a reporting conversion made for a previous website"
+      ],
+      "purge": [
+        "tagMetaAdUtms > puts the house UTMs on the creative's URL parameters and leaves links clean",
+        "assertMetaAdPayload > accepts a minimal single-creative ad",
+        "assertMetaAdPayload > requires a call to action, which Zernio rejects a Meta ad without",
+        "assertMetaAdPayload > requires headline and body on every creative",
+        "assertMetaAdPayload > rejects mixing creative shapes and requires one of them",
+        "assertMetaAdPayload > treats a carousel as its own creative shape",
+        "assertMetaAdPayload video rules > accepts a top-level video as its own creative shape",
+        "assertMetaAdPayload video rules > rejects a creative carrying both an image and a video",
+        "assertMetaAdPayload video rules > requires the still thumbnail on a video creative",
+        "videoPayloadFor > compiles the clip plus its still",
+        "videoPayloadFor > refuses a clip with no still",
+        "videoPayloadFor > refuses a clip standing in as its own still",
+        "estimateMonthlyKeywordCost > prices searches as clicks, not as impressions",
+        "estimateMonthlyKeywordCost > falls back to the top-of-page bid when there is no average CPC",
+        "estimateMonthlyKeywordCost > reports what it could not price rather than treating it as free",
+        "estimateMonthlyKeywordCost > carries the CTR assumption out with the number",
+        "googlePauseOutcome > records paused only when the pause actually landed",
+        "extractPreviewFrames > finds iframes at any nesting and decodes the src",
+        "extractPreviewFrames > returns empty for a response with no iframes, never throws",
+        "extractPreviewFrames > keeps an iframe with no src, flagged by the null",
+        "metaPageIdFromConnection > mines the page id out of Zernio's composite identity",
+        "metaPageIdFromConnection > returns null rather than guessing when there is no page segment",
+        "connectionRunsAsBrandPage > passes a connection bound to the brand's Page",
+        "connectionRunsAsBrandPage > passes any connection while the brand has no Page bound",
+        "what a Meta ad set optimises toward > runs a client on the shared pixel event by default",
+        "what a Meta ad set optimises toward > optimises on the brand's reporting conversion under host scope",
+        "what a Meta ad set optimises toward > refuses host scope before the brand has a reporting conversion",
+        "what a Meta ad set optimises toward > lets an explicit custom conversion in the settings win",
+        "what a Meta ad set optimises toward > sends no promoted object when the settings name neither a pixel nor an event",
+        "attaches a carousel to a conversion ad set without resending its pixel and budget",
+        "Google draft display crops > preserves distinct reviewed crops instead of overwriting them with the ad image",
+        "Google draft display crops > keeps existing single-image drafts usable and rejects missing media",
+        "metaCallToActionType > sends Meta's Book now button, never the type Ads Manager reads as Unknown",
+        "withMetaAttribution > gives every new ad set 7-day click and 1-day view",
+        "withMetaAttribution > sends no window on an attach, which Zernio refuses",
+        "metaPlacementAssetsFor > pins an image's square to Facebook and its 9:16 to Reels, Instagram feed keeps the default",
+        "metaPlacementAssetsFor > pins a video ad's 9:16 cut to Reels in an all-video block",
+        "metaPlacementAssetsFor > sends no block for a video whose story is a still"
+      ],
+      "category": "Ad provider safety",
+      "reason": "Protect money ownership, account identity, invalid conversion setup and truthful pause outcomes."
+    },
+    {
+      "file": "src/server/services/affiliate-monitor.service.test.ts",
+      "decision": "delete-file",
+      "currentLines": 96,
+      "keep": [],
+      "purge": [
+        "evaluateTrackingHealth > never pages on zero-action days while clicks are flowing",
+        "evaluateTrackingHealth > pages a tracking break on a single zero-click day against a healthy baseline",
+        "evaluateTrackingHealth > anchors a multi-day break on the run's first day",
+        "evaluateTrackingHealth > does not arm on a low-click program",
+        "evaluateTrackingHealth > stays silent when the report is missing yesterday",
+        "evaluateTrackingHealth > stays silent with no baseline days at all"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/amplification.service.test.ts",
+      "decision": "delete-file",
+      "currentLines": 21,
+      "keep": [],
+      "purge": [
+        "amplification matching > matches the same platform account despite harmless handle formatting",
+        "amplification matching > does not attribute activity from another platform or account"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/audio-transcription.test.ts",
+      "decision": "delete-file",
+      "currentLines": 47,
+      "keep": [],
+      "purge": [
+        "vocabularyPrompt > carries the product names Whisper gets wrong",
+        "vocabularyPrompt > puts the caller's brand first, as the least-known noun",
+        "vocabularyPrompt > does not repeat a term the caller also supplied",
+        "vocabularyPrompt > stays inside the prompt window",
+        "vocabularyPrompt > ignores blank input rather than emitting empty entries"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/blog-workbench/draft-mirror.test.ts",
+      "decision": "trim",
+      "currentLines": 88,
+      "keep": [
+        "Velite draft mirror > updates an unchanged draft from a new run but preserves operator edits",
+        "Velite draft mirror > never resets an operator's publication date"
+      ],
+      "purge": [
+        "Velite draft mirror > exports model prose as inert Markdown and exposes synthetic evidence"
+      ],
+      "category": "Content and operator data",
+      "reason": "Generation cannot overwrite manual edits or publication dates."
+    },
+    {
+      "file": "src/server/services/blog-workbench/layout.test.ts",
+      "decision": "trim",
+      "currentLines": 144,
+      "keep": [
+        "typed layout keeps model strings as JSON data and refuses executable prose",
+        "all Markdown destination forms respect the grounded allowlist"
+      ],
+      "purge": [
+        "layout cannot introduce an ungrounded booking destination or reorder headings",
+        "layout prose must use grounded destinations too",
+        "property media attaches only to the exact grounded destination",
+        "comparison caveats cannot be silently dropped by surplus table cells"
+      ],
+      "category": "Content and operator data",
+      "reason": "Model output cannot become executable module prose or introduce ungrounded Markdown destinations."
+    },
+    {
+      "file": "src/server/services/blog-workbench/workflow.test.ts",
+      "decision": "delete-file",
+      "currentLines": 126,
+      "keep": [],
+      "purge": [
+        "blog workbench workflow > gives evaluator comments stable IDs",
+        "blog workbench workflow > builds a review state and a complete external-agent packet",
+        "blog workbench workflow > keeps the first visual placement when a storyboard repeats one"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/brand-enrichment-meta.test.ts",
+      "decision": "delete-file",
+      "currentLines": 20,
+      "keep": [],
+      "purge": [
+        "selectBrandLogo > uses the favicon for the square brand-logo slot",
+        "selectBrandLogo > falls back to Open Graph artwork when a site has no favicon"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/brand-enrichment.test.ts",
+      "decision": "delete-file",
+      "currentLines": 50,
+      "keep": [],
+      "purge": [
+        "identity from Firecrawl branding > keeps only hex colours, typed fonts, and the real logo",
+        "identity from Firecrawl branding > is absent when Firecrawl returned no profile"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/brand-mark.test.ts",
+      "decision": "delete-file",
+      "currentLines": 41,
+      "keep": [],
+      "purge": [
+        "brand mark > text colour follows the tone, and colour means the brand's primary",
+        "brand mark > the icon comes from the source the recipe names"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/brand-purge.test.ts",
+      "decision": "delete-file",
+      "currentLines": 37,
+      "keep": [],
+      "purge": [
+        "brand purge guards > refuses while financial records still point at the brand",
+        "brand purge guards > allows a brand carrying only marketing data",
+        "brand purge guards > requires the name exactly, forgiving only surrounding whitespace"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/campaign-codename.service.test.ts",
+      "decision": "delete-file",
+      "currentLines": 19,
+      "keep": [],
+      "purge": [
+        "campaignCodenameOf > reads the codename a house name ends with",
+        "campaignCodenameOf > finds none on a name without one"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/campaign-media-cleanup.test.ts",
+      "decision": "delete-file",
+      "currentLines": 22,
+      "keep": [],
+      "purge": [
+        "campaign cleanup owns generated approval exports, including exports made before attaching an ad"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/card-director.service.test.ts",
+      "decision": "delete-file",
+      "currentLines": 107,
+      "keep": [],
+      "purge": [
+        "applying the art director's read > a keep changes nothing",
+        "applying the art director's read > copy only ever gets shorter, and never empty",
+        "applying the art director's read > an empty facts line drops it; null leaves it",
+        "applying the art director's read > a focal point replaces the coarse position",
+        "applying the art director's read > a tint is recorded lower-case so identical reads match on reuse",
+        "the darkening colour > is black unless asked otherwise",
+        "the darkening colour > keeps the hue but never the brightness"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/catalog-lock.test.ts",
+      "decision": "delete-file",
+      "currentLines": 19,
+      "keep": [],
+      "purge": [
+        "approved catalog cards > refuse changes until reopened",
+        "approved catalog cards > only a local dev server may force past the lock"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/composition-copy.test.ts",
+      "decision": "delete-file",
+      "currentLines": 21,
+      "keep": [],
+      "purge": [
+        "the guest rating on a card > a feed rating out of ten is halved",
+        "the guest rating on a card > a rating already out of five is kept to one decimal",
+        "the guest rating on a card > no reviews means no pill"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/composition-fonts.test.ts",
+      "decision": "delete-file",
+      "currentLines": 33,
+      "keep": [],
+      "purge": [
+        "brand fonts > reads weight and url for the formats satori can decode",
+        "brand fonts > prefers the heading face, then the first, then none"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/composition-source.test.ts",
+      "decision": "delete-file",
+      "currentLines": 124,
+      "keep": [],
+      "purge": [
+        "satori image source > converts WebP, which satori cannot decode, to JPEG",
+        "satori image source > keeps alpha by emitting PNG, whatever the header said",
+        "satori image source > caps oversized sources",
+        "brand mark sources > unwraps a WanderOS image proxy to the file it serves",
+        "brand mark sources > traces a flat shape's alpha to a single-colour SVG",
+        "dominant colour > names the ink of a one-colour mark",
+        "dominant colour > declines a two-colour mark"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/content-publishing.service.test.ts",
+      "decision": "delete-file",
+      "currentLines": 169,
+      "keep": [],
+      "purge": [
+        "Reel payloads > marks a Facebook Reel as one, with its title",
+        "Reel payloads > leaves a Facebook feed video a feed video",
+        "Reel payloads > refuses a Reel without exactly one video",
+        "Reel payloads > maps Instagram Reel options onto Zernio's fields",
+        "validatePublishSettings > keeps Reel-only options off feed posts",
+        "validatePublishSettings > normalises collaborators and caps them at three",
+        "TikTok payloads > sends TikTok's required settings as a public post, with the cover frame",
+        "TikTok payloads > refuses anything but one video, and first comments",
+        "TikTok payloads > takes only a cover and the AI label as publish options"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/demand/bdr-assignment.service.test.ts",
+      "decision": "trim",
+      "currentLines": 142,
+      "keep": [
+        "who works a demand lead (both CRMs written) > Outreach's owner is authoritative over HubSpot's picker and CIO",
+        "who works a demand lead (both CRMs written) > an off-roster picker is preserved even when demand_bdr_email is a stale roster address"
+      ],
+      "purge": [
+        "who works a demand lead (both CRMs written) > with no Outreach owner, a roster rep in the HubSpot picker keeps the lead",
+        "who works a demand lead (both CRMs written) > a HubSpot-only rep never leaves the Outreach prospect ownerless",
+        "who works a demand lead (both CRMs written) > once Outreach is gone, a rep outside the roster is kept rather than reassigned",
+        "who works a demand lead (both CRMs written) > CIO's attributes are honoured before rotation when neither CRM has an owner",
+        "who works a demand lead (both CRMs written) > a CIO rep Outreach cannot resolve rotates while Outreach is active, and is kept after",
+        "who works a demand lead (both CRMs written) > nobody has the lead → none, so the caller rotates",
+        "demand rotation > only BDRs with a HubSpot owner id can receive new leads",
+        "demand rotation > phone and email-only leads rotate on independent indexes"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/demand/field-mapping.test.ts",
+      "decision": "trim",
+      "currentLines": 222,
+      "keep": [
+        "demand field mapping > writes only demand_* properties, never a supply-side field",
+        "demand field mapping > a stage the BDR set is never regressed by a later abandonment",
+        "demand field mapping > a booking event never re-attributes a BDR-assisted booking as direct",
+        "demand field mapping > demand_signals preserves a BDR's manual pick and never clears on an eventless lead"
+      ],
+      "purge": [
+        "demand field mapping > identity fields are separate from the demand payload and only used on create",
+        "demand field mapping > a new contact starts at New; a direct booking lands at Booked Direct",
+        "demand field mapping > BDR assignment stamps the picker, the email, and the time only when new",
+        "demand field mapping > a BDR without a HubSpot owner id clears the picker so a stale value cannot outrank the email",
+        "demand field mapping > sync count increments from the contact's current value",
+        "demand field mapping > checkout context reads like the Outreach note BDRs are used to",
+        "demand field mapping > demand_signals maps the event and accumulates without duplicating",
+        "demand field mapping > abandoned search carries destination and a date range"
+      ],
+      "category": "CRM integrity",
+      "reason": "Sync cannot overwrite supply-side ownership or erase human sales decisions and attribution."
+    },
+    {
+      "file": "src/server/services/demand/hubspot-errors.test.ts",
+      "decision": "delete-file",
+      "currentLines": 69,
+      "keep": [],
+      "purge": [
+        "a duplicate contact on create becomes an update, not a failed lead > reads the existing id out of HubSpot's 409",
+        "a duplicate contact on create becomes an update, not a failed lead > other errors are not mistaken for a conflict",
+        "transient HubSpot failures are retried, permanent ones are not > 429 and 5xx are retryable; 4xx are not",
+        "transient HubSpot failures are retried, permanent ones are not > a call that recovers within the budget succeeds; a 4xx surfaces at once"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/demand/owner-parity.test.ts",
+      "decision": "delete-file",
+      "currentLines": 26,
+      "keep": [],
+      "purge": [
+        "demand__bdr → Customer.io loop guard > a rep changing the BDR in the CRM is mirrored",
+        "demand__bdr → Customer.io loop guard > a HubSpot workflow rotating the BDR is mirrored",
+        "demand__bdr → Customer.io loop guard > our own sync writes echoing back are dropped",
+        "demand__bdr → Customer.io loop guard > an event with no recorded source is treated as ours"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/digest-extract.test.ts",
+      "decision": "delete-file",
+      "currentLines": 28,
+      "keep": [],
+      "purge": [
+        "splitCityFromName > a bracketed city becomes the city",
+        "splitCityFromName > it agrees with a city already read",
+        "splitCityFromName > a bracket naming somewhere else is part of the name"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/email-dns-link.test.ts",
+      "decision": "delete-file",
+      "currentLines": 23,
+      "keep": [],
+      "purge": [
+        "email setup expires and rejects signed or malformed credentials"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/geography-resolve.test.ts",
+      "decision": "delete-file",
+      "currentLines": 47,
+      "keep": [],
+      "purge": [
+        "geographyByLookup > collapses a state written both ways into one code",
+        "geographyByLookup > keeps the distinct cities and country",
+        "geographyByLookup > keeps a non-US region visible rather than dropping it",
+        "geographyByLookup > omits keys entirely when nothing is known"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/home-facts.test.ts",
+      "decision": "delete-file",
+      "currentLines": 49,
+      "keep": [],
+      "purge": [
+        "nightly rate > reads the feed's cents as dollars",
+        "nightly rate > treats absent and zero alike",
+        "the facts line on a catalog card > counts what the feed gave, in the order a guest reads them",
+        "the facts line on a catalog card > says nothing rather than inventing a count"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/hubspot-company-email-context.service.test.ts",
+      "decision": "delete-file",
+      "currentLines": 32,
+      "keep": [],
+      "purge": [
+        "cleanCompanyEmailText > keeps names and company facts while removing direct contact data",
+        "cleanCompanyEmailText > drops quoted reply history"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/inbound-router.test.ts",
+      "decision": "delete-file",
+      "currentLines": 77,
+      "keep": [],
+      "purge": [
+        "inboundLeadStatus > qualifies a WanderOS inbound only at 10+ units",
+        "inboundLeadStatus > parks portfolios under 10 in the < 10 Homes hold status",
+        "inboundLeadStatus > sends an unknown unit count to research instead of guessing MQL",
+        "inboundLeadStatus > leaves Listed inbounds on their own status regardless of size",
+        "slackOwnerLabel > shows Kyle's name without notifying him",
+        "slackOwnerLabel > continues mentioning other assigned owners"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/lead-channel.service.test.ts",
+      "decision": "delete-file",
+      "currentLines": 249,
+      "keep": [],
+      "purge": [
+        "isPlaceholderEmail > matches the placeholder mailboxes HubSpot appends",
+        "isPlaceholderEmail > does not match real prospect domains that contain those words",
+        "scoreStoredContact > hard-zeroes a placeholder address despite a name and a founder title",
+        "scoreStoredContact > still scores the real corporate contact on the same company",
+        "scoreLeadChannel > does not select a placeholder as the channel when it is the only contact",
+        "scoreLeadChannel > prefers the real contact over a higher-titled placeholder",
+        "scoreLeadChannel enrolment target > enrols the highest-scoring person, not the scraped role inbox",
+        "scoreLeadChannel enrolment target > falls back to a stored contact when the scraped address has no row",
+        "scoreLeadChannel enrolment target > skips a retired contact and picks the next in line",
+        "scoreLeadChannel enrolment target > has no enrolment target when every contact is retired"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/lead-correspondence.test.ts",
+      "decision": "delete-file",
+      "currentLines": 50,
+      "keep": [],
+      "purge": [
+        "countContactMentions > separates two people who share a surname",
+        "countContactMentions > omits anyone the record never names",
+        "countContactMentions > skips first names too short to match safely",
+        "storedContactMentions > returns undefined when the domain has no stored summary",
+        "storedContactMentions > reads counts off a stored enrichment blob"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/media-analysis.service.test.ts",
+      "decision": "delete-file",
+      "currentLines": 48,
+      "keep": [],
+      "purge": [
+        "videoEvidence > prefers the storyboard, in board order, capped at ten",
+        "videoEvidence > falls back to the poster and says so",
+        "videoEvidence > returns null when there is nothing to look at"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/outreach/ota-guest-import.service.test.ts",
+      "decision": "delete-file",
+      "currentLines": 159,
+      "keep": [],
+      "purge": [
+        "parseOtaGuestCsv > reads quoted fields containing commas without shifting columns",
+        "parseOtaGuestCsv > maps by header name so a re-ordered export still lands in the right field",
+        "parseOtaGuestCsv > fails loudly when the export is missing a required column",
+        "skipReason > keeps a real guest",
+        "skipReason > drops rows we must never push to Outreach",
+        "dedupeByEmail > merges the same guest across channels into one prospect payload",
+        "prospect payload > always carries the campaign tag and preserves tags already on the prospect",
+        "prospect payload > writes booking context a BDR can act on",
+        "prospect payload > maps booking stats onto the demand custom fields",
+        "prospect payload > normalizes phones and names"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/performance-copy-notes.test.ts",
+      "decision": "delete-file",
+      "currentLines": 14,
+      "keep": [],
+      "purge": [
+        "copy context carries intake availability restrictions as reference facts"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/performance-intake-notification.test.ts",
+      "decision": "delete-file",
+      "currentLines": 22,
+      "keep": [],
+      "purge": [
+        "Performance intake notifications preserve submission and delivery behavior"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/performance-intake.test.ts",
+      "decision": "delete-file",
+      "currentLines": 343,
+      "keep": [],
+      "purge": [
+        "intake budget parsing > reads the presets and free text the form produces",
+        "intake budget parsing > returns null rather than zero for anything unusable",
+        "apply blockers > lets a submitted intake through",
+        "apply blockers > refuses to apply twice",
+        "property rows > carries the client's URL onto the row",
+        "property rows > dedupes against existing rows and within a submission",
+        "property rows > invents nothing for an all-properties request",
+        "cycle period > matches performance_cycle.period's YYYY-MM shape",
+        "brand page matching > matches through case and punctuation differences",
+        "brand page matching > never matches a page that merely contains the brand name",
+        "brand page matching > returns nothing when two pages share a name",
+        "brand page matching > returns nothing rather than guessing when the grant has not landed",
+        "brand reference > prefers the snapshot slug and falls back to the id",
+        "public access-check throttle > allows a first check",
+        "public access-check throttle > refuses a second check inside the window",
+        "public access-check throttle > allows again once the window has passed",
+        "prefill contact fields > uses the commercial record when a token addressed the form",
+        "prefill contact fields > returns null rather than the Wander rep when no account exists",
+        "prefill contact fields > withholds contact details from a guessable slug link",
+        "property addresses > matches through case and a trailing slash",
+        "property addresses > leaves a hand-pasted URL unlocated rather than guessing",
+        "audience geography from the homes > rolls up codes, names and cities without repeating any",
+        "audience geography from the homes > keeps a state we cannot name out of regions and in states",
+        "audience geography from the homes > returns nothing for homes with no location",
+        "intake featured-home replacement > resolves the complete replacement, including homes already saved",
+        "intake featured-home replacement > uses the whole current catalog for advertise everything",
+        "intake featured-home replacement > blocks partial matches and a different brand rather than silently featuring fewer homes",
+        "intake rejects malformed known answers and preserves future questions"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/performance-settings.test.ts",
+      "decision": "trim",
+      "currentLines": 168,
+      "keep": [
+        "a chat update to catalog keeps the recorded platform, payment, and journey",
+        "a concurrent settings edit fails rather than silently overwriting it"
+      ],
+      "purge": [
+        "intake prose stays on the receipt instead of becoming an asset URL",
+        "an explicit null clears only the selected readiness fact",
+        "note edits record the authenticated editor without changing delivery",
+        "unrelated changes preserve the note editor and blank notes clear"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/performance.service.test.ts",
+      "decision": "delete-file",
+      "currentLines": 32,
+      "keep": [],
+      "purge": [
+        "countDeliveryByCycle > counts each kind from its own source",
+        "countDeliveryByCycle > ignores rows attached to no cycle"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/place-statement.test.ts",
+      "decision": "delete-file",
+      "currentLines": 44,
+      "keep": [],
+      "purge": [
+        "the place card's statement > the preposition goes down with the place",
+        "the place card's statement > a hook that ends without a preposition keeps the place alone on its line",
+        "the place card's statement > no hook is just the place",
+        "the place card's statement > a long hook wraps before the place and never runs past three lines"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/pregen-hubspot-draft-policy.test.ts",
+      "decision": "delete-file",
+      "currentLines": 338,
+      "keep": [],
+      "purge": [
+        "findPregenHubspotDraftViolations > accepts a grounded fresh opening carrying a supported number",
+        "findPregenHubspotDraftViolations > accepts a draft that earns credibility without a number",
+        "findPregenHubspotDraftViolations > rejects the limp corporate register in touch 1",
+        "findPregenHubspotDraftViolations > rejects recipient attribution and unsupported preview claims",
+        "findPregenHubspotDraftViolations > rejects addressing the reader's history as you, recipient or not",
+        "findPregenHubspotDraftViolations > allows the same history attributed to the person who said it",
+        "findPregenHubspotDraftViolations > allows a meeting length outside touch 1",
+        "findPregenHubspotDraftViolations > allows an explicit disclaimer that the preview does not answer technical questions",
+        "findPregenHubspotDraftViolations > rejects crediting Wander.com with a WanderOS platform number",
+        "findPregenHubspotDraftViolations > rejects calling the already-rendered preview link below from the closing",
+        "findPregenHubspotDraftViolations > rejects the three claims that reached a reviewer on fisher3vacations.com",
+        "findPregenHubspotDraftViolations > allows naming the direct-booking decision without quantifying it",
+        "findPregenHubspotDraftViolations > rejects a hook built on the prospect's site being broken",
+        "findPregenHubspotDraftViolations > catches the OTA-absence claim when it swaps the verb",
+        "findPregenHubspotDraftViolations > still allows the durable facts a hook should rest on",
+        "findPregenHubspotDraftViolations > allows denying the connection, which is the copy we want"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/pregen-hubspot-outreach.service.test.ts",
+      "decision": "delete-file",
+      "currentLines": 174,
+      "keep": [],
+      "purge": [
+        "selectCompanyHistoryForGeneration > keeps inbound replies even when they are older than the recent window",
+        "selectCompanyHistoryForGeneration > removes current pregen self-test messages",
+        "selectCompanyHistoryForGeneration > removes operator self-test correspondence",
+        "hubspotCompanyPropertiesFromRenderedSteps > carries all four touches",
+        "hubspotCompanyPropertiesFromRenderedSteps > splits touch 1 around an attributed link line",
+        "hubspotCompanyPropertiesFromRenderedSteps > refuses touch 1 with no link line"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/pregen-recipient.test.ts",
+      "decision": "delete-file",
+      "currentLines": 79,
+      "keep": [],
+      "purge": [
+        "pickRecipient > prefers whoever the logged history actually names most",
+        "pickRecipient > an explicit request wins over the scoring",
+        "pickRecipient > returns null when no contact is linked to HubSpot",
+        "pickRecipient > skips a role inbox however often the history names it"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/pregen/generation/units.test.ts",
+      "decision": "delete-file",
+      "currentLines": 65,
+      "keep": [],
+      "purge": [
+        "toGalleryUnits > backfills past a missing image instead of losing a card slot",
+        "toGalleryUnits > shows at most three images even when a fourth survived",
+        "toGalleryUnits > drops a unit whose every image is missing rather than render an empty card"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/pregen/preview-url.test.ts",
+      "decision": "delete-file",
+      "currentLines": 30,
+      "keep": [],
+      "purge": [
+        "previewHostLabel > takes the registrable name and drops the rest",
+        "previewHostLabel > never emits something that is not a legal single label",
+        "previewHostLabel > falls back rather than producing an empty host"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "src/server/services/spend-tracker/spend-tracker.test.ts",
+      "decision": "trim",
+      "currentLines": 595,
+      "keep": [
+        "computeChannelPacing — ad (variable) channels > uses spendThroughYesterday / (dayOfMonth-1), NOT the diluted /dayOfMonth (#9l)",
+        "computeChannelPacing — ad (variable) channels > returns null on the 1st of the month",
+        "buildMetaDailyRows — marketplace filter + daily grouping > re-sums grouped daily totals to Marketplace-only spend",
+        "resolveFixedCostsForMonth > latest effective month ≤ target wins and carries forward",
+        "mergeSpendBookingsAndFunnel > skips BQ Meta spend and applies Meta API per-day overrides",
+        "mergeSpendBookingsAndFunnel > keeps Meta BQ bookings on days without API data (per-day fallback)",
+        "mergeSpendBookingsAndFunnel > skips BQ ad-network spend for fixed-cost channels (no double count)",
+        "mergeSpendBookingsAndFunnel > applies Google connector overrides per day (data-driven)"
+      ],
+      "purge": [
+        "computeChannelPacing — fixed-cost channels > projects to the monthly amount from completed days (today is $0)",
+        "computeChannelPacing — fixed-cost channels > works from a single completed day",
+        "computeChannelPacing — fixed-cost channels > returns null on the 1st (only the in-progress $0 day)",
+        "computeChannelPacing — fixed-cost channels > returns null for a channel zeroed all month (SEO June, #9i)",
+        "computeChannelPacing — ad (variable) channels > projects the run-rate from a full set of completed days",
+        "computeChannelPacing — ad (variable) channels > returns null when an ad channel has no completed-day spend",
+        "isMarketplaceCampaign > excludes real WanderOS / Listed campaign names",
+        "isMarketplaceCampaign > keeps real Marketplace campaigns",
+        "isMarketplaceCampaign > is case-insensitive",
+        "isMarketplaceCampaign > keeps null/undefined/empty names (pessimistic — fail toward counting)",
+        "buildMetaDailyRows — marketplace filter + daily grouping > sums 28d_click + 1d_view per campaign-row before grouping",
+        "resolveFixedCostsForMonth > returns seed values for pre-override months",
+        "buildFixedCostRows — daily pro-ration (#9j) > pro-rates monthly amounts by days-in-month and zeroes the in-progress UTC day",
+        "buildFixedCostRows — daily pro-ration (#9j) > uses each month's own resolved amounts across month boundaries",
+        "buildFixedCostRows — daily pro-ration (#9j) > lifecycle has no channel mapping and is skipped",
+        "mergeSpendBookingsAndFunnel > Pinterest override replaces spend but keeps BQ bookings unless pixel conversions exist",
+        "mergeSpendBookingsAndFunnel > maps mybookingpal → amex and unknown partners → other",
+        "applyDemandSalesManual > replaces BQ demand-sales numbers with the manual month total",
+        "applyDemandSalesManual > creates an anchor row when the month has no BQ rows",
+        "applyDemandSalesManual > ignores months outside the window and leaves spend untouched"
+      ],
+      "category": "Financial reporting",
+      "reason": "Protect pacing math, source precedence, attribution and double counting."
+    },
+    {
+      "file": "test/assistant-speech.test.ts",
+      "decision": "keep-all",
+      "currentLines": 19,
+      "keep": [
+        "voice admission preserves access, quota, server configuration, and private provider errors"
+      ],
+      "purge": [],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    },
+    {
+      "file": "test/assistant-voice-lifecycle.test.ts",
+      "decision": "delete-file",
+      "currentLines": 31,
+      "keep": [],
+      "purge": [
+        "switching chats without starting voice does not crash",
+        "ending voice includes late transcript fragments in the recovered draft and retained transcript",
+        "provider closure recovers unsent speech, stops result reads, and allows a new call"
+      ],
+      "reason": "Below the strict retention budget. This is a priority decision, not evidence that every removed assertion is valueless."
+    }
+  ],
+  "validation": {
+    "passed": 124,
+    "failed": 0,
+    "all109AgreedCasesPresent": true,
+    "upstreamCasesPreserved": 15,
+    "unitRuntimeMs": 1580,
+    "unitCommand": "bun test",
+    "staticCheck": "SKIP_ENV_VALIDATION=1 bun run check: passed, existing warnings",
+    "aiContracts": "passed with dummy local configuration",
+    "sourceLinesAfter": 3113,
+    "retainedFilesAfterRebase": 31,
+    "applicationSourceChanged": false
+  },
+  "restoredCases": 10,
+  "rebasedOnto": "adbdeb07ce7e3947b7b93ff71cffd0c4594742ea",
+  "upstreamPreservedFiles": [
+    {
+      "file": "src/lib/launch-checklist.test.ts",
+      "keep": [
+        "bulk input rejects duplicate and unknown milestone keys",
+        "bulk updates preserve other milestones and record provenance per item",
+        "new checklists have no inferred completions or claims about missing assets",
+        "workflow retries do not overwrite later manual corrections"
+      ],
+      "reason": "New upstream tests introduced after the assessment; preserved during rebase."
+    },
+    {
+      "file": "src/lib/studio-homes.test.ts",
+      "keep": [
+        "an operator's hero wins over the gallery's first photo",
+        "homes without photos remain without photos instead of becoming build candidates",
+        "manual homes retain saved identity and photos in Ad studio"
+      ],
+      "reason": "New upstream tests introduced after the assessment; preserved during rebase."
+    },
+    {
+      "file": "src/server/clients/wanderos-probe.test.ts",
+      "keep": [
+        "WanderOS probe verifies one search page even with no published homes",
+        "a failed WanderOS search can be retried instead of saving a negative detection",
+        "a website without WanderOS assets makes no listing requests"
+      ],
+      "reason": "New upstream tests introduced after the assessment; preserved during rebase."
+    },
+    {
+      "file": "src/server/services/launch-checklist.service.test.ts",
+      "keep": [
+        "a racing write fails instead of losing a parallel workflow completion",
+        "a replayed workflow receipt leaves a later manual reopening intact",
+        "a stale checkbox cannot overwrite a later operator decision",
+        "an unavailable scoped brand cannot receive checklist updates",
+        "bulk milestone updates preserve tracker fields and stamp the authenticated actor"
+      ],
+      "reason": "New upstream tests introduced after the assessment; preserved during rebase."
+    }
+  ],
+  "upstreamCaseAccounting": {
+    "added": 16,
+    "preserved": 15,
+    "purged": 1,
+    "note": "The added legacy-route alias case belonged to the assistant-focus file selected for deletion; the other 15 additions were preserved."
+  }
+}

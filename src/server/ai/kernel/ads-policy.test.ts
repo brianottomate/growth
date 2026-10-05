@@ -1,5 +1,4 @@
 import { describe, expect, it } from "bun:test";
-
 import { growthActionPolicies } from "@/server/ai/kernel/policy";
 
 /**
@@ -21,21 +20,6 @@ const SPEND_CAPABLE = [
   "duplicateMetaCampaign",
 ] as const satisfies readonly AdsWriteAction[];
 
-/** Local rows only: safe to expose everywhere, including MCP. */
-const LOCAL_ONLY = [
-  "planPlatform",
-  "draftCampaign",
-  "draftAd",
-  "addAudience",
-  "setCreativePool",
-  "setPlatformDraft",
-  "attachCampaign",
-  "importMetaCampaign",
-  "deleteCampaignDraft",
-  "deleteAudience",
-  "deleteAdDraft",
-] as const satisfies readonly AdsWriteAction[];
-
 describe("ads action policy", () => {
   for (const action of SPEND_CAPABLE) {
     it(`${action} requires operator approval and stays off MCP`, () => {
@@ -43,38 +27,10 @@ describe("ads action policy", () => {
       expect(adsWrite[action].surfaces).not.toContain("mcp");
     });
   }
-
-  for (const action of LOCAL_ONLY) {
-    it(`${action} stays a local write needing no approval`, () => {
-      expect(adsWrite[action].consequence).toBe("local-write");
-      expect(adsWrite[action].approval).toBe("none");
-      expect(adsWrite[action].surfaces).toContain("mcp");
-    });
-  }
-
   it("approving an ad is the operator's sign-off, not the model's", () => {
     // Approval is what the push requires, so a model approving its own ideas
     // would make the gate meaningless.
     expect(adsWrite.setAdStatus.approval).toBe("user");
     expect(adsWrite.setAdStatus.surfaces).not.toContain("mcp");
-  });
-
-  it("deleting a live campaign is irreversible, unlike pausing it", () => {
-    expect(adsWrite.deletePlatformCampaign.reversible).toBe(false);
-    expect(adsWrite.setDelivery.reversible).toBe(true);
-    expect(adsWrite.setDelivery.undoWith).toBe("adsWrite.setDelivery");
-  });
-
-  it("pushing retains its receipt and explicit deletion recovery", () => {
-    // Google creates before pausing, so push itself remains approval-gated.
-    expect(adsWrite.push.undoWith).toBe("adsWrite.deletePlatformCampaign");
-    expect(adsWrite.push.idempotent).toBe(true);
-  });
-
-  it("reading a campaign needs no approval and reaches every surface", () => {
-    expect(growthActionPolicies.adsRead.ideaContext.approval).toBe("none");
-    expect(growthActionPolicies.adsRead.ideaContext.surfaces).toContain("mcp");
-    expect(growthActionPolicies.adsRead.openCampaign.approval).toBe("none");
-    expect(growthActionPolicies.adsRead.openCampaign.surfaces).toContain("mcp");
   });
 });
