@@ -28,7 +28,14 @@ try {
       "--name",
       "uncommitted_schema",
     ],
-    { stdin: "ignore", stdout: "pipe", stderr: "pipe" },
+    {
+      // Schema generation is offline; transitive schema imports must not require
+      // application/provider credentials. App builds still validate their env.
+      env: { ...process.env, SKIP_ENV_VALIDATION: "1" },
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "pipe",
+    },
   );
   const [stdout, stderr, code] = await Promise.all([
     new Response(child.stdout).text(),
