@@ -1,30 +1,11 @@
-import type { McpServer } from "@modelcontextprotocol/server";
+import { widgetDocument } from "./widget-shell";
 export const NEXT_OPTIONS_URI = "ui://wander-growth/next-options/v1.html";
-export const NEXT_OPTIONS_HTML = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
-:root{color-scheme:light dark;font:14px system-ui}body{margin:0;padding:10px;background:transparent}#options{display:flex;flex-wrap:wrap;gap:8px}button,textarea{font:inherit;color:inherit;background:light-dark(#fff,#20242c);border:1px solid light-dark(#d1d5db,#596170);border-radius:10px;padding:10px}button{cursor:pointer}button:disabled{opacity:.5}textarea{display:block;box-sizing:border-box;width:100%;margin:10px 0}#status{font-size:12px}button:focus-visible,textarea:focus-visible{outline:2px solid #648cff;outline-offset:2px}</style></head><body><div id="options"></div><form id="edit" hidden><label for="draft">Add your details</label><textarea id="draft" rows="3"></textarea><button type="submit">Send message</button></form><p id="status" role="status"></p><script>
-(function(){const root=document.getElementById('options'),form=document.getElementById('edit'),draft=document.getElementById('draft'),status=document.getElementById('status');let ready=false,pending=null,count=0;function send(text){if(!ready||pending)return;pending='send-'+(++count);status.textContent='Sending…';window.parent.postMessage({jsonrpc:'2.0',id:pending,method:'ui/message',params:{role:'user',content:[{type:'text',text}]}},'*')}function render(payload){const options=payload&&payload.data&&payload.data.options;if(!Array.isArray(options))return;root.replaceChildren();form.hidden=true;options.slice(0,3).forEach(o=>{if(typeof o.label!=='string'||typeof o.text!=='string')return;const b=document.createElement('button');b.textContent=(o.kind==='detail'?'✎ ':'')+o.label;b.onclick=()=>{if(o.kind==='detail'){form.hidden=false;draft.value=o.text;draft.focus()}else send(o.text)};root.appendChild(b)})}form.onsubmit=e=>{e.preventDefault();if(draft.value.trim())send(draft.value.trim())};window.addEventListener('message',e=>{if(e.source!==window.parent)return;const m=e.data;if(!m||m.jsonrpc!=='2.0')return;if(m.id==='init'&&m.result){ready=true;window.parent.postMessage({jsonrpc:'2.0',method:'ui/notifications/initialized'},'*')}if(m.id===pending){pending=null;status.textContent=m.error?'Could not send. Try again.':'Message sent.'}if(m.method==='ui/notifications/tool-result')render(m.params&&m.params.structuredContent)});window.parent.postMessage({jsonrpc:'2.0',id:'init',method:'ui/initialize',params:{appInfo:{name:'growth-next-options',version:'1.0.0'},appCapabilities:{},protocolVersion:'2026-01-26'}},'*')})();
-</script></body></html>`;
-export function registerNextOptionsResource(server: McpServer) {
-  server.registerResource(
-    "next-options",
-    NEXT_OPTIONS_URI,
-    { mimeType: "text/html;profile=mcp-app" },
-    async () => ({
-      contents: [
-        {
-          uri: NEXT_OPTIONS_URI,
-          mimeType: "text/html;profile=mcp-app",
-          text: NEXT_OPTIONS_HTML,
-          _meta: {
-            ui: {
-              prefersBorder: false,
-              csp: { connectDomains: [], resourceDomains: [] },
-            },
-            "openai/widgetDescription":
-              "Contextual follow-ups. Detail choices open an editable draft before sending.",
-          },
-        },
-      ],
-    }),
-  );
-}
+export const NEXT_OPTIONS_HTML = widgetDocument(
+  "growth-next-options",
+  String.raw`
+.choices{display:grid;gap:8px}.choice{display:flex;align-items:center;gap:12px;text-align:left;width:100%;padding:14px;border-radius:13px}.choice .icon{display:grid;place-items:center;width:32px;height:32px;flex:none;background:var(--accent-bg);color:var(--accent);border-radius:9px}.choice .choice-copy{flex:1;min-width:0}.choice strong{display:block;font-size:13px;font-weight:550}.choice small{display:block;color:var(--muted);font-size:10px;margin-top:2px}.choice .arrow{color:var(--muted)}.draft-form{border:1px solid var(--line);border-radius:14px;background:var(--soft);padding:14px;margin-top:12px}.draft-form[hidden]{display:none}.draft-form label{font-size:12px;font-weight:600}.draft-form textarea{display:block;resize:vertical;min-height:100px;width:100%;margin:8px 0 12px;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--bg);font-size:12px;line-height:1.6}.draft-form .row button{font-size:11px}
+`,
+  String.raw`
+function render(value){var options=value&&value.data&&value.data.options;if(!Array.isArray(options)){empty('No follow-up choices','Useful next steps will appear after the response.');return}heading('Where to next?','Choose a direction, or make it your own.','spark');var choices=el('div','choices'),form=el('form','draft-form');form.hidden=true;var label=el('label','','Add your details');label.htmlFor='draft';var draft=el('textarea','');draft.id='draft';draft.rows=3;var controls=el('div','row'),cancel=el('button','','Cancel'),submit=el('button','primary','Send message');cancel.type='button';cancel.onclick=function(){form.hidden=true};submit.type='submit';submit.dataset.handoff='true';submit.disabled=!ready;controls.appendChild(cancel);controls.appendChild(submit);form.appendChild(label);form.appendChild(draft);form.appendChild(controls);form.onsubmit=function(event){event.preventDefault();if(draft.value.trim())send(draft.value.trim())};options.slice(0,3).forEach(function(option){var button=el('button','choice');button.type='button';button.appendChild(icon(option.kind==='detail'?'edit':option.kind==='answer'?'check':'arrow'));var copy=el('span','choice-copy');copy.appendChild(el('strong','',option.label));copy.appendChild(el('small','',option.kind==='detail'?'Edit before sending':option.kind==='answer'?'Reply with this direction':'Continue in your conversation'));button.appendChild(copy);button.appendChild(el('span','arrow','↗'));if(option.kind!=='detail'){button.dataset.handoff='true';button.disabled=!ready||!!pending}button.onclick=function(){if(option.kind==='detail'){form.hidden=false;draft.value=option.text;draft.focus()}else send(option.text)};choices.appendChild(button)});root.appendChild(choices);root.appendChild(form);root.appendChild(el('p','footer','Your choice continues the conversation.'))}
+`,
+);

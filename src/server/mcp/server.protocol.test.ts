@@ -84,6 +84,48 @@ async function assertToolCatalog(client: Client) {
       ? resource.contents[0].text
       : "",
   ).toContain("Social posts");
+  for (const [toolName, resourceName] of [
+    ["contentRead__upcoming", "content-calendar"],
+    ["contentRead__pipeline", "content-pipeline"],
+    ["contentRead__productionQueue", "production-queue"],
+    ["adsRead__top", "ad-performance"],
+    ["contentRead__getWorkItem", "work-item"],
+    ["adsRead__openCampaign", "campaign-overview"],
+    ["adsRead__ideaContext", "creative-review"],
+    ["adsWrite__saveIdea", "creative-review"],
+    ["adsWrite__draftAd", "creative-review"],
+    ["adsRead__catalogState", "catalog-review"],
+    ["brandRead__getMap", "brand-picker"],
+    ["brandRead__list", "brand-picker"],
+    ["mediaLibraryRead__listingPhotos", "listing-photos"],
+  ]) {
+    const uri = `ui://wander-growth/${resourceName}/v1.html`;
+    const tool = tools.find((entry) => entry.name === toolName);
+    expect(tool?._meta?.ui).toEqual({
+      resourceUri: uri,
+      visibility: ["model", "app"],
+    });
+    expect(tool?._meta?.["openai/outputTemplate"]).toBe(uri);
+    const view = await client.readResource({ uri });
+    expect(view.contents[0]?.mimeType).toBe("text/html;profile=mcp-app");
+    if (toolName === "mediaLibraryRead__listingPhotos") {
+      // Readability alone misses a host CSP that would blank native listing photos.
+      const metadata = view.contents[0]?._meta as {
+        ui?: { csp?: { resourceDomains?: string[] } };
+      };
+      expect(metadata.ui?.csp?.resourceDomains).toContain(
+        "https://assets.wander.com",
+      );
+      expect(metadata.ui?.csp?.resourceDomains).toContain(
+        "https://assets-websites.wander.com",
+      );
+    }
+    expect(
+      view.contents[0] && "text" in view.contents[0]
+        ? view.contents[0].text
+        : "",
+    ).toContain("ui/notifications/tool-result");
+  }
 }
 
 // These integration tests compile the complete catalog on their first request.

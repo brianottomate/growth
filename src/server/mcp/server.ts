@@ -1,15 +1,19 @@
 import "server-only";
-import { registerNextOptionsResource } from "./next-options-ui";
+import { registerConnectorResources } from "./connector-widgets";
 
 import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
 
 import { MCP_TOOLS } from "@/server/ai/capabilities";
 import { registerMcpTools } from "@/server/ai/capabilities/to-mcp-server";
 import { env } from "@/env";
-import { registerSocialPostPreviewResource } from "./social-post-preview-ui";
 
-function socialPostPreviewResourceDomains() {
-  const domains = new Set<string>();
+function connectorResourceDomains() {
+  // Listing photos can be reviewed before they are imported into Growth's R2.
+  // Match the native composition preview's public Wander asset allowlist.
+  const domains = new Set<string>([
+    "https://assets.wander.com",
+    "https://assets-websites.wander.com",
+  ]);
   if (env.R2_PUBLIC_BASE_URL) {
     domains.add(new URL(env.R2_PUBLIC_BASE_URL).origin);
   }
@@ -30,8 +34,7 @@ export function createGrowthMcpServer() {
   });
 
   registerMcpTools(server, MCP_TOOLS);
-  registerNextOptionsResource(server);
-  registerSocialPostPreviewResource(server, socialPostPreviewResourceDomains());
+  registerConnectorResources(server, connectorResourceDomains());
   return server;
 }
 

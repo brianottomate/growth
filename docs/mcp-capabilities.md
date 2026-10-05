@@ -79,6 +79,7 @@ Notable portable workflows:
 - route stale storefront updates and confirm external surfaces after completion;
 - return canonical navigation URLs;
 - render selected social post IDs as platform-aware inline MCP App previews;
+- show upcoming content, pipeline summaries, production queues, and top ads as interactive MCP Apps (see [workbench](connector-ui-workbench.md));
 - discover brand handles and save reviewable channel suggestions;
 - scrape public posts with a durable ingest-run record;
 - sync owned history, website structure, and blog articles;

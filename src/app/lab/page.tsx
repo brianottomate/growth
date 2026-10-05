@@ -20,6 +20,11 @@ const PAGES: { name: string; href: string; note?: string }[] = [
     note: "tool cards, conversation states, generated UI, and capability inventory",
   },
   {
+    name: "Connector UI workbench",
+    href: "/lab/design-system/connectors",
+    note: "actual MCP widgets with sample results and a simulated host",
+  },
+  {
     name: "Design contracts",
     href: "/lab/design-contracts",
     note: "shared component style review",

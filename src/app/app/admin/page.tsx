@@ -77,6 +77,11 @@ const GROUPS = [
         note: "Conversation states and tool cards",
       },
       {
+        label: "Connector UI workbench",
+        href: "/lab/design-system/connectors",
+        note: "MCP widgets, tool results, and host interactions",
+      },
+      {
         label: "Pregen run review",
         href: "/lab/pregen-review",
         note: "Source captures and evaluation receipts",

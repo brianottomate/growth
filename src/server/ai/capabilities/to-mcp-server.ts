@@ -1,6 +1,6 @@
 import "server-only";
 import { mcpOutputSchema } from "@/server/mcp/result-contract";
-import { NEXT_OPTIONS_URI } from "@/server/mcp/next-options-ui";
+import { widgetForTool } from "@/server/mcp/connector-widgets";
 
 import type { AuthInfo, McpServer } from "@modelcontextprotocol/server";
 import { anthropic } from "@ai-sdk/anthropic";
@@ -29,7 +29,6 @@ import { buildGrowthToolRuntime } from "../kernel/runtime";
 import { runtimeClockSection } from "../kernel/runtime-clock";
 import { summarizeGrowthUsage } from "../kernel/usage";
 import type { GrowthExecutionContext } from "../kernel/tool";
-import { SOCIAL_POST_PREVIEW_URI } from "@/server/mcp/social-post-preview-ui";
 
 type ToolContext = { http?: { authInfo?: AuthInfo } };
 
@@ -244,7 +243,7 @@ export function registerMcpTools(
     const policy = policyForGrowthTool(name);
     const nativeDefinition = definition;
     const inputSchema = nativeDefinition.transportInputSchema;
-    const rendersSocialPostPreview = name === "renderSocialPosts";
+    const widget = widgetForTool(name);
     const outputSchema = mcpOutputSchema(nativeDefinition.resultSchema);
     server.registerTool(
       name,
@@ -263,24 +262,18 @@ export function registerMcpTools(
           idempotentHint: policy.idempotent,
           openWorldHint: name === "researchRead",
         },
-        ...(name === "presentNextOptions"
-          ? {
-              _meta: {
-                ui: { resourceUri: NEXT_OPTIONS_URI },
-                "openai/outputTemplate": NEXT_OPTIONS_URI,
-              },
-            }
-          : {}),
-        ...(rendersSocialPostPreview
+        ...(widget
           ? {
               _meta: {
                 ui: {
-                  resourceUri: SOCIAL_POST_PREVIEW_URI,
-                  visibility: ["model", "app"],
+                  resourceUri: widget.uri,
+                  ...(widget.id === "options"
+                    ? {}
+                    : { visibility: ["model", "app"] }),
                 },
-                "openai/outputTemplate": SOCIAL_POST_PREVIEW_URI,
-                "openai/toolInvocation/invoking": "Rendering social posts",
-                "openai/toolInvocation/invoked": "Social posts ready",
+                "openai/outputTemplate": widget.uri,
+                "openai/toolInvocation/invoking": `Preparing ${widget.title.toLowerCase()}`,
+                "openai/toolInvocation/invoked": `${widget.title} ready`,
               },
             }
           : {}),

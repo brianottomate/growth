@@ -246,7 +246,14 @@ export function AssistantGallery({ catalog }: { catalog: CatalogEntry[] }) {
             <ArrowLeft className="size-4" />
             Growth Lab
           </Link>
-          <ThemeToggle />
+          <div className="flex items-center gap-3">
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/lab/design-system/connectors">
+                Connector UI workbench
+              </Link>
+            </Button>
+            <ThemeToggle />
+          </div>
         </div>
         <div className="max-w-3xl">
           <p className="mb-3 text-xs tracking-widest text-muted-foreground uppercase">
