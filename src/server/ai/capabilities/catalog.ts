@@ -62,7 +62,7 @@ export const importWanderOsAction = growthAction({
     run: wanderOsImportRunSchema,
   }),
   description:
-    "Import WanderOS in the background: import homes and baseline catalog inventory, select up to five Featured homes while keeping existing selections, and create destinations if none exist. Follow wanderOsImportStatus for progress. Retry resumes unfinished steps. Does not write catalog copy or approve/export cards.",
+    "Requires enriched brand identity, saved brand story and creative mark before starting. Import WanderOS in the background: import homes, select up to five Featured homes while keeping existing selections, create destinations if none exist, and prepare initial catalog photo/copy. Follow wanderOsImportStatus for progress. Retry resumes unfinished steps. Does not approve or export cards.",
   examples: [{ brandId: "brd_01" }],
   execute: async (input, ctx) => {
     const actor = { ...input, userId: ctx.userId };
@@ -73,9 +73,13 @@ export const importWanderOsAction = growthAction({
 });
 export const wanderOsImportStatusAction = growthAction({
   inputSchema: brandInput,
-  outputSchema: z.object({ run: wanderOsImportRunSchema.nullable() }),
+  outputSchema: z.object({
+    run: wanderOsImportRunSchema.nullable(),
+    missingFoundations: z.array(z.string()),
+    setupHref: z.string(),
+  }),
   description:
-    "Read the latest WanderOS import workflow and progress of its homes, Featured selection and destination steps.",
+    "Read missing brand setup prerequisites and the latest WanderOS import progress for homes, Featured selection, destinations and catalog preparation.",
   examples: [{ brandId: "brd_01" }],
   execute: (input, ctx) =>
     wanderOsImportStatus({ ...input, userId: ctx.userId }),

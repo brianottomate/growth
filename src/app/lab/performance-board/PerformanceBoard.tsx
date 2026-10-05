@@ -290,6 +290,7 @@ export function PerformanceBoard() {
               </div>
             </section>
             <section
+              id="performance-setup"
               aria-label="Workflow two: brand setup"
               className="rounded-2xl border bg-background/60 p-6"
             >
@@ -306,11 +307,11 @@ export function PerformanceBoard() {
                 {[
                   [
                     "Branding & brand mark",
-                    "Branding is a readout of the initial Firecrawl enrichment. The brand mark defines how the identity appears in creative.",
+                    "Enrich the brand from its website and save its creative mark before importing WanderOS. Both are required foundations for catalog and ad creative.",
                   ],
                   [
                     "Brand story & personas",
-                    "Write the brand story and define guest personas. Direct workflows save starter context; Shape supports discussion and refinement. Seed lists remain with personas.",
+                    "Save the brand story before importing WanderOS; draft it from the website first, then refine it with home and guest evidence later. Define personas after the story is saved; personas remain optional for WanderOS import. Direct workflows save context; Shape supports refinement.",
                   ],
                   [
                     "Brand preview & typography",
@@ -349,14 +350,15 @@ export function PerformanceBoard() {
               </div>
             </section>
             <section
+              id="performance-wanderos"
               aria-label="WanderOS: homes and destinations"
               className="rounded-2xl border bg-background/60 p-6"
             >
               <h2 className="text-xl font-semibold">02b · WanderOS</h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                Prepare the property context used by Catalog and Campaigns. The
-                tab owns homes and destinations; Settings owns connection and
-                sync.
+                Complete brand identity, story and creative mark in Setup first.
+                Then import WanderOS homes, select Featured homes, create
+                destinations and prepare catalog cards in one automatic flow.
               </p>
               <AtlasContext journey="wanderos" slug={slug} />
               <div className="mt-4 space-y-2">
@@ -392,11 +394,12 @@ export function PerformanceBoard() {
               <aside className="mt-4 rounded-xl border border-dashed p-4">
                 <h3 className="font-medium">Connection & sync</h3>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Configure the WanderOS booking site and refresh the home feed
-                  in Settings. Legacy Homes and Booking routes redirect to this
-                  tab. Automatic feed and booking links depend on WanderOS;
-                  selection does not establish live availability or launch a
-                  campaign.
+                  Website detection can run before brand setup. Import stays
+                  blocked until identity, story and creative mark are saved,
+                  including requests from chat or API. Configure the booking
+                  site and refresh the feed in Settings. Automatic feed and
+                  booking links depend on WanderOS; selection does not establish
+                  live availability or launch a campaign.
                 </p>
               </aside>
             </section>
@@ -408,15 +411,16 @@ export function PerformanceBoard() {
               <h2 className="text-xl font-semibold">03 · Catalog</h2>
               <p className="mt-2 text-muted-foreground">Sil</p>
               <p className="mt-2 text-sm text-muted-foreground">
-                Sil’s production workflow · Meta catalog creative. Full brand
-                setup should not be a prerequisite just to start a catalog.
+                Sil’s production workflow · Meta catalog creative. Initial
+                preparation runs automatically during WanderOS import, after
+                brand identity, story and creative mark are saved.
               </p>
               <AtlasContext journey="catalog" slug={slug} />
               <div className="mt-4 space-y-2">
                 {[
                   [
                     "What should be in place",
-                    "Identify the homes, usable photos, and visual defaults that support catalog production. Clarify how brand story and personas improve the work without making complete onboarding a blanket prerequisite.",
+                    "Brand identity, saved story and creative mark precede the WanderOS import and its initial catalog preparation. Imported homes and usable photos supply the cards. Personas and complete onboarding are not required.",
                   ],
                   [
                     "Choose the catalog card",
@@ -642,8 +646,9 @@ export function PerformanceBoard() {
             <h2 className="text-lg font-semibold">What should be in place</h2>
             <p className="text-xs text-muted-foreground">
               Proposed shared concept · what supports creation, review, and
-              delivery. These are planning notes, not new app gates. Full brand
-              setup is not a blanket prerequisite.
+              delivery. WanderOS import requires brand identity, saved story and
+              creative mark. Other readiness notes remain planning concepts;
+              complete onboarding is not a blanket prerequisite.
             </p>
             <div className="flex w-max items-start gap-4">
               {[

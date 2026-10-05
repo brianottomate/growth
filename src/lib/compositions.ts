@@ -62,7 +62,7 @@ export const COMPOSITION_FORMATS = [
  */
 export const STORY_SAFE_ZONE = { top: 0.14, bottom: 0.35, side: 0.06 } as const;
 
-export const COMPOSITION_TEMPLATES = [
+const COMPOSITION_TEMPLATE_DEFINITIONS = [
   {
     id: "photo-only",
     version: 1,
@@ -198,9 +198,21 @@ export const COMPOSITION_TEMPLATES = [
   },
 ] as const;
 
+export const COMPOSITION_TEMPLATES = COMPOSITION_TEMPLATE_DEFINITIONS;
+
+/** Preserve the source photo when a saved composition has been retired or removed. */
+export function resolveCompositionTemplateId(
+  id: string,
+): CompositionTemplateId {
+  return (
+    COMPOSITION_TEMPLATES.find((template) => template.id === id)?.id ??
+    "photo-only"
+  );
+}
+
 export type CompositionFormatId = (typeof COMPOSITION_FORMATS)[number]["id"];
 export type CompositionTemplateId =
-  (typeof COMPOSITION_TEMPLATES)[number]["id"];
+  (typeof COMPOSITION_TEMPLATE_DEFINITIONS)[number]["id"];
 
 export type CompositionFieldKey =
   | "mark"
@@ -459,27 +471,25 @@ export const COMPOSITION_FIELDS: Record<
 };
 
 export function getCompositionFields(id: CompositionTemplateId) {
-  return COMPOSITION_FIELDS[id];
+  return COMPOSITION_FIELDS[resolveCompositionTemplateId(id)];
 }
 
 export function compositionHasField(
   id: CompositionTemplateId,
   key: CompositionFieldKey,
 ) {
-  return COMPOSITION_FIELDS[id].some((field) => field.key === key);
+  return getCompositionFields(id).some((field) => field.key === key);
 }
 
-const templateIds = COMPOSITION_TEMPLATES.map((template) => template.id) as [
-  CompositionTemplateId,
-  ...CompositionTemplateId[],
-];
 const formatIds = COMPOSITION_FORMATS.map((format) => format.id) as [
   CompositionFormatId,
   ...CompositionFormatId[],
 ];
 
 export const compositionFormatIdSchema = z.enum(formatIds);
-export const compositionTemplateIdSchema = z.enum(templateIds);
+export const compositionTemplateIdSchema = z
+  .enum(COMPOSITION_TEMPLATES.map((template) => template.id))
+  .catch("photo-only");
 /** Which side of the photo the cover crop keeps. */
 export const COMPOSITION_IMAGE_POSITIONS = [
   "top",
@@ -494,7 +504,7 @@ export const compositionImagePositionSchema = z.enum(
 
 const compositionShape = {
   brandId: z.string().min(1),
-  templateId: z.enum(templateIds),
+  templateId: compositionTemplateIdSchema,
   formatId: z.enum(formatIds),
   sourceMediaAssetId: z.string().min(1).optional(),
   title: z.string().trim().max(120),
@@ -544,17 +554,17 @@ const compositionShape = {
   tier: z.enum(["luxury", "iconic"]).optional(),
 };
 
-function requireTier(
-  value: { templateId: CompositionTemplateId; tier?: string },
-  context: z.RefinementCtx,
-) {
-  if (value.templateId === "tier-badge" && !value.tier) {
-    context.addIssue({
-      code: "custom",
-      path: ["tier"],
-      message: "This blueprint needs a tier",
-    });
-  }
+/** Generic ads may reference this newsletter layout without supplying a tier. */
+function withAvailableComposition<
+  T extends { templateId: CompositionTemplateId; tier?: string },
+>(value: T): T {
+  return {
+    ...value,
+    templateId:
+      value.templateId === "tier-badge" && !value.tier
+        ? "photo-only"
+        : value.templateId,
+  };
 }
 
 function requireSourceImage(
@@ -595,9 +605,11 @@ function requireTitle(
 
 export const compositionSpecSchema = z
   .object(compositionShape)
+  .superRefine((value) => {
+    value.templateId = withAvailableComposition(value).templateId;
+  })
   .superRefine(requireSourceImage)
-  .superRefine(requireTitle)
-  .superRefine(requireTier);
+  .superRefine(requireTitle);
 
 /**
  * A spec for an on-demand preview, where the photo may come from a URL the
@@ -607,17 +619,21 @@ export const compositionSpecSchema = z
  */
 export const compositionPreviewSchema = z
   .object(compositionShape)
-  .superRefine(requireTitle)
-  .superRefine(requireTier);
+  .superRefine((value) => {
+    value.templateId = withAvailableComposition(value).templateId;
+  })
+  .superRefine(requireTitle);
 
 export const freezeCompositionSchema = z
   .object({
     ...compositionShape,
     assetTitle: z.string().trim().min(1).max(180),
   })
+  .superRefine((value) => {
+    value.templateId = withAvailableComposition(value).templateId;
+  })
   .superRefine(requireSourceImage)
-  .superRefine(requireTitle)
-  .superRefine(requireTier);
+  .superRefine(requireTitle);
 
 export type CompositionSpec = z.infer<typeof compositionSpecSchema>;
 export type FreezeCompositionInput = z.infer<typeof freezeCompositionSchema>;
@@ -627,7 +643,9 @@ export function getCompositionFormat(id: CompositionFormatId) {
 }
 
 export function getCompositionTemplate(id: CompositionTemplateId) {
-  return COMPOSITION_TEMPLATES.find((template) => template.id === id)!;
+  return COMPOSITION_TEMPLATES.find(
+    (template) => template.id === resolveCompositionTemplateId(id),
+  )!;
 }
 
 /**

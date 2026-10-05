@@ -104,7 +104,10 @@ export function AddAdDialog({
             name="format"
             label="Format"
             gridCols={3}
-            options={[...HAND_MADE_AD_FORMATS, "text" as const].map((value) => {
+            options={[
+              ...HAND_MADE_AD_FORMATS.filter((value) => value !== "catalog"),
+              "text" as const,
+            ].map((value) => {
               const Icon = FORMAT_ICONS[value];
               return {
                 value,
@@ -135,7 +138,7 @@ export function AddAdDialog({
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="shell-url">Destination URL</Label>
+              <Label htmlFor="shell-url">Destination URL (optional)</Label>
               <Input
                 id="shell-url"
                 type="url"

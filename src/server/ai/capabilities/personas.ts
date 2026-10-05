@@ -243,7 +243,7 @@ const suggestionSchema = z.object({
 /** Read and reason separately from creation, so Shape can discuss the same proposals. */
 export const suggestPersonas = growthAction({
   description:
-    "Suggest up to three missing brand-level guest personas from the brand story and homes, preserving the existing set. Read-only; return planning hypotheses, not measured booking facts. The UI can create them immediately when the operator clicks Define personas; chat can discuss before personaWrite.create.",
+    "Requires a saved brand story. Suggest up to three missing brand-level guest personas from the brand story and homes, preserving the existing set. Read-only; return planning hypotheses, not measured booking facts. The UI can create them immediately when the operator clicks Define personas; chat can discuss before personaWrite.create.",
   inputSchema: z.object({ brandId: z.string().trim().min(1) }),
   outputSchema: z.object({ suggestions: z.array(suggestionSchema).max(3) }),
   execute: async (input, ctx) => {
@@ -276,8 +276,8 @@ export const suggestPersonas = growthAction({
         columns: { name: true, description: true },
       }),
     ]);
-    if (!brand?.story && !brand?.description && !homes.length)
-      throw new Error("Add a brand story or homes before defining personas.");
+    if (!brand?.story?.trim())
+      throw new Error("Save the brand story before defining personas.");
     const { system, prompt } = personaSuggestionsPrompt(
       JSON.stringify({ brand, homes, existing }),
     );

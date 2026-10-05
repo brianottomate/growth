@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
@@ -25,13 +26,26 @@ export function ImportWanderOsButton({ brandId }: { brandId: string }) {
         client.setQueryData(
           orpc.catalog.wanderOsImportStatus.queryOptions({ input: { brandId } })
             .queryKey,
-          { run: result.run },
+          (current: typeof progress.data) =>
+            current ? { ...current, run: result.run } : undefined,
         );
       },
       onError: (error) => toast.error(error.message),
     }),
   );
   const busy = start.isPending || active(progress.data?.run?.status);
+  if (progress.data?.missingFoundations.length && !busy)
+    return (
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <p className="text-muted-foreground">
+          Complete {progress.data.missingFoundations.join(", ")} before
+          importing.
+        </p>
+        <Button size="sm" variant="outline" asChild>
+          <Link href={progress.data.setupHref}>Complete brand setup</Link>
+        </Button>
+      </div>
+    );
   return (
     <Button
       size="sm"

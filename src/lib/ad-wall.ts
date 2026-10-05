@@ -12,12 +12,16 @@ export type WallCard = {
   thumbnail: string | null;
   assetId: string | null;
   type: "image" | "video" | "carousel";
+  width?: number;
+  height?: number;
   /** The 9:16 stories and reels show instead of the baseline, when there is one. */
   story: {
     url: string;
     thumbnail: string | null;
     assetId: string | null;
     via: "upload" | "crop" | "extend" | "render";
+    width?: number;
+    height?: number;
   } | null;
 };
 
@@ -121,12 +125,16 @@ export function toWallAd(ad: {
       thumbnail: item.thumbnail ?? null,
       assetId: item.assetId ?? null,
       type: item.type,
+      width: item.width,
+      height: item.height,
       story: item.story
         ? {
             url: cardUrl(item.story.url),
             thumbnail: item.story.thumbnail ?? null,
             assetId: item.story.assetId ?? null,
             via: item.story.via,
+            width: item.story.width,
+            height: item.story.height,
           }
         : null,
     })),

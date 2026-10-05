@@ -27,18 +27,14 @@ import { targetedAsset } from "@/lib/audience-asset";
 import { AddAdDialog } from "@/app/app/performance/clients/[brandSlug]/ads/AddAdDialog";
 import { AdIdeasList } from "./AdIdeasList";
 import { AdTile } from "./AdWall";
-import { CampaignAssetsDrawer } from "./CampaignAssetsDrawer";
 import type { PickableHome } from "@/app/app/performance/clients/[brandSlug]/HomePicker";
 
 import { AskAssistantButton } from "./AskAssistantButton";
 import { Audiences } from "./Audiences";
-import { CreativePool } from "./CreativePool";
-import { DeleteCampaignButton } from "./DeleteCampaignButton";
 import { AddExistingAdsDialog } from "@/app/app/performance/clients/[brandSlug]/ads/AddExistingAdsDialog";
 import { money } from "./format";
 import { PlanPlatformButton } from "./PlanPlatformButton";
 import { PlatformSection } from "./PlatformSection";
-import { EditCampaignLabel } from "./EditCampaignLabel";
 import { WorkInChatButton } from "./WorkInChatButton";
 
 /**
@@ -186,7 +182,6 @@ export async function CampaignView({
       ? `${((totals.clicks / totals.impressions) * 100).toFixed(2)}%`
       : "—";
 
-  const pool = campaign.creativePool ?? [];
   const ask = (
     focus: "photos" | "ads" | "audiences" | "platforms" | "live",
     text: string,
@@ -217,17 +212,16 @@ export async function CampaignView({
           />
         </>
       )}
-      <CampaignAssetsDrawer count={pool.length} brandId={brand.id}>
-        <CreativePool
-          campaignId={campaign.id}
-          brandId={brand.id}
-          pool={pool}
-          askAssistant={ask(
-            "photos",
-            `Fill the photo pool for “${campaign.name}”`,
-          )}
-        />
-      </CampaignAssetsDrawer>
+      <AskAssistantButton
+        brandId={brand.id}
+        brandName={brandName}
+        campaignId={campaign.id}
+        campaignName={campaign.name}
+        focus="ads"
+        label="Shape"
+        newThread
+        ask={`Help me shape the ads for “${campaignDisplayName(campaign.name)}”. Read the campaign and its assigned ads, then discuss the creative and copy I want to refine before making changes.`}
+      />
     </div>
   );
   return (
@@ -249,22 +243,18 @@ export async function CampaignView({
             ]}
           />
         )}
-        <div className="flex flex-col items-start justify-between gap-3 @3xl:flex-row">
-          <div className="w-full min-w-0 @3xl:flex-1">
-            <div className="flex flex-wrap items-start gap-2.5">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
               <h2
                 title={campaign.name}
-                className="min-w-0 text-2xl leading-snug font-semibold tracking-tight [overflow-wrap:anywhere]"
+                className="line-clamp-2 min-w-0 text-2xl leading-snug font-semibold tracking-tight [overflow-wrap:anywhere]"
               >
                 {campaignDisplayName(campaign.name)}
               </h2>
-              <EditCampaignLabel
-                campaignId={campaign.id}
-                name={campaign.name}
-              />
               <span
                 className={cn(
-                  "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium",
+                  "inline-flex shrink-0 rounded-full px-2 py-0.5 text-[11px] leading-5 font-medium",
                   anyLive
                     ? "bg-primary/10 text-primary"
                     : anyPushed
@@ -315,15 +305,6 @@ export async function CampaignView({
             </nav>
           </div>
           <div className="flex items-center gap-2">
-            <DeleteCampaignButton
-              listPath={campaignListPath(brandSlug, workspace)}
-              campaignId={campaign.id}
-              campaignName={campaign.name}
-              brandSlug={brandSlug}
-              livePlatformCampaigns={pushed.length}
-              platformCampaignIds={pushed.map((row) => row.id)}
-              compact
-            />
             <WorkInChatButton
               brandId={brand.id}
               brandName={brandName}

@@ -1,16 +1,14 @@
 "use client";
 
+import {
+  ImagePickerDialog,
+  type PickerImage,
+} from "@/components/image-picker-dialog";
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { ideaImagesSaved, ideaSource } from "@/lib/ad-idea-studio";
 import { sendAssistantIntent } from "@/lib/assistant-events";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { MessageSquare, MoreHorizontal } from "lucide-react";
+import { MessageSquare, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/components/ui/lib/utils";
 import {} from "@/lib/meta-placement-plan";
 import { useRouter } from "next/navigation";
@@ -76,9 +74,10 @@ export type StudioAd = {
   content: AdCreativeContent;
   updatedAt: string;
   homeId?: string | null;
+  bookingTargetId?: string | null;
 };
 
-export function AdIdeaCard({
+export function AdCard({
   ad,
   campaignId,
   brandId,
@@ -87,8 +86,10 @@ export function AdIdeaCard({
   deliveryState,
   home,
   studio = false,
+  metadata,
 }: {
   ad: StudioAd;
+  metadata?: React.ReactNode;
   /** The campaign it sits in; absent in the studio, where ideas have none. */
   campaignId?: string;
   /**
@@ -181,7 +182,7 @@ export function AdIdeaCard({
   const [dirty, setDirty] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editor, setEditor] = useState<
-    "copy" | "slide" | "image" | "pool" | null
+    "copy" | "destination" | "slide" | "image" | "pool" | null
   >(null);
   const [showPool, setShowPool] = useState(false);
   const [savedState, setSavedState] = useState(() => ({
@@ -200,6 +201,7 @@ export function AdIdeaCard({
   const [photoSearch, setPhotoSearch] = useState("");
   /** The slide whose photo is being changed from its row, saved on pick. */
   const [swapping, setSwapping] = useState<string | null>(null);
+  const [imagePickerOpen, setImagePickerOpen] = useState(false);
   const homeGalleries = useQuery({
     ...orpc.ads.starterIdeaHomes.queryOptions({
       input: campaignId ? { campaignId } : { brandId },
@@ -208,6 +210,7 @@ export function AdIdeaCard({
       editor === "image" ||
       editor === "pool" ||
       homePickerOpen ||
+      imagePickerOpen ||
       swapping !== null,
   });
   const homes = homeGalleries.data ?? [];
@@ -224,6 +227,11 @@ export function AdIdeaCard({
       .find((photo) => sameIdeaSource(photo, source))?.label ??
     `Image ${index + 1}`;
   const [poolTarget, setPoolTarget] = useState<"slide" | "size">("slide");
+  const [imagePickerTarget, setImagePickerTarget] = useState<string | null>(
+    null,
+  );
+  const [imageLibrary, setImageLibrary] = useState(false);
+  const [imageScope, setImageScope] = useState<"all" | "size">("size");
   const [picker, setPicker] = useState<"add" | "replace" | "swap" | null>(null);
   const { uploadFiles, uploading, progress } = useMediaUpload(brandId);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -254,7 +262,7 @@ export function AdIdeaCard({
         setName(saved.name);
         setEditor(null);
         setDirty(false);
-        toast.success("Ad idea saved");
+        toast.success("Ad saved");
         router.refresh();
       },
       onError: (error) => {
@@ -264,10 +272,11 @@ export function AdIdeaCard({
     }),
   );
   const newCopy = useMutation(
-    orpc.ads.writeSetCopy.mutationOptions({
-      onSuccess: () => {
-        toast.success("New copy saved");
-        router.refresh();
+    orpc.ads.draftCreativeCopy.mutationOptions({
+      onSuccess: (result) => {
+        setDocument(result.document);
+        setDirty(true);
+        toast.success("Copy drafted. Review it, then apply changes.");
       },
       onError: (error) => toast.error(error.message),
     }),
@@ -283,10 +292,19 @@ export function AdIdeaCard({
     });
   }, [ad]);
   const openEditor = (
-    kind: "copy" | "slide" | "image" | "pool",
+    kind: "copy" | "destination" | "slide" | "image" | "pool",
     id: string | null = null,
   ) => {
-    setDocument(savedState.document);
+    setDocument({
+      ...savedState.document,
+      copy: {
+        ...savedState.document.copy,
+        bookingTargetId:
+          savedState.document.copy.bookingTargetId !== undefined
+            ? savedState.document.copy.bookingTargetId
+            : (ad.bookingTargetId ?? null),
+      },
+    });
     setName(savedState.name);
     setVersion(savedState.version);
     setDirty(false);
@@ -294,30 +312,69 @@ export function AdIdeaCard({
     setPoolTarget(kind === "image" ? "size" : "slide");
     setShowPool(kind === "pool");
     setSwapping(null);
-    if (kind !== "copy") setView("details");
+    if (kind !== "copy" && kind !== "destination") setView("details");
     setEditor(kind);
   };
+  const bookingTargets = useQuery({
+    ...orpc.homeGroups.targets.queryOptions({ input: { brandId } }),
+    enabled: editor === "destination" || Boolean(ad.bookingTargetId),
+  });
+  const selectedBookingTarget = bookingTargets.data?.targets.find(
+    (target) =>
+      target.id ===
+      (document.copy.bookingTargetId !== undefined
+        ? document.copy.bookingTargetId
+        : ad.bookingTargetId),
+  );
+  const savedBookingTarget = bookingTargets.data?.targets.find(
+    (target) =>
+      target.id ===
+      (savedState.document.copy.bookingTargetId !== undefined
+        ? savedState.document.copy.bookingTargetId
+        : ad.bookingTargetId),
+  );
   const stale = editor !== null && version !== savedState.version;
   const persist = (
     next: IdeaDocument,
     nextName = savedState.name,
     expectedVersion = savedState.version,
+    closeDetails = false,
   ) =>
-    save.mutate({
-      adId: ad.id,
-      expectedUpdatedAt: expectedVersion,
-      name: nextName,
-      document: withIdeaPool(next),
-    });
+    save.mutate(
+      {
+        adId: ad.id,
+        expectedUpdatedAt: expectedVersion,
+        name: nextName,
+        document: withIdeaPool(next),
+      },
+      {
+        onSuccess: () => {
+          if (closeDetails) setView("overview");
+        },
+      },
+    );
   const edit = (fn: (current: IdeaDocument) => IdeaDocument) => {
     setDocument((current) => withIdeaPool(fn(withIdeaPool(current))));
     setDirty(true);
   };
+  const editDestination = (linkUrl: string, bookingTargetId: string | null) =>
+    edit((d) => ({
+      ...d,
+      copy: { ...d.copy, linkUrl, bookingTargetId },
+      copyOverrides: Object.fromEntries(
+        Object.entries(d.copyOverrides).map(([shape, copy]) => [
+          shape,
+          copy ? { ...copy, linkUrl, bookingTargetId } : copy,
+        ]),
+      ),
+    }));
   const card =
     document.cards.find((c) => c.id === selectedId) ??
     (document.role === "hero_static" ? document.cards[0] : undefined);
   const isStatic = savedState.document.role === "hero_static";
   const limit = isStatic ? 1 : 10;
+  const creativeCards =
+    editor === "slide" ? document.cards : savedState.document.cards;
   const swapCrop = useMutation(orpc.ads.suggestCrop.mutationOptions());
   const busy =
     newCopy.isPending ||
@@ -440,6 +497,52 @@ export function AdIdeaCard({
     [cards[selected], cards[target]] = [cards[target]!, cards[selected]!];
     persist({ ...d, cards });
   };
+  const pickSlideImage = (source: PickerImage) => {
+    if (!imagePickerTarget && !isStatic) return;
+    const targetId = imagePickerTarget ?? crypto.randomUUID();
+    edit((d) => {
+      const existing = d.cards.some((c) => c.id === targetId);
+      const cards = existing
+        ? d.cards.map((c) =>
+            c.id !== targetId
+              ? c
+              : imageScope === "all"
+                ? { ...c, source, sourceOverrides: {} }
+                : {
+                    ...c,
+                    sourceOverrides: { ...c.sourceOverrides, [shape]: source },
+                  },
+          )
+        : [
+            {
+              id: targetId,
+              source,
+              mode: "supplied" as const,
+              ...(imageScope === "size"
+                ? {
+                    sourceOverrides: Object.fromEntries(
+                      IDEA_SHAPES.filter((size) => size !== shape).map(
+                        (size) => [size, null],
+                      ),
+                    ),
+                  }
+                : {}),
+              recipe: defaultIdeaRecipe(d.role),
+              overrides: {},
+            },
+          ];
+      return withIdeaPool({ ...d, cards }, [source]);
+    });
+    setSelectedId(targetId);
+    setImagePickerTarget(targetId);
+  };
+  const openImagePicker = (targetId: string | null, scope: "all" | "size") => {
+    if (editor !== "slide" || selectedId !== targetId)
+      openEditor("slide", targetId);
+    setImagePickerTarget(targetId);
+    setImageScope(scope);
+    setImagePickerOpen(true);
+  };
   const renderSlide = (slide: IdeaImage, index: number, editing: boolean) => (
     <AdIdeaSlideRow
       key={slide.id}
@@ -449,7 +552,7 @@ export function AdIdeaCard({
       name={savedState.name}
       shape={shape}
       index={index}
-      count={savedState.document.cards.length}
+      count={editing ? document.cards.length : savedState.document.cards.length}
       isStatic={isStatic}
       uploading={uploading}
       progress={progress}
@@ -461,7 +564,11 @@ export function AdIdeaCard({
       }
       onEdit={() => openEditor("slide", slide.id)}
       onChange={(fn) => updateCardById(slide.id, fn)}
-      onReplace={() => (editing ? setPicker("replace") : setSwapping(slide.id))}
+      onReplace={() => {
+        if (editing || isStatic)
+          openImagePicker(slide.id, editing ? "size" : "all");
+        else setSwapping(slide.id);
+      }}
       onUpload={async (files) =>
         attach(await uploadFiles(files), "replace", slide.id, shape)
       }
@@ -472,10 +579,6 @@ export function AdIdeaCard({
           cards: savedState.document.cards.filter((c) => c.id !== slide.id),
         })
       }
-      onChoosePool={() => {
-        setPoolTarget("size");
-        setShowPool(true);
-      }}
       photoPanel={
         !editing && swapping === slide.id ? (
           <SlidePhotoPicker
@@ -494,21 +597,40 @@ export function AdIdeaCard({
   );
 
   const closeEditor = () => {
+    setDocument(savedState.document);
+    setName(savedState.name);
+    setVersion(savedState.version);
+    setDirty(false);
     setEditor(null);
     setPicker(null);
     setHomePickerOpen(false);
   };
+  const editorActions = (
+    <div className="flex flex-wrap justify-end gap-2">
+      <Button variant="outline" disabled={busy} onClick={closeEditor}>
+        Cancel
+      </Button>
+      <Button
+        disabled={!dirty || busy || stale || !name.trim()}
+        onClick={() => persist(document, name, version)}
+      >
+        {save.isPending ? "Applying…" : "Apply changes"}
+      </Button>
+    </div>
+  );
   // The editor opens in place of what it edits, like a catalog row.
   const editorPanel = (
     <div className="space-y-4 rounded-lg border bg-muted/30 p-4">
       <h4 className="text-sm font-medium">
         {editor === "copy"
           ? "Edit ad copy"
-          : editor === "slide"
-            ? `Edit ${isStatic ? "image" : `slide ${document.cards.findIndex((c) => c.id === selectedId) + 1}`}`
-            : editor === "image"
-              ? `Choose image · ${isStatic ? "Image" : `Slide ${document.cards.findIndex((c) => c.id === selectedId) + 1}`} · ${IDEA_SHAPE_LABELS[shape]}`
-              : "Manage images"}
+          : editor === "destination"
+            ? "Edit destination"
+            : editor === "slide"
+              ? `Edit ${isStatic ? "image" : `slide ${document.cards.findIndex((c) => c.id === selectedId) + 1}`}`
+              : editor === "image"
+                ? `Choose image · ${isStatic ? "Image" : `Slide ${document.cards.findIndex((c) => c.id === selectedId) + 1}`} · ${IDEA_SHAPE_LABELS[shape]}`
+                : "Add slides"}
       </h4>
       {stale && (
         <p role="alert" className="text-sm">
@@ -519,8 +641,50 @@ export function AdIdeaCard({
       <fieldset disabled={busy || stale} className="space-y-4">
         {editor === "copy" && (
           <>
+            <div
+              className="flex flex-wrap gap-2"
+              aria-label="Copy quick actions"
+            >
+              {(
+                [
+                  ["all", "Rewrite all copy"],
+                  ["caption", "Rewrite caption"],
+                  ["image", "Rewrite image text"],
+                ] as const
+              ).map(([scope, label]) => (
+                <Button
+                  key={scope}
+                  size="sm"
+                  variant="outline"
+                  disabled={
+                    locked ||
+                    busy ||
+                    dirty ||
+                    stale ||
+                    !document.cards.length ||
+                    (scope === "image" &&
+                      !document.cards.some((item) => item.mode === "compose"))
+                  }
+                  onClick={() =>
+                    newCopy.mutate({
+                      adId: ad.id,
+                      expectedUpdatedAt: version,
+                      scope,
+                    })
+                  }
+                >
+                  {newCopy.isPending && newCopy.variables?.scope === scope
+                    ? "Writing…"
+                    : label}
+                </Button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Rewrites are drafts. Review the text and preview, then apply
+              changes to save.
+            </p>
             <label className="block space-y-1 text-xs">
-              Ad idea name
+              Ad name
               <Input
                 value={name}
                 onChange={(e) => {
@@ -529,9 +693,9 @@ export function AdIdeaCard({
                 }}
               />
             </label>
-            <div className="grid gap-3 md:grid-cols-2">
-              <h3 className="text-sm font-medium md:col-span-2">Ad copy</h3>
-              <p className="text-xs text-muted-foreground md:col-span-2">
+            <div className="grid w-full max-w-4xl grid-cols-1 gap-3">
+              <h3 className="text-sm font-medium">Ad copy</h3>
+              <p className="text-xs text-muted-foreground">
                 The words around the creative, shared across its images.
               </p>
               <label className="block space-y-1 text-xs">
@@ -574,61 +738,133 @@ export function AdIdeaCard({
                   }
                 />
               </label>
-              <div className="grid gap-3 sm:grid-cols-2 md:col-span-2">
-                <label className="block space-y-1 text-xs">
-                  Destination URL
-                  <Input
-                    value={document.copy.linkUrl}
-                    placeholder="https://"
-                    onChange={(e) =>
-                      edit((d) => ({
-                        ...d,
-                        copy: { ...d.copy, linkUrl: e.target.value },
-                      }))
-                    }
-                  />
-                </label>
-                <div className="space-y-1 text-xs">
-                  <label htmlFor={`ad-cta-${ad.id}`}>Call to action</label>
+            </div>
+            <AdIdeaPreview
+              brandId={brandId}
+              brandName={brandName}
+              brandLogo={brandLogo}
+              home={home}
+              showMetaPreview={false}
+              studio={{ document }}
+              content={ad.content}
+            />
+          </>
+        )}
+        {editor === "destination" && (
+          <div className="space-y-3">
+            {bookingTargets.isPending ? (
+              <p role="status" className="text-xs text-muted-foreground">
+                Loading booking targets…
+              </p>
+            ) : bookingTargets.isError ? (
+              <p role="alert" className="text-xs">
+                Could not load booking targets.
+                <Button
+                  variant="link"
+                  size="sm"
+                  onClick={() => void bookingTargets.refetch()}
+                >
+                  Try again
+                </Button>
+              </p>
+            ) : (
+              Boolean(bookingTargets.data?.targets.length) && (
+                <div className="space-y-2">
+                  <label className="text-xs" htmlFor={`ad-target-${ad.id}`}>
+                    Destination source
+                  </label>
                   <Select
-                    value={document.copy.callToAction}
-                    onValueChange={(callToAction) =>
-                      edit((d) => ({
-                        ...d,
-                        copy: { ...d.copy, callToAction },
-                      }))
-                    }
+                    value={document.copy.bookingTargetId ?? "manual"}
+                    onValueChange={(value) => {
+                      const target = bookingTargets.data?.targets.find(
+                        (t) => t.id === value,
+                      );
+                      editDestination(
+                        target?.url ?? document.copy.linkUrl,
+                        target?.id ?? null,
+                      );
+                    }}
                   >
-                    <SelectTrigger id={`ad-cta-${ad.id}`} className="w-full">
-                      <SelectValue placeholder="Choose a call to action" />
+                    <SelectTrigger id={`ad-target-${ad.id}`}>
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {document.copy.callToAction &&
-                        !CALL_TO_ACTION_OPTIONS.some(
-                          (option) =>
-                            option.value === document.copy.callToAction,
-                        ) && (
-                          <SelectItem
-                            value={document.copy.callToAction}
-                            disabled
-                          >
-                            {document.copy.callToAction
-                              .replaceAll("_", " ")
-                              .toLowerCase()}{" "}
-                            (current)
-                          </SelectItem>
-                        )}
-                      {CALL_TO_ACTION_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
+                      <SelectItem value="manual">Enter URL</SelectItem>
+                      {bookingTargets.data?.targets.map((target) => (
+                        <SelectItem
+                          key={target.id}
+                          value={target.id}
+                          disabled={!target.url}
+                        >
+                          {target.name}
+                          {target.issue ? ` · ${target.issue}` : ""}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  {document.copy.bookingTargetId && selectedBookingTarget && (
+                    <p className="text-xs text-muted-foreground">
+                      {[
+                        selectedBookingTarget.checkIn,
+                        selectedBookingTarget.checkOut,
+                        selectedBookingTarget.guests
+                          ? `${selectedBookingTarget.guests} guests`
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}{" "}
+                      Saves this target’s current URL; later target changes
+                      won’t update this ad.
+                    </p>
+                  )}
                 </div>
+              )
+            )}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="block space-y-1 text-xs">
+                Destination URL
+                <Input
+                  value={document.copy.linkUrl}
+                  placeholder="https://"
+                  onChange={(e) => editDestination(e.target.value, null)}
+                />
+              </label>
+              <div className="space-y-1 text-xs">
+                <label htmlFor={`ad-cta-${ad.id}`}>Call to action</label>
+                <Select
+                  value={document.copy.callToAction}
+                  onValueChange={(callToAction) =>
+                    edit((d) => ({
+                      ...d,
+                      copy: { ...d.copy, callToAction },
+                    }))
+                  }
+                >
+                  <SelectTrigger id={`ad-cta-${ad.id}`} className="w-full">
+                    <SelectValue placeholder="Choose a call to action" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {document.copy.callToAction &&
+                      !CALL_TO_ACTION_OPTIONS.some(
+                        (option) => option.value === document.copy.callToAction,
+                      ) && (
+                        <SelectItem value={document.copy.callToAction} disabled>
+                          {document.copy.callToAction
+                            .replaceAll("_", " ")
+                            .toLowerCase()}{" "}
+                          (current)
+                        </SelectItem>
+                      )}
+                    {CALL_TO_ACTION_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
-          </>
+          </div>
         )}
         {editor === "slide" &&
           card &&
@@ -775,17 +1011,7 @@ export function AdIdeaCard({
           </>
         )}
       </fieldset>
-      <div className="flex justify-end gap-2">
-        <Button variant="outline" disabled={busy} onClick={closeEditor}>
-          Cancel
-        </Button>
-        <Button
-          disabled={!dirty || busy || stale || !name.trim()}
-          onClick={() => persist(document, name, version)}
-        >
-          {save.isPending ? "Saving…" : "Save changes"}
-        </Button>
-      </div>
+      {editorActions}
     </div>
   );
   return (
@@ -795,9 +1021,14 @@ export function AdIdeaCard({
       aria-label={ad.name}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1 space-y-1.5">
+        <div className="min-w-0 flex-1 basis-64 space-y-1.5">
           <div className="flex flex-wrap items-center gap-3">
-            <h3 className="font-medium break-words">{savedState.name}</h3>
+            <h3
+              title={savedState.name}
+              className="line-clamp-2 min-w-0 flex-1 font-medium [overflow-wrap:anywhere]"
+            >
+              {savedState.name}
+            </h3>
             {approved && (
               <ApprovedStamp
                 at={ad.content.ideaStudio?.approval?.approvedAt ?? new Date()}
@@ -825,6 +1056,12 @@ export function AdIdeaCard({
                   : "Draft ad"}
               {deliveryState ? ` · ${deliveryState}` : ""}
             </span>
+            {metadata && (
+              <>
+                <span aria-hidden="true">·</span>
+                {metadata}
+              </>
+            )}
             {save.isPending && <span>· Saving…</span>}
             {crop.isPending && <span>· Choosing crop…</span>}
             {ad.content.metaImport && <span aria-hidden="true">·</span>}
@@ -895,30 +1132,10 @@ export function AdIdeaCard({
             )}
           </div>
         </div>
-        <div className="ml-auto flex flex-wrap items-center gap-2">
+        <div className="ml-auto flex max-w-full flex-wrap items-center gap-2">
           <Button
             size="sm"
             variant="outline"
-            disabled={
-              busy ||
-              locked ||
-              editor !== null ||
-              dirty ||
-              document.cards.length === 0
-            }
-            onClick={() =>
-              newCopy.mutate({
-                brandId,
-                campaignId: campaignId ?? undefined,
-                adId: ad.id,
-              })
-            }
-          >
-            {newCopy.isPending ? "Writing…" : "New copy"}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
             disabled={busy || editor !== null}
             onClick={() =>
               sendAssistantIntent({
@@ -929,86 +1146,22 @@ export function AdIdeaCard({
                 campaignId: campaignId ?? undefined,
                 campaignName: savedState.name,
                 adId: ad.id,
-                focus: "copy",
-                visibleText: `Talk through the ad copy for “${savedState.name}”. Review only this ad's primary text, headline, description and call to action against brand and listing facts. Suggest two or three focused options. Keep images and image text unchanged. Show me the options before saving; I will choose one.`,
+                focus: "ads",
+                visibleText: `Help me shape “${savedState.name}”. Read this ad’s creative and copy, then discuss what I want to refine before making changes.`,
               })
             }
           >
-            <MessageSquare className="size-3.5" /> Talk through copy
+            <MessageSquare className="size-3.5" /> Shape
           </Button>
-          {studio && !pushed && (!approved || !imagesSaved) && (
-            <Button
-              size="sm"
-              disabled={busy || freeze.isPending || editor !== null}
-              onClick={() =>
-                freeze.mutate({
-                  adId: ad.id,
-                  expectedUpdatedAt: savedState.version,
-                  exportShapes: [
-                    ...(savedState.document.exportShapes ??
-                      savedState.document.shapes),
-                  ],
-                })
-              }
-            >
-              {freeze.isPending
-                ? "Saving images…"
-                : approved
-                  ? "Save images"
-                  : "Freeze"}
-            </Button>
-          )}
-          {!pushed && (!studio || approved) && (
-            <Button
-              size="sm"
-              variant={approved ? "outline" : "default"}
-              disabled={busy || approval.isPending || editor !== null}
-              loading={approval.isPending}
-              onClick={() =>
-                approval.mutate({
-                  adId: ad.id,
-                  status: approved ? "drawn" : "approved",
-                  expectedUpdatedAt: savedState.version,
-                  ...(approved
-                    ? {}
-                    : {
-                        exportShapes: [
-                          ...(savedState.document.exportShapes ??
-                            savedState.document.shapes),
-                        ],
-                      }),
-                })
-              }
-            >
-              {approved ? "Reopen idea" : "Approve"}
-            </Button>
-          )}
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              appearance="icon"
-              aria-label={`More for ${savedState.name}`}
-            >
-              <MoreHorizontal className="size-4" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-40">
-              <DropdownMenuItem
-                variant="destructive"
-                disabled={busy}
-                onClick={() => setDeleteOpen(true)}
-              >
-                Delete ad…
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
       </div>
       {collapsed && (
         <AdIdeaPreview
-          onExpand={() => setView("details")}
           brandId={brandId}
           brandName={brandName}
           brandLogo={brandLogo}
           home={home}
+          showMetaPreview={false}
           studio={{
             document: savedState.document,
             approval: ad.content.ideaStudio?.approval,
@@ -1021,7 +1174,7 @@ export function AdIdeaCard({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-medium">Ad copy</h4>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Button
                   size="sm"
                   variant="outline"
@@ -1030,25 +1183,54 @@ export function AdIdeaCard({
                 >
                   Edit copy
                 </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  aria-expanded
-                  onClick={() => setView("overview")}
-                >
-                  Collapse
-                </Button>
               </div>
             </div>
             {editor === "copy" ? (
               editorPanel
             ) : (
-              <dl className="grid grid-cols-1 gap-4 text-sm @xl:grid-cols-2">
+              <dl className="grid w-full max-w-4xl grid-cols-1 gap-4 text-sm">
                 {(
                   [
                     ["Headline", savedState.document.copy.headline],
                     ["Description", savedState.document.copy.description],
                     ["Primary text", savedState.document.copy.body],
+                  ] as const
+                ).map(([label, value]) => (
+                  <div key={label} className="min-w-0">
+                    <dt className="mb-1 text-xs text-muted-foreground">
+                      {label}
+                    </dt>
+                    <dd className="break-words whitespace-pre-wrap">
+                      {value || "Not set"}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+          </div>
+          <div className="space-y-3 border-t pt-4">
+            <div className="flex items-center justify-between gap-2">
+              <h4 className="text-sm font-medium">Destination</h4>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={locked || busy || editor !== null}
+                onClick={() => openEditor("destination")}
+              >
+                Edit destination
+              </Button>
+            </div>
+            {editor !== "destination" && savedBookingTarget && (
+              <p className="text-xs text-muted-foreground">
+                Booking target · {savedBookingTarget.name}
+              </p>
+            )}
+            {editor === "destination" ? (
+              editorPanel
+            ) : (
+              <dl className="grid grid-cols-1 gap-4 text-sm @xl:grid-cols-2">
+                {(
+                  [
                     ["Destination URL", savedState.document.copy.linkUrl],
                     ["Call to action", savedState.document.copy.callToAction],
                   ] as const
@@ -1058,7 +1240,21 @@ export function AdIdeaCard({
                       {label}
                     </dt>
                     <dd className="break-words whitespace-pre-wrap">
-                      {value || "Not set"}
+                      {label === "Destination URL" &&
+                      value &&
+                      /^https?:\/\//i.test(value) ? (
+                        <a
+                          href={value}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="[overflow-wrap:anywhere] underline underline-offset-4 hover:text-primary"
+                        >
+                          {value}
+                          <span className="sr-only"> (opens in a new tab)</span>
+                        </a>
+                      ) : (
+                        value || "Not set"
+                      )}
                     </dd>
                   </div>
                 ))}
@@ -1131,7 +1327,7 @@ export function AdIdeaCard({
                     Select a size to edit. Check sizes to export.
                   </p>
                 </div>
-                {savedState.document.cards.length === 0 ? (
+                {creativeCards.length === 0 ? (
                   <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed px-6 py-8 text-center">
                     <h4 className="text-sm font-medium">
                       {isStatic ? "Start with an image" : "Build your carousel"}
@@ -1144,11 +1340,24 @@ export function AdIdeaCard({
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={locked || busy || editor !== null}
-                      onClick={() => openEditor("pool")}
+                      disabled={
+                        locked ||
+                        busy ||
+                        (editor !== null && !(isStatic && editor === "slide"))
+                      }
+                      onClick={() =>
+                        isStatic
+                          ? openImagePicker(null, "all")
+                          : openEditor("pool")
+                      }
                     >
-                      {isStatic ? "Add image" : "Add images"}
+                      {isStatic ? "Choose image" : "Add images"}
                     </Button>
+                    {editor === "slide" && (
+                      <div className="w-full border-t pt-3">
+                        {editorActions}
+                      </div>
+                    )}
                     {Boolean(savedState.document.pool?.length) && (
                       <p className="text-xs text-muted-foreground">
                         {savedState.document.pool?.length} images available in
@@ -1161,10 +1370,10 @@ export function AdIdeaCard({
                     <h4 className="text-sm font-medium">
                       {isStatic
                         ? "Creative"
-                        : `Slides · ${savedState.document.cards.length}`}
+                        : `Slides · ${creativeCards.length}`}
                     </h4>
                     <div className="space-y-3">
-                      {savedState.document.cards.map((slide, index) =>
+                      {creativeCards.map((slide, index) =>
                         editor === "slide" && slide.id === selectedId ? (
                           <div key={slide.id}>{editorPanel}</div>
                         ) : (
@@ -1182,46 +1391,101 @@ export function AdIdeaCard({
                         ),
                       )}
                     </div>
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3">
-                      <p className="text-sm text-muted-foreground">
-                        Image pool · {savedState.document.pool?.length ?? 0}{" "}
-                        photos
-                      </p>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={locked || busy || editor !== null}
-                        onClick={() => openEditor("pool")}
-                      >
-                        {isStatic
-                          ? "Manage image"
-                          : "Manage images / add slides"}
-                      </Button>
-                    </div>
+                    {!isStatic && (
+                      <div className="flex justify-end border-t pt-3">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={
+                            locked ||
+                            busy ||
+                            editor !== null ||
+                            creativeCards.length >= limit
+                          }
+                          onClick={() => openEditor("pool")}
+                        >
+                          <Plus className="size-4" />
+                          Add slides
+                        </Button>
+                      </div>
+                    )}
                   </>
                 )}
                 {(editor === "image" || editor === "pool") && editorPanel}
-              </div>
-              <div className="space-y-3 border-t pt-4">
-                <h5 className="text-xs font-medium">
-                  {studio ? "Preview" : "Meta preview"}
-                </h5>
-                <AdIdeaPreview
-                  brandId={brandId}
-                  brandName={brandName}
-                  brandLogo={brandLogo}
-                  studio={{
-                    document: savedState.document,
-                    approval: ad.content.ideaStudio?.approval,
-                  }}
-                  content={ad.content}
-                  platform
-                />
               </div>
             </div>
           )}
         </>
       )}
+      <footer className="flex flex-wrap items-center justify-end gap-2 border-t pt-3">
+        <Button
+          size="icon-sm"
+          variant="ghost"
+          aria-label={`Delete ${savedState.name}`}
+          disabled={busy}
+          onClick={() => setDeleteOpen(true)}
+        >
+          <Trash2 className="size-4" />
+        </Button>
+
+        <Button
+          size="sm"
+          variant="outline"
+          aria-expanded={!collapsed}
+          disabled={busy || editor !== null}
+          onClick={() => setView(collapsed ? "details" : "overview")}
+        >
+          {collapsed ? (locked ? "View details" : "Edit") : "Close details"}
+        </Button>
+
+        {collapsed && studio && !pushed && (!approved || !imagesSaved) && (
+          <Button
+            size="sm"
+            disabled={busy || freeze.isPending || editor !== null}
+            onClick={() =>
+              freeze.mutate({
+                adId: ad.id,
+                expectedUpdatedAt: savedState.version,
+                exportShapes: [
+                  ...(savedState.document.exportShapes ??
+                    savedState.document.shapes),
+                ],
+              })
+            }
+          >
+            {freeze.isPending
+              ? "Saving images…"
+              : approved
+                ? "Save images"
+                : "Approve"}
+          </Button>
+        )}
+        {collapsed && !pushed && (!studio || approved) && (
+          <Button
+            size="sm"
+            variant={approved ? "outline" : "default"}
+            disabled={busy || approval.isPending || editor !== null}
+            loading={approval.isPending}
+            onClick={() =>
+              approval.mutate({
+                adId: ad.id,
+                status: approved ? "drawn" : "approved",
+                expectedUpdatedAt: savedState.version,
+                ...(approved
+                  ? {}
+                  : {
+                      exportShapes: [
+                        ...(savedState.document.exportShapes ??
+                          savedState.document.shapes),
+                      ],
+                    }),
+              })
+            }
+          >
+            {approved ? "Reopen idea" : "Approve"}
+          </Button>
+        )}
+      </footer>
       <DeleteAlert
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
@@ -1330,14 +1594,44 @@ export function AdIdeaCard({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ImagePickerDialog
+        open={imagePickerOpen}
+        onOpenChange={setImagePickerOpen}
+        homes={homes}
+        pool={document.pool ?? []}
+        loading={homeGalleries.isLoading}
+        current={(() => {
+          const target = document.cards.find((c) => c.id === imagePickerTarget);
+          return target ? ideaSource(target, shape) : null;
+        })()}
+        scope={imageScope}
+        onScopeChange={setImageScope}
+        sizeLabel={IDEA_SHAPE_LABELS[shape]}
+        onPick={pickSlideImage}
+        onLibrary={() => {
+          setImageLibrary(true);
+          setPicker("replace");
+        }}
+      />
       <MediaPickerDialog
         brandId={brandId}
         open={picker !== null}
         onOpenChange={(open) => {
-          if (!open) setPicker(null);
+          if (!open) {
+            setPicker(null);
+            setImageLibrary(false);
+          }
         }}
         existingAssetIds={[]}
         onPick={(item) => {
+          if (imageLibrary && picker === "replace") {
+            if (item.type === "image") pickSlideImage(item);
+            else toast.error("Choose a still image");
+            setImagePickerTarget(null);
+            setImageLibrary(false);
+            setPicker(null);
+            return;
+          }
           if (picker === "swap") {
             if (item.type !== "image")
               toast.error("Choose a still image for this ad idea");

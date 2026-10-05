@@ -1,4 +1,6 @@
 "use client";
+import Link from "next/link";
+import { EmptyState } from "@/components/ui/empty-state";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
@@ -33,10 +35,11 @@ export function PersonaAudiences({
   brand,
   personas,
 }: {
-  brand: { id: string; slug: string; name: string };
+  brand: { id: string; slug: string; name: string; story: string | null };
   personas: Persona[];
   unassigned?: unknown[];
 }) {
+  const hasStory = Boolean(brand.story?.trim());
   const router = useRouter();
   const suggest = useMutation(orpc.persona.suggest.mutationOptions());
   const create = useMutation(orpc.persona.create.mutationOptions());
@@ -65,7 +68,7 @@ export function PersonaAudiences({
           <Button
             size="sm"
             variant="outline"
-            disabled={suggest.isPending || create.isPending}
+            disabled={!hasStory || suggest.isPending || create.isPending}
             onClick={() => void define()}
           >
             <Sparkles className="size-3.5" />
@@ -78,6 +81,41 @@ export function PersonaAudiences({
           />
         </div>
       </div>
+      {!personas.length && (
+        <EmptyState
+          compact
+          icon={Users}
+          title="Define who you’re speaking to"
+          description={
+            hasStory
+              ? "Use the brand story to define guest personas."
+              : "Save the brand story before defining personas."
+          }
+          actions={
+            <>
+              {hasStory ? (
+                <Button
+                  size="sm"
+                  disabled={suggest.isPending || create.isPending}
+                  onClick={() => void define()}
+                >
+                  <Sparkles className="size-3.5" />
+                  Define personas
+                </Button>
+              ) : (
+                <Button size="sm" asChild>
+                  <Link href="#brand-story">Write story</Link>
+                </Button>
+              )}
+              <ShapeBrandButton
+                brandId={brand.id}
+                brandName={brand.name}
+                section="personas"
+              />
+            </>
+          }
+        />
+      )}
       <div className="grid grid-cols-1 gap-3 @3xl:grid-cols-2">
         {personas.map((persona) => (
           <article

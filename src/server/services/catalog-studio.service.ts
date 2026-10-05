@@ -61,6 +61,8 @@ export async function catalogBrand(userId: string, brandId: string) {
       id: brandTable.id,
       name: brandTable.name,
       story: brandTable.story,
+      brandIdentity: brandTable.brandIdentity,
+      brandMark: brandTable.brandMark,
       voice: brandTable.brandFingerprint,
       slug: brandTable.slug,
       website: brandTable.website,

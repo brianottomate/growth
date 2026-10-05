@@ -1,4 +1,5 @@
 "use client";
+import { AdSlideCopy } from "./AdSlideCopy";
 import { useEffect, useId, useRef, useState } from "react";
 import { ChevronRight, ExternalLink } from "lucide-react";
 import {
@@ -16,6 +17,7 @@ import { ctaLabel } from "@/components/social-mock";
 import { META_PLACEMENTS, type MetaPlacement } from "@/lib/meta-placement-plan";
 import {
   IDEA_SHAPE_LABELS,
+  IDEA_SHAPES,
   ideaEditorPreviewUrl,
   ideaSource,
   type IdeaImage,
@@ -29,6 +31,7 @@ export function AdIdeaPreview({
   brandName,
   brandLogo,
   platform = false,
+  showMetaPreview = true,
   content,
   home,
   onExpand,
@@ -39,6 +42,7 @@ export function AdIdeaPreview({
   brandName: string;
   brandLogo: string | null;
   platform?: boolean;
+  showMetaPreview?: boolean;
   content?: AdCreativeContent;
   home?: { name: string; url: string };
   /** Shown beside the size switcher; opens the ad's full editor. */
@@ -50,9 +54,10 @@ export function AdIdeaPreview({
     {},
   );
   // The sizes that ship: what the checkboxes in the expanded ad select.
-  const sizes = studio.document.exportShapes?.length
+  const includedSizes = studio.document.exportShapes?.length
     ? studio.document.exportShapes
     : studio.document.shapes;
+  const sizes = IDEA_SHAPES.filter((size) => includedSizes.includes(size));
   const defaultShape = sizes.includes("square") ? "square" : sizes[0]!;
   const [picked, setPicked] = useState<IdeaShape | null>(null);
   const shape = picked && sizes.includes(picked) ? picked : defaultShape;
@@ -262,17 +267,7 @@ export function AdIdeaPreview({
                       className="h-auto w-full rounded-t-lg"
                     />
                   </a>
-                  <div className="rounded-b-lg border border-t-0 bg-card px-2.5 py-2 text-xs">
-                    <p
-                      className={`truncate font-medium ${headline ? "" : "text-muted-foreground"}`}
-                      title={headline}
-                    >
-                      {headline || "Headline not set"}
-                    </p>
-                    <p className="line-clamp-2 text-muted-foreground">
-                      {description || "Description not set"}
-                    </p>
-                  </div>
+                  <AdSlideCopy headline={headline} description={description} />
                 </div>
               );
             })}
@@ -305,22 +300,24 @@ export function AdIdeaPreview({
               )}
             </div>
           </div>
-          <div className="border-t pt-2">
-            <Collapsible open={platformOpen} onOpenChange={setPlatformOpen}>
-              <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm">
-                  <ChevronRight
-                    aria-hidden="true"
-                    className={`size-3.5 transition-transform ${platformOpen ? "rotate-90" : ""}`}
-                  />
-                  Meta preview
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="pt-3">{platformPreview()}</div>
-              </CollapsibleContent>
-            </Collapsible>
-          </div>
+          {showMetaPreview && (
+            <div className="border-t pt-2">
+              <Collapsible open={platformOpen} onOpenChange={setPlatformOpen}>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="sm">
+                    <ChevronRight
+                      aria-hidden="true"
+                      className={`size-3.5 transition-transform ${platformOpen ? "rotate-90" : ""}`}
+                    />
+                    Meta preview
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="pt-3">{platformPreview()}</div>
+                </CollapsibleContent>
+              </Collapsible>
+            </div>
+          )}
         </>
       )}
     </div>

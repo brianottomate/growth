@@ -72,7 +72,10 @@ export function BrandStoryCard({
     </>
   );
   return (
-    <section className="space-y-3 rounded-xl border p-4">
+    <section
+      id="brand-story"
+      className="scroll-mt-4 space-y-3 rounded-xl border p-4"
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="flex items-center gap-2 text-base font-semibold">

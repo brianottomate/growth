@@ -29,6 +29,18 @@ import {
 import { suggestFeaturedHomes } from "./featured-home-suggestions.service";
 import { draftBrandMarkets } from "./brand-markets.service";
 
+import { missingCreativeFoundations } from "@/lib/brand-creative-readiness";
+
+function requireCreativeFoundations(
+  brand: Parameters<typeof missingCreativeFoundations>[0],
+) {
+  const missing = missingCreativeFoundations(brand);
+  if (missing.length)
+    throw new Error(
+      `Complete brand setup before importing WanderOS: ${missing.join(", ")}.`,
+    );
+}
+
 const PROVIDER = "wanderos-import";
 const whereRun = (brandId: string) =>
   and(
@@ -54,19 +66,24 @@ export async function wanderOsImportStatus(input: {
   userId: string;
   brandId: string;
 }) {
-  await catalogBrand(input.userId, input.brandId);
+  const brand = await catalogBrand(input.userId, input.brandId);
   await expireWorkflowRuns(input.brandId);
   const run = await db.query.workflowRunTable.findFirst({
     where: whereRun(input.brandId),
     orderBy: [desc(workflowRunTable.createdAt)],
   });
-  return { run: run ? view(run) : null };
+  return {
+    run: run ? view(run) : null,
+    missingFoundations: missingCreativeFoundations(brand),
+    setupHref: `/app/performance/clients/${brand.slug ?? brand.id}/setup`,
+  };
 }
 export async function startWanderOsImport(input: {
   userId: string;
   brandId: string;
 }) {
   const brand = await catalogBrand(input.userId, input.brandId);
+  requireCreativeFoundations(brand);
   const { run: latest } = await wanderOsImportStatus(input);
   const steps =
     latest?.status === "failed"
@@ -98,6 +115,7 @@ export async function runWanderOsImport(
     updateWorkflowRun(run, patch);
   try {
     const brand = await catalogBrand(input.userId, input.brandId);
+    requireCreativeFoundations(brand);
     const steps = view(run).steps;
     const authorize = () => catalogBrand(input.userId, input.brandId);
     await runWanderOsImportSteps(

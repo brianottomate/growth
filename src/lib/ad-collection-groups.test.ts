@@ -42,7 +42,7 @@ test("home groups partition explicit, source, multi-home and home-less ads exact
     groups.find((group) => group.key === "home:h1")?.ads.map((item) => item.id),
   ).toEqual(["explicit", "source"]);
   expect(adHomeContext(ads[2]!, homes).label).toBe("Multiple homes");
-  expect(adHomeContext(ads[3]!, homes).label).toBe("Brand-wide · no home");
+  expect(adHomeContext(ads[3]!, homes).label).toBe("No home linked");
   expect(adHomeContext(ads[4]!, homes).label).toBe("Pine · name reference");
   expect(
     groupCollectionAds(ads, "type", homes).reduce(

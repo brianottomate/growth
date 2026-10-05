@@ -30,12 +30,14 @@ export function MediaPickerDialog({
   onOpenChange,
   onPick,
   existingAssetIds,
+  kind,
 }: {
   brandId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onPick: (item: MediaItem) => void;
   existingAssetIds: string[];
+  kind?: "image" | "video";
 }) {
   const queryClient = useQueryClient();
   const listOptions = orpc.media.list.queryOptions({ input: { brandId } });
@@ -44,6 +46,13 @@ export function MediaPickerDialog({
     enabled: open,
   });
   const { uploadFiles, uploading, progress } = useMediaUpload(brandId);
+  const accept = kind
+    ? Object.fromEntries(
+        Object.entries(MEDIA_ACCEPT).filter(([mime]) =>
+          mime.startsWith(`${kind}/`),
+        ),
+      )
+    : MEDIA_ACCEPT;
 
   // Uploads land in the pool right away rather than making the operator find
   // them again in the grid; refreshing the list keeps the two in step.
@@ -69,7 +78,9 @@ export function MediaPickerDialog({
 
   const picked = new Set(existingAssetIds);
   const pickable = assets.filter(
-    (a) => a.kind === "image" || a.kind === "gif" || a.kind === "video",
+    (a) =>
+      (a.kind === "image" || a.kind === "gif" || a.kind === "video") &&
+      (!kind || (kind === "video" ? a.kind === "video" : a.kind !== "video")),
   );
   const visible = pickable.filter((a) => {
     if (terms.length === 0) return true;
@@ -99,11 +110,13 @@ export function MediaPickerDialog({
         <div className="space-y-2 pb-1">
           <Dropzone
             compact
-            accept={MEDIA_ACCEPT}
+            accept={accept}
             onFiles={handleFiles}
             uploading={uploading}
             progress={progress}
-            title="Drop images or video here"
+            title={
+              kind === "video" ? "Drop video here" : "Drop images or video here"
+            }
             hint="or click to browse · added to this brand's library"
           />
           <div className="flex flex-wrap items-center justify-between gap-2">

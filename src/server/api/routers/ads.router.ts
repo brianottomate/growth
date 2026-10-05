@@ -1,3 +1,5 @@
+import { adSectionSchema } from "@/lib/ad-section";
+import { saveAdSection } from "@/server/services/ad-set.service";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/server/db";
 import { audienceTable, campaignAudienceAssetTable } from "@/server/db/schema";
@@ -19,6 +21,7 @@ import {
 } from "@/server/services/starter-ad-generation.service";
 import { z } from "zod";
 import { ideaShapeSchema } from "@/lib/ad-idea-studio";
+import { draftAdCreativeCopy } from "@/server/services/ad-creative-copy.service";
 import { freezeIdea } from "@/server/services/ad-approval.service";
 import { channelPlatformEnum } from "@/server/db/channel-schema";
 
@@ -81,6 +84,11 @@ import {
 } from "@/server/ai/capabilities/ads";
 
 export const adsRouter = {
+  saveSection: workspaceProcedure
+    .input(adSectionSchema)
+    .handler(({ input, context }) =>
+      saveAdSection(input, context.workspace.orgId),
+    ),
   unlinkAudienceAsset: workspaceProcedure
     .input(
       z.object({
@@ -163,6 +171,17 @@ export const adsRouter = {
 
   /** The copy pass: AI words onto the drafts already drawn. Captions and editable image words together. */
   writeSetCopy: actionProcedure(writeSetCopyAction),
+  draftCreativeCopy: workspaceProcedure
+    .input(
+      z.object({
+        adId: z.string().min(1),
+        expectedUpdatedAt: z.string().datetime(),
+        scope: z.enum(["all", "caption", "image"]),
+      }),
+    )
+    .handler(({ input, context: ctx }) =>
+      draftAdCreativeCopy({ ...input, orgId: ctx.workspace.orgId }),
+    ),
 
   draftAd: actionProcedure(draftAdAction),
   saveIdea: actionProcedure(saveIdeaAction),

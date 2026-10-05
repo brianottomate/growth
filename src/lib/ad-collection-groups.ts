@@ -74,7 +74,7 @@ export function adHomeContext(ad: CollectionAd, homes: AdHomeContext[] = []) {
     };
   return {
     key: "brand",
-    label: "Brand-wide · no home",
+    label: "No home linked",
     anchor: "brand",
     photo: null,
   };

@@ -1088,7 +1088,6 @@ function AdFixtureCard({
             adCopy={draft.copy}
             onChange={updateSlide}
             onReplace={cyclePhoto}
-            onChoosePool={cyclePhoto}
             onUpload={async (files) => {
               const file = files[0];
               if (!file) return;

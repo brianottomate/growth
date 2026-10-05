@@ -1,3 +1,6 @@
+import type { adSectionSchema } from "@/lib/ad-section";
+import { resolveBookingTarget } from "./home-groups.service";
+import type { z } from "zod";
 import {
   isReplaceableStudioAd,
   textAdCopySchema,
@@ -92,7 +95,10 @@ import { brandWebsiteId } from "./wanderos-listings.service";
 import { studioListings } from "./studio-homes.service";
 import { homeGroupContext } from "./home-groups.service";
 import type { SavedStudioHome } from "@/lib/studio-homes";
-import { videoAdCardFor } from "@/server/services/video-delivery.service";
+import {
+  deliveryMediaFor,
+  videoAdCardFor,
+} from "@/server/services/video-delivery.service";
 
 // Building the set a Performance client actually runs.
 //
@@ -1296,13 +1302,25 @@ export async function editAdCards(input: {
     let story: AdPlacementVariant | undefined;
     if (input.edit.op === "setStory") {
       const picked = await cardFromAsset(brand.id, input.edit.mediaAssetId);
-      if (picked.item.type === "video") {
+      if ((picked.item.type === "video") !== (card.type === "video")) {
         throw new AdSetError(
           422,
-          "A story variant is an image; a video ad takes one clip",
+          "Use a video variant for a video ad, or an image variant for an image ad",
         );
       }
-      story = { ...picked.item, via: "upload" };
+      const [item] =
+        card.type === "video"
+          ? await deliveryMediaFor([picked.item], "vertical")
+          : [picked.item];
+      if (
+        card.type === "video" &&
+        (!item?.width ||
+          !item.height ||
+          Math.abs(item.width / item.height - 9 / 16) >= 0.02)
+      ) {
+        throw new AdSetError(422, "Stories and Reels need a 9:16 video cut");
+      }
+      story = { ...item!, via: "upload" };
     } else if (input.edit.op === "makeStory") {
       if (!input.userId) {
         throw new AdSetError(422, "Deriving a story needs a signed-in user");
@@ -1342,6 +1360,18 @@ export async function editAdCards(input: {
       break;
     default:
       edit = input.edit;
+  }
+  if (
+    (edit.op === "replace" || edit.op === "append") &&
+    edit.item.type === "video"
+  ) {
+    const cut = await videoAdCardFor(edit.item);
+    const previousStory =
+      edit.op === "replace" ? cardAt(edit.index).story : undefined;
+    edit.item = {
+      ...(cut ?? edit.item),
+      ...(previousStory ? { story: previousStory } : {}),
+    };
   }
   let media: AdCard[];
   try {
@@ -1521,6 +1551,35 @@ export async function setAdStatus(input: {
       userId: input.userId,
       expectedUpdatedAt: input.expectedUpdatedAt,
     });
+  }
+  const content = creativeContent(ad);
+  if (adFormatOf(content) === "video") {
+    if (!input.expectedUpdatedAt)
+      throw new Error("Reload this ad before changing approval.");
+    if (
+      input.status === "approved" &&
+      (!content.media.length ||
+        content.media.some((item) => item.type !== "video") ||
+        !content.headline.trim() ||
+        !content.body.trim() ||
+        (!content.linkUrl && !ad.brand.website))
+    )
+      throw new Error(
+        "Add a video, headline, primary text and destination before approval.",
+      );
+    const saved = await db
+      .update(adTable)
+      .set({ status: input.status })
+      .where(
+        and(
+          eq(adTable.id, ad.id),
+          eq(adTable.updatedAt, new Date(input.expectedUpdatedAt)),
+        ),
+      )
+      .returning({ id: adTable.id });
+    if (!saved.length)
+      throw new Error("This ad changed. Refresh before changing approval.");
+    return { adId: ad.id, status: input.status };
   }
   await db
     .update(adTable)
@@ -2132,4 +2191,108 @@ export async function writeSetCopy(input: {
     updated += 1;
   }
   return { brandId: brand.id, updated };
+}
+
+/** Section saves merge into the latest persisted content and require the reviewed version. */
+export async function saveAdSection(
+  input: z.infer<typeof adSectionSchema>,
+  orgId: string,
+) {
+  const ad = await requireOwnedAd({ adId: input.adId, orgId });
+  if (ad.updatedAt.toISOString() !== input.expectedUpdatedAt)
+    throw new Error(
+      "This ad changed elsewhere. Reload before saving your edits.",
+    );
+  let content = ad.content;
+  let bookingTargetId = ad.bookingTargetId;
+  const section = input.section;
+  if (section.kind === "destination") {
+    if (
+      section.bookingTargetId &&
+      section.bookingTargetId !== ad.bookingTargetId
+    ) {
+      const resolved = await resolveBookingTarget(
+        section.bookingTargetId,
+        orgId,
+      );
+      if (resolved.target.brandId !== ad.brandId)
+        throw new Error("Booking target belongs to another brand.");
+      if (resolved.url !== section.linkUrl)
+        throw new Error(
+          "This booking target changed. Choose it again before saving.",
+        );
+    }
+    bookingTargetId = section.bookingTargetId;
+    content = {
+      ...content,
+      linkUrl: section.linkUrl || undefined,
+      ...("media" in content
+        ? { callToAction: section.callToAction || undefined }
+        : {}),
+    };
+  } else if (section.kind === "text") {
+    if ("media" in content)
+      throw new Error("Use the creative copy editor for this ad.");
+    content = { ...content, ...section.copy };
+  } else {
+    if (!("media" in content) || adFormatOf(content) !== "video")
+      throw new Error("Use the image editor for this ad.");
+    if (section.kind === "copy")
+      content = {
+        ...content,
+        headline: section.headline,
+        body: section.body,
+        description: section.description || undefined,
+      };
+    else {
+      let base = content.media[0];
+      if (section.baseAssetId === null) base = undefined;
+      else if (section.baseAssetId && section.baseAssetId !== base?.assetId) {
+        const picked = await cardFromAsset(ad.brandId, section.baseAssetId);
+        if (picked.item.type !== "video")
+          throw new Error("Choose a video file.");
+        base = (await videoAdCardFor(picked.item)) ?? picked.item;
+      }
+      let story = content.media[0]?.story;
+      if (section.storyAssetId === null) story = undefined;
+      else if (
+        section.storyAssetId &&
+        section.storyAssetId !== story?.assetId
+      ) {
+        const picked = await cardFromAsset(ad.brandId, section.storyAssetId);
+        const [cut] = await deliveryMediaFor([picked.item], "vertical");
+        if (
+          cut?.type !== "video" ||
+          !cut.width ||
+          !cut.height ||
+          Math.abs(cut.width / cut.height - 9 / 16) >= 0.02
+        )
+          throw new Error("The separate Story cut must be a 9:16 video.");
+        story = { ...cut, via: "upload" };
+      }
+      if (story && !base)
+        throw new Error("Choose a base video before adding a Story cut.");
+      if (base) {
+        const { story: _old, ...file } = base;
+        base = story ? { ...file, story } : file;
+      }
+      content = { ...content, media: base ? [base] : [] };
+    }
+  }
+  const saved = await db
+    .update(adTable)
+    .set({ content, bookingTargetId })
+    .where(
+      and(
+        eq(adTable.id, ad.id),
+        eq(adTable.status, "drawn"),
+        eq(adTable.updatedAt, new Date(input.expectedUpdatedAt)),
+      ),
+    )
+    .returning({ id: adTable.id });
+  if (!saved.length)
+    throw new Error(
+      "This ad changed elsewhere. Reload before saving your edits.",
+    );
+  return { adId: ad.id };
 }

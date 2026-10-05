@@ -2,19 +2,14 @@
 
 import { parseAsStringLiteral, useQueryStates } from "nuqs";
 import { Button } from "@/components/ui/button";
+import { AdFormatFilter } from "@/components/ad-format-filter";
+import { AD_FORMATS, type AdFormat } from "@/lib/ad-format";
 import { ApprovedStamp } from "@/components/approved-stamp";
 
-const AD_TYPES = [
-  "all-homes",
-  "statics",
-  "home-carousels",
-  "video",
-  "text",
-  "other",
-] as const;
+const AD_TYPES = AD_FORMATS.map((format) => format.id);
 
 type Group = {
-  id: string;
+  id: AdFormat;
   label: string;
   ads: { id: string; approved: boolean; node: React.ReactNode }[];
 };
@@ -65,35 +60,15 @@ export function AdIdeaGroups({ groups }: { groups: Group[] }) {
           </Button>
         ))}
       </div>
-      <div
-        role="group"
-        aria-label="Ad types"
-        className="sticky top-0 z-10 -mx-1 flex flex-wrap gap-1.5 bg-background/95 px-1 py-2 backdrop-blur"
-      >
-        <Button
-          variant={adType === null ? "secondary" : "outline"}
-          size="sm"
-          aria-pressed={adType === null}
-          onClick={() => setFilters({ adType: null })}
-        >
-          All types · {statusCount}
-        </Button>
-        {filteredGroups.map((group) => (
-          <Button
-            key={group.id}
-            variant={adType === group.id ? "secondary" : "outline"}
-            size="sm"
-            aria-pressed={adType === group.id}
-            onClick={() =>
-              setFilters({
-                adType: AD_TYPES.find((type) => type === group.id) ?? null,
-              })
-            }
-          >
-            {group.label} · {group.ads.length}
-          </Button>
-        ))}
-      </div>
+      <AdFormatFilter
+        value={adType}
+        onChange={(value) => setFilters({ adType: value })}
+        formats={filteredGroups.map((group) => ({
+          id: group.id,
+          label: group.label,
+          count: group.ads.length,
+        }))}
+      />
       {shown.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed py-10 text-sm text-muted-foreground">
           {filter === "review" && statusCount === 0 ? (

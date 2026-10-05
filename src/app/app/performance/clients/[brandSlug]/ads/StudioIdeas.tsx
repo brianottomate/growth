@@ -1,7 +1,9 @@
 "use client";
 
+import { adFormat } from "@/lib/ad-format";
+
 import Link from "next/link";
-import { Checkbox } from "@/components/ui/checkbox";
+import { ExternalLink } from "lucide-react";
 import { campaignDisplayName } from "@/lib/campaign-navigation";
 import {
   groupCollectionAds,
@@ -10,8 +12,8 @@ import {
   type AdHomeContext,
 } from "@/lib/ad-collection-groups";
 import { useEffect } from "react";
-import { AdIdeaCard } from "@/app/app/brands/[brandSlug]/ads/_views/AdIdeaCard";
-import { BookingTargetPicker } from "@/app/app/brands/[brandSlug]/ads/_views/BookingTargetPicker";
+import { AdCard } from "@/app/app/brands/[brandSlug]/ads/_views/AdCard";
+import { PreparedAdCard } from "@/app/app/brands/[brandSlug]/ads/_views/PreparedAdCard";
 import { TextAdCard } from "@/app/app/brands/[brandSlug]/ads/_views/TextAdCard";
 import { AdTile } from "@/app/app/brands/[brandSlug]/ads/_views/AdWall";
 import { type AdState, toWallAd } from "@/lib/ad-wall";
@@ -58,12 +60,8 @@ export function StudioIdeas({
   homes,
   website,
   focusHomeId,
-  connected,
   grouping,
   homeContext,
-  selectedIds,
-  onSelect,
-  selectionDisabled,
 }: {
   ideas: StudioIdea[];
   brandId: string;
@@ -76,9 +74,6 @@ export function StudioIdeas({
   connected: boolean;
   grouping: AdGrouping;
   homeContext: AdHomeContext[];
-  selectedIds: ReadonlySet<string>;
-  onSelect: (ids: string[], checked: boolean) => void;
-  selectionDisabled: boolean;
 }) {
   useEffect(() => {
     if (focusHomeId)
@@ -93,10 +88,6 @@ export function StudioIdeas({
         const frozen = group.ads.filter(
           (idea) => idea.status === "approved",
         ).length;
-        const selectable = group.ads.filter((ad) => !ad.campaignId);
-        const selectedCount = selectable.filter((ad) =>
-          selectedIds.has(ad.id),
-        ).length;
         return (
           <section
             key={group.key}
@@ -104,25 +95,6 @@ export function StudioIdeas({
             className="space-y-3 py-4 first:pt-0 last:pb-0"
           >
             <h2 className="flex items-baseline gap-2 text-sm font-semibold">
-              {selectable.length > 0 && (
-                <Checkbox
-                  aria-label={`Select ${group.label}`}
-                  disabled={selectionDisabled}
-                  checked={
-                    selectedCount === selectable.length
-                      ? true
-                      : selectedCount > 0
-                        ? "indeterminate"
-                        : false
-                  }
-                  onCheckedChange={(checked) =>
-                    onSelect(
-                      selectable.map((ad) => ad.id),
-                      checked === true,
-                    )
-                  }
-                />
-              )}
               {group.photo && (
                 <img
                   src={group.photo}
@@ -148,40 +120,31 @@ export function StudioIdeas({
                     : "Assigned"}
                 </Link>
               ) : (
-                <p className="text-xs text-muted-foreground">Unassigned</p>
+                <span className="text-xs text-muted-foreground">
+                  Unassigned
+                </span>
               );
-              const wrap = (node: React.ReactNode) => (
+              const adMetadata = assignment;
+              const wrap = (node: React.ReactNode, metadataInside = false) => (
                 <div key={idea.id} className="space-y-2">
-                  {grouping === "type" && (
+                  {idea.home?.url ? (
+                    <a
+                      href={idea.home.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+                    >
+                      {idea.home.name}
+                      <ExternalLink aria-hidden="true" className="size-3" />
+                      <span className="sr-only">(opens in a new tab)</span>
+                    </a>
+                  ) : grouping === "type" ? (
                     <p className="text-xs font-medium">
                       {adHomeContext(idea, homeContext).label}
                     </p>
-                  )}
-                  <div className="flex items-center gap-2">
-                    {!idea.campaignId && (
-                      <Checkbox
-                        aria-label={`Select ${idea.name}`}
-                        checked={selectedIds.has(idea.id)}
-                        disabled={selectionDisabled}
-                        onCheckedChange={(checked) =>
-                          onSelect([idea.id], checked === true)
-                        }
-                      />
-                    )}
-                    {assignment}
-                  </div>
+                  ) : null}
+                  {!metadataInside && adMetadata}
                   {node}
-                  {connected &&
-                    idea.status !== "approved" &&
-                    idea.deliveryState !== "pushed" && (
-                      <BookingTargetPicker
-                        key={`${idea.id}:${idea.updatedAt}`}
-                        adId={idea.id}
-                        brandId={brandId}
-                        brandSlug={brandSlug}
-                        targetId={idea.bookingTargetId}
-                      />
-                    )}
                 </div>
               );
               if (!("media" in idea.content))
@@ -190,27 +153,41 @@ export function StudioIdeas({
                     key={idea.id}
                     ad={{ ...idea, content: idea.content }}
                     brandId={brandId}
+                    brandName={brandName}
+                    campaignId={idea.campaignId ?? undefined}
+                    metadata={adMetadata}
                     website={website}
                     deliveryState={idea.deliveryState}
                   />,
+                  true,
                 );
               if (editable(idea.content))
                 return wrap(
-                  <AdIdeaCard
+                  <AdCard
                     key={idea.id}
                     studio={!idea.campaignId}
+                    metadata={adMetadata}
                     campaignId={idea.campaignId ?? undefined}
                     deliveryState={idea.deliveryState}
                     ad={{ ...idea, content: idea.content }}
                     brandId={brandId}
                     brandName={brandName}
                     brandLogo={brandLogo}
-                    home={
-                      idea.home?.url
-                        ? { name: idea.home.name, url: idea.home.url }
-                        : undefined
-                    }
                   />,
+                  true,
+                );
+              if (adFormat(idea.content) === "video")
+                return wrap(
+                  <PreparedAdCard
+                    ad={idea}
+                    brandId={brandId}
+                    brandName={brandName}
+                    campaignId={idea.campaignId ?? undefined}
+                    metadata={adMetadata}
+                    website={website}
+                    deliveryState={idea.deliveryState}
+                  />,
+                  true,
                 );
               const wall = toWallAd({
                 ...idea,

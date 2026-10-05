@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Combobox } from "@/components/ui/compound/combobox";
 import { cn } from "@/components/ui/lib/utils";
+import { CompositionPicker } from "@/components/composition-picker";
 import { toast } from "@/components/ui/toast";
 import {
   CATALOG_TEMPLATES,
@@ -179,56 +180,28 @@ export function CatalogTemplateCard({
           })}
         />
       </div>
-      <div className="grid grid-cols-2 gap-3 @2xl:grid-cols-3 @5xl:grid-cols-4">
-        {CATALOG_TEMPLATES.map((templateId) => {
-          const label = templateLabel(templateId);
-          const guide = CATALOG_COPY_INTENTS[templateId];
-          const src = previewAtWidth(
+      <CompositionPicker
+        value={current}
+        disabled={saving !== null}
+        pendingId={saving}
+        selectedLabel="default"
+        onChange={(templateId) => save.mutate({ brandId, templateId })}
+        options={CATALOG_TEMPLATES.map((templateId) => ({
+          id: templateId,
+          label: templateLabel(templateId),
+          previewUrl: previewAtWidth(
             catalogCardPreviewUrl(
               brandId,
               asTemplate(card, templateId),
               format,
             ),
             240,
-          );
-          const chosen = current === templateId;
-          return (
-            <div
-              key={templateId}
-              className={cn(
-                "space-y-2 rounded-lg border p-2 text-sm",
-                chosen && "ring-2 ring-foreground",
-              )}
-            >
-              <button
-                type="button"
-                aria-pressed={chosen}
-                disabled={saving !== null}
-                onClick={() => save.mutate({ brandId, templateId })}
-                className="block w-full space-y-2 text-left"
-              >
-                {src && (
-                  // oxlint-disable-next-line nextjs/no-img-element
-                  <img
-                    src={src}
-                    alt={label}
-                    className="aspect-square w-full rounded-md object-cover"
-                  />
-                )}
-                <span className="block font-medium">
-                  {label}
-                  {chosen
-                    ? " · default"
-                    : saving === templateId
-                      ? " · saving…"
-                      : ""}
-                </span>
-              </button>
-              {guide && <Guide guide={guide} />}
-            </div>
-          );
-        })}
-      </div>
+          ),
+          details: CATALOG_COPY_INTENTS[templateId] ? (
+            <Guide guide={CATALOG_COPY_INTENTS[templateId]} />
+          ) : undefined,
+        }))}
+      />
     </div>
   );
 }

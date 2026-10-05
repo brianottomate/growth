@@ -24,8 +24,7 @@ export default async function PerformanceBrandAdsPage({
   searchParams: Promise<{ homes?: string; focus?: string }>;
 }) {
   const [{ brandSlug }, query] = await Promise.all([params, searchParams]);
-  const { session, org, brand, deskBrand } =
-    await loadPerformanceBrand(brandSlug);
+  const { session, org, brand } = await loadPerformanceBrand(brandSlug);
   if (!session) redirect("/signin");
   if (!org)
     return <div className="text-muted-foreground">No organization found.</div>;
@@ -78,14 +77,6 @@ export default async function PerformanceBrandAdsPage({
     ? focusHomeId
     : null;
 
-  // Where approved ads can go. Only a campaign nothing has been pushed for
-  // can still take ads; a live one is Meta's to edit.
-  const campaigns = (deskBrand?.campaigns ?? [])
-    .filter((campaign) =>
-      campaign.platforms.every((row) => row.status === "draft"),
-    )
-    .map((campaign) => ({ id: campaign.id, name: campaign.name }));
-
   const slug = brand.slug ?? brand.id;
 
   return (
@@ -99,7 +90,6 @@ export default async function PerformanceBrandAdsPage({
         homes={homes}
         ideas={ideas}
         homeContext={groupContext.homes}
-        campaigns={campaigns}
         connected={groupContext.connected}
         focusHomeId={focused}
       />

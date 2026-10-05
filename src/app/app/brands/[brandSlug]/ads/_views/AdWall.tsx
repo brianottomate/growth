@@ -48,6 +48,7 @@ import {
 } from "@/lib/performance-ads";
 import type { MediaItem } from "@/server/db/schema";
 import { orpc } from "@/orpc/client";
+import { VideoPlacementVariants } from "./VideoPlacementVariants";
 
 import {
   HomePicker,
@@ -713,7 +714,47 @@ export function AdTile({
       >
         <div className="flex min-w-0 justify-start">{mock}</div>
         <div className="min-w-0 space-y-2">
-          {ad.textOnly ? null : strip}
+          {ad.textOnly ? null : ad.format === "video" ? (
+            <VideoPlacementVariants
+              card={ad.cards[0]}
+              brandId={brandId}
+              locked={locked}
+              busy={busy}
+              onChooseFeed={() => setPicking(ad.cards.length ? 0 : "append")}
+              onUploadFeed={(files) =>
+                dropped(files, ad.cards.length ? 0 : "append")
+              }
+              onSetStory={(mediaAssetId) =>
+                editCards.mutate({
+                  adId: ad.id,
+                  edit: { op: "setStory", index: 0, mediaAssetId },
+                })
+              }
+              onUploadStory={async (files) => {
+                const items = await uploadFiles(files);
+                const mediaAssetId = items.map(assetIdOf).find(Boolean);
+                if (mediaAssetId)
+                  await editCards.mutateAsync({
+                    adId: ad.id,
+                    edit: { op: "setStory", index: 0, mediaAssetId },
+                  });
+              }}
+              onClearStory={() =>
+                editCards.mutate({
+                  adId: ad.id,
+                  edit: { op: "clearStory", index: 0 },
+                })
+              }
+              onUseRendition={() =>
+                editCards.mutate({
+                  adId: ad.id,
+                  edit: { op: "makeStory", index: 0, how: "auto" },
+                })
+              }
+            />
+          ) : (
+            strip
+          )}
           {!editing ? (
             <div className="space-y-1">
               {!ad.textOnly && (
@@ -864,6 +905,7 @@ export function AdTile({
       </SimpleDialog>
       {picking !== null ? (
         <MediaPickerDialog
+          kind={ad.format === "video" ? "video" : undefined}
           brandId={brandId}
           open
           onOpenChange={(next) => !next && setPicking(null)}

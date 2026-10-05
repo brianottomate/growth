@@ -11,6 +11,7 @@ import { db } from "@/server/db";
 import { adTable, brandTable } from "@/server/db/schema";
 import { resolveCompositionContext } from "./composition.service";
 import { assertAdNotPushed } from "./ad-approval.service";
+import { resolveBookingTarget } from "./home-groups.service";
 
 /** One shared edit path for humans and assistants. Saving keeps this a draft. */
 export async function saveAdIdea(
@@ -48,6 +49,17 @@ export async function saveAdIdea(
       "This ad changed elsewhere. Reload before saving your edits.",
     );
 
+  const bookingTargetId = document.copy.bookingTargetId;
+  if (bookingTargetId && bookingTargetId !== ad.bookingTargetId) {
+    const resolved = await resolveBookingTarget(bookingTargetId, context.orgId);
+    if (resolved.target.brandId !== brand.id)
+      throw new Error("Booking target belongs to another brand.");
+    if (resolved.url !== document.copy.linkUrl)
+      throw new Error(
+        "This booking target changed. Choose it again before saving.",
+      );
+  }
+
   // Validate source ownership even while the draft has incomplete overlay text.
   const sources = document.pool ?? [];
   for (let start = 0; start < sources.length; start += 8) {
@@ -84,7 +96,13 @@ export async function saveAdIdea(
     next.content.metaImport = { ...next.content.metaImport, issues: [] };
   const [saved] = await db
     .update(adTable)
-    .set({ ...next, name: args.name, status: "drawn", updatedAt: new Date() })
+    .set({
+      ...next,
+      ...(bookingTargetId !== undefined ? { bookingTargetId } : {}),
+      name: args.name,
+      status: "drawn",
+      updatedAt: new Date(),
+    })
     .where(and(eq(adTable.id, ad.id), eq(adTable.updatedAt, ad.updatedAt)))
     .returning();
   if (!saved)

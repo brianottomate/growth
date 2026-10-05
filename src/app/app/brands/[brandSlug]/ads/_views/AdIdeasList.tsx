@@ -1,39 +1,15 @@
+import { PreparedAdCard } from "./PreparedAdCard";
+import { AD_FORMATS, adFormat } from "@/lib/ad-format";
 import { TextAdCard } from "./TextAdCard";
 import { WorkspaceCardHeader } from "@/app/app/performance/WorkspaceCard";
 import { Images } from "lucide-react";
 import type { AdContent } from "@/server/db/schema";
 import { ideaDocumentFromAd } from "@/lib/ad-idea-studio";
 import { isImportedMetaCatalog } from "@/lib/meta-import";
-import { AdIdeaCard } from "./AdIdeaCard";
+import { AdCard } from "./AdCard";
 import { AdIdeaGroups } from "./AdIdeaGroups";
 import { AdPlatformRouting } from "./AdPlatformRouting";
 import type { ChannelPlatform } from "@/server/db/schema";
-
-// Stable type order for the filter bar and the combined ad list.
-const GROUPS = [
-  { id: "all-homes", label: "All-homes carousels" },
-  { id: "statics", label: "Statics" },
-  { id: "home-carousels", label: "Home carousels" },
-  { id: "video", label: "Video" },
-  { id: "text", label: "Text ads" },
-  { id: "other", label: "Other" },
-] as const;
-type GroupId = (typeof GROUPS)[number]["id"];
-
-function groupOf(ad: {
-  name: string;
-  content: AdContent;
-  homeId?: string | null;
-}): GroupId {
-  if (!("media" in ad.content)) return "text";
-  if (ad.content.media.some((m) => m.type === "video")) return "video";
-  const format = ad.content.format;
-  if (format && format !== "static" && format !== "carousel") return "other";
-  const role = ideaDocumentFromAd({ name: ad.name, content: ad.content }).role;
-  if (role === "hero_static") return "statics";
-  if (role === "hero_carousel" || !ad.homeId) return "all-homes";
-  return "home-carousels";
-}
 
 export function AdIdeasList({
   ads,
@@ -73,6 +49,7 @@ export function AdIdeasList({
     content: AdContent;
     updatedAt: Date;
     homeId?: string | null;
+    bookingTargetId?: string | null;
     createdAt: Date;
     platforms?: ChannelPlatform[] | null;
   }[];
@@ -107,9 +84,9 @@ export function AdIdeasList({
           Number("format" in b.content && b.content.format === "carousel")
         : 0),
   );
-  const groups = GROUPS.map((group) => ({
+  const groups = AD_FORMATS.map((group) => ({
     ...group,
-    ads: ordered.filter((ad) => groupOf(ad) === group.id),
+    ads: ordered.filter((ad) => adFormat(ad.content) === group.id),
   })).filter((group) => group.ads.length > 0);
   const renderAd = (ad: (typeof ordered)[number]) => (
     <div key={ad.id}>
@@ -131,6 +108,8 @@ export function AdIdeasList({
           updatedAt: ad.updatedAt.toISOString(),
         }}
         brandId={brandId}
+        brandName={brandName}
+        campaignId={campaignId}
         website={landingUrl}
         deliveryState={states[ad.id]}
       />
@@ -139,7 +118,7 @@ export function AdIdeasList({
       (!ad.content.format ||
         ad.content.format === "static" ||
         ad.content.format === "carousel") ? (
-      <AdIdeaCard
+      <AdCard
         campaignId={campaignId}
         brandId={brandId}
         brandName={brandName}
@@ -153,6 +132,15 @@ export function AdIdeasList({
           updatedAt: ad.updatedAt.toISOString(),
           homeId: ad.homeId,
         }}
+      />
+    ) : "media" in ad.content && adFormat(ad.content) === "video" ? (
+      <PreparedAdCard
+        ad={{ ...ad, updatedAt: ad.updatedAt.toISOString() }}
+        brandId={brandId}
+        brandName={brandName}
+        campaignId={campaignId}
+        website={landingUrl}
+        deliveryState={states[ad.id]}
       />
     ) : (
       fallback(ad.id)

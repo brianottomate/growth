@@ -58,14 +58,7 @@ export function BookingTargetPicker({
         </Button>
       </p>
     );
-  if (!targets.data?.targets.length)
-    return (
-      <p className="text-xs text-muted-foreground">
-        <Link href={manageHref} className="underline">
-          Home groups & booking targets
-        </Link>
-      </p>
-    );
+  if (!targets.data?.targets.length) return null;
   const target = targets.data.targets.find((t) => t.id === selected);
   return (
     <div className="space-y-2 rounded-lg border p-3">

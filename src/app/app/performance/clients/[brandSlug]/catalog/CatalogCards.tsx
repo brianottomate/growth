@@ -1,4 +1,7 @@
 "use client";
+import { toast } from "@/components/ui/toast";
+import { ImagePickerDialog } from "@/components/image-picker-dialog";
+import { CompositionSelector } from "@/components/composition-picker";
 import { ApprovedStamp } from "@/components/approved-stamp";
 import { catalogAddressIssues } from "@/lib/catalog-addresses";
 import {
@@ -26,6 +29,8 @@ import {
   Search,
   List,
   LayoutGrid,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { ORPCError } from "@orpc/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -36,6 +41,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/components/ui/lib/utils";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import {
   InputGroup,
   InputGroupAddon,
@@ -830,6 +836,7 @@ export function CatalogCards({
                           </div>
                           {editing ? (
                             <CardEditor
+                              brandId={brandId}
                               card={details}
                               home={homeOf(card)}
                               onChange={setDetails}
@@ -897,43 +904,53 @@ export function CatalogCards({
                               </details>
                             )}
                           {!editing && (
-                            <div className="mt-auto flex flex-wrap items-center gap-1 border-t pt-3">
-                              {(
-                                [
-                                  ["Choose photo", () => choosePhoto(card)],
+                            <div className="mt-auto space-y-3 border-t pt-3">
+                              <div
+                                role="group"
+                                aria-label="Quick actions"
+                                className="flex flex-wrap items-center justify-start gap-1"
+                              >
+                                {(
                                   [
-                                    fixing[card.homeId] === "photo"
-                                      ? "Updating photo + copy…"
-                                      : "New photo + copy",
-                                    () => void quickFix(card, "photo"),
-                                  ],
-                                  [
-                                    fixing[card.homeId] === "copy"
-                                      ? "Writing copy…"
-                                      : "New copy",
-                                    () => void quickFix(card, "copy"),
-                                  ],
-                                ] as const
-                              ).map(([label, onClick]) => (
-                                <Button
-                                  key={label}
-                                  size="xs"
-                                  variant="ghost"
-                                  disabled={
-                                    Boolean(fixing[card.homeId]) ||
-                                    locked(card) ||
-                                    (card.mode === "finished" &&
-                                      label !== "Choose photo")
-                                  }
-                                  title={
-                                    locked(card) ? LOCKED_TITLE : undefined
-                                  }
-                                  onClick={onClick}
-                                >
-                                  {label}
-                                </Button>
-                              ))}
-                              <div className="ml-auto flex flex-wrap items-center gap-2">
+                                    ["Choose photo", () => choosePhoto(card)],
+                                    [
+                                      fixing[card.homeId] === "photo"
+                                        ? "Updating photo + copy…"
+                                        : "New photo + copy",
+                                      () => void quickFix(card, "photo"),
+                                    ],
+                                    [
+                                      fixing[card.homeId] === "copy"
+                                        ? "Writing copy…"
+                                        : "New copy",
+                                      () => void quickFix(card, "copy"),
+                                    ],
+                                  ] as const
+                                ).map(([label, onClick]) => (
+                                  <Button
+                                    key={label}
+                                    size="xs"
+                                    variant="ghost"
+                                    disabled={
+                                      Boolean(fixing[card.homeId]) ||
+                                      locked(card) ||
+                                      (card.mode === "finished" &&
+                                        label !== "Choose photo")
+                                    }
+                                    title={
+                                      locked(card) ? LOCKED_TITLE : undefined
+                                    }
+                                    onClick={onClick}
+                                  >
+                                    {label}
+                                  </Button>
+                                ))}
+                              </div>
+                              <div
+                                role="group"
+                                aria-label="Card actions"
+                                className="flex flex-wrap items-center justify-end gap-2"
+                              >
                                 <IncludeButton
                                   card={card}
                                   onInclude={(included) =>
@@ -1249,6 +1266,7 @@ export function CatalogCards({
             <div className="grid gap-6 md:grid-cols-2">
               <CardPreview brandId={brandId} card={details} format={format} />
               <CardEditor
+                brandId={brandId}
                 card={details}
                 home={homeOf(details)}
                 onChange={setDetails}
@@ -1368,8 +1386,18 @@ export function IncludeButton({
   onInclude: (included: boolean) => void;
 }) {
   return (
-    <Button size="sm" variant="ghost" onClick={() => onInclude(!card.included)}>
-      {card.included ? "Exclude" : "Include"}
+    <Button
+      size="icon-sm"
+      variant="ghost"
+      aria-label={card.included ? "Exclude from catalog" : "Include in catalog"}
+      title={card.included ? "Exclude from catalog" : "Include in catalog"}
+      onClick={() => onInclude(!card.included)}
+    >
+      {card.included ? (
+        <EyeOff className="size-4" />
+      ) : (
+        <Eye className="size-4" />
+      )}
     </Button>
   );
 }
@@ -1470,6 +1498,7 @@ function PreviewImage({
 }
 
 export function CardEditor({
+  brandId,
   card,
   home,
   onChange,
@@ -1479,6 +1508,7 @@ export function CardEditor({
   onCancel,
   saving = false,
 }: {
+  brandId?: string;
   card: CatalogCard;
   home: CatalogHome | undefined;
   onChange: (card: CatalogCard) => void;
@@ -1489,54 +1519,105 @@ export function CardEditor({
   onCancel?: () => void;
   saving?: boolean;
 }) {
-  return (
-    <fieldset disabled={saving} className="space-y-4">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <label className="flex items-center gap-2 text-sm">
-          Image mode
-          <select
-            className="rounded border bg-background px-2 py-1"
-            value={card.mode ?? "compose"}
-            onChange={(e) =>
-              onChange({
-                ...card,
-                mode: e.target.value as "compose" | "finished",
+  const [imagePickerOpen, setImagePickerOpen] = useState(false);
+  const importPhoto = useMutation(orpc.media.importUrls.mutationOptions());
+  const chooseCardPhoto = async (photo: { url: string; assetId?: string }) => {
+    try {
+      const asset =
+        brandId && !photo.assetId
+          ? (
+              await importPhoto.mutateAsync({
+                brandId,
+                images: [{ url: photo.url, title: home?.name }],
               })
+            ).assets[0]
+          : undefined;
+      const assetId = photo.assetId ?? asset?.id;
+      const url = asset?.url ?? photo.url;
+      onChange(
+        card.mode === "finished" && assetId
+          ? {
+              ...card,
+              finishedArtwork: { assetId, url, format: DEFAULT_CATALOG_FORMAT },
             }
-          >
-            <option value="compose">Composed</option>
-            <option value="finished">Artwork</option>
-          </select>
-        </label>
+          : { ...card, imageUrl: url, assetId },
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Unable to choose image",
+      );
+    }
+  };
+
+  return (
+    <fieldset disabled={saving || importPhoto.isPending} className="space-y-4">
+      <div className="space-y-4">
+        <div role="group" aria-label="Image mode" className="flex gap-2">
+          {(
+            [
+              ["finished", "Artwork"],
+              ["compose", "Composed"],
+            ] as const
+          ).map(([mode, label]) => (
+            <Button
+              key={mode}
+              size="sm"
+              variant={
+                (card.mode ?? "compose") === mode ? "secondary" : "outline"
+              }
+              aria-pressed={(card.mode ?? "compose") === mode}
+              onClick={() => onChange({ ...card, mode })}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
+        {card.mode !== "finished" && (
+          <CompositionSelector
+            value={card.templateId}
+            disabled={saving}
+            onChange={(templateId) => onChange({ ...card, templateId })}
+            options={COMPOSITION_TEMPLATES.filter(
+              (template) => template.id !== "tier-badge",
+            ).map((template) => ({
+              id: template.id,
+              label: template.label,
+              previewUrl: brandId
+                ? catalogCardPreviewUrl(brandId, {
+                    ...card,
+                    templateId: template.id,
+                  })
+                : undefined,
+            }))}
+          />
+        )}
         {card.mode !== "finished" && (
           <div className="flex flex-wrap items-center gap-4">
-            <label className="flex items-center gap-2 text-sm">
-              Crop
-              <select
-                aria-label="Crop focus"
-                className="rounded border bg-background px-2 py-1"
-                value={card.imagePosition}
-                onChange={(e) =>
-                  onChange({
-                    ...card,
-                    imagePosition: e.target
-                      .value as CatalogCard["imagePosition"],
-                  })
-                }
-              >
+            <Select
+              value={card.imagePosition}
+              onValueChange={(value) =>
+                onChange({
+                  ...card,
+                  imagePosition: value as CatalogCard["imagePosition"],
+                })
+              }
+            >
+              <SelectTrigger aria-label="Image crop focus">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
                 {COMPOSITION_IMAGE_POSITIONS.map((position) => (
-                  <option key={position}>{position}</option>
+                  <SelectItem key={position} value={position}>
+                    Crop focus: {position}
+                  </SelectItem>
                 ))}
-              </select>
-            </label>
+              </SelectContent>
+            </Select>
             <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                aria-label="Include brand logo"
+              <Switch
+                aria-label="Brand logo"
                 checked={card.showLogo}
-                onChange={(e) =>
-                  onChange({ ...card, showLogo: e.target.checked })
-                }
+                onCheckedChange={(showLogo) => onChange({ ...card, showLogo })}
               />
               Brand logo
             </label>
@@ -1549,9 +1630,6 @@ export function CardEditor({
             Use the original image as-is. Text and branding are already part of
             the image. Your composition is kept if you switch back.
           </p>
-          <Button variant="outline" onClick={onLibrary}>
-            Choose artwork
-          </Button>
         </div>
       ) : (
         <>
@@ -1571,50 +1649,36 @@ export function CardEditor({
               onChange={(e) => onChange({ ...card, subtitle: e.target.value })}
             />
           </label>
-          <label className="block space-y-1 text-sm">
-            Composition
-            <select
-              className="block w-full rounded border bg-background p-2"
-              value={card.templateId}
-              onChange={(e) =>
-                onChange({
-                  ...card,
-                  templateId: e.target.value as CatalogCard["templateId"],
-                })
-              }
-            >
-              {COMPOSITION_TEMPLATES.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <Button variant="outline" onClick={onLibrary}>
-            Choose from library or upload
-          </Button>
-          <div>
-            <p className="mb-2 text-sm">Hero photo for this home</p>
-            <div className="grid max-h-96 grid-cols-3 gap-2 overflow-y-auto">
-              {home?.gallery?.map((photo) => (
-                <button
-                  key={photo.url}
-                  aria-label="Make this the hero photo"
-                  aria-pressed={!card.assetId && photo.url === card.imageUrl}
-                  onClick={() => onHero(photo.url)}
-                >
-                  <img
-                    src={photo.thumbUrl}
-                    alt="Home photo"
-                    className={`aspect-square w-full rounded object-cover ${!card.assetId && photo.url === card.imageUrl ? "ring-2 ring-foreground" : ""}`}
-                  />
-                </button>
-              ))}
-            </div>
-          </div>
         </>
       )}
-      <div className="flex gap-2">
+      <div className="space-y-2 border-t pt-3">
+        <h5 className="text-sm font-medium">Image</h5>
+        <Button variant="outline" onClick={() => setImagePickerOpen(true)}>
+          Choose image
+        </Button>
+      </div>
+      <ImagePickerDialog
+        open={imagePickerOpen}
+        onOpenChange={setImagePickerOpen}
+        homes={
+          home
+            ? [{ id: card.homeId, name: home.name, photos: home.gallery ?? [] }]
+            : []
+        }
+        current={{
+          url: card.finishedArtwork?.url ?? card.imageUrl,
+          assetId: card.assetId,
+        }}
+        onPick={(photo) => void chooseCardPhoto(photo)}
+        onLibrary={onLibrary}
+        onMakeHero={(photo) => onHero(photo.url)}
+      />
+      <div className="flex flex-wrap justify-end gap-2">
+        {onCancel && (
+          <Button variant="ghost" disabled={saving} onClick={onCancel}>
+            Cancel
+          </Button>
+        )}
         <Button
           disabled={
             !card.title.trim() ||
@@ -1625,11 +1689,6 @@ export function CardEditor({
         >
           Apply changes
         </Button>
-        {onCancel && (
-          <Button variant="ghost" disabled={saving} onClick={onCancel}>
-            Cancel
-          </Button>
-        )}
       </div>
     </fieldset>
   );

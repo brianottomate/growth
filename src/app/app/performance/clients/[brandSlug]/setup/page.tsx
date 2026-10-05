@@ -131,7 +131,7 @@ export default async function PerformanceBrandSetupPage({
       />
       <section className="rounded-xl border p-4">
         <PersonaAudiences
-          brand={{ id: brand.id, slug, name: brand.name }}
+          brand={{ id: brand.id, slug, name: brand.name, story: brand.story }}
           personas={audiences.personas.map(({ persona, targets }) => ({
             id: persona.id,
             name: persona.name,

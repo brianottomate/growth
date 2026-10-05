@@ -8,9 +8,10 @@ import type {
 import {
   compositionImagePositionSchema,
   compositionTemplateIdSchema,
+  resolveCompositionTemplateId,
 } from "./compositions";
 
-export const IDEA_SHAPES = ["portrait", "square", "story", "wide"] as const;
+export const IDEA_SHAPES = ["square", "story", "portrait", "wide"] as const;
 export const IDEA_SHAPE_LABELS = {
   portrait: "Portrait · 4:5",
   square: "Square · 1:1",
@@ -43,6 +44,8 @@ export const ideaCopySchema = z.object({
   /** Meta's grey line under the headline; empty lets Meta scrape the page. */
   description: z.string().max(120).optional(),
   linkUrl: z.union([z.string().url(), z.literal("")]),
+  /** Explicit null clears a saved booking target when entering a URL manually. */
+  bookingTargetId: z.string().min(1).nullable().optional(),
   callToAction: z.string().max(60),
 });
 /** One carousel card's own words on Meta; blank falls back to the ad's. */
@@ -245,7 +248,35 @@ export function withIdeaPool(
     if (existing < 0) pool.push(source);
     else pool[existing] = { ...pool[existing], ...source };
   }
-  return { ...document, pool };
+  return {
+    ...document,
+    pool,
+    cards: document.cards.map((card) => ({
+      ...card,
+      recipe: {
+        ...card.recipe,
+        templateId:
+          resolveCompositionTemplateId(card.recipe.templateId) === "tier-badge"
+            ? "photo-only"
+            : resolveCompositionTemplateId(card.recipe.templateId),
+      },
+      overrides: Object.fromEntries(
+        Object.entries(card.overrides).map(([shape, recipe]) => [
+          shape,
+          recipe
+            ? {
+                ...recipe,
+                templateId:
+                  resolveCompositionTemplateId(recipe.templateId) ===
+                  "tier-badge"
+                    ? "photo-only"
+                    : resolveCompositionTemplateId(recipe.templateId),
+              }
+            : recipe,
+        ]),
+      ),
+    })),
+  };
 }
 export function ideaRecipe(card: IdeaImage, shape: IdeaShape) {
   return card.overrides[shape] ?? card.recipe;

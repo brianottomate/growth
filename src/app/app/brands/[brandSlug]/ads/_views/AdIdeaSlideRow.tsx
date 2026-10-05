@@ -1,9 +1,13 @@
 "use client";
+import { AdSlideCopy } from "./AdSlideCopy";
+import { CompositionSelector } from "@/components/composition-picker";
 
 import { useEffect, useState, type ReactNode } from "react";
 import Image from "next/image";
+import { ArrowUp, ArrowDown, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Dropzone } from "@/components/ui/dropzone";
 import { StorySafeZone } from "./StorySafeZone";
 import {
@@ -43,14 +47,13 @@ export function AdIdeaSlideRow({
   onUpload,
   onMove,
   onRemove,
-  onChoosePool,
   editing,
   onEdit,
   frozenUrl,
   photoPanel,
   adCopy,
 }: {
-  /** The ad's own Meta copy, which a carousel card inherits where blank. */
+  /** The ad's shared copy, which a carousel slide inherits where blank. */
   adCopy: { headline: string; description?: string };
   editing: boolean;
   /** Shown in place of the slide's details while its photo is being changed. */
@@ -71,7 +74,6 @@ export function AdIdeaSlideRow({
   onUpload: (files: File[]) => Promise<void>;
   onMove: (direction: number) => void;
   onRemove: () => void;
-  onChoosePool: () => void;
 }) {
   const updateCard = onChange;
   const recipe = ideaRecipe(card, shape);
@@ -93,93 +95,111 @@ export function AdIdeaSlideRow({
     card.mode === "compose" &&
     recipe.templateId !== "photo-only" &&
     !recipe.title.trim();
+  const imageSettings = (
+    <div className="flex flex-wrap items-center gap-3">
+      <Select
+        value={recipe.imagePosition}
+        onValueChange={(value) =>
+          updateRecipe({
+            imagePosition: value as IdeaRecipe["imagePosition"],
+          })
+        }
+      >
+        <SelectTrigger aria-label="Image crop focus">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {COMPOSITION_IMAGE_POSITIONS.map((p) => (
+            <SelectItem key={p} value={p}>
+              Crop focus: {p}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {card.mode === "compose" && (
+        <>
+          {getCompositionFields(recipe.templateId).some(
+            (f) => f.key === "mark",
+          ) && (
+            <label className="flex items-center gap-2 text-xs">
+              <Switch
+                aria-label="Brand logo"
+                checked={recipe.showLogo}
+                onCheckedChange={(showLogo) => updateRecipe({ showLogo })}
+              />
+              Brand logo
+            </label>
+          )}
+        </>
+      )}
+    </div>
+  );
   return (
     <section
       aria-label={isStatic ? "Ad image" : `Slide ${index + 1}`}
-      className="rounded-lg border p-4"
+      className="@container/slide-editor min-w-0 rounded-lg border p-4"
     >
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         {" "}
-        <h4 className="mb-3 text-xs font-medium text-muted-foreground">
+        <h4 className="text-xs font-medium text-muted-foreground">
           {isStatic ? "Image" : `Slide ${index + 1}`}
         </h4>
-        <div className="flex flex-wrap gap-1">
-          {!editing && (
-            <>
-              {" "}
-              {!isStatic && (
-                <>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={index === 0}
-                    onClick={() => onMove(-1)}
-                  >
-                    Move earlier
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={index === count - 1}
-                    onClick={() => onMove(1)}
-                  >
-                    Move later
-                  </Button>
-                </>
-              )}
-              <Button size="sm" variant="ghost" onClick={onRemove}>
-                {isStatic
-                  ? "Remove image from all sizes"
-                  : "Remove slide from all sizes"}
-              </Button>
-            </>
-          )}
-        </div>
       </div>
-      <div className="grid grid-cols-1 items-start gap-5 @xl:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
-        <div className="space-y-2">
+      <div className="grid grid-cols-1 items-stretch gap-5 @min-[44rem]/slide-editor:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
+        <div className="min-w-0 space-y-2">
           <div className="flex justify-center">
-            <div
-              className="relative w-full max-w-xs overflow-hidden rounded-lg border bg-muted"
-              style={{
-                aspectRatio: `${dimensions.width}/${dimensions.height}`,
-              }}
-            >
-              {awaitingArtwork && !editing ? (
-                <p className="p-4 text-sm text-muted-foreground">
-                  Awaiting artwork for this size
-                </p>
-              ) : awaitingArtwork ? (
-                <Dropzone
-                  title="Awaiting artwork"
-                  hint="Drop an image for this size, or choose one below"
-                  multiple={false}
-                  uploading={uploading}
-                  progress={progress}
-                  onFiles={async (files) => onUpload(files.slice(0, 1))}
+            <div className="w-full max-w-xs">
+              <div
+                className={`relative w-full overflow-hidden border bg-muted ${isStatic ? "rounded-lg" : "rounded-t-lg"}`}
+                style={{
+                  aspectRatio: `${dimensions.width}/${dimensions.height}`,
+                }}
+              >
+                {awaitingArtwork && !editing ? (
+                  <p className="p-4 text-sm text-muted-foreground">
+                    Awaiting artwork for this size
+                  </p>
+                ) : awaitingArtwork ? (
+                  <Dropzone
+                    title="Awaiting artwork"
+                    hint="Drop an image for this size, or choose one below"
+                    multiple={false}
+                    uploading={uploading}
+                    progress={progress}
+                    onFiles={async (files) => onUpload(files.slice(0, 1))}
+                  />
+                ) : previewFailed ? (
+                  <div className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-muted-foreground">
+                    Preview unavailable. Check the source image and try another
+                    template.
+                  </div>
+                ) : previewUrl ? (
+                  <Image
+                    unoptimized
+                    loading="lazy"
+                    fill
+                    src={previewUrl}
+                    alt={`${name} · slide ${index + 1} — ${IDEA_SHAPE_LABELS[shape]} preview`}
+                    className="object-contain"
+                    onError={() => setPreviewFailed(true)}
+                  />
+                ) : null}
+                {shape === "story" &&
+                previewUrl &&
+                !previewFailed &&
+                !awaitingArtwork ? (
+                  <StorySafeZone />
+                ) : null}
+              </div>
+              {!isStatic && (
+                <AdSlideCopy
+                  headline={card.copy?.headline?.trim() || adCopy.headline}
+                  description={
+                    card.copy?.description?.trim() || adCopy.description
+                  }
                 />
-              ) : previewFailed ? (
-                <div className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-muted-foreground">
-                  Preview unavailable. Check the source image and try another
-                  template.
-                </div>
-              ) : previewUrl ? (
-                <Image
-                  unoptimized
-                  loading="lazy"
-                  fill
-                  src={previewUrl}
-                  alt={`${name} · slide ${index + 1} — ${IDEA_SHAPE_LABELS[shape]} preview`}
-                  className="object-contain"
-                  onError={() => setPreviewFailed(true)}
-                />
-              ) : null}
-              {shape === "story" &&
-              previewUrl &&
-              !previewFailed &&
-              !awaitingArtwork ? (
-                <StorySafeZone />
-              ) : null}
+              )}
             </div>
           </div>
 
@@ -190,7 +210,7 @@ export function AdIdeaSlideRow({
             </p>
           )}
         </div>
-        <div className="min-w-0 space-y-3">
+        <div className="flex min-w-0 flex-col gap-3">
           {photoPanel && !editing ? (
             photoPanel
           ) : !editing ? (
@@ -205,79 +225,114 @@ export function AdIdeaSlideRow({
                         )?.label ?? recipe.templateId
                       }`}
                 </span>
-                <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="outline" onClick={onReplace}>
-                    {awaitingArtwork ? "Choose image" : "Change image"}
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={onEdit}>
-                    {isStatic ? "Edit image" : "Edit slide"}
-                  </Button>
-                </div>
               </div>
               {card.mode === "compose" ? (
-                <dl className="space-y-3 text-sm">
-                  {getCompositionFields(recipe.templateId)
-                    .filter((f) =>
-                      ["title", "subtitle", "eyebrow", "cta"].includes(f.key),
-                    )
-                    .map((field) => (
-                      <div key={field.key}>
-                        <dt className="text-xs text-muted-foreground">
-                          {field.key === "title"
-                            ? "Image headline"
-                            : field.label}
-                        </dt>
-                        <dd className="break-words whitespace-pre-wrap">
-                          {recipe[
-                            field.key as
-                              | "title"
-                              | "subtitle"
-                              | "eyebrow"
-                              | "cta"
-                          ] || "Not set"}
-                        </dd>
-                      </div>
-                    ))}
-                </dl>
+                <div className="space-y-3">
+                  <h5 className="text-xs font-medium">Image text</h5>
+                  <dl className="space-y-3 text-sm">
+                    {getCompositionFields(recipe.templateId)
+                      .filter((f) =>
+                        ["title", "subtitle", "eyebrow", "cta"].includes(f.key),
+                      )
+                      .map((field) => (
+                        <div key={field.key}>
+                          <dt className="text-xs text-muted-foreground">
+                            {field.key === "title"
+                              ? "Image headline"
+                              : field.label}
+                          </dt>
+                          <dd className="break-words whitespace-pre-wrap">
+                            {recipe[
+                              field.key as
+                                | "title"
+                                | "subtitle"
+                                | "eyebrow"
+                                | "cta"
+                            ] || "Not set"}
+                          </dd>
+                        </div>
+                      ))}
+                  </dl>
+                </div>
               ) : null}
-              {!isStatic && (
-                <dl className="space-y-3 text-sm">
-                  {(["headline", "description"] as const).map((key) => {
-                    const own = card.copy?.[key]?.trim();
-                    return (
-                      <div key={key}>
-                        <dt className="text-xs text-muted-foreground">
-                          {key === "headline"
-                            ? "Meta headline"
-                            : "Meta description"}
-                          {own ? "" : " · from the ad"}
-                        </dt>
-                        <dd className="break-words">
-                          {own || adCopy[key] || "Not set"}
-                        </dd>
-                      </div>
-                    );
-                  })}
-                </dl>
-              )}
-              <p className="text-xs text-muted-foreground">
-                {IDEA_SHAPE_LABELS[shape]} · Crop: {recipe.imagePosition}
-                {card.mode === "compose"
-                  ? ` · Logo ${recipe.showLogo ? "on" : "off"}`
-                  : ""}
-                {card.sourceOverrides?.[shape] === null
-                  ? " · Awaiting artwork"
-                  : card.sourceOverrides?.[shape]
-                    ? " · Custom image"
-                    : " · Base image"}
-              </p>
+              <div
+                role="group"
+                aria-label="Quick actions"
+                className="mt-auto flex flex-wrap justify-start gap-2 border-t pt-3"
+              >
+                <Button size="sm" variant="ghost" onClick={onReplace}>
+                  {awaitingArtwork ? "Choose image" : "Change image"}
+                </Button>
+              </div>
+              <div
+                role="group"
+                aria-label="Slide actions"
+                className="flex flex-wrap items-center justify-end gap-2"
+              >
+                <div className="flex flex-wrap gap-1">
+                  {!editing && (
+                    <>
+                      {" "}
+                      {!isStatic && (
+                        <>
+                          <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            aria-label="Move slide earlier"
+                            title="Move slide earlier"
+                            disabled={index === 0}
+                            onClick={() => onMove(-1)}
+                          >
+                            <ArrowUp className="size-4" />
+                          </Button>
+                          <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            aria-label="Move slide later"
+                            title="Move slide later"
+                            disabled={index === count - 1}
+                            onClick={() => onMove(1)}
+                          >
+                            <ArrowDown className="size-4" />
+                          </Button>
+                        </>
+                      )}
+                      <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        aria-label={
+                          isStatic
+                            ? "Remove image from all sizes"
+                            : "Remove slide from all sizes"
+                        }
+                        title={
+                          isStatic
+                            ? "Remove image from all sizes"
+                            : "Remove slide from all sizes"
+                        }
+                        onClick={onRemove}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+                <Button size="sm" variant="outline" onClick={onEdit}>
+                  {isStatic ? "Edit image" : "Edit slide"}
+                </Button>
+              </div>
             </>
           ) : (
             <>
-              <div className="flex gap-2">
+              <div
+                role="group"
+                aria-label="Image mode"
+                className="flex flex-wrap gap-2"
+              >
                 <Button
                   size="sm"
                   variant={card.mode === "supplied" ? "secondary" : "outline"}
+                  aria-pressed={card.mode === "supplied"}
                   onClick={() =>
                     updateCard((c) => ({ ...c, mode: "supplied" }))
                   }
@@ -287,39 +342,42 @@ export function AdIdeaSlideRow({
                 <Button
                   size="sm"
                   variant={card.mode === "compose" ? "secondary" : "outline"}
+                  aria-pressed={card.mode === "compose"}
                   onClick={() => updateCard((c) => ({ ...c, mode: "compose" }))}
                 >
                   Composed
                 </Button>
               </div>
               {card.mode === "supplied" ? (
-                <p className="text-xs text-muted-foreground">
-                  Use this image without adding text or a logo. Preview the crop
-                  in each shape.
-                </p>
+                <>
+                  <p className="text-xs text-muted-foreground">
+                    Use this image without adding text or a logo. Preview the
+                    crop in each shape.
+                  </p>
+                  {imageSettings}
+                </>
               ) : (
                 <>
-                  <Select
+                  <CompositionSelector
                     value={recipe.templateId}
-                    onValueChange={(value) =>
-                      updateRecipe({
-                        templateId: value as IdeaRecipe["templateId"],
-                      })
-                    }
-                  >
-                    <SelectTrigger aria-label="Composition template">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {COMPOSITION_TEMPLATES.filter(
-                        (t) => t.id !== "photo-only",
-                      ).map((t) => (
-                        <SelectItem key={t.id} value={t.id}>
-                          {t.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    aspectRatio={`${dimensions.width} / ${dimensions.height}`}
+                    onChange={(templateId) => updateRecipe({ templateId })}
+                    options={COMPOSITION_TEMPLATES.filter(
+                      (template) =>
+                        template.id !== "photo-only" &&
+                        template.id !== "tier-badge",
+                    ).map((template) => ({
+                      id: template.id,
+                      label: template.label,
+                      previewUrl: ideaEditorPreviewUrl(
+                        brandId,
+                        patchIdeaRecipe(card, shape, {
+                          templateId: template.id,
+                        }),
+                        shape,
+                      ),
+                    }))}
+                  />
                   <label className="flex items-center gap-2 text-xs">
                     <input
                       type="checkbox"
@@ -334,13 +392,14 @@ export function AdIdeaSlideRow({
                         })
                       }
                     />
-                    Customize composition for {IDEA_SHAPE_LABELS[shape]}
+                    Use separate settings for {IDEA_SHAPE_LABELS[shape]}
                   </label>
                   <p className="text-xs text-muted-foreground">
                     {card.overrides[shape]
-                      ? "Editing only this shape."
-                      : "Editing this image’s shared composition. Each shape adapts the layout."}
+                      ? "Changes apply only to this size."
+                      : "Changes apply to all sizes using shared settings. Layout adapts automatically."}
                   </p>
+                  {imageSettings}
                   {getCompositionFields(recipe.templateId)
                     .filter((f) =>
                       ["title", "subtitle", "eyebrow", "cta"].includes(f.key),
@@ -376,7 +435,7 @@ export function AdIdeaSlideRow({
 
               {!isStatic && (
                 <div className="space-y-3 border-t pt-3">
-                  <h5 className="text-xs font-medium">Card copy · Meta</h5>
+                  <h5 className="text-xs font-medium">Slide ad copy</h5>
                   {(["headline", "description"] as const).map((key) => (
                     <label key={key} className="block space-y-1 text-xs">
                       {key === "headline" ? "Headline" : "Description"}
@@ -401,51 +460,11 @@ export function AdIdeaSlideRow({
               )}
 
               <div className="space-y-3 border-t pt-3">
-                <h5 className="text-xs font-medium">
-                  Image settings · {IDEA_SHAPE_LABELS[shape]}
-                </h5>
+                <h5 className="text-xs font-medium">Image</h5>
                 <div className="mt-3 space-y-3">
-                  <Select
-                    value={recipe.imagePosition}
-                    onValueChange={(value) =>
-                      updateRecipe({
-                        imagePosition: value as IdeaRecipe["imagePosition"],
-                      })
-                    }
-                  >
-                    <SelectTrigger aria-label="Image crop focus">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {COMPOSITION_IMAGE_POSITIONS.map((p) => (
-                        <SelectItem key={p} value={p}>
-                          Crop focus: {p}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  {card.mode === "compose" && (
-                    <>
-                      {getCompositionFields(recipe.templateId).some(
-                        (f) => f.key === "mark",
-                      ) && (
-                        <label className="flex items-center gap-2 text-xs">
-                          <input
-                            type="checkbox"
-                            checked={recipe.showLogo}
-                            onChange={(e) =>
-                              updateRecipe({ showLogo: e.target.checked })
-                            }
-                          />
-                          Show brand logo
-                        </label>
-                      )}
-                    </>
-                  )}
                   <div className="flex flex-wrap gap-2">
                     <Button variant="outline" size="sm" onClick={onReplace}>
-                      Replace image for this size
+                      Choose image
                     </Button>
                     <Button
                       variant="ghost"
@@ -461,7 +480,7 @@ export function AdIdeaSlideRow({
                         }))
                       }
                     >
-                      Clear this size
+                      Remove image for this size
                     </Button>
                     {card.sourceOverrides?.[shape] !== undefined && (
                       <Button
@@ -478,10 +497,6 @@ export function AdIdeaSlideRow({
                         Use base image
                       </Button>
                     )}
-
-                    <Button size="sm" variant="outline" onClick={onChoosePool}>
-                      Choose from pool for this size
-                    </Button>
                   </div>
                 </div>
               </div>

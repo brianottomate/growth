@@ -41,7 +41,8 @@ function LiveFrame({
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
-  const scale = Math.min(1, size.width / width);
+  const frameWidth = width || size.width;
+  const scale = Math.min(1, size.width / frameWidth);
   return (
     <section
       className="flex min-h-0 min-w-[440px] flex-1 flex-col border-r last:border-r-0"
@@ -67,7 +68,7 @@ function LiveFrame({
           src={path}
           className="origin-top-left border-0"
           style={{
-            width,
+            width: frameWidth,
             height: size.height / scale,
             transform: `scale(${scale})`,
           }}
@@ -78,8 +79,9 @@ function LiveFrame({
 }
 
 export function LiveWorkspaces() {
-  const [width, setWidth] = useState(1000);
+  const [width, setWidth] = useState(0);
   const [revision, setRevision] = useState(0);
+  const [showCatalog, setShowCatalog] = useState(false);
   return (
     <main className="flex h-svh flex-col overflow-hidden bg-background">
       <header className="flex shrink-0 flex-wrap items-center gap-4 border-b px-4 py-3">
@@ -95,6 +97,14 @@ export function LiveWorkspaces() {
             Porchlit Properties · Live pages and data
           </p>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          aria-pressed={showCatalog}
+          onClick={() => setShowCatalog((value) => !value)}
+        >
+          {showCatalog ? "Hide catalog" : "Show catalog"}
+        </Button>
         <label className="flex items-center gap-2 text-sm">
           Page width
           <select
@@ -103,6 +113,7 @@ export function LiveWorkspaces() {
             onChange={(event) => setWidth(Number(event.target.value))}
             className="rounded-md border bg-background px-3 py-2"
           >
+            <option value={0}>Fit panel</option>
             <option value={760}>760px</option>
             <option value={1000}>1000px</option>
             <option value={1280}>1280px</option>
@@ -118,7 +129,9 @@ export function LiveWorkspaces() {
         </Button>
       </header>
       <div className="flex min-h-0 flex-1 overflow-x-auto">
-        {WORKSPACES.map((workspace) => (
+        {WORKSPACES.filter(
+          (workspace) => showCatalog || workspace.title !== "Catalog",
+        ).map((workspace) => (
           <LiveFrame
             key={workspace.path}
             {...workspace}
