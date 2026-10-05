@@ -2,10 +2,12 @@ import "server-only";
 
 import { env } from "@/env";
 
-// Read-only Postmark client. Postmark has two auth scopes: the account token
-// (servers, domains, sender signatures) and a per-server token (streams,
-// stats, messages, suppressions, webhooks). Every server's token is on its
-// GET /servers row, so the account token reaches any server.
+// Postmark client. Postmark has two auth scopes: the account token (servers,
+// domains, sender signatures) and a per-server token (streams, stats,
+// messages, suppressions, webhooks, sending). Every server's token is on its
+// GET /servers row, so the account token reaches any server. The only write is
+// sendPostmarkBatch, which brand-email-send.service calls once a person has
+// approved the send.
 
 const API_BASE = "https://api.postmarkapp.com";
 
@@ -140,6 +142,18 @@ export function listPostmarkServers(count = 500, offset = 0) {
   );
 }
 
+export function getPostmarkServerById(serverId: number) {
+  return postmarkGet<PostmarkServer>(`/servers/${serverId}`, { account: true });
+}
+
+/** A brand server's send token, read with the account token when needed. */
+export async function postmarkServerToken(serverId: number) {
+  const server = await getPostmarkServerById(serverId);
+  const token = server.ApiTokens[0];
+  if (!token) throw new Error(`Postmark server ${serverId} has no API token.`);
+  return token;
+}
+
 export function listPostmarkDomains(count = 500, offset = 0) {
   return postmarkGet<{ TotalCount: number; Domains: PostmarkDomainSummary[] }>(
     "/domains",
@@ -250,4 +264,55 @@ export function listPostmarkWebhooks(serverToken?: string) {
 
 export function listPostmarkBulkRequests(serverToken?: string) {
   return postmarkGet<unknown>("/email/bulk", { serverToken });
+}
+
+// ---- sending --------------------------------------------------------
+
+export type PostmarkOutgoingMessage = {
+  From: string;
+  To: string;
+  ReplyTo?: string;
+  Subject: string;
+  HtmlBody: string;
+  TextBody: string;
+  MessageStream: string;
+  Tag?: string;
+  TrackOpens?: boolean;
+  TrackLinks?: "None" | "HtmlAndText" | "HtmlOnly" | "TextOnly";
+  Metadata?: Record<string, string>;
+};
+
+export type PostmarkSendResult = {
+  ErrorCode: number;
+  Message: string;
+  MessageID?: string;
+  To?: string;
+};
+
+/**
+ * Up to 500 messages in one call. Postmark answers with one result per
+ * message, in order; a suppressed or inactive recipient comes back with a
+ * non-zero ErrorCode rather than failing the batch.
+ */
+export async function sendPostmarkBatch(
+  serverToken: string,
+  messages: PostmarkOutgoingMessage[],
+) {
+  if (messages.length === 0) return [];
+  if (messages.length > 500)
+    throw new Error("Postmark batches are limited to 500 messages.");
+  const response = await fetch(new URL("/email/batch", API_BASE), {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "X-Postmark-Server-Token": serverToken,
+    },
+    body: JSON.stringify(messages),
+  });
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Postmark POST /email/batch → ${response.status}: ${body}`);
+  }
+  return (await response.json()) as PostmarkSendResult[];
 }

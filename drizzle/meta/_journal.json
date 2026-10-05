@@ -22,6 +22,13 @@
       "when": 1791216422783,
       "tag": "0002_home_group_primary_backfill",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791216264891,
+      "tag": "0003_brand_email_delivery",
+      "breakpoints": true
     }
   ]
 }

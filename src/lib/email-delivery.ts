@@ -19,10 +19,13 @@ export const MESSAGE_SEND_STATUSES = [
 
 export type MessageSendStatus = (typeof MESSAGE_SEND_STATUSES)[number];
 
+export type MessageSendProvider = "customerio" | "postmark";
+
 export type MessageSendSummary = {
   id: string;
   contentHash: string;
-  provider: "customerio";
+  provider: MessageSendProvider;
+  /** Customer.io: the broadcast id. Postmark: the brand's server id. */
   providerBroadcastId: string;
   providerMessageId: string | null;
   audienceKind: MessageAudienceKind;
@@ -72,16 +75,29 @@ export type MessageSendSnapshot = {
     ctaUrl: string | null;
     templateKey: string;
   };
-  audience: {
-    kind: MessageAudienceKind;
-    provider: "customerio";
-    segmentId: number;
-    label: string;
-  };
+  audience:
+    | {
+        kind: MessageAudienceKind;
+        provider: "customerio";
+        segmentId: number;
+        label: string;
+      }
+    | {
+        kind: MessageAudienceKind;
+        provider: "postmark";
+        /** A compiled email_audience_snapshot; its table holds the guests. */
+        snapshotId: string;
+        serverId: number;
+        messageStream: string;
+        label: string;
+      };
+  /** Postmark sends: who the email is from, frozen at approval. */
+  sender?: { fromName: string; fromEmail: string; replyTo: string | null };
   productUpdate: ProductUpdateContext | null;
   preview: {
     renderer: "@wandercom/design-system-emails";
     template: "generic.html";
+    /** Postmark sends keep per-guest fields unfilled; they fill per guest. */
     html: string;
     text: string;
   };
@@ -158,4 +174,20 @@ export function customerIoBroadcastData(
       email: snapshot.email,
     },
   };
+}
+
+/** Everything a brand needs before Growth can send as it, as one sentence each. */
+export function brandSendBlockers(brand: {
+  name: string;
+  emailDelivery: { provider: string } | null;
+  emailSender: { fromEmail?: string | null } | null;
+  legalIdentity: { address?: unknown } | null;
+}) {
+  return [
+    !brand.emailDelivery && `${brand.name} has no email provider set up.`,
+    !brand.emailSender?.fromEmail &&
+      `${brand.name} has no from-address in its email sender.`,
+    !brand.legalIdentity?.address &&
+      `${brand.name} has no postal address for the footer.`,
+  ].filter((blocker): blocker is string => Boolean(blocker));
 }

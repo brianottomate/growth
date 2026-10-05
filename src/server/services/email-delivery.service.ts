@@ -84,6 +84,8 @@ export async function createMessageSendDraft(input: {
     document: current,
     brandName: spot.brand.name,
     logo: spot.brand.brandIdentity?.logo ?? spot.brand.logo,
+    sender: spot.brand.emailSender,
+    legal: spot.brand.legalIdentity,
   });
   const snapshot: MessageSendSnapshot = {
     schema: "wander-growth.message-send.v1",

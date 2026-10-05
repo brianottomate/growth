@@ -54,6 +54,8 @@ export const getEmailDraftOutputSchema = z.strictObject({
     name: z.string(),
     slug: z.string().nullable(),
     homeCount: z.number(),
+    /** Why Growth cannot send as this brand yet; empty when it can. */
+    sendBlockers: z.array(z.string()),
   }),
   canDeliver: z.boolean(),
   content: z
@@ -103,7 +105,7 @@ export const getEmailDraftOutputSchema = z.strictObject({
       error: z.string().nullable(),
       id: z.string(),
       contentHash: z.string(),
-      provider: z.literal("customerio"),
+      provider: z.enum(["customerio", "postmark"]),
       providerBroadcastId: z.string(),
       providerMessageId: z.string().nullable(),
       sentAt: z.iso.datetime().nullable(),

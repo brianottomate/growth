@@ -228,6 +228,18 @@ export type BrandEmailSender = {
   valueProps?: { iconUrl: string; label: string }[] | null;
 };
 
+/**
+ * Which provider sends the brand's marketing email, and where in it. No
+ * credentials: a Postmark server's token is read with the account token.
+ * Another provider joins this union with its own fields.
+ */
+export type BrandEmailDelivery = {
+  provider: "postmark";
+  serverId: number;
+  /** The broadcast stream marketing goes out on; Postmark handles unsubscribes. */
+  messageStream: string;
+};
+
 export type PerformanceSettings = {
   /** One current plain-text handoff note, edited through the canonical settings writer. */
   note?: string | null;
@@ -446,6 +458,8 @@ export const brandTable = pgTable(
     emailSender: t.jsonb().$type<BrandEmailSender>(),
     /** Applied with scripts/apply-brand-email-sender.ts. */
     legalIdentity: t.jsonb().$type<BrandLegalIdentity>(),
+    /** Which provider sends its marketing email; see BrandEmailDelivery. */
+    emailDelivery: t.jsonb().$type<BrandEmailDelivery>(),
     wanderOsCheckedAt: t.timestamp({ withTimezone: true }),
 
     // The domain of the `leads.lead_domain` row a prospect came from. A text

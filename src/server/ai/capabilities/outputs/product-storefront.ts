@@ -8,6 +8,7 @@ import { brandRelationshipEnum } from "@/server/db/brand-schema";
 import { currencyEnum } from "@/server/db/auth-schema";
 import {
   homesSchema,
+  brandEmailDeliverySchema,
   brandEmailSenderSchema,
   brandLegalIdentitySchema,
   metaReportingConversionsSchema,
@@ -477,6 +478,7 @@ const brandSchema = z.strictObject({
   wanderOsEnabled: z.boolean(),
   emailSender: brandEmailSenderSchema,
   legalIdentity: brandLegalIdentitySchema,
+  emailDelivery: brandEmailDeliverySchema,
   website: z.string().nullable(),
   websiteMeta: websiteMetaSchema.nullable(),
   zernioProfileId: z.string().nullable(),

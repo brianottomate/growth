@@ -15,7 +15,7 @@ import {
   type EmailDocumentFormat,
   type ProductUpdateEmailDraft,
 } from "@/lib/email-document";
-import { messageSendSummary } from "@/lib/email-delivery";
+import { brandSendBlockers, messageSendSummary } from "@/lib/email-delivery";
 import { db, withTransaction } from "@/server/db";
 import {
   brandTable,
@@ -289,6 +289,7 @@ export async function getEmailWorkspace(input: {
       name: spot.brand.name,
       slug: spot.brand.slug,
       homeCount,
+      sendBlockers: brandSendBlockers(spot.brand),
     },
   };
 }

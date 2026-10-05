@@ -23,6 +23,7 @@ import { previewBody } from "./email-blocks";
 import { DigestImageBoard } from "./DigestImageBoard";
 import { EmailPreviewFrame, type PreviewPick } from "./EmailPreviewFrame";
 import { FindHomesCard } from "./FindHomesCard";
+import { SendCard } from "./SendCard";
 
 type Workspace = RouterOutputs["newsletter"]["workspace"];
 type Draft = Pick<
@@ -357,6 +358,10 @@ function Editor({ workspace }: { workspace: Workspace }) {
                 </p>
               )}
             </section>
+
+            {!draft.productUpdate && (
+              <SendCard workspace={workspace} dirty={dirty} />
+            )}
 
             {fieldsOpen && (
               <ManualFieldsDialog

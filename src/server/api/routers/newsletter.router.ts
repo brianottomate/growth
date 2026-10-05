@@ -42,6 +42,13 @@ import {
   sendApprovedMessage,
 } from "@/server/services/email-delivery.service";
 import {
+  brandSendAudiences,
+  brandSendProgress,
+  dispatchBrandSend,
+  prepareBrandSend,
+  sendBrandTestEmail,
+} from "@/server/services/brand-email-send.service";
+import {
   digestHomePhotos,
   digestSectionFromBrandHomes,
   emailHomePhotos,
@@ -332,11 +339,67 @@ export const newsletterRouter = {
         ctx.db,
         ctx.session.user.id,
       );
-      return sendApprovedMessage({
+      const send = await ctx.db.query.messageSendTable.findFirst({
+        where: (table, { eq }) => eq(table.id, input.messageSendId),
+        columns: { provider: true },
+      });
+      const args = {
         messageSendId: input.messageSendId,
         organizationId,
         userId: ctx.session.user.id,
+      };
+      return send?.provider === "postmark"
+        ? dispatchBrandSend(args)
+        : sendApprovedMessage(args);
+    }),
+
+  /** The saved email to the signed-in person, through the brand's server. */
+  sendTest: protectedProcedure
+    .input(z.object({ platformPostId: z.string() }))
+    .handler(async ({ context: ctx, input }) => {
+      const organizationId = await organizationIdForUser(
+        ctx.db,
+        ctx.session.user.id,
+      );
+      return sendBrandTestEmail({
+        ...input,
+        organizationId,
+        userId: ctx.session.user.id,
       });
+    }),
+
+  sendAudiences: protectedProcedure
+    .input(z.object({ brandId: z.string() }))
+    .handler(async ({ context: ctx, input }) => {
+      const organizationId = await organizationIdForUser(
+        ctx.db,
+        ctx.session.user.id,
+      );
+      return brandSendAudiences({ ...input, organizationId });
+    }),
+
+  prepareBrandSend: protectedProcedure
+    .input(z.object({ platformPostId: z.string(), snapshotId: z.string() }))
+    .handler(async ({ context: ctx, input }) => {
+      const organizationId = await organizationIdForUser(
+        ctx.db,
+        ctx.session.user.id,
+      );
+      return prepareBrandSend({
+        ...input,
+        organizationId,
+        userId: ctx.session.user.id,
+      });
+    }),
+
+  sendProgress: protectedProcedure
+    .input(z.object({ messageSendId: z.string() }))
+    .handler(async ({ context: ctx, input }) => {
+      const organizationId = await organizationIdForUser(
+        ctx.db,
+        ctx.session.user.id,
+      );
+      return brandSendProgress({ ...input, organizationId });
     }),
 
   subscribe: publicProcedure

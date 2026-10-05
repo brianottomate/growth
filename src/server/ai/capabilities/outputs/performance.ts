@@ -1,5 +1,6 @@
 import { brandPageSnapshotSchema } from "@/lib/brand-website-content";
 import {
+  brandEmailDeliverySchema,
   brandEmailSenderSchema,
   brandLegalIdentitySchema,
   metaReportingConversionsSchema,
@@ -791,6 +792,7 @@ export const previewIntakeApplyActionOutputSchema = z.strictObject({
         wanderOsEnabled: z.boolean(),
         emailSender: brandEmailSenderSchema,
         legalIdentity: brandLegalIdentitySchema,
+        emailDelivery: brandEmailDeliverySchema,
         website: z.string().nullable(),
         websiteMeta: z
           .strictObject({

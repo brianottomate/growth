@@ -176,3 +176,41 @@ export function retryWebsiteProspect(
     body: { prospectId },
   });
 }
+
+export type GuestEmailOptOut = {
+  websiteId: string;
+  email: string;
+  source: string;
+  createdAt: string;
+};
+
+/**
+ * Every guest who unsubscribed from one WanderOS website's marketing email,
+ * all pages. The route (wandercom/wander#22237) answers an unknown org or
+ * website with a 404, so a wrong id fails here instead of reading as
+ * "nobody unsubscribed".
+ */
+export async function listGuestEmailOptOuts(input: {
+  organizationId: string;
+  websiteId: string;
+}) {
+  const emails = new Set<string>();
+  let cursor: string | null = null;
+  do {
+    const page: {
+      results: GuestEmailOptOut[];
+      meta: { nextCursor: string | null; hasMore: boolean };
+    } = await wanderFetch("/internal/guest-opt-outs/list", {
+      method: "POST",
+      body: {
+        organizationId: input.organizationId,
+        websiteId: input.websiteId,
+        limit: 100,
+        ...(cursor ? { cursor } : {}),
+      },
+    });
+    for (const row of page.results) emails.add(row.email.trim().toLowerCase());
+    cursor = page.meta.hasMore ? page.meta.nextCursor : null;
+  } while (cursor);
+  return emails;
+}

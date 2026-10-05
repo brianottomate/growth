@@ -189,6 +189,15 @@ export const brandEmailSenderSchema = z
   })
   .nullable();
 
+/** Brand emailDelivery. */
+export const brandEmailDeliverySchema = z
+  .strictObject({
+    provider: z.literal("postmark"),
+    serverId: z.number().int(),
+    messageStream: z.string(),
+  })
+  .nullable();
+
 /** Brand performanceSettings.metaReportingConversions, keyed by ad account. */
 export const metaReportingConversionsSchema = z
   .record(

@@ -12,6 +12,7 @@ import { platformPostTable } from "./content-schema";
 import { createId } from "./utils";
 import type {
   MessageAudienceKind,
+  MessageSendProvider,
   MessageSendSnapshot,
 } from "@/lib/email-delivery";
 import type { ProductUpdateContext } from "@/lib/email-document";
@@ -41,8 +42,8 @@ export const messageSendStatusEnum = pgEnum("message_send_status", [
 
 /**
  * Immutable delivery intent and outcome for an approved email revision.
- * Recipient membership stays in the provider; this table stores only the
- * provider-managed audience reference and the exact content snapshot.
+ * Customer.io sends keep membership in the provider; Postmark sends read a
+ * compiled audience snapshot and record each guest in message_send_recipient.
  */
 export const messageSendTable = pgTable(
   "message_send",
@@ -60,7 +61,11 @@ export const messageSendTable = pgTable(
       .notNull()
       .references(() => productionPacketTable.id),
     contentHash: t.text().notNull(),
-    provider: t.text().$type<"customerio">().default("customerio").notNull(),
+    provider: t
+      .text()
+      .$type<MessageSendProvider>()
+      .default("customerio")
+      .notNull(),
     providerBroadcastId: t.text().notNull(),
     providerMessageId: t.text(),
     audienceKind: t.text().$type<MessageAudienceKind>().notNull(),
@@ -69,6 +74,8 @@ export const messageSendTable = pgTable(
     status: messageSendStatusEnum().default("draft").notNull(),
     snapshot: jsonb().$type<MessageSendSnapshot>().notNull(),
     idempotencyKey: t.text().notNull(),
+    /** Postmark sends: the audience page to resume from; null at the start. */
+    dispatchCursor: t.text(),
     error: t.text(),
     createdBy: t.text().references(() => userTable.id, {
       onDelete: "set null",
@@ -101,6 +108,46 @@ export const messageSendTable = pgTable(
 );
 
 export type MessageSend = typeof messageSendTable.$inferSelect;
+
+/**
+ * One row per guest a Postmark send reaches or deliberately skips. The row is
+ * written before the provider call, so a retried or resumed send never emails
+ * the same address twice.
+ */
+export const messageSendRecipientTable = pgTable(
+  "message_send_recipient",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("msr")),
+    messageSendId: t
+      .text()
+      .notNull()
+      .references(() => messageSendTable.id, { onDelete: "cascade" }),
+    email: t.text().notNull(),
+    status: t
+      .text()
+      .$type<"pending" | "sent" | "skipped" | "failed">()
+      .default("pending")
+      .notNull(),
+    /** Why a guest was skipped or failed: "opted_out", Postmark's message. */
+    reason: t.text(),
+    providerMessageId: t.text(),
+    createdAt: t.timestamp({ withTimezone: true }).notNull().defaultNow(),
+    sentAt: t.timestamp({ withTimezone: true }),
+  }),
+  (table) => [
+    uniqueIndex("message_send_recipient_email_idx").on(
+      table.messageSendId,
+      table.email,
+    ),
+    index("message_send_recipient_status_idx").on(
+      table.messageSendId,
+      table.status,
+    ),
+  ],
+);
 
 /**
  * Every Postmark webhook event from the servers Growth controls, as received.
