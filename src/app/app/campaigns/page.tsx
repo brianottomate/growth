@@ -12,9 +12,7 @@ export const metadata: Metadata = {
   title: "Campaigns",
 };
 
-// Campaigns & moments — the management surface over `campaign`. The moment
-// planner (/app/plan) births these from a prompt; here is where you see them
-// all, edit dates/status, and attach the content that belongs to each push.
+// Paid campaign index across workspace brands. Initiatives coordinate shared pushes.
 export default async function CampaignsPage() {
   const session = await getSession();
   if (!session?.user) redirect("/signin");

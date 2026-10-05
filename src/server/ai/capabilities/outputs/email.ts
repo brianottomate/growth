@@ -58,7 +58,6 @@ export const getEmailDraftOutputSchema = z.strictObject({
   canDeliver: z.boolean(),
   content: z
     .strictObject({
-      campaign: z.strictObject({ id: z.string(), name: z.string() }).nullable(),
       ctaText: z.string().nullable(),
       hook: z.string().nullable(),
       id: z.string(),

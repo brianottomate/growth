@@ -60,9 +60,9 @@ export function MomentAmplifiers({ momentId }: { momentId: string }) {
   const [addOpen, setAddOpen] = useState(false);
 
   const { data, isLoading } = useQuery(
-    orpc.amplifier.targetsForCampaign.queryOptions({
+    orpc.amplifier.targetsForInitiative.queryOptions({
       input: {
-        campaignId: momentId,
+        initiativeId: momentId,
       },
     }),
   );
@@ -71,9 +71,9 @@ export function MomentAmplifiers({ momentId }: { momentId: string }) {
 
   const invalidate = () =>
     queryClient.invalidateQueries(
-      orpc.amplifier.targetsForCampaign.queryOptions({
+      orpc.amplifier.targetsForInitiative.queryOptions({
         input: {
-          campaignId: momentId,
+          initiativeId: momentId,
         },
       }),
     );

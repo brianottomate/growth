@@ -5,7 +5,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { ChannelLogo } from "@/components/channel-logos";
 import type { CampaignStatus } from "@/server/db/schema";
 import { orpc } from "@/orpc/client";
 
@@ -106,9 +105,9 @@ export function CampaignsClient({
 
       {campaigns.length === 0 && (
         <p className="mt-10 text-sm text-muted-foreground">
-          No campaigns yet. Create one here, or commit a moment from{" "}
-          <Link href="/app/plan" className="underline underline-offset-2">
-            Plan
+          No campaigns yet. Create a paid campaign from{" "}
+          <Link href="/app/brands" className="underline underline-offset-2">
+            Brands
           </Link>
           .
         </p>
@@ -159,14 +158,6 @@ export function CampaignsClient({
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
                         {range && <span>{range}</span>}
-                        {i.contentCount > 0 && (
-                          <span>
-                            {i.contentCount} piece
-                            {i.contentCount === 1 ? "" : "s"}
-                            {i.publishedCount > 0 &&
-                              ` · ${i.publishedCount} published`}
-                          </span>
-                        )}
                         {i.adCampaignCount > 0 && (
                           <span>
                             {i.adCampaignCount} ad campaign

@@ -1,51 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  ArrowLeft,
-  ExternalLink,
-  Link2,
-  Loader2,
-  Pencil,
-  X,
-} from "lucide-react";
-
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, ExternalLink, Loader2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { toast } from "@/components/ui/toast";
 import { ChannelLogo } from "@/components/channel-logos";
-import { PILLAR_BY_SLUG } from "@/lib/pillars";
 import { orpc } from "@/orpc/client";
 import { CampaignDialog } from "../CampaignDialog";
 import { fmtRange, STATUS_META } from "../CampaignsClient";
 import { AlignmentPanel } from "./AlignmentPanel";
-import { MomentAmplifiers } from "./MomentAmplifiers";
-
-const CONTENT_STATUS_LABEL: Record<string, string> = {
-  slot: "Slot",
-  draft: "Draft",
-  discovered: "Discovered",
-  pending_review: "In Review",
-  approved: "Approved",
-  scheduled: "Scheduled",
-  published: "Published",
-  rejected: "Rejected",
-  archived: "Archived",
-};
-
-const fmtDay = (d: Date | null) =>
-  d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
 
 export function CampaignDetail({ campaignId }: { campaignId: string }) {
   const queryClient = useQueryClient();
@@ -54,7 +18,6 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
   );
 
   const [editOpen, setEditOpen] = useState(false);
-  const [linkOpen, setLinkOpen] = useState(false);
 
   const invalidate = async () => {
     await Promise.all([
@@ -63,20 +26,10 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
       ),
       queryClient.invalidateQueries(orpc.campaign.overview.queryOptions()),
       queryClient.invalidateQueries(
-        orpc.campaign.linkableContent.queryOptions({ input: { campaignId } }),
-      ),
-      queryClient.invalidateQueries(
         orpc.campaign.alignment.queryOptions({ input: { campaignId } }),
       ),
     ]);
   };
-
-  const unlink = useMutation(
-    orpc.campaign.unlinkContent.mutationOptions({
-      onSuccess: invalidate,
-      onError: (e) => toast.error(e.message || "Failed to unlink"),
-    }),
-  );
 
   if (!campaign) {
     return (
@@ -159,86 +112,6 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
         </Button>
       </div>
 
-      {/* ---- linked content ------------------------------------------- */}
-      <section className="mt-10">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-            Content · {campaign.contentPosts.length}
-          </h2>
-          <Button size="sm" variant="outline" onClick={() => setLinkOpen(true)}>
-            <Link2 className="size-3.5" />
-            Link content
-          </Button>
-        </div>
-
-        {campaign.contentPosts.length === 0 ? (
-          <p className="mt-4 text-sm text-muted-foreground">
-            Nothing attached yet. Link existing pieces, or commit a moment from{" "}
-            <Link href="/app/plan" className="underline underline-offset-2">
-              Plan
-            </Link>{" "}
-            to generate them.
-          </p>
-        ) : (
-          <div className="mt-3 flex flex-col gap-1.5">
-            {campaign.contentPosts.map((p) => {
-              const pillar = p.pillar ? PILLAR_BY_SLUG[p.pillar] : undefined;
-              return (
-                <div
-                  key={p.id}
-                  className="group flex items-center gap-3 rounded-lg border bg-card px-3 py-2.5 transition-colors hover:bg-accent/40"
-                >
-                  <Link
-                    href={`/app/content/${p.id}`}
-                    className="flex min-w-0 flex-1 items-center gap-3"
-                  >
-                    <span className="truncate text-sm">
-                      {p.title ?? "Untitled"}
-                    </span>
-                    <span className="shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                      {CONTENT_STATUS_LABEL[p.status] ?? p.status}
-                    </span>
-                    {pillar && (
-                      <span
-                        className="flex shrink-0 items-center gap-1 text-[11px]"
-                        style={{ color: pillar.color }}
-                      >
-                        <span
-                          className="size-1.5 rounded-full"
-                          style={{ background: pillar.color }}
-                        />
-                        {pillar.name}
-                      </span>
-                    )}
-                    {p.series && (
-                      <span
-                        className="shrink-0 text-[11px]"
-                        style={{ color: p.series.color ?? undefined }}
-                      >
-                        {p.series.name}
-                      </span>
-                    )}
-                  </Link>
-                  <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
-                    {fmtDay(p.plannedAt)}
-                  </span>
-                  <button
-                    type="button"
-                    aria-label="Unlink"
-                    onClick={() =>
-                      unlink.mutate({ campaignId, contentPostId: p.id })
-                    }
-                    className="text-muted-foreground opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:text-foreground pointer-coarse:opacity-100"
-                  >
-                    <X className="size-3.5" />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
       {/* ---- linked ad campaigns -------------------------------------- */}
       <section className="mt-10">
         <h2 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
@@ -277,9 +150,6 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
       {/* ---- intent vs. actual (strategy ↔ synced reality) ----------- */}
       <AlignmentPanel campaignId={campaignId} onChanged={invalidate} />
 
-      {/* ---- amplifiers (earned reach) -------------------------------- */}
-      <MomentAmplifiers momentId={campaignId} />
-
       <CampaignDialog
         open={editOpen}
         onOpenChange={setEditOpen}
@@ -298,137 +168,6 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
           endAt: campaign.endAt,
         }}
       />
-
-      <LinkContentDialog
-        open={linkOpen}
-        onOpenChange={setLinkOpen}
-        campaignId={campaignId}
-        onLinked={invalidate}
-      />
     </div>
-  );
-}
-// ---- link picker -----------------------------------------------------
-
-function LinkContentDialog({
-  open,
-  onOpenChange,
-  campaignId,
-  onLinked,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  campaignId: string;
-  onLinked: () => Promise<void>;
-}) {
-  const [q, setQ] = useState("");
-  const [picked, setPicked] = useState<Set<string>>(new Set());
-
-  const { data: linkable, isLoading } = useQuery({
-    ...orpc.campaign.linkableContent.queryOptions({ input: { campaignId } }),
-    enabled: open,
-  });
-
-  const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    const list = linkable ?? [];
-    if (!needle) return list;
-    return list.filter((p) => (p.title ?? "").toLowerCase().includes(needle));
-  }, [linkable, q]);
-
-  const link = useMutation(
-    orpc.campaign.linkContent.mutationOptions({
-      onSuccess: async () => {
-        await onLinked();
-        setPicked(new Set());
-        onOpenChange(false);
-      },
-      onError: (e) => toast.error(e.message || "Failed to link content"),
-    }),
-  );
-
-  function toggle(id: string) {
-    setPicked((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[560px]">
-        <DialogHeader>
-          <DialogTitle>Link content</DialogTitle>
-          <DialogDescription>
-            Attach existing pieces from this brand to the campaign.
-          </DialogDescription>
-        </DialogHeader>
-
-        <Input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search by title…"
-        />
-
-        <div className="-mx-1 max-h-80 overflow-y-auto px-1">
-          {isLoading ? (
-            <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" /> Loading…
-            </div>
-          ) : filtered.length === 0 ? (
-            <p className="py-6 text-sm text-muted-foreground">
-              {q
-                ? "No matches."
-                : "No unattached content on this brand — everything is already part of a campaign."}
-            </p>
-          ) : (
-            <div className="flex flex-col">
-              {filtered.map((p) => (
-                <label
-                  key={p.id}
-                  className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-accent/40"
-                >
-                  <Checkbox
-                    checked={picked.has(p.id)}
-                    onCheckedChange={() => toggle(p.id)}
-                  />
-                  <span className="min-w-0 flex-1 truncate text-sm">
-                    {p.title ?? "Untitled"}
-                  </span>
-                  <span className="shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                    {CONTENT_STATUS_LABEL[p.status] ?? p.status}
-                  </span>
-                  <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
-                    {fmtDay(p.plannedAt)}
-                  </span>
-                </label>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={link.isPending}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={() =>
-              link.mutate({ campaignId, contentPostIds: [...picked] })
-            }
-            disabled={picked.size === 0 || link.isPending}
-          >
-            {link.isPending && <Loader2 className="size-4 animate-spin" />}
-            Link {picked.size > 0 ? picked.size : ""} piece
-            {picked.size === 1 ? "" : "s"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }

@@ -57,6 +57,12 @@ const write = (
 });
 
 export const growthActionPolicies = {
+  initiativeRead: { list: read(), get: read(), options: read() },
+  initiativeWrite: {
+    save: write(),
+    link: write({ idempotent: true }),
+    unlink: write({ idempotent: true }),
+  },
   operationRead: { status: read() },
   workspaceOverview: { overview: read() },
   navigateWorkspace: { navigate: read() },

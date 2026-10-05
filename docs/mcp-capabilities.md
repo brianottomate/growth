@@ -182,3 +182,9 @@ that run's captures. Both actions verify that the selected brand belongs to the
 current workspace. A run key replays identical evidence and rejects changed
 input. Browser capture, posting, Slack notification, and the global mention
 queue remain separate operations. This feature adds no database columns.
+
+Initiatives provide optional workspace-level coordination across organic series,
+standalone content posts and paid campaigns. `initiativeRead` exposes `list`,
+`get` and eligible membership `options`; `initiativeWrite` exposes `save`, `link`
+and `unlink`. These are local operations shared with `/app/initiatives`, with
+workspace checks and one typed FK membership table. See [Initiatives](initiatives.md).

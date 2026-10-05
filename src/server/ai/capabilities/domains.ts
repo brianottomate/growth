@@ -1,4 +1,12 @@
 import {
+  getInitiativeAction,
+  initiativeOptionsAction,
+  linkInitiativeAction,
+  listInitiativesAction,
+  saveInitiativeAction,
+  unlinkInitiativeAction,
+} from "./initiatives";
+import {
   launchChecklistAction,
   recordLaunchChecklistAction,
 } from "./launch-checklist";
@@ -252,6 +260,24 @@ import {
 import { readWebPage, webSearch } from "./research";
 import { growthDomainTool } from "./types";
 
+export const initiativeRead = growthDomainTool({
+  description:
+    "Read workspace initiatives and their organic and paid membership.",
+  actions: {
+    list: listInitiativesAction,
+    get: getInitiativeAction,
+    options: initiativeOptionsAction,
+  },
+});
+export const initiativeWrite = growthDomainTool({
+  description:
+    "Manage optional initiative groupings. Work remains brand-owned; no provider changes.",
+  actions: {
+    save: saveInitiativeAction,
+    link: linkInitiativeAction,
+    unlink: unlinkInitiativeAction,
+  },
+});
 export const brandRead = growthDomainTool({
   description: "Read brands, their mapped surfaces, and the next useful move.",
   actions: {
@@ -735,6 +761,8 @@ export const listeningWrite = growthDomainTool({
 });
 
 export const DOMAIN_CAPABILITY_TOOLS = {
+  initiativeRead,
+  initiativeWrite,
   driveRead,
   brandRead,
   brandWrite,

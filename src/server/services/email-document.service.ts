@@ -24,7 +24,6 @@ import {
   emailDocumentTable,
   emailDocumentVersionTable,
   emailGenerationJobTable,
-  campaignTable,
   homeTable,
   messageSendTable,
   platformPostTable,
@@ -81,7 +80,7 @@ export async function requireOwnedEmailSpot(
     where: eq(platformPostTable.id, platformPostId),
     with: {
       brand: true,
-      contentPost: { with: { series: true, campaign: true } },
+      contentPost: { with: { series: true } },
     },
   });
   if (
@@ -272,12 +271,6 @@ export async function getEmailWorkspace(input: {
                 name: spot.contentPost.series.name,
               }
             : null,
-          campaign: spot.contentPost.campaign
-            ? {
-                id: spot.contentPost.campaign.id,
-                name: spot.contentPost.campaign.name,
-              }
-            : null,
         }
       : null,
     brand: {
@@ -347,10 +340,9 @@ export async function createEmailSlot(input: {
   ctaText?: string;
   pillar?: string;
   seriesId?: string;
-  campaignId?: string;
   plannedAt?: string;
 }) {
-  const [brand, series, campaign, newsletterChannel] = await Promise.all([
+  const [brand, series, newsletterChannel] = await Promise.all([
     db.query.brandTable.findFirst({
       where: and(
         eq(brandTable.id, input.brandId),
@@ -367,15 +359,6 @@ export async function createEmailSlot(input: {
           ),
         })
       : null,
-    input.campaignId
-      ? db.query.campaignTable.findFirst({
-          where: and(
-            eq(campaignTable.id, input.campaignId),
-            eq(campaignTable.brandId, input.brandId),
-            isNull(campaignTable.deletedAt),
-          ),
-        })
-      : null,
     db.query.channelTable.findFirst({
       where: and(
         eq(channelTable.brandId, input.brandId),
@@ -389,9 +372,6 @@ export async function createEmailSlot(input: {
   if (!brand) throw new Error("Brand not found in this workspace.");
   if (input.seriesId && !series)
     throw new Error("Series not found for this brand.");
-  if (input.campaignId && !campaign) {
-    throw new Error("Campaign not found for this brand.");
-  }
   const plannedAt = input.plannedAt ? new Date(input.plannedAt) : null;
   if (plannedAt && Number.isNaN(plannedAt.getTime())) {
     throw new Error("Invalid content-calendar date.");
@@ -409,10 +389,9 @@ export async function createEmailSlot(input: {
         ctaText: input.ctaText,
         pillar,
         seriesId: series?.id,
-        campaignId: campaign?.id,
         plannedAt,
         status: "slot",
-        slotKind: series || campaign ? "anchored" : "freeflow",
+        slotKind: series ? "anchored" : "freeflow",
         origin: "human",
         ownerId: input.userId,
         createdById: input.userId,
@@ -548,7 +527,7 @@ export async function runEmailGenerationJob(jobId: string) {
       with: {
         brand: true,
         channel: true,
-        contentPost: { with: { series: true, campaign: true } },
+        contentPost: { with: { series: true } },
       },
     });
     if (!document || !spot?.brand || !isEmailFormat(spot.format)) {
@@ -595,7 +574,6 @@ export async function runEmailGenerationJob(jobId: string) {
       prompt: [
         content?.title ? `Working title: ${content.title}` : null,
         content?.series ? `Series: ${content.series.name}` : null,
-        content?.campaign ? `Campaign: ${content.campaign.name}` : null,
         content?.pillar ? `Content pillar: ${content.pillar}` : null,
         content?.hook ? `Hook / premise: ${content.hook}` : null,
         content?.captionDirection
@@ -802,7 +780,6 @@ export async function exportEmailHandoff(input: {
     format: workspace.spot.format,
     revision: workspace.document.currentRevision,
     seriesName: workspace.content?.series?.name,
-    campaignName: workspace.content?.campaign?.name,
     plannedAt: workspace.content?.plannedAt?.toISOString(),
     scheduledAt: workspace.spot.scheduledAt?.toISOString(),
     purpose: workspace.content?.purpose,

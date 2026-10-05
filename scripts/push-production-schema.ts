@@ -1,3 +1,4 @@
+import { migrateInitiatives } from "./migrate-initiatives";
 import postgres from "postgres";
 import {
   assertSchemaPushSucceeded,
@@ -24,8 +25,9 @@ try {
   await client.begin(async (tx) => {
     for (const statement of launchRetirementStatements(source))
       await tx.unsafe(statement);
+    await migrateInitiatives(tx);
   });
-  console.log("Launches schema retirement committed.");
+  console.log("Launch retirement and Initiative cutover committed.");
 } finally {
   await client.end();
 }

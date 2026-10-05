@@ -96,6 +96,7 @@ export const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
     items: [
       { label: "Content", href: "/app/content", icon: FileText },
       { label: "Series", href: "/app/series", icon: ListTree },
+      { label: "Initiatives", href: "/app/initiatives", icon: Target },
       { label: "Calendar", href: "/app/calendar", icon: Calendar },
       { label: "Campaigns", href: "/app/campaigns", icon: Megaphone },
       { label: "Studio", href: "/app/studio", icon: Sparkles },

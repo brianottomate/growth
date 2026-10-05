@@ -6,7 +6,6 @@ import { z } from "zod";
 /** Wire results for this capability. Dates are ISO strings after JSON normalization. */
 const seriesSchema = z.strictObject({
   brandId: z.string(),
-  campaignId: z.string().nullable(),
   color: z.string().nullable(),
   createdAt: z.iso.datetime(),
   deletedAt: z.iso.datetime().nullable(),

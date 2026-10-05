@@ -9,7 +9,6 @@ import {
   brandTable,
   platformCampaignTable,
   channelPlatformEnum,
-  contentPostTable,
   campaignStatusEnum,
   campaignTable,
   memberTable,
@@ -87,13 +86,7 @@ const campaignFields = {
   endAt: z.date().nullish(),
 };
 
-/**
- * Campaigns — the campaign/moment management surface (/app/campaigns).
- * An campaign is the umbrella for a push: a seasonal moment, a major
- * event, or a long-running campaign. Content posts and ad campaigns hang
- * off it via their `campaignId`. The moment planner (/app/plan) creates
- * these too; this router is the generic CRUD + linking lane.
- */
+/** Paid campaign management. Cross-channel pushes are grouped by Initiative. */
 export const campaignRouter = {
   /** All campaigns for the org's brands, with linked-work rollups. */
   overview: protectedProcedure.handler(async ({ context: ctx }) => {
@@ -112,37 +105,16 @@ export const campaignRouter = {
     const ids = campaigns.map((i) => i.id);
     if (ids.length === 0) return { campaigns: [] };
 
-    const [contentCounts, adCounts] = await Promise.all([
-      ctx.db
-        .select({
-          campaignId: contentPostTable.campaignId,
-          status: contentPostTable.status,
-          n: count(),
-        })
-        .from(contentPostTable)
-        .where(
-          and(
-            inArray(contentPostTable.campaignId, ids),
-            isNull(contentPostTable.deletedAt),
-          ),
-        )
-        .groupBy(contentPostTable.campaignId, contentPostTable.status),
-      ctx.db
-        .select({ campaignId: platformCampaignTable.campaignId, n: count() })
-        .from(platformCampaignTable)
-        .where(inArray(platformCampaignTable.campaignId, ids))
-        .groupBy(platformCampaignTable.campaignId),
-    ]);
+    const adCounts = await ctx.db
+      .select({ campaignId: platformCampaignTable.campaignId, n: count() })
+      .from(platformCampaignTable)
+      .where(inArray(platformCampaignTable.campaignId, ids))
+      .groupBy(platformCampaignTable.campaignId);
 
     return {
       campaigns: campaigns.map((i) => {
-        const mine = contentCounts.filter((c) => c.campaignId === i.id);
         return {
           ...i,
-          contentCount: mine.reduce((s, c) => s + c.n, 0),
-          publishedCount: mine
-            .filter((c) => c.status === "published")
-            .reduce((s, c) => s + c.n, 0),
           adCampaignCount: adCounts.find((c) => c.campaignId === i.id)?.n ?? 0,
         };
       }),
@@ -155,25 +127,10 @@ export const campaignRouter = {
     .handler(async ({ context: ctx, input }) => {
       const campaign = await assertCampaignAccess(ctx, input.id);
 
-      const [brand, contentPosts, adCampaigns] = await Promise.all([
+      const [brand, adCampaigns] = await Promise.all([
         ctx.db.query.brandTable.findFirst({
           where: eq(brandTable.id, campaign.brandId),
           columns: { id: true, name: true, slug: true },
-        }),
-        ctx.db.query.contentPostTable.findMany({
-          where: and(
-            eq(contentPostTable.campaignId, campaign.id),
-            isNull(contentPostTable.deletedAt),
-          ),
-          columns: {
-            id: true,
-            title: true,
-            status: true,
-            pillar: true,
-            plannedAt: true,
-          },
-          with: { series: { columns: { id: true, name: true, color: true } } },
-          orderBy: [contentPostTable.plannedAt],
         }),
         ctx.db.query.platformCampaignTable.findMany({
           where: eq(platformCampaignTable.campaignId, campaign.id),
@@ -182,7 +139,7 @@ export const campaignRouter = {
         }),
       ]);
 
-      return { ...campaign, brand, contentPosts, adCampaigns };
+      return { ...campaign, brand, adCampaigns };
     }),
 
   create: protectedProcedure
@@ -208,67 +165,6 @@ export const campaignRouter = {
         .where(eq(campaignTable.id, id))
         .returning();
       return campaign;
-    }),
-
-  /** Brand content not yet attached to any campaign — the link picker. */
-  linkableContent: protectedProcedure
-    .input(z.object({ campaignId: z.string() }))
-    .handler(async ({ context: ctx, input }) => {
-      const campaign = await assertCampaignAccess(ctx, input.campaignId);
-      return ctx.db.query.contentPostTable.findMany({
-        where: and(
-          eq(contentPostTable.brandId, campaign.brandId),
-          isNull(contentPostTable.campaignId),
-          isNull(contentPostTable.deletedAt),
-        ),
-        columns: {
-          id: true,
-          title: true,
-          status: true,
-          pillar: true,
-          plannedAt: true,
-        },
-        orderBy: [desc(contentPostTable.plannedAt)],
-        limit: 200,
-      });
-    }),
-
-  linkContent: protectedProcedure
-    .input(
-      z.object({
-        campaignId: z.string(),
-        contentPostIds: z.array(z.string()).min(1).max(200),
-      }),
-    )
-    .handler(async ({ context: ctx, input }) => {
-      const campaign = await assertCampaignAccess(ctx, input.campaignId);
-      // Same-brand only — a campaign never owns another brand's content.
-      await ctx.db
-        .update(contentPostTable)
-        .set({ campaignId: campaign.id })
-        .where(
-          and(
-            inArray(contentPostTable.id, input.contentPostIds),
-            eq(contentPostTable.brandId, campaign.brandId),
-          ),
-        );
-      return { ok: true };
-    }),
-
-  unlinkContent: protectedProcedure
-    .input(z.object({ campaignId: z.string(), contentPostId: z.string() }))
-    .handler(async ({ context: ctx, input }) => {
-      await assertCampaignAccess(ctx, input.campaignId);
-      await ctx.db
-        .update(contentPostTable)
-        .set({ campaignId: null })
-        .where(
-          and(
-            eq(contentPostTable.id, input.contentPostId),
-            eq(contentPostTable.campaignId, input.campaignId),
-          ),
-        );
-      return { ok: true };
     }),
 
   // ---- intent vs. actual (strategy layer ↔ Zernio-synced reality) --------

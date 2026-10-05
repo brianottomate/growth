@@ -1,15 +1,18 @@
+import { getInitiative } from "@/server/services/initiative.service";
 import type { Database } from "@/server/db";
 import { z } from "zod";
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
 
-import { protectedProcedure, actionProcedure } from "@/server/api/orpc";
+import {
+  protectedProcedure,
+  actionProcedure,
+  workspaceProcedure,
+} from "@/server/api/orpc";
 import {
   amplificationTargetTable,
   amplifierTable,
   brandTable,
-  contentPostTable,
-  campaignTable,
   memberTable,
   platformPostTable,
 } from "@/server/db/schema";
@@ -53,19 +56,6 @@ async function assertAmplifierAccess(ctx: Ctx, id: string) {
   return amplifier;
 }
 
-async function assertMomentAccess(ctx: Ctx, id: string) {
-  const moment = await ctx.db.query.campaignTable.findFirst({
-    where: and(eq(campaignTable.id, id), isNull(campaignTable.deletedAt)),
-  });
-  if (!moment) throw new ORPCError("NOT_FOUND");
-  const brand = await ctx.db.query.brandTable.findFirst({
-    where: and(eq(brandTable.id, moment.brandId), isNull(brandTable.deletedAt)),
-  });
-  if (!brand?.organizationId) throw new ORPCError("NOT_FOUND");
-  await assertOrgMembership(ctx, brand.organizationId);
-  return { moment, brand };
-}
-
 async function assertPostAccess(ctx: Ctx, id: string) {
   const post = await ctx.db.query.platformPostTable.findFirst({
     where: eq(platformPostTable.id, id),
@@ -92,16 +82,13 @@ async function assertTargetAccess(ctx: Ctx, id: string) {
   return target;
 }
 
-/** The campaign's platform posts (via its content items) — the candidates an
- * amplification ask can anchor to. */
-async function platformPostsForCampaign(ctx: Ctx, campaignId: string) {
-  const contents = await ctx.db.query.contentPostTable.findMany({
-    where: and(
-      eq(contentPostTable.campaignId, campaignId),
-      isNull(contentPostTable.deletedAt),
-    ),
-    columns: { id: true, title: true },
-  });
+async function platformPostsForInitiative(
+  ctx: Ctx,
+  initiativeId: string,
+  orgId: string,
+) {
+  const detail = await getInitiative(initiativeId, orgId);
+  const contents = detail.contentPosts;
   if (contents.length === 0) return [];
   const titleById = new Map(contents.map((c) => [c.id, c.title]));
   const posts = await ctx.db.query.platformPostTable.findMany({
@@ -226,11 +213,14 @@ export const amplifierRouter = {
   addTarget: actionProcedure(requestAmplification),
 
   /** All targets across a campaign's posts (the roll-up view). */
-  targetsForCampaign: protectedProcedure
-    .input(z.object({ campaignId: z.string() }))
+  targetsForInitiative: workspaceProcedure
+    .input(z.object({ initiativeId: z.string() }))
     .handler(async ({ context: ctx, input }) => {
-      await assertMomentAccess(ctx, input.campaignId);
-      const posts = await platformPostsForCampaign(ctx, input.campaignId);
+      const posts = await platformPostsForInitiative(
+        ctx,
+        input.initiativeId,
+        ctx.workspace.orgId,
+      );
       if (posts.length === 0) return { targets: [], posts: [] };
       const targets = await ctx.db.query.amplificationTargetTable.findMany({
         where: inArray(

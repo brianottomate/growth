@@ -215,6 +215,7 @@
     "zod": "^4.5.4"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@react-email/preview-server": "^5.2.10",
     "@shadcn/lint": "^0.1.0",
     "@tailwindcss/forms": "^0.5.11",
