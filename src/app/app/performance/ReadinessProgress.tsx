@@ -6,8 +6,8 @@ import { cn } from "@/components/ui/lib/utils";
 
 export type ReadinessLinks = Record<ReadinessFix, string | null>;
 
-export function readinessGroupLabel(id: string, label: string) {
-  return id === "onboarded" ? "Onboarding" : label;
+export function readinessGroupLabel(_id: string, label: string) {
+  return label;
 }
 
 export function ReadinessProgress({
@@ -18,7 +18,12 @@ export function ReadinessProgress({
   compact?: boolean;
 }) {
   return (
-    <div className={cn("grid grid-cols-3", compact ? "gap-2" : "gap-4")}>
+    <div
+      className={cn("grid", compact ? "gap-2" : "gap-4")}
+      style={{
+        gridTemplateColumns: `repeat(${checklist.groups.length}, minmax(0, 1fr))`,
+      }}
+    >
       {checklist.groups.map((group) => (
         <div key={group.id} className="min-w-0 space-y-2">
           <div

@@ -1,5 +1,4 @@
 import "server-only";
-import { completeLaunchMilestones } from "./launch-checklist.service";
 
 import { and, desc, eq, gte, ilike, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
@@ -488,13 +487,6 @@ export async function openPerformanceCycle(
       endAt: input.endAt ? new Date(input.endAt) : null,
     })
     .returning();
-  if (input.mediaBudget && account.brandId)
-    await completeLaunchMilestones(
-      account.brandId,
-      ["budget"],
-      "Cycle media budget set",
-      `cycle-budget:${cycle!.id}:${cycle!.updatedAt.toISOString()}`,
-    );
   return { cycle: cycle! };
 }
 
@@ -516,13 +508,6 @@ export async function updatePerformanceCycle(
     })
     .where(eq(performanceCycleTable.id, cycleId))
     .returning();
-  if (input.mediaBudget && account.brandId)
-    await completeLaunchMilestones(
-      account.brandId,
-      ["budget"],
-      "Cycle media budget set",
-      `cycle-budget:${cycle!.id}:${cycle!.updatedAt.toISOString()}`,
-    );
   return { cycle: cycle! };
 }
 

@@ -9,6 +9,7 @@ import {
 const event = z.object({
   item: launchItemSchema,
   checked: z.boolean(),
+  skipped: z.boolean().optional(),
   by: z.string().nullable(),
   byName: z.string().nullable().optional(),
   source: z.enum(["manual", "assistant", "workflow"]),
@@ -23,14 +24,14 @@ const outputSchema = z.object({
 });
 export const launchChecklistAction = growthAction({
   description:
-    "Read the explicitly recorded client launch checklist and provenance. No completion is inferred from assets or provider state.",
+    "Read the explicitly recorded client onboarding checklist and provenance. No completion is inferred from assets or provider state.",
   inputSchema: z.object({ brandId: z.string().min(1) }),
   outputSchema,
   execute: (input, ctx) => readLaunchRecord(input.brandId, ctx.orgId),
 });
 export const recordLaunchChecklistAction = growthAction({
   description:
-    "Record one or many client launch milestones as checked or unchecked in a single atomic update. This only records progress; it never performs the milestone or launches ads. Read the revision first and send expectedRevision. Evidence is an optional explanatory reference.",
+    "Record one or many client onboarding milestones as checked, unchecked or skipped in a single atomic update, optionally dated (YYYY-MM-DD) to when the milestone happened. This only records progress; it never performs the milestone. Read the revision first and send expectedRevision. Evidence is an optional explanatory reference.",
   inputSchema: z.object({
     brandId: z.string().min(1),
     patch: launchPatchSchema,

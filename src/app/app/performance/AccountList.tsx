@@ -109,7 +109,7 @@ function AccountRow({
             </p>
             <div
               role="progressbar"
-              aria-label="Launch checklist"
+              aria-label="Onboarding checklist"
               aria-valuemin={0}
               aria-valuemax={checklist.total}
               aria-valuenow={checklist.done}

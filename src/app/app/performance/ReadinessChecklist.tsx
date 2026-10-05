@@ -3,11 +3,18 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
+import { useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DatePicker,
+  fromDateInputValue,
+  toDateInputValue,
+} from "@/components/ui/date-picker";
 import { orpc } from "@/orpc/client";
 import { toast } from "@/components/ui/toast";
 import type { LaunchItem } from "@/lib/launch-checklist";
-import { ListChecks } from "lucide-react";
+import { Check, ListChecks } from "lucide-react";
+import { cn } from "@/components/ui/lib/utils";
 
 import {
   Accordion,
@@ -60,7 +67,7 @@ export function ReadinessChecklist({
                 aria-hidden="true"
                 className="size-4 text-muted-foreground"
               />
-              Launch checklist
+              Onboarding checklist
             </span>
             <span className="text-xs whitespace-nowrap text-muted-foreground tabular-nums">
               {checklist.done} of {checklist.total} done
@@ -139,56 +146,24 @@ export function ReadinessChecklist({
                             action.label === item.action?.label,
                         );
                         return (
-                          <li
+                          <MilestoneRow
                             key={item.id}
-                            className="flex flex-wrap items-start gap-x-3 gap-y-1 py-3"
-                          >
-                            <Checkbox
-                              aria-label={item.label}
-                              checked={item.done}
-                              disabled={
-                                !brandId || revision == null || save.isPending
-                              }
-                              onCheckedChange={(checked) => {
-                                if (brandId && revision != null)
-                                  save.mutate({
-                                    brandId,
-                                    expectedRevision: revision,
-                                    patch: [
-                                      {
-                                        item: item.id as LaunchItem,
-                                        checked: checked === true,
-                                      },
-                                    ],
-                                  });
-                              }}
-                              className="mt-0.5"
-                            />
-                            <span className="min-w-0 flex-1 basis-40">
-                              <span className="sr-only">
-                                {item.done ? "Complete: " : "Incomplete: "}
-                              </span>
-                              <span className="block text-sm font-medium">
-                                {item.label}
-                              </span>
-                              {item.detail ? (
-                                <span
-                                  title={item.provenance}
-                                  className="mt-0.5 block text-xs leading-5 text-muted-foreground"
-                                >
-                                  {item.detail}
-                                </span>
-                              ) : null}
-                            </span>
-                            {!item.done && href && !sharedAction ? (
-                              <Link
-                                href={href}
-                                className="inline-flex min-h-8 items-center text-xs font-medium underline decoration-border underline-offset-4 hover:decoration-foreground"
-                              >
-                                {item.action!.label}
-                              </Link>
-                            ) : null}
-                          </li>
+                            item={item}
+                            href={sharedAction ? null : href}
+                            disabled={
+                              !brandId || revision == null || save.isPending
+                            }
+                            onRecord={(entry) => {
+                              if (brandId && revision != null)
+                                save.mutate({
+                                  brandId,
+                                  expectedRevision: revision,
+                                  patch: [
+                                    { item: item.id as LaunchItem, ...entry },
+                                  ],
+                                });
+                            }}
+                          />
                         );
                       })}
                     </ul>
@@ -197,11 +172,134 @@ export function ReadinessChecklist({
               );
             })}
           </Accordion>
-          <p className="text-xs text-muted-foreground">
-            Recorded by your team and completed workflows.
-          </p>
         </AccordionContent>
       </AccordionItem>
     </Accordion>
+  );
+}
+
+const today = () => new Date().toISOString().slice(0, 10);
+
+/**
+ * One milestone: a checkbox, the label and who recorded it, a date field for
+ * milestones that happen outside the app, a skip for ones that do not apply
+ * to this client, and the link that resolves it.
+ */
+function MilestoneRow({
+  item,
+  href,
+  disabled,
+  onRecord,
+}: {
+  item: Checklist["groups"][number]["items"][number];
+  href: string | null;
+  disabled: boolean;
+  onRecord: (entry: {
+    checked: boolean;
+    skipped?: boolean;
+    at?: string;
+  }) => void;
+}) {
+  const [date, setDate] = useState(today);
+  const settled = item.done || item.skipped;
+  return (
+    <li className="flex flex-wrap items-start gap-x-3 gap-y-1 py-3">
+      {item.observed ? (
+        <span
+          aria-hidden="true"
+          className={cn(
+            "mt-0.5 flex size-4 items-center justify-center rounded-[4px] border",
+            item.done
+              ? "border-foreground bg-foreground text-background"
+              : "border-dashed border-border",
+          )}
+        >
+          {item.done ? <Check className="size-3" /> : null}
+        </span>
+      ) : (
+        <Checkbox
+          aria-label={item.label}
+          checked={item.done ? true : item.skipped ? "indeterminate" : false}
+          disabled={disabled}
+          onCheckedChange={(checked) =>
+            onRecord(
+              checked === true && item.dated
+                ? { checked: true, at: date }
+                : { checked: checked === true },
+            )
+          }
+          className="mt-0.5"
+        />
+      )}
+      <span className="min-w-0 flex-1 basis-40">
+        <span className="sr-only">
+          {item.done
+            ? "Complete: "
+            : item.skipped
+              ? "Skipped: "
+              : "Incomplete: "}
+        </span>
+        <span
+          className={cn(
+            "block text-sm font-medium",
+            item.skipped && "text-muted-foreground line-through",
+          )}
+        >
+          {item.label}
+        </span>
+        {item.detail ? (
+          <span
+            title={item.provenance}
+            className="mt-0.5 block text-xs leading-5 text-muted-foreground"
+          >
+            {item.detail}
+          </span>
+        ) : null}
+      </span>
+      {!settled ? (
+        <span className="flex items-center gap-3">
+          {item.dated ? (
+            <DatePicker
+              aria-label={`${item.label} date`}
+              value={fromDateInputValue(date)}
+              onChange={(picked) =>
+                setDate(picked ? toDateInputValue(picked) : today())
+              }
+              disabled={disabled}
+              clearable={false}
+              align="end"
+              className="h-8"
+            />
+          ) : null}
+          {href ? (
+            <Link
+              href={href}
+              className="inline-flex min-h-8 items-center text-xs font-medium underline decoration-border underline-offset-4 hover:decoration-foreground"
+            >
+              {item.action!.label}
+            </Link>
+          ) : null}
+          {item.observed ? null : (
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => onRecord({ checked: false, skipped: true })}
+              className="inline-flex min-h-8 items-center text-xs text-muted-foreground hover:text-foreground"
+            >
+              Skip
+            </button>
+          )}
+        </span>
+      ) : item.skipped ? (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => onRecord({ checked: false, skipped: false })}
+          className="inline-flex min-h-8 items-center text-xs text-muted-foreground hover:text-foreground"
+        >
+          Reopen
+        </button>
+      ) : null}
+    </li>
   );
 }

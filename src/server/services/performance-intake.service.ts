@@ -1,6 +1,4 @@
 import { validIntakeUrl } from "./performance-settings.service";
-import type { LaunchItem } from "@/lib/launch-checklist";
-import { completeLaunchMilestones } from "./launch-checklist.service";
 import {
   STANDARD_PITCH_DEFAULTS,
   publicPitchSettings,
@@ -285,18 +283,6 @@ export async function submitPerformanceIntake(input: {
   if (brand.relationship === "prospect")
     await advanceBusinessStage(brand.id, "signed");
 
-  const milestones: LaunchItem[] = ["intake"];
-  if (!budgetIsRecommendation && (parseBudgetDollars(answers.budget) ?? 0) > 0)
-    milestones.push("budget");
-  if (answers.reportEmails?.trim() && answers.invoiceEmail?.trim())
-    milestones.push("contacts");
-  if (validIntakeUrl(answers.creativeDriveUrl)) milestones.push("folder");
-  await completeLaunchMilestones(
-    brand.id,
-    milestones,
-    `Intake ${intake!.id}`,
-    `intake-submitted:${intake!.id}`,
-  );
   return { intakeId: intake!.id };
 }
 
@@ -1025,12 +1011,6 @@ export async function verifyIntakeAccess(
       .where(eq(performanceIntakeTable.id, intake.id));
     if (intake.brandId) {
       await bindBrandPage(intake.brandId, match.id);
-      await completeLaunchMilestones(
-        intake.brandId,
-        ["access"],
-        `Verified page ${match.id}`,
-        `intake-verified:${intake.id}:${match.id}`,
-      );
     }
   }
 

@@ -1,4 +1,3 @@
-import { completeLaunchMilestones } from "./launch-checklist.service";
 import "server-only";
 
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
@@ -548,12 +547,6 @@ export async function addWanderOsHome(input: {
       homeId: row.id,
       externalId: listing.id,
     });
-  await completeLaunchMilestones(
-    input.brandId,
-    ["homes"],
-    "Home added",
-    `home-added:${row.id}`,
-  );
   return row;
 }
 
@@ -673,13 +666,6 @@ export async function ingestBrandHomes(input: {
       }),
     );
   }
-  if (selected.length > 0 && failed.length === 0)
-    await completeLaunchMilestones(
-      input.brandId,
-      ["homes"],
-      "Home inventory import",
-      `homes-import:${crypto.randomUUID()}`,
-    );
   return { listings: selected.length, withDetail, failed };
 }
 
@@ -766,13 +752,6 @@ export async function createManualHomes(input: {
       .returning();
     rows.push(row!);
   }
-  if (rows.length)
-    await completeLaunchMilestones(
-      input.brandId,
-      ["homes"],
-      "Manual homes saved",
-      `manual-homes:${rows.map((row) => row.id).join(":")}`,
-    );
   return rows;
 }
 

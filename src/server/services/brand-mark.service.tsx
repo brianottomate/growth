@@ -1,4 +1,3 @@
-import { completeLaunchMilestones } from "./launch-checklist.service";
 import "server-only";
 
 import { anthropic } from "@ai-sdk/anthropic";
@@ -764,13 +763,7 @@ export async function setBrandMark(input: {
     .update(brandTable)
     .set({ brandMark: mark })
     .where(eq(brandTable.id, brand.id));
-  await completeLaunchMilestones(
-    input.brandId,
-    ["mark"],
-    "Brand mark saved",
-    `mark:${JSON.stringify(mark.variants)}`,
-    input.userId,
-  );
+
   return mark;
 }
 

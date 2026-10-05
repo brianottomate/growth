@@ -1,29 +1,40 @@
 import { z } from "zod";
 import {
-  readinessChecklist,
+  LAUNCH_MILESTONES,
+  type ObservedFacts,
   type ReadinessChecklist,
+  type ReadinessItem,
 } from "./performance-readiness";
 
 export const launchItemSchema = z.enum([
+  "signed",
+  "intake_sent",
   "intake",
+  "invoice_sent",
+  "invoice_paid",
   "budget",
   "access",
-  "homes",
-  "contacts",
-  "mark",
-  "folder",
-  "previews",
-  "ads",
-  "campaign",
-  "audience",
-  "pushed",
-  "live",
+  "google_access",
+  "wanderos",
+  "email_domain",
+  "guest_list",
 ]);
 export type LaunchItem = z.infer<typeof launchItemSchema>;
+/** A tick, an untick, a skip, or a tick dated to when it happened (YYYY-MM-DD). */
 export const launchPatchSchema = z
-  .array(z.object({ item: launchItemSchema, checked: z.boolean() }))
+  .array(
+    z.object({
+      item: launchItemSchema,
+      checked: z.boolean(),
+      skipped: z.boolean().optional(),
+      at: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/)
+        .optional(),
+    }),
+  )
   .min(1)
-  .max(13)
+  .max(11)
   .refine(
     (patch) => new Set(patch.map((entry) => entry.item)).size === patch.length,
     "Each item may be updated once per request",
@@ -31,6 +42,8 @@ export const launchPatchSchema = z
 export type LaunchEvent = {
   item: LaunchItem;
   checked: boolean;
+  /** Not applicable to this client; settled without being done. */
+  skipped?: boolean;
   by: string | null;
   byName?: string | null;
   source: "manual" | "assistant" | "workflow";
@@ -57,7 +70,12 @@ export function applyLaunchPatch(
   receipt?: string,
 ): LaunchRecord {
   if (receipt && current.receipts.includes(receipt)) return current;
-  const events = patch.map((entry) => ({ ...entry, ...stamp }));
+  const events: LaunchEvent[] = patch.map(({ at, skipped, ...entry }) => ({
+    ...entry,
+    ...stamp,
+    skipped: !entry.checked && skipped === true,
+    at: at ? `${at}T12:00:00.000Z` : stamp.at,
+  }));
   return {
     revision: current.revision + 1,
     items: {
@@ -69,54 +87,87 @@ export function applyLaunchPatch(
   };
 }
 
-/** Static labels/actions, with completion exclusively from explicit milestone writes. */
+const fmtDay = (date: Date) =>
+  date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+
+/** What the app sees for an observed item: done, and the line that says so. */
+function observe(
+  id: string,
+  facts: ObservedFacts | undefined,
+): Pick<ReadinessItem, "done" | "detail"> {
+  if (id === "intake")
+    return facts?.intakeFiledAt
+      ? { done: true, detail: `Filed ${fmtDay(facts.intakeFiledAt)}` }
+      : { done: false, detail: "Not filed" };
+  if (id === "wanderos")
+    return facts?.wanderOsConnected
+      ? { done: true, detail: "Connected" }
+      : { done: false, detail: "Not connected" };
+  return { done: false, detail: null };
+}
+
+/**
+ * Static labels and actions. Observed items read the app's own facts;
+ * recorded items complete only from explicit milestone writes.
+ */
 export function recordedLaunchChecklist(
   record: LaunchRecord,
+  facts?: ObservedFacts,
 ): ReadinessChecklist {
-  const template = readinessChecklist({
-    intakeFiled: false,
-    mediaBudget: null,
-    accessVerified: false,
-    accessClaimed: false,
-    homesOnRecord: 0,
-    homesAll: false,
-    hasMark: false,
-    reportEmails: false,
-    invoiceEmail: false,
-    creativeFolder: false,
-    previewsKept: 0,
-    adsDrafted: 0,
-    campaigns: 0,
-    audiences: 0,
-    lookalikes: 0,
-    pushed: false,
-    live: false,
-  });
-  const groups = template.groups.map((group) => {
-    const items = group.items.map((item) => {
+  const groups = LAUNCH_MILESTONES.map((group) => {
+    const items = group.items.map((item): ReadinessItem => {
+      if (item.observed) {
+        const seen = observe(item.id, facts);
+        return {
+          id: item.id,
+          label: item.label,
+          observed: true,
+          done: seen.done,
+          skipped: false,
+          dated: false,
+          detail: seen.detail,
+          action: seen.done ? null : item.action,
+        };
+      }
       const event = record.items[item.id as LaunchItem];
       const done = event?.checked ?? false;
+      const skipped = !done && event?.skipped === true;
+      const who =
+        event?.source === "workflow"
+          ? "Workflow"
+          : (event?.byName ??
+            (event?.source === "assistant" ? "Chat" : "Operator"));
       return {
-        ...item,
+        id: item.id,
+        label: item.label,
+        observed: false,
         done,
+        skipped,
+        dated: item.dated === true,
         detail: event
-          ? `${done ? "Completed" : "Reopened"} · ${event.source === "workflow" ? "Workflow" : (event.byName ?? (event.source === "assistant" ? "Chat" : "Operator"))} · ${event.at.slice(0, 10)}`
+          ? `${done ? "Completed" : skipped ? "Skipped" : "Reopened"} · ${who} · ${event.at.slice(0, 10)}`
           : "Not recorded",
         provenance: event
           ? `${event.source} · ${event.byName ?? event.by ?? "System"} · ${event.at}${event.evidence ? ` · ${event.evidence}` : ""}`
           : undefined,
-        action: done
-          ? null
-          : item.id === "homes"
-            ? { label: "Open homes", to: "homes" as const }
-            : item.action,
+        action: done || skipped ? null : item.action,
       };
     });
-    return { ...group, items, done: items.filter((item) => item.done).length };
+    return {
+      id: group.id,
+      label: group.label,
+      items,
+      done: items.filter((item) => item.done || item.skipped).length,
+      total: items.length,
+    };
   });
   return {
     groups,
     done: groups.reduce((sum, group) => sum + group.done, 0),
-    total: template.total,
+    total: groups.reduce((sum, group) => sum + group.total, 0),
   };
 }

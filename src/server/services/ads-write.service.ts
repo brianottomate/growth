@@ -1,7 +1,3 @@
-import {
-  recordLaunchChecklist,
-  completeLaunchMilestones,
-} from "./launch-checklist.service";
 import { applyMetaTrackingDefaults } from "@/lib/meta-tracking";
 import { metaTrackingDefaults } from "./meta-tracking-defaults";
 import { resolveMetaSchedule, metaScheduleIssue } from "@/lib/meta-schedule";
@@ -1579,13 +1575,6 @@ export async function createAdAudience(
       .returning();
   }
 
-  if (externalId)
-    await completeLaunchMilestones(
-      destination.brand.id,
-      ["audience"],
-      `Audience ${externalId}`,
-      `audience-created:${externalId}`,
-    );
   return {
     brand: destination.brand,
     adAccount: destination.adAccount,
@@ -1974,15 +1963,6 @@ export async function setCampaignDelivery(
       status: platformCampaignTable.status,
     });
 
-  await recordLaunchChecklist({
-    brandId: campaign.brandId,
-    orgId: context.organizationId,
-    patch: [{ item: "live", checked: input.status === "active" }],
-    source: "workflow",
-    by: null,
-    evidence: `Delivery ${campaign.id}: ${input.status}`,
-    receipt: `delivery:${context.runId}:${campaign.id}:${input.status}`,
-  });
   return { campaign: updated, provider };
 }
 
@@ -2482,13 +2462,6 @@ export async function pushDraftToPlatform(
   if (platform === "google_ads") return pushToGoogle(pushArgs);
   if (platform === "linkedin_ads") return pushToLinkedIn(pushArgs);
   const result = await pushToMeta(pushArgs);
-  if (!input.validateOnly)
-    await completeLaunchMilestones(
-      brand.id,
-      ["pushed"],
-      `Meta campaign ${campaign.id}`,
-      `meta-built:${draft.id}`,
-    );
   return result;
 }
 

@@ -1,5 +1,3 @@
-import { completeLaunchMilestones } from "./launch-checklist.service";
-import type { LaunchItem } from "@/lib/launch-checklist";
 import "server-only";
 
 import { and, eq, isNull, sql } from "drizzle-orm";
@@ -153,19 +151,6 @@ export async function setPerformanceSettings(input: {
     throw new PerformanceSettingsError(
       422,
       "Client settings changed while saving. Refresh and try again.",
-    );
-  const milestones: LaunchItem[] = [];
-  if ((input.patch.agreedAdSpend ?? 0) > 0) milestones.push("budget");
-  if (input.patch.reportEmails?.trim() && input.patch.invoiceEmail?.trim())
-    milestones.push("contacts");
-  if (input.patch.creativeDriveUrl) milestones.push("folder");
-  if (!input.client)
-    await completeLaunchMilestones(
-      brand.id,
-      milestones,
-      `Client settings: ${changed.join(", ")}`,
-      `settings:${next.updatedAt}`,
-      input.by,
     );
   return { settings: next, changed };
 }

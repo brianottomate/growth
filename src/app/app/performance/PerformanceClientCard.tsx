@@ -474,7 +474,7 @@ export function PerformanceClientCard({
           className="mt-3 space-y-3 border-t pt-3"
         >
           <div className="flex items-baseline justify-between gap-2 text-[11px] text-muted-foreground">
-            <span>Launch checklist · recorded</span>
+            <span>Onboarding checklist</span>
             <span className="whitespace-nowrap tabular-nums">
               {card.readiness.checklist.done}/{card.readiness.checklist.total}
             </span>

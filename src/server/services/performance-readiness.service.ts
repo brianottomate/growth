@@ -73,13 +73,24 @@ export async function loadBrandReadiness(
   const recordedRows = brandIds.length
     ? await db.query.brandTable.findMany({
         where: inArray(brandTable.id, brandIds),
-        columns: { id: true, performanceChecklist: true },
+        columns: {
+          id: true,
+          performanceChecklist: true,
+          wanderOsEnabled: true,
+          wanderOsWebsiteId: true,
+        },
       })
     : [];
   const records = new Map(
     recordedRows.map((row) => [
       row.id,
       row.performanceChecklist?.launch ?? emptyLaunchRecord(),
+    ]),
+  );
+  const connected = new Map(
+    recordedRows.map((row) => [
+      row.id,
+      Boolean(row.wanderOsEnabled && row.wanderOsWebsiteId),
     ]),
   );
 
@@ -123,11 +134,15 @@ export async function loadBrandReadiness(
   const out = new Map<string, BrandReadiness>();
   for (const brand of brands) {
     const record = records.get(brand.id) ?? emptyLaunchRecord();
+    const intake = brand.account
+      ? (intakeByAccount.get(brand.account.id) ?? null)
+      : null;
     out.set(brand.id, {
-      intake: brand.account
-        ? (intakeByAccount.get(brand.account.id) ?? null)
-        : null,
-      checklist: recordedLaunchChecklist(record),
+      intake,
+      checklist: recordedLaunchChecklist(record, {
+        intakeFiledAt: intake?.submittedAt ?? null,
+        wanderOsConnected: connected.get(brand.id) ?? false,
+      }),
       revision: record.revision,
     });
   }
@@ -142,9 +157,7 @@ export function readinessLinks(
   return {
     intake: brand.intakeUrl,
     connect: `/app/performance/clients/${slug}#submission`,
-    homes: `/app/performance/clients/${slug}/wanderos`,
-    draw: `/app/performance/clients/${slug}/ads`,
-    mark: `/app/performance/clients/${slug}/setup#brand-mark`,
-    ads: `/app/performance/clients/${slug}/campaigns`,
+    wanderos: `/app/performance/clients/${slug}/wanderos`,
+    finance: "/app/performance/finance",
   };
 }
