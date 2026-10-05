@@ -1,5 +1,16 @@
-import { brandForAssistant } from "./brand-output";
 import {
+  listSponsoredAbandonmentActionNativeResultSchema,
+  searchAttachableCampaignsActionNativeResultSchema,
+  updatePerformanceCycleActionNativeResultSchema,
+  openPerformanceCycleActionNativeResultSchema,
+  updatePerformancePropertyActionNativeResultSchema,
+  addPerformancePropertyActionNativeResultSchema,
+  updatePerformanceAccountActionNativeResultSchema,
+  createPerformanceAccountActionNativeResultSchema,
+  previewIntakeApplyActionNativeResultSchema,
+  listIntakesActionNativeResultSchema,
+  getPerformanceAccountActionNativeResultSchema,
+  listPerformanceAccountsActionNativeResultSchema,
   listPerformanceAccountsActionOutputSchema,
   getPerformanceAccountActionOutputSchema,
   listIntakesActionOutputSchema,
@@ -17,6 +28,9 @@ import {
   syncAdCampaignsActionOutputSchema,
   attachToPerformanceCycleActionOutputSchema,
 } from "./outputs/performance";
+
+import { brandForAssistant } from "./brand-output";
+
 import "server-only";
 import { appliedEvidenceSchema } from "@/lib/applied-evidence";
 
@@ -79,6 +93,7 @@ const actorFrom = (ctx: { orgId: string }): PerformanceActor => ({
 });
 
 export const listPerformanceAccountsAction = growthAction({
+  nativeOutputSchema: listPerformanceAccountsActionNativeResultSchema,
   outputSchema: listPerformanceAccountsActionOutputSchema,
   description:
     "List Performance accounts (the commercial record of each property manager paying Wander to run performance marketing for their homes) with their properties and recent billing cycles.",
@@ -87,6 +102,7 @@ export const listPerformanceAccountsAction = growthAction({
 });
 
 export const getPerformanceAccountAction = growthAction({
+  nativeOutputSchema: getPerformanceAccountActionNativeResultSchema,
   outputSchema: getPerformanceAccountActionOutputSchema,
   description:
     "Read one Performance account completely: contact, plan, the homes on the record, every billing cycle, report list, and the delivery attached to each cycle (campaigns, lifecycle campaigns, amplification targets).",
@@ -305,6 +321,7 @@ export const clientCampaignContextAction = growthAction({
 });
 
 export const listIntakesAction = growthAction({
+  nativeOutputSchema: listIntakesActionNativeResultSchema,
   outputSchema: listIntakesActionOutputSchema,
   description:
     "List Performance onboarding submissions in the authenticated workspace, newest first: what they answered, the budget they agreed to, whether it has been applied, and whether their ad access has been verified. Supply accountId to list one account, or omit it to list all accounts in the workspace.",
@@ -315,6 +332,7 @@ export const listIntakesAction = growthAction({
 });
 
 export const previewIntakeApplyAction = growthAction({
+  nativeOutputSchema: previewIntakeApplyActionNativeResultSchema,
   outputSchema: previewIntakeApplyActionOutputSchema,
   description:
     "Show exactly what applying an intake would write: the billing period and budget, the homes that become the brand's Client’s picks group (made primary, beside our Featured homes suggestion), which commercial property rows are new, and anything blocking it. Read-only. Always call this before applyIntake and show the operator the result.",
@@ -380,6 +398,7 @@ export const promoteToClientAction = growthAction({
 });
 
 export const createPerformanceAccountAction = growthAction({
+  nativeOutputSchema: createPerformanceAccountActionNativeResultSchema,
   outputSchema: createPerformanceAccountActionOutputSchema,
   description:
     "Onboard a performance customer. Commercial record only — payment is handled offline; link a brand row separately if their scraped identity exists.",
@@ -388,6 +407,7 @@ export const createPerformanceAccountAction = growthAction({
 });
 
 export const updatePerformanceAccountAction = growthAction({
+  nativeOutputSchema: updatePerformanceAccountActionNativeResultSchema,
   outputSchema: updatePerformanceAccountActionOutputSchema,
   description:
     "Update a performance account's contact, plan, status, brand link, or notes.",
@@ -396,6 +416,7 @@ export const updatePerformanceAccountAction = growthAction({
 });
 
 export const addPerformancePropertyAction = growthAction({
+  nativeOutputSchema: addPerformancePropertyActionNativeResultSchema,
   outputSchema: addPerformancePropertyActionOutputSchema,
   description:
     "Add one of the client's homes to a Performance account. The monolith propertyId can be backfilled later; rows without it have no booking attribution yet.",
@@ -404,6 +425,7 @@ export const addPerformancePropertyAction = growthAction({
 });
 
 export const updatePerformancePropertyAction = growthAction({
+  nativeOutputSchema: updatePerformancePropertyActionNativeResultSchema,
   outputSchema: updatePerformancePropertyActionOutputSchema,
   description:
     "Update a home's title, notes, or backfill its monolith property id (the booking-attribution join key).",
@@ -412,6 +434,7 @@ export const updatePerformancePropertyAction = growthAction({
 });
 
 export const openPerformanceCycleAction = growthAction({
+  nativeOutputSchema: openPerformanceCycleActionNativeResultSchema,
   outputSchema: openPerformanceCycleActionOutputSchema,
   description:
     "Open a billing cycle (YYYY-MM, unique per account). Record billedAmount and mediaBudget separately — reports must be honest about which number spend is measured against.",
@@ -420,6 +443,7 @@ export const openPerformanceCycleAction = growthAction({
 });
 
 export const updatePerformanceCycleAction = growthAction({
+  nativeOutputSchema: updatePerformanceCycleActionNativeResultSchema,
   outputSchema: updatePerformanceCycleActionOutputSchema,
   description:
     "Update a cycle's status (planned → live → reporting → closed), amounts, dates, or notes.",
@@ -428,6 +452,7 @@ export const updatePerformanceCycleAction = growthAction({
 });
 
 export const searchAttachableCampaignsAction = growthAction({
+  nativeOutputSchema: searchAttachableCampaignsActionNativeResultSchema,
   outputSchema: searchAttachableCampaignsActionOutputSchema,
   description:
     "Find platform ad campaigns that are not yet attached to any performance cycle, newest first. Use this before attaching so the campaign is chosen by id rather than guessed from its name.",
@@ -445,6 +470,7 @@ export const refreshPerformanceCycleSpendAction = growthAction({
 });
 
 export const listSponsoredAbandonmentAction = growthAction({
+  nativeOutputSchema: listSponsoredAbandonmentActionNativeResultSchema,
   outputSchema: listSponsoredAbandonmentActionOutputSchema,
   description:
     "Guests who abandoned checkout (or wishlisted) on a Performance client's homes, hottest first. Joined on the listing id the tracked event carries, never on property name. Use this to answer what a customer's boosted homes produced and to hand BDRs a follow-up list. Read-only; it does not contact anyone.",

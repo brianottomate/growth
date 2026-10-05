@@ -1,3 +1,4 @@
+import type { BrandListResult, GetBrandOutput } from "./outputs/brands";
 import {
   listBrandsOutputSchema,
   getBrandOutputSchema,
@@ -62,7 +63,7 @@ export const listBrands = growthAction({
   inputSchema: z.object({
     query: z.string().trim().min(1).max(200).optional(),
   }),
-  execute: async (input, ctx) => {
+  execute: async (input, ctx): Promise<BrandListResult> => {
     // Search literal text; operator input is not an SQL wildcard expression.
     const pattern = input.query
       ? `%${input.query.replace(/[\\%_]/g, "\\$&")}%`
@@ -97,7 +98,7 @@ export const getBrand = growthAction({
   description:
     "Read one brand by its known id, especially the focused brand. Returns current website, identity summary, story, and Performance settings including recorded journey, card statuses and note. Read before targeted edits and again to verify them. No organization-wide list is needed when the brand id is known. Missing recorded facts do not imply unpaid or unstarted work.",
   inputSchema: z.object({ brandId: z.string().trim().min(1) }),
-  execute: async (input, ctx) => {
+  execute: async (input, ctx): Promise<GetBrandOutput> => {
     const brand = await db.query.brandTable.findFirst({
       where: and(
         eq(brandTable.id, input.brandId),

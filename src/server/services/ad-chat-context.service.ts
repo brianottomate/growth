@@ -1,3 +1,4 @@
+import type { IdeaContextResult } from "@/server/ai/capabilities/outputs/ads";
 import "server-only";
 import { performanceCopyNotes } from "./performance-copy-notes.service";
 import { listingCopyContext } from "./listing-copy-context.service";
@@ -25,7 +26,7 @@ export async function adChatContext(input: {
   organizationId: string;
   campaignId?: string;
   adId: string;
-}) {
+}): Promise<IdeaContextResult> {
   const ad = await db.query.adTable.findFirst({
     where: eq(adTable.id, input.adId),
   });

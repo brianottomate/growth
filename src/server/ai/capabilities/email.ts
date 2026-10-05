@@ -1,4 +1,5 @@
 import {
+  getEmailDraftNativeResultSchema,
   getEmailDraftOutputSchema,
   createEmailSlotOutputSchema,
   createDigestFromRowOutputSchema,
@@ -9,6 +10,7 @@ import {
   generateEmailDraftOutputSchema,
   deleteEmailDraftOutputSchema,
 } from "./outputs/email";
+
 import "server-only";
 
 import { waitUntil } from "@vercel/functions";
@@ -42,6 +44,7 @@ import {
 import { growthAction, GrowthActionError } from "./types";
 
 export const getEmailDraft = growthAction({
+  nativeOutputSchema: getEmailDraftNativeResultSchema,
   outputSchema: getEmailDraftOutputSchema,
   description:
     "Read the canonical subject, Markdown body, CTA, revisions, planning context, and latest generation job for one owned newsletter issue or blast. Use this when the conversation is about a specific email slot; do not treat platform_post.text as the email body.",

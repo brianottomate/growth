@@ -86,3 +86,9 @@ export const notifyAmplificationOutputSchema = z.union([
     status: z.literal("sent"),
   }),
 ]);
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const notifyAmplificationNativeResultSchema = z.union([
+  notifyAmplificationOutputSchema.options[0],
+  notifyAmplificationOutputSchema.options[1].extend({ notifiedAt: z.date() }),
+]);

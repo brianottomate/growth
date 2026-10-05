@@ -20,7 +20,10 @@ export const workspaceOverview = growthTool({
   description:
     "One-shot snapshot of the whole growth workspace: brand count, content pipeline by status, how many posts await a human, leads headline numbers, and the count of engage-worthy social mentions. Call this FIRST for broad 'give me an overview / what's going on / catch me up' questions, then drill in with the more specific tools.",
   inputSchema: z.object({ action: z.literal("overview") }),
-  execute: async ({ action }, ctx) => {
+  execute: async (
+    { action },
+    ctx,
+  ): Promise<z.output<typeof workspaceOverviewOutputSchema>> => {
     const [brands, content, needsAttention, leads, engage] = await Promise.all([
       listBrands.run({}, ctx),
       contentPipelineSummary.run({}, ctx),

@@ -1,10 +1,12 @@
 import {
+  notifyAmplificationNativeResultSchema,
   listAmplifiersOutputSchema,
   requestAmplificationOutputSchema,
   notifyAmplificationOutputSchema,
   savedAmplifierOutputSchema,
   amplificationTargetsOutputSchema,
 } from "./outputs/amplification";
+
 import "server-only";
 import {
   amplificationPlatformSchema,
@@ -571,6 +573,7 @@ export const readAmplificationTargets = growthAction({
 });
 
 export const notifyAmplification = growthAction({
+  nativeOutputSchema: notifyAmplificationNativeResultSchema,
   outputSchema: notifyAmplificationOutputSchema,
   description:
     "Send one planned amplification request to the configured Slack channel and tag the amplifier by stored Slack member ID. This is an external message and requires explicit approval. Idempotent after Slack returns a persisted message receipt.",

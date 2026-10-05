@@ -1,3 +1,4 @@
+import type { DraftAdPreviewResult } from "@/server/contracts/ad-tool-output";
 import { applyMetaTrackingDefaults } from "@/lib/meta-tracking";
 import { metaTrackingDefaults } from "./meta-tracking-defaults";
 import { resolveMetaSchedule, metaScheduleIssue } from "@/lib/meta-schedule";
@@ -1719,8 +1720,8 @@ export function googlePauseOutcome(
  */
 export function extractPreviewFrames(
   payload: unknown,
-): Array<{ iframe: string; src: string | null }> {
-  const found: Array<{ iframe: string; src: string | null }> = [];
+): DraftAdPreviewResult["previews"] {
+  const found: DraftAdPreviewResult["previews"] = [];
   const walk = (value: unknown) => {
     if (typeof value === "string") {
       if (value.includes("<iframe")) {
@@ -1775,7 +1776,7 @@ export async function previewDraftAd(
     formats?: string[];
   },
   context: AdsWriteContext,
-) {
+): Promise<DraftAdPreviewResult> {
   const owner = await db.query.adTable.findFirst({
     where: eq(adTable.id, input.adId),
     columns: { brandId: true },

@@ -27,3 +27,13 @@ export const recentMentionsOutputSchema = z.strictObject({
     }),
   ),
 });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const recentMentionsNativeResultSchema =
+  recentMentionsOutputSchema.extend({
+    mentions: z.array(
+      recentMentionsOutputSchema.shape.mentions.element.extend({
+        receivedAt: z.date(),
+      }),
+    ),
+  });

@@ -1,9 +1,9 @@
+import { performanceSettingsSchema } from "./brands";
 import { brandPageSnapshotSchema } from "@/lib/brand-website-content";
 import {
   brandEmailDeliverySchema,
   brandEmailSenderSchema,
   brandLegalIdentitySchema,
-  metaReportingConversionsSchema,
 } from "./shared";
 import { performanceCycleStatusEnum } from "@/server/db/performance-schema";
 import { performanceAccountStatusEnum } from "@/server/db/performance-schema";
@@ -100,15 +100,6 @@ const accountSchema = z.strictObject({
   updatedAt: z.iso.datetime(),
   website: z.string().nullable(),
 });
-
-const buttonPrimarySchema = z
-  .strictObject({
-    background: z.string().optional(),
-    borderColor: z.string().optional(),
-    borderRadius: z.string().optional(),
-    textColor: z.string().optional(),
-  })
-  .catchall(z.string().optional());
 
 const createPerformanceAccountSchema = z.strictObject({
   account: accountSchema,
@@ -399,184 +390,7 @@ export const previewIntakeApplyActionOutputSchema = z.strictObject({
                 tone: z.string(),
               })
               .optional(),
-            raw: z
-              .strictObject({
-                animations: z
-                  .strictObject({
-                    easing: z.string().optional(),
-                    transitionDuration: z.string().optional(),
-                  })
-                  .catchall(z.string().optional())
-                  .optional(),
-                brandName: z.string().optional(),
-                colors: z
-                  .strictObject({
-                    accent: z.string().optional(),
-                    background: z.string().optional(),
-                    error: z.string().optional(),
-                    link: z.string().optional(),
-                    primary: z.string().optional(),
-                    secondary: z.string().optional(),
-                    success: z.string().optional(),
-                    textPrimary: z.string().optional(),
-                    textSecondary: z.string().optional(),
-                    warning: z.string().optional(),
-                  })
-                  .catchall(z.string().optional())
-                  .optional(),
-                colorScheme: z.enum(["dark", "light"]).optional(),
-                components: z
-                  .strictObject({
-                    buttonPrimary: buttonPrimarySchema.optional(),
-                    buttonSecondary: buttonPrimarySchema.optional(),
-                    input: z
-                      .strictObject({
-                        borderColor: z.string().optional(),
-                        borderRadius: z.string().optional(),
-                        focusBorderColor: z.string().optional(),
-                      })
-                      .catchall(z.string().optional())
-                      .optional(),
-                  })
-                  .catchall(jsonValueSchema)
-                  .optional(),
-                fonts: z
-                  .array(
-                    z
-                      .strictObject({ family: z.string() })
-                      .catchall(jsonValueSchema),
-                  )
-                  .optional(),
-                icons: z
-                  .strictObject({
-                    primaryColor: z.string().optional(),
-                    style: z.string().optional(),
-                  })
-                  .catchall(z.string().optional())
-                  .optional(),
-                images: z
-                  .strictObject({
-                    favicon: z.string().nullable().optional(),
-                    logo: z.string().nullable().optional(),
-                    ogImage: z.string().nullable().optional(),
-                  })
-                  .catchall(z.string().nullable().optional())
-                  .optional(),
-                layout: z
-                  .strictObject({
-                    footerHeight: z.string().optional(),
-                    grid: z
-                      .strictObject({
-                        columns: z.number().optional(),
-                        maxWidth: z.string().optional(),
-                      })
-                      .catchall(z.union([z.string(), z.number()]).optional())
-                      .optional(),
-                    headerHeight: z.string().optional(),
-                  })
-                  .catchall(
-                    z
-                      .union([
-                        z.string(),
-                        z.number(),
-                        z.record(
-                          z.string(),
-                          z.union([z.string(), z.number()]).optional(),
-                        ),
-                      ])
-                      .optional(),
-                  )
-                  .optional(),
-                logo: z.string().nullable().optional(),
-                personality: z
-                  .strictObject({
-                    energy: z.enum(["high", "medium", "low"]),
-                    targetAudience: z.string(),
-                    tone: z.enum([
-                      "bold",
-                      "professional",
-                      "playful",
-                      "modern",
-                      "traditional",
-                      "minimalist",
-                    ]),
-                  })
-                  .optional(),
-                spacing: z
-                  .strictObject({
-                    baseUnit: z.number().optional(),
-                    borderRadius: z.string().optional(),
-                    gridGutter: z.number().optional(),
-                    margins: z.record(z.string(), z.number()).optional(),
-                    padding: z.record(z.string(), z.number()).optional(),
-                  })
-                  .catchall(
-                    z
-                      .union([
-                        z.string(),
-                        z.number(),
-                        z.record(z.string(), z.number()),
-                      ])
-                      .optional(),
-                  )
-                  .optional(),
-                tone: z
-                  .strictObject({
-                    emojiUsage: z.string().optional(),
-                    voice: z.string().optional(),
-                  })
-                  .catchall(z.string().optional())
-                  .optional(),
-                typography: z
-                  .strictObject({
-                    fontFamilies: z
-                      .strictObject({
-                        code: z.string().optional(),
-                        heading: z.string().optional(),
-                        primary: z.string().optional(),
-                      })
-                      .catchall(z.string().optional())
-                      .optional(),
-                    fontSizes: z
-                      .strictObject({
-                        body: z.string().optional(),
-                        h1: z.string().optional(),
-                        h2: z.string().optional(),
-                        h3: z.string().optional(),
-                        small: z.string().optional(),
-                      })
-                      .catchall(z.string().optional())
-                      .optional(),
-                    fontStacks: z
-                      .strictObject({
-                        body: z.array(z.string()).optional(),
-                        heading: z.array(z.string()).optional(),
-                        paragraph: z.array(z.string()).optional(),
-                        primary: z.array(z.string()).optional(),
-                      })
-                      .catchall(z.array(z.string()).optional())
-                      .optional(),
-                    fontWeights: z
-                      .strictObject({
-                        bold: z.number().optional(),
-                        light: z.number().optional(),
-                        medium: z.number().optional(),
-                        regular: z.number().optional(),
-                      })
-                      .catchall(z.number().optional())
-                      .optional(),
-                    lineHeights: z
-                      .strictObject({
-                        body: z.number().optional(),
-                        heading: z.number().optional(),
-                      })
-                      .catchall(z.number().optional())
-                      .optional(),
-                  })
-                  .optional(),
-              })
-              .catchall(jsonValueSchema)
-              .optional(),
+            raw: jsonValueSchema.optional(),
           })
           .nullable(),
         brandListeningStory: z
@@ -711,76 +525,7 @@ export const previewIntakeApplyActionOutputSchema = z.strictObject({
               .optional(),
           })
           .nullable(),
-        performanceSettings: z
-          .strictObject({
-            adCopiesUrl: z.string().nullable().optional(),
-            adsConnectionBrandId: z.string().optional(),
-            bookings: z.number().nullable().optional(),
-            carouselCreativeUrl: z.string().nullable().optional(),
-            catalogCreativeUrl: z.string().nullable().optional(),
-            creativeDriveUrl: z.string().nullable().optional(),
-            dedicatedNewsletter: z.string().nullable().optional(),
-            guestListDriveUrl: z.string().nullable().optional(),
-            heroCreativeUrl: z.string().nullable().optional(),
-            homeInventory: z
-              .strictObject({
-                addressesFetchedAt: z.string().optional(),
-                enrichmentError: z.string().optional(),
-                homes: z.array(
-                  z.strictObject({
-                    bathrooms: z.number().nullable().optional(),
-                    bedrooms: z.number().nullable().optional(),
-                    city: z.string().nullable().optional(),
-                    country: z.string().nullable().optional(),
-                    gallery: z
-                      .array(
-                        z.strictObject({
-                          thumbUrl: z.string(),
-                          url: z.string(),
-                          room: z.string().nullable().optional(),
-                        }),
-                      )
-                      .optional(),
-                    guests: z.number().nullable().optional(),
-                    id: z.string(),
-                    imageUrl: z.string().nullable().optional(),
-                    latitude: z.number().nullable().optional(),
-                    longitude: z.number().nullable().optional(),
-                    name: z.string(),
-                    nightlyFrom: z.number().nullable().optional(),
-                    postalCode: z.string().nullable().optional(),
-                    rating: z.number().optional(),
-                    state: z.string().nullable().optional(),
-                    streetAddress: z.string().nullable().optional(),
-                    streetAddress2: z.string().nullable().optional(),
-                    streetAddress3: z.string().nullable().optional(),
-                    thumbUrl: z.string().optional(),
-                    url: z.string(),
-                  }),
-                ),
-                syncedAt: z.string(),
-              })
-              .optional(),
-            influencer: z.string().nullable().optional(),
-            invoiceEmail: z.string().nullable().optional(),
-            metaTrackingDefaults: z
-              .record(
-                z.string(),
-                z.strictObject({
-                  customEventType: z.string(),
-                  pixelId: z.string(),
-                }),
-              )
-              .optional(),
-            metaReportingConversions: metaReportingConversionsSchema,
-            reportEmails: z.string().nullable().optional(),
-            socialMediaPosts: z.string().nullable().optional(),
-            ugcPermission: z.string().nullable().optional(),
-            updatedAt: z.string().optional(),
-            updatedBy: z.string().nullable().optional(),
-            updatedFrom: z.enum(["agent", "intake", "operator"]).optional(),
-          })
-          .nullable(),
+        performanceSettings: performanceSettingsSchema.nullable(),
         previewSourceUrl: z.string().nullable(),
         relationship: z.enum(brandRelationshipEnum.enumValues),
         slug: z.string().nullable(),
@@ -979,3 +724,202 @@ export const attachToPerformanceCycleActionOutputSchema = z.union([
     previousCycleId: z.string().nullable(),
   }),
 ]);
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const listPerformanceAccountsActionNativeResultSchema =
+  listPerformanceAccountsActionOutputSchema.extend({
+    accounts: z.array(
+      listPerformanceAccountsActionOutputSchema.shape.accounts.element.extend({
+        createdAt: z.date(),
+        currentCycle:
+          listPerformanceAccountsActionOutputSchema.shape.accounts.element.shape.currentCycle
+            .unwrap()
+            .extend({ actualSpendAt: z.date().nullable() })
+            .nullable(),
+        cycles: z.array(
+          listPerformanceAccountsActionOutputSchema.shape.accounts.element.shape.cycles.element.extend(
+            { actualSpendAt: z.date().nullable() },
+          ),
+        ),
+        deletedAt: z.date().nullable(),
+        signedAt: z.date().nullable(),
+        updatedAt: z.date(),
+      }),
+    ),
+  });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const getPerformanceAccountActionNativeResultSchema =
+  getPerformanceAccountActionOutputSchema.extend({
+    account: getPerformanceAccountActionOutputSchema.shape.account.extend({
+      createdAt: z.date(),
+      cycles: z.array(
+        getPerformanceAccountActionOutputSchema.shape.account.shape.cycles.element.extend(
+          {
+            actualSpendAt: z.date().nullable(),
+            createdAt: z.date(),
+            endAt: z.date().nullable(),
+            feePaidAt: z.date().nullable(),
+            mediaPaidAt: z.date().nullable(),
+            startAt: z.date().nullable(),
+            updatedAt: z.date(),
+          },
+        ),
+      ),
+      deletedAt: z.date().nullable(),
+      properties: z.array(
+        getPerformanceAccountActionOutputSchema.shape.account.shape.properties.element.extend(
+          {
+            createdAt: z.date(),
+            deletedAt: z.date().nullable(),
+            updatedAt: z.date(),
+          },
+        ),
+      ),
+      reports: z.array(
+        getPerformanceAccountActionOutputSchema.shape.account.shape.reports.element.extend(
+          { publishedAt: z.date().nullable() },
+        ),
+      ),
+      signedAt: z.date().nullable(),
+      updatedAt: z.date(),
+    }),
+  });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const listIntakesActionNativeResultSchema = z.array(
+  listIntakesActionOutputSchema.element.extend({
+    accessClaimedAt: z.date().nullable(),
+    answers: listIntakesActionOutputSchema.element.shape.answers.catchall(
+      z.unknown(),
+    ),
+    appliedAt: z.date().nullable(),
+    billingAcknowledgedAt: z.date().nullable(),
+    createdAt: z.date(),
+    guestListConsentAt: z.date().nullable(),
+    instagramLinkConfirmedAt: z.date().nullable(),
+    submittedAt: z.date(),
+    updatedAt: z.date(),
+    zernioVerifiedAt: z.date().nullable(),
+  }),
+);
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const previewIntakeApplyActionNativeResultSchema =
+  previewIntakeApplyActionOutputSchema.extend({
+    intake: previewIntakeApplyActionOutputSchema.shape.intake.extend({
+      accessClaimedAt: z.date().nullable(),
+      account:
+        previewIntakeApplyActionOutputSchema.shape.intake.shape.account.extend({
+          createdAt: z.date(),
+          deletedAt: z.date().nullable(),
+          signedAt: z.date().nullable(),
+          updatedAt: z.date(),
+        }),
+      answers:
+        previewIntakeApplyActionOutputSchema.shape.intake.shape.answers.catchall(
+          z.unknown(),
+        ),
+      appliedAt: z.date().nullable(),
+      billingAcknowledgedAt: z.date().nullable(),
+      brand: previewIntakeApplyActionOutputSchema.shape.intake.shape.brand
+        .unwrap()
+        .extend({
+          brandIdentity:
+            previewIntakeApplyActionOutputSchema.shape.intake.shape.brand
+              .unwrap()
+              .shape.brandIdentity.unwrap()
+              .extend({
+                raw: z.unknown().optional(),
+              })
+              .nullable(),
+          businessStageAt: z.date().nullable(),
+          createdAt: z.date(),
+          deletedAt: z.date().nullable(),
+          deliveryStageAt: z.date().nullable(),
+          industryResearch:
+            previewIntakeApplyActionOutputSchema.shape.intake.shape.brand
+              .unwrap()
+              .shape.industryResearch.unwrap()
+              .catchall(z.unknown())
+              .nullable(),
+          lastAccessCheckAt: z.date().nullable(),
+          updatedAt: z.date(),
+          wanderOsCheckedAt: z.date().nullable(),
+        })
+        .nullable(),
+      createdAt: z.date(),
+      guestListConsentAt: z.date().nullable(),
+      instagramLinkConfirmedAt: z.date().nullable(),
+      submittedAt: z.date(),
+      updatedAt: z.date(),
+      zernioVerifiedAt: z.date().nullable(),
+    }),
+  });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const createPerformanceAccountActionNativeResultSchema =
+  createPerformanceAccountActionOutputSchema.extend({
+    account: createPerformanceAccountActionOutputSchema.shape.account.extend({
+      createdAt: z.date(),
+      deletedAt: z.date().nullable(),
+      signedAt: z.date().nullable(),
+      updatedAt: z.date(),
+    }),
+  });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const updatePerformanceAccountActionNativeResultSchema =
+  createPerformanceAccountActionNativeResultSchema;
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const addPerformancePropertyActionNativeResultSchema =
+  addPerformancePropertyActionOutputSchema.extend({
+    property: addPerformancePropertyActionOutputSchema.shape.property.extend({
+      createdAt: z.date(),
+      deletedAt: z.date().nullable(),
+      updatedAt: z.date(),
+    }),
+  });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const updatePerformancePropertyActionNativeResultSchema =
+  addPerformancePropertyActionNativeResultSchema;
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const openPerformanceCycleActionNativeResultSchema =
+  openPerformanceCycleActionOutputSchema.extend({
+    cycle: openPerformanceCycleActionOutputSchema.shape.cycle.extend({
+      actualSpendAt: z.date().nullable(),
+      createdAt: z.date(),
+      endAt: z.date().nullable(),
+      feePaidAt: z.date().nullable(),
+      mediaPaidAt: z.date().nullable(),
+      startAt: z.date().nullable(),
+      updatedAt: z.date(),
+    }),
+  });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const updatePerformanceCycleActionNativeResultSchema =
+  openPerformanceCycleActionNativeResultSchema;
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const searchAttachableCampaignsActionNativeResultSchema =
+  searchAttachableCampaignsActionOutputSchema.extend({
+    campaigns: z.array(
+      searchAttachableCampaignsActionOutputSchema.shape.campaigns.element.extend(
+        { startAt: z.date().nullable() },
+      ),
+    ),
+  });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const listSponsoredAbandonmentActionNativeResultSchema =
+  listSponsoredAbandonmentActionOutputSchema.extend({
+    events: z.array(
+      listSponsoredAbandonmentActionOutputSchema.shape.events.element.extend({
+        abandonedAt: z.date().nullable(),
+      }),
+    ),
+  });

@@ -1,3 +1,5 @@
+import type { AdsScopeResult } from "@/server/contracts/ad-tool-output";
+export type { AdsScopeResult } from "@/server/contracts/ad-tool-output";
 import "server-only";
 
 import { and, eq, isNull } from "drizzle-orm";
@@ -223,15 +225,7 @@ function passesStatus(ad: FlatAd, filter: AdsStatusFilter): boolean {
 
 // ---- AGGREGATE (scope) -----------------------------------------------------
 
-type Bucket = {
-  key: string;
-  ads: number;
-  impressions: number;
-  clicks: number;
-  engagement: number;
-  spend: number;
-  ctr: number;
-};
+type Bucket = AdsScopeResult["byDestination"][number];
 
 function bucketBy(ads: FlatAd[], keyFn: (a: FlatAd) => string): Bucket[] {
   const map = new Map<string, Omit<Bucket, "ctr">>();
@@ -256,32 +250,6 @@ function bucketBy(ads: FlatAd[], keyFn: (a: FlatAd) => string): Bucket[] {
     .map((e) => ({ ...e, ctr: e.impressions ? e.clicks / e.impressions : 0 }))
     .sort((a, b) => b.impressions - a.impressions);
 }
-
-export type AdsScopeResult = {
-  brand: { id: string; slug: string; name: string };
-  window: { fromDate: string; toDate: string };
-  account: { id?: string; name?: string };
-  totals: {
-    ads: number; // delivered (impressions > 0)
-    allAds: number;
-    impressions: number;
-    clicks: number;
-    ctr: number;
-    spend: number;
-    engagement: number;
-    conversions: number;
-  };
-  byMonth: {
-    month: string;
-    ads: number;
-    impressions: number;
-    clicks: number;
-    spend: number;
-  }[];
-  byObjective: Bucket[];
-  byDestination: Bucket[];
-  flags: { hasAuditAds: boolean; hasOsAds: boolean };
-};
 
 export async function computeAdsScope(input: {
   organizationId: string;

@@ -9,11 +9,7 @@ import {
 } from "./compositions";
 import { homeCatalogCopy, place, ratingOutOfFive } from "./home-ad-previews";
 import { marketOf, type BrandMarkets } from "./markets";
-import {
-  hotelFeedRows,
-  type HotelFeedHome,
-  type HotelFeedRow,
-} from "./meta-hotel-feed";
+import { hotelFeedRows, type HotelFeedHome } from "./meta-hotel-feed";
 
 export const catalogCardSchema = z.object({
   homeId: z.string().min(1),
@@ -83,29 +79,56 @@ export type CatalogHome = HotelFeedHome & {
   thumbUrl?: string;
   gallery?: { url: string; thumbUrl: string; room?: string | null }[];
 };
-export type CatalogExport = {
-  id: string;
-  status: string;
-  createdAt: string;
-  error: string | null;
-  folderId?: string;
-  completed?: number;
-  total?: number;
-  assets?: {
-    homeId: string;
-    name: string;
-    assetId: string;
-    url: string;
-    format: string;
-    /** What the image was drawn from; an unchanged card reuses it. */
-    renderKey?: string;
-    /** Copied from the previous export rather than drawn again. */
-    reused?: boolean;
-  }[];
-  rows?: HotelFeedRow[];
-  /** What the export's cards are: "Supplied artwork", "Catalog · destination". */
-  label?: string;
-};
+export const catalogExportSchema = z.strictObject({
+  id: z.string(),
+  status: z.string(),
+  createdAt: z.string(),
+  error: z.string().nullable(),
+  primaryFormat: compositionFormatIdSchema.optional(),
+  folderId: z.string().optional(),
+  completed: z.number().optional(),
+  total: z.number().optional(),
+  assets: z
+    .array(
+      z.strictObject({
+        homeId: z.string(),
+        name: z.string(),
+        assetId: z.string(),
+        url: z.string(),
+        format: z.string(),
+        renderKey: z.string().optional(),
+        reused: z.boolean().optional(),
+      }),
+    )
+    .optional(),
+  rows: z
+    .array(
+      z.strictObject({
+        streetAddress: z.string().nullable().optional(),
+        streetAddress2: z.string().nullable().optional(),
+        streetAddress3: z.string().nullable().optional(),
+        postalCode: z.string().nullable().optional(),
+        latitude: z.number().nullable().optional(),
+        longitude: z.number().nullable().optional(),
+        id: z.string(),
+        brand: z.string(),
+        description: z.string(),
+        title: z.string(),
+        link: z.string(),
+        imageUrl: z.string(),
+        city: z.string(),
+        region: z.string(),
+        country: z.string(),
+        price: z.string(),
+        bedrooms: z.number().nullable(),
+        guests: z.number().nullable(),
+      }),
+    )
+    .optional(),
+  label: z.string().optional(),
+});
+
+export type CatalogExport = z.output<typeof catalogExportSchema>;
 /**
  * The headline a card carries until someone writes a better one. Plain and
  * never wrong on purpose: a real headline comes from the listing, written by

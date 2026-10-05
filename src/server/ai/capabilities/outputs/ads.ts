@@ -1,3 +1,8 @@
+export {
+  adsScopeOutputSchema,
+  previewAdActionOutputSchema,
+  listCampaignsActionOutputSchema,
+} from "@/server/contracts/ad-tool-output";
 import {
   ideaCopySchema,
   ideaDocumentSchema,
@@ -23,16 +28,6 @@ import { z } from "zod";
 import { jsonValueSchema } from "../../kernel/output";
 
 /** Wire results for this capability. Dates are ISO strings after JSON normalization. */
-const byDestinationItemSchema = z.strictObject({
-  ads: z.number(),
-  clicks: z.number(),
-  ctr: z.number(),
-  engagement: z.number(),
-  impressions: z.number(),
-  key: z.string(),
-  spend: z.number(),
-});
-
 const creativePoolItemSchema = z.strictObject({
   assetId: z.string().optional(),
   derivedFrom: z.string().optional(),
@@ -233,25 +228,7 @@ const portraitSchema = z.strictObject({
   imagePosition: compositionImagePositionSchema,
   showLogo: z.boolean(),
   subtitle: z.string(),
-  templateId: z.enum([
-    "photo-only",
-    "catalog-copy",
-    "catalog-place",
-    "catalog-place-plain",
-    "catalog-amenities",
-    "catalog-amenities-place",
-    "catalog-destination",
-    "catalog-headline",
-    "catalog-review",
-    "tall-statement",
-    "tall-welcome",
-    "hero-overlay",
-    "image-hero",
-    "split-frame",
-    "editorial-overlay",
-    "product-proof",
-    "brand-statement",
-  ]),
+  templateId: compositionTemplateIdSchema,
   title: z.string(),
 });
 
@@ -300,6 +277,7 @@ const copyOverridesSchema = z.strictObject({
       callToAction: z.string(),
       headline: z.string(),
       description: z.string().optional(),
+      bookingTargetId: z.string().nullable().optional(),
       linkUrl: z.string(),
     })
     .optional(),
@@ -309,6 +287,7 @@ const copyOverridesSchema = z.strictObject({
       callToAction: z.string(),
       headline: z.string(),
       description: z.string().optional(),
+      bookingTargetId: z.string().nullable().optional(),
       linkUrl: z.string(),
     })
     .optional(),
@@ -318,6 +297,7 @@ const copyOverridesSchema = z.strictObject({
       callToAction: z.string(),
       headline: z.string(),
       description: z.string().optional(),
+      bookingTargetId: z.string().nullable().optional(),
       linkUrl: z.string(),
     })
     .optional(),
@@ -327,6 +307,7 @@ const copyOverridesSchema = z.strictObject({
       callToAction: z.string(),
       headline: z.string(),
       description: z.string().optional(),
+      bookingTargetId: z.string().nullable().optional(),
       linkUrl: z.string(),
     })
     .optional(),
@@ -339,6 +320,7 @@ const documentSchema = z.strictObject({
     callToAction: z.string(),
     headline: z.string(),
     description: z.string().optional(),
+    bookingTargetId: z.string().nullable().optional(),
     linkUrl: z.string(),
   }),
   copyOverrides: copyOverridesSchema,
@@ -416,6 +398,8 @@ const metaImportSchema = z.strictObject({
 
 const contentSchema = z.strictObject({
   body: z.string(),
+  bookingTargetId: z.string().nullable().optional(),
+  description: z.string().optional(),
   callToAction: z.string().optional(),
   format: z
     .enum(["video", "carousel", "static", "portfolio", "catalog"])
@@ -431,6 +415,8 @@ const contentSchema = z.strictObject({
 
 const copySchema = z.strictObject({
   body: z.string().optional(),
+  bookingTargetId: z.string().nullable().optional(),
+  description: z.string().optional(),
   callToAction: z.string().optional(),
   headline: z.string().optional(),
   linkUrl: z.string().optional(),
@@ -448,11 +434,38 @@ const placementsValueSchema = z.strictObject({
 
 const placementsSchema = z.record(z.string(), placementsValueSchema);
 
-const draftAdSchema = z.strictObject({
+export const draftAdResultSchema = z.strictObject({
   bookingTargetId: z.string().nullable(),
   brandId: z.string(),
   businessKey: z.string().nullable(),
   campaignId: z.string().nullable(),
+  content: z.union([
+    contentSchema.extend({
+      // Provider snapshots stay unknown natively; wire validation checks JSON values.
+      metaImport: metaImportSchema
+        .extend({
+          rawCreative: z.record(z.string(), z.unknown()),
+        })
+        .optional(),
+    }),
+    z.strictObject({
+      descriptions: z.array(z.string()),
+      headlines: z.array(z.string()),
+      linkUrl: z.string().optional(),
+    }),
+  ]),
+  createdAt: z.date(),
+  homeId: z.string().nullable(),
+  id: z.string(),
+  name: z.string(),
+  placements: placementsSchema.nullable(),
+  platforms: z.array(z.enum(channelPlatformEnum.enumValues)).nullable(),
+  status: z.enum(["approved", "drawn", "kept"]),
+  type: z.enum(["text", "creative"]),
+  updatedAt: z.date(),
+});
+
+const draftAdSchema = draftAdResultSchema.extend({
   content: z.union([
     contentSchema,
     z.strictObject({
@@ -462,15 +475,9 @@ const draftAdSchema = z.strictObject({
     }),
   ]),
   createdAt: z.iso.datetime(),
-  homeId: z.string().nullable(),
-  id: z.string(),
-  name: z.string(),
-  placements: placementsSchema.nullable(),
-  platforms: z.array(z.enum(channelPlatformEnum.enumValues)).nullable(),
-  status: z.enum(["approved", "drawn", "kept"]),
-  type: z.enum(["text", "creative"]),
   updatedAt: z.iso.datetime(),
 });
+export type DraftAdResult = z.output<typeof draftAdResultSchema>;
 
 const geographySchema = z.strictObject({
   cities: z.array(z.string()).optional(),
@@ -574,37 +581,6 @@ const addAudienceSchema = z.strictObject({
   homeIds: z.array(z.string()).nullable(),
   type: z.enum(audienceTypeEnum.enumValues),
   updatedAt: z.iso.datetime(),
-});
-
-export const adsScopeOutputSchema = z.strictObject({
-  account: z.strictObject({
-    id: z.string().optional(),
-    name: z.string().optional(),
-  }),
-  brand: z.strictObject({ id: z.string(), name: z.string(), slug: z.string() }),
-  byDestination: z.array(byDestinationItemSchema),
-  byMonth: z.array(
-    z.strictObject({
-      ads: z.number(),
-      clicks: z.number(),
-      impressions: z.number(),
-      month: z.string(),
-      spend: z.number(),
-    }),
-  ),
-  byObjective: z.array(byDestinationItemSchema),
-  flags: z.strictObject({ hasAuditAds: z.boolean(), hasOsAds: z.boolean() }),
-  totals: z.strictObject({
-    ads: z.number(),
-    allAds: z.number(),
-    clicks: z.number(),
-    conversions: z.number(),
-    ctr: z.number(),
-    engagement: z.number(),
-    impressions: z.number(),
-    spend: z.number(),
-  }),
-  window: z.strictObject({ fromDate: z.string(), toDate: z.string() }),
 });
 
 export const topAdsOutputSchema = z.strictObject({
@@ -935,7 +911,6 @@ export const openCampaignActionOutputSchema = z.strictObject({
           bidStrategy: z.string().nullable(),
           body: z.string().nullable(),
           brandId: z.string(),
-          bookingTargetId: z.string().nullable(),
           businessKey: z.string().nullable(),
           channelId: z.string().nullable(),
           copy: z
@@ -1006,16 +981,6 @@ export const openCampaignActionOutputSchema = z.strictObject({
   ),
 });
 
-export const previewAdActionOutputSchema = z.strictObject({
-  adId: z.string(),
-  adName: z.string(),
-  formats: z.array(z.string()),
-  previews: z.array(
-    z.strictObject({ iframe: z.string(), src: z.string().nullable() }),
-  ),
-  previewUrls: z.array(z.string()),
-});
-
 export const importCreativeActionOutputSchema = z.strictObject({
   asset: z.strictObject({
     id: z.string(),
@@ -1048,14 +1013,6 @@ export const createGoogleAdsAccountActionOutputSchema = z.strictObject({
   accountCreated: z.boolean(),
   conversionLabel: z.string().nullable(),
 });
-
-export const listCampaignsActionOutputSchema = z.array(
-  z.strictObject({
-    id: z.string(),
-    name: z.string(),
-    status: z.enum(campaignStatusEnum.enumValues),
-  }),
-);
 
 export const replaceAdCardActionOutputSchema = z.strictObject({
   adId: z.string(),
@@ -1481,3 +1438,400 @@ export const ideaContextActionOutputSchema = z.strictObject({
     }),
   ),
 });
+
+export type IdeaContextResult = z.output<typeof ideaContextActionOutputSchema>;
+export type EditCatalogCardResult = z.output<
+  typeof editCatalogCardActionOutputSchema
+>;
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const draftCampaignActionNativeResultSchema =
+  draftCampaignActionOutputSchema.extend({
+    campaign: draftCampaignActionOutputSchema.shape.campaign.extend({
+      createdAt: z.date(),
+      deletedAt: z.date().nullable(),
+      endAt: z.date().nullable(),
+      startAt: z.date().nullable(),
+      updatedAt: z.date(),
+    }),
+  });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const createSpecializedMetaDraftActionNativeResultSchema =
+  createSpecializedMetaDraftActionOutputSchema.extend({
+    provider: createSpecializedMetaDraftActionOutputSchema.shape.provider
+      .extend({
+        ad: createSpecializedMetaDraftActionOutputSchema.shape.provider.shape.ad
+          .unwrap()
+          .extend({
+            creative:
+              createSpecializedMetaDraftActionOutputSchema.shape.provider.shape.ad
+                .unwrap()
+                .shape.creative.unwrap()
+                .catchall(z.unknown())
+                .optional(),
+            metrics:
+              createSpecializedMetaDraftActionOutputSchema.shape.provider.shape.ad
+                .unwrap()
+                .shape.metrics.unwrap()
+                .catchall(z.unknown())
+                .optional(),
+          })
+          .catchall(z.unknown())
+          .optional(),
+        ads: z
+          .array(
+            createSpecializedMetaDraftActionOutputSchema.shape.provider.shape.ads
+              .unwrap()
+              .element.extend({
+                creative:
+                  createSpecializedMetaDraftActionOutputSchema.shape.provider.shape.ads
+                    .unwrap()
+                    .element.shape.creative.unwrap()
+                    .catchall(z.unknown())
+                    .optional(),
+                metrics:
+                  createSpecializedMetaDraftActionOutputSchema.shape.provider.shape.ads
+                    .unwrap()
+                    .element.shape.metrics.unwrap()
+                    .catchall(z.unknown())
+                    .optional(),
+              })
+              .catchall(z.unknown()),
+          )
+          .optional(),
+      })
+      .catchall(z.unknown()),
+  });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const boostMetaPostActionNativeResultSchema =
+  boostMetaPostActionOutputSchema.extend({
+    provider: boostMetaPostActionOutputSchema.shape.provider
+      .extend({
+        ad: boostMetaPostActionOutputSchema.shape.provider.shape.ad
+          .unwrap()
+          .extend({
+            creative: boostMetaPostActionOutputSchema.shape.provider.shape.ad
+              .unwrap()
+              .shape.creative.unwrap()
+              .catchall(z.unknown())
+              .optional(),
+            metrics: boostMetaPostActionOutputSchema.shape.provider.shape.ad
+              .unwrap()
+              .shape.metrics.unwrap()
+              .catchall(z.unknown())
+              .optional(),
+          })
+          .catchall(z.unknown())
+          .optional(),
+        ads: z
+          .array(
+            boostMetaPostActionOutputSchema.shape.provider.shape.ads
+              .unwrap()
+              .element.extend({
+                creative:
+                  boostMetaPostActionOutputSchema.shape.provider.shape.ads
+                    .unwrap()
+                    .element.shape.creative.unwrap()
+                    .catchall(z.unknown())
+                    .optional(),
+                metrics:
+                  boostMetaPostActionOutputSchema.shape.provider.shape.ads
+                    .unwrap()
+                    .element.shape.metrics.unwrap()
+                    .catchall(z.unknown())
+                    .optional(),
+              })
+              .catchall(z.unknown()),
+          )
+          .optional(),
+      })
+      .catchall(z.unknown()),
+  });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const duplicateMetaCampaignActionNativeResultSchema =
+  duplicateMetaCampaignActionOutputSchema.extend({
+    provider: duplicateMetaCampaignActionOutputSchema.shape.provider
+      .extend({
+        discovery: z.unknown().optional(),
+        raw: z.unknown().optional(),
+      })
+      .catchall(z.unknown()),
+  });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const createAudienceActionNativeResultSchema =
+  createAudienceActionOutputSchema.extend({
+    provider: createAudienceActionOutputSchema.shape.provider
+      .extend({
+        audience: createAudienceActionOutputSchema.shape.provider.shape.audience
+          .unwrap()
+          .catchall(z.unknown())
+          .optional(),
+      })
+      .catchall(z.unknown()),
+  });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const openCampaignActionNativeResultSchema =
+  openCampaignActionOutputSchema.extend({
+    ads: z.array(
+      openCampaignActionOutputSchema.shape.ads.element.extend({
+        content: z.union([
+          openCampaignActionOutputSchema.shape.ads.element.shape.content.options[0].extend(
+            {
+              metaImport:
+                openCampaignActionOutputSchema.shape.ads.element.shape.content.options[0].shape.metaImport
+                  .unwrap()
+                  .extend({
+                    rawCreative: z.record(
+                      openCampaignActionOutputSchema.shape.ads.element.shape.content.options[0].shape.metaImport.unwrap()
+                        .shape.rawCreative.keyType,
+                      z.unknown(),
+                    ),
+                  })
+                  .optional(),
+            },
+          ),
+          openCampaignActionOutputSchema.shape.ads.element.shape.content
+            .options[1],
+        ]),
+        createdAt: z.date(),
+        updatedAt: z.date(),
+      }),
+    ),
+    audiences: z.array(
+      openCampaignActionOutputSchema.shape.audiences.element.extend({
+        createdAt: z.date(),
+        updatedAt: z.date(),
+      }),
+    ),
+    campaign: openCampaignActionOutputSchema.shape.campaign.extend({
+      createdAt: z.date(),
+      deletedAt: z.date().nullable(),
+      endAt: z.date().nullable(),
+      startAt: z.date().nullable(),
+      updatedAt: z.date(),
+    }),
+    platformCampaigns: z.array(
+      openCampaignActionOutputSchema.shape.platformCampaigns.element.extend({
+        ads: z.array(
+          openCampaignActionOutputSchema.shape.platformCampaigns.element.shape.ads.element.extend(
+            { createdAt: z.date(), updatedAt: z.date() },
+          ),
+        ),
+        adSets: z.array(
+          openCampaignActionOutputSchema.shape.platformCampaigns.element.shape.adSets.element.extend(
+            {
+              createdAt: z.date(),
+              targetingSpec: z.unknown(),
+              updatedAt: z.date(),
+            },
+          ),
+        ),
+        createdAt: z.date(),
+        endAt: z.date().nullable(),
+        settings:
+          openCampaignActionOutputSchema.shape.platformCampaigns.element.shape.settings
+            .unwrap()
+            .extend({
+              meta: openCampaignActionOutputSchema.shape.platformCampaigns.element.shape.settings
+                .unwrap()
+                .shape.meta.unwrap()
+                .extend({
+                  importSource:
+                    openCampaignActionOutputSchema.shape.platformCampaigns.element.shape.settings
+                      .unwrap()
+                      .shape.meta.unwrap()
+                      .shape.importSource.unwrap()
+                      .extend({
+                        adSets: z.array(
+                          z.record(
+                            openCampaignActionOutputSchema.shape.platformCampaigns.element.shape.settings
+                              .unwrap()
+                              .shape.meta.unwrap()
+                              .shape.importSource.unwrap().shape.adSets.element
+                              .keyType,
+                            z.unknown(),
+                          ),
+                        ),
+                      })
+                      .optional(),
+                })
+                .optional(),
+            })
+            .nullable(),
+        startAt: z.date().nullable(),
+        updatedAt: z.date(),
+      }),
+    ),
+  });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const addAudienceActionNativeResultSchema =
+  addAudienceActionOutputSchema.extend({
+    createdAt: z.date(),
+    updatedAt: z.date(),
+  });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const updateAudienceActionNativeResultSchema =
+  addAudienceActionNativeResultSchema;
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const setPlatformDraftActionNativeResultSchema =
+  setPlatformDraftActionOutputSchema.extend({
+    endAt: z.date().nullable(),
+    settings: setPlatformDraftActionOutputSchema.shape.settings
+      .unwrap()
+      .extend({
+        meta: setPlatformDraftActionOutputSchema.shape.settings
+          .unwrap()
+          .shape.meta.unwrap()
+          .extend({
+            importSource: setPlatformDraftActionOutputSchema.shape.settings
+              .unwrap()
+              .shape.meta.unwrap()
+              .shape.importSource.unwrap()
+              .extend({
+                adSets: z.array(
+                  z.record(
+                    setPlatformDraftActionOutputSchema.shape.settings
+                      .unwrap()
+                      .shape.meta.unwrap()
+                      .shape.importSource.unwrap().shape.adSets.element.keyType,
+                    z.unknown(),
+                  ),
+                ),
+              })
+              .optional(),
+          })
+          .optional(),
+      })
+      .nullable(),
+    startAt: z.date().nullable(),
+  });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const pushDraftActionNativeResultSchema = z.union([
+  pushDraftActionOutputSchema.options[0].extend({
+    provider: pushDraftActionOutputSchema.options[0].shape.provider
+      .extend({
+        ad: pushDraftActionOutputSchema.options[0].shape.provider.shape.ad
+          .unwrap()
+          .extend({
+            creative:
+              pushDraftActionOutputSchema.options[0].shape.provider.shape.ad
+                .unwrap()
+                .shape.creative.unwrap()
+                .catchall(z.unknown())
+                .optional(),
+            metrics:
+              pushDraftActionOutputSchema.options[0].shape.provider.shape.ad
+                .unwrap()
+                .shape.metrics.unwrap()
+                .catchall(z.unknown())
+                .optional(),
+          })
+          .catchall(z.unknown())
+          .optional(),
+        ads: z
+          .array(
+            pushDraftActionOutputSchema.options[0].shape.provider.shape.ads
+              .unwrap()
+              .element.extend({
+                creative:
+                  pushDraftActionOutputSchema.options[0].shape.provider.shape.ads
+                    .unwrap()
+                    .element.shape.creative.unwrap()
+                    .catchall(z.unknown())
+                    .optional(),
+                metrics:
+                  pushDraftActionOutputSchema.options[0].shape.provider.shape.ads
+                    .unwrap()
+                    .element.shape.metrics.unwrap()
+                    .catchall(z.unknown())
+                    .optional(),
+              })
+              .catchall(z.unknown()),
+          )
+          .optional(),
+      })
+      .catchall(z.unknown()),
+  }),
+  pushDraftActionOutputSchema.options[1],
+  pushDraftActionOutputSchema.options[2].extend({
+    provider: pushDraftActionOutputSchema.options[2].shape.provider
+      .extend({
+        ad: pushDraftActionOutputSchema.options[2].shape.provider.shape.ad
+          .unwrap()
+          .extend({
+            creative:
+              pushDraftActionOutputSchema.options[2].shape.provider.shape.ad
+                .unwrap()
+                .shape.creative.unwrap()
+                .catchall(z.unknown())
+                .optional(),
+            metrics:
+              pushDraftActionOutputSchema.options[2].shape.provider.shape.ad
+                .unwrap()
+                .shape.metrics.unwrap()
+                .catchall(z.unknown())
+                .optional(),
+          })
+          .catchall(z.unknown())
+          .optional(),
+        ads: z
+          .array(
+            pushDraftActionOutputSchema.options[2].shape.provider.shape.ads
+              .unwrap()
+              .element.extend({
+                creative:
+                  pushDraftActionOutputSchema.options[2].shape.provider.shape.ads
+                    .unwrap()
+                    .element.shape.creative.unwrap()
+                    .catchall(z.unknown())
+                    .optional(),
+                metrics:
+                  pushDraftActionOutputSchema.options[2].shape.provider.shape.ads
+                    .unwrap()
+                    .element.shape.metrics.unwrap()
+                    .catchall(z.unknown())
+                    .optional(),
+              })
+              .catchall(z.unknown()),
+          )
+          .optional(),
+      })
+      .catchall(z.unknown()),
+  }),
+  pushDraftActionOutputSchema.options[3],
+]);
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const setDeliveryActionNativeResultSchema =
+  setDeliveryActionOutputSchema.extend({
+    provider: setDeliveryActionOutputSchema.shape.provider.extend({
+      skippedReasons: z
+        .record(
+          setDeliveryActionOutputSchema.shape.provider.shape.skippedReasons.unwrap()
+            .keyType,
+          z.unknown(),
+        )
+        .optional(),
+    }),
+  });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const deletePlatformCampaignActionNativeResultSchema =
+  deletePlatformCampaignActionOutputSchema.extend({
+    provider: z
+      .record(
+        deletePlatformCampaignActionOutputSchema.shape.provider.unwrap()
+          .keyType,
+        z.unknown(),
+      )
+      .nullable(),
+  });

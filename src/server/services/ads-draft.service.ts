@@ -1,3 +1,5 @@
+import type { DraftAdResult } from "@/server/ai/capabilities/outputs/ads";
+import type { CampaignListResult } from "@/server/contracts/ad-tool-output";
 import {
   listHomesInGroup,
   studioBookingDestination,
@@ -819,7 +821,7 @@ export async function addDraftAd(input: {
   type?: "creative" | "text";
   content: AdContent;
   businessKey?: string | null;
-}) {
+}): Promise<DraftAdResult> {
   const { campaign, brand } = await resolveAdAuthoringScope(input);
   const businessKey =
     input.businessKey ??
@@ -1241,7 +1243,7 @@ export function planAdSignature(content: AdContent) {
 export async function listBrandCampaigns(input: {
   organizationId: string;
   brandId: string;
-}) {
+}): Promise<CampaignListResult> {
   const brand = await db.query.brandTable.findFirst({
     where: eq(brandTable.id, input.brandId),
     columns: { organizationId: true },

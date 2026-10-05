@@ -1,5 +1,18 @@
-import { brandForAssistant } from "./brand-output";
 import {
+  captureProductStorefrontReferenceNativeResultSchema,
+  copySiblingStorefrontContentNativeResultSchema,
+  assignProductStorefrontManagerNativeResultSchema,
+  confirmProductStorefrontCurrentNativeResultSchema,
+  markProductStorefrontStaleNativeResultSchema,
+  updateProductStorefrontNativeResultSchema,
+  createProductStorefrontNativeResultSchema,
+  updateProductAtlasNativeResultSchema,
+  createProductAtlasProductNativeResultSchema,
+  listProductStorefrontReferencesNativeResultSchema,
+  readProductStorefrontNativeResultSchema,
+  listProductStorefrontsNativeResultSchema,
+  readProductAtlasNativeResultSchema,
+  listProductAtlasProductsNativeResultSchema,
   listProductAtlasProductsOutputSchema,
   readProductAtlasOutputSchema,
   listProductStorefrontsOutputSchema,
@@ -16,6 +29,9 @@ import {
   captureProductStorefrontReferenceOutputSchema,
   removeProductStorefrontReferenceOutputSchema,
 } from "./outputs/product-storefront";
+
+import { brandForAssistant } from "./brand-output";
+
 import "server-only";
 
 import { z } from "zod";
@@ -61,6 +77,7 @@ const actorFrom = (ctx: CapabilityContext) =>
   }) satisfies ProductStorefrontActor;
 
 export const listProductAtlasProducts = growthAction({
+  nativeOutputSchema: listProductAtlasProductsNativeResultSchema,
   outputSchema: listProductAtlasProductsOutputSchema,
   description:
     "List products in the organization with their brand, manager, lifecycle, atlas counts, and storefront summaries.",
@@ -96,6 +113,7 @@ export const listProductAtlasProducts = growthAction({
 });
 
 export const readProductAtlas = growthAction({
+  nativeOutputSchema: readProductAtlasNativeResultSchema,
   outputSchema: readProductAtlasOutputSchema,
   description:
     "Read one complete Product Atlas document, including jobs, journeys, stories, views, connections, implementation references, observations, and its storefronts.",
@@ -107,6 +125,7 @@ export const readProductAtlas = growthAction({
 });
 
 export const listProductStorefronts = growthAction({
+  nativeOutputSchema: listProductStorefrontsNativeResultSchema,
   outputSchema: listProductStorefrontsOutputSchema,
   description:
     "List storefront records and their product, surface, manager, listing state, freshness, stale note, and confirmation time.",
@@ -124,6 +143,7 @@ export const listProductStorefronts = growthAction({
 });
 
 export const readProductStorefront = growthAction({
+  nativeOutputSchema: readProductStorefrontNativeResultSchema,
   outputSchema: readProductStorefrontOutputSchema,
   description:
     "Read one complete storefront record, including target copy, Media Library references, external links, freshness state, and changelog.",
@@ -141,6 +161,7 @@ export const readProductStorefront = growthAction({
 });
 
 export const listProductStorefrontReferences = growthAction({
+  nativeOutputSchema: listProductStorefrontReferencesNativeResultSchema,
   outputSchema: listProductStorefrontReferencesOutputSchema,
   description:
     "List point-in-time competitor and inspiration snapshots captured for one storefront, including source provenance and structured comparisons.",
@@ -150,6 +171,7 @@ export const listProductStorefrontReferences = growthAction({
 });
 
 export const createProductAtlasProduct = growthAction({
+  nativeOutputSchema: createProductAtlasProductNativeResultSchema,
   outputSchema: createProductAtlasProductOutputSchema,
   description:
     "Create a product owned by an existing brand, optionally with its complete typed Product Atlas graph.",
@@ -158,6 +180,7 @@ export const createProductAtlasProduct = growthAction({
 });
 
 export const updateProductAtlas = growthAction({
+  nativeOutputSchema: updateProductAtlasNativeResultSchema,
   outputSchema: updateProductAtlasOutputSchema,
   description:
     "Update product identity, manager, lifecycle, or the complete atlas document. The latest write wins.",
@@ -166,6 +189,7 @@ export const updateProductAtlas = growthAction({
 });
 
 export const createProductStorefront = growthAction({
+  nativeOutputSchema: createProductStorefrontNativeResultSchema,
   outputSchema: createProductStorefrontOutputSchema,
   description:
     "Create one storefront surface for a product. Asset ids must be ready Media Library items owned by the product brand.",
@@ -174,6 +198,7 @@ export const createProductStorefront = growthAction({
 });
 
 export const updateProductStorefront = growthAction({
+  nativeOutputSchema: updateProductStorefrontNativeResultSchema,
   outputSchema: updateProductStorefrontOutputSchema,
   description:
     "Update storefront copy, assets, links, or listing state. This always marks the storefront stale and requires a note explaining the external update needed.",
@@ -182,6 +207,7 @@ export const updateProductStorefront = growthAction({
 });
 
 export const markProductStorefrontStale = growthAction({
+  nativeOutputSchema: markProductStorefrontStaleNativeResultSchema,
   outputSchema: markProductStorefrontStaleOutputSchema,
   description:
     "Mark a storefront stale without changing its target content. The note must state what changed or needs updating.",
@@ -190,6 +216,7 @@ export const markProductStorefrontStale = growthAction({
 });
 
 export const confirmProductStorefrontCurrent = growthAction({
+  nativeOutputSchema: confirmProductStorefrontCurrentNativeResultSchema,
   outputSchema: confirmProductStorefrontCurrentOutputSchema,
   description:
     "Confirm that the external storefront now matches Growth's target content. This stamps the actor and time and clears the active stale note.",
@@ -198,6 +225,7 @@ export const confirmProductStorefrontCurrent = growthAction({
 });
 
 export const assignProductStorefrontManager = growthAction({
+  nativeOutputSchema: assignProductStorefrontManagerNativeResultSchema,
   outputSchema: assignProductStorefrontManagerOutputSchema,
   description:
     "Assign or clear the organization member responsible for one storefront. Assignment routes responsibility and does not change permissions.",
@@ -206,6 +234,7 @@ export const assignProductStorefrontManager = growthAction({
 });
 
 export const copySiblingStorefrontContent = growthAction({
+  nativeOutputSchema: copySiblingStorefrontContentNativeResultSchema,
   outputSchema: copySiblingStorefrontContentOutputSchema,
   description:
     "Copy target content between sibling surfaces for the same product, such as ChatGPT and Claude. The target is marked stale.",
@@ -214,6 +243,7 @@ export const copySiblingStorefrontContent = growthAction({
 });
 
 export const captureProductStorefrontReference = growthAction({
+  nativeOutputSchema: captureProductStorefrontReferenceNativeResultSchema,
   outputSchema: captureProductStorefrontReferenceOutputSchema,
   description:
     "Read a public competitor or inspiration storefront and save a source-grounded, point-in-time structured snapshot for human and AI comparison.",

@@ -72,3 +72,33 @@ export const nextForBrandOutputSchema = z.strictObject({
   }),
   upcoming: upcomingContentResultSchema,
 });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const nextForBrandNativeResultSchema = nextForBrandOutputSchema.extend({
+  production: nextForBrandOutputSchema.shape.production.extend({
+    items: z.array(
+      nextForBrandOutputSchema.shape.production.shape.items.element.extend({
+        plannedAt: z.date().nullable(),
+      }),
+    ),
+  }),
+  readiness: nextForBrandOutputSchema.shape.readiness.extend({
+    ownedHistory:
+      nextForBrandOutputSchema.shape.readiness.shape.ownedHistory.extend({
+        earliest: z.date().nullable(),
+        latest: z.date().nullable(),
+      }),
+  }),
+  upcoming: nextForBrandOutputSchema.shape.upcoming.extend({
+    posts: z.array(
+      nextForBrandOutputSchema.shape.upcoming.shape.posts.element.extend({
+        plannedAt: z.date().nullable(),
+      }),
+    ),
+    standalonePlatformPosts: z.array(
+      nextForBrandOutputSchema.shape.upcoming.shape.standalonePlatformPosts.element.extend(
+        { metadata: z.unknown(), scheduledAt: z.date().nullable() },
+      ),
+    ),
+  }),
+});

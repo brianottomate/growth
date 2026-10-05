@@ -59,7 +59,10 @@ export const blogAgent = growthTool({
         "The exact owned chat-attachment URL when the operator explicitly asks to use the pasted image on the article.",
       ),
   }),
-  execute: async (input, ctx) => {
+  execute: async (
+    input,
+    ctx,
+  ): Promise<z.output<typeof blogAgentOutputSchema>> => {
     if (
       input.attachmentUrl &&
       !isOwnedChatImageUrl(input.attachmentUrl, ctx.userId)

@@ -127,7 +127,10 @@ function actionFailure(error: Error) {
  * organization scope and failure classification the assistant and MCP get.
  */
 export function actionProcedure<Schema extends z.ZodObject, Output>(
-  action: GrowthAction<z.infer<Schema>, Output, Schema>,
+  action: Pick<
+    GrowthAction<z.infer<Schema>, Output, Schema>,
+    "inputSchema" | "run"
+  >,
 ) {
   return workspaceProcedure
     .input(action.inputSchema)

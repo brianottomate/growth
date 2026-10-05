@@ -83,194 +83,6 @@ const fontItemSchema = z.strictObject({
   weight: z.number().optional(),
 });
 
-const animationsSchema = z
-  .strictObject({
-    easing: z.string().optional(),
-    transitionDuration: z.string().optional(),
-  })
-  .catchall(z.string().optional());
-
-const providerColorsSchema = z
-  .strictObject({
-    accent: z.string().optional(),
-    background: z.string().optional(),
-    error: z.string().optional(),
-    link: z.string().optional(),
-    primary: z.string().optional(),
-    secondary: z.string().optional(),
-    success: z.string().optional(),
-    textPrimary: z.string().optional(),
-    textSecondary: z.string().optional(),
-    warning: z.string().optional(),
-  })
-  .catchall(z.string().optional());
-
-const buttonPrimarySchema = z
-  .strictObject({
-    background: z.string().optional(),
-    borderColor: z.string().optional(),
-    borderRadius: z.string().optional(),
-    textColor: z.string().optional(),
-  })
-  .catchall(z.string().optional());
-
-const inputSchema = z
-  .strictObject({
-    borderColor: z.string().optional(),
-    borderRadius: z.string().optional(),
-    focusBorderColor: z.string().optional(),
-  })
-  .catchall(z.string().optional());
-
-const componentsSchema = z
-  .strictObject({
-    buttonPrimary: buttonPrimarySchema.optional(),
-    buttonSecondary: buttonPrimarySchema.optional(),
-    input: inputSchema.optional(),
-  })
-  .catchall(jsonValueSchema);
-
-const imagesSchema = z
-  .strictObject({
-    favicon: z.string().nullable().optional(),
-    logo: z.string().nullable().optional(),
-    ogImage: z.string().nullable().optional(),
-  })
-  .catchall(z.string().nullable().optional());
-
-const gridSchema = z
-  .strictObject({
-    columns: z.number().optional(),
-    maxWidth: z.string().optional(),
-  })
-  .catchall(z.union([z.string(), z.number()]).optional());
-
-const layoutSchema = z
-  .strictObject({
-    footerHeight: z.string().optional(),
-    grid: gridSchema.optional(),
-    headerHeight: z.string().optional(),
-  })
-  .catchall(
-    z
-      .union([
-        z.string(),
-        z.number(),
-        z.record(z.string(), z.union([z.string(), z.number()]).optional()),
-      ])
-      .optional(),
-  );
-
-const personalitySchema = z.strictObject({
-  energy: z.enum(["high", "medium", "low"]),
-  targetAudience: z.string(),
-  tone: z.enum([
-    "bold",
-    "professional",
-    "playful",
-    "modern",
-    "traditional",
-    "minimalist",
-  ]),
-});
-
-const spacingSchema = z
-  .strictObject({
-    baseUnit: z.number().optional(),
-    borderRadius: z.string().optional(),
-    gridGutter: z.number().optional(),
-    margins: z.record(z.string(), z.number()).optional(),
-    padding: z.record(z.string(), z.number()).optional(),
-  })
-  .catchall(
-    z
-      .union([z.string(), z.number(), z.record(z.string(), z.number())])
-      .optional(),
-  );
-
-const fontFamiliesSchema = z
-  .strictObject({
-    code: z.string().optional(),
-    heading: z.string().optional(),
-    primary: z.string().optional(),
-  })
-  .catchall(z.string().optional());
-
-const fontSizesSchema = z
-  .strictObject({
-    body: z.string().optional(),
-    h1: z.string().optional(),
-    h2: z.string().optional(),
-    h3: z.string().optional(),
-    small: z.string().optional(),
-  })
-  .catchall(z.string().optional());
-
-const fontStacksSchema = z
-  .strictObject({
-    body: z.array(z.string()).optional(),
-    heading: z.array(z.string()).optional(),
-    paragraph: z.array(z.string()).optional(),
-    primary: z.array(z.string()).optional(),
-  })
-  .catchall(z.array(z.string()).optional());
-
-const fontWeightsSchema = z
-  .strictObject({
-    bold: z.number().optional(),
-    light: z.number().optional(),
-    medium: z.number().optional(),
-    regular: z.number().optional(),
-  })
-  .catchall(z.number().optional());
-
-const typographySchema = z.strictObject({
-  fontFamilies: fontFamiliesSchema.optional(),
-  fontSizes: fontSizesSchema.optional(),
-  fontStacks: fontStacksSchema.optional(),
-  fontWeights: fontWeightsSchema.optional(),
-  lineHeights: z
-    .strictObject({
-      body: z.number().optional(),
-      heading: z.number().optional(),
-    })
-    .catchall(z.number().optional())
-    .optional(),
-});
-
-const rawSchema = z
-  .strictObject({
-    animations: animationsSchema.optional(),
-    brandName: z.string().optional(),
-    colors: providerColorsSchema.optional(),
-    colorScheme: z.enum(["dark", "light"]).optional(),
-    components: componentsSchema.optional(),
-    fonts: z
-      .array(z.strictObject({ family: z.string() }).catchall(jsonValueSchema))
-      .optional(),
-    icons: z
-      .strictObject({
-        primaryColor: z.string().optional(),
-        style: z.string().optional(),
-      })
-      .catchall(z.string().optional())
-      .optional(),
-    images: imagesSchema.optional(),
-    layout: layoutSchema.optional(),
-    logo: z.string().nullable().optional(),
-    personality: personalitySchema.optional(),
-    spacing: spacingSchema.optional(),
-    tone: z
-      .strictObject({
-        emojiUsage: z.string().optional(),
-        voice: z.string().optional(),
-      })
-      .catchall(z.string().optional())
-      .optional(),
-    typography: typographySchema.optional(),
-  })
-  .catchall(jsonValueSchema);
-
 const brandIdentitySchema = z.strictObject({
   colors: colorsSchema.optional(),
   colorScheme: z.enum(["dark", "light"]).optional(),
@@ -285,7 +97,7 @@ const brandIdentitySchema = z.strictObject({
       tone: z.string(),
     })
     .optional(),
-  raw: rawSchema.optional(),
+  raw: jsonValueSchema.optional(),
 });
 
 const brandListeningStorySchema = z.strictObject({
@@ -836,3 +648,226 @@ export const captureProductStorefrontReferenceOutputSchema = z.strictObject({
 export const removeProductStorefrontReferenceOutputSchema = z.strictObject({
   id: z.string(),
 });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const listProductAtlasProductsNativeResultSchema =
+  listProductAtlasProductsOutputSchema.extend({
+    products: z.array(
+      listProductAtlasProductsOutputSchema.shape.products.element.extend({
+        storefronts: z.array(
+          listProductAtlasProductsOutputSchema.shape.products.element.shape.storefronts.element.extend(
+            { confirmedAt: z.date().nullable() },
+          ),
+        ),
+      }),
+    ),
+  });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const readProductAtlasNativeResultSchema =
+  readProductAtlasOutputSchema.extend({
+    brand: readProductAtlasOutputSchema.shape.brand.extend({
+      brandIdentity:
+        readProductAtlasOutputSchema.shape.brand.shape.brandIdentity
+          .unwrap()
+          .extend({
+            raw: z.unknown().optional(),
+          })
+          .nullable(),
+      businessStageAt: z.date().nullable(),
+      createdAt: z.date(),
+      deletedAt: z.date().nullable(),
+      deliveryStageAt: z.date().nullable(),
+      industryResearch:
+        readProductAtlasOutputSchema.shape.brand.shape.industryResearch
+          .unwrap()
+          .catchall(z.unknown())
+          .nullable(),
+      lastAccessCheckAt: z.date().nullable(),
+      updatedAt: z.date(),
+      wanderOsCheckedAt: z.date().nullable(),
+    }),
+    createdAt: z.date(),
+    deletedAt: z.date().nullable(),
+    manager: readProductAtlasOutputSchema.shape.manager
+      .unwrap()
+      .extend({
+        banExpires: z.date().nullable(),
+        createdAt: z.date(),
+        onboardingCompletedAt: z.date().nullable(),
+        updatedAt: z.date(),
+      })
+      .nullable(),
+    storefronts: z.array(
+      readProductAtlasOutputSchema.shape.storefronts.element.extend({
+        confirmedAt: z.date().nullable(),
+        createdAt: z.date(),
+        deletedAt: z.date().nullable(),
+        staleMarkedAt: z.date().nullable(),
+        updatedAt: z.date(),
+      }),
+    ),
+    updatedAt: z.date(),
+  });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const listProductStorefrontsNativeResultSchema = z.array(
+  listProductStorefrontsOutputSchema.element.extend({
+    confirmedAt: z.date().nullable(),
+    createdAt: z.date(),
+    deletedAt: z.date().nullable(),
+    product: listProductStorefrontsOutputSchema.element.shape.product.extend({
+      brand:
+        listProductStorefrontsOutputSchema.element.shape.product.shape.brand.extend(
+          {
+            brandIdentity:
+              listProductStorefrontsOutputSchema.element.shape.product.shape.brand.shape.brandIdentity
+                .unwrap()
+                .extend({
+                  raw: z.unknown().optional(),
+                })
+                .nullable(),
+            businessStageAt: z.date().nullable(),
+            createdAt: z.date(),
+            deletedAt: z.date().nullable(),
+            deliveryStageAt: z.date().nullable(),
+            industryResearch:
+              listProductStorefrontsOutputSchema.element.shape.product.shape.brand.shape.industryResearch
+                .unwrap()
+                .catchall(z.unknown())
+                .nullable(),
+            lastAccessCheckAt: z.date().nullable(),
+            updatedAt: z.date(),
+            wanderOsCheckedAt: z.date().nullable(),
+          },
+        ),
+      createdAt: z.date(),
+      deletedAt: z.date().nullable(),
+      updatedAt: z.date(),
+    }),
+    staleMarkedAt: z.date().nullable(),
+    updatedAt: z.date(),
+  }),
+);
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const readProductStorefrontNativeResultSchema =
+  readProductStorefrontOutputSchema.extend({
+    confirmedAt: z.date().nullable(),
+    confirmer: readProductStorefrontOutputSchema.shape.confirmer
+      .unwrap()
+      .extend({
+        banExpires: z.date().nullable(),
+        createdAt: z.date(),
+        onboardingCompletedAt: z.date().nullable(),
+        updatedAt: z.date(),
+      })
+      .nullable(),
+    createdAt: z.date(),
+    deletedAt: z.date().nullable(),
+    manager: readProductStorefrontOutputSchema.shape.manager
+      .unwrap()
+      .extend({
+        banExpires: z.date().nullable(),
+        createdAt: z.date(),
+        onboardingCompletedAt: z.date().nullable(),
+        updatedAt: z.date(),
+      })
+      .nullable(),
+    product: readProductStorefrontOutputSchema.shape.product.extend({
+      brand: readProductStorefrontOutputSchema.shape.product.shape.brand.extend(
+        {
+          brandIdentity:
+            readProductStorefrontOutputSchema.shape.product.shape.brand.shape.brandIdentity
+              .unwrap()
+              .extend({
+                raw: z.unknown().optional(),
+              })
+              .nullable(),
+          businessStageAt: z.date().nullable(),
+          createdAt: z.date(),
+          deletedAt: z.date().nullable(),
+          deliveryStageAt: z.date().nullable(),
+          industryResearch:
+            readProductStorefrontOutputSchema.shape.product.shape.brand.shape.industryResearch
+              .unwrap()
+              .catchall(z.unknown())
+              .nullable(),
+          lastAccessCheckAt: z.date().nullable(),
+          updatedAt: z.date(),
+          wanderOsCheckedAt: z.date().nullable(),
+        },
+      ),
+      createdAt: z.date(),
+      deletedAt: z.date().nullable(),
+      updatedAt: z.date(),
+    }),
+    staleMarkedAt: z.date().nullable(),
+    staleMarker: readProductStorefrontOutputSchema.shape.staleMarker
+      .unwrap()
+      .extend({
+        banExpires: z.date().nullable(),
+        createdAt: z.date(),
+        onboardingCompletedAt: z.date().nullable(),
+        updatedAt: z.date(),
+      })
+      .nullable(),
+    updatedAt: z.date(),
+  });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const listProductStorefrontReferencesNativeResultSchema = z.array(
+  listProductStorefrontReferencesOutputSchema.element.extend({
+    createdAt: z.date(),
+    observedAt: z.date(),
+  }),
+);
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const createProductAtlasProductNativeResultSchema =
+  createProductAtlasProductOutputSchema.extend({
+    createdAt: z.date(),
+    deletedAt: z.date().nullable(),
+    updatedAt: z.date(),
+  });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const updateProductAtlasNativeResultSchema =
+  createProductAtlasProductNativeResultSchema;
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const createProductStorefrontNativeResultSchema =
+  createProductStorefrontOutputSchema.extend({
+    confirmedAt: z.date().nullable(),
+    createdAt: z.date(),
+    deletedAt: z.date().nullable(),
+    staleMarkedAt: z.date().nullable(),
+    updatedAt: z.date(),
+  });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const updateProductStorefrontNativeResultSchema =
+  createProductStorefrontNativeResultSchema;
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const markProductStorefrontStaleNativeResultSchema =
+  createProductStorefrontNativeResultSchema;
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const confirmProductStorefrontCurrentNativeResultSchema =
+  createProductStorefrontNativeResultSchema;
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const assignProductStorefrontManagerNativeResultSchema =
+  createProductStorefrontNativeResultSchema;
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const copySiblingStorefrontContentNativeResultSchema =
+  createProductStorefrontNativeResultSchema;
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const captureProductStorefrontReferenceNativeResultSchema =
+  captureProductStorefrontReferenceOutputSchema.extend({
+    createdAt: z.date(),
+    observedAt: z.date(),
+  });

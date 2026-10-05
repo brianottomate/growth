@@ -54,3 +54,24 @@ export const assignPersonaAudienceOutputSchema = z.strictObject({
   name: z.string(),
   personaId: z.string().nullable(),
 });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const listPersonasNativeResultSchema = z.array(
+  listPersonasOutputSchema.element.extend({
+    createdAt: z.date(),
+    deletedAt: z.date().nullable(),
+    updatedAt: z.date(),
+  }),
+);
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const createPersonaNativeResultSchema = createPersonaOutputSchema.extend(
+  {
+    createdAt: z.date(),
+    deletedAt: z.date().nullable(),
+    updatedAt: z.date(),
+  },
+);
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const updatePersonaNativeResultSchema = createPersonaNativeResultSchema;

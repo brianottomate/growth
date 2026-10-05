@@ -37,7 +37,10 @@ export const newsletterAgent = growthTool({
         "The newsletter spot id, when the task concerns an existing issue.",
       ),
   }),
-  execute: async (input, ctx) => {
+  execute: async (
+    input,
+    ctx,
+  ): Promise<z.output<typeof newsletterAgentOutputSchema>> => {
     const result = await runNewsletterAgent({
       task: input.task,
       platformPostId: input.platformPostId,

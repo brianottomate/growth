@@ -1,4 +1,8 @@
-import { recentMentionsOutputSchema } from "./outputs/listening";
+import {
+  recentMentionsNativeResultSchema,
+  recentMentionsOutputSchema,
+} from "./outputs/listening";
+
 import "server-only";
 
 import { z } from "zod";
@@ -14,6 +18,7 @@ import { growthAction } from "./types";
  * `mention.list` oRPC query rather than scoping by org.
  */
 export const recentMentions = growthAction({
+  nativeOutputSchema: recentMentionsNativeResultSchema,
   outputSchema: recentMentionsOutputSchema,
   description:
     "List recent social mentions captured by the listening pipeline (Reddit/X/etc.), newest first. Each carries the source, author, a snippet, and the system's suggestedAction (engage | monitor | skip) + relevance score. Use for 'what are people saying / any mentions worth replying to / what's in the listening queue' questions. Set onlyEngageWorthy to surface just the act-today items.",

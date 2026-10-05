@@ -25,6 +25,7 @@ import * as outputs from "./outputs/lifecycle";
 export const lifecycleOverviewAction = growthAction({
   description: "Read compact lifecycle program coverage.",
   inputSchema: z.object({ brandId: z.string().optional() }),
+  nativeOutputSchema: outputs.overviewNativeResultSchema,
   outputSchema: outputs.overviewResultSchema,
   execute: (input, ctx) =>
     getLifecycleOverview({
@@ -38,6 +39,7 @@ export const lifecycleOverviewAction = growthAction({
 export const inspectLifecycleProgramAction = growthAction({
   description: "Read one complete lifecycle journey.",
   inputSchema: z.object({ programId: z.string() }),
+  nativeOutputSchema: outputs.inspectProgramNativeResultSchema,
   outputSchema: outputs.inspectProgramResultSchema,
   execute: (input, ctx) =>
     getLifecycleProgram({ organizationId: ctx.orgId, ...input }),
@@ -46,6 +48,7 @@ export const inspectLifecycleProgramAction = growthAction({
 export const searchLifecycleCampaignsAction = growthAction({
   description: "Find mirrored Customer.io, Outreach and HubSpot campaigns.",
   inputSchema: lifecycleCampaignSearchSchema,
+  nativeOutputSchema: outputs.searchCampaignsNativeResultSchema,
   outputSchema: outputs.searchCampaignsResultSchema,
   execute: (filters, ctx) =>
     searchLifecycleCampaigns({ organizationId: ctx.orgId, filters }),
@@ -55,6 +58,7 @@ export const findLifecycleGapsAction = growthAction({
   description:
     "Find uncovered programs, unlinked campaigns and cleanup candidates.",
   inputSchema: z.object({ brandId: z.string().optional() }),
+  nativeOutputSchema: outputs.findGapsNativeResultSchema,
   outputSchema: outputs.findGapsResultSchema,
   execute: (input, ctx) =>
     getLifecycleGaps({ organizationId: ctx.orgId, ...input }),
@@ -63,6 +67,7 @@ export const findLifecycleGapsAction = growthAction({
 export const createLifecycleProgramAction = growthAction({
   description: "Create a local lifecycle program.",
   inputSchema: lifecycleProgramCreateSchema,
+  nativeOutputSchema: outputs.programNativeResultSchema,
   outputSchema: outputs.programResultSchema,
   execute: async (program, ctx) => {
     const created = await createLifecycleProgram({
@@ -79,6 +84,7 @@ export const updateLifecycleProgramAction = growthAction({
     programId: z.string(),
     changes: lifecycleProgramChangesSchema,
   }),
+  nativeOutputSchema: outputs.programNativeResultSchema,
   outputSchema: outputs.programResultSchema,
   execute: async (input, ctx) => {
     const program = await updateLifecycleProgram({
@@ -92,6 +98,7 @@ export const updateLifecycleProgramAction = growthAction({
 export const addLifecycleStepAction = growthAction({
   description: "Add a step to a local lifecycle program.",
   inputSchema: lifecycleStepCreateSchema,
+  nativeOutputSchema: outputs.stepNativeResultSchema,
   outputSchema: outputs.stepResultSchema,
   execute: async (step, ctx) => {
     const created = await addLifecycleStep({
@@ -108,6 +115,7 @@ export const updateLifecycleStepAction = growthAction({
     stepId: z.string(),
     changes: lifecycleStepChangesSchema,
   }),
+  nativeOutputSchema: outputs.stepNativeResultSchema,
   outputSchema: outputs.stepResultSchema,
   execute: async (input, ctx) => {
     const step = await updateLifecycleStep({
@@ -125,6 +133,7 @@ export const linkLifecycleCampaignAction = growthAction({
     campaignId: z.string(),
     programId: z.string().nullable(),
   }),
+  nativeOutputSchema: outputs.campaignNativeResultSchema,
   outputSchema: outputs.campaignResultSchema,
   execute: async (input, ctx) => ({
     campaign: await linkLifecycleCampaign({
@@ -144,6 +153,7 @@ export const setLifecycleCleanupStatusAction = growthAction({
     campaignId: z.string(),
     cleanupStatus: lifecycleCleanupStatusSchema,
   }),
+  nativeOutputSchema: outputs.campaignNativeResultSchema,
   outputSchema: outputs.campaignResultSchema,
   execute: async (input, ctx) => ({
     campaign: await setLifecycleCampaignCleanupStatus({
@@ -158,6 +168,7 @@ export const archiveLifecycleProgramAction = growthAction({
   description:
     "Archive a local lifecycle program. Provider delivery stays unchanged.",
   inputSchema: z.object({ programId: z.string() }),
+  nativeOutputSchema: outputs.programNativeResultSchema,
   outputSchema: outputs.programResultSchema,
   execute: async (input, ctx) => ({
     program: await setLifecycleProgramArchived({
@@ -172,6 +183,7 @@ export const archiveLifecycleProgramAction = growthAction({
 export const restoreLifecycleProgramAction = growthAction({
   description: "Restore an archived local lifecycle program.",
   inputSchema: z.object({ programId: z.string() }),
+  nativeOutputSchema: outputs.programNativeResultSchema,
   outputSchema: outputs.programResultSchema,
   execute: async (input, ctx) => ({
     program: await setLifecycleProgramArchived({

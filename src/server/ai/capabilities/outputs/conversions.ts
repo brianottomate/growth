@@ -74,3 +74,21 @@ export const inspectConversionRealityOutputSchema = z.strictObject({
     }),
   ),
 });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const inspectConversionRealityNativeResultSchema =
+  inspectConversionRealityOutputSchema.extend({
+    events: z.array(
+      inspectConversionRealityOutputSchema.shape.events.element.extend({
+        createdAt: z.date(),
+        updatedAt: z.date(),
+      }),
+    ),
+    mappings: z.array(
+      inspectConversionRealityOutputSchema.shape.mappings.element.extend({
+        createdAt: z.date(),
+        lastCheckedAt: z.date().nullable(),
+        updatedAt: z.date(),
+      }),
+    ),
+  });

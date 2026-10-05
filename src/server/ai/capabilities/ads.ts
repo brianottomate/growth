@@ -1,11 +1,17 @@
 import {
-  adAuthoringFields,
-  hasOneAdOwner,
-  textAdCopySchema,
-} from "@/lib/ad-authoring";
-import { env } from "@/env";
-import { campaignPath } from "@/lib/campaign-navigation";
-import {
+  deletePlatformCampaignActionNativeResultSchema,
+  setDeliveryActionNativeResultSchema,
+  pushDraftActionNativeResultSchema,
+  setPlatformDraftActionNativeResultSchema,
+  updateAudienceActionNativeResultSchema,
+  addAudienceActionNativeResultSchema,
+  openCampaignActionNativeResultSchema,
+  createAudienceActionNativeResultSchema,
+  duplicateMetaCampaignActionNativeResultSchema,
+  boostMetaPostActionNativeResultSchema,
+  createSpecializedMetaDraftActionNativeResultSchema,
+  draftCampaignActionNativeResultSchema,
+  draftAdResultSchema,
   adsScopeOutputSchema,
   topAdsOutputSchema,
   listAdsDestinationsOutputSchema,
@@ -58,6 +64,15 @@ import {
   importMetaCampaignActionOutputSchema,
   ideaContextActionOutputSchema,
 } from "./outputs/ads";
+
+import {
+  adAuthoringFields,
+  hasOneAdOwner,
+  textAdCopySchema,
+} from "@/lib/ad-authoring";
+import { env } from "@/env";
+import { campaignPath } from "@/lib/campaign-navigation";
+
 import { adChatContext } from "@/server/services/ad-chat-context.service";
 import { suggestCampaignAudiences } from "@/server/services/campaign-audience-suggestions.service";
 import {
@@ -286,6 +301,7 @@ export const listAdsDestinations = growthAction({
 });
 
 export const draftCampaignAction = growthAction({
+  nativeOutputSchema: draftCampaignActionNativeResultSchema,
   outputSchema: draftCampaignActionOutputSchema,
   description:
     "Create a LOCAL campaign draft — the editable first-party object shown at /app/brands/{brandSlug}/ads/{campaignId}. Nothing touches any ad platform: per-platform campaigns are created later by the push, which is a separate operator-approved step. Use planPlatform and setPlatformDraft to prepare delivery, then push after operator approval.",
@@ -352,6 +368,7 @@ export const draftCampaignAction = growthAction({
 });
 
 export const createSpecializedMetaDraftAction = growthAction({
+  nativeOutputSchema: createSpecializedMetaDraftActionNativeResultSchema,
   outputSchema: createSpecializedMetaDraftActionOutputSchema,
   description:
     "Create a specialized Meta campaign for lead generation, lead conversion, app promotion, or catalog sales through Zernio. Standard traffic, engagement, awareness, video views, and conversion campaigns must use draftCampaign then push. Create a campaign, ad set, and ad — single-image via imageUrl, or a 2–10 card carousel via carouselCards. The campaign is forced to PAUSED so it cannot spend until activated in a separate operator step. Set validateOnly to check Meta's tree without creating it. Requires explicit operator approval even for validation because Meta uploads referenced media during dry runs.",
@@ -444,6 +461,7 @@ export const createSpecializedMetaDraftAction = growthAction({
 });
 
 export const boostMetaPostAction = growthAction({
+  nativeOutputSchema: boostMetaPostActionNativeResultSchema,
   outputSchema: boostMetaPostActionOutputSchema,
   description:
     "Boost one existing Facebook or Instagram post through Zernio while preserving its engagement. Zernio launches the created Meta hierarchy ACTIVE, so approval starts a spend-capable campaign immediately. Provide exactly one provider post identifier. Requires explicit operator approval.",
@@ -477,6 +495,7 @@ export const boostMetaPostAction = growthAction({
 });
 
 export const duplicateMetaCampaignAction = growthAction({
+  nativeOutputSchema: duplicateMetaCampaignActionNativeResultSchema,
   outputSchema: duplicateMetaCampaignActionOutputSchema,
   description:
     "Deep-copy one Meta campaign already visible inside the named brand's allowlisted account. Zernio creates the copied campaign PAUSED and syncs the copy back into the ad tree. Requires explicit operator approval.",
@@ -494,6 +513,7 @@ export const duplicateMetaCampaignAction = growthAction({
 });
 
 export const createAudienceAction = growthAction({
+  nativeOutputSchema: createAudienceActionNativeResultSchema,
   outputSchema: createAudienceActionOutputSchema,
   description:
     "Create a Meta custom audience (customer_list or lookalike) on an allowlisted ad account through Zernio. No spend, but a provider write — and the endpoint is NOT idempotent, so a failure must be reported to the operator, never retried. Lookalikes require sourceAudienceId, country, and ratio (0.01–0.20).",
@@ -569,6 +589,7 @@ export const addAudienceUsersAction = growthAction({
 });
 
 export const draftAdAction = growthAction({
+  nativeOutputSchema: draftAdResultSchema,
   outputSchema: draftAdActionOutputSchema,
   description:
     "Add a drafted ad to a LOCAL campaign or to the brand ad studio — a suggestion the push transforms per platform. Local only. Type creative (default) carries copy plus media: one image, several images (a carousel, in order), or a video — for Meta. Media the operator attached this turn can be passed by its chat url directly; it is saved into the brand's library and its video poster resolved for you. Type text is a pool of headlines and descriptions, for Google/OpenAI.",
@@ -761,6 +782,7 @@ export const draftAdAction = growthAction({
 // it was standing on. These close that.
 
 export const openCampaignAction = growthAction({
+  nativeOutputSchema: openCampaignActionNativeResultSchema,
   outputSchema: openCampaignActionOutputSchema,
   description:
     "Read one first-party campaign in full: its brief, ad sets and their audiences, drafted and live ads, and any per-platform campaigns the push created. Use this before editing a campaign so you are working from its current state rather than what was said earlier in the conversation.",
@@ -940,6 +962,7 @@ const EXCLUDED_TERMS_HELP =
   "Terms this audience must not be reached on, same notation. Sent as the Google ad group's negative keywords.";
 
 export const addAudienceAction = growthAction({
+  nativeOutputSchema: addAudienceActionNativeResultSchema,
   outputSchema: addAudienceActionOutputSchema,
   description:
     "Add an audience to a LOCAL campaign: one buyable narrowing (one age window, one geography, optional keyword suggestions) that the push compiles to a Meta ad set / Google ad group. Default to ONE audience and ONE ad set per campaign. Reuse or update the existing audience. Only propose or create multiple audiences when the operator explicitly requests a split or experiment. Local only, and an audience carries NO money — budgets live on the platform draft. Omit everything but the name for broad targeting, which is a legitimate and often correct choice.",
@@ -1012,6 +1035,7 @@ export const addAudienceAction = growthAction({
 });
 
 export const updateAudienceAction = growthAction({
+  nativeOutputSchema: updateAudienceActionNativeResultSchema,
   outputSchema: updateAudienceActionOutputSchema,
   description:
     "Update a campaign audience's fields — name, age window, geography, search terms, or excluded terms. Only the fields sent are changed. Local only. Budgets live on the platform draft (setPlatformDraft), never on an audience.",
@@ -1132,6 +1156,7 @@ export const setCreativePoolAction = growthAction({
 });
 
 export const setPlatformDraftAction = growthAction({
+  nativeOutputSchema: setPlatformDraftActionNativeResultSchema,
   outputSchema: setPlatformDraftActionOutputSchema,
   description:
     "Set a platform draft's AUTHORITATIVE budget and its platform-specific settings before pushing: Google needs a campaign type (a search campaign without keywords is rejected at push — its keywords derive from the audiences' suggestions unless overridden here); Meta takes pixel, conversion event, placements, budget mode, and optional schedule controls (startWhenLaunched/runUntilPaused). Daily budgets need no dates; lifetime budgets need an end. Read listDestinations for verified trackingDefaults instead of guessing a pixel; LinkedIn takes the authoring Company Page id, a manual bid and the CTA, all optional. Also the only place to set flight dates, which a lifetime budget requires. Local only.",
@@ -1343,6 +1368,7 @@ export const deleteAdDraftAction = growthAction({
 });
 
 export const pushDraftAction = growthAction({
+  nativeOutputSchema: pushDraftActionNativeResultSchema,
   outputSchema: pushDraftActionOutputSchema,
   description:
     "COMPILE a LOCAL campaign onto one platform: each audience becomes an ad set / ad group, every creative ad runs under each, and region names resolve to real platform geo keys. Budget, dates and settings come from the platform DRAFT row (set them with setPlatformDraft first), so this takes no numbers of its own. Everything is created PAUSED; adsWrite.setDelivery starts spend separately. Set validateOnly for a dry run — Meta only, single audience only. LinkedIn: campaign group → campaign (the ad set) → creative. ONE push sends every creative ad, same as Meta — the first opens the campaign and the rest are attached to it, one provider call each. Do not split a campaign across several pushes or ask the operator to pick a subset. LinkedIn targets at country level only, and its goals are engagement / traffic / awareness / video_views. Call adsRead.listDestinations first for the account ids; never guess them.",
@@ -1366,6 +1392,7 @@ export const pushDraftAction = growthAction({
 });
 
 export const setDeliveryAction = growthAction({
+  nativeOutputSchema: setDeliveryActionNativeResultSchema,
   outputSchema: setDeliveryActionOutputSchema,
   description:
     "Start or pause delivery of a per-platform campaign. Setting status to active STARTS SPEND on the client's ad account immediately. Requires explicit operator approval, and pausing is the reverse of the same action.",
@@ -1381,6 +1408,7 @@ export const setDeliveryAction = growthAction({
 });
 
 export const deletePlatformCampaignAction = growthAction({
+  nativeOutputSchema: deletePlatformCampaignActionNativeResultSchema,
   outputSchema: deletePlatformCampaignActionOutputSchema,
   description:
     "Delete a campaign on the ad account itself, cascading to its ad sets and ads on the platform. Reporting history goes with it and this cannot be undone. Pausing via adsWrite.setDelivery is usually what is wanted instead. Requires explicit operator approval.",
@@ -2035,6 +2063,7 @@ export const unfreezePlacementAction = growthAction({
 });
 
 export const saveIdeaAction = growthAction({
+  nativeOutputSchema: draftAdResultSchema,
   outputSchema: saveIdeaActionOutputSchema,
   description:
     "Save an editable image ad idea: shared ad copy, ordered source images, per-image composition recipes and shape overrides. Read adsRead.ideaContext immediately before saving for this ad's current updatedAt and complete document. After reopening or any prior save, read again; never reuse the old version. Preserves recipes and returns the ad to draft; does not publish or materialize renders.",

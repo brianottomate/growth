@@ -1,3 +1,5 @@
+import type { EditCatalogCardResult } from "@/server/ai/capabilities/outputs/ads";
+import type { CatalogStateResult } from "@/server/ai/capabilities/outputs/catalog";
 import {
   startWorkflowRun,
   claimWorkflowRun,
@@ -329,7 +331,7 @@ export async function catalogState(
   userId: string,
   brandId: string,
   refresh = false,
-) {
+): Promise<CatalogStateResult> {
   const brand = await catalogBrand(userId, brandId);
   const { inventory, homes, draft, unwritten } = await catalogHomes(
     brand,
@@ -579,7 +581,7 @@ export async function editCatalogCard(input: {
   /** Mark the card as reviewed in the state this edit leaves it in. */
   approved?: boolean;
   force?: boolean;
-}) {
+}): Promise<EditCatalogCardResult> {
   const brand = await catalogBrand(input.userId, input.brandId);
   const { patch } = input;
   // Taking a card in or out of the export is not a change to what it shows.
@@ -686,7 +688,7 @@ export async function editCatalogCard(input: {
         ),
       );
   return {
-    approved: input.approved ?? card.approved,
+    approved: input.approved ?? card.approved ?? false,
     homeId: card.homeId,
     title: card.title,
     subtitle: card.subtitle,

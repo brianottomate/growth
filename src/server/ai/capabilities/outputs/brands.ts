@@ -103,12 +103,16 @@ const performanceSettingsShape = {
   updatedFrom: z.enum(["agent", "intake", "operator"]).optional(),
 } satisfies Record<keyof PerformanceSettings, z.ZodType>;
 
+export const performanceSettingsSchema = z.strictObject(
+  performanceSettingsShape,
+);
+
 export const setPerformanceSettingsActionOutputSchema = z.strictObject({
   brandId: z.string(),
   changed: z.array(z.string()),
   ok: z.literal(true),
   path: z.string(),
-  settings: z.strictObject(performanceSettingsShape),
+  settings: performanceSettingsSchema,
 });
 
 export const getBrandOutputSchema = z.strictObject({
@@ -121,7 +125,7 @@ export const getBrandOutputSchema = z.strictObject({
       scrapedAt: z.string().nullable(),
       hasBrandIdentity: z.boolean(),
     }),
-    performanceSettings: z.strictObject(performanceSettingsShape).nullable(),
+    performanceSettings: performanceSettingsSchema.nullable(),
   }),
 });
 
@@ -135,3 +139,5 @@ export const enrichBrandActionOutputSchema = z.strictObject({
   name: z.string(),
   tagline: z.string().nullable(),
 });
+
+export type BrandListResult = z.output<typeof listBrandsOutputSchema>;

@@ -427,3 +427,111 @@ export const findGapsResultSchema = z.strictObject({
   programs: z.array(programItemSchema),
   unlinkedCampaigns: z.array(campaignItemSchema),
 });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const overviewNativeResultSchema = overviewResultSchema.extend({
+  programs: z.array(
+    overviewResultSchema.shape.programs.element.extend({
+      createdAt: z.date(),
+      deletedAt: z.date().nullable(),
+      metadata: z.unknown(),
+      steps: z.array(
+        overviewResultSchema.shape.programs.element.shape.steps.element.extend({
+          createdAt: z.date(),
+          updatedAt: z.date(),
+        }),
+      ),
+      updatedAt: z.date(),
+    }),
+  ),
+});
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const inspectProgramNativeResultSchema =
+  inspectProgramResultSchema.extend({
+    campaigns: z.array(
+      inspectProgramResultSchema.shape.campaigns.element.extend({
+        createdAt: z.date(),
+        deletedAt: z.date().nullable(),
+        lastSentAt: z.date().nullable(),
+        metadata: z.unknown(),
+        startedAt: z.date().nullable(),
+        touchpoints: z.array(
+          inspectProgramResultSchema.shape.campaigns.element.shape.touchpoints.element.extend(
+            { createdAt: z.date(), updatedAt: z.date() },
+          ),
+        ),
+        updatedAt: z.date(),
+      }),
+    ),
+    createdAt: z.date(),
+    deletedAt: z.date().nullable(),
+    metadata: z.unknown(),
+    steps: z.array(
+      inspectProgramResultSchema.shape.steps.element.extend({
+        createdAt: z.date(),
+        updatedAt: z.date(),
+      }),
+    ),
+    updatedAt: z.date(),
+  });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const searchCampaignsNativeResultSchema = z.array(
+  searchCampaignsResultSchema.element.extend({
+    createdAt: z.date(),
+    deletedAt: z.date().nullable(),
+    lastSentAt: z.date().nullable(),
+    metadata: z.unknown(),
+    startedAt: z.date().nullable(),
+    updatedAt: z.date(),
+  }),
+);
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const findGapsNativeResultSchema = findGapsResultSchema.extend({
+  programs: z.array(
+    findGapsResultSchema.shape.programs.element.extend({
+      createdAt: z.date(),
+      deletedAt: z.date().nullable(),
+      metadata: z.unknown(),
+      steps: z.array(
+        findGapsResultSchema.shape.programs.element.shape.steps.element.extend({
+          createdAt: z.date(),
+          updatedAt: z.date(),
+        }),
+      ),
+      updatedAt: z.date(),
+    }),
+  ),
+});
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const programNativeResultSchema = programResultSchema.extend({
+  program: programResultSchema.shape.program.extend({
+    createdAt: z.date(),
+    deletedAt: z.date().nullable(),
+    metadata: z.unknown(),
+    updatedAt: z.date(),
+  }),
+});
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const stepNativeResultSchema = stepResultSchema.extend({
+  step: stepResultSchema.shape.step.extend({
+    createdAt: z.date(),
+    updatedAt: z.date(),
+  }),
+});
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const campaignNativeResultSchema = campaignResultSchema.extend({
+  campaign: campaignResultSchema.shape.campaign.extend({
+    createdAt: z.date(),
+    deletedAt: z.date().nullable(),
+    lastSentAt: z.date().nullable(),
+    metadata: z.unknown(),
+    startedAt: z.date().nullable(),
+    updatedAt: z.date(),
+  }),
+});

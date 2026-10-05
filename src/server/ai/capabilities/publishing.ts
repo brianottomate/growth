@@ -1,4 +1,5 @@
 import {
+  proposeLivePostNativeResultSchema,
   scheduleSocialPostOutputSchema,
   publishSocialPostNowOutputSchema,
   rescheduleSocialPostOutputSchema,
@@ -7,6 +8,7 @@ import {
   proposeLivePostOutputSchema,
   applyLivePostMatchActionOutputSchema,
 } from "./outputs/publishing";
+
 import "server-only";
 
 import { eq } from "drizzle-orm";
@@ -222,6 +224,7 @@ export const recordExternalPublish = growthAction({
 });
 
 export const proposeLivePost = growthAction({
+  nativeOutputSchema: proposeLivePostNativeResultSchema,
   outputSchema: proposeLivePostOutputSchema,
   description:
     "Work out which live post a planned spot became, for a spot the team posted by hand. Reads the unclaimed live posts on that account near the planned date and asks the model which one it is, returning the candidate, a confidence and the reasoning. Writes nothing. Use before publishingWrite.applyLivePostMatch, and use it instead of asking the operator for a permalink they would have to go find.",

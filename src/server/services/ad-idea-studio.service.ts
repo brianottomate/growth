@@ -1,3 +1,4 @@
+import type { DraftAdResult } from "@/server/ai/capabilities/outputs/ads";
 import "server-only";
 import { and, eq, isNull } from "drizzle-orm";
 import type { z } from "zod";
@@ -17,7 +18,7 @@ import { resolveBookingTarget } from "./home-groups.service";
 export async function saveAdIdea(
   input: z.infer<typeof ideaSaveSchema>,
   context: { orgId: string; userId: string },
-) {
+): Promise<DraftAdResult> {
   const { document: incoming, ...args } = ideaSaveSchema.parse(input);
   const document = withIdeaPool(incoming);
   const ad = await db.query.adTable.findFirst({

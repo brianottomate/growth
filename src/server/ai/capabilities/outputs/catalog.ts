@@ -4,6 +4,7 @@ import {
   CATALOG_TEMPLATES,
   CATALOG_WRITE_PASSES,
   catalogCardSchema,
+  catalogExportSchema,
   CATALOG_FORMATS,
 } from "@/lib/catalog-studio";
 import { compositionFormatIdSchema } from "@/lib/compositions";
@@ -45,47 +46,6 @@ const catalogHomeSchema = z.strictObject({
       }),
     )
     .optional(),
-});
-
-const catalogExportSchema = z.strictObject({
-  id: z.string(),
-  status: z.string(),
-  createdAt: z.string(),
-  error: z.string().nullable(),
-  folderId: z.string().optional(),
-  completed: z.number().optional(),
-  total: z.number().optional(),
-  assets: z
-    .array(
-      z.strictObject({
-        homeId: z.string(),
-        name: z.string(),
-        assetId: z.string(),
-        url: z.string(),
-        format: z.string(),
-      }),
-    )
-    .optional(),
-  rows: z
-    .array(
-      z.strictObject({
-        ...address,
-        id: z.string(),
-        brand: z.string(),
-        description: z.string(),
-        title: z.string(),
-        link: z.string(),
-        imageUrl: z.string(),
-        city: z.string(),
-        region: z.string(),
-        country: z.string(),
-        price: z.string(),
-        bedrooms: z.number().nullable(),
-        guests: z.number().nullable(),
-      }),
-    )
-    .optional(),
-  label: z.string().optional(),
 });
 
 export const catalogStateActionOutputSchema = z.strictObject({
@@ -174,3 +134,7 @@ export const deleteCatalogExportActionOutputSchema = z.strictObject({
 export const exportCatalogActionOutputSchema = z.strictObject({
   runId: z.string(),
 });
+
+export type CatalogStateResult = z.output<
+  typeof catalogStateActionOutputSchema
+>;

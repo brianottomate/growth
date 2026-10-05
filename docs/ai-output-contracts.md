@@ -6,10 +6,10 @@ execute the same typed tool; MCP advertises that schema in `tools/list`.
 
 ## Coverage
 
-The domain catalog contains 206 actions and seven standalone tools. Individual
-operation projection and job status produce 214 native tools
-and 199 MCP tools. All have output contracts. The additional MCP `invoke_growth` facade declares
-both its report and compact-error shapes.
+The catalog declares 278 action contracts and seven standalone tools.
+Individual operation projection and job status produce 286 native tools
+and 265 MCP tools. All have output contracts. The additional MCP
+`invoke_growth` facade declares both its report and compact-error shapes.
 
 Action contracts live beside the capability's input and execution definition.
 Larger result shapes live in `src/server/ai/capabilities/outputs/`, grouped by
@@ -30,6 +30,37 @@ out before returning data; their UI services retain their existing shape.
 The contract gate rejects an advertised `connectToken` property.
 
 ## Wire boundary
+
+### Schema-first implementations
+
+`growthAction` infers each implementation's result from its declared Zod schema,
+with `NoInfer` preventing the implementation from widening that contract.
+Every registered action uses this pattern. JSON-compatible actions declare
+`outputSchema`; actions with native Dates or provider snapshots also declare
+`nativeOutputSchema`, and their wire schema must match the native result's JSON
+projection. The seven standalone tools declare schema-derived return types too.
+Generated operation tools and background status derive their contracts from
+these canonical actions.
+
+Native contracts explicitly override Date fields with `z.date()` while reusing
+the wire contract's records, enums and optional fields. App callers retain Dates;
+the receipt boundary serializes once. Native provider extensions retain unknown
+values, while the advertised wire schema validates JSON values. Shared native
+records are reused across actions. There is no build-time generator, output cast,
+or additional per-call parsing.
+
+Shared service/tool contracts cover ad scope, campaign listing and previews,
+catalog exports and saved media analyses. Service return types and JSONB typings
+derive from these schemas; type-only imports do not load the AI catalog at runtime.
+Intake and Product Atlas brand results share sender/settings schemas, and
+ad recipes reuse the canonical composition template enum. Raw Firecrawl branding
+is preserved as JSON without constraining provider-specific fields; normalized
+brand identity fields retain explicit schemas.
+
+Missing required fields, incompatible values and invalid enum members now fail
+at the implementation boundary. TypeScript still permits extra properties on
+existing objects and cannot check refinements, so runtime validation remains
+necessary for external values and the advertised strict wire shape.
 
 Service actions remain usable as native service functions through `action.run`.
 Native tool execution retains service types, including Dates. The receipt boundary

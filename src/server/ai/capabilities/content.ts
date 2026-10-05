@@ -1,4 +1,9 @@
 import {
+  productionQueueNativeResultSchema,
+  upcomingContentNativeResultSchema,
+  suggestMediaForContentNativeResultSchema,
+  searchContentWorkItemsNativeResultSchema,
+  getContentWorkItemResultSchema,
   getContentWorkItemOutputSchema,
   searchContentWorkItemsOutputSchema,
   updateContentWorkItemOutputSchema,
@@ -24,6 +29,9 @@ import {
   promotePlatformPostOutputSchema,
   deleteContentWorkItemOutputSchema,
 } from "./outputs/content";
+
+import type { ContentWorkItemResult } from "./outputs/content";
+
 import "server-only";
 
 import { z } from "zod";
@@ -154,11 +162,12 @@ const ADD_A_SPOT_HINT =
   "To post on a platform this work item has no spot for, add one with contentWrite.createPlatformPost or contentWrite.addCrossPost rather than editing a draft that does not exist.";
 
 export const getContentWorkItem = growthAction({
+  nativeOutputSchema: getContentWorkItemResultSchema,
   outputSchema: getContentWorkItemOutputSchema,
   description:
     "Read one canonical content work item with its brief, media pool, platform drafts, local schedule, provider receipt/status, connection readiness, and deterministic production-readiness checklist. Call this FIRST when the active conversation is about finishing or refining a content item. A deliveryExternalId is proof that Zernio accepted the post; scheduledAt alone is local intent.",
   inputSchema: z.object({ contentPostId: z.string() }),
-  execute: async ({ contentPostId }, ctx) => {
+  execute: async ({ contentPostId }, ctx): Promise<ContentWorkItemResult> => {
     const content = await requireContentWorkItem(contentPostId, ctx);
     const platformGroups = groupPlatformThreads(content.platformPosts);
     const readiness = getContentReadiness({
@@ -246,6 +255,7 @@ export const getContentWorkItem = growthAction({
 });
 
 export const searchContentWorkItems = growthAction({
+  nativeOutputSchema: searchContentWorkItemsNativeResultSchema,
   outputSchema: searchContentWorkItemsOutputSchema,
   description:
     "Search the current organization's canonical content ideas and their owned platform drafts by title, hook, copy, brand, platform, or format. Use this before creating an idea when the operator refers to existing work by name or intent.",
@@ -1199,6 +1209,7 @@ async function attachMediaItem(
  * without mutating the library or silently recovering archived bytes.
  */
 export const suggestMediaForContent = growthAction({
+  nativeOutputSchema: suggestMediaForContentNativeResultSchema,
   outputSchema: suggestMediaForContentOutputSchema,
   description:
     "Retrieve media options for an active content work item from three honest lanes: ready assets already in the brand library, media found on the brand's historical platform posts, and the brief/context needed to write one strong AI image-generation prompt. Call after getContentWorkItem when the operator asks what visual or media to use. Return at most one recommendation per lane in your answer, explain why it fits, and distinguish immediately usable library media from archive media that still needs recovery. Never recommend a library asset solely from its dimensions, filename, or recency: it needs semantic evidence in its title, alt text, or tags.",
@@ -1607,6 +1618,7 @@ export const contentPipelineSummary = growthAction({
 });
 
 export const upcomingContent = growthAction({
+  nativeOutputSchema: upcomingContentNativeResultSchema,
   outputSchema: upcomingContentOutputSchema,
   description:
     "List content planned inside a bounded upcoming window, soonest first. Defaults to the next 14 days and can focus one owned brand. Use for 'what's next / what's planned in the next two weeks / what's on the calendar' questions.",
@@ -1692,6 +1704,7 @@ export const upcomingContent = growthAction({
 });
 
 export const productionQueue = growthAction({
+  nativeOutputSchema: productionQueueNativeResultSchema,
   outputSchema: productionQueueOutputSchema,
   description:
     "List canonical content work items in the next 14 days with deterministic readiness checks and the next incomplete production step. Use for 'what should I work on?', 'what is blocked?', or after planning to move from slots into execution.",

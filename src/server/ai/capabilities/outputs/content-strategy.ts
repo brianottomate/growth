@@ -215,3 +215,53 @@ export const clearContentSeriesOutputSchema = z.strictObject({
   ok: z.literal(true),
   url: z.string(),
 });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const getContentStrategyNativeResultSchema =
+  getContentStrategyOutputSchema.extend({
+    series: z.array(
+      getContentStrategyOutputSchema.shape.series.element.extend({
+        content: z.array(
+          getContentStrategyOutputSchema.shape.series.element.shape.content.element.extend(
+            { plannedAt: z.date().nullable() },
+          ),
+        ),
+        endAt: z.date().nullable(),
+        startAt: z.date().nullable(),
+      }),
+    ),
+  });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const saveContentPillarNativeResultSchema =
+  saveContentPillarOutputSchema.extend({
+    pillar: saveContentPillarOutputSchema.shape.pillar.extend({
+      createdAt: z.date(),
+      updatedAt: z.date(),
+    }),
+  });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const saveContentSeriesNativeResultSchema = z.union([
+  saveContentSeriesOutputSchema.options[0].extend({
+    series: saveContentSeriesOutputSchema.options[0].shape.series
+      .unwrap()
+      .extend({
+        createdAt: z.date(),
+        deletedAt: z.date().nullable(),
+        endAt: z.date().nullable(),
+        startAt: z.date().nullable(),
+        updatedAt: z.date(),
+      })
+      .optional(),
+  }),
+  saveContentSeriesOutputSchema.options[1].extend({
+    series: saveContentSeriesOutputSchema.options[1].shape.series.extend({
+      createdAt: z.date(),
+      deletedAt: z.date().nullable(),
+      endAt: z.date().nullable(),
+      startAt: z.date().nullable(),
+      updatedAt: z.date(),
+    }),
+  }),
+]);

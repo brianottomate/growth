@@ -485,3 +485,105 @@ export const registerBrandChannelOutputSchema = z.union([
     url: z.string(),
   }),
 ]);
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const discoverBrandChannelsNativeResultSchema =
+  discoverBrandChannelsOutputSchema.extend({
+    suggestions: z.array(
+      discoverBrandChannelsOutputSchema.shape.suggestions.element.extend({
+        createdAt: z.date(),
+        reviewedAt: z.date().nullable(),
+        updatedAt: z.date(),
+        verifiedAt: z.date().nullable(),
+      }),
+    ),
+  });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const getSharedSessionNativeResultSchema =
+  getSharedSessionOutputSchema.extend({
+    session: getSharedSessionOutputSchema.shape.session.extend({
+      createdAt: z.date(),
+      updatedAt: z.date(),
+    }),
+  });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const listMediaLibraryNativeResultSchema =
+  listMediaLibraryOutputSchema.extend({
+    assets: z.array(
+      listMediaLibraryOutputSchema.shape.assets.element.extend({
+        createdAt: z.date(),
+      }),
+    ),
+  });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const listMediaAnalysesNativeResultSchema =
+  listMediaAnalysesOutputSchema.extend({
+    assets: z.array(
+      listMediaAnalysesOutputSchema.shape.assets.element.extend({
+        updatedAt: z.date(),
+      }),
+    ),
+    images: z.array(
+      listMediaAnalysesOutputSchema.shape.images.element.extend({
+        createdAt: z.date(),
+        deletedAt: z.date().nullable(),
+        metadata:
+          listMediaAnalysesOutputSchema.shape.images.element.shape.metadata
+            .unwrap()
+            .catchall(z.unknown())
+            .nullable(),
+        updatedAt: z.date(),
+      }),
+    ),
+    videos: z.array(
+      listMediaAnalysesOutputSchema.shape.videos.element.extend({
+        artifactsSavedAt: z.date().nullable(),
+        completedAt: z.date().nullable(),
+        createdAt: z.date(),
+        updatedAt: z.date(),
+      }),
+    ),
+  });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const getMediaAnalysisNativeResultSchema = z.union([
+  getMediaAnalysisOutputSchema.options[0].extend({
+    artifactsSavedAt: z.date().nullable(),
+    completedAt: z.date().nullable(),
+    createdAt: z.date(),
+    updatedAt: z.date(),
+  }),
+  getMediaAnalysisOutputSchema.options[1].extend({
+    asset: getMediaAnalysisOutputSchema.options[1].shape.asset.extend({
+      createdAt: z.date(),
+      deletedAt: z.date().nullable(),
+      metadata:
+        getMediaAnalysisOutputSchema.options[1].shape.asset.shape.metadata
+          .unwrap()
+          .catchall(z.unknown())
+          .nullable(),
+      updatedAt: z.date(),
+    }),
+  }),
+]);
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const getStrategyTargetsNativeResultSchema =
+  getStrategyTargetsOutputSchema.extend({
+    cadence: z.array(
+      getStrategyTargetsOutputSchema.shape.cadence.element.extend({
+        createdAt: z.date(),
+        deletedAt: z.date().nullable(),
+        updatedAt: z.date(),
+      }),
+    ),
+    mix: z.array(
+      getStrategyTargetsOutputSchema.shape.mix.element.extend({
+        createdAt: z.date(),
+        updatedAt: z.date(),
+      }),
+    ),
+  });

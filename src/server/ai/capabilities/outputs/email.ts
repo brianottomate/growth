@@ -1,3 +1,4 @@
+import { listingsDigestSchema } from "@/lib/listings-digest";
 import { workflowRunStatusEnum } from "@/server/db/creative-work-schema";
 import { messageSendStatusEnum } from "@/server/db/email-document-schema";
 import { contentStatusEnum } from "@/server/db/content-schema";
@@ -6,28 +7,7 @@ import { z } from "zod";
 import { newsletterTemplateIds } from "@/lib/newsletter-templates";
 
 /** Wire results for this capability. Dates are ISO strings after JSON normalization. */
-const propertyItemSchema = z.strictObject({
-  city: z.string().nullable().optional(),
-  href: z.string().nullable().optional(),
-  imageUrl: z.string().nullable().optional(),
-  name: z.string(),
-  nightlyUsd: z.number().nullable().optional(),
-  operated: z.boolean(),
-  perPersonUsd: z.number().nullable().optional(),
-  sleeps: z.number().nullable().optional(),
-});
-
-const sectionItemSchema = z.strictObject({
-  heading: z.string(),
-  properties: z.array(propertyItemSchema),
-});
-
-const digestSchema = z.strictObject({
-  rationale: z.string().nullable().optional(),
-  schema: z.literal("wander-growth.listings-digest.v1"),
-  sections: z.array(sectionItemSchema),
-  theme: z.string().nullable().optional(),
-});
+const digestSchema = listingsDigestSchema;
 
 const changeItemSchema = z.strictObject({
   category: z.enum(["fixed", "new", "improved"]),
@@ -76,12 +56,12 @@ export const getEmailDraftOutputSchema = z.strictObject({
     createdBy: z.string().nullable(),
     ctaLabel: z.string().nullable(),
     ctaUrl: z.string().nullable(),
-    digest: digestSchema.nullable(),
+    digest: digestSchema.nullable().optional(),
     handoffTargetRepo: z.string().nullable(),
     id: z.string(),
     platformPostId: z.string(),
     preheader: z.string().nullable(),
-    productUpdate: productUpdateSchema.nullable(),
+    productUpdate: productUpdateSchema.nullable().optional(),
     subject: z.string(),
     templateKey: z.string(),
     updatedAt: z.iso.datetime(),
@@ -217,3 +197,32 @@ export const deleteEmailDraftOutputSchema = z.strictObject({
   ok: z.literal(true),
   url: z.string(),
 });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const getEmailDraftNativeResultSchema = getEmailDraftOutputSchema.extend(
+  {
+    content: getEmailDraftOutputSchema.shape.content
+      .unwrap()
+      .extend({ plannedAt: z.date().nullable() })
+      .nullable(),
+    document: getEmailDraftOutputSchema.shape.document.extend({
+      createdAt: z.date(),
+      updatedAt: z.date(),
+    }),
+    latestJob: getEmailDraftOutputSchema.shape.latestJob
+      .unwrap()
+      .extend({ createdAt: z.date(), completedAt: z.date().nullable() })
+      .optional(),
+    messageSends: z.array(
+      getEmailDraftOutputSchema.shape.messageSends.element.extend({
+        approvedAt: z.date().nullable(),
+        createdAt: z.date(),
+        sentAt: z.date().nullable(),
+      }),
+    ),
+    spot: getEmailDraftOutputSchema.shape.spot.extend({
+      publishedAt: z.date().nullable(),
+      scheduledAt: z.date().nullable(),
+    }),
+  },
+);

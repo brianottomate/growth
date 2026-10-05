@@ -1,4 +1,7 @@
 import {
+  saveContentSeriesNativeResultSchema,
+  saveContentPillarNativeResultSchema,
+  getContentStrategyNativeResultSchema,
   getContentStrategyOutputSchema,
   saveContentPillarOutputSchema,
   saveContentSeriesOutputSchema,
@@ -7,6 +10,7 @@ import {
   deleteContentSeriesOutputSchema,
   clearContentSeriesOutputSchema,
 } from "./outputs/content-strategy";
+
 import "server-only";
 
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
@@ -57,6 +61,7 @@ async function requireBrandContentIdeas(
 }
 
 export const getContentStrategy = growthAction({
+  nativeOutputSchema: getContentStrategyNativeResultSchema,
   outputSchema: getContentStrategyOutputSchema,
   description:
     "Read one brand's content strategy vocabulary and structure: brand-specific pillars and target mix, recurring series with cadence, installments, and first-post gaps, plus pending grouping proposals awaiting review. Use this before discussing pillars, series, editorial arcs, recurring formats, or whether past posts should be grouped.",
@@ -253,6 +258,7 @@ export const getContentStrategy = growthAction({
 });
 
 export const saveContentPillar = growthAction({
+  nativeOutputSchema: saveContentPillarNativeResultSchema,
   outputSchema: saveContentPillarOutputSchema,
   description:
     "Create a new brand-specific content pillar or update an existing pillar's name, description, or color after agreeing on the change. Pillar slugs are stable because content posts and mix targets reference them.",
@@ -281,6 +287,7 @@ export const saveContentPillar = growthAction({
 });
 
 export const saveContentSeries = growthAction({
+  nativeOutputSchema: saveContentSeriesNativeResultSchema,
   outputSchema: saveContentSeriesOutputSchema,
   description:
     "Create a new recurring content series or update an existing series for one owned brand after the arc, theme, and rough timing are agreed. A series groups distinct content ideas under a shared editorial arc; it is not the same as a retrospective grouping proposal.",

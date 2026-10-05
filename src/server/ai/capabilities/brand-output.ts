@@ -7,7 +7,7 @@ type ConnectionFields = Pick<
   | "connectTokenIssuedAt"
   | "connectTokenIssuedByEmail"
   | "connectTokenIssuedByName"
-> & { emailSender?: unknown };
+> & { emailSender: unknown };
 
 /** Connection-link credentials belong to the operator UI, never model results. */
 export function brandForAssistant<
@@ -33,13 +33,9 @@ export function brandForAssistant<
   return {
     ...visible,
     // Project only declared sender settings; preserve the stored record.
-    ...("emailSender" in brand
-      ? {
-          emailSender:
-            emailSender == null
-              ? null
-              : brandEmailSenderSchema.unwrap().strip().parse(sender),
-        }
-      : {}),
+    emailSender:
+      emailSender == null
+        ? null
+        : brandEmailSenderSchema.unwrap().strip().parse(sender),
   };
 }

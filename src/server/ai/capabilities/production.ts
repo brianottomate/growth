@@ -24,7 +24,10 @@ export const prepareProductionPacket = growthTool({
     instructions: z.string().trim().optional(),
     referenceMediaAssetIds: z.array(z.string()).max(12).optional(),
   }),
-  execute: async (input, ctx) => {
+  execute: async (
+    input,
+    ctx,
+  ): Promise<z.output<typeof prepareProductionPacketOutputSchema>> => {
     const { action, ...packetInput } = input;
     const packet = await createProductionPacket({
       ...packetInput,

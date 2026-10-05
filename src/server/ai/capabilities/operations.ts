@@ -1,4 +1,10 @@
 import {
+  getStrategyTargetsNativeResultSchema,
+  getMediaAnalysisNativeResultSchema,
+  listMediaAnalysesNativeResultSchema,
+  listMediaLibraryNativeResultSchema,
+  getSharedSessionNativeResultSchema,
+  discoverBrandChannelsNativeResultSchema,
   discoverBrandChannelsOutputSchema,
   scrapeBrandPostsOutputSchema,
   syncOwnedBrandContentOutputSchema,
@@ -23,6 +29,7 @@ import {
   setSeriesCadenceOutputSchema,
   registerBrandChannelOutputSchema,
 } from "./outputs/operations";
+
 import "server-only";
 import { primaryHomeIds } from "@/server/services/home-groups.service";
 
@@ -159,6 +166,7 @@ const brandMixInput = z.object({
 });
 
 export const discoverBrandChannels = growthAction({
+  nativeOutputSchema: discoverBrandChannelsNativeResultSchema,
   outputSchema: discoverBrandChannelsOutputSchema,
   description:
     "Discover official social handles for an owned or tracked brand from its website and web search, then save them as pending, unverified suggestions with confidence and source evidence for review. Confirm a suggestion by reading its profile URL, or accept it and run a small scrape, which proves the profile exists. Use only when the operator asks to discover or refresh channels.",
@@ -514,6 +522,7 @@ export const analyzeTimelineVideo = growthAction({
  * creativeWork.getThread applies for the owner's own UI.
  */
 export const getSharedSession = growthAction({
+  nativeOutputSchema: getSharedSessionNativeResultSchema,
   outputSchema: getSharedSessionOutputSchema,
   description:
     "Read one shared assistant session by its ath_ id: its title and the messages in order, with each tool call named. Use when the operator refers to another session by id. Private sessions are refused — only sessions explicitly shared inside the organization can be read.",
@@ -591,6 +600,7 @@ const SEARCH_WINDOW = 200;
  * had nothing to reach for.
  */
 export const listMediaLibrary = growthAction({
+  nativeOutputSchema: listMediaLibraryNativeResultSchema,
   outputSchema: listMediaLibraryOutputSchema,
   description:
     "List the most recent media-library assets for an owned brand, newest first, each with the url an ad creative or content attachment takes. This is the library itself, not saved analyses — reach for it whenever the operator says to use, pick, or reuse something already saved. Search scans a recent window rather than the whole library; the result says so when it was truncated. Assets with no resolvable url are counted separately and left out, since they cannot be used.",
@@ -666,6 +676,7 @@ export const listMediaLibrary = growthAction({
 });
 
 export const listMediaAnalyses = growthAction({
+  nativeOutputSchema: listMediaAnalysesNativeResultSchema,
   outputSchema: listMediaAnalysesOutputSchema,
   description:
     "List saved image and durable video analyses visible to the organization, optionally narrowed to one owned brand.",
@@ -727,6 +738,7 @@ export const listMediaAnalyses = growthAction({
 });
 
 export const getMediaAnalysis = growthAction({
+  nativeOutputSchema: getMediaAnalysisNativeResultSchema,
   outputSchema: getMediaAnalysisOutputSchema,
   description:
     "Read one saved image or durable video analysis by its canonical ID.",
@@ -764,7 +776,7 @@ export const getMediaAnalysis = growthAction({
       asset.metadata && typeof asset.metadata === "object"
         ? asset.metadata
         : {};
-    if (!("aiAnalysis" in metadata)) {
+    if (!metadata.aiAnalysis) {
       throw new Error("That asset has not been analyzed yet.");
     }
     return { asset, analysis: metadata.aiAnalysis };
@@ -787,6 +799,7 @@ export const proposeStrategyTargets = growthAction({
 });
 
 export const getStrategyTargets = growthAction({
+  nativeOutputSchema: getStrategyTargetsNativeResultSchema,
   outputSchema: getStrategyTargetsOutputSchema,
   description:
     "Read the current channel cadence and brand-default content-mix targets for one owned brand.",

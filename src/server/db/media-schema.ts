@@ -1,3 +1,8 @@
+import type { z } from "zod";
+import type {
+  libraryMediaAnalysisSchema,
+  timelineVideoAnalysisSchema,
+} from "@/server/ai/capabilities/outputs/media-analysis";
 import { relations } from "drizzle-orm";
 import {
   index,
@@ -241,7 +246,11 @@ export const mediaAssetTable = pgTable(
     duration: t.integer(), // seconds, video/audio only
     storyboard: t.jsonb().$type<MediaStoryboard>(), // video only
 
-    metadata: t.jsonb(),
+    metadata: t.jsonb().$type<
+      Record<string, unknown> & {
+        aiAnalysis?: z.output<typeof libraryMediaAnalysisSchema>;
+      }
+    >(),
 
     createdAt: t
       .timestamp()
@@ -345,7 +354,7 @@ export const mediaVideoAnalysisTable = pgTable(
     transcriptText: t.text(),
     transcriptWords: t.jsonb().$type<VideoTranscriptWord[]>(),
     transcriptError: t.text(),
-    analysis: t.jsonb(),
+    analysis: t.jsonb().$type<z.output<typeof timelineVideoAnalysisSchema>>(),
     error: t.text(),
     createdBy: t
       .text()

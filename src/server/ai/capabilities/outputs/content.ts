@@ -46,7 +46,7 @@ const statusCountSchema = z.strictObject({
   status: z.enum(contentStatusEnum.enumValues),
 });
 
-export const getContentWorkItemOutputSchema = z.strictObject({
+export const getContentWorkItemResultSchema = z.strictObject({
   brand: z.strictObject({ id: z.string(), name: z.string() }),
   brief: z.strictObject({
     captionDirection: z.string().nullable(),
@@ -59,7 +59,7 @@ export const getContentWorkItemOutputSchema = z.strictObject({
   id: z.string(),
   media: z.array(mediaItemSchema),
   pillar: z.string().nullable(),
-  plannedAt: z.iso.datetime().nullable(),
+  plannedAt: z.date().nullable(),
   platformPosts: z.array(
     z.strictObject({
       archetype: z.string().nullable(),
@@ -89,11 +89,11 @@ export const getContentWorkItemOutputSchema = z.strictObject({
       deliveryError: z.string().nullable(),
       deliveryExternalId: z.string().nullable(),
       deliveryStatus: z.string().nullable(),
-      deliveryUpdatedAt: z.iso.datetime().nullable(),
+      deliveryUpdatedAt: z.date().nullable(),
       firstComment: z.string().nullable(),
       firstCommentError: z.string().nullable(),
       firstCommentStatus: z.string().nullable(),
-      firstCommentUpdatedAt: z.iso.datetime().nullable(),
+      firstCommentUpdatedAt: z.date().nullable(),
       publishSettings: publishSettingsSchema.nullable(),
       format: z.string().nullable(),
       id: z.string(),
@@ -113,7 +113,7 @@ export const getContentWorkItemOutputSchema = z.strictObject({
           "outreach",
         ])
         .nullable(),
-      scheduledAt: z.iso.datetime().nullable(),
+      scheduledAt: z.date().nullable(),
       status: z.enum(contentStatusEnum.enumValues),
       text: z.string().nullable(),
       threadItems: z.array(
@@ -153,6 +153,21 @@ export const getContentWorkItemOutputSchema = z.strictObject({
   title: z.string().nullable(),
   url: z.string(),
 });
+
+export const getContentWorkItemOutputSchema =
+  getContentWorkItemResultSchema.extend({
+    plannedAt: z.iso.datetime().nullable(),
+    platformPosts: z.array(
+      getContentWorkItemResultSchema.shape.platformPosts.element.extend({
+        scheduledAt: z.iso.datetime().nullable(),
+        deliveryUpdatedAt: z.iso.datetime().nullable(),
+        firstCommentUpdatedAt: z.iso.datetime().nullable(),
+      }),
+    ),
+  });
+export type ContentWorkItemResult = z.output<
+  typeof getContentWorkItemResultSchema
+>;
 
 export const searchContentWorkItemsOutputSchema = z.strictObject({
   ideas: z.array(
@@ -482,3 +497,49 @@ export const deleteContentWorkItemOutputSchema = z.strictObject({
   spotsDeleted: z.number(),
   url: z.string(),
 });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const searchContentWorkItemsNativeResultSchema =
+  searchContentWorkItemsOutputSchema.extend({
+    ideas: z.array(
+      searchContentWorkItemsOutputSchema.shape.ideas.element.extend({
+        updatedAt: z.date(),
+      }),
+    ),
+  });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const suggestMediaForContentNativeResultSchema =
+  suggestMediaForContentOutputSchema.extend({
+    archive: z.array(
+      suggestMediaForContentOutputSchema.shape.archive.element.extend({
+        publishedAt: z.date().nullable(),
+      }),
+    ),
+  });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const upcomingContentNativeResultSchema =
+  upcomingContentOutputSchema.extend({
+    posts: z.array(
+      upcomingContentOutputSchema.shape.posts.element.extend({
+        plannedAt: z.date().nullable(),
+      }),
+    ),
+    standalonePlatformPosts: z.array(
+      upcomingContentOutputSchema.shape.standalonePlatformPosts.element.extend({
+        metadata: z.unknown(),
+        scheduledAt: z.date().nullable(),
+      }),
+    ),
+  });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const productionQueueNativeResultSchema =
+  productionQueueOutputSchema.extend({
+    items: z.array(
+      productionQueueOutputSchema.shape.items.element.extend({
+        plannedAt: z.date().nullable(),
+      }),
+    ),
+  });

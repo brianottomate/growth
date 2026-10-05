@@ -94,3 +94,17 @@ export const applyLivePostMatchActionOutputSchema = z.strictObject({
   platformPostId: z.string(),
   publishedAt: z.string().nullable(),
 });
+
+/** Native service result; the existing wire contract validates its JSON projection. */
+export const proposeLivePostNativeResultSchema =
+  proposeLivePostOutputSchema.extend({
+    candidatesConsidered: z.array(
+      proposeLivePostOutputSchema.shape.candidatesConsidered.element.extend({
+        publishedAt: z.date().nullable(),
+      }),
+    ),
+    match: proposeLivePostOutputSchema.shape.match
+      .unwrap()
+      .extend({ publishedAt: z.date().nullable() })
+      .nullable(),
+  });

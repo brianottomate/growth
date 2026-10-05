@@ -49,7 +49,10 @@ export const navigateWorkspace = growthTool({
         "Required for performance_client or performance_setup; also used for brand_map or Next. Use the exact id from brandRead.get or brandRead.list.",
       ),
   }),
-  execute: async (input, ctx) => {
+  execute: async (
+    input,
+    ctx,
+  ): Promise<z.output<typeof navigateWorkspaceOutputSchema>> => {
     if (
       input.surface === "performance_client" ||
       input.surface === "performance_setup"

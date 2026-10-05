@@ -937,7 +937,7 @@ export async function reconcileStaleUploads(brandId: string) {
         .set({
           status: "error",
           metadata: {
-            ...(asset.metadata as Record<string, unknown> | null),
+            ...asset.metadata,
             uploadError:
               "The browser never delivered the bytes — the tab closed, the network dropped, or the request was blocked.",
           },

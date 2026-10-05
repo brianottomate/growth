@@ -127,10 +127,42 @@ export interface GrowthAction<
   ) => Promise<OUTPUT>;
 }
 
+/** JSON-compatible actions derive their implementation result from the schema. */
+export function growthAction<
+  I extends z.ZodObject,
+  S extends z.ZodType,
+>(definition: {
+  description: string;
+  inputSchema: I;
+  outputSchema: S;
+  examples?: readonly z.input<I>[];
+  execute: (
+    input: z.infer<I>,
+    ctx: GrowthActionContext,
+  ) => Promise<NoInfer<z.output<S>>>;
+}): GrowthAction<z.infer<I>, z.output<S>, I>;
+
+/** Native services keep Dates; their separately declared wire projection is checked too. */
+export function growthAction<
+  I extends z.ZodObject,
+  S extends z.ZodType,
+>(definition: {
+  description: string;
+  inputSchema: I;
+  nativeOutputSchema: S;
+  outputSchema: z.ZodType<NoInfer<GrowthWireOutput<z.output<S>>>>;
+  examples?: readonly z.input<I>[];
+  execute: (
+    input: z.infer<I>,
+    ctx: GrowthActionContext,
+  ) => Promise<NoInfer<z.output<S>>>;
+}): GrowthAction<z.infer<I>, z.output<S>, I>;
+
 export function growthAction<I extends z.ZodObject, O>(definition: {
   description: string;
   inputSchema: I;
-  outputSchema: z.ZodType<NoInfer<GrowthWireOutput<O>>>;
+  nativeOutputSchema?: z.ZodType<O>;
+  outputSchema: z.ZodType<GrowthWireOutput<O>>;
   examples?: readonly z.input<I>[];
   execute: (input: z.infer<I>, ctx: GrowthActionContext) => Promise<O>;
 }): GrowthAction<z.infer<I>, O, I> {

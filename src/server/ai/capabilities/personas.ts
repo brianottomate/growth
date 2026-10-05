@@ -1,4 +1,7 @@
 import {
+  updatePersonaNativeResultSchema,
+  createPersonaNativeResultSchema,
+  listPersonasNativeResultSchema,
   listPersonasOutputSchema,
   createPersonaOutputSchema,
   updatePersonaOutputSchema,
@@ -7,6 +10,7 @@ import {
   createPersonaLookalikeOutputSchema,
   assignPersonaAudienceOutputSchema,
 } from "./outputs/personas";
+
 import "server-only";
 import { requirePersonaEvidence } from "@/lib/brand-evidence";
 
@@ -85,6 +89,7 @@ const personaFields = {
 };
 
 export const listPersonas = growthAction({
+  nativeOutputSchema: listPersonasNativeResultSchema,
   outputSchema: listPersonasOutputSchema,
   description:
     "List a brand's personas — the stable 'who we talk to' layer, the people counterpart of content pillars.",
@@ -102,6 +107,7 @@ export const listPersonas = growthAction({
 });
 
 export const createPersona = growthAction({
+  nativeOutputSchema: createPersonaNativeResultSchema,
   outputSchema: createPersonaOutputSchema,
   description:
     "Create a persona under an owned brand. Personas are few and stable — check the existing list before adding one; geography is optional. A distinct motivation with or without geography is valid; avoid duplicate descriptions.",
@@ -130,6 +136,7 @@ export const createPersona = growthAction({
 });
 
 export const updatePersona = growthAction({
+  nativeOutputSchema: updatePersonaNativeResultSchema,
   outputSchema: updatePersonaOutputSchema,
   description:
     "Update a persona's fields. Only the fields sent are changed; null clears one.",
