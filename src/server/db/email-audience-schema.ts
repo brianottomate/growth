@@ -1,4 +1,3 @@
-import { env } from "@/env";
 import { pgTable, pgSchema, index, jsonb } from "drizzle-orm/pg-core";
 import { brandTable } from "./brand-schema";
 import { createId } from "./utils";
@@ -6,10 +5,14 @@ import type { EmailAudienceDefinition } from "@/lib/email-audience";
 
 // Local integration tests can isolate new audience tables in a private schema.
 // Deployments always use public; the override is deliberately development-only.
+// Raw process.env, not the validated env: drizzle-kit loads this file in CI
+// (db:check) where the app's secrets do not exist.
+const devSchema =
+  process.env.NODE_ENV === "development"
+    ? process.env.EMAIL_AUDIENCE_DEV_SCHEMA
+    : undefined;
 const audienceTable = (
-  env.NODE_ENV === "development" && env.EMAIL_AUDIENCE_DEV_SCHEMA
-    ? pgSchema(env.EMAIL_AUDIENCE_DEV_SCHEMA).table
-    : pgTable
+  devSchema ? pgSchema(devSchema).table : pgTable
 ) as typeof pgTable;
 
 export const emailAudienceTable = audienceTable(
