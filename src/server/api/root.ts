@@ -1,3 +1,4 @@
+import { workflowRouter } from "./routers/workflow.router";
 import { initiativeRouter } from "@/server/api/routers/initiative.router";
 import { homeGroupsRouter } from "@/server/api/routers/homeGroups.router";
 import { userRouter } from "@/server/api/routers/user.router";
@@ -48,6 +49,7 @@ import { zernioRouter } from "@/server/api/routers/zernio.router";
  * All routers added in /api/routers should be manually added here.
  */
 export const appRouter = {
+  workflow: workflowRouter,
   initiative: initiativeRouter,
   homeGroups: homeGroupsRouter,
   user: userRouter,

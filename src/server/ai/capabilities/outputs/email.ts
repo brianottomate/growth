@@ -1,4 +1,4 @@
-import { creativeRunStatusEnum } from "@/server/db/creative-work-schema";
+import { workflowRunStatusEnum } from "@/server/db/creative-work-schema";
 import { messageSendStatusEnum } from "@/server/db/email-document-schema";
 import { contentStatusEnum } from "@/server/db/content-schema";
 import { z } from "zod";
@@ -87,7 +87,7 @@ export const getEmailDraftOutputSchema = z.strictObject({
   latestJob: z
     .strictObject({
       id: z.string(),
-      status: z.enum(creativeRunStatusEnum.enumValues),
+      status: z.enum(workflowRunStatusEnum.enumValues),
       error: z.string().nullable(),
       createdAt: z.iso.datetime(),
       completedAt: z.iso.datetime().nullable(),
@@ -203,7 +203,7 @@ export const draftEmailFromTemplateOutputSchema = z.strictObject({
 
 export const generateEmailDraftOutputSchema = z.strictObject({
   jobId: z.string(),
-  status: z.enum(creativeRunStatusEnum.enumValues),
+  status: z.enum(workflowRunStatusEnum.enumValues),
   url: z.string(),
 });
 

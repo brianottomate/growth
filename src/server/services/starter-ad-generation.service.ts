@@ -1,3 +1,9 @@
+import {
+  startWorkflowRun,
+  claimWorkflowRun,
+  updateWorkflowRun,
+  failWorkflowRun,
+} from "./workflow-run.service";
 import { brandStrategyContext } from "./brand-strategy-context.service";
 import "server-only";
 import { performanceCopyNotes } from "./performance-copy-notes.service";
@@ -30,7 +36,7 @@ import {
 } from "@/lib/ad-idea-studio";
 import type { StarterHome } from "@/lib/starter-ad-ideas";
 import { db } from "@/server/db";
-import { adTable, brandTable, creativeRunTable } from "@/server/db/schema";
+import { adTable, brandTable, workflowRunTable } from "@/server/db/schema";
 import { fetchWanderOsListingDetail } from "@/server/clients/wanderos-site.client";
 import { campaignCopyRules } from "@/server/ai/prompts/campaign-copy";
 import { runCopyRequest, type CopyRequest } from "@/server/ai/copy-request";
@@ -44,6 +50,7 @@ const MODEL = "claude-sonnet-5";
 const PROVIDER = "starter-ads";
 type Input = z.infer<typeof starterGenerationSchema> & {
   organizationId: string;
+  userId?: string;
 };
 
 export async function startStarterGeneration(input: Input) {
@@ -60,28 +67,24 @@ export async function startStarterGeneration(input: Input) {
   const bookingDestination = targetId
     ? await studioBookingDestination(brand.id, targetId, input.organizationId)
     : null;
-  const [run] = await db
-    .insert(creativeRunTable)
-    .values({
-      organizationId: input.organizationId,
-      brandId: brand.id,
-      provider: PROVIDER,
-      kind: "image",
-      model: MODEL,
-      prompt:
-        "Select real home photos and create editable starter ad copy and compositions",
-      input: { ...input, bookingDestination },
-      providerOutput: {
-        message:
-          input.source === "brand"
-            ? "Preparing brand ideas"
-            : "Preparing homes",
-        created: 0,
-        total: input.source === "brand" ? 3 : 1 + input.homeIds.length * 2,
-      },
-    })
-    .returning({ id: creativeRunTable.id });
-  return { runId: run!.id };
+  const { run } = await startWorkflowRun({
+    organizationId: input.organizationId,
+    brandId: brand.id,
+    createdBy: input.userId,
+    campaignId: campaign?.id,
+    workflowType: "starter-ads",
+    model: MODEL,
+    prompt:
+      "Select real home photos and create editable starter ad copy and compositions",
+    input: { ...input, bookingDestination },
+    progress: {
+      message:
+        input.source === "brand" ? "Preparing brand ideas" : "Preparing homes",
+      created: 0,
+      total: input.source === "brand" ? 3 : 1 + input.homeIds.length * 2,
+    },
+  });
+  return { runId: run.id };
 }
 
 export async function starterGenerationStatus(input: {
@@ -90,13 +93,13 @@ export async function starterGenerationStatus(input: {
   brandId?: string;
 }) {
   const { brand } = await resolveAdAuthoringScope(input);
-  const runs = await db.query.creativeRunTable.findMany({
+  const runs = await db.query.workflowRunTable.findMany({
     where: and(
-      eq(creativeRunTable.organizationId, input.organizationId),
-      eq(creativeRunTable.brandId, brand.id),
-      eq(creativeRunTable.provider, PROVIDER),
+      eq(workflowRunTable.organizationId, input.organizationId),
+      eq(workflowRunTable.brandId, brand.id),
+      eq(workflowRunTable.workflowType, PROVIDER),
     ),
-    orderBy: desc(creativeRunTable.createdAt),
+    orderBy: desc(workflowRunTable.createdAt),
   });
   const run = runs.find((r) =>
     input.campaignId
@@ -110,11 +113,11 @@ export async function starterGenerationStatus(input: {
     status: run.status,
     error: run.error,
     message:
-      typeof run.providerOutput?.message === "string"
-        ? run.providerOutput.message
+      typeof run.progress?.message === "string"
+        ? run.progress.message
         : "Preparing homes",
-    created: Number(run.providerOutput?.created ?? 0),
-    total: Number(run.providerOutput?.total ?? 0),
+    created: Number(run.progress?.created ?? 0),
+    total: Number(run.progress?.total ?? 0),
   };
 }
 
@@ -276,16 +279,19 @@ export function brandConceptsRequest(input: {
 }
 
 export async function runStarterGeneration(runId: string, input: Input) {
+  const claimed = await claimWorkflowRun(runId, PROVIDER);
+  if (!claimed) return;
+  input = {
+    ...starterGenerationSchema.parse(claimed.input),
+    organizationId: claimed.organizationId,
+  };
   let created = 0;
   const total = input.source === "brand" ? 3 : 1 + input.homeIds.length * 2;
   const progress = async (message: string) => {
-    await db
-      .update(creativeRunTable)
-      .set({
-        status: "processing",
-        providerOutput: { message, created, total },
-      })
-      .where(eq(creativeRunTable.id, runId));
+    await updateWorkflowRun(claimed, {
+      status: "running",
+      progress: { message, created, total },
+    });
   };
   try {
     const { campaign, brand } = await resolveAdAuthoringScope(input);
@@ -294,11 +300,11 @@ export async function runStarterGeneration(runId: string, input: Input) {
       brand.id,
       input.organizationId,
     );
-    const run = await db.query.creativeRunTable.findFirst({
+    const run = await db.query.workflowRunTable.findFirst({
       where: and(
-        eq(creativeRunTable.id, runId),
-        eq(creativeRunTable.organizationId, input.organizationId),
-        eq(creativeRunTable.brandId, brand.id),
+        eq(workflowRunTable.id, runId),
+        eq(workflowRunTable.organizationId, input.organizationId),
+        eq(workflowRunTable.brandId, brand.id),
       ),
     });
     if (!run) throw new Error("Generation run not found in this workspace.");
@@ -367,18 +373,15 @@ export async function runStarterGeneration(runId: string, input: Input) {
         created++;
         await progress("Saving brand ideas");
       }
-      await db
-        .update(creativeRunTable)
-        .set({
-          status: "ready",
-          completedAt: new Date(),
-          providerOutput: {
-            message: "Copy ready · add photos in the ad studio",
-            created,
-            total,
-          },
-        })
-        .where(eq(creativeRunTable.id, runId));
+      await updateWorkflowRun(claimed, {
+        status: "succeeded",
+        completedAt: new Date(),
+        progress: {
+          message: "Copy ready · add photos in the ad studio",
+          created,
+          total,
+        },
+      });
       return;
     }
     const [available, listings, homes, websiteId, fullBrand] =
@@ -538,28 +541,13 @@ export async function runStarterGeneration(runId: string, input: Input) {
       pool: heroCards.map((c) => c.source),
       copy: { ...copy, callToAction: "BOOK_NOW", linkUrl: brand.website ?? "" },
     });
-    await db
-      .update(creativeRunTable)
-      .set({
-        status: "ready",
-        completedAt: new Date(),
-        providerOutput: { message: "Ready to review", created, total },
-      })
-      .where(eq(creativeRunTable.id, runId));
+    await updateWorkflowRun(claimed, {
+      status: "succeeded",
+      completedAt: new Date(),
+      progress: { message: "Ready to review", created, total },
+    });
   } catch (error) {
     console.error("Starter ad generation failed", runId, error);
-    await db
-      .update(creativeRunTable)
-      .set({
-        status: "error",
-        completedAt: new Date(),
-        error: error instanceof Error ? error.message : "Generation failed",
-        providerOutput: {
-          message: "Generation stopped; created drafts are saved",
-          created,
-          total,
-        },
-      })
-      .where(eq(creativeRunTable.id, runId));
+    await failWorkflowRun(claimed, error);
   }
 }

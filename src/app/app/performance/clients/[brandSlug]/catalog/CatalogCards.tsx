@@ -102,7 +102,7 @@ function errorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
 }
 const running = (status?: string) =>
-  status === "queued" || status === "processing";
+  status === "queued" || status === "running";
 /**
  * A local dev server may change approved cards. Exporting unapproved ones is
  * `scripts/export-catalog-unapproved.ts`.
@@ -343,40 +343,13 @@ export function CatalogCards({
   const startWrite = useMutation(
     orpc.catalog.writeCards.mutationOptions({
       onMutate: () => setError(""),
-      onSuccess: ({ run }) =>
-        client.setQueryData(writeStatus.queryKey, { run }),
+      onSuccess: ({ run }) => {
+        client.setQueryData(writeStatus.queryKey, { run });
+        void client.invalidateQueries({ queryKey: orpc.workflow.key() });
+      },
       onError: (e) => setError(errorMessage(e, "Unable to write the cards")),
     }),
   );
-  // Follow the run: cards fill in as they land, and a finished run says what
-  // it could not do.
-  const lastRun = useRef<{ id: string; status: string; batch: number }>(null);
-  useEffect(() => {
-    if (!writeRun) return;
-    const last = lastRun.current;
-    const batch = Math.floor(writeRun.done / 5);
-    lastRun.current = { id: writeRun.runId, status: writeRun.status, batch };
-    if (last?.id !== writeRun.runId) return;
-    if (last.status === writeRun.status && last.batch === batch) return;
-    void client.invalidateQueries({ queryKey: state.queryKey });
-    if (!running(last.status) || running(writeRun.status)) return;
-    const { failed, left } = writeRun;
-    if (writeRun.status === "error")
-      setError(writeRun.error ?? "Unable to write the cards");
-    else if (failed || left)
-      setError(
-        [
-          failed
-            ? `${failed} card${failed === 1 ? "" : "s"} could not be written; New copy on the card retries it.`
-            : "",
-          left
-            ? `${left} card${left === 1 ? " was" : "s were"} not reached in time; run it again for the rest.`
-            : "",
-        ]
-          .filter(Boolean)
-          .join(" "),
-      );
-  }, [writeRun, client, state.queryKey]);
   const writing = running(writeRun?.status)
     ? writeRun
     : startWrite.isPending
@@ -440,7 +413,10 @@ export function CatalogCards({
       () => orpc.catalog.exportCatalog.call({ brandId, fresh }),
       "Unable to export",
     );
-    if (done) void setView("exports");
+    if (done) {
+      void setView("exports");
+      void client.invalidateQueries({ queryKey: orpc.workflow.key() });
+    }
     setBusy(false);
   }
   const cardActions = () => (
@@ -455,7 +431,12 @@ export function CatalogCards({
       />
     </>
   );
-  const activeExport = query.data?.exports.some((e) => running(e.status));
+  const activity = useQuery({
+    ...orpc.workflow.activity.queryOptions({ input: { brandId } }),
+  });
+  const activeExport = activity.data?.some(
+    (run) => run.destination === "Catalog" && running(run.status),
+  );
   return (
     <div className="space-y-4">
       <div
@@ -515,9 +496,7 @@ export function CatalogCards({
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="outline">
-                        {writing
-                          ? `Preparing ${writing.done}/${writing.total}`
-                          : "Bulk actions"}
+                        Bulk actions
                         <ChevronDown aria-hidden="true" className="size-4" />
                       </Button>
                     </DropdownMenuTrigger>

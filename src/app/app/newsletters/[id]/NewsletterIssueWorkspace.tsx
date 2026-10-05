@@ -155,7 +155,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
 
   const activeJob =
     workspace.latestJob?.status === "queued" ||
-    workspace.latestJob?.status === "processing";
+    workspace.latestJob?.status === "running";
   const formatLabel =
     workspace.spot.format === "newsletter.blast"
       ? "One-off blast"
@@ -433,7 +433,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
             <p className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="size-4 animate-spin" /> Writing a new draft
             </p>
-          ) : workspace.latestJob?.status === "error" ? (
+          ) : workspace.latestJob?.status === "failed" ? (
             <p className="text-sm text-red-500">
               {workspace.latestJob.error || "Generation failed."}
             </p>
@@ -653,7 +653,7 @@ export function NewsletterIssueWorkspace({
     ...orpc.newsletter.workspace.queryOptions({ input: { platformPostId } }),
     refetchInterval: (result) => {
       const status = result.state.data?.latestJob?.status;
-      return status === "queued" || status === "processing" ? 2_000 : false;
+      return status === "queued" || status === "running" ? 2_000 : false;
     },
   });
   // Chat edits this email beside the page; reload when it writes.

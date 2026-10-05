@@ -211,7 +211,11 @@ export const adsRouter = {
   generateStarterIdeas: workspaceProcedure
     .input(starterGenerationSchema)
     .handler(async ({ context: ctx, input }) => {
-      const args = { ...input, organizationId: ctx.workspace.orgId };
+      const args = {
+        ...input,
+        organizationId: ctx.workspace.orgId,
+        userId: ctx.session.user.id,
+      };
       const run = await startStarterGeneration(args);
       after(() => runStarterGeneration(run.runId, args));
       return run;

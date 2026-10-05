@@ -319,8 +319,7 @@ export function ProductionPacketCard({
       : configuration.data?.falConfigured;
 
   useEffect(() => {
-    if (!activeRun || !["queued", "processing"].includes(activeRun.status))
-      return;
+    if (!activeRun || !["queued", "running"].includes(activeRun.status)) return;
     const timer = window.setTimeout(
       () => refreshRun.mutate({ runId: activeRun.id }),
       3000,
@@ -399,7 +398,7 @@ export function ProductionPacketCard({
             Claude, ChatGPT, or another production tool.
           </p>
         )}
-        {activeRun && ["queued", "processing"].includes(activeRun.status) && (
+        {activeRun && ["queued", "running"].includes(activeRun.status) && (
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <ThinkingOrb
               state="composing"
@@ -410,7 +409,7 @@ export function ProductionPacketCard({
             session; the run is durable.
           </p>
         )}
-        {activeRun?.status === "error" && (
+        {activeRun?.status === "failed" && (
           <p className="text-xs text-destructive">{activeRun.error}</p>
         )}
         {candidate && (

@@ -15,8 +15,6 @@ import {
 import { type PickedHome } from "../PickedHomes";
 import { brandTabHref, loadPerformanceBrand } from "../_data";
 
-import { WanderOsImportProgress } from "./WanderOsImport";
-
 export const metadata: Metadata = { title: "WanderOS · Wander Performance" };
 export const dynamic = "force-dynamic";
 
@@ -96,7 +94,6 @@ export default async function PerformanceWanderOsPage({
 
   return (
     <div className="space-y-4">
-      <WanderOsImportProgress brandId={brand.id} />
       {!hasImportedHomes && (
         <WanderOsConnectionCard
           brandId={brand.id}

@@ -27,7 +27,7 @@ import {
   brandTable,
   assistantThreadTable,
   contentPostTable,
-  creativeRunTable,
+  workflowRunTable,
   mediaAssetTable,
   productionPacketTable,
 } from "@/server/db/schema";
@@ -341,12 +341,12 @@ export async function submitPacketForImageGeneration(input: {
       };
 
       await db
-        .update(creativeRunTable)
+        .update(workflowRunTable)
         .set({
           input: { ...started.input, providerInput },
           prompt: generationPrompt,
         })
-        .where(eq(creativeRunTable.id, runId));
+        .where(eq(workflowRunTable.id, runId));
 
       try {
         const generated = await generateGeminiImage({
@@ -367,18 +367,18 @@ export async function submitPacketForImageGeneration(input: {
           generated.contentType,
         );
         const [run] = await db
-          .update(creativeRunTable)
+          .update(workflowRunTable)
           .set({
-            status: "ready",
+            status: "succeeded",
             candidates: [{ url, contentType: generated.contentType }],
             providerOutput: generated.providerOutput,
             completedAt: new Date(),
           })
           .where(
             and(
-              eq(creativeRunTable.id, runId),
-              inArray(creativeRunTable.status, ["queued", "processing"]),
-              sql`(${creativeRunTable.expiresAt} IS NULL OR ${creativeRunTable.expiresAt} > now())`,
+              eq(workflowRunTable.id, runId),
+              inArray(workflowRunTable.status, ["queued", "running"]),
+              sql`(${workflowRunTable.expiresAt} IS NULL OR ${workflowRunTable.expiresAt} > now())`,
             ),
           )
           .returning();
@@ -391,13 +391,13 @@ export async function submitPacketForImageGeneration(input: {
             ? error.message
             : "Google Gemini generation failed";
         await db
-          .update(creativeRunTable)
-          .set({ status: "error", error: message, completedAt: new Date() })
+          .update(workflowRunTable)
+          .set({ status: "failed", error: message, completedAt: new Date() })
           .where(
             and(
-              eq(creativeRunTable.id, runId),
-              inArray(creativeRunTable.status, ["queued", "processing"]),
-              sql`(${creativeRunTable.expiresAt} IS NULL OR ${creativeRunTable.expiresAt} > now())`,
+              eq(workflowRunTable.id, runId),
+              inArray(workflowRunTable.status, ["queued", "running"]),
+              sql`(${workflowRunTable.expiresAt} IS NULL OR ${workflowRunTable.expiresAt} > now())`,
             ),
           );
         throw error;
@@ -414,21 +414,21 @@ export async function submitPacketForImageGeneration(input: {
     });
 
     await db
-      .update(creativeRunTable)
+      .update(workflowRunTable)
       .set({
         model,
         input: { ...started.input, providerInput },
         prompt: generationPrompt,
       })
-      .where(eq(creativeRunTable.id, runId));
+      .where(eq(workflowRunTable.id, runId));
     await db
-      .update(creativeRunTable)
+      .update(workflowRunTable)
       .set({ webhookTokenHash: sha256(token) })
       .where(
         and(
-          eq(creativeRunTable.id, runId),
-          inArray(creativeRunTable.status, ["queued", "processing"]),
-          sql`(${creativeRunTable.expiresAt} IS NULL OR ${creativeRunTable.expiresAt} > now())`,
+          eq(workflowRunTable.id, runId),
+          inArray(workflowRunTable.status, ["queued", "running"]),
+          sql`(${workflowRunTable.expiresAt} IS NULL OR ${workflowRunTable.expiresAt} > now())`,
         ),
       );
 
@@ -439,13 +439,13 @@ export async function submitPacketForImageGeneration(input: {
         webhookUrl: falWebhookUrl(runId, token),
       });
       const [run] = await db
-        .update(creativeRunTable)
+        .update(workflowRunTable)
         .set({ providerRequestId: submitted.request_id })
         .where(
           and(
-            eq(creativeRunTable.id, runId),
-            inArray(creativeRunTable.status, ["queued", "processing"]),
-            sql`(${creativeRunTable.expiresAt} IS NULL OR ${creativeRunTable.expiresAt} > now())`,
+            eq(workflowRunTable.id, runId),
+            inArray(workflowRunTable.status, ["queued", "running"]),
+            sql`(${workflowRunTable.expiresAt} IS NULL OR ${workflowRunTable.expiresAt} > now())`,
           ),
         )
         .returning();
@@ -455,13 +455,13 @@ export async function submitPacketForImageGeneration(input: {
       const message =
         error instanceof Error ? error.message : "Fal submission failed";
       await db
-        .update(creativeRunTable)
-        .set({ status: "error", error: message, completedAt: new Date() })
+        .update(workflowRunTable)
+        .set({ status: "failed", error: message, completedAt: new Date() })
         .where(
           and(
-            eq(creativeRunTable.id, runId),
-            inArray(creativeRunTable.status, ["queued", "processing"]),
-            sql`(${creativeRunTable.expiresAt} IS NULL OR ${creativeRunTable.expiresAt} > now())`,
+            eq(workflowRunTable.id, runId),
+            inArray(workflowRunTable.status, ["queued", "running"]),
+            sql`(${workflowRunTable.expiresAt} IS NULL OR ${workflowRunTable.expiresAt} > now())`,
           ),
         );
       throw error;
@@ -476,34 +476,34 @@ export async function refreshCreativeRun(input: {
   runId: string;
   organizationId: string;
 }) {
-  let run = await db.query.creativeRunTable.findFirst({
+  let run = await db.query.workflowRunTable.findFirst({
     where: and(
-      eq(creativeRunTable.id, input.runId),
-      eq(creativeRunTable.organizationId, input.organizationId),
+      eq(workflowRunTable.id, input.runId),
+      eq(workflowRunTable.organizationId, input.organizationId),
     ),
   });
   if (!run) throw new Error("Creative run not found.");
   if (run.packetId) {
     await latestDocumentRun(run.packetId, input.organizationId);
-    run = (await db.query.creativeRunTable.findFirst({
-      where: eq(creativeRunTable.id, run.id),
+    run = (await db.query.workflowRunTable.findFirst({
+      where: eq(workflowRunTable.id, run.id),
     }))!;
   }
   if (run.provider !== "fal" || !run.providerRequestId) return run;
-  if (["ready", "error", "cancelled"].includes(run.status)) return run;
+  if (["succeeded", "failed", "cancelled"].includes(run.status)) return run;
 
   const status = await getFalImageStatus(run.model, run.providerRequestId);
   if (status.status !== "COMPLETED") {
     const [updated] = await db
-      .update(creativeRunTable)
+      .update(workflowRunTable)
       .set({
-        status: status.status === "IN_PROGRESS" ? "processing" : "queued",
+        status: "running",
       })
       .where(
         and(
-          eq(creativeRunTable.id, run.id),
-          inArray(creativeRunTable.status, ["queued", "processing"]),
-          sql`(${creativeRunTable.expiresAt} IS NULL OR ${creativeRunTable.expiresAt} > now())`,
+          eq(workflowRunTable.id, run.id),
+          inArray(workflowRunTable.status, ["queued", "running"]),
+          sql`(${workflowRunTable.expiresAt} IS NULL OR ${workflowRunTable.expiresAt} > now())`,
         ),
       )
       .returning();
@@ -514,9 +514,9 @@ export async function refreshCreativeRun(input: {
   const payload = result.data as FalPayload;
   const candidates = normalizeCandidates(payload);
   const [updated] = await db
-    .update(creativeRunTable)
+    .update(workflowRunTable)
     .set({
-      status: candidates.length ? "ready" : "error",
+      status: candidates.length ? "succeeded" : "failed",
       candidates,
       providerOutput: payload,
       error: candidates.length ? null : "Fal returned no image candidates.",
@@ -524,9 +524,9 @@ export async function refreshCreativeRun(input: {
     })
     .where(
       and(
-        eq(creativeRunTable.id, run.id),
-        inArray(creativeRunTable.status, ["queued", "processing"]),
-        sql`(${creativeRunTable.expiresAt} IS NULL OR ${creativeRunTable.expiresAt} > now())`,
+        eq(workflowRunTable.id, run.id),
+        inArray(workflowRunTable.status, ["queued", "running"]),
+        sql`(${workflowRunTable.expiresAt} IS NULL OR ${workflowRunTable.expiresAt} > now())`,
       ),
     )
     .returning();
@@ -541,8 +541,8 @@ export async function applyFalWebhook(input: {
   payload?: FalPayload;
   error?: string;
 }) {
-  const run = await db.query.creativeRunTable.findFirst({
-    where: eq(creativeRunTable.id, input.runId),
+  const run = await db.query.workflowRunTable.findFirst({
+    where: eq(workflowRunTable.id, input.runId),
   });
   if (
     !run?.webhookTokenHash ||
@@ -551,15 +551,16 @@ export async function applyFalWebhook(input: {
   ) {
     return null;
   }
-  if (["ready", "error", "cancelled"].includes(run.status)) return run;
+  if (["succeeded", "failed", "cancelled"].includes(run.status)) return run;
 
   const candidates =
     input.status === "OK" ? normalizeCandidates(input.payload ?? {}) : [];
   const [updated] = await db
-    .update(creativeRunTable)
+    .update(workflowRunTable)
     .set({
       providerRequestId: run.providerRequestId ?? input.requestId,
-      status: input.status === "OK" && candidates.length ? "ready" : "error",
+      status:
+        input.status === "OK" && candidates.length ? "succeeded" : "failed",
       candidates,
       providerOutput: input.payload ?? {},
       error:
@@ -572,9 +573,9 @@ export async function applyFalWebhook(input: {
     })
     .where(
       and(
-        eq(creativeRunTable.id, run.id),
-        inArray(creativeRunTable.status, ["queued", "processing"]),
-        sql`(${creativeRunTable.expiresAt} IS NULL OR ${creativeRunTable.expiresAt} > now())`,
+        eq(workflowRunTable.id, run.id),
+        inArray(workflowRunTable.status, ["queued", "running"]),
+        sql`(${workflowRunTable.expiresAt} IS NULL OR ${workflowRunTable.expiresAt} > now())`,
       ),
     )
     .returning();
@@ -595,14 +596,15 @@ export async function acceptCreativeCandidate(input: {
   organizationId: string;
   userId: string;
 }) {
-  const run = await db.query.creativeRunTable.findFirst({
+  const run = await db.query.workflowRunTable.findFirst({
     where: and(
-      eq(creativeRunTable.id, input.runId),
-      eq(creativeRunTable.organizationId, input.organizationId),
+      eq(workflowRunTable.id, input.runId),
+      eq(workflowRunTable.organizationId, input.organizationId),
     ),
     with: { packet: true },
   });
-  if (run?.status !== "ready") throw new Error("Creative run is not ready.");
+  if (run?.status !== "succeeded")
+    throw new Error("Creative run is not ready.");
   if (run.acceptedMediaAssetId)
     return { run, mediaAssetId: run.acceptedMediaAssetId };
   const candidate = run.candidates[input.candidateIndex];
@@ -638,8 +640,8 @@ export async function acceptCreativeCandidate(input: {
     }
     const [fresh] = await tx
       .select()
-      .from(creativeRunTable)
-      .where(eq(creativeRunTable.id, run.id))
+      .from(workflowRunTable)
+      .where(eq(workflowRunTable.id, run.id))
       .for("update");
     if (fresh?.acceptedMediaAssetId)
       throw new Error(
@@ -698,13 +700,13 @@ export async function acceptCreativeCandidate(input: {
     }
 
     await tx
-      .update(creativeRunTable)
+      .update(workflowRunTable)
       .set({ acceptedMediaAssetId: mediaId })
-      .where(eq(creativeRunTable.id, run.id));
+      .where(eq(workflowRunTable.id, run.id));
   });
 
-  const accepted = await db.query.creativeRunTable.findFirst({
-    where: eq(creativeRunTable.id, run.id),
+  const accepted = await db.query.workflowRunTable.findFirst({
+    where: eq(workflowRunTable.id, run.id),
   });
   return { run: accepted ?? run, mediaAssetId: mediaId, url: r2Url };
 }

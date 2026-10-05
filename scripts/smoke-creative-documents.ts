@@ -6,7 +6,7 @@ import {
   brandTable,
   memberTable,
   productionPacketTable,
-  creativeRunTable,
+  workflowRunTable,
 } from "../src/server/db/schema";
 import { emptyCreativeDocument } from "../src/lib/creative-document";
 import {
@@ -105,9 +105,9 @@ try {
   const expired = await beginDocumentRun(runInput);
   await claimDocumentRun(expired.id);
   await db
-    .update(creativeRunTable)
+    .update(workflowRunTable)
     .set({ expiresAt: new Date(Date.now() - 1000) })
-    .where(eq(creativeRunTable.id, expired.id));
+    .where(eq(workflowRunTable.id, expired.id));
   await saveCreativeDocument({ ...input, document });
   assert.equal(await finishDocumentRun(expired.id, document), false);
   console.log(
@@ -115,11 +115,11 @@ try {
   );
 } finally {
   await db
-    .delete(creativeRunTable)
+    .delete(workflowRunTable)
     .where(
       and(
-        eq(creativeRunTable.packetId, packet.id),
-        eq(creativeRunTable.organizationId, owner.organizationId),
+        eq(workflowRunTable.packetId, packet.id),
+        eq(workflowRunTable.organizationId, owner.organizationId),
       ),
     );
   await db

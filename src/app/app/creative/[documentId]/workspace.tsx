@@ -17,7 +17,7 @@ export function CreativeDocumentWorkspace({
   const query = useQuery({
     ...orpc.creativeWork.document.queryOptions({ input: { documentId } }),
     refetchInterval: (query) =>
-      ["queued", "processing"].includes(query.state.data?.run?.status ?? "")
+      ["queued", "running"].includes(query.state.data?.run?.status ?? "")
         ? 3000
         : false,
   });
@@ -56,7 +56,7 @@ export function CreativeDocumentWorkspace({
   const document = draft ?? data.document;
   const locked =
     data.run?.status === "queued" ||
-    data.run?.status === "processing" ||
+    data.run?.status === "running" ||
     produce.isPending ||
     pull.isPending ||
     push.isPending;
@@ -316,7 +316,7 @@ export function CreativeDocumentWorkspace({
             ))}
           </div>
         )}
-        {document.type === "image" && data.run?.status === "ready" && (
+        {document.type === "image" && data.run?.status === "succeeded" && (
           <div className="grid grid-cols-2 gap-3">
             {data.run.candidates.map((candidate, index) => (
               <div key={candidate.url} className="space-y-2">

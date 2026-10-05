@@ -397,8 +397,8 @@ vars with the `vercel-env` skill; inspect deploy logs with the `vercel-logs` ski
 ## Important boundaries
 
 - Use Bun. Do not run npm or yarn in this repository.
-- `bun run build` includes `drizzle-kit push`; do not run it casually against an
-  unknown database URL.
+- `bun run build` does not mutate the database. Apply reviewed schema changes
+  explicitly before deploying code that needs them.
 - Preserve the default-deny ad-account allowlist. Aggregator OAuth grants can
   expose unrelated personal or portfolio accounts.
 - Provider sends, publishes, deletes, campaign changes, and conversion-action

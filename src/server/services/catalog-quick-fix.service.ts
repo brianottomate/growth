@@ -1,3 +1,10 @@
+import {
+  startWorkflowRun,
+  claimWorkflowRun,
+  updateWorkflowRun,
+  failWorkflowRun,
+  expireWorkflowRuns,
+} from "./workflow-run.service";
 import { aiFindingSchema } from "@/lib/ai-notes";
 import "server-only";
 
@@ -26,7 +33,7 @@ import {
   catalogNewPhotoPrompt,
 } from "@/server/ai/prompts";
 import { db } from "@/server/db";
-import { brandTable, creativeRunTable, homeTable } from "@/server/db/schema";
+import { brandTable, workflowRunTable, homeTable } from "@/server/db/schema";
 
 import {
   assertCardOpen,
@@ -764,23 +771,18 @@ export type CatalogWriteProgress = {
 
 const WRITE_PROVIDER = "catalog-write";
 /** Past the function's 800 s limit a run that still says processing was cut off. */
-const WRITE_STALE_MS = 15 * 60_000;
+
 /** Room under that limit for the cards in flight when the budget runs out. */
 const WRITE_BUDGET_MS = 10 * 60_000;
 
-function catalogWriteRun(run: typeof creativeRunTable.$inferSelect) {
-  const output = run.providerOutput ?? {};
-  const cutOff =
-    (run.status === "queued" || run.status === "processing") &&
-    Date.now() - run.createdAt.getTime() > WRITE_STALE_MS;
+function catalogWriteRun(run: typeof workflowRunTable.$inferSelect) {
+  const output = run.progress ?? {};
   const pass = CATALOG_WRITE_PASSES.find((p) => p === run.input.pass);
   return {
     runId: run.id,
     pass: pass ?? "photosAndCopy",
-    status: cutOff ? ("error" as const) : run.status,
-    error: cutOff
-      ? "Stopped before it finished. Run it again for the rest."
-      : run.error,
+    status: run.status,
+    error: run.error,
     done: Number(output.done ?? 0),
     total: Number(output.total ?? 0),
     failed: Number(output.failed ?? 0),
@@ -796,12 +798,13 @@ export async function catalogWriteStatus(input: {
   brandId: string;
 }) {
   const brand = await catalogBrand(input.userId, input.brandId);
-  const run = await db.query.creativeRunTable.findFirst({
+  await expireWorkflowRuns(brand.id);
+  const run = await db.query.workflowRunTable.findFirst({
     where: and(
-      eq(creativeRunTable.brandId, brand.id),
-      eq(creativeRunTable.provider, WRITE_PROVIDER),
+      eq(workflowRunTable.brandId, brand.id),
+      eq(workflowRunTable.workflowType, WRITE_PROVIDER),
     ),
-    orderBy: [desc(creativeRunTable.createdAt)],
+    orderBy: [desc(workflowRunTable.createdAt)],
   });
   return { run: run ? catalogWriteRun(run) : null };
 }
@@ -817,31 +820,27 @@ export async function startCatalogWrite(input: {
 }) {
   const brand = await catalogBrand(input.userId, input.brandId);
   const { run: latest } = await catalogWriteStatus(input);
-  if (latest && (latest.status === "queued" || latest.status === "processing"))
+  if (latest && (latest.status === "queued" || latest.status === "running"))
     return { started: false, homeIds: [], run: latest };
   const homeIds = await openCatalogCards(input.userId, input.brandId);
   if (!homeIds.length)
     throw new Error(
       "No card is open for changes: every included card is approved or supplied artwork.",
     );
-  const [run] = await db
-    .insert(creativeRunTable)
-    .values({
-      brandId: brand.id,
-      organizationId: brand.organizationId,
-      createdBy: input.userId,
-      provider: WRITE_PROVIDER,
-      kind: "image",
-      model: MODEL,
-      prompt:
-        input.pass === "copy"
-          ? "Rewrite the copy of every open catalog card"
-          : "Check the hero and write the copy of every open catalog card",
-      input: { pass: input.pass, homeIds },
-      providerOutput: { done: 0, total: homeIds.length, failed: 0 },
-    })
-    .returning();
-  return { started: true, homeIds, run: catalogWriteRun(run!) };
+  const { run, started } = await startWorkflowRun({
+    brandId: brand.id,
+    organizationId: brand.organizationId,
+    createdBy: input.userId,
+    workflowType: "catalog-write",
+    model: MODEL,
+    prompt:
+      input.pass === "copy"
+        ? "Rewrite the copy of every open catalog card"
+        : "Check the hero and write the copy of every open catalog card",
+    input: { ...input, homeIds },
+    progress: { done: 0, total: homeIds.length, failed: 0 },
+  });
+  return { started, homeIds, run: catalogWriteRun(run) };
 }
 
 /** The run's body, after the response: progress lands on the run row. */
@@ -854,20 +853,24 @@ export async function runCatalogWrite(
     homeIds: string[];
   },
 ) {
-  const save = (set: Partial<typeof creativeRunTable.$inferInsert>) =>
-    db.update(creativeRunTable).set(set).where(eq(creativeRunTable.id, runId));
+  const run = await claimWorkflowRun(runId, WRITE_PROVIDER);
+  if (!run) return;
+  const save = (set: Partial<typeof workflowRunTable.$inferInsert>) =>
+    updateWorkflowRun(run, set);
   try {
-    await save({ status: "processing" });
     const result = await writeCatalogCards({
       ...input,
       until: Date.now() + WRITE_BUDGET_MS,
-      onProgress: (progress) =>
-        save({ status: "processing", providerOutput: progress }),
+      onProgress: (progress) => save({ status: "running", progress: progress }),
     });
     await save({
-      status: "ready",
+      status: result.failed.length || result.left ? "failed" : "succeeded",
+      error:
+        result.failed.length || result.left
+          ? `${result.failed.length} cards failed; ${result.left} remain.`
+          : null,
       completedAt: new Date(),
-      providerOutput: {
+      progress: {
         done: result.done,
         total: result.total,
         failed: result.failed.length,
@@ -876,10 +879,7 @@ export async function runCatalogWrite(
       },
     });
   } catch (error) {
-    await save({
-      status: "error",
-      error: error instanceof Error ? error.message : "Writing cards failed",
-    });
+    await failWorkflowRun(run, error);
   }
 }
 
@@ -887,6 +887,7 @@ export async function runCatalogWrite(
 export async function prepareInitialCatalog(input: {
   userId: string;
   brandId: string;
+  parentRunId?: string;
 }) {
   const brand = await catalogBrand(input.userId, input.brandId);
   const rows = await db.query.homeTable.findMany({
@@ -900,21 +901,25 @@ export async function prepareInitialCatalog(input: {
       !row.aiNotes?.catalog,
   );
   const total = queue.length;
-  const [run] = await db
-    .insert(creativeRunTable)
-    .values({
-      brandId: brand.id,
-      organizationId: brand.organizationId,
-      createdBy: input.userId,
-      provider: WRITE_PROVIDER,
-      kind: "image",
-      model: MODEL,
-      status: "processing",
-      prompt: "Initial catalog copy and single-hero review",
-      input: { pass: "copy", homeIds: queue.map((row) => row.externalId) },
-      providerOutput: { done: 0, total, failed: 0 },
-    })
-    .returning();
+  const started = await startWorkflowRun({
+    brandId: brand.id,
+    organizationId: brand.organizationId,
+    createdBy: input.userId,
+    workflowType: "catalog-write",
+    model: MODEL,
+    parentRunId: input.parentRunId,
+    prompt: "Initial catalog copy and single-hero review",
+    input: {
+      ...input,
+      pass: "initial",
+      homeIds: queue.map((row) => row.externalId),
+    },
+    progress: { done: 0, total, failed: 0 },
+  });
+  if (!started.started)
+    throw new Error("Catalog preparation is already running");
+  const run = await claimWorkflowRun(started.run.id, WRITE_PROVIDER);
+  if (!run) throw new Error("Catalog preparation could not start");
   let done = 0;
   const failures: string[] = [];
   const until = Date.now() + WRITE_BUDGET_MS;
@@ -1019,10 +1024,9 @@ export async function prepareInitialCatalog(input: {
               and(eq(homeTable.id, row.id), eq(homeTable.brandId, brand.id)),
             );
           done++;
-          await db
-            .update(creativeRunTable)
-            .set({ providerOutput: { done, total, failed: failures.length } })
-            .where(eq(creativeRunTable.id, run!.id));
+          await updateWorkflowRun(run, {
+            progress: { done, total, failed: failures.length },
+          });
         } catch (error) {
           failures.push(
             `${row.name}: ${error instanceof Error ? error.message : "Preparation failed"}`,
@@ -1031,22 +1035,19 @@ export async function prepareInitialCatalog(input: {
       }
     }),
   );
-  await db
-    .update(creativeRunTable)
-    .set({
-      status: failures.length || queue.length ? "error" : "ready",
-      completedAt: new Date(),
-      error:
-        failures[0] ?? (queue.length ? "Retry to finish preparation." : null),
-      providerOutput: {
-        done,
-        total,
-        failed: failures.length,
-        left: queue.length,
-        failures,
-      },
-    })
-    .where(eq(creativeRunTable.id, run!.id));
+  await updateWorkflowRun(run, {
+    status: failures.length || queue.length ? "failed" : "succeeded",
+    completedAt: new Date(),
+    error:
+      failures[0] ?? (queue.length ? "Retry to finish preparation." : null),
+    progress: {
+      done,
+      total,
+      failed: failures.length,
+      left: queue.length,
+      failures,
+    },
+  });
   if (failures.length || queue.length)
     throw new Error(
       `${failures.length} cards failed; ${queue.length} remain. ${failures[0] ?? "Retry to finish preparation."}`,

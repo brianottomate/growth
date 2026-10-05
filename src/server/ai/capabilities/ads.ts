@@ -1509,7 +1509,7 @@ export const generateStarterIdeasAction = growthAction({
     .refine(hasOneAdOwner, { message: "Supply either campaignId or brandId." }),
   outputSchema: z.object({
     runId: z.string(),
-    status: z.enum(["queued", "processing", "ready", "error", "cancelled"]),
+    status: z.enum(["queued", "running", "succeeded", "failed", "cancelled"]),
     created: z.number(),
     total: z.number(),
     error: z.string().nullable(),
@@ -1547,6 +1547,7 @@ export const generateStarterIdeasAction = growthAction({
           : []),
       ],
       organizationId: ctx.orgId,
+      userId: ctx.userId,
     };
     const { runId } = await startStarterGeneration(args);
     await runStarterGeneration(runId, args);
@@ -1557,7 +1558,7 @@ export const generateStarterIdeasAction = growthAction({
     });
     return {
       runId,
-      status: run?.status ?? ("error" as const),
+      status: run?.status ?? ("failed" as const),
       created: run?.created ?? 0,
       total: run?.total ?? 0,
       error: run?.error ?? null,

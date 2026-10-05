@@ -7,7 +7,7 @@ import {
   CATALOG_FORMATS,
 } from "@/lib/catalog-studio";
 import { compositionFormatIdSchema } from "@/lib/compositions";
-import { creativeRunStatusEnum } from "@/server/db/creative-work-schema";
+import { workflowRunStatusEnum } from "@/server/db/creative-work-schema";
 
 const address = {
   streetAddress: z.string().nullable().optional(),
@@ -110,7 +110,7 @@ export const catalogStateActionOutputSchema = z.strictObject({
 const catalogWriteRunSchema = z.strictObject({
   runId: z.string(),
   pass: z.enum(CATALOG_WRITE_PASSES),
-  status: z.enum(creativeRunStatusEnum.enumValues),
+  status: z.enum(workflowRunStatusEnum.enumValues),
   error: z.string().nullable(),
   done: z.number(),
   total: z.number(),

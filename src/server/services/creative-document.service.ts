@@ -1,3 +1,4 @@
+import { claimWorkflowRun } from "./workflow-run.service";
 import "server-only";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import {
@@ -8,7 +9,7 @@ import { db, withTransaction, type TransactionClient } from "@/server/db";
 import {
   brandTable,
   contentPostTable,
-  creativeRunTable,
+  workflowRunTable,
   mediaAssetTable,
   platformDocumentTable,
   platformPostTable,
@@ -50,26 +51,26 @@ export async function lockDocument(
   const row = rows[0];
   if (!row) throw new Error("Creative document not found in this workspace.");
   await tx
-    .update(creativeRunTable)
+    .update(workflowRunTable)
     .set({
-      status: "error",
+      status: "failed",
       error: "Production timed out. You can retry.",
       completedAt: new Date(),
     })
     .where(
       and(
-        eq(creativeRunTable.packetId, id),
-        inArray(creativeRunTable.status, ["queued", "processing"]),
-        sql`${creativeRunTable.expiresAt} <= now()`,
+        eq(workflowRunTable.packetId, id),
+        inArray(workflowRunTable.status, ["queued", "running"]),
+        sql`${workflowRunTable.expiresAt} <= now()`,
       ),
     );
   return row;
 }
 export async function assertUnlocked(tx: TransactionClient, id: string) {
-  const active = await tx.query.creativeRunTable.findFirst({
+  const active = await tx.query.workflowRunTable.findFirst({
     where: and(
-      eq(creativeRunTable.packetId, id),
-      inArray(creativeRunTable.status, ["queued", "processing"]),
+      eq(workflowRunTable.packetId, id),
+      inArray(workflowRunTable.status, ["queued", "running"]),
     ),
   });
   if (active)
@@ -302,13 +303,14 @@ export async function beginDocumentRun(
     const document = creativeDocumentSchema.parse(row.document);
     await validateAssets(document, row.brandId);
     const [run] = await tx
-      .insert(creativeRunTable)
+      .insert(workflowRunTable)
       .values({
         organizationId: input.organizationId,
         brandId: row.brandId,
         contentPostId: row.contentPostId,
         packetId: row.id,
         createdBy: input.userId,
+        workflowType: "creative-document",
         provider: input.provider,
         model: input.model,
         kind: document.type,
@@ -321,27 +323,16 @@ export async function beginDocumentRun(
     return run!;
   });
 }
-export async function claimDocumentRun(runId: string) {
-  const [run] = await db
-    .update(creativeRunTable)
-    .set({ status: "processing" })
-    .where(
-      and(
-        eq(creativeRunTable.id, runId),
-        eq(creativeRunTable.status, "queued"),
-        sql`${creativeRunTable.expiresAt} > now()`,
-      ),
-    )
-    .returning();
-  return run;
+export function claimDocumentRun(runId: string) {
+  return claimWorkflowRun(runId, "creative-document");
 }
 export async function finishDocumentRun(
   runId: string,
   result?: CreativeDocument,
   providerOutput?: Record<string, unknown>,
 ) {
-  const run = await db.query.creativeRunTable.findFirst({
-    where: eq(creativeRunTable.id, runId),
+  const run = await db.query.workflowRunTable.findFirst({
+    where: eq(workflowRunTable.id, runId),
   });
   if (!run?.packetId) throw new Error("Document run not found.");
   const parsed = result ? creativeDocumentSchema.parse(result) : undefined;
@@ -353,18 +344,18 @@ export async function finishDocumentRun(
   return withTransaction(async (tx) => {
     await lockDocument(tx, run.packetId!, run.organizationId);
     const [finished] = await tx
-      .update(creativeRunTable)
+      .update(workflowRunTable)
       .set({
-        status: "ready",
+        status: "succeeded",
         result: parsed,
         providerOutput,
         completedAt: new Date(),
       })
       .where(
         and(
-          eq(creativeRunTable.id, runId),
-          eq(creativeRunTable.status, "processing"),
-          sql`${creativeRunTable.expiresAt} > now()`,
+          eq(workflowRunTable.id, runId),
+          eq(workflowRunTable.status, "running"),
+          sql`${workflowRunTable.expiresAt} > now()`,
         ),
       )
       .returning();
@@ -379,24 +370,24 @@ export async function finishDocumentRun(
 }
 export async function failDocumentRun(runId: string, error: unknown) {
   await db
-    .update(creativeRunTable)
+    .update(workflowRunTable)
     .set({
-      status: "error",
+      status: "failed",
       error: error instanceof Error ? error.message : "Production failed",
       completedAt: new Date(),
     })
     .where(
       and(
-        eq(creativeRunTable.id, runId),
-        inArray(creativeRunTable.status, ["queued", "processing"]),
+        eq(workflowRunTable.id, runId),
+        inArray(workflowRunTable.status, ["queued", "running"]),
       ),
     );
 }
 export async function cancelDocumentRun(runId: string, organizationId: string) {
-  const run = await db.query.creativeRunTable.findFirst({
+  const run = await db.query.workflowRunTable.findFirst({
     where: and(
-      eq(creativeRunTable.id, runId),
-      eq(creativeRunTable.organizationId, organizationId),
+      eq(workflowRunTable.id, runId),
+      eq(workflowRunTable.organizationId, organizationId),
     ),
   });
   if (!run?.packetId) throw new Error("Document run not found.");
@@ -405,12 +396,12 @@ export async function cancelDocumentRun(runId: string, organizationId: string) {
   return withTransaction(async (tx) => {
     await lockDocument(tx, run.packetId!, organizationId);
     await tx
-      .update(creativeRunTable)
+      .update(workflowRunTable)
       .set({ status: "cancelled", completedAt: new Date() })
       .where(
         and(
-          eq(creativeRunTable.id, runId),
-          inArray(creativeRunTable.status, ["queued", "processing"]),
+          eq(workflowRunTable.id, runId),
+          inArray(workflowRunTable.status, ["queued", "running"]),
         ),
       );
     return { cancelled: true };
@@ -423,11 +414,11 @@ export async function latestDocumentRun(
   await withTransaction(async (tx) => {
     await lockDocument(tx, documentId, organizationId);
   });
-  return db.query.creativeRunTable.findFirst({
+  return db.query.workflowRunTable.findFirst({
     where: and(
-      eq(creativeRunTable.packetId, documentId),
-      eq(creativeRunTable.organizationId, organizationId),
+      eq(workflowRunTable.packetId, documentId),
+      eq(workflowRunTable.organizationId, organizationId),
     ),
-    orderBy: [desc(creativeRunTable.createdAt)],
+    orderBy: [desc(workflowRunTable.createdAt)],
   });
 }

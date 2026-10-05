@@ -106,7 +106,13 @@ export const readCreativeDocument = growthAction({
     run: z
       .object({
         id: z.string(),
-        status: z.enum(["queued", "processing", "ready", "error", "cancelled"]),
+        status: z.enum([
+          "queued",
+          "running",
+          "succeeded",
+          "failed",
+          "cancelled",
+        ]),
         operation: z.string(),
         error: z.string().nullable(),
         candidates: z.array(z.object({ url: z.string() })),
@@ -118,10 +124,7 @@ export const readCreativeDocument = growthAction({
   execute: async ({ documentId }, ctx) => {
     const row = await getCreativeDocument(documentId, ctx.orgId);
     let run = await latestDocumentRun(documentId, ctx.orgId);
-    if (
-      run?.provider === "fal" &&
-      ["queued", "processing"].includes(run.status)
-    )
+    if (run?.provider === "fal" && ["queued", "running"].includes(run.status))
       run = await refreshCreativeRun({
         runId: run.id,
         organizationId: ctx.orgId,

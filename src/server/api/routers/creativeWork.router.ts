@@ -23,7 +23,7 @@ import {
   assistantThreadTable,
   brandTable,
   contentPostTable,
-  creativeRunTable,
+  workflowRunTable,
 } from "@/server/db/schema";
 import { getWanderMembership } from "@/server/wander-workspace";
 import { isFalConfigured } from "@/server/clients/fal.client";
@@ -206,12 +206,12 @@ export const creativeWorkRouter = {
     .handler(async ({ context: ctx, input }) => {
       const membership = await membershipForUser(ctx.db, ctx.session.user.id);
       return (
-        (await ctx.db.query.creativeRunTable.findFirst({
+        (await ctx.db.query.workflowRunTable.findFirst({
           where: and(
-            eq(creativeRunTable.packetId, input.packetId),
-            eq(creativeRunTable.organizationId, membership.organizationId),
+            eq(workflowRunTable.packetId, input.packetId),
+            eq(workflowRunTable.organizationId, membership.organizationId),
           ),
-          orderBy: [desc(creativeRunTable.createdAt)],
+          orderBy: [desc(workflowRunTable.createdAt)],
         })) ?? null
       );
     }),

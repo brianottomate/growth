@@ -1,10 +1,17 @@
+import {
+  startWorkflowRun,
+  claimWorkflowRun,
+  updateWorkflowRun,
+  failWorkflowRun,
+  expireWorkflowRuns,
+} from "./workflow-run.service";
 import { prepareInitialCatalog } from "./catalog-quick-fix.service";
 import "server-only";
-import { and, desc, eq, sql } from "drizzle-orm";
-import { db, withTransaction } from "@/server/db";
+import { and, desc, eq } from "drizzle-orm";
+import { db } from "@/server/db";
 import {
   brandTable,
-  creativeRunTable,
+  workflowRunTable,
   homeGroupTable,
 } from "@/server/db/schema";
 import {
@@ -23,31 +30,24 @@ import { suggestFeaturedHomes } from "./featured-home-suggestions.service";
 import { draftBrandMarkets } from "./brand-markets.service";
 
 const PROVIDER = "wanderos-import";
-const STALE_MS = 15 * 60 * 1000;
 const whereRun = (brandId: string) =>
   and(
-    eq(creativeRunTable.brandId, brandId),
-    eq(creativeRunTable.provider, PROVIDER),
+    eq(workflowRunTable.brandId, brandId),
+    eq(workflowRunTable.workflowType, PROVIDER),
   );
-function view(run: typeof creativeRunTable.$inferSelect) {
-  const stale =
-    ["queued", "processing"].includes(run.status) &&
-    Date.now() - run.createdAt.getTime() > STALE_MS;
+function view(run: typeof workflowRunTable.$inferSelect) {
   const parsed = wanderOsImportStepSchema
     .array()
-    .safeParse(run.providerOutput?.steps);
+    .safeParse(run.progress?.steps);
   return {
     id: run.id,
-    status:
-      stale || run.status === "cancelled" ? ("error" as const) : run.status,
+    status: run.status === "cancelled" ? ("failed" as const) : run.status,
     steps: initialImportSteps().map((step) =>
       parsed.success
         ? (parsed.data.find((saved) => saved.step === step.step) ?? step)
         : step,
     ),
-    error: stale
-      ? "Import was interrupted. Retry to continue unfinished steps."
-      : run.error,
+    error: run.error,
   };
 }
 export async function wanderOsImportStatus(input: {
@@ -55,9 +55,10 @@ export async function wanderOsImportStatus(input: {
   brandId: string;
 }) {
   await catalogBrand(input.userId, input.brandId);
-  const run = await db.query.creativeRunTable.findFirst({
+  await expireWorkflowRuns(input.brandId);
+  const run = await db.query.workflowRunTable.findFirst({
     where: whereRun(input.brandId),
-    orderBy: [desc(creativeRunTable.createdAt)],
+    orderBy: [desc(workflowRunTable.createdAt)],
   });
   return { run: run ? view(run) : null };
 }
@@ -66,71 +67,37 @@ export async function startWanderOsImport(input: {
   brandId: string;
 }) {
   const brand = await catalogBrand(input.userId, input.brandId);
-  return withTransaction(async (tx) => {
-    await tx.execute(
-      sql`select pg_advisory_xact_lock(hashtext(${`wanderos-import:${brand.id}`}))`,
-    );
-    const [previous] = await tx
-      .select()
-      .from(creativeRunTable)
-      .where(whereRun(brand.id))
-      .orderBy(desc(creativeRunTable.createdAt))
-      .limit(1);
-    const latest = previous ? view(previous) : null;
-    if (latest && ["queued", "processing"].includes(latest.status))
-      return { started: false, run: latest };
-    const steps =
-      latest?.status === "error"
-        ? latest.steps.map((step) =>
-            step.status === "ready"
-              ? step
-              : { ...step, status: "pending" as const, message: "" },
-          )
-        : initialImportSteps();
-    const [run] = await tx
-      .insert(creativeRunTable)
-      .values({
-        brandId: brand.id,
-        organizationId: brand.organizationId,
-        createdBy: input.userId,
-        provider: PROVIDER,
-        kind: "image",
-        model: "wanderos-setup",
-        prompt: "Import homes, select Featured homes, and create destinations",
-        input: {},
-        providerOutput: { steps },
-      })
-      .returning();
-    return { started: true, run: view(run!) };
+  const { run: latest } = await wanderOsImportStatus(input);
+  const steps =
+    latest?.status === "failed"
+      ? latest.steps.map((step) =>
+          step.status === "ready"
+            ? step
+            : { ...step, status: "pending" as const, message: "" },
+        )
+      : initialImportSteps();
+  const { run, started } = await startWorkflowRun({
+    brandId: brand.id,
+    organizationId: brand.organizationId,
+    createdBy: input.userId,
+    workflowType: PROVIDER,
+    input: { ...input },
+    progress: { steps },
+    retryOfId: latest?.status === "failed" ? latest.id : null,
   });
+  return { started, run: view(run) };
 }
+
 export async function runWanderOsImport(
   runId: string,
   input: { userId: string; brandId: string },
 ) {
-  const save = (patch: Partial<typeof creativeRunTable.$inferInsert>) =>
-    db
-      .update(creativeRunTable)
-      .set(patch)
-      .where(and(eq(creativeRunTable.id, runId), whereRun(input.brandId)));
+  const run = await claimWorkflowRun(runId, PROVIDER);
+  if (!run) return;
+  const save = (patch: Partial<typeof workflowRunTable.$inferInsert>) =>
+    updateWorkflowRun(run, patch);
   try {
     const brand = await catalogBrand(input.userId, input.brandId);
-    const run = await db.query.creativeRunTable.findFirst({
-      where: and(eq(creativeRunTable.id, runId), whereRun(brand.id)),
-    });
-    if (run?.status !== "queued") return;
-    // Claim before doing work so duplicate dispatch cannot run the same workflow.
-    const claimed = await db
-      .update(creativeRunTable)
-      .set({ status: "processing" })
-      .where(
-        and(
-          eq(creativeRunTable.id, runId),
-          eq(creativeRunTable.status, "queued"),
-        ),
-      )
-      .returning({ id: creativeRunTable.id });
-    if (!claimed.length) return;
     const steps = view(run).steps;
     const authorize = () => catalogBrand(input.userId, input.brandId);
     await runWanderOsImportSteps(
@@ -188,7 +155,7 @@ export async function runWanderOsImport(
             });
           return `${existing.length + additions.length} Featured homes selected`;
         },
-        catalog: () => prepareInitialCatalog(input),
+        catalog: () => prepareInitialCatalog({ ...input, parentRunId: runId }),
         destinations: async () => {
           await authorize();
           const current = await db.query.brandTable.findFirst({
@@ -202,15 +169,11 @@ export async function runWanderOsImport(
         },
       },
       async (steps) => {
-        await save({ providerOutput: { steps } });
+        await save({ progress: { steps } });
       },
     );
-    await save({ status: "ready", completedAt: new Date(), error: null });
+    await save({ status: "succeeded", completedAt: new Date(), error: null });
   } catch (error) {
-    await save({
-      status: "error",
-      error: error instanceof Error ? error.message : "Import failed",
-      completedAt: new Date(),
-    });
+    await failWorkflowRun(run, error);
   }
 }

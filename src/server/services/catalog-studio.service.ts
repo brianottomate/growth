@@ -1,14 +1,22 @@
+import {
+  startWorkflowRun,
+  claimWorkflowRun,
+  updateWorkflowRun,
+  failWorkflowRun,
+  ownedWorkflow,
+} from "./workflow-run.service";
 import "server-only";
 import { listingCopyContext } from "./listing-copy-context.service";
 import { catalogNewCopyPrompt, brandStorySection } from "@/server/ai/prompts";
 import { marketOf } from "@/lib/markets";
 
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
-import { db } from "@/server/db";
+import { db, withTransaction } from "@/server/db";
 import {
   brandTable,
   memberTable,
-  creativeRunTable,
+  workflowRunTable,
+  catalogExportTable,
   mediaFolderTable,
   mediaAssetTable,
   homeTable,
@@ -297,12 +305,9 @@ export async function catalogState(
     brand,
     refresh,
   );
-  const runs = await db.query.creativeRunTable.findMany({
-    where: and(
-      eq(creativeRunTable.brandId, brandId),
-      eq(creativeRunTable.provider, PROVIDER),
-    ),
-    orderBy: [desc(creativeRunTable.createdAt)],
+  const exports = await db.query.catalogExportTable.findMany({
+    where: eq(catalogExportTable.brandId, brandId),
+    orderBy: desc(catalogExportTable.createdAt),
   });
   return {
     homes,
@@ -313,11 +318,11 @@ export async function catalogState(
     format: DEFAULT_CATALOG_FORMAT,
     draft,
     unwritten,
-    exports: runs.map((run): CatalogExport => ({
-      ...run.providerOutput,
+    exports: exports.map((run): CatalogExport => ({
+      ...run.output,
       id: run.id,
-      status: run.status,
-      error: run.error,
+      status: "ready",
+      error: null,
       createdAt: run.createdAt.toISOString(),
       label: exportLabel(run.input),
     })),
@@ -756,39 +761,35 @@ export async function startCatalogExport(
   for (const card of included.filter((c) => c.mode === "finished")) {
     await finishedCatalogAsset(brandId, card.finishedArtwork!.assetId);
   }
-  const [run] = await db
-    .insert(creativeRunTable)
-    .values({
-      brandId,
-      organizationId: brand.organizationId,
-      createdBy: userId,
-      provider: PROVIDER,
-      kind: "image",
-      model: "composition-renderer",
-      prompt: "Freeze catalog compositions and snapshot the matching feed",
-      input: { draft, homes },
-      providerOutput: {
-        completed: 0,
-        total: included.length * draft.formats.length,
-      },
-    })
-    .returning();
-  return { run: run!, brand, homes, draft };
+  const { run } = await startWorkflowRun({
+    brandId,
+    organizationId: brand.organizationId,
+    createdBy: userId,
+    workflowType: "catalog-export",
+    model: "composition-renderer",
+    prompt: "Freeze catalog compositions and snapshot the matching feed",
+    input: { draft, homes, userId, brandId },
+    progress: {
+      completed: 0,
+      total: included.length * draft.formats.length,
+    },
+  });
+  const snapshot = run.input as { homes: CatalogHome[]; draft: CatalogDraft };
+  return { run, brand, homes: snapshot.homes, draft: snapshot.draft };
 }
 export async function renderCatalogExport(
   input: Awaited<ReturnType<typeof startCatalogExport>> & { fresh?: boolean },
   userId: string,
 ) {
-  const { run, brand, homes, draft } = input;
+  const { brand, homes, draft } = input;
+  const run = await claimWorkflowRun(input.run.id, PROVIDER);
+  if (!run) return;
   const assets: NonNullable<CatalogExport["assets"]> = [];
   let folderId: string | undefined;
   const total =
     draft.cards.filter((c) => c.included).length * draft.formats.length;
   try {
-    await db
-      .update(creativeRunTable)
-      .set({ status: "processing" })
-      .where(eq(creativeRunTable.id, run.id));
+    await updateWorkflowRun(run, { status: "running" });
     const [folder] = await db
       .insert(mediaFolderTable)
       .values({
@@ -798,13 +799,10 @@ export async function renderCatalogExport(
       })
       .returning();
     folderId = folder!.id;
-    await db
-      .update(creativeRunTable)
-      .set({
-        status: "processing",
-        providerOutput: { folderId, total, completed: 0 },
-      })
-      .where(eq(creativeRunTable.id, run.id));
+    await updateWorkflowRun(run, {
+      status: "running",
+      progress: { folderId, total, completed: 0 },
+    });
     const previous = await previousRenders(brand.id, input.fresh);
     for (const card of draft.cards.filter((c) => c.included)) {
       const home = homes.find((h) => h.id === card.homeId)!;
@@ -890,26 +888,35 @@ export async function renderCatalogExport(
           ...(renderKey ? { renderKey } : {}),
           ...(reused ? { reused: true } : {}),
         });
-        await db
-          .update(creativeRunTable)
-          .set({
-            providerOutput: {
-              folderId,
-              total,
-              completed: assets.length,
-              assets,
-            },
-          })
-          .where(eq(creativeRunTable.id, run.id));
+        await updateWorkflowRun(run, {
+          progress: {
+            folderId,
+            total,
+            completed: assets.length,
+            assets,
+          },
+        });
       }
     }
     const rows = catalogExportRows(homes, draft, assets, brand.name);
-    await db
-      .update(creativeRunTable)
-      .set({
-        status: "ready",
-        completedAt: new Date(),
-        providerOutput: {
+    await withTransaction(async (tx) => {
+      const [finished] = await tx
+        .update(workflowRunTable)
+        .set({
+          status: "succeeded",
+          completedAt: new Date(),
+          progress: { completed: assets.length, total },
+        })
+        .where(ownedWorkflow(run))
+        .returning({ id: workflowRunTable.id });
+      if (!finished) throw new Error("Export is no longer active");
+      await tx.insert(catalogExportTable).values({
+        id: run.id,
+        organizationId: brand.organizationId,
+        brandId: brand.id,
+        sourceRunId: run.id,
+        input: { draft, homes },
+        output: {
           folderId,
           total,
           completed: assets.length,
@@ -917,35 +924,25 @@ export async function renderCatalogExport(
           rows,
           primaryFormat: draft.primaryFormat,
         },
-      })
-      .where(eq(creativeRunTable.id, run.id));
+        createdBy: userId,
+      });
+    });
   } catch (error) {
-    await db
-      .update(creativeRunTable)
-      .set({
-        status: "error",
-        error: error instanceof Error ? error.message : "Export failed",
-        providerOutput: { folderId, total, completed: assets.length, assets },
-      })
-      .where(eq(creativeRunTable.id, run.id));
+    await failWorkflowRun(run, error);
   }
 }
 /** The last ready export's images by what they were drawn from. */
 async function previousRenders(brandId: string, fresh = false) {
   const none = new Map<string, typeof mediaAssetTable.$inferSelect>();
   if (fresh) return none;
-  const run = await db.query.creativeRunTable.findFirst({
-    where: and(
-      eq(creativeRunTable.brandId, brandId),
-      eq(creativeRunTable.provider, PROVIDER),
-      eq(creativeRunTable.status, "ready"),
-    ),
+  const run = await db.query.catalogExportTable.findFirst({
+    where: and(eq(catalogExportTable.brandId, brandId)),
     orderBy: (r, { desc }) => [desc(r.createdAt)],
-    columns: { providerOutput: true },
+    columns: { output: true },
   });
-  const keyed = (
-    (run?.providerOutput as CatalogExport | null)?.assets ?? []
-  ).filter((a) => a.renderKey);
+  const keyed = ((run?.output as CatalogExport | null)?.assets ?? []).filter(
+    (a) => a.renderKey,
+  );
   if (!keyed.length) return none;
   const rows = await db.query.mediaAssetTable.findMany({
     where: and(
@@ -972,18 +969,16 @@ export async function catalogExport(
   runId: string,
 ) {
   const brand = await catalogBrand(userId, brandId);
-  const run = await db.query.creativeRunTable.findFirst({
+  const run = await db.query.catalogExportTable.findFirst({
     where: and(
-      eq(creativeRunTable.id, runId),
-      eq(creativeRunTable.brandId, brandId),
-      eq(creativeRunTable.provider, PROVIDER),
-      eq(creativeRunTable.status, "ready"),
+      eq(catalogExportTable.id, runId),
+      eq(catalogExportTable.brandId, brandId),
     ),
   });
   if (!run) throw new Error("Completed export not found");
   const { draft } = run.input as { draft: CatalogDraft };
   return {
-    ...(run.providerOutput as unknown as Required<
+    ...(run.output as unknown as Required<
       Pick<CatalogExport, "rows" | "assets" | "folderId">
     >),
     brand,
@@ -1023,20 +1018,14 @@ export async function deleteCatalogExport(
   runId: string,
 ) {
   await catalogBrand(userId, brandId);
-  const run = await db.query.creativeRunTable.findFirst({
+  const run = await db.query.catalogExportTable.findFirst({
     where: and(
-      eq(creativeRunTable.id, runId),
-      eq(creativeRunTable.brandId, brandId),
-      eq(creativeRunTable.provider, PROVIDER),
+      eq(catalogExportTable.id, runId),
+      eq(catalogExportTable.brandId, brandId),
     ),
   });
   if (!run) throw new Error("Export not found");
-  // A render that died mid-way never leaves `processing`, so only a recent one is live.
-  const live = run.status === "queued" || run.status === "processing";
-  if (live && Date.now() - run.createdAt.getTime() < 30 * 60 * 1000)
-    throw new Error("This export is still rendering.");
-
-  const output = run.providerOutput as {
+  const output = run.output as {
     folderId?: string;
     assets?: { assetId: string }[];
   } | null;
@@ -1053,6 +1042,6 @@ export async function deleteCatalogExport(
     await db
       .delete(mediaFolderTable)
       .where(eq(mediaFolderTable.id, output.folderId));
-  await db.delete(creativeRunTable).where(eq(creativeRunTable.id, run.id));
+  await db.delete(catalogExportTable).where(eq(catalogExportTable.id, run.id));
   return { runId: run.id, images: ids.size };
 }

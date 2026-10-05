@@ -1,3 +1,4 @@
+import { WorkflowActivity } from "./WorkflowActivity";
 import { WorkspaceBreadcrumbs } from "@/components/workspace-breadcrumbs";
 import type { ReactNode } from "react";
 import { notFound, redirect } from "next/navigation";
@@ -73,6 +74,7 @@ export default async function PerformanceBrandLayout({
         </div>
       </div>
       <BrandTabs slug={slug} />
+      <WorkflowActivity brandId={brand.id} />
       {children}
     </div>
   );

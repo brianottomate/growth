@@ -59,6 +59,10 @@
     {
       "path": "/api/media/renditions",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/workflows",
+      "schedule": "0 * * * *"
     }
   ]
 }

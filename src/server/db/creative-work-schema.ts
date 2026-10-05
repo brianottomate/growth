@@ -5,6 +5,7 @@ import type { UIMessage } from "ai";
 import { relations } from "drizzle-orm";
 import {
   check,
+  foreignKey,
   index,
   pgEnum,
   pgTable,
@@ -12,6 +13,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { organizationTable, userTable } from "./auth-schema";
+import { campaignTable } from "./ads-schema";
 import { brandTable } from "./brand-schema";
 import { contentPostTable, platformPostTable } from "./content-schema";
 import { mediaAssetTable } from "./media-schema";
@@ -326,11 +328,11 @@ export type CreativeCandidate = {
   seed?: number;
 };
 
-export const creativeRunStatusEnum = pgEnum("creative_run_status", [
+export const workflowRunStatusEnum = pgEnum("workflow_run_status", [
   "queued",
-  "processing",
-  "ready",
-  "error",
+  "running",
+  "succeeded",
+  "failed",
   "cancelled",
 ]);
 
@@ -338,13 +340,13 @@ export const creativeRunStatusEnum = pgEnum("creative_run_status", [
  * Durable adapter run. Provider-specific state stays here; accepted media is
  * copied into media_asset so the brand library outlives any adapter.
  */
-export const creativeRunTable = pgTable(
-  "creative_run",
+export const workflowRunTable = pgTable(
+  "workflow_run",
   (t) => ({
     id: t
       .text()
       .primaryKey()
-      .$defaultFn(() => createId("crun")),
+      .$defaultFn(() => createId("wrun")),
     organizationId: t
       .text()
       .references(() => organizationTable.id, { onDelete: "cascade" })
@@ -362,17 +364,29 @@ export const creativeRunTable = pgTable(
     packetId: t
       .text()
       .references(() => productionPacketTable.id, { onDelete: "set null" }),
-    provider: t.text().notNull(),
-    kind: t.text({ enum: ["image", "video", "article", "email"] }).notNull(),
-    model: t.text().notNull(),
-    prompt: t.text().notNull(),
+    workflowType: t.text().notNull(),
+    campaignId: t
+      .text()
+      .references(() => campaignTable.id, { onDelete: "set null" }),
+    workflowVersion: t.integer().notNull().default(1),
+    progress: t.jsonb().$type<Record<string, unknown>>().notNull().default({}),
+    parentRunId: t.text(),
+    retryOfId: t.text(),
+    lockKey: t.text(),
+    claimToken: t.uuid(),
+    startedAt: t.timestamp({ withTimezone: true }),
+    dismissedAt: t.timestamp({ withTimezone: true }),
+    provider: t.text().notNull().default("internal"),
+    kind: t.text({ enum: ["image", "video", "article", "email"] }),
+    model: t.text().notNull().default(""),
+    prompt: t.text().notNull().default(""),
     input: t.jsonb().$type<Record<string, unknown>>().notNull(),
     operation: t.text().notNull().default("generate"),
     expiresAt: t.timestamp({ withTimezone: true }),
     result: t.jsonb().$type<CreativeDocument>(),
     providerRequestId: t.text(),
     webhookTokenHash: t.text(),
-    status: creativeRunStatusEnum().default("queued").notNull(),
+    status: workflowRunStatusEnum().default("queued").notNull(),
     candidates: t.jsonb().$type<CreativeCandidate[]>().default([]).notNull(),
     providerOutput: t.jsonb().$type<Record<string, unknown>>(),
     acceptedMediaAssetId: t
@@ -394,19 +408,66 @@ export const creativeRunTable = pgTable(
     completedAt: t.timestamp(),
   }),
   (table) => [
-    uniqueIndex("creative_run_active_packet_idx")
+    uniqueIndex("workflow_run_active_packet_idx")
       .on(table.packetId)
       .where(
-        sql`${table.packetId} IS NOT NULL AND ${table.status} IN ('queued', 'processing')`,
+        sql`${table.packetId} IS NOT NULL AND ${table.status} IN ('queued', 'running')`,
       ),
-    index("creative_run_brand_idx").on(table.brandId),
-    index("creative_run_packet_idx").on(table.packetId),
-    index("creative_run_thread_idx").on(table.threadId),
-    uniqueIndex("creative_run_provider_request_idx").on(
+    index("workflow_run_brand_idx").on(table.brandId, table.createdAt),
+    index("workflow_run_queue_idx").on(table.status, table.createdAt),
+    foreignKey({
+      columns: [table.parentRunId],
+      foreignColumns: [table.id],
+    }).onDelete("set null"),
+    foreignKey({
+      columns: [table.retryOfId],
+      foreignColumns: [table.id],
+    }).onDelete("set null"),
+    uniqueIndex("workflow_run_active_resource_idx")
+      .on(table.organizationId, table.lockKey)
+      .where(
+        sql`${table.lockKey} IS NOT NULL AND ${table.status} IN ('queued', 'running')`,
+      ),
+    index("workflow_run_packet_idx").on(table.packetId),
+    index("workflow_run_thread_idx").on(table.threadId),
+    uniqueIndex("workflow_run_provider_request_idx").on(
       table.provider,
       table.providerRequestId,
     ),
   ],
+);
+
+/** Frozen output; deleting run history never removes an export. */
+export const catalogExportTable = pgTable(
+  "catalog_export",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("cexp")),
+    organizationId: t
+      .text()
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    brandId: t
+      .text()
+      .notNull()
+      .references(() => brandTable.id, { onDelete: "cascade" }),
+    sourceRunId: t
+      .text()
+      .unique()
+      .references(() => workflowRunTable.id, { onDelete: "set null" }),
+    input: t.jsonb().$type<Record<string, unknown>>().notNull(),
+    output: t.jsonb().$type<Record<string, unknown>>().notNull(),
+    createdBy: t
+      .text()
+      .references(() => userTable.id, { onDelete: "set null" }),
+    createdAt: t
+      .timestamp()
+      .notNull()
+      .$defaultFn(() => new Date()),
+  }),
+  (t) => [index("catalog_export_brand_idx").on(t.brandId, t.createdAt)],
 );
 
 export const assistantThreadRelations = relations(
@@ -430,7 +491,7 @@ export const assistantThreadRelations = relations(
     }),
     messages: many(assistantMessageTable),
     packets: many(productionPacketTable),
-    runs: many(creativeRunTable),
+    runs: many(workflowRunTable),
   }),
 );
 
@@ -459,29 +520,29 @@ export const productionPacketRelations = relations(
       fields: [productionPacketTable.threadId],
       references: [assistantThreadTable.id],
     }),
-    runs: many(creativeRunTable),
+    runs: many(workflowRunTable),
   }),
 );
 
-export const creativeRunRelations = relations(creativeRunTable, ({ one }) => ({
+export const workflowRunRelations = relations(workflowRunTable, ({ one }) => ({
   brand: one(brandTable, {
-    fields: [creativeRunTable.brandId],
+    fields: [workflowRunTable.brandId],
     references: [brandTable.id],
   }),
   contentPost: one(contentPostTable, {
-    fields: [creativeRunTable.contentPostId],
+    fields: [workflowRunTable.contentPostId],
     references: [contentPostTable.id],
   }),
   thread: one(assistantThreadTable, {
-    fields: [creativeRunTable.threadId],
+    fields: [workflowRunTable.threadId],
     references: [assistantThreadTable.id],
   }),
   packet: one(productionPacketTable, {
-    fields: [creativeRunTable.packetId],
+    fields: [workflowRunTable.packetId],
     references: [productionPacketTable.id],
   }),
   acceptedMediaAsset: one(mediaAssetTable, {
-    fields: [creativeRunTable.acceptedMediaAssetId],
+    fields: [workflowRunTable.acceptedMediaAssetId],
     references: [mediaAssetTable.id],
   }),
 }));
@@ -491,7 +552,7 @@ export type AssistantRun = typeof assistantRunTable.$inferSelect;
 export type AssistantToolReceipt =
   typeof assistantToolReceiptTable.$inferSelect;
 export type ProductionPacket = typeof productionPacketTable.$inferSelect;
-export type CreativeRun = typeof creativeRunTable.$inferSelect;
+export type WorkflowRun = typeof workflowRunTable.$inferSelect;
 
 /** One primary creative document per channel version; ownership stays with content. */
 export const platformDocumentTable = pgTable("platform_document", (t) => ({

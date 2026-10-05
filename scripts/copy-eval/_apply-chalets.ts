@@ -18,7 +18,7 @@ import { catalogCardFingerprint } from "@/lib/catalog-studio";
 import { db } from "@/server/db";
 import {
   brandTable,
-  creativeRunTable,
+  workflowRunTable,
   homeTable,
   userTable,
 } from "@/server/db/schema";
@@ -225,8 +225,8 @@ if (args.includes("--export")) {
   const run = await startCatalogExport(user.id, brand.id);
   console.log("export", run.run.id, "started");
   await renderCatalogExport({ ...run, fresh: true }, user.id);
-  const done = await db.query.creativeRunTable.findFirst({
-    where: eq(creativeRunTable.id, run.run.id),
+  const done = await db.query.workflowRunTable.findFirst({
+    where: eq(workflowRunTable.id, run.run.id),
     columns: { status: true, error: true },
   });
   console.log("export", run.run.id, done?.status, done?.error ?? "");

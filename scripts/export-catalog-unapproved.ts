@@ -47,12 +47,12 @@ if (!user) throw new Error(`No user ${email}`);
 const run = await startCatalogExport(user.id, brand.id, true);
 console.log(`${brand.name}: export ${run.run.id} started`);
 await renderCatalogExport(run, user.id);
-const done = await db.query.creativeRunTable.findFirst({
+const done = await db.query.workflowRunTable.findFirst({
   where: (t, { eq }) => eq(t.id, run.run.id),
   columns: { status: true, error: true },
 });
 console.log(`${brand.name}: export ${run.run.id} ${done?.status}`);
-if (done?.status !== "ready") {
+if (done?.status !== "succeeded") {
   console.error(done?.error ?? "The export did not finish.");
   process.exit(1);
 }

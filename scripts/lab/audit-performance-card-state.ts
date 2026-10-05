@@ -11,7 +11,7 @@ import {
   campaignTable,
   platformCampaignTable,
   platformPostTable,
-  creativeRunTable,
+  workflowRunTable,
 } from "@/server/db/schema";
 
 const org = await db.query.organizationTable.findFirst({
@@ -94,10 +94,10 @@ const [accounts, homes, campaigns, platforms, emails, exports] =
       ),
       columns: { brandId: true, status: true, updatedAt: true },
     }),
-    db.query.creativeRunTable.findMany({
+    db.query.workflowRunTable.findMany({
       where: and(
-        inArray(creativeRunTable.brandId, ids),
-        eq(creativeRunTable.provider, "catalog-export"),
+        inArray(workflowRunTable.brandId, ids),
+        eq(workflowRunTable.workflowType, "catalog-export"),
       ),
       columns: {
         brandId: true,

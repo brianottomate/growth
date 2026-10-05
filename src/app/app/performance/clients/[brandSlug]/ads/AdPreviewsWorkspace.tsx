@@ -25,7 +25,7 @@ import {
   type AdGrouping,
   type AdHomeContext,
 } from "@/lib/ad-collection-groups";
-import { StudioGeneration, StudioGenerationProgress } from "./StudioGeneration";
+import { StudioGeneration } from "./StudioGeneration";
 import { AddAdDialog } from "./AddAdDialog";
 import { StudioIdeas, type StudioIdea } from "./StudioIdeas";
 
@@ -168,7 +168,6 @@ export function AdPreviewsWorkspace({
   );
   return (
     <div className="space-y-4">
-      <StudioGenerationProgress brandId={brandId} />
       <div
         className="flex w-fit max-w-full flex-wrap gap-1 rounded-lg border p-0.5"
         role="group"

@@ -19,7 +19,7 @@ export const wanderOsImportStepSchema = z.object({
 });
 export const wanderOsImportRunSchema = z.object({
   id: z.string(),
-  status: z.enum(["queued", "processing", "ready", "error"]),
+  status: z.enum(["queued", "running", "succeeded", "failed"]),
   steps: z.array(wanderOsImportStepSchema),
   error: z.string().nullable(),
 });

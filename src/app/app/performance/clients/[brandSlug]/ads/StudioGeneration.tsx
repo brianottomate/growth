@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,64 +32,10 @@ function useStudioGenerationRun(brandId: string) {
   return useQuery({
     ...orpc.ads.starterGenerationStatus.queryOptions({ input: { brandId } }),
     refetchInterval: (query) =>
-      ["queued", "processing"].includes(query.state.data?.status ?? "")
+      ["queued", "running"].includes(query.state.data?.status ?? "")
         ? 2000
         : false,
   });
-}
-
-export function StudioGenerationProgress({ brandId }: { brandId: string }) {
-  const progress = useStudioGenerationRun(brandId);
-  const router = useRouter();
-  const seen = useRef("");
-  const run = progress.data;
-  useEffect(() => {
-    if (!run) return;
-    const version = `${run.id}:${run.created}:${run.status}`;
-    if (seen.current === version) return;
-    seen.current = version;
-    router.refresh();
-  }, [run, router]);
-  if (progress.error)
-    return (
-      <div role="alert" className="space-y-2 rounded-xl border p-4 text-sm">
-        <p>Could not load ad generation progress.</p>
-        <Button
-          variant="outline"
-          size="sm"
-          loading={progress.isFetching}
-          onClick={() => void progress.refetch()}
-        >
-          Try again
-        </Button>
-      </div>
-    );
-  if (!run || !["queued", "processing", "error"].includes(run.status))
-    return null;
-  const failed = run.status === "error";
-  return (
-    <div
-      role={failed ? "alert" : "status"}
-      className="space-y-2 rounded-xl border p-4 text-sm"
-    >
-      <div className="flex items-center justify-between gap-3">
-        <p className="flex items-center gap-2 font-medium">
-          {!failed && (
-            <Loader2
-              aria-hidden="true"
-              className="size-4 shrink-0 animate-spin"
-            />
-          )}
-          {failed ? "Ad generation needs attention" : "Generating ads"}
-        </p>
-        <span className="shrink-0 text-muted-foreground">
-          {run.created}/{run.total} ads
-        </span>
-      </div>
-      <p className="break-words text-muted-foreground">{run.message}</p>
-      {run.error && <p>{run.error}</p>}
-    </div>
-  );
 }
 
 /** Batch creation snapshots group membership into the saved ads/run. */
@@ -103,6 +48,7 @@ export function StudioGeneration({
   brandSlug: string;
   connected: boolean;
 }) {
+  const client = useQueryClient();
   const [open, setOpen] = useState(false);
   const [groupId, setGroupId] = useState("");
   const [bookingTargetId, setBookingTargetId] = useState("");
@@ -136,14 +82,13 @@ export function StudioGeneration({
   });
   const available = homes.data ?? [];
   const progress = useStudioGenerationRun(brandId);
-  const running = ["queued", "processing"].includes(
-    progress.data?.status ?? "",
-  );
+  const running = ["queued", "running"].includes(progress.data?.status ?? "");
   const generate = useMutation(
     orpc.ads.generateStarterIdeas.mutationOptions({
       onSuccess: () => {
         setOpen(false);
         void progress.refetch();
+        void client.invalidateQueries({ queryKey: orpc.workflow.key() });
       },
       onError: (error) => toast.error(error.message),
     }),

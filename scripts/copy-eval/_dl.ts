@@ -4,12 +4,12 @@ import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import { db } from "@/server/db";
-import { creativeRunTable } from "@/server/db/schema";
+import { catalogExportTable } from "@/server/db/schema";
 const id = process.argv[2]!;
-const run = (await db.query.creativeRunTable.findFirst({
-  where: eq(creativeRunTable.id, id),
+const run = (await db.query.catalogExportTable.findFirst({
+  where: eq(catalogExportTable.id, id),
 }))!;
-const out = (run.providerOutput ?? {}) as {
+const out = (run.output ?? {}) as {
   assets?: {
     url?: string;
     homeId?: string;
