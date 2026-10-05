@@ -597,9 +597,8 @@ export async function runEmailGenerationJob(jobId: string) {
           ? `Visual direction: ${content.visualDirection}`
           : null,
         content?.ctaText ? `CTA intent: ${content.ctaText}` : null,
-        source.brief.direction.trim()
-          ? `Latest refinement brief:\n${source.brief.direction.trim()}`
-          : null,
+        `Saved editorial brief (the current writing direction; prefer it over older planning context):\n${JSON.stringify(source.brief)}`,
+        "Only treat the brief's sourced, supported claims as facts. Constraints and open questions are not evidence. Omit unverified claims rather than presenting them as confirmed.",
         document.digest
           ? `The homes in this issue, by place:\n${document.digest.sections
               .map(

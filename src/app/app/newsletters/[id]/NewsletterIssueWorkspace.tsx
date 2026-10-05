@@ -13,6 +13,8 @@ import {
   Sparkles,
 } from "lucide-react";
 
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SavedBriefPanel } from "@/components/editorial/SavedBriefPanel";
 import { SimpleDialog } from "@/components/ui/dialog";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 import { orpc, type RouterOutputs } from "@/orpc/client";
@@ -95,6 +97,12 @@ function Editor({ workspace }: { workspace: Workspace }) {
   }, [dirty]);
   const previewSequence = useRef(0);
   const [previewHtml, setPreviewHtml] = useState("");
+  const [editorTab, setEditorTab] = useState(
+    workspace.document.bodyMarkdown.trim() || workspace.document.digest
+      ? "draft"
+      : "brief",
+  );
+  const [briefDirty, setBriefDirty] = useState(false);
   const [fieldsOpen, setFieldsOpen] = useState(false);
   const [previewWarnings, setPreviewWarnings] = useState<string[]>([]);
   // Preview the stored fields, a sample guest, or a guest without attributes.
@@ -194,19 +202,13 @@ function Editor({ workspace }: { workspace: Workspace }) {
                   workspace.content?.title || draft.subject || "this email",
                 platformPostId: workspace.spot.id,
                 platform: "newsletter",
-                visibleText: `Help me work through the ${formatLabel.toLowerCase()} “${workspace.content?.title || draft.subject || "Untitled"}”. Read the email draft first, then help me refine it.`,
+                visibleText: `Help me work through the ${formatLabel.toLowerCase()} “${workspace.content?.title || draft.subject || "Untitled"}”. Read the saved creative document and its full brief first, then help me refine the ${editorTab === "brief" ? "brief" : "email draft"}.`,
               })
             }
             className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
           >
             <MessageSquare className="size-4" /> Work in chat
           </button>
-          <Link
-            className="text-sm underline"
-            href={`/app/creative/${workspace.document.id}`}
-          >
-            Creative brief
-          </Link>
           <Link
             href={
               workspace.content
@@ -222,283 +224,310 @@ function Editor({ workspace }: { workspace: Workspace }) {
         </div>
       </div>
 
+      <Tabs value={editorTab} onValueChange={setEditorTab}>
+        <TabsList>
+          <TabsTrigger value="draft">Draft</TabsTrigger>
+          <TabsTrigger value="brief">Brief</TabsTrigger>
+        </TabsList>
+      </Tabs>
+      <div hidden={editorTab !== "brief"}>
+        <SavedBriefPanel
+          documentId={workspace.document.id}
+          draftDirty={dirty}
+          hasDraft={!!draft.bodyMarkdown.trim() || !!draft.digest}
+          onDirtyChange={setBriefDirty}
+          onProduced={() => setEditorTab("draft")}
+        />
+      </div>
       {activeJob && (
         <p className="text-sm text-muted-foreground">
           Producing this document. Editing is locked until completion.
         </p>
       )}
-      <div className="grid grid-cols-1 gap-5 @5xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.9fr)]">
-        <fieldset
-          disabled={activeJob}
-          inert={activeJob}
-          className="min-w-0 space-y-4 disabled:opacity-60"
-        >
-          {/* Chat-first: the conversation is the write path for words (subject,
+      {briefDirty && editorTab === "draft" && (
+        <p className="text-sm text-muted-foreground">
+          You have unsaved brief changes in the Brief tab.
+        </p>
+      )}
+      <div hidden={editorTab !== "draft"}>
+        <div className="grid grid-cols-1 gap-5 @5xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.9fr)]">
+          <fieldset
+            disabled={activeJob}
+            inert={activeJob}
+            className="min-w-0 space-y-4 disabled:opacity-60"
+          >
+            {/* Chat-first: the conversation is the write path for words (subject,
               intro, CTA); the one clicky exception is photos, because picking
               an image is a recognition task a grid does better than prose. The
               form fields survive below as a collapsed escape hatch. */}
-          {/* The empty state of a Wander issue: no homes and no words yet.
+            {/* The empty state of a Wander issue: no homes and no words yet.
               wander.com homes only exist for the Wander brand. */}
-          {!draft.digest &&
-            !draft.bodyMarkdown.trim() &&
-            workspace.brand.slug === "wander" && (
-              <FindHomesCard
-                title={workspace.content?.title || draft.subject || "Untitled"}
-                hook={workspace.content?.hook}
-                purpose={workspace.content?.purpose}
-                sendDate={workspace.content?.plannedAt}
-              />
-            )}
-          <EmailBlocksCard
-            // A saved, restored or generated revision replaces the body; the
-            // blocks re-read it.
-            key={workspace.document.updatedAt.toISOString()}
-            platformPostId={workspace.spot.id}
-            brandId={workspace.brand.id}
-            campaign={workspace.content?.title || draft.subject}
-            canAddHomes={workspace.brand.homeCount > 0}
-            fields={{
-              subject: draft.subject,
-              preheader: draft.preheader,
-              bodyMarkdown: draft.bodyMarkdown,
-              ctaLabel: draft.ctaLabel,
-              ctaUrl: draft.ctaUrl,
-              templateKey: draft.templateKey,
-              digest: draft.digest,
-            }}
-            select={previewSelect}
-            onOpenChange={setActivePick}
-            onChange={(change) => {
-              const next = { ...draft, ...change };
-              setDraft(next);
-            }}
-          />
-          {/* Wander's issues match their homes to wander.com; a brand's own
-              homes are edited in their blocks above. */}
-          {draft.digest && workspace.brand.slug === "wander" && (
-            <DigestImageBoard
-              digest={draft.digest}
-              intro={draft.bodyMarkdown}
-              campaign={workspace.content?.title || draft.subject}
-              brandId={workspace.brand.id}
-              wanderMarketplace={workspace.brand.slug === "wander"}
-              onChange={(digest) => setDraft({ ...draft, digest })}
-            />
-          )}
-
-          <section className="rounded-xl border bg-card p-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() =>
-                  save.mutate({
-                    platformPostId: workspace.spot.id,
-                    changes: draft,
-                    note: "Saved from the newsletter workspace",
-                  })
-                }
-                disabled={save.isPending || activeJob || !dirty}
-                className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-              >
-                {save.isPending ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Save className="size-4" />
-                )}
-                Save document
-              </button>
-              <button
-                type="button"
-                onClick={() => renderPreview()}
-                disabled={preview.isPending}
-                className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-accent disabled:opacity-50"
-              >
-                <RefreshCw
-                  className={`size-4 ${preview.isPending ? "animate-spin" : ""}`}
+            {!draft.digest &&
+              !draft.bodyMarkdown.trim() &&
+              workspace.brand.slug === "wander" && (
+                <FindHomesCard
+                  title={
+                    workspace.content?.title || draft.subject || "Untitled"
+                  }
+                  hook={workspace.content?.hook}
+                  purpose={workspace.content?.purpose}
+                  sendDate={workspace.content?.plannedAt}
                 />
-                Refresh preview
-              </button>
-              <button
-                type="button"
-                onClick={() => setFieldsOpen(true)}
-                className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-accent"
-              >
-                <Pencil className="size-4" /> Edit fields manually
-              </button>
-            </div>
-            {(save.error || preview.error) && (
-              <p className="mt-2 text-sm text-red-500">
-                {(save.error ?? preview.error)?.message}
-              </p>
-            )}
-          </section>
-
-          {fieldsOpen && (
-            <ManualFieldsDialog
-              initial={{
+              )}
+            <EmailBlocksCard
+              // A saved, restored or generated revision replaces the body; the
+              // blocks re-read it.
+              key={workspace.document.updatedAt.toISOString()}
+              platformPostId={workspace.spot.id}
+              brandId={workspace.brand.id}
+              campaign={workspace.content?.title || draft.subject}
+              canAddHomes={workspace.brand.homeCount > 0}
+              fields={{
                 subject: draft.subject,
                 preheader: draft.preheader,
                 bodyMarkdown: draft.bodyMarkdown,
                 ctaLabel: draft.ctaLabel,
                 ctaUrl: draft.ctaUrl,
+                templateKey: draft.templateKey,
+                digest: draft.digest,
               }}
-              isDigest={Boolean(draft.digest)}
-              saving={save.isPending}
-              onSave={(fields) => {
-                const next = { ...draft, ...fields };
+              select={previewSelect}
+              onOpenChange={setActivePick}
+              onChange={(change) => {
+                const next = { ...draft, ...change };
                 setDraft(next);
-                save.mutate(
-                  {
-                    platformPostId: workspace.spot.id,
-                    changes: next,
-                    note: "Edited fields manually",
-                  },
-                  { onSuccess: () => setFieldsOpen(false) },
-                );
               }}
-              onOpenChange={setFieldsOpen}
             />
-          )}
+            {/* Wander's issues match their homes to wander.com; a brand's own
+              homes are edited in their blocks above. */}
+            {draft.digest && workspace.brand.slug === "wander" && (
+              <DigestImageBoard
+                digest={draft.digest}
+                intro={draft.bodyMarkdown}
+                campaign={workspace.content?.title || draft.subject}
+                brandId={workspace.brand.id}
+                wanderMarketplace={workspace.brand.slug === "wander"}
+                onChange={(digest) => setDraft({ ...draft, digest })}
+              />
+            )}
 
-          {draft.productUpdate && (
             <section className="rounded-xl border bg-card p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <h2 className="font-semibold">Verified product evidence</h2>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Customer-facing claims are grounded in these exact changes.
-                    Only release-verified evidence can enter delivery.
-                  </p>
-                </div>
-                <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium">
-                  {new Date(
-                    draft.productUpdate.periodStart,
-                  ).toLocaleDateString()}
-                  –
-                  {new Date(draft.productUpdate.periodEnd).toLocaleDateString()}
-                </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    save.mutate({
+                      platformPostId: workspace.spot.id,
+                      changes: draft,
+                      note: "Saved from the newsletter workspace",
+                    })
+                  }
+                  disabled={save.isPending || activeJob || !dirty}
+                  className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+                >
+                  {save.isPending ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Save className="size-4" />
+                  )}
+                  Save document
+                </button>
+                <button
+                  type="button"
+                  onClick={() => renderPreview()}
+                  disabled={preview.isPending}
+                  className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-accent disabled:opacity-50"
+                >
+                  <RefreshCw
+                    className={`size-4 ${preview.isPending ? "animate-spin" : ""}`}
+                  />
+                  Refresh preview
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFieldsOpen(true)}
+                  className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-accent"
+                >
+                  <Pencil className="size-4" /> Edit fields manually
+                </button>
               </div>
-              <div className="mt-3 divide-y">
-                {draft.productUpdate.changes.map((change) => (
-                  <div
-                    key={`${change.repository}:${change.ref}`}
-                    className="py-3 text-sm"
-                  >
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold uppercase">
-                        {change.category}
-                      </span>
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase ${
-                          change.releaseStatus === "shipped"
-                            ? "bg-emerald-500/10 text-emerald-700"
-                            : "bg-amber-500/10 text-amber-700"
-                        }`}
-                      >
-                        {change.releaseStatus}
-                      </span>
-                      <span className="font-medium">{change.title}</span>
-                    </div>
-                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                      {change.summary}
-                    </p>
-                    {change.customerImpact && (
-                      <p className="mt-1 text-xs">
-                        Customer impact: {change.customerImpact}
-                      </p>
-                    )}
-                    <p className="mt-1 font-mono text-[11px] text-muted-foreground">
-                      {change.url ? (
-                        <a
-                          href={change.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="underline underline-offset-2 hover:text-foreground"
-                        >
-                          {change.repository}@{change.ref}
-                        </a>
-                      ) : (
-                        <>
-                          {change.repository}@{change.ref}
-                        </>
-                      )}
+              {(save.error || preview.error) && (
+                <p className="mt-2 text-sm text-red-500">
+                  {(save.error ?? preview.error)?.message}
+                </p>
+              )}
+            </section>
+
+            {fieldsOpen && (
+              <ManualFieldsDialog
+                initial={{
+                  subject: draft.subject,
+                  preheader: draft.preheader,
+                  bodyMarkdown: draft.bodyMarkdown,
+                  ctaLabel: draft.ctaLabel,
+                  ctaUrl: draft.ctaUrl,
+                }}
+                isDigest={Boolean(draft.digest)}
+                saving={save.isPending}
+                onSave={(fields) => {
+                  const next = { ...draft, ...fields };
+                  setDraft(next);
+                  save.mutate(
+                    {
+                      platformPostId: workspace.spot.id,
+                      changes: next,
+                      note: "Edited fields manually",
+                    },
+                    { onSuccess: () => setFieldsOpen(false) },
+                  );
+                }}
+                onOpenChange={setFieldsOpen}
+              />
+            )}
+
+            {draft.productUpdate && (
+              <section className="rounded-xl border bg-card p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h2 className="font-semibold">Verified product evidence</h2>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Customer-facing claims are grounded in these exact
+                      changes. Only release-verified evidence can enter
+                      delivery.
                     </p>
                   </div>
-                ))}
-              </div>
-            </section>
-          )}
+                  <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium">
+                    {new Date(
+                      draft.productUpdate.periodStart,
+                    ).toLocaleDateString()}
+                    –
+                    {new Date(
+                      draft.productUpdate.periodEnd,
+                    ).toLocaleDateString()}
+                  </span>
+                </div>
+                <div className="mt-3 divide-y">
+                  {draft.productUpdate.changes.map((change) => (
+                    <div
+                      key={`${change.repository}:${change.ref}`}
+                      className="py-3 text-sm"
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold uppercase">
+                          {change.category}
+                        </span>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase ${
+                            change.releaseStatus === "shipped"
+                              ? "bg-emerald-500/10 text-emerald-700"
+                              : "bg-amber-500/10 text-amber-700"
+                          }`}
+                        >
+                          {change.releaseStatus}
+                        </span>
+                        <span className="font-medium">{change.title}</span>
+                      </div>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        {change.summary}
+                      </p>
+                      {change.customerImpact && (
+                        <p className="mt-1 text-xs">
+                          Customer impact: {change.customerImpact}
+                        </p>
+                      )}
+                      <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+                        {change.url ? (
+                          <a
+                            href={change.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="underline underline-offset-2 hover:text-foreground"
+                          >
+                            {change.repository}@{change.ref}
+                          </a>
+                        ) : (
+                          <>
+                            {change.repository}@{change.ref}
+                          </>
+                        )}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
 
-          {activeJob ? (
-            <p className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" /> Writing a new draft
-            </p>
-          ) : workspace.latestJob?.status === "failed" ? (
-            <p className="text-sm text-red-500">
-              {workspace.latestJob.error || "Generation failed."}
-            </p>
-          ) : null}
-        </fieldset>
+            {activeJob ? (
+              <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" /> Writing a new draft
+              </p>
+            ) : workspace.latestJob?.status === "failed" ? (
+              <p className="text-sm text-red-500">
+                {workspace.latestJob.error || "Generation failed."}
+              </p>
+            ) : null}
+          </fieldset>
 
-        <div className="@5xl:sticky @5xl:top-4 @5xl:self-start">
-          <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-slate-50 px-4 py-2.5 text-xs font-medium text-slate-600">
-              <span>Email preview</span>
-              {/* Per-guest fields stay as written in the stored document and
+          <div className="@5xl:sticky @5xl:top-4 @5xl:self-start">
+            <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-slate-50 px-4 py-2.5 text-xs font-medium text-slate-600">
+                <span>Email preview</span>
+                {/* Per-guest fields stay as written in the stored document and
                   are filled for each guest at send time. */}
-              <div className="flex overflow-hidden rounded-md border border-slate-200">
-                {(
-                  [
-                    ["template", "As written"],
-                    ["full", "Sample guest"],
-                    ["sparse", "No guest data"],
-                  ] as const
-                ).map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => {
-                      setViewAs(value);
-                      renderPreview(value);
-                    }}
-                    className={`px-2 py-1 text-[11px] font-medium ${
-                      viewAs === value
-                        ? "bg-slate-800 text-white"
-                        : "bg-white text-slate-600 hover:bg-slate-100"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
+                <div className="flex overflow-hidden rounded-md border border-slate-200">
+                  {(
+                    [
+                      ["template", "As written"],
+                      ["full", "Sample guest"],
+                      ["sparse", "No guest data"],
+                    ] as const
+                  ).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => {
+                        setViewAs(value);
+                        renderPreview(value);
+                      }}
+                      className={`px-2 py-1 text-[11px] font-medium ${
+                        viewAs === value
+                          ? "bg-slate-800 text-white"
+                          : "bg-white text-slate-600 hover:bg-slate-100"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
+              {previewWarnings.length > 0 && (
+                <div className="space-y-1 border-b border-amber-200 bg-amber-50 px-4 py-2">
+                  {previewWarnings.map((warning) => (
+                    <p key={warning} className="text-xs text-amber-800">
+                      {warning}
+                    </p>
+                  ))}
+                </div>
+              )}
+              {previewHtml ? (
+                <EmailPreviewFrame
+                  html={previewHtml}
+                  active={activePick}
+                  onPick={(pick) =>
+                    setPreviewSelect((current) => ({
+                      pick,
+                      nonce: (current?.nonce ?? 0) + 1,
+                    }))
+                  }
+                />
+              ) : (
+                <div className="flex h-[560px] items-center justify-center text-sm text-slate-500">
+                  {preview.isPending
+                    ? "Rendering preview…"
+                    : "Preview unavailable"}
+                </div>
+              )}
             </div>
-            {previewWarnings.length > 0 && (
-              <div className="space-y-1 border-b border-amber-200 bg-amber-50 px-4 py-2">
-                {previewWarnings.map((warning) => (
-                  <p key={warning} className="text-xs text-amber-800">
-                    {warning}
-                  </p>
-                ))}
-              </div>
-            )}
-            {previewHtml ? (
-              <EmailPreviewFrame
-                html={previewHtml}
-                active={activePick}
-                onPick={(pick) =>
-                  setPreviewSelect((current) => ({
-                    pick,
-                    nonce: (current?.nonce ?? 0) + 1,
-                  }))
-                }
-              />
-            ) : (
-              <div className="flex h-[560px] items-center justify-center text-sm text-slate-500">
-                {preview.isPending
-                  ? "Rendering preview…"
-                  : "Preview unavailable"}
-              </div>
-            )}
           </div>
         </div>
       </div>

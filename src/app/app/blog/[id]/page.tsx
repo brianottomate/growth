@@ -3,8 +3,16 @@ import { notFound, redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { StructuredText } from "react-datocms/structured-text";
 
+import { BlogWorkspace } from "../BlogWorkspace";
+import { ensureBlogDocument } from "@/server/services/blog-document.service";
 import { db } from "@/server/db";
-import { memberTable, platformPostTable } from "@/server/db/schema";
+import {
+  initiativeMemberTable,
+  initiativeTable,
+  memberTable,
+  platformDocumentTable,
+  platformPostTable,
+} from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { getBlogArticleDraft } from "@/server/clients/datocms-cda.client";
 import { PreviewBlock } from "../preview/[itemId]/PreviewBlocks";
@@ -33,13 +41,45 @@ export default async function BlogArticlePage({
   if (!org) notFound();
 
   const post = await db.query.platformPostTable.findFirst({
-    where: and(
-      eq(platformPostTable.id, id),
-      eq(platformPostTable.externalKind, "blog_article"),
-    ),
+    where: eq(platformPostTable.id, id),
     with: { brand: true },
   });
-  if (!post || post.brand?.organizationId !== org.id) notFound();
+  if (post?.platform !== "blog" || post.brand?.organizationId !== org.id)
+    notFound();
+  const selection = await db.query.platformDocumentTable.findFirst({
+    where: eq(platformDocumentTable.platformPostId, post.id),
+  });
+  if (post.source === "owned" && (!post.externalId || selection)) {
+    const documentId = await ensureBlogDocument({
+      platformPostId: post.id,
+      organizationId: org.id,
+      userId: session.user.id,
+    });
+    const [initiative] = post.contentPostId
+      ? await db
+          .select({ id: initiativeTable.id, name: initiativeTable.name })
+          .from(initiativeMemberTable)
+          .innerJoin(
+            initiativeTable,
+            eq(initiativeTable.id, initiativeMemberTable.initiativeId),
+          )
+          .where(
+            and(
+              eq(initiativeMemberTable.contentPostId, post.contentPostId),
+              eq(initiativeTable.organizationId, org.id),
+            ),
+          )
+          .limit(1)
+      : [];
+    return (
+      <BlogWorkspace
+        initiative={initiative}
+        documentId={documentId}
+        platformPostId={post.id}
+        brandName={post.brand.name}
+      />
+    );
+  }
 
   const meta = (post.metadata ?? {}) as BlogMeta;
   const datoArticle = post.externalId

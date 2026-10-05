@@ -128,6 +128,16 @@ export default async function ContentDetailPage({
     ownedSpots[0]!.platform === "newsletter" &&
     (ownedSpots[0]!.format === "newsletter.broadcast" ||
       ownedSpots[0]!.format === "newsletter.blast");
+  const onlyBlog =
+    ownedSpots.length === 1 && ownedSpots[0]!.platform === "blog";
+  if (
+    content &&
+    onlyBlog &&
+    content.brand?.organizationId === org.id &&
+    !content.deletedAt &&
+    resolvedSearchParams?.card !== "1"
+  )
+    redirect(`/app/blog/${ownedSpots[0]!.id}`);
   if (content && onlyEmail && resolvedSearchParams?.card !== "1") {
     redirect(`/app/newsletters/${ownedSpots[0]!.id}`);
   }
@@ -437,6 +447,7 @@ export default async function ContentDetailPage({
       />
 
       <CreativeDocuments
+        blogPlatformPostId={ownedSpots.find((p) => p.platform === "blog")?.id}
         contentPostId={content.id}
         brandId={content.brandId}
         title={content.title ?? "Untitled"}
