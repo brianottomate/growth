@@ -487,9 +487,9 @@ const formatIds = COMPOSITION_FORMATS.map((format) => format.id) as [
 ];
 
 export const compositionFormatIdSchema = z.enum(formatIds);
-export const compositionTemplateIdSchema = z
-  .enum(COMPOSITION_TEMPLATES.map((template) => template.id))
-  .catch("photo-only");
+export const compositionTemplateIdSchema = z.enum(
+  COMPOSITION_TEMPLATES.map((template) => template.id),
+);
 /** Which side of the photo the cover crop keeps. */
 export const COMPOSITION_IMAGE_POSITIONS = [
   "top",
@@ -504,7 +504,9 @@ export const compositionImagePositionSchema = z.enum(
 
 const compositionShape = {
   brandId: z.string().min(1),
-  templateId: compositionTemplateIdSchema,
+  // A stored recipe whose template was retired still draws its photo. Only
+  // here: elsewhere a missing or unknown id must fail so defaults apply.
+  templateId: compositionTemplateIdSchema.catch("photo-only"),
   formatId: z.enum(formatIds),
   sourceMediaAssetId: z.string().min(1).optional(),
   title: z.string().trim().max(120),
