@@ -285,7 +285,9 @@ export async function sourceGroup(
  * a home used to carry its own `featured` flag.
  */
 export function inPrimaryGroup(homeId: AnyColumn) {
-  return sql<boolean>`exists (select 1 from ${homeGroupMemberTable} join ${homeGroupTable} on ${homeGroupTable.id} = ${homeGroupMemberTable.groupId} where ${homeGroupTable.isPrimary} and ${homeGroupMemberTable.homeId} = ${homeId})`;
+  // Raw, aliased names: inside a relational query's `where`, Drizzle renders
+  // every column under the outer table's alias, which breaks the subquery.
+  return sql<boolean>`exists (select 1 from home_group_member m join home_group g on g.id = m.group_id where g.is_primary and m.home_id = ${homeId})`;
 }
 
 /** The ids of a brand's primary-group homes. */
