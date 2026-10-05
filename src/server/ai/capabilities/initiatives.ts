@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import {
+  channelPlatformEnum,
   campaignStatusEnum,
   contentStatusEnum,
   seriesStatusEnum,
@@ -52,7 +53,56 @@ const initiative = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
 });
+const previewMedia = z.object({
+  url: z.string(),
+  type: z.enum(["image", "video", "carousel"]),
+  thumbnail: z.string().nullable(),
+  width: z.number().nullable(),
+  height: z.number().nullable(),
+});
+const previewBase = {
+  id: z.string(),
+  description: z.string().nullable(),
+  media: z.array(previewMedia),
+};
+const dates = { startAt: z.string().nullable(), endAt: z.string().nullable() };
+const platform = z.object({
+  platform: z.enum(channelPlatformEnum.enumValues),
+  status: z.string(),
+});
 const detail = z.object({
+  previews: z.object({
+    posts: z.array(
+      z.object({
+        ...previewBase,
+        plannedAt: z.string().nullable(),
+        channels: z.array(platform.extend({ format: z.string().nullable() })),
+      }),
+    ),
+    series: z.array(
+      z.object({ ...previewBase, ...dates, postCount: z.number() }),
+    ),
+    campaigns: z.array(
+      z.object({
+        ...previewBase,
+        ...dates,
+        goal: z.string().nullable(),
+        adCount: z.number(),
+        ads: z.array(
+          z.object({
+            ...previewBase,
+            name: z.string(),
+            textOnly: z.boolean(),
+            status: z.enum(["drawn", "kept", "approved"]),
+            executions: z.array(platform),
+          }),
+        ),
+        creativeLines: z.array(z.string()),
+        audienceCount: z.number(),
+        platforms: z.array(platform),
+      }),
+    ),
+  }),
   initiative,
   brands: z.array(brand),
   owners: z.array(owner),

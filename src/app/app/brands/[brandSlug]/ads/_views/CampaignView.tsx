@@ -1,5 +1,4 @@
 import { WorkspaceCardHeader } from "@/app/app/performance/WorkspaceCard";
-import { BookingTargetPicker } from "./BookingTargetPicker";
 import { WorkspaceBreadcrumbs } from "@/components/workspace-breadcrumbs";
 import {
   campaignListPath,
@@ -341,12 +340,6 @@ export async function CampaignView({
             />
           </div>
         </div>
-        <BookingTargetPicker
-          brandId={brand.id}
-          brandSlug={brandSlug}
-          campaignId={campaign.id}
-          targetId={campaign.bookingTargetId}
-        />
       </header>
 
       <section

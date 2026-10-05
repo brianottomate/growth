@@ -1,4 +1,7 @@
 "use client";
+import { WorkPreview, previewDate } from "./WorkPreview";
+import { StatusBoard, workLane } from "./StatusBoard";
+import { AdPreview } from "./AdPreview";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -93,7 +96,7 @@ function InitiativeEditor({
           />
         </label>
         <label className="space-y-1 text-sm">
-          Lead brand
+          Primary brand
           <SimpleSelect
             value={value.leadBrandId ?? "none"}
             onValueChange={(v) =>
@@ -273,122 +276,298 @@ export function InitiativeDetail({ id }: { id: string }) {
     ...i,
     status: initiativeStatusSchema.parse(i.status),
   };
-  const rows = (
-    items: {
-      id: string;
-      label: string;
-      status: string;
-      brandId: string;
-      href: string;
-      key: string;
-      direct: boolean;
-    }[],
-  ) => (
-    <div className="mt-3 space-y-2">
-      {items.length === 0 && (
-        <p className="text-sm text-muted-foreground">Nothing linked yet.</p>
-      )}
-      {items.map((row) => (
-        <div
-          key={row.id}
-          className="flex items-center gap-3 rounded-lg border bg-card p-3"
-        >
-          <Link className="min-w-0 flex-1" href={row.href}>
-            <div className="font-medium">{row.label}</div>
-            <div className="text-xs text-muted-foreground">
-              {brandName(row.brandId)} · {row.status}
-              {!row.direct && " · Included through series"}
-            </div>
-          </Link>
-          {row.direct && (
-            <Button
-              disabled={unlink.isPending}
-              variant="ghost"
-              size="sm"
-              onClick={() => unlink.mutate({ id, ...target(row.key, row.id) })}
-            >
-              Unlink
-            </Button>
-          )}
-        </div>
-      ))}
-    </div>
+  const linkedSeries = new Set(data.series.map((series) => series.id));
+  const standalone = data.contentPosts.filter(
+    (post) => !post.seriesId || !linkedSeries.has(post.seriesId),
+  );
+  const postBoard = (posts: typeof data.contentPosts) => (
+    <StatusBoard
+      items={posts.map((post) => {
+        const preview = data.previews.posts.find((item) => item.id === post.id);
+        const live =
+          preview?.channels.filter((channel) => channel.status === "published")
+            .length ?? 0;
+        const scheduled =
+          preview?.channels.filter((channel) => channel.status === "scheduled")
+            .length ?? 0;
+        return {
+          id: post.id,
+          lane: live
+            ? workLane("published")
+            : scheduled
+              ? workLane("scheduled")
+              : workLane(post.status),
+          card: (
+            <WorkPreview
+              board
+              title={post.title ?? "Untitled"}
+              href={`/app/content/${post.id}`}
+              brand={brandName(post.brandId)}
+              status={post.status}
+              delivery={
+                live
+                  ? `${live} live${scheduled ? ` · ${scheduled} scheduled` : ""}`
+                  : scheduled
+                    ? `${scheduled} scheduled`
+                    : undefined
+              }
+              description={preview?.description}
+              media={preview?.media}
+              platforms={preview?.channels.map((channel) => channel.platform)}
+              detail={`${preview?.channels.length ?? 0} channel versions`}
+              date={previewDate(preview?.plannedAt ?? null)}
+              onUnlink={
+                post.direct
+                  ? () => unlink.mutate({ id, contentPostId: post.id })
+                  : undefined
+              }
+              unlinking={unlink.isPending}
+            />
+          ),
+        };
+      })}
+    />
   );
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <Link href="/app/initiatives" className="text-sm text-muted-foreground">
         ← Initiatives
       </Link>
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-semibold">{i.name}</h1>
-            <span className="rounded-full border px-3 py-1 text-xs capitalize">
-              {i.status}
-            </span>
+      <section className="space-y-4">
+        <div className="flex flex-col justify-between gap-4 @3xl:flex-row @3xl:items-start">
+          <div className="min-w-0">
+            <p className="mb-2 text-xs text-muted-foreground">Overview</p>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-2xl font-semibold">{i.name}</h1>
+              <span className="rounded-full border px-3 py-1 text-xs capitalize">
+                {i.status}
+              </span>
+            </div>
+            <p className="mt-2 max-w-3xl text-sm whitespace-pre-line text-muted-foreground">
+              {i.description}
+            </p>
           </div>
-          <p className="mt-2 max-w-3xl text-sm whitespace-pre-line text-muted-foreground">
-            {i.description}
-          </p>
-          <p className="mt-2 text-xs text-muted-foreground">
-            {i.leadBrandId
-              ? `Lead brand: ${brandName(i.leadBrandId)}`
-              : "Workspace initiative"}
-            {i.ownerId
-              ? ` · Owner: ${data.owners.find((o) => o.id === i.ownerId)?.name ?? "Unassigned"}`
-              : ""}
-            {i.startAt ? ` · ${i.startAt.slice(0, 10)}` : ""}
-            {i.endAt ? ` to ${i.endAt.slice(0, 10)}` : ""}
-          </p>
+          <div className="flex shrink-0 items-center gap-2">
+            <Button variant="outline" onClick={() => setEditing(true)}>
+              Edit
+            </Button>
+            <Button onClick={() => setLinking(true)}>Link work</Button>
+          </div>
         </div>
-        <Button variant="outline" onClick={() => setEditing(true)}>
-          Edit
-        </Button>
-      </div>
-      <Button onClick={() => setLinking(true)}>Link work</Button>
-      <div className="grid grid-cols-1 gap-6 @4xl:grid-cols-2">
-        <section>
-          <h2 className="font-semibold">
-            Content posts · {data.contentPosts.length}
-          </h2>
-          {rows(
-            data.contentPosts.map((p) => ({
-              ...p,
-              label: p.title ?? "Untitled",
-              href: `/app/content/${p.id}`,
-              key: "contentPostId",
-            })),
+        <div className="flex flex-wrap gap-x-8 gap-y-3 text-xs text-muted-foreground">
+          {i.leadBrandId && (
+            <p>
+              Primary brand{" "}
+              <span className="ml-2 text-foreground">
+                {brandName(i.leadBrandId)}
+              </span>
+            </p>
           )}
-        </section>
-        <div className="space-y-6">
-          <section>
-            <h2 className="font-semibold">Series · {data.series.length}</h2>
-            {rows(
-              data.series.map((s) => ({
-                ...s,
-                label: s.name,
-                href: `/app/series/${s.id}`,
-                key: "seriesId",
-                direct: true,
-              })),
-            )}
-          </section>
-          <section>
-            <h2 className="font-semibold">
-              Paid campaigns · {data.campaigns.length}
-            </h2>
-            {rows(
-              data.campaigns.map((c) => ({
-                ...c,
-                label: c.name,
-                href: `/app/brands/${data.brands.find((b) => b.id === c.brandId)?.slug}/ads/${c.id}`,
-                key: "campaignId",
-                direct: true,
-              })),
-            )}
-          </section>
+          {i.ownerId && (
+            <p>
+              Owner{" "}
+              <span className="ml-2 text-foreground">
+                {data.owners.find((owner) => owner.id === i.ownerId)?.name ??
+                  "Unassigned"}
+              </span>
+            </p>
+          )}
+          {(i.startAt || i.endAt) && (
+            <p>
+              Dates{" "}
+              <span className="ml-2 text-foreground">
+                {previewDate(i.startAt, i.endAt)}
+              </span>
+            </p>
+          )}
         </div>
-      </div>
+      </section>
+      <section className="space-y-4">
+        <h2 className="font-semibold">
+          Campaigns{" "}
+          <span className="ml-2 text-sm font-normal text-muted-foreground">
+            {data.campaigns.length}
+          </span>
+        </h2>
+        {data.campaigns.length === 0 && (
+          <p className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">
+            No campaigns linked. Link a paid campaign to include its ads and
+            audience plans.
+          </p>
+        )}
+        {data.campaigns.map((campaign) => {
+          const preview = data.previews.campaigns.find(
+            (item) => item.id === campaign.id,
+          );
+          const slug = data.brands.find(
+            (brand) => brand.id === campaign.brandId,
+          )?.slug;
+          const href = slug
+            ? `/app/brands/${slug}/ads/${campaign.id}`
+            : `/app/campaigns/${campaign.id}`;
+          const isLive =
+            preview?.ads.some((ad) =>
+              ad.executions.some((execution) =>
+                ["active", "live"].includes(execution.status.toLowerCase()),
+              ),
+            ) ?? false;
+          return (
+            <article
+              key={campaign.id}
+              className="space-y-4 rounded-xl border p-4"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link href={href} className="font-semibold hover:underline">
+                      {campaign.name}
+                    </Link>
+                    <span className="rounded-md border px-2 py-0.5 text-xs text-muted-foreground">
+                      {isLive ? "Live" : "Not live"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {brandName(campaign.brandId)} · {campaign.status} ·{" "}
+                    {preview?.adCount ?? 0} ads · {preview?.audienceCount ?? 0}{" "}
+                    {preview?.audienceCount === 1
+                      ? "audience plan"
+                      : "audience plans"}
+                  </p>
+                  <p className="line-clamp-2 max-w-3xl text-xs leading-relaxed text-muted-foreground">
+                    {preview?.description}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={unlink.isPending}
+                  onClick={() => unlink.mutate({ id, campaignId: campaign.id })}
+                >
+                  Unlink
+                </Button>
+              </div>
+              <StatusBoard
+                paid
+                items={(preview?.ads ?? []).map((ad) => {
+                  const statuses = ad.executions.map((execution) =>
+                    execution.status.toLowerCase(),
+                  );
+                  return {
+                    id: ad.id,
+                    lane: statuses.some((status) =>
+                      ["active", "live"].includes(status),
+                    )
+                      ? workLane("live")
+                      : statuses.includes("scheduled")
+                        ? workLane("scheduled")
+                        : workLane(ad.status),
+                    card: (
+                      <AdPreview
+                        title={ad.name}
+                        status={
+                          statuses.some((status) =>
+                            ["active", "live"].includes(status),
+                          )
+                            ? "Live"
+                            : statuses.includes("scheduled")
+                              ? "Scheduled"
+                              : ad.status === "drawn"
+                                ? "Draft"
+                                : ad.status === "kept"
+                                  ? "Shortlisted"
+                                  : ad.status.replaceAll("_", " ")
+                        }
+                        href={href}
+                        description={ad.description}
+                        media={ad.media}
+                      />
+                    ),
+                  };
+                })}
+              />
+            </article>
+          );
+        })}
+      </section>
+      <section className="space-y-4">
+        <h2 className="font-semibold">
+          Series{" "}
+          <span className="ml-2 text-sm font-normal text-muted-foreground">
+            {data.series.length}
+          </span>
+        </h2>
+        {data.series.length === 0 && (
+          <p className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">
+            No series linked. You can coordinate standalone social posts below,
+            or link a series to include its current and future posts.
+          </p>
+        )}
+        {data.series.map((series) => {
+          const preview = data.previews.series.find(
+            (item) => item.id === series.id,
+          );
+          const posts = data.contentPosts.filter(
+            (post) => post.seriesId === series.id,
+          );
+          return (
+            <details
+              key={series.id}
+              open={data.series.length === 1}
+              className="rounded-xl border p-4"
+            >
+              <summary className="cursor-pointer text-sm font-semibold">
+                {series.name}{" "}
+                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                  {brandName(series.brandId)} · {posts.length} posts
+                </span>
+              </summary>
+              <div className="mt-4 space-y-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <p className="max-w-3xl text-xs text-muted-foreground">
+                    {preview?.description}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" variant="outline" asChild>
+                      <Link href={`/app/series/${series.id}`}>Open series</Link>
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => unlink.mutate({ id, seriesId: series.id })}
+                      disabled={unlink.isPending}
+                    >
+                      Unlink series
+                    </Button>
+                  </div>
+                </div>
+                {postBoard(posts)}
+                <p className="text-xs text-muted-foreground">
+                  New posts in this series appear here automatically.
+                </p>
+              </div>
+            </details>
+          );
+        })}
+      </section>
+      <section className="space-y-4">
+        <h2 className="font-semibold">
+          Standalone social posts{" "}
+          <span className="ml-2 text-sm font-normal text-muted-foreground">
+            {standalone.length}
+          </span>
+        </h2>
+        <p className="text-xs text-muted-foreground">
+          Linked directly to this initiative, outside the series shown above.
+        </p>
+        {standalone.length ? (
+          postBoard(standalone)
+        ) : (
+          <p className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">
+            No standalone posts. Link individual social posts, or open a linked
+            series to see its posts.
+          </p>
+        )}
+      </section>
       <MomentAmplifiers momentId={id} />
       <Dialog open={editing} onOpenChange={setEditing}>
         <DialogContent className="@container">

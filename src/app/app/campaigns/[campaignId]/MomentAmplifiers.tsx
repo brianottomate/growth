@@ -23,27 +23,11 @@ import { orpc } from "@/orpc/client";
 const ASKS = ["planned", "asked", "confirmed", "fulfilled"] as const;
 type Ask = (typeof ASKS)[number];
 
-const ASK_META: Record<Ask, { label: string; cls: string; dot: string }> = {
-  planned: {
-    label: "Planned",
-    cls: "text-muted-foreground",
-    dot: "bg-muted-foreground/40",
-  },
-  asked: {
-    label: "Asked",
-    cls: "text-amber-600 dark:text-amber-400",
-    dot: "bg-amber-500",
-  },
-  confirmed: {
-    label: "Confirmed",
-    cls: "text-blue-600 dark:text-blue-400",
-    dot: "bg-blue-500",
-  },
-  fulfilled: {
-    label: "Fulfilled",
-    cls: "text-emerald-600 dark:text-emerald-400",
-    dot: "bg-emerald-500",
-  },
+const ASK_META: Record<Ask, { label: string }> = {
+  planned: { label: "Planned" },
+  asked: { label: "Asked" },
+  confirmed: { label: "Confirmed" },
+  fulfilled: { label: "Completed" },
 };
 
 const TYPE_OPTIONS = [
@@ -105,11 +89,19 @@ export function MomentAmplifiers({ momentId }: { momentId: string }) {
   );
 
   return (
-    <section className="mt-10">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-          Amplifiers · {targets?.length ?? 0}
-        </h2>
+    <section className="@container space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="font-semibold">
+            Team amplification{" "}
+            <span className="ml-2 text-sm font-normal text-muted-foreground">
+              {targets?.length ?? 0}
+            </span>
+          </h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Coordinate team shares and track who has followed through.
+          </p>
+        </div>
         <Button size="sm" variant="outline" onClick={() => setAddOpen(true)}>
           <Plus className="size-3.5" />
           Add amplifier
@@ -122,22 +114,40 @@ export function MomentAmplifiers({ momentId }: { momentId: string }) {
         </div>
       ) : !targets || targets.length === 0 ? (
         <p className="mt-4 text-sm text-muted-foreground">
-          No one recruited yet. Add a friend-of-the-company, investor, or
-          creator to boost this launch — they live in a shared org rolodex, so
-          you can reuse them across brands.
+          Add teammates or partners to help share the initiative.
         </p>
       ) : (
-        <div className="mt-3 flex flex-col gap-1.5">
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            {ASKS.map((ask) => {
+              const count = targets.filter(
+                (target) => target.ask === ask,
+              ).length;
+              return count > 0 ? (
+                <span key={ask}>
+                  {count} {ASK_META[ask].label.toLowerCase()}
+                </span>
+              ) : null;
+            })}
+          </div>
           {targets.map((t) => {
-            const meta = ASK_META[(t.ask as Ask) ?? "planned"];
             return (
               <div
                 key={t.id}
-                className="group flex items-center gap-3 rounded-lg border bg-card px-3 py-2.5 transition-colors hover:bg-accent/40"
+                className="group flex flex-wrap items-center gap-3 rounded-xl border bg-card p-3"
               >
-                <span className="truncate text-sm font-medium">
-                  {t.amplifier.name}
+                <span
+                  aria-hidden="true"
+                  className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium"
+                >
+                  {t.amplifier.name
+                    .split(" ")
+                    .filter(Boolean)
+                    .map((part) => part[0])
+                    .slice(0, 2)
+                    .join("")}
                 </span>
+                <span className="text-sm font-medium">{t.amplifier.name}</span>
                 {t.amplifier.type && (
                   <span className="shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground capitalize">
                     {t.amplifier.type}
@@ -146,7 +156,7 @@ export function MomentAmplifiers({ momentId }: { momentId: string }) {
                 <span className="text-[10px] text-muted-foreground capitalize">
                   {t.actionKind.replace("_", " ")}
                 </span>
-                <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
                   {(t.amplifier.handles ?? []).map((h) => (
                     <span
                       key={`${h.platform}:${h.handle}`}
@@ -171,11 +181,6 @@ export function MomentAmplifiers({ momentId }: { momentId: string }) {
                   }))}
                   aria-label="Recruitment status"
                 />
-                <span
-                  className={`flex shrink-0 items-center gap-1 text-[11px] ${meta.cls}`}
-                >
-                  <span className={`size-1.5 rounded-full ${meta.dot}`} />
-                </span>
                 <Button
                   size="sm"
                   variant="outline"

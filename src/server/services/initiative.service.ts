@@ -1,3 +1,4 @@
+import { initiativePreviews } from "./initiative-preview.service";
 import "server-only";
 import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import type { z } from "zod";
@@ -86,6 +87,7 @@ export async function initiativeWorkspace(
                 : undefined,
             ),
           )
+          .orderBy(contentPostTable.createdAt)
       : [],
     ids.length
       ? db
@@ -154,7 +156,14 @@ export async function getInitiative(id: string, orgId: string) {
     .from(initiativeMemberTable)
     .where(eq(initiativeMemberTable.initiativeId, id));
   const workspace = await initiativeWorkspace(orgId, members);
+  const previews = await initiativePreviews(
+    orgId,
+    workspace.posts.map((p) => p.id),
+    workspace.series.map((s) => s.id),
+    workspace.campaigns.map((c) => c.id),
+  );
   return {
+    previews,
     initiative: serialize(row),
     members: members.map(({ createdAt, ...m }) => ({
       ...m,
