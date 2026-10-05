@@ -16,18 +16,11 @@ fit is a planning hypothesis, never an assertion about individual customers.
 
 ## Platform assets
 
-`platform_audience` remains the reusable provider record. The new
+`platform_audience` remains the reusable provider record. The
 `campaign_audience_asset` join selects one asset per campaign audience/platform;
 one asset can serve many campaigns. An explicit local unlink does not delete a
 provider asset. Meta is the initial upload/lookalike surface; the join is
 platform-neutral. Actual provider IDs remain in the mirror, not authored plans.
-
-The additive migration preserves direct selections first, then materializes
-legacy persona-based selections. The cutover runs only when the join table is
-first created, so future releases cannot resurrect an unlinked selection.
-Run `bun scripts/apply-campaign-audiences.ts` against an identified target.
-Production runs the migration before its schema diff. No customer-data table
-is added.
 
 ## Seeds
 

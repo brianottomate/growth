@@ -90,15 +90,16 @@ bun run build          # Velite build + Next build
 Database commands:
 
 ```bash
-bun run db:push        # Push schema changes for development
+bun run db:check       # Check schema/snapshot agreement
 bun run db:generate    # Generate migrations
 bun run db:migrate     # Run migrations
 bun run db:studio      # Open Drizzle Studio
 ```
 
-Deployments currently remain `db:push`-managed. The prerequisites and staged
-cutover to checked-in migrations are documented in
-[`docs/database-migration-transition.md`](docs/database-migration-transition.md).
+Database changes use checked-in Drizzle migrations. The `build` script applies
+pending migrations after `next build` succeeds, in every environment. Development,
+preview and production currently share the same database. See
+[`docs/database-migrations.md`](docs/database-migrations.md).
 
 Other local tools:
 

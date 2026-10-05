@@ -138,8 +138,8 @@ campaign keep running untouched — cutover is earned by drift/dry-run data.
 ## Ops notes
 
 - ⚠️ `growth/.env` `DATABASE_URL` points at **prod Neon**. Schema here is
-  additive; apply via the normal flow (`db:generate`/`db:migrate` or
-  `db:push`) deliberately, not as a side effect of local iteration.
+  managed through committed migrations (`db:generate`/`db:migrate`).
+  Production migrations run in the release workflow.
 - The ingest upsert is ts-guarded per stage column: Amplitude retries (same
   ts) and out-of-order deliveries can't regress state. `searchCount` only
   increments when the guard passes, so retries don't inflate it.

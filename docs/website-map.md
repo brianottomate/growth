@@ -68,7 +68,7 @@ group key in metadata; a proper multi-brand UI is a follow-up.
 ## Runbook
 
 ```bash
-bun run db:push                                     # first time: create web_page
+bun run db:migrate                                  # apply committed schema migrations
 bun run scripts/import-website.ts --enrich          # sync + OG covers for static pages
 bun run scripts/import-website.ts                   # fast re-sync
 bun run scripts/import-website.ts --rollup-over=5000  # keep big groups per-page

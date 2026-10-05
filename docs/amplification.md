@@ -68,15 +68,7 @@ The app, chat and MCP share canonical singular actions:
 action for changes. Writes enforce the active workspace and personal-brand
 ownership. Multi-person work is a sequence of individual calls.
 
-## Migration and verification
-
-Run `bun scripts/apply-amplification.ts` with the intended `DATABASE_URL`. The
-production schema runner calls the same transactional migration before Drizzle
-push. It renames `promoted_brand_id` to `linked_brand_id`, adds handoff preference,
-backfills destination from the source platform, and replaces assignment
-uniqueness. On the first introduction of the output column, unambiguous legacy
-managed outputs are linked only when suggested copy is absent or agrees. Later
-passes never restore links or overwrite preferences/copy. No content is purged.
+## Verification
 
 Normal gates are `bun run check`, `bun test`, and `bun run ai:contracts`.
 `scripts/verify-amplification.ts` additionally exercises the real database with
@@ -85,18 +77,12 @@ retries, single editable copy, publisher identity, exact fulfillment and
 migration replay. It requires `AMPLIFICATION_TEST_DATABASE_HOST` to exactly
 match the disposable database host and makes no provider calls.
 
-## Current local preview
-
-The `initiative-email-blog` worktree uses Neon branch
-`br-polished-bird-aire64n7` (`initiative-amplification-20261005`) in project
-`lingering-river-02200892`. Production has not been migrated in this iteration.
-Its local URL is `http://127.0.0.1:3003` to isolate cookies from other localhost
-servers using another database. Start with `bun dev --port 3003 --hostname
-127.0.0.1`. The worktree `.env` contains the matching local base URL.
+## Preview data
 
 `scripts/prepare-vrma-amplification-preview.ts` is separate, opt-in preview data
-preparation. It verifies the same host guard, removes only unshipped extra social
-channel drafts for the three specified VRMA posts, and plans Sahil's two actions.
+preparation. It requires `AMPLIFICATION_TEST_DATABASE_HOST` to match the disposable
+database host, removes only unshipped extra social channel drafts for the three
+specified VRMA posts, and plans Sahil's two actions.
 It saves removed rows to `/tmp/vrma-preview-channel-backup.json`. It is not part
-of schema migration and sends/publishes nothing. Delete this Neon branch when
-the worktree is retired after release; do not point production at it.
+of schema migration and sends/publishes nothing. Use an isolated Neon branch for
+this preview data.

@@ -12,7 +12,7 @@ flowchart LR
   C --> P[Platform post: channel and delivery]
   P --> L[platform_document selection]
   L --> D
-  D --> R[creative_run: frozen input and attempt]
+  D --> R[workflow_run: frozen input and attempt]
   R --> M[media_asset: accepted output]
   D --> E[Email renderer / Dato draft transfer]
 ```
@@ -38,7 +38,7 @@ version is a format discriminator, **not an edit counter**.
 No revision table, optimistic conflict counter, external edit detection or merging.
 Saving replaces the current document. Preparing a brief does not enqueue a job.
 Production freezes the saved input on a run and locks document edits and transfers.
-The unique partial index permits one queued/processing run per packet. Backend row
+The unique partial index permits one queued/running run per packet. Backend row
 locks serialize saves and run creation. Cancelled, failed and expired runs release
 editing. A late result cannot replace the document. Previous good content survives
 failed generation. Attempts keep diagnostics and provider receipts; they are not
@@ -64,23 +64,3 @@ Image acceptance saves to the media library and shared content pool. Selecting t
 finished document on a channel copies its chosen asset into that platform post;
 repeat selection explicitly to use a newer asset. Normal small social posts need
 no creative document.
-
-## Cutover
-
-`bun --env-file=.env scripts/apply-creative-documents.ts` validates in a rolled-back
-transaction. `--apply` commits the additive migration; the deployed old email
-workspace remains usable. `--retire-legacy` also removes old email tables and
-requires there be no unmigrated delivery snapshots. The production build performs
-the final migration before Drizzle schema push.
-
-The production audit on 2026-10-05 found 24 current email documents, 55 email
-versions, 3 completed email generation jobs, 11 production packets, and no message
-sends. Current drafts and packets are retained. Old revisions and completed email
-job history are intentionally retired at cutover. Dato records and existing blog
-platform posts are untouched. Imported blogs can be pulled explicitly into a new
-article document; they are not bulk-rewritten.
-
-The additive migration is repeatable. At deployment it copies any newer edits from
-the old email editor, while preserving newer edits in the shared document. There
-is no ongoing bidirectional sync between the legacy and new editor. Migration
-refuses to retire active email jobs or unmigrated send snapshots.

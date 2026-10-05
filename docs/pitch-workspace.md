@@ -36,18 +36,7 @@ Rep setup edits on wander.com remain temporary overrides; editing in Growth is
 how a change becomes shared. Older wander.com deployments ignore `settings`;
 the new renderer accepts responses without it, so rollout order is safe.
 
-## Migration and checks
-
-Run the exact additive migration rather than a broad schema push:
-
-```sh
-bun --conditions=react-server scripts/apply-pitch-settings.ts
-```
-
-Dev and production currently share Neon. The additive migration creates `brand_pitch` and copies any legacy overrides,
-without overwriting newer pitch rows. The obsolete brand column is removed by
-the new production schema. The workspace dev environment was prepared
-with this migration during implementation.
+## Checks
 
 ```sh
 bun run check

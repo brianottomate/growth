@@ -187,9 +187,7 @@ the model limitation they are rather than a claimed projection.
 
 #### Opt-out is now mirrored (and was silently dropped before)
 
-`hs_email_optout` was in the allow-list but had nowhere to land, so it was
-fetched and discarded. `leads.contact.email_opt_out` now holds it, applied via
-`scripts/apply-contact-optout-schema.ts`.
+`leads.contact.email_opt_out` mirrors HubSpot’s `hs_email_optout` property.
 
 HubSpot enforces suppression at send time regardless, so this is not a
 compliance fix — it is a cost fix. Without it, an opted-out contact still counts
@@ -440,8 +438,7 @@ Relevant commands:
 # Ensure HubSpot contact properties exist
 bun --conditions=react-server scripts/ensure-hubspot-pregen-properties.ts
 
-# Apply and refresh the mirrored HubSpot list memberships
-bun --conditions=react-server scripts/apply-hubspot-pregen-list-schema.ts
+# Refresh the mirrored HubSpot list memberships
 bun --conditions=react-server scripts/import-hubspot-pregen-lists.ts --dry
 bun --conditions=react-server scripts/import-hubspot-pregen-lists.ts
 
@@ -462,9 +459,6 @@ The import is idempotent and only reconciles the four explicit list IDs above.
 It does not edit the HubSpot list definitions or enroll contacts.
 
 ```bash
-# Apply the mirrored opt-out column (idempotent, additive)
-bun --conditions=react-server scripts/apply-contact-optout-schema.ts
-
 # Walk the full HubSpot contact universe into leads.contact
 bun --conditions=react-server scripts/backfill-hubspot-contacts.ts --dry
 bun --conditions=react-server scripts/backfill-hubspot-contacts.ts

@@ -51,18 +51,6 @@ schema; product results have named nested fields. See
 [output contracts](ai-output-contracts.md) for coverage, credential projection,
 and post-execution failure recovery.
 
-## Schema and release
-
-Run `bun --conditions=react-server scripts/apply-chat-turn-control.ts` against
-the selected database before running this version. It performs only additive
-DDL in a transaction: turn-control fields on `assistant_thread` and the new
-`assistant_input` table/index. It is safe to run again. Never apply a broad
-schema push from this branch to the shared production database.
-
-The feature PR preview uses a dedicated Neon branch. Applying the migration to
-the shared database and releasing production remain separate release steps.
-The additive fields can stay in place if the application is rolled back.
-
 ## Verification
 
 - `bun run check`

@@ -370,7 +370,7 @@ export default async function WebsitePage({
     : brands.map((brand) => brand.id);
 
   // Graceful before first provisioning: `web_page` may not exist yet
-  // (schema ships in this repo; `bun run db:push` creates it).
+  // (schema ships in this repo and is applied through Drizzle migrations).
   let pages: WebPage[] = [];
   let tableMissing = false;
   try {

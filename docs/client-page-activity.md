@@ -52,10 +52,8 @@ notification policy can consume the stored events without changing link access.
 
 ## Schema and deployment
 
-`scripts/apply-client-page-view-schema.ts` applies only the additive table and
-two indexes. It is exported through the Drizzle schema barrel. Existing pregen
-data is neither moved nor rewritten. Development/preview and production share
-a database today: apply the exact DDL deliberately, not an unrelated db:push.
+`client_page_view` and its indexes are defined in the Drizzle schema and
+created by the committed migrations.
 
 Deploy Growth's endpoint before wander.com's beacon changes. The existing
 GROWTH_GATEWAY_URL, API token and optional Vercel automation bypass are reused;

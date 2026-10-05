@@ -3,7 +3,7 @@
 // Growth's own layout: the promo's copy and offer, its featured homes as cards
 // from the brand's own homes, placed where the copy listed them. Sets the
 // brand's email sender from its perf-email brand config (needs
-// db:apply:brand-email-sender). An issue already on the calendar gets a new
+// the committed Drizzle migrations). An issue already on the calendar gets a new
 // revision, so the earlier one stays restorable. Drafts only; nothing is sent.
 //
 //   bun --conditions=react-server run scripts/import-performance-promos.ts \

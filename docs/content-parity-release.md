@@ -1,22 +1,10 @@
 # Content parity release
 
-This slice changes application code and adds an explicit database release step.
-It is not live until every gate below is complete.
+Schema changes are applied by the release workflow using committed Drizzle
+migrations. First-comment delivery fields, Slack amplification receipts,
+amplifier Slack member IDs, and brand-owned ad accounts are part of the schema.
 
-## 1. Apply schema deliberately
-
-The additive migration was rehearsed on an expiring Neon branch. Apply it to
-production only with an approved release operation:
-
-```sh
-bun run db:apply:content-parity
-```
-
-The script adds first-comment delivery fields, Slack amplification receipts,
-amplifier Slack member IDs, and brand ownership for ad accounts. It refuses to
-finish if an allowed ad account remains unscoped.
-
-## 2. Configure provider boundaries
+## Configure provider boundaries
 
 Required for Zernio publishing:
 
@@ -39,7 +27,7 @@ Required for human amplification notification:
 - the bot invited to that channel
 - optionally, a direct Slack member ID stored on an amplifier as a fallback
 
-## 3. Deploy and verify
+## Deploy and verify
 
 Before merge/deploy:
 
@@ -69,5 +57,3 @@ After production deployment:
    stored channel/message timestamp, then retry and prove it does not duplicate.
 7. Read ads for `wander` and `wanderos` separately and confirm no account appears
    outside its assigned brand.
-
-Only after those checks is the slice live rather than code-complete.

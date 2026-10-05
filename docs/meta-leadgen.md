@@ -19,7 +19,7 @@ wander, wander.com, tracking and sites) is tracked in
 | Qualification rules, signature, payload parsing | `src/lib/meta-leadgen.ts` (+ tests) |
 | Graph + Conversions API client | `src/server/clients/meta-leadgen.client.ts` |
 | Orchestration, idempotency | `src/server/services/meta-leadgen.service.ts` |
-| Ledger table | `leads.meta_leadgen_lead`, applied with `bun run db:apply:meta-leadgen` |
+| Ledger table | `leads.meta_leadgen_lead`, managed by committed Drizzle migrations |
 
 Flow per lead: store the leadgen id → fetch the lead with a Page token → parse
 the unit count → if 10+ send `Marketing Qualified Lead` to pixel

@@ -25,10 +25,9 @@ The activity API checks live workspace membership and brand scope, and returns a
 
 The layout polls every 2 seconds during active work and every 15 seconds while idle, only while the page is visible. Changes invalidate relevant queries and refresh server components. An observed active-to-success transition emits a toast and removes the activity row. Initial page loads do not replay old completion toasts. Failed rows remain until dismissed. Buttons retain their specialized status queries where they need operation-specific state.
 
-## Cutover
+## Validation
 
-`scripts/apply-workflow-run-cutover.ts --apply` is the one-time additive cutover, generated from the actual Drizzle schema. It copies completed creative results and all saved exports, classifies old active jobs as interrupted, and leaves the old table available while the old application is deployed. After the new release is Ready, the explicit forced schema push retires `creative_run` and its enum. Build itself no longer modifies the database.
-
-The earlier `workflow-run-proposal.sql` is a design draft, not the applied schema. Current table definitions in `src/server/db/creative-work-schema.ts` are authoritative.
+Current table definitions live in `src/server/db/creative-work-schema.ts`;
+committed Drizzle migrations create the schema.
 
 Validation: normal check/test/AI-contract gates, `scripts/smoke-workflow-runs.ts --run`, and `scripts/smoke-creative-documents.ts --run`. Both smoke scripts use temporary rows, call no providers, and clean up. They cover duplicate claims, workspace boundaries, edit locks, cancellation/expiry fencing, preservation of the last good document, and export independence.

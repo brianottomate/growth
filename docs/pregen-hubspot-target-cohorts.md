@@ -29,7 +29,6 @@ separately and links both to `leads.domain` where a HubSpot company ID is known.
 ## Refresh
 
 ```bash
-bun --conditions=react-server scripts/apply-hubspot-pregen-list-schema.ts
 bun --conditions=react-server scripts/import-hubspot-pregen-lists.ts --dry
 bun --conditions=react-server scripts/import-hubspot-pregen-lists.ts
 ```

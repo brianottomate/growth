@@ -38,9 +38,9 @@ bun run ai:gauntlet     # Contract gate plus isolated live DB access/receipt che
 bun run lint:fix        # oxlint --fix
 bun run format:write    # oxfmt
 
-bun run db:push         # Push schema to DB (dev iteration)
+bun run db:check        # Check schema/snapshot agreement
 bun run db:generate     # Generate migration files
-bun run db:migrate      # Apply migrations (production)
+bun run db:migrate      # Apply committed migrations (local and production)
 bun run db:studio       # Drizzle Studio
 bun run db:seed         # scripts/seed.ts (seeded rows get isSeed=true)
 bun run db:unseed       # Remove seeded rows
@@ -90,8 +90,11 @@ Since 2026-08-28 this repo follows the org-wide release-drafter flow
   before publishing.
 - PR labels `major`/`minor`/`patch` set the version bump; unlabeled PRs count
   as patch.
-- Rollback: re-run the `Deploy` workflow run of the last good release. A rerun
-  triggers a Vercel instant rollback to that release's deployment.
+- The `build` script runs committed migrations after `next build` succeeds in
+  every environment. Development, preview and production share the same database.
+  See `docs/database-migrations.md` for the workflow.
+- Rollback: never reverse database migrations automatically. Prefer a forward-fix
+  release; an app-only instant rollback needs verified schema compatibility.
 - Git history was rewritten on 2026-08-27 to purge `public/lab` media
   (129M → 6.6M clones). `public/lab/` is gitignored; keep binaries out of git.
 
@@ -397,8 +400,9 @@ vars with the `vercel-env` skill; inspect deploy logs with the `vercel-logs` ski
 ## Important boundaries
 
 - Use Bun. Do not run npm or yarn in this repository.
-- `bun run build` does not mutate the database. Apply reviewed schema changes
-  explicitly before deploying code that needs them.
+- `bun run build` applies pending migrations to the configured database after
+  compiling. Commit Drizzle SQL and snapshots with schema edits. Never
+  use `drizzle-kit push` or one-off schema repair scripts on persistent databases.
 - Preserve the default-deny ad-account allowlist. Aggregator OAuth grants can
   expose unrelated personal or portfolio accounts.
 - Provider sends, publishes, deletes, campaign changes, and conversion-action
