@@ -103,6 +103,10 @@ function observe(
     return facts?.intakeFiledAt
       ? { done: true, detail: `Filed ${fmtDay(facts.intakeFiledAt)}` }
       : { done: false, detail: "Not filed" };
+  if (id === "invoice_paid")
+    return facts?.feePaidAt
+      ? { done: true, detail: `Paid ${fmtDay(facts.feePaidAt)}` }
+      : { done: false, detail: "Not paid" };
   if (id === "wanderos")
     return facts?.wanderOsConnected
       ? { done: true, detail: "Connected" }

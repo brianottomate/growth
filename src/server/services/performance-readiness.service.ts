@@ -1,11 +1,12 @@
 import "server-only";
 
-import { and, inArray, isNull } from "drizzle-orm";
+import { and, inArray, isNotNull, isNull } from "drizzle-orm";
 
 import { type ReadinessChecklist } from "@/lib/performance-readiness";
 import { db } from "@/server/db";
 import {
   brandTable,
+  performanceCycleTable,
   performanceIntakeTable,
   performancePropertyTable,
 } from "@/server/db/schema";
@@ -55,7 +56,7 @@ export async function loadBrandReadiness(
     .map((brand) => brand.account?.id)
     .filter((id): id is string => Boolean(id));
 
-  const [intakes, properties] = accountIds.length
+  const [intakes, properties, paidCycles] = accountIds.length
     ? await Promise.all([
         db.query.performanceIntakeTable.findMany({
           where: inArray(performanceIntakeTable.accountId, accountIds),
@@ -68,8 +69,22 @@ export async function loadBrandReadiness(
           ),
           columns: { accountId: true },
         }),
+        db.query.performanceCycleTable.findMany({
+          where: and(
+            inArray(performanceCycleTable.accountId, accountIds),
+            isNotNull(performanceCycleTable.feePaidAt),
+          ),
+          columns: { accountId: true, feePaidAt: true },
+        }),
       ])
-    : [[], []];
+    : [[], [], []];
+  // Onboarding asks whether the first invoice was paid, in any month.
+  const firstPaid = new Map<string, Date>();
+  for (const row of paidCycles) {
+    const seen = firstPaid.get(row.accountId);
+    if (!seen || row.feePaidAt! < seen)
+      firstPaid.set(row.accountId, row.feePaidAt!);
+  }
   const recordedRows = brandIds.length
     ? await db.query.brandTable.findMany({
         where: inArray(brandTable.id, brandIds),
@@ -142,6 +157,9 @@ export async function loadBrandReadiness(
       checklist: recordedLaunchChecklist(record, {
         intakeFiledAt: intake?.submittedAt ?? null,
         wanderOsConnected: connected.get(brand.id) ?? false,
+        feePaidAt: brand.account
+          ? (firstPaid.get(brand.account.id) ?? null)
+          : null,
       }),
       revision: record.revision,
     });
@@ -158,6 +176,6 @@ export function readinessLinks(
     intake: brand.intakeUrl,
     connect: `/app/performance/clients/${slug}#submission`,
     wanderos: `/app/performance/clients/${slug}/wanderos`,
-    finance: "/app/performance/finance",
+    finance: `/app/performance/clients/${slug}#payments`,
   };
 }

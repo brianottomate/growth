@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 
 import {
   PERFORMANCE_FEE_DOLLARS,
@@ -89,6 +89,25 @@ export async function markCycleLinePaid(
     .set(input.line === "fee" ? { feePaidAt: at } : { mediaPaidAt: at })
     .where(eq(performanceCycleTable.id, cycle.id))
     .returning();
+  // The Overview card shows the same fact; keep it in step without going
+  // through setPerformanceSettings, which calls back into here.
+  const key = input.line === "fee" ? "managementPayment" : "spendPayment";
+  const state = JSON.stringify({ [key]: input.paid ? "Paid" : "Open" });
+  await db
+    .update(brandTable)
+    .set({
+      performanceSettings: sql`coalesce(${brandTable.performanceSettings}, '{}'::jsonb) || jsonb_build_object('cardState', coalesce(${brandTable.performanceSettings}->'cardState', '{}'::jsonb) || ${state}::jsonb)`,
+    })
+    .where(
+      and(
+        eq(brandTable.id, input.brandId),
+        // Undoing only clears a Paid; a card already set to another state
+        // (Not invoiced) is the person's answer and stays.
+        input.paid
+          ? undefined
+          : sql`${brandTable.performanceSettings}->'cardState'->>${key} = 'Paid'`,
+      ),
+    );
   if (input.line === "fee" && input.paid) {
     await advanceBusinessStage(input.brandId, "paid");
   }

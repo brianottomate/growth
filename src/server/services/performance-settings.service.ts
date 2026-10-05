@@ -11,6 +11,7 @@ import {
 
 import { db, type Database, type TransactionClient } from "@/server/db";
 import { brandTable, userTable } from "@/server/db/schema";
+import { markCycleLinePaid } from "./performance-billing.service";
 import type { PerformanceSettings } from "@/server/db/brand-schema";
 import type { PerformanceIntakeAnswers } from "@/server/db/performance-schema";
 
@@ -152,6 +153,21 @@ export async function setPerformanceSettings(input: {
       422,
       "Client settings changed while saving. Refresh and try again.",
     );
+  // Paid lives on the month's billing cycle, which is what moves the brand to
+  // Paid on the Clients list. The card's payment fields write through to it.
+  for (const [key, line] of [
+    ["managementPayment", "fee"],
+    ["spendPayment", "media"],
+  ] as const) {
+    const was = current.cardState?.[key] === "Paid";
+    const is = next.cardState?.[key] === "Paid";
+    if (was !== is) {
+      await markCycleLinePaid(
+        { orgId: input.orgId },
+        { brandId: brand.id, line, paid: is },
+      );
+    }
+  }
   return { settings: next, changed };
 }
 

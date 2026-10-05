@@ -279,7 +279,10 @@ export function PerformanceClientCard({
         </div>
       )}
       {context === "client" ? (
-        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 border-t pt-3 text-xs">
+        <div
+          id="payments"
+          className="mt-3 flex scroll-mt-4 flex-wrap gap-x-5 gap-y-2 border-t pt-3 text-xs"
+        >
           <Status label="Management payment" value={state.managementPayment} />
           <Status label="Ad spend payment" value={state.spendPayment} />
           {state.billingPeriod ? (

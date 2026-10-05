@@ -6,7 +6,8 @@
 /**
  * Where an unticked item is resolved. The page maps these to hrefs:
  * `intake` is the client-facing form, `connect` the brand's access flow,
- * `wanderos` the brand's WanderOS tab, `finance` the Finance page.
+ * `wanderos` the brand's WanderOS tab, `finance` the payments on the
+ * brand's Overview card.
  */
 export type ReadinessFix = "intake" | "connect" | "wanderos" | "finance";
 
@@ -55,6 +56,8 @@ export type ObservedFacts = {
   intakeFiledAt: Date | null;
   /** The brand is on a WanderOS site. */
   wanderOsConnected: boolean;
+  /** When the client's first management fee was recorded paid, if ever. */
+  feePaidAt: Date | null;
 };
 
 const INTAKE = { label: "Open intake form", to: "intake" } as const;
@@ -79,7 +82,12 @@ export const LAUNCH_MILESTONES: readonly {
         dated: true,
         action: FINANCE,
       },
-      { id: "invoice_paid", label: "Invoice paid", action: FINANCE },
+      {
+        id: "invoice_paid",
+        label: "Invoice paid",
+        observed: true,
+        action: FINANCE,
+      },
       { id: "budget", label: "Media budget set", action: INTAKE },
       {
         id: "access",
