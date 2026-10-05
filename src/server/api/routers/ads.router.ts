@@ -1,3 +1,12 @@
+import { and, eq } from "drizzle-orm";
+import { db } from "@/server/db";
+import { audienceTable, campaignAudienceAssetTable } from "@/server/db/schema";
+import { requireOwnedCampaign } from "@/server/services/ads-draft.service";
+import {
+  prepareCampaignSeed,
+  campaignSeedSnapshot,
+  buildCampaignLookalike,
+} from "@/server/services/campaign-seed.service";
 import { adAuthoringScopeSchema } from "@/lib/ad-authoring";
 import { after } from "next/server";
 import { starterGenerationSchema } from "@/lib/starter-ad-generation";
@@ -14,6 +23,7 @@ import { freezeIdea } from "@/server/services/ad-approval.service";
 import { channelPlatformEnum } from "@/server/db/channel-schema";
 
 import {
+  listAdSet,
   setAdPhotoOnly,
   setAdTextOnly,
   setAdPlatforms,
@@ -36,6 +46,7 @@ import {
   addAdShellAction,
   createAdsFromAssetsAction,
   addAudienceAction,
+  updateAudienceAction,
   suggestCampaignAudiencesAction,
   linkAudienceAction,
   createGoogleAdsAccountAction,
@@ -70,6 +81,67 @@ import {
 } from "@/server/ai/capabilities/ads";
 
 export const adsRouter = {
+  unlinkAudienceAsset: workspaceProcedure
+    .input(
+      z.object({
+        audienceId: z.string().min(1),
+        platform: z.enum(channelPlatformEnum.enumValues),
+      }),
+    )
+    .handler(async ({ input, context: ctx }) => {
+      const audience = await db.query.audienceTable.findFirst({
+        where: eq(audienceTable.id, input.audienceId),
+      });
+      if (!audience) throw new Error("Audience not found");
+      await requireOwnedCampaign(audience.campaignId, ctx.workspace.orgId);
+      await db
+        .delete(campaignAudienceAssetTable)
+        .where(
+          and(
+            eq(campaignAudienceAssetTable.audienceId, input.audienceId),
+            eq(campaignAudienceAssetTable.platform, input.platform),
+          ),
+        );
+      return { unlinked: true };
+    }),
+
+  prepareSeed: workspaceProcedure
+    .input(z.object({ audienceId: z.string().min(1) }))
+    .handler(({ input, context: ctx }) =>
+      prepareCampaignSeed(input, {
+        organizationId: ctx.workspace.orgId,
+        userId: ctx.session.user.id,
+      }),
+    ),
+  seedSnapshot: workspaceProcedure
+    .input(
+      z.object({
+        audienceId: z.string().min(1),
+        snapshotId: z.string().min(1),
+      }),
+    )
+    .handler(({ input, context: ctx }) =>
+      campaignSeedSnapshot(input, {
+        organizationId: ctx.workspace.orgId,
+        userId: ctx.session.user.id,
+      }),
+    ),
+  buildLookalike: workspaceProcedure
+    .input(
+      z.object({
+        audienceId: z.string().min(1),
+        seedPlatformAudienceId: z.string().min(1),
+        country: z.string().regex(/^[A-Z]{2}$/),
+        approved: z.literal(true),
+      }),
+    )
+    .handler(({ input, context: ctx }) =>
+      buildCampaignLookalike(input, {
+        organizationId: ctx.workspace.orgId,
+        userId: ctx.session.user.id,
+      }),
+    ),
+
   // The /overview top-ads card refetches here when its controls change, with
   // no model round-trip.
   topAds: actionProcedure(topAds),
@@ -152,14 +224,28 @@ export const adsRouter = {
         organizationId: ctx.workspace.orgId,
       }),
     ),
-  /** Editable starter ideas, blank or prefilled from selected homes. */
+  brandAds: workspaceProcedure
+    .input(z.object({ brandId: z.string().min(1) }))
+    .handler(({ context: ctx, input }) =>
+      listAdSet({ ...input, orgId: ctx.workspace.orgId }),
+    ),
+
+  /** Editable starter ads, blank or prefilled from selected homes. */
   addStarterIdeas: workspaceProcedure
     .input(
-      z.object({
-        campaignId: z.string().min(1),
-        source: z.enum(["blank", "featured", "shells"]).default("blank"),
-        homeIds: z.array(z.string().min(1)).min(1).max(10).optional(),
-      }),
+      z
+        .object({
+          campaignId: z.string().min(1).optional(),
+          brandId: z.string().min(1).optional(),
+          batchId: z.string().uuid().optional(),
+          bookingTargetId: z.string().min(1).optional(),
+          source: z.enum(["blank", "featured", "shells"]).default("blank"),
+          homeIds: z.array(z.string().min(1)).min(1).max(10).optional(),
+        })
+        .refine(
+          (value) => Boolean(value.campaignId) !== Boolean(value.brandId),
+          { message: "Supply either campaignId or brandId." },
+        ),
     )
     .handler(async ({ context: ctx, input }) =>
       addStarterAdIdeas({
@@ -251,6 +337,7 @@ export const adsRouter = {
   replaceAdMedia: actionProcedure(replaceAdCardAction),
 
   addAudience: actionProcedure(addAudienceAction),
+  updateAudience: actionProcedure(updateAudienceAction),
   suggestCampaignAudiences: actionProcedure(suggestCampaignAudiencesAction),
   linkAudience: actionProcedure(linkAudienceAction),
   createReportingConversion: actionProcedure(createReportingConversionAction),

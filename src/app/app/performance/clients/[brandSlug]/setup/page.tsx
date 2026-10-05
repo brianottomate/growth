@@ -137,7 +137,8 @@ export default async function PerformanceBrandSetupPage({
             id: persona.id,
             name: persona.name,
             description: persona.description,
-            countries: persona.demandGeography?.countries ?? [],
+            demandGeography: persona.demandGeography,
+            destinationGeography: persona.destinationGeography,
             targets,
           }))}
           unassigned={audiences.unassigned}

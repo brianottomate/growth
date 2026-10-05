@@ -121,6 +121,7 @@ import {
   platformAdTable,
   platformAudienceTable,
   personaTable,
+  campaignAudienceAssetTable,
   type Ad,
   type AdCreativeContent,
   type AdTextContent,
@@ -1997,33 +1998,36 @@ async function platformAudienceExternalIdFor(
   brandId: string,
   platform: PushableAdPlatform,
 ): Promise<string | null> {
-  const lineage = [
-    eq(platformAudienceTable.audienceId, planAudience.id),
-    ...(planAudience.personaId
-      ? [eq(platformAudienceTable.personaId, planAudience.personaId)]
-      : []),
-  ];
-  for (const link of lineage) {
-    const rows = await db
-      .select({ externalId: platformAudienceTable.externalId })
-      .from(platformAudienceTable)
-      .innerJoin(
-        channelTable,
-        eq(channelTable.id, platformAudienceTable.channelId),
-      )
-      .where(
-        and(
-          link,
-          eq(platformAudienceTable.brandId, brandId),
-          eq(channelTable.platform, platform),
-          isNotNull(platformAudienceTable.externalId),
-        ),
-      )
-      // Deterministic when several assets are linked: newest wins. The link
-      // actions also unlink same-platform siblings, so this is the backstop.
-      .orderBy(desc(platformAudienceTable.updatedAt))
-      .limit(1);
-    if (rows[0]?.externalId) return rows[0].externalId;
+  const [linked] = await db
+    .select({
+      externalId: platformAudienceTable.externalId,
+      seedMetadata: platformAudienceTable.seedMetadata,
+    })
+    .from(campaignAudienceAssetTable)
+    .innerJoin(
+      platformAudienceTable,
+      eq(
+        campaignAudienceAssetTable.platformAudienceId,
+        platformAudienceTable.id,
+      ),
+    )
+    .where(
+      and(
+        eq(campaignAudienceAssetTable.audienceId, planAudience.id),
+        eq(campaignAudienceAssetTable.platform, platform),
+        eq(platformAudienceTable.brandId, brandId),
+      ),
+    )
+    .limit(1);
+  if (linked) {
+    if (
+      !linked.externalId ||
+      (linked.seedMetadata && linked.seedMetadata.status !== "ready")
+    )
+      throw new Error(
+        "The selected audience is not ready. Choose another audience before pushing.",
+      );
+    return linked.externalId;
   }
   return null;
 }

@@ -2,7 +2,7 @@ import "server-only";
 
 import { anthropic } from "@ai-sdk/anthropic";
 import { generateText, Output } from "ai";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { marketOf, type Market } from "@/lib/markets";
@@ -16,9 +16,10 @@ import { db } from "@/server/db";
 import {
   audienceTable,
   brandTable,
-  campaignTable,
   homeTable,
   platformAudienceTable,
+  personaTable,
+  campaignAudienceAssetTable,
 } from "@/server/db/schema";
 
 import { requireOwnedCampaign } from "./ads-draft.service";
@@ -100,8 +101,12 @@ const suggestionSchema = z.object({
   states: z
     .array(z.string())
     .describe("Geo only: two-letter codes of the whole states to target."),
-  ageMin: z.number().int(),
-  ageMax: z.number().int(),
+  personaId: z.string().nullable(),
+  cities: z.array(z.string()),
+  countries: z.array(z.string()),
+  homeIds: z.array(z.string()),
+  ageMin: z.number().int().nullable(),
+  ageMax: z.number().int().nullable(),
   platformAudienceId: z
     .string()
     .nullable()
@@ -136,9 +141,21 @@ export async function suggestCampaignAudiences(input: {
     columns: { id: true, name: true, story: true, markets: true },
   });
   if (!brand) throw new Error("Brand not found");
+  const personas = await db.query.personaTable.findMany({
+    where: and(
+      eq(personaTable.brandId, brand.id),
+      isNull(personaTable.deletedAt),
+    ),
+  });
   const current = await db.query.audienceTable.findMany({
     where: eq(audienceTable.campaignId, campaign.id),
-    columns: { name: true, ageMin: true, ageMax: true, geography: true },
+    columns: {
+      name: true,
+      personaId: true,
+      ageMin: true,
+      ageMax: true,
+      geography: true,
+    },
   });
   const coveredStates = new Set(
     current.flatMap((row) =>
@@ -149,7 +166,18 @@ export async function suggestCampaignAudiences(input: {
   );
   const homes = await db.query.homeTable.findMany({
     where: and(eq(homeTable.brandId, brand.id), isNull(homeTable.deletedAt)),
-    columns: { externalId: true, source: true, city: true, state: true },
+    columns: {
+      id: true,
+      name: true,
+      externalId: true,
+      source: true,
+      city: true,
+      state: true,
+      bedrooms: true,
+      guests: true,
+      amenities: true,
+      featured: true,
+    },
   });
 
   // Every market the brand has, drafted or edited.
@@ -158,13 +186,6 @@ export async function suggestCampaignAudiences(input: {
     const market = marketOf(brand.markets, home.city);
     if (market) markets.set(market.id, market);
   }
-  const homeStates = [
-    ...new Set(
-      homes
-        .map((home) => usStateCode(home.state))
-        .filter((s): s is string => Boolean(s)),
-    ),
-  ];
 
   const window = await bookingWindow(
     homes
@@ -172,8 +193,7 @@ export async function suggestCampaignAudiences(input: {
       .map((home) => home.externalId),
   );
 
-  // Audiences already in the ad account. One linked to another campaign's
-  // audience is reported, not offered: reusing the link would move it.
+  // Platform assets remain reusable across campaigns through explicit links.
   const assets = await db.query.platformAudienceTable.findMany({
     where: eq(platformAudienceTable.brandId, brand.id),
     columns: {
@@ -182,49 +202,29 @@ export async function suggestCampaignAudiences(input: {
       type: true,
       sizeLabel: true,
       audienceId: true,
+      seedMetadata: true,
+      externalId: true,
     },
   });
-  const linked = assets.filter((asset) => asset.audienceId);
-  const linkedPlans = linked.length
-    ? await db.query.audienceTable.findMany({
-        where: inArray(
-          audienceTable.id,
-          linked.map((asset) => asset.audienceId!),
-        ),
-        columns: { id: true, campaignId: true },
-      })
-    : [];
-  const campaignNames = new Map<string, string>();
-  const otherCampaignIds = [
-    ...new Set(
-      linkedPlans
-        .map((plan) => plan.campaignId)
-        .filter((id) => id && id !== campaign.id),
-    ),
-  ] as string[];
-  if (otherCampaignIds.length)
-    for (const row of await db.query.campaignTable.findMany({
-      where: inArray(campaignTable.id, otherCampaignIds),
-      columns: { id: true, name: true },
-    }))
-      campaignNames.set(row.id, row.name);
+  const memberships = await db
+    .select()
+    .from(campaignAudienceAssetTable)
+    .innerJoin(
+      audienceTable,
+      eq(campaignAudienceAssetTable.audienceId, audienceTable.id),
+    )
+    .where(eq(audienceTable.brandId, brand.id));
   const inUse = new Map<string, string>();
-  for (const asset of linked) {
-    const plan = linkedPlans.find((p) => p.id === asset.audienceId);
-    if (plan?.campaignId && plan.campaignId !== campaign.id)
-      inUse.set(
-        asset.id,
-        campaignNames.get(plan.campaignId) ?? plan.campaignId,
-      );
-  }
-  // Assets this campaign already targets are covered, not offered again.
+  const usedHere = new Set(
+    memberships
+      .filter((m) => m.audience.campaignId === campaign.id)
+      .map((m) => m.campaign_audience_asset.platformAudienceId),
+  );
   const offerable = assets.filter(
     (asset) =>
-      !inUse.has(asset.id) &&
-      !linkedPlans.some(
-        (plan) =>
-          plan.id === asset.audienceId && plan.campaignId === campaign.id,
-      ),
+      !usedHere.has(asset.id) &&
+      asset.externalId &&
+      (!asset.seedMetadata || asset.seedMetadata.status === "ready"),
   );
 
   const feeders = [...markets.values()].flatMap((market) =>
@@ -238,10 +238,6 @@ export async function suggestCampaignAudiences(input: {
       name: campaign.name,
       goal: campaign.goal ?? null,
       landingUrl: campaign.landingUrl ?? null,
-    },
-    homes: {
-      count: homes.length,
-      states: homeStates.map((s) => `${s} (${usStateName(s) ?? s})`),
     },
     markets: [...markets.values()].map((market) => ({
       label: market.label,
@@ -259,7 +255,29 @@ export async function suggestCampaignAudiences(input: {
       feederCities: feeders.filter((f) => f.state === state).map((f) => f.city),
     })),
     bookingWindow: window,
+    personas: personas.map(
+      ({ id, name, description, demandGeography, destinationGeography }) => ({
+        id,
+        name,
+        description,
+        demandGeography,
+        destinationGeography,
+      }),
+    ),
+    homes: homes.map(
+      ({ id, name, city, state, bedrooms, guests, amenities, featured }) => ({
+        id,
+        name,
+        city,
+        state,
+        bedrooms,
+        guests,
+        amenities,
+        featured,
+      }),
+    ),
     alreadyInThisCampaign: current.map((row) => ({
+      personaId: row.personaId,
       name: row.name,
       states: row.geography?.states ?? [],
       ages: [row.ageMin, row.ageMax],
@@ -279,23 +297,8 @@ export async function suggestCampaignAudiences(input: {
       .join(" "),
   };
 
-  const empty = !feeders.length && !offerable.length;
-  const fallback = (): AudienceSuggestion[] =>
-    homeStates
-      .filter((state) => !coveredStates.has(state))
-      .slice(0, 1)
-      .map((state) => ({
-        name: `${usStateName(state) ?? state} drive-in · 25-64`,
-        kind: "geo",
-        cities: [],
-        states: [state],
-        countries: ["US"],
-        regions: [usStateName(state) ?? state],
-        ageMin: 25,
-        ageMax: 64,
-        platformAudienceId: null,
-        why: "No market, no session data and no synced audiences yet: the homes' own state.",
-      }));
+  const empty = !feeders.length && !offerable.length && !personas.length;
+  const fallback = (): AudienceSuggestion[] => [];
 
   let suggestions: AudienceSuggestion[];
   if (empty) {
@@ -313,9 +316,14 @@ export async function suggestCampaignAudiences(input: {
       providerOptions: { anthropic: { effort: "low" } },
     });
     const known = new Set(offerable.map((asset) => asset.id));
+    const knownPersonas = new Set(personas.map((p) => p.id));
+    const knownHomes = new Set(homes.map((h) => h.id));
     suggestions = output.audiences
       .map((s) => ({
         ...s,
+        personaId:
+          s.personaId && knownPersonas.has(s.personaId) ? s.personaId : null,
+        homeIds: s.homeIds.filter((id) => knownHomes.has(id)),
         states: s.states
           .map((state) => usStateCode(state))
           .filter((state): state is string => Boolean(state)),
@@ -330,7 +338,12 @@ export async function suggestCampaignAudiences(input: {
       )
       .filter((s) =>
         s.kind === "geo"
-          ? s.states.length > 0
+          ? Boolean(
+              s.states.length ||
+              s.cities.length ||
+              s.countries.length ||
+              s.personaId,
+            )
           : Boolean(s.platformAudienceId && known.has(s.platformAudienceId)),
       )
       .slice(0, count)
@@ -338,9 +351,9 @@ export async function suggestCampaignAudiences(input: {
         const states = s.kind === "geo" ? s.states : [];
         return {
           ...s,
-          cities: [],
+          cities: s.kind === "geo" ? s.cities : [],
           states,
-          countries: s.kind === "geo" ? ["US"] : [],
+          countries: s.kind === "geo" ? s.countries : [],
           regions: states.map((state) => usStateName(state) ?? state),
           platformAudienceId: s.kind === "geo" ? null : s.platformAudienceId,
         };

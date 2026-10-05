@@ -6,7 +6,6 @@ import {
   type CampaignWorkspace,
 } from "@/lib/campaign-navigation";
 import { workspaceActor } from "@/server/workspace-actor";
-import { starterGenerationStatus } from "@/server/services/starter-ad-generation.service";
 import { listBrandHomes } from "@/server/services/homes.service";
 import { isImportedMetaCatalog } from "@/lib/meta-import";
 import Link from "next/link";
@@ -35,8 +34,7 @@ import { AskAssistantButton } from "./AskAssistantButton";
 import { Audiences } from "./Audiences";
 import { CreativePool } from "./CreativePool";
 import { DeleteCampaignButton } from "./DeleteCampaignButton";
-import { AddStarterIdeasButton } from "./AddStarterIdeasButton";
-import { WriteSearchAdsButton } from "./WriteSearchAdsButton";
+import { AddExistingAdsDialog } from "@/app/app/performance/clients/[brandSlug]/ads/AddExistingAdsDialog";
 import { money } from "./format";
 import { PlanPlatformButton } from "./PlanPlatformButton";
 import { PlatformSection } from "./PlatformSection";
@@ -82,9 +80,15 @@ export async function CampaignView({
 
   const { campaign, audiences, ads, platformCampaigns, platformAudiences } =
     draft;
+  const reusableAssets = platformAudiences.map((asset) => ({
+    ...asset,
+    linkedAudienceIds: draft.assetLinks
+      .filter((link) => link.platformAudienceId === asset.id)
+      .map((link) => link.audienceId),
+  }));
   const metaTargets = Object.fromEntries(
     audiences.flatMap((row) => {
-      const hit = targetedAsset(row, platformAudiences, "meta_ads");
+      const hit = targetedAsset(row, reusableAssets, "meta_ads");
       return hit ? [[row.id, { name: hit.asset.name, via: hit.via }]] : [];
     }),
   );
@@ -93,10 +97,6 @@ export async function CampaignView({
 
   // Their homes, for binding an ad to one. Empty for a brand whose WanderOS
   // site is not connected, in which case a home is a name typed on the tile.
-  const generation = await starterGenerationStatus({
-    organizationId: org.id,
-    campaignId,
-  });
   const orderedHomes = await listBrandHomes(brand.id);
   const adHomeIds = [
     ...new Set(ads.flatMap((ad) => (ad.homeId ? [ad.homeId] : []))),
@@ -204,18 +204,29 @@ export async function CampaignView({
   const editableAds = ads.filter(
     (ad) => !("media" in ad.content) || !isImportedMetaCatalog(ad.content),
   );
-  const adActions = (empty: boolean) => (
-    <AddStarterIdeasButton
-      campaignId={campaign.id}
-      brandId={brand.id}
-      brandName={brandName}
-      campaignName={campaign.name}
-      empty={empty}
-    >
-      {plannedPlatforms.includes("google_ads") && (
-        <WriteSearchAdsButton campaignId={campaign.id} />
+  const studioPath = `/app/performance/clients/${brandSlug}/ads`;
+  const adActions = (
+    <div className="flex flex-wrap items-center gap-2">
+      {!anyPushed && (
+        <>
+          <AddExistingAdsDialog
+            brandId={brand.id}
+            campaignId={campaign.id}
+            studioPath={studioPath}
+          />
+          <AddAdDialog
+            brandId={brand.id}
+            website={campaign.landingUrl ?? brand.website}
+            campaignId={campaign.id}
+          />
+        </>
       )}
-      <AddAdDialog brandId={brand.id} homes={homes} campaignId={campaign.id} />
+      <Link
+        href={studioPath}
+        className="text-xs font-medium underline underline-offset-4"
+      >
+        Open Ad Studio
+      </Link>
       <CampaignAssetsDrawer count={pool.length} brandId={brand.id}>
         <CreativePool
           campaignId={campaign.id}
@@ -227,7 +238,7 @@ export async function CampaignView({
           )}
         />
       </CampaignAssetsDrawer>
-    </AddStarterIdeasButton>
+    </div>
   );
   return (
     <div className="space-y-4">
@@ -347,12 +358,14 @@ export async function CampaignView({
         className="scroll-mt-4 space-y-4 rounded-xl border bg-background p-4"
       >
         <AdIdeasList
-          actions={adActions(false)}
-          emptyState={adActions(true)}
-          preparingHero={
-            generation?.source === "featured" &&
-            ["queued", "processing"].includes(generation.status)
+          actions={adActions}
+          emptyState={
+            <p className="text-sm text-muted-foreground">
+              No ads assigned. Add existing brand ads or create one above. Batch
+              generation and the full collection are in Ad Studio.
+            </p>
           }
+          preparingHero={false}
           homeOrder={orderedHomes.map((home) => home.id)}
           homeLinks={homeLinks}
           campaignId={campaign.id}
@@ -399,6 +412,12 @@ export async function CampaignView({
               brandName={brandName}
               audiences={audiences}
               metaTargets={metaTargets}
+              personas={draft.personas}
+              platformAssets={reusableAssets}
+              homes={orderedHomes.map((home) => ({
+                id: home.id,
+                name: home.name,
+              }))}
             />
           </Step>
 
@@ -431,6 +450,76 @@ export async function CampaignView({
               </>
             }
           >
+            {editableAds.length > 0 && (
+              <div className="mb-4 space-y-2 rounded-lg border p-3">
+                <h3 className="text-sm font-medium">Ad destinations</h3>
+                <p className="text-xs text-muted-foreground">
+                  Review the saved ad URLs below and the tracking settings in
+                  each platform draft. Edit destinations in the ad editor or Ad
+                  Studio.
+                </p>
+                <ul className="space-y-2 text-xs">
+                  {editableAds.map((ad) => {
+                    const url = ad.content.linkUrl ?? campaign.landingUrl;
+                    const safe = safeHomeUrl(url);
+                    const cardUrls =
+                      "media" in ad.content
+                        ? ad.content.media.flatMap((card, index) =>
+                            card.landingUrl
+                              ? [{ index, url: card.landingUrl }]
+                              : [],
+                          )
+                        : [];
+                    return (
+                      <li key={ad.id} className="space-y-1">
+                        <span className="font-medium">{ad.name}: </span>
+                        {safe ? (
+                          <a
+                            href={safe}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="break-all underline"
+                          >
+                            {url}
+                          </a>
+                        ) : (
+                          <span role="alert" className="text-destructive">
+                            {url
+                              ? "Invalid destination URL"
+                              : "Missing destination URL"}
+                          </span>
+                        )}
+                        {ad.content.linkUrl == null && safe && (
+                          <span className="text-muted-foreground">
+                            {" "}
+                            (campaign fallback)
+                          </span>
+                        )}
+                        {cardUrls.map((card) => (
+                          <p key={card.index} className="pl-3 break-all">
+                            Card {card.index + 1}:{" "}
+                            {safeHomeUrl(card.url) ? (
+                              <a
+                                href={safeHomeUrl(card.url)!}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="underline"
+                              >
+                                {card.url}
+                              </a>
+                            ) : (
+                              <span role="alert" className="text-destructive">
+                                Invalid card destination URL
+                              </span>
+                            )}
+                          </p>
+                        ))}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
             {planned.length === 0 ? (
               <EmptyState
                 compact

@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
+import { HomePreview } from "@/components/home-preview";
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { Check, ImageOff, Loader2, Plus, Search } from "lucide-react";
+import { Check, Loader2, Plus, Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/components/ui/lib/utils";
@@ -105,34 +105,13 @@ export function HomeRowsGrid({
                 home.featured && "ring-1 ring-ring",
               )}
             >
-              <Link
+              <HomePreview
                 href={`/app/performance/clients/${brandSlug}/homes/${home.externalId}`}
-                className="block"
-              >
-                {home.heroThumbUrl ? (
-                  // oxlint-disable-next-line nextjs/no-img-element
-                  <img
-                    src={home.heroThumbUrl}
-                    alt={home.name}
-                    loading="lazy"
-                    className="aspect-[4/3] w-full bg-muted object-cover transition-opacity group-hover:opacity-90"
-                  />
-                ) : (
-                  <span className="grid aspect-[4/3] w-full grid-cols-1 place-items-center bg-muted text-muted-foreground">
-                    <ImageOff className="size-4" aria-label="No hero photo" />
-                  </span>
-                )}
-                <span className="block px-2.5 py-2">
-                  <span className="flex items-center gap-1 text-xs font-semibold">
-                    <span className="truncate group-hover:underline">
-                      {home.name}
-                    </span>
-                  </span>
-                  <span className="block truncate text-[11px] text-muted-foreground">
-                    {home.facts}
-                  </span>
-                </span>
-              </Link>
+                name={home.name}
+                imageUrl={home.heroThumbUrl}
+                facts={home.facts}
+                layout="card"
+              />
               <button
                 type="button"
                 onClick={() => {

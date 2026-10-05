@@ -7,7 +7,6 @@ import {
   listPersonas,
   suggestPersonas,
   updatePersona,
-  uploadPersonaSeedListAction,
 } from "@/server/ai/capabilities/personas";
 
 export const personaRouter = {
@@ -18,7 +17,6 @@ export const personaRouter = {
   delete: actionProcedure(deletePersona),
   // The Audiences tab's buttons. The click is the operator's approval of the
   // provider write, the same as the Launch button on a campaign.
-  uploadSeedList: actionProcedure(uploadPersonaSeedListAction),
   createLookalike: actionProcedure(createPersonaLookalikeAction),
   assignAudience: actionProcedure(assignPersonaAudienceAction),
 };

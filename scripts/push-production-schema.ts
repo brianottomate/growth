@@ -1,3 +1,4 @@
+import { migrateCampaignAudiences } from "./migrate-campaign-audiences";
 import { migrateCreativeDocuments } from "./migrate-creative-documents";
 import { migrateInitiatives } from "./migrate-initiatives";
 import postgres from "postgres";
@@ -27,6 +28,7 @@ try {
     for (const statement of launchRetirementStatements(source))
       await tx.unsafe(statement);
     await migrateInitiatives(tx);
+    await migrateCampaignAudiences(tx);
     await migrateCreativeDocuments(tx, true);
   });
   console.log("Launch retirement and Initiative cutover committed.");

@@ -735,6 +735,8 @@ export const personaTable = pgTable(
      * by an operator or agent; a campaign audience can be derived from it.
      */
     demandGeography: t.jsonb().$type<PersonaDemandGeography>(),
+    /** Places they want to visit or buy in; never residence targeting. */
+    destinationGeography: t.jsonb().$type<PersonaDemandGeography>(),
     notes: t.text(),
 
     createdAt: t

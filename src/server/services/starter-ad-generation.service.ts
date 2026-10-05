@@ -1,3 +1,4 @@
+import { brandStrategyContext } from "./brand-strategy-context.service";
 import "server-only";
 import { performanceCopyNotes } from "./performance-copy-notes.service";
 import {
@@ -36,7 +37,7 @@ import { runCopyRequest, type CopyRequest } from "@/server/ai/copy-request";
 import { resolveAdAuthoringScope, starterIdeaHomes } from "./ads-draft.service";
 import { brandListings, brandWebsiteId } from "./wanderos-listings.service";
 import { listAllBrandHomes } from "./homes.service";
-import { resolveBookingTarget } from "./home-groups.service";
+import { studioBookingDestination } from "./home-groups.service";
 import { fetchPublicImage } from "./media.service";
 
 const MODEL = "claude-sonnet-5";
@@ -46,7 +47,7 @@ type Input = z.infer<typeof starterGenerationSchema> & {
 };
 
 export async function startStarterGeneration(input: Input) {
-  const { brand } = await resolveAdAuthoringScope(input);
+  const { brand, campaign } = await resolveAdAuthoringScope(input);
   const homes = await listAllBrandHomes(brand.id);
   if (input.source !== "brand" && !input.homeIds.length)
     throw new Error("Choose at least one home");
@@ -55,6 +56,10 @@ export async function startStarterGeneration(input: Input) {
     input.homeIds.some((id) => !homes.some((h) => h.id === id))
   )
     throw new Error("Choose this brand's homes");
+  const targetId = input.bookingTargetId ?? campaign?.bookingTargetId;
+  const bookingDestination = targetId
+    ? await studioBookingDestination(brand.id, targetId, input.organizationId)
+    : null;
   const [run] = await db
     .insert(creativeRunTable)
     .values({
@@ -65,7 +70,7 @@ export async function startStarterGeneration(input: Input) {
       model: MODEL,
       prompt:
         "Select real home photos and create editable starter ad copy and compositions",
-      input,
+      input: { ...input, bookingDestination },
       providerOutput: {
         message:
           input.source === "brand"
@@ -284,16 +289,36 @@ export async function runStarterGeneration(runId: string, input: Input) {
   };
   try {
     const { campaign, brand } = await resolveAdAuthoringScope(input);
+    const strategy = await brandStrategyContext(brand.id, campaign?.id);
     const clientNotes = await performanceCopyNotes(
       brand.id,
       input.organizationId,
     );
-    const booking = campaign?.bookingTargetId
-      ? await resolveBookingTarget(
-          campaign?.bookingTargetId,
-          input.organizationId,
-        )
-      : null;
+    const run = await db.query.creativeRunTable.findFirst({
+      where: and(
+        eq(creativeRunTable.id, runId),
+        eq(creativeRunTable.organizationId, input.organizationId),
+        eq(creativeRunTable.brandId, brand.id),
+      ),
+    });
+    if (!run) throw new Error("Generation run not found in this workspace.");
+    const snapshot = run.input.bookingDestination;
+    const booking =
+      snapshot &&
+      typeof snapshot === "object" &&
+      "targetId" in snapshot &&
+      "url" in snapshot &&
+      typeof snapshot.targetId === "string" &&
+      typeof snapshot.url === "string"
+        ? { targetId: snapshot.targetId, url: snapshot.url }
+        : !Object.hasOwn(run.input, "bookingDestination") &&
+            campaign?.bookingTargetId
+          ? await studioBookingDestination(
+              brand.id,
+              campaign.bookingTargetId,
+              input.organizationId,
+            )
+          : null;
     if (input.source === "brand") {
       await progress("Writing brand concepts and ad copy");
       const fullBrand = await db.query.brandTable.findFirst({
@@ -304,7 +329,7 @@ export async function runStarterGeneration(runId: string, input: Input) {
           brandName: brand.name,
           website: brand.website,
           story: fullBrand?.story ?? null,
-          brandContext: fullBrand?.brandFingerprint,
+          brandContext: { fingerprint: fullBrand?.brandFingerprint, strategy },
           campaign: campaign?.name ?? `${brand.name} ad studio`,
         }),
         { appendix: clientNotes },
@@ -330,7 +355,7 @@ export async function runStarterGeneration(runId: string, input: Input) {
           type: "creative",
           status: "drawn",
           businessKey: `${runId}:${created}`,
-          bookingTargetId: booking?.target.id ?? null,
+          bookingTargetId: booking?.targetId ?? null,
           content: { ...content, ideaStudio: { document } },
         });
         created++;
@@ -382,7 +407,7 @@ export async function runStarterGeneration(runId: string, input: Input) {
         status: "drawn",
         homeId: homeId ?? null,
         businessKey: `${runId}:${created}`,
-        bookingTargetId: booking?.target.id ?? null,
+        bookingTargetId: booking?.targetId ?? null,
         ...projectIdea(
           brand.id,
           {
@@ -413,7 +438,7 @@ export async function runStarterGeneration(runId: string, input: Input) {
       const { output: generated } = await runCopyRequest(
         homeCompositionRequest({
           brandName: brand.name,
-          brandStory: fullBrand?.story ?? null,
+          brandStory: `${fullBrand?.story ?? ""}\nBrand strategy reference: ${strategy}`,
           voice: fullBrand?.brandFingerprint,
           campaign: campaign?.name ?? `${brand.name} ad studio`,
           home: {

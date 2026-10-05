@@ -48,7 +48,6 @@ import "server-only";
 
 import {
   addAudienceAction,
-  addAudienceUsersAction,
   adsScope,
   attachCampaignAction,
   importMetaCampaignAction,
@@ -129,7 +128,6 @@ import {
   listPersonas,
   suggestPersonas,
   updatePersona,
-  uploadPersonaSeedListAction,
 } from "./personas";
 import { getBrandMap } from "./brand-map";
 import {
@@ -628,8 +626,6 @@ export const adsWrite = growthDomainTool({
     deletePlatformCampaign: deletePlatformCampaignAction,
     createSpecializedMetaDraft: createSpecializedMetaDraftAction,
     createAudience: createAudienceAction,
-    addAudienceUsers: addAudienceUsersAction,
-    uploadPersonaSeedList: uploadPersonaSeedListAction,
     createPersonaLookalike: createPersonaLookalikeAction,
     assignPersonaAudience: assignPersonaAudienceAction,
     boostMetaPost: boostMetaPostAction,

@@ -817,7 +817,7 @@ export function AdIdeaCard({
                     : "Approved"
                 : ad.content.metaImport
                   ? "Needs local review"
-                  : "Draft idea"}
+                  : "Draft ad"}
               {deliveryState ? ` · ${deliveryState}` : ""}
             </span>
             {save.isPending && <span>· Saving…</span>}

@@ -223,8 +223,6 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "deletePlatformCampaign",
     "createSpecializedMetaDraft",
     "createAudience",
-    "addAudienceUsers",
-    "uploadPersonaSeedList",
     "createPersonaLookalike",
     "assignPersonaAudience",
     "boostMetaPost",

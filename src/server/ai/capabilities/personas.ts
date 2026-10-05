@@ -76,6 +76,11 @@ const personaFields = {
     .describe(
       "The demand side, structured: where the guests we want come FROM. This is the reusable source a campaign audience derives from; supply geography (where the homes are) is not this. Fill it from your own reasoning or a blob looked up elsewhere and note the `source`.",
     ),
+  destinationGeography: demandGeographySchema
+    .nullish()
+    .describe(
+      "Optional destinations of interest. Never use these as where customers live.",
+    ),
   notes: z.string().trim().max(4000).nullish(),
 };
 
@@ -99,7 +104,7 @@ export const listPersonas = growthAction({
 export const createPersona = growthAction({
   outputSchema: createPersonaOutputSchema,
   description:
-    "Create a persona under an owned brand. Personas are few and stable — check the existing list before adding one; a geography or age variant of an existing persona is a campaign audience, not a new persona.",
+    "Create a persona under an owned brand. Personas are few and stable — check the existing list before adding one; geography is optional. A distinct motivation with or without geography is valid; avoid duplicate descriptions.",
   inputSchema: z.object({
     brandId: z.string().trim().min(1),
     ...personaFields,
@@ -116,6 +121,7 @@ export const createPersona = growthAction({
         ageRanges: input.ageRanges ?? null,
         geographies: input.geographies ?? null,
         demandGeography: input.demandGeography ?? null,
+        destinationGeography: input.destinationGeography ?? null,
         notes: input.notes ?? null,
       })
       .returning();
@@ -134,6 +140,7 @@ export const updatePersona = growthAction({
     ageRanges: personaFields.ageRanges,
     geographies: personaFields.geographies,
     demandGeography: personaFields.demandGeography,
+    destinationGeography: personaFields.destinationGeography,
     notes: personaFields.notes,
   }),
   execute: async (input, ctx) => {

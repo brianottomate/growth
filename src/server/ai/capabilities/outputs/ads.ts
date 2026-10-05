@@ -571,6 +571,7 @@ const addAudienceSchema = z.strictObject({
   name: z.string(),
   optimizationGoal: z.string().nullable(),
   personaId: z.string().nullable(),
+  homeIds: z.array(z.string()).nullable(),
   type: z.enum(audienceTypeEnum.enumValues),
   updatedAt: z.iso.datetime(),
 });
@@ -812,6 +813,14 @@ export const addAudienceUsersActionOutputSchema = z.strictObject({
 export const draftAdActionOutputSchema = draftAdSchema;
 
 export const openCampaignActionOutputSchema = z.strictObject({
+  assetLinks: z.array(
+    z.strictObject({
+      id: z.string(),
+      audienceId: z.string(),
+      platformAudienceId: z.string(),
+      platform: z.enum(channelPlatformEnum.enumValues),
+    }),
+  ),
   handoff: campaignHandoffSchema,
   ads: z.array(
     z.strictObject({
@@ -862,6 +871,7 @@ export const openCampaignActionOutputSchema = z.strictObject({
       optimizationGoal: z.string().nullable(),
       persona: z.strictObject({ id: z.string(), name: z.string() }).nullable(),
       personaId: z.string().nullable(),
+      homeIds: z.array(z.string()).nullable(),
       type: z.enum(audienceTypeEnum.enumValues),
       updatedAt: z.iso.datetime(),
     }),
@@ -894,6 +904,23 @@ export const openCampaignActionOutputSchema = z.strictObject({
       id: z.string(),
       name: z.string(),
       personaId: z.string().nullable(),
+      source: z.enum([
+        "manual",
+        "pixel_event",
+        "customer_list",
+        "amplitude_cohort",
+        "lookalike_seed",
+      ]),
+      sourceId: z.string().nullable(),
+      seedMetadata: z
+        .strictObject({
+          source: z.enum(["csv", "bigquery"]),
+          snapshotId: z.string().optional(),
+          count: z.number(),
+          status: z.enum(["uploading", "ready", "failed"]),
+          cleanupFailed: z.boolean().optional(),
+        })
+        .nullable(),
       sizeLabel: z.string().nullable(),
       type: z.enum(audienceTypeEnum.enumValues),
     }),
@@ -1212,12 +1239,14 @@ export const suggestCampaignAudiencesActionOutputSchema = z.strictObject({
     z.strictObject({
       name: z.string(),
       kind: z.enum(["geo", "lookalike", "retargeting"]),
+      personaId: z.string().nullable(),
+      homeIds: z.array(z.string()),
       cities: z.array(z.string()),
       states: z.array(z.string()),
       countries: z.array(z.string()),
       regions: z.array(z.string()),
-      ageMin: z.number(),
-      ageMax: z.number(),
+      ageMin: z.number().nullable(),
+      ageMax: z.number().nullable(),
       platformAudienceId: z.string().nullable(),
       why: z.string(),
     }),

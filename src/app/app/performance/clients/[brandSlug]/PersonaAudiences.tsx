@@ -1,583 +1,294 @@
 "use client";
-
-import { useRef, useState } from "react";
+import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import {
-  MoreHorizontal,
-  Plus,
-  RefreshCw,
-  Sparkles,
-  Upload,
-  Users,
-} from "lucide-react";
-
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Pencil, Plus, Sparkles, Users } from "lucide-react";
+import { AudienceMap } from "@/components/audience-map";
+import { GeographyChips } from "@/components/geography-chips";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { EmptyState } from "@/components/ui/empty-state";
-import { ShapeBrandButton } from "./ShapeBrandButton";
-import { toast } from "@/components/ui/toast";
+import { SimpleDialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SimpleSelect } from "@/components/ui/select";
-import { cn } from "@/components/ui/lib/utils";
-import { parseSeedList, type SeedListParse } from "@/lib/seed-list";
+import { toast } from "@/components/ui/toast";
 import { orpc } from "@/orpc/client";
+import { ShapeBrandButton } from "./ShapeBrandButton";
+import type { PersonaDemandGeography } from "@/server/db/brand-schema";
 
-// The section's label and tile shapes. `_components` exports them too, but it
-// imports server services, so a client component cannot pull it in.
-const label =
-  "text-[10.5px] font-semibold tracking-[0.09em] uppercase text-muted-foreground";
-const tile = "bg-muted/40 rounded-xl border px-3 py-2.5";
-
-type Asset = {
-  id: string;
-  name: string;
-  type: string;
-  source: string;
-  sizeLabel: string | null;
-  externalId: string | null;
-  platform: string;
-};
-
-type PersonaRow = {
+type Persona = {
   id: string;
   name: string;
   description: string | null;
-  countries: string[];
-  targets: { asset: Asset; seed: Asset | null }[];
+  demandGeography: PersonaDemandGeography | null;
+  destinationGeography: PersonaDemandGeography | null;
 };
-
-const DEFAULT_COUNTRY = "US";
-
-const PLATFORM_LABEL: Record<string, string> = {
-  meta_ads: "Meta",
-  google_ads: "Google",
-  linkedin_ads: "LinkedIn",
-};
-
-function assetKind(asset: Asset) {
-  if (asset.type === "lookalike") return "Lookalike";
-  if (asset.source === "customer_list") return "Customer list";
-  return "Custom audience";
+function located(geo: PersonaDemandGeography | null) {
+  return Boolean(
+    geo &&
+    [geo.countries, geo.states, geo.regions, geo.cities].some(
+      (values) => values?.length,
+    ),
+  );
 }
-
-function errorText(error: unknown) {
-  return error instanceof Error ? error.message : "Something went wrong";
-}
-
 export function PersonaAudiences({
   brand,
   personas,
-  unassigned,
 }: {
   brand: { id: string; slug: string; name: string };
-  personas: PersonaRow[];
-  unassigned: Asset[];
+  personas: Persona[];
+  unassigned?: unknown[];
 }) {
   const router = useRouter();
-  const [creating, setCreating] = useState(false);
-  const [defining, setDefining] = useState(false);
   const suggest = useMutation(orpc.persona.suggest.mutationOptions());
-  const add = useMutation(orpc.persona.create.mutationOptions());
+  const create = useMutation(orpc.persona.create.mutationOptions());
   const define = async () => {
-    setDefining(true);
     try {
-      const { suggestions } = await suggest.mutateAsync({ brandId: brand.id });
-      const existingNames = new Set(
-        personas.map((row) =>
-          row.name.trim().toLowerCase().replace(/\s+/g, " "),
-        ),
-      );
-      let created = 0;
-      for (const suggestion of suggestions) {
-        if (
-          existingNames.has(
-            suggestion.name.trim().toLowerCase().replace(/\s+/g, " "),
-          )
-        )
-          continue;
-        await add.mutateAsync({ brandId: brand.id, ...suggestion });
-        created++;
-      }
-      toast.info(
-        created
-          ? `Created ${created} personas`
-          : suggestions.length
-            ? "The suggested personas already exist. No new personas were added."
-            : "No additional personas were suggested. Existing personas were kept.",
-      );
-    } catch (error) {
-      toast.error(errorText(error));
-    } finally {
-      setDefining(false);
+      const result = await suggest.mutateAsync({ brandId: brand.id });
+      for (const proposal of result.suggestions)
+        await create.mutateAsync({ brandId: brand.id, ...proposal });
       router.refresh();
+      if (!result.suggestions.length)
+        toast.info("No additional personas suggested");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not define personas",
+      );
     }
   };
-  const actions = (primary = false) => (
-    <>
-      <Button
-        size="sm"
-        variant={primary ? "default" : "outline"}
-        disabled={defining}
-        onClick={() => void define()}
-      >
-        <Sparkles className="size-3.5" />
-        {defining ? "Defining…" : "Define personas"}
-      </Button>
-      <ShapeBrandButton
-        brandId={brand.id}
-        brandName={brand.name}
-        section="personas"
-      />
-    </>
-  );
-  const refresh = useMutation(
-    orpc.ads.pullAudiences.mutationOptions({
-      onSuccess: () => router.refresh(),
-    }),
-  );
-
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-base font-semibold">
-          <Users aria-hidden="true" className="size-4 text-muted-foreground" />
-          Personas{" "}
-          <span className="text-muted-foreground">· {personas.length}</span>
+          <Users className="size-4" />
+          Personas · {personas.length}
         </h2>
-        <div className="flex min-w-0 flex-wrap gap-2">
-          {actions()}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                size="sm"
-                variant="outline"
-                aria-label="More persona actions"
-              >
-                <MoreHorizontal className="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={() => setCreating(true)}>
-                <Plus />
-                New persona
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={refresh.isPending}
-                onSelect={() => refresh.mutate({ brandSlug: brand.slug })}
-              >
-                <RefreshCw
-                  className={cn(refresh.isPending && "animate-spin")}
-                />
-                Refresh from Meta
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-      {refresh.error ? (
-        <p role="alert" className="text-sm text-destructive">
-          {errorText(refresh.error)}
-        </p>
-      ) : null}
-
-      {personas.length === 0 ? (
-        <EmptyState
-          icon={Users}
-          title="Start with the people behind the booking"
-          description="Define and save a small set of guest personas from the brand story and homes, or Shape who the creative should speak to."
-          actions={actions(true)}
-        />
-      ) : (
-        <div className="grid grid-cols-1 gap-3 @xl:grid-cols-2">
-          {personas.map((persona) => (
-            <PersonaCard key={persona.id} persona={persona} />
-          ))}
-        </div>
-      )}
-
-      {unassigned.length > 0 ? (
-        <details className="group">
-          <summary className="cursor-pointer list-none">
-            <span className={label}>
-              In the ad account · {unassigned.length}
-            </span>
-          </summary>
-          <ul className="mt-2 divide-y rounded-xl border">
-            {unassigned.map((asset) => (
-              <UnassignedRow key={asset.id} asset={asset} personas={personas} />
-            ))}
-          </ul>
-        </details>
-      ) : null}
-
-      <NewPersonaDialog
-        brandId={brand.id}
-        open={creating}
-        onOpenChange={setCreating}
-      />
-    </div>
-  );
-}
-
-function PersonaCard({ persona }: { persona: PersonaRow }) {
-  const router = useRouter();
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [parsed, setParsed] = useState<SeedListParse | null>(null);
-  const [fileName, setFileName] = useState("");
-  const country = persona.countries[0] ?? DEFAULT_COUNTRY;
-  const lookalike = useMutation(
-    orpc.persona.createLookalike.mutationOptions({
-      onSuccess: () => router.refresh(),
-    }),
-  );
-
-  return (
-    <div className={cn(tile, "space-y-3 py-3")}>
-      <div>
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="font-semibold">{persona.name}</h3>
-          <span className="text-xs text-muted-foreground">
-            {persona.countries.length ? persona.countries.join(", ") : country}
-          </span>
-        </div>
-        {persona.description ? (
-          <p className="line-clamp-2 text-sm text-muted-foreground">
-            {persona.description}
-          </p>
-        ) : null}
-      </div>
-
-      {persona.targets.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          Upload a customer list to seed a lookalike.
-        </p>
-      ) : (
-        <ul className="space-y-2">
-          {persona.targets.map(({ asset, seed }) => (
-            <li
-              key={asset.id}
-              className="rounded-lg border bg-background px-3 py-2 text-sm"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="truncate font-medium">{asset.name}</span>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {PLATFORM_LABEL[asset.platform] ?? asset.platform}
-                </span>
-              </div>
-              <div className="text-xs text-muted-foreground">
-                {assetKind(asset)}
-                {asset.sizeLabel ? ` · ${asset.sizeLabel}` : ""}
-                {seed ? ` · from ${seed.name}` : ""}
-              </div>
-              {asset.source === "customer_list" &&
-              asset.platform === "meta_ads" ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="mt-2"
-                  disabled={lookalike.isPending || !asset.externalId}
-                  onClick={() =>
-                    lookalike.mutate({
-                      seedPlatformAudienceId: asset.id,
-                      personaId: persona.id,
-                      ratio: 0.01,
-                      country,
-                    })
-                  }
-                >
-                  {lookalike.isPending
-                    ? "Creating…"
-                    : `Build 1% ${country} lookalike`}
-                </Button>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      )}
-      {lookalike.error ? (
-        <p role="alert" className="text-sm text-destructive">
-          {errorText(lookalike.error)}
-        </p>
-      ) : null}
-
-      <input
-        ref={fileRef}
-        type="file"
-        accept=".csv,text/csv"
-        className="hidden"
-        onChange={async (event) => {
-          const file = event.target.files?.[0];
-          event.target.value = "";
-          if (!file) return;
-          setFileName(file.name);
-          setParsed(parseSeedList(await file.text()));
-        }}
-      />
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => fileRef.current?.click()}
-      >
-        <Upload className="size-3.5" />
-        Upload seed list
-      </Button>
-
-      <UploadDialog
-        persona={persona}
-        fileName={fileName}
-        parsed={parsed}
-        onClose={() => setParsed(null)}
-      />
-    </div>
-  );
-}
-
-function UploadDialog({
-  persona,
-  fileName,
-  parsed,
-  onClose,
-}: {
-  persona: PersonaRow;
-  fileName: string;
-  parsed: SeedListParse | null;
-  onClose: () => void;
-}) {
-  const router = useRouter();
-  const [name, setName] = useState("");
-  const upload = useMutation(
-    orpc.persona.uploadSeedList.mutationOptions({
-      onSuccess: () => {
-        setName("");
-        onClose();
-        router.refresh();
-      },
-    }),
-  );
-  const members = parsed?.members ?? [];
-
-  return (
-    <Dialog
-      open={parsed !== null}
-      onOpenChange={(open) => {
-        if (!open && !upload.isPending) {
-          upload.reset();
-          onClose();
-        }
-      }}
-    >
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Seed list for {persona.name}</DialogTitle>
-        </DialogHeader>
-        {parsed ? (
-          <div className="space-y-3 text-sm">
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-1">
-              <dt className="text-muted-foreground">File</dt>
-              <dd className="truncate">{fileName}</dd>
-              <dt className="text-muted-foreground">People</dt>
-              <dd>
-                {members.length.toLocaleString()} of{" "}
-                {parsed.rows.toLocaleString()} rows
-              </dd>
-              <dt className="text-muted-foreground">Emails</dt>
-              <dd>
-                {parsed.withEmail.toLocaleString()}
-                {parsed.emailColumn ? ` · "${parsed.emailColumn}"` : ""}
-              </dd>
-              <dt className="text-muted-foreground">Phones</dt>
-              <dd>
-                {parsed.withPhone.toLocaleString()}
-                {parsed.phoneColumn ? ` · "${parsed.phoneColumn}"` : ""}
-              </dd>
-            </dl>
-            {members.length === 0 ? (
-              <p role="alert" className="text-destructive">
-                No email or phone column found.
-              </p>
-            ) : null}
-            <div className="space-y-1">
-              <Label htmlFor="seed-name">Name on Meta</Label>
-              <Input
-                id="seed-name"
-                value={name}
-                placeholder={`${persona.name} · seed`}
-                onChange={(event) => setName(event.target.value)}
-              />
-            </div>
-            {upload.error ? (
-              <p role="alert" className="text-destructive">
-                {errorText(upload.error)}
-              </p>
-            ) : null}
-          </div>
-        ) : null}
-        <DialogFooter>
+        <div className="flex flex-wrap gap-2">
           <Button
-            disabled={members.length === 0 || upload.isPending}
-            onClick={() =>
-              upload.mutate({
-                personaId: persona.id,
-                users: members,
-                ...(name.trim() ? { name: name.trim() } : {}),
-              })
-            }
+            size="sm"
+            variant="outline"
+            disabled={suggest.isPending || create.isPending}
+            onClick={() => void define()}
           >
-            {upload.isPending
-              ? "Uploading…"
-              : `Upload ${members.length.toLocaleString()} to Meta`}
+            <Sparkles className="size-3.5" />
+            Define personas
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function UnassignedRow({
-  asset,
-  personas,
-}: {
-  asset: Asset;
-  personas: PersonaRow[];
-}) {
-  const router = useRouter();
-  const assign = useMutation(
-    orpc.persona.assignAudience.mutationOptions({
-      onSuccess: () => router.refresh(),
-    }),
-  );
-  return (
-    <li className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
-      <div className="min-w-0">
-        <div className="truncate">{asset.name}</div>
-        <div className="text-xs text-muted-foreground">
-          {PLATFORM_LABEL[asset.platform] ?? asset.platform} ·{" "}
-          {assetKind(asset)}
-          {asset.sizeLabel ? ` · ${asset.sizeLabel}` : ""}
+          <PersonaEditor brandId={brand.id} />
+          <ShapeBrandButton
+            brandId={brand.id}
+            brandName={brand.name}
+            section="personas"
+          />
         </div>
-        {assign.error ? (
-          <p role="alert" className="text-xs text-destructive">
-            {errorText(assign.error)}
-          </p>
-        ) : null}
       </div>
-      {personas.length > 0 ? (
-        <SimpleSelect
-          size="sm"
-          className="w-48"
-          placeholder="Use for persona"
-          aria-label={`Use ${asset.name} for a persona`}
-          disabled={assign.isPending}
-          options={personas.map((persona) => ({
-            value: persona.id,
-            label: persona.name,
-          }))}
-          onValueChange={(personaId) =>
-            assign.mutate({ platformAudienceId: asset.id, personaId })
-          }
-        />
-      ) : null}
-    </li>
+      <p className="text-sm text-muted-foreground">
+        Who we speak to and why. Personas inform campaign audiences and
+        creative; geography is optional.
+      </p>
+      <div className="grid grid-cols-1 gap-3 @3xl:grid-cols-2">
+        {personas.map((persona) => (
+          <article
+            key={persona.id}
+            className="space-y-3 rounded-xl border bg-muted/40 p-4"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <h3 className="font-semibold">{persona.name}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {persona.description}
+                </p>
+              </div>
+              <PersonaEditor brandId={brand.id} persona={persona} />
+            </div>
+            {located(persona.demandGeography) && (
+              <PersonaLocation
+                persona={persona}
+                geography={persona.demandGeography!}
+                title="Where they live / travel from"
+              />
+            )}
+            {located(persona.destinationGeography) && (
+              <PersonaLocation
+                persona={persona}
+                geography={persona.destinationGeography!}
+                title="Destinations of interest"
+              />
+            )}
+          </article>
+        ))}
+      </div>
+      <Link
+        className="text-xs underline"
+        href={`/app/performance/clients/${brand.slug}/campaigns`}
+      >
+        Create or select Meta audiences and lookalikes inside a campaign
+      </Link>
+    </div>
   );
 }
-
-function NewPersonaDialog({
+function PersonaLocation({
+  persona,
+  geography,
+  title,
+}: {
+  persona: Persona;
+  geography: PersonaDemandGeography;
+  title: string;
+}) {
+  return (
+    <section className="space-y-2">
+      <h4 className="text-xs font-medium">{title}</h4>
+      <GeographyChips label="Countries" values={geography.countries} />
+      <GeographyChips label="States" values={geography.states} />
+      <GeographyChips label="Regions" values={geography.regions} />
+      <GeographyChips label="Cities" values={geography.cities} />
+      <AudienceMap
+        audiences={[{ id: persona.id, name: persona.name, geography }]}
+        context="persona"
+      />
+    </section>
+  );
+}
+function PersonaEditor({
   brandId,
-  open,
-  onOpenChange,
+  persona,
 }: {
   brandId: string;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  persona?: Persona;
 }) {
   const router = useRouter();
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [country, setCountry] = useState(DEFAULT_COUNTRY);
-  const create = useMutation(
-    orpc.persona.create.mutationOptions({
-      onSuccess: () => {
-        setName("");
-        setDescription("");
-        setCountry(DEFAULT_COUNTRY);
-        onOpenChange(false);
-        router.refresh();
-      },
-    }),
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(persona?.name ?? "");
+  const [description, setDescription] = useState(persona?.description ?? "");
+  const [origin, setOrigin] = useState(persona?.demandGeography ?? {});
+  const [destination, setDestination] = useState(
+    persona?.destinationGeography ?? {},
   );
-  const code = country.trim().toUpperCase();
-
+  const create = useMutation(orpc.persona.create.mutationOptions());
+  const update = useMutation(orpc.persona.update.mutationOptions());
+  const busy = create.isPending || update.isPending;
+  const save = async () => {
+    try {
+      const fields = {
+        name,
+        description: description || null,
+        demandGeography: located(origin) ? origin : null,
+        destinationGeography: located(destination) ? destination : null,
+      };
+      if (persona)
+        await update.mutateAsync({ personaId: persona.id, ...fields });
+      else await create.mutateAsync({ brandId, ...fields });
+      setOpen(false);
+      router.refresh();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not save persona",
+      );
+    }
+  };
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>New persona</DialogTitle>
-        </DialogHeader>
-        <form
-          className="space-y-3"
-          onSubmit={(event) => {
-            event.preventDefault();
-            create.mutate({
-              brandId,
-              name: name.trim(),
-              description: description.trim() || null,
-              demandGeography: code.length === 2 ? { countries: [code] } : null,
-            });
-          }}
+    <SimpleDialog
+      title={persona ? "Edit persona" : "New persona"}
+      description="Describe a motivation or need. Add geography only when it is part of the persona."
+      open={open}
+      onOpenChange={(next) => {
+        if (busy) return;
+        if (next) {
+          setName(persona?.name ?? "");
+          setDescription(persona?.description ?? "");
+          setOrigin(persona?.demandGeography ?? {});
+          setDestination(persona?.destinationGeography ?? {});
+        }
+        setOpen(next);
+      }}
+      trigger={
+        <Button
+          size="sm"
+          variant="outline"
+          aria-label={persona ? `Edit ${persona.name}` : "New persona"}
         >
-          <div className="space-y-1">
-            <Label htmlFor="persona-name">Name</Label>
-            <Input
-              id="persona-name"
-              value={name}
-              placeholder="Past guests of similar homes"
-              onChange={(event) => setName(event.target.value)}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="persona-description">Description</Label>
-            <Input
-              id="persona-description"
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="persona-country">Guests come from (country)</Label>
-            <Input
-              id="persona-country"
-              value={country}
-              maxLength={2}
-              className="w-20"
-              onChange={(event) => setCountry(event.target.value.toUpperCase())}
-            />
-          </div>
-          {create.error ? (
-            <p role="alert" className="text-sm text-destructive">
-              {errorText(create.error)}
-            </p>
-          ) : null}
-          <DialogFooter>
-            <Button type="submit" disabled={!name.trim() || create.isPending}>
-              {create.isPending ? "Creating…" : "Create persona"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+          {persona ? (
+            <Pencil className="size-3.5" />
+          ) : (
+            <>
+              <Plus className="size-3.5" />
+              New persona
+            </>
+          )}
+        </Button>
+      }
+      footer={
+        <Button disabled={!name.trim() || busy} onClick={() => void save()}>
+          {busy ? "Saving…" : "Save persona"}
+        </Button>
+      }
+    >
+      <div className="space-y-4">
+        <Label>
+          Name
+          <Input value={name} onChange={(e) => setName(e.target.value)} />
+        </Label>
+        <Label>
+          Description
+          <textarea
+            className="mt-1 min-h-20 w-full rounded-md border bg-background p-2 text-sm"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        </Label>
+        <GeoFields
+          title="Where they live / travel from (optional)"
+          value={origin}
+          onChange={setOrigin}
+        />
+        <GeoFields
+          title="Destinations of interest (optional)"
+          value={destination}
+          onChange={setDestination}
+        />
+      </div>
+    </SimpleDialog>
+  );
+}
+function GeoFields({
+  title,
+  value,
+  onChange,
+}: {
+  title: string;
+  value: PersonaDemandGeography;
+  onChange: (value: PersonaDemandGeography) => void;
+}) {
+  return (
+    <fieldset className="space-y-2 rounded-lg border p-3">
+      <legend className="text-xs font-medium">{title}</legend>
+      {(
+        [
+          ["countries", "Country codes (US, CA)"],
+          ["states", "US state codes (NY, OH)"],
+          ["regions", "Regions"],
+          ["cities", "Cities"],
+        ] as const
+      ).map(([field, label]) => (
+        <Label key={field} className="block">
+          {label}
+          <Input
+            defaultValue={value[field]?.join(", ") ?? ""}
+            onBlur={(e) =>
+              onChange({
+                ...value,
+                [field]: e.target.value
+                  .split(",")
+                  .map((s) =>
+                    field === "countries" || field === "states"
+                      ? s.trim().toUpperCase()
+                      : s.trim(),
+                  )
+                  .filter(Boolean),
+              })
+            }
+          />
+        </Label>
+      ))}
+    </fieldset>
   );
 }

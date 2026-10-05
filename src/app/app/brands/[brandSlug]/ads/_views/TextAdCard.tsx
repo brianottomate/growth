@@ -20,12 +20,14 @@ type TextIdea = {
   content: AdTextContent;
 };
 
-function TextAdForm({
+export function TextAdForm({
   ad,
   brandId,
   website,
+  campaignId,
   onSaved,
 }: {
+  campaignId?: string | null;
   ad?: TextIdea;
   brandId: string;
   website: string | null;
@@ -144,7 +146,7 @@ function TextAdForm({
                 expectedUpdatedAt: ad.updatedAt,
               })
             : create.mutate({
-                brandId,
+                ...(campaignId ? { campaignId } : { brandId }),
                 name: name.trim(),
                 type: "text",
                 ...copy,
@@ -154,37 +156,6 @@ function TextAdForm({
         Save draft
       </Button>
     </div>
-  );
-}
-
-export function NewTextAdButton({
-  brandId,
-  website,
-}: {
-  brandId: string;
-  website: string | null;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <SimpleDialog
-      open={open}
-      onOpenChange={setOpen}
-      title="Create a text-first ad"
-      size="lg"
-      trigger={
-        <Button variant="outline" size="sm">
-          Add text ad
-        </Button>
-      }
-    >
-      {open && (
-        <TextAdForm
-          brandId={brandId}
-          website={website}
-          onSaved={() => setOpen(false)}
-        />
-      )}
-    </SimpleDialog>
   );
 }
 

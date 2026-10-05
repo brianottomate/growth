@@ -12,6 +12,7 @@ import type { StarterHome } from "./starter-ad-ideas";
 export const starterGenerationSchema = z
   .object({
     ...adAuthoringFields,
+    bookingTargetId: z.string().min(1).optional(),
     source: z.enum(["featured", "brand"]).default("featured"),
     homeIds: z.array(z.string().min(1)).max(10),
     intendedPlacements: z

@@ -1,4 +1,9 @@
 "use client";
+import { CampaignAudienceContext } from "./CampaignAudienceContext";
+import {
+  CampaignAudienceAssets,
+  type CampaignAsset,
+} from "./CampaignAudienceAssets";
 import { WorkspaceCardHeader } from "@/app/app/performance/WorkspaceCard";
 
 import { useRouter } from "next/navigation";
@@ -27,6 +32,8 @@ type AudienceRow = {
     regions?: string[];
     cities?: string[];
   } | null;
+  homeIds: string[] | null;
+  description: string | null;
   keywords: string[] | null;
   excludedKeywords?: string[] | null;
 };
@@ -43,17 +50,23 @@ export function Audiences({
   brandName,
   audiences,
   metaTargets = {},
+  personas = [],
+  platformAssets = [],
+  homes = [],
 }: {
   campaignId: string;
   campaignName: string;
   brandId: string;
   brandName: string;
   audiences: AudienceRow[];
+  personas?: { id: string; name: string }[];
+  platformAssets?: CampaignAsset[];
+  homes?: { id: string; name: string }[];
   /** The Meta audience each ad set will target, by campaign audience id. */
   metaTargets?: Record<string, { name: string; via: "audience" | "persona" }>;
 }) {
   const router = useRouter();
-  const { busy, run } = useSuggestedAudiences(campaignId);
+  const { busy, run, review } = useSuggestedAudiences(campaignId);
   // A chat on this campaign's audiences; Suggest is the one-click add.
   const audienceChat = () =>
     sendAssistantIntent({
@@ -81,7 +94,7 @@ export function Audiences({
         onClick={() => void run()}
       >
         <Sparkles className="size-3.5" />
-        {busy ? "Adding…" : "Add audiences"}
+        {busy ? "Suggesting…" : "Suggest audiences"}
       </Button>
       <Button size="sm" variant="outline" onClick={audienceChat}>
         <MessageSquare className="size-3.5" />
@@ -97,6 +110,13 @@ export function Audiences({
         count={audiences.length || "Broad"}
         actions={actions()}
       />
+      {personas.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          Brand personas: {personas.map((p) => p.name).join(" · ")}. Suggestions
+          retain their persona and explain proposed targeting.
+        </p>
+      )}
+      {review}
       {audiences.length === 0 ? (
         <EmptyState
           compact
@@ -165,6 +185,20 @@ export function Audiences({
                     </Button>
                   </div>
                 </div>
+                {row.description && (
+                  <p className="text-xs text-muted-foreground">
+                    {row.description}
+                  </p>
+                )}
+                {row.homeIds?.length ? (
+                  <p className="text-xs text-muted-foreground">
+                    Relevant homes:{" "}
+                    {homes
+                      .filter((h) => row.homeIds?.includes(h.id))
+                      .map((h) => h.name)
+                      .join(", ")}
+                  </p>
+                ) : null}
                 <div className="space-y-2">
                   <GeographyChips
                     label="Countries"
@@ -196,6 +230,16 @@ export function Audiences({
                       : "No age narrowing"}
                   </p>
                 </div>
+                <CampaignAudienceContext
+                  audience={row}
+                  personas={personas}
+                  homes={homes}
+                />
+                <CampaignAudienceAssets
+                  audienceId={row.id}
+                  assets={platformAssets}
+                  countries={row.geography?.countries}
+                />
               </div>
             ))}
           </section>

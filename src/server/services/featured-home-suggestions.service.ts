@@ -1,3 +1,4 @@
+import { brandStrategyContext } from "./brand-strategy-context.service";
 import "server-only";
 
 import { anthropic } from "@ai-sdk/anthropic";
@@ -37,6 +38,11 @@ export type HomeEvidence = {
   homeId: string;
   listingId: string;
   name: string;
+  city: string | null;
+  state: string | null;
+  bedrooms: number | null;
+  guests: number | null;
+  amenities: unknown;
   /** Direct-site bookings over the last 12 months, confirmed and not cancelled. */
   directBookings: number;
   directValue: number;
@@ -124,6 +130,7 @@ export async function suggestFeaturedHomes(input: {
   brandStory: string | null;
   count: number;
 }) {
+  const strategy = await brandStrategyContext(input.brandId);
   const rows = await db.query.homeTable.findMany({
     where: and(
       eq(homeTable.brandId, input.brandId),
@@ -136,6 +143,11 @@ export async function suggestFeaturedHomes(input: {
       name: true,
       heroSourceUrl: true,
       galleryCache: true,
+      city: true,
+      state: true,
+      bedrooms: true,
+      guests: true,
+      amenities: true,
     },
   });
   if (rows.length === 0)
@@ -156,6 +168,11 @@ export async function suggestFeaturedHomes(input: {
         homeId: row.id,
         listingId: row.externalId,
         name: row.name,
+        city: row.city,
+        state: row.state,
+        bedrooms: row.bedrooms,
+        guests: row.guests,
+        amenities: row.amenities,
         directBookings: Number(e?.direct_bookings ?? 0),
         directValue: Number(e?.direct_value ?? 0),
         sold90: e?.sold_90 == null ? null : Number(e.sold_90),
@@ -201,11 +218,17 @@ export async function suggestFeaturedHomes(input: {
               count,
               brandStory: brandStorySection({
                 brandName: input.brandName,
-                story: input.brandStory,
+                story: `${input.brandStory ?? ""}\nBrand strategy reference: ${strategy}`,
               }),
               candidates: shortlist.map((home, index) => ({
                 photo: index + 1,
                 name: home.name,
+                city: home.city,
+                state: home.state,
+                bedrooms: home.bedrooms,
+                guests: home.guests,
+                amenities: home.amenities,
+                open60: home.open60,
                 directBookings12m: home.directBookings,
                 directValue12m: home.directValue,
                 sold90: home.sold90,
@@ -231,9 +254,19 @@ export async function suggestFeaturedHomes(input: {
 
   return {
     picks: picked,
-    candidates: shortlist.map(({ thumb: _thumb, ...home }) => ({
-      ...home,
-      picked: picked.includes(home.homeId),
-    })),
+    candidates: shortlist.map(
+      ({
+        thumb: _thumb,
+        city: _city,
+        state: _state,
+        bedrooms: _bedrooms,
+        guests: _guests,
+        amenities: _amenities,
+        ...home
+      }) => ({
+        ...home,
+        picked: picked.includes(home.homeId),
+      }),
+    ),
   };
 }

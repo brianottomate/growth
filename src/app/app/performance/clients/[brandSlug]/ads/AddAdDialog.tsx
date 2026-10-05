@@ -1,216 +1,139 @@
 "use client";
 
 import { useState } from "react";
-import { useWorkspaceMutation } from "../useWorkspaceMutation";
-import { CreativeDrop } from "./CreativeDrop";
 import { Plus } from "lucide-react";
-
+import { useWorkspaceMutation } from "../useWorkspaceMutation";
+import { TextAdForm } from "@/app/app/brands/[brandSlug]/ads/_views/TextAdCard";
 import { Button } from "@/components/ui/button";
 import { SimpleDialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/components/ui/lib/utils";
 import { toast } from "@/components/ui/toast";
 import { AD_FORMAT_LABEL, HAND_MADE_AD_FORMATS } from "@/lib/performance-ads";
+import { safeHomeUrl } from "@/lib/ad-preview-links";
 import { orpc } from "@/orpc/client";
 
-import { HomePicker, type PickableHome } from "../HomePicker";
+type Format = (typeof HAND_MADE_AD_FORMATS)[number] | "text";
 
-type Format = (typeof HAND_MADE_AD_FORMATS)[number];
-
-/**
- * An ad before its creative: decide what it is and, when it is about one,
- * which home, and it lands on the wall as a slot to drop the file into. The
- * home is picked from their site, or typed when the site is not connected.
- * The house name is filled in unless one is typed.
- */
+/** Shared manual creation; home-aware authoring belongs in Ad Studio. */
 export function AddAdDialog({
   brandId,
-  homes,
+  website,
   campaignId = null,
 }: {
   brandId: string;
-  /** Their homes; empty when their site is not connected, so the home is typed. */
-  homes: PickableHome[];
-  /** Land in this campaign rather than on the brand's wall. */
+  website: string | null;
   campaignId?: string | null;
 }) {
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<"create" | "import">("create");
   const [format, setFormat] = useState<Format>("static");
-  const [homeId, setHomeId] = useState<string | null>(null);
-  const [homeName, setHomeName] = useState("");
   const [name, setName] = useState("");
-  const home = homeId ? (homes.find((row) => row.id === homeId) ?? null) : null;
-  const byName = homes.length === 0;
-
+  const [linkUrl, setLinkUrl] = useState(website ?? "");
   const add = useWorkspaceMutation(
     orpc.ads.addAdShell.mutationOptions({
       onSuccess: (result) => {
-        toast.success(
-          `${result.name} is on the wall, waiting for its creative.`,
-        );
+        toast.success(`${result.name} is ready for creative and copy.`);
         setOpen(false);
         setName("");
-        setHomeId(null);
-        setHomeName("");
       },
       onError: (error) => toast.error(error.message),
     }),
   );
-
   return (
     <SimpleDialog
       open={open}
       onOpenChange={(next) => {
         if (!add.isPending) setOpen(next);
       }}
-      title="Add an ad"
-      size={mode === "import" ? "lg" : "sm"}
+      title="Create an ad"
+      size={format === "text" ? "lg" : "default"}
+      scrollable
+      className="flex max-h-[90dvh] flex-col"
       trigger={
         <Button size="sm" variant="outline">
           <Plus className="size-3" />
-          Add ad
+          Create ad
         </Button>
       }
       footer={
-        mode === "create" ? (
+        format !== "text" ? (
           <Button
             size="sm"
             loading={add.isPending}
-            onClick={() =>
+            disabled={Boolean(linkUrl.trim()) && !safeHomeUrl(linkUrl.trim())}
+            onClick={() => {
               add.mutate({
                 brandId,
                 format,
-                propertyId:
-                  format === "catalog" ? undefined : (homeId ?? undefined),
-                homeName:
-                  format === "catalog" || !byName
-                    ? undefined
-                    : homeName.trim() || undefined,
                 campaignId: campaignId ?? undefined,
                 name: name.trim() || undefined,
-              })
-            }
+                linkUrl: linkUrl.trim() || undefined,
+              });
+            }}
           >
-            Add {AD_FORMAT_LABEL[format].toLowerCase()}
+            Create ad
           </Button>
         ) : undefined
       }
     >
-      {campaignId ? (
-        <div
-          className="mb-4 flex gap-2"
-          role="group"
-          aria-label="Add ad method"
-        >
-          <Button
-            variant={mode === "create" ? "secondary" : "ghost"}
-            onClick={() => setMode("create")}
+      <div className="space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="ad-format">Format</Label>
+          <select
+            id="ad-format"
+            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+            value={format}
+            onChange={(e) => setFormat(e.target.value as Format)}
           >
-            Create ad idea
-          </Button>
-          <Button
-            variant={mode === "import" ? "secondary" : "ghost"}
-            onClick={() => setMode("import")}
-          >
-            Import finished creative
-          </Button>
+            {HAND_MADE_AD_FORMATS.map((option) => (
+              <option key={option} value={option}>
+                {AD_FORMAT_LABEL[option]}
+              </option>
+            ))}
+            <option value="text">Text</option>
+          </select>
         </div>
-      ) : null}
-      {mode === "import" && campaignId ? (
-        <CreativeDrop brandId={brandId} homes={homes} campaignId={campaignId} />
-      ) : (
-        <div className="space-y-4">
-          <div className="space-y-1.5">
-            <Label>Format</Label>
-            <div className="flex gap-1 rounded-full border p-0.5">
-              {HAND_MADE_AD_FORMATS.map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => setFormat(option)}
-                  aria-pressed={format === option}
-                  className={cn(
-                    "flex-1 rounded-full px-2.5 py-1 text-[11.5px] transition-colors",
-                    format === option
-                      ? "bg-foreground font-medium text-background"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {AD_FORMAT_LABEL[option]}
-                </button>
-              ))}
-            </div>
-            {format === "catalog" ? (
-              <p className="text-[11px] text-muted-foreground">
-                One card per home. Meta renders the live ad from the product
-                set; the cards here show the shape.
-              </p>
-            ) : null}
-          </div>
-          {format === "catalog" ? null : byName ? (
+        {format === "text" ? (
+          open && (
+            <TextAdForm
+              brandId={brandId}
+              campaignId={campaignId}
+              website={website}
+              onSaved={() => setOpen(false)}
+            />
+          )
+        ) : (
+          <>
             <div className="space-y-1.5">
-              <Label htmlFor="shell-home">
-                Home{" "}
-                <span className="font-normal text-muted-foreground">
-                  (by name; their site is not connected)
-                </span>
-              </Label>
+              <Label htmlFor="shell-name">Ad name (optional)</Label>
               <Input
-                id="shell-home"
-                value={homeName}
-                onChange={(event) => setHomeName(event.target.value)}
-                placeholder="Leave empty for an ad about no home"
+                id="shell-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Name this ad"
               />
             </div>
-          ) : (
             <div className="space-y-1.5">
-              <Label>Home</Label>
-              <div className="flex items-center gap-2">
-                {home ? (
-                  <span className="flex min-w-0 items-center gap-1.5 text-xs">
-                    {/* oxlint-disable-next-line nextjs/no-img-element */}
-                    <img
-                      src={home.thumbUrl ?? home.imageUrl}
-                      alt=""
-                      className="size-5 rounded-full object-cover"
-                    />
-                    <span className="truncate">{home.name}</span>
-                  </span>
-                ) : (
-                  <span className="text-xs text-muted-foreground">
-                    About no home in particular
-                  </span>
-                )}
-                <HomePicker
-                  homes={homes}
-                  picked={homeId ? [homeId] : []}
-                  max={1}
-                  single
-                  title="Which home is this ad about?"
-                  label={home ? "Change" : "Pick a home"}
-                  onChange={(next) => setHomeId(next[0] ?? null)}
-                />
-              </div>
+              <Label htmlFor="shell-url">Destination URL</Label>
+              <Input
+                id="shell-url"
+                type="url"
+                value={linkUrl}
+                onChange={(e) => setLinkUrl(e.target.value)}
+                placeholder="https://example.com/landing-page"
+              />
+              {linkUrl.trim() && !safeHomeUrl(linkUrl.trim()) ? (
+                <p role="alert" className="text-xs text-destructive">
+                  Use a valid HTTP or HTTPS URL.
+                </p>
+              ) : null}
             </div>
-          )}
-          <div className="space-y-1.5">
-            <Label htmlFor="shell-name">
-              Name{" "}
-              <span className="font-normal text-muted-foreground">
-                (optional)
-              </span>
-            </Label>
-            <Input
-              id="shell-name"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="The house name, unless you type one"
-            />
-          </div>
-        </div>
-      )}
+            <p className="text-xs text-muted-foreground">
+              Add creative and copy in the ad editor after creating the draft.
+            </p>
+          </>
+        )}
+      </div>
     </SimpleDialog>
   );
 }

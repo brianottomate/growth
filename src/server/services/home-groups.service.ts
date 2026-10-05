@@ -476,3 +476,15 @@ export async function listHomesInGroup(
     : [];
   return members.flatMap((m) => homes.filter((h) => h.id === m.homeId));
 }
+
+/** Validate ownership before copying a reusable target into new studio ads. */
+export async function studioBookingDestination(
+  brandId: string,
+  targetId: string,
+  orgId: string,
+) {
+  const resolved = await resolveBookingTarget(targetId, orgId);
+  if (resolved.target.brandId !== brandId)
+    throw new Error("Choose this brand's booking target.");
+  return { targetId: resolved.target.id, url: resolved.url };
+}

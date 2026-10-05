@@ -15,7 +15,13 @@ type MapAudience = {
   name: string;
   geography: AudienceGeography | null;
 };
-export function AudienceMap({ audiences }: { audiences: MapAudience[] }) {
+export function AudienceMap({
+  audiences,
+  context = "campaign",
+}: {
+  audiences: MapAudience[];
+  context?: "campaign" | "persona";
+}) {
   const [selection, setSelection] = useState("all");
   const [view, setView] = useState<"us" | "world">(() =>
     audiences.some((a) => audienceMapTarget(a.geography).countries.has("US"))
@@ -84,7 +90,7 @@ export function AudienceMap({ audiences }: { audiences: MapAudience[] }) {
       <svg
         viewBox={map.viewBox}
         role="img"
-        aria-label={`${view === "us" ? "United States" : "World"} targeting coverage for ${current === "all" ? "all audiences" : selected[0]?.name}`}
+        aria-label={`${view === "us" ? "United States" : "World"} ${context === "persona" ? "persona geography" : "targeting coverage"} for ${current === "all" ? "all audiences" : selected[0]?.name}`}
         className="w-full"
         onMouseLeave={() => setHover(null)}
       >
@@ -92,7 +98,7 @@ export function AudienceMap({ audiences }: { audiences: MapAudience[] }) {
           const id =
             view === "us" ? (usStateCode(place.name) ?? place.id) : place.id;
           const coverage = audienceMapCoverage(targets, view, id);
-          const description = `${place.name}: ${coverage === "full" ? "targeted" : coverage === "partial" ? "selected locations only" : "not highlighted"}`;
+          const description = `${place.name}: ${coverage === "full" ? (context === "persona" ? "described geography" : "targeted") : coverage === "partial" ? "selected locations only" : "not highlighted"}`;
           return (
             <path
               key={place.id}
@@ -121,7 +127,7 @@ export function AudienceMap({ audiences }: { audiences: MapAudience[] }) {
       <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
         <span className="flex items-center gap-1.5">
           <span className="size-2.5 rounded-sm bg-foreground opacity-80" />
-          Targeted
+          {context === "persona" ? "Described geography" : "Targeted"}
         </span>
         {view === "world" && (
           <span className="flex items-center gap-1.5">
@@ -136,7 +142,7 @@ export function AudienceMap({ audiences }: { audiences: MapAudience[] }) {
       </div>
       {view === "us" && fullUS && (
         <p className="text-xs text-muted-foreground">
-          Nationwide US targeting. Select an individual audience to inspect
+          Nationwide US coverage. Select an individual audience to inspect
           narrower coverage.
         </p>
       )}
@@ -170,8 +176,9 @@ export function AudienceMap({ audiences }: { audiences: MapAudience[] }) {
         </p>
       )}
       <p className="text-xs text-muted-foreground">
-        Planned targeting · audiences may overlap. This map does not show
-        bookings or estimated reach.
+        {context === "persona"
+          ? "Persona geography · planning context, not platform targeting or measured customer locations."
+          : "Planned targeting · audiences may overlap. This map does not show bookings or estimated reach."}
       </p>
     </div>
   );

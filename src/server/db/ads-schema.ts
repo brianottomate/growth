@@ -458,6 +458,7 @@ export const audienceTable = pgTable(
 
     ageMin: t.integer(),
     ageMax: t.integer(),
+    homeIds: t.jsonb().$type<string[]>(),
     geography: t.jsonb().$type<AudienceGeographyPlan>(),
     /**
      * What this audience searches for, one term per entry. Match type rides
@@ -872,6 +873,14 @@ export const platformAudienceTable = pgTable(
     sizeLabel: t.text(), // "~1.2M" — coarse, mirrored from platform
 
     definition: t.jsonb(),
+    /** Operational metadata only; never recipient rows or uploaded files. */
+    seedMetadata: t.jsonb().$type<{
+      source: "csv" | "bigquery";
+      snapshotId?: string;
+      count: number;
+      status: "uploading" | "ready" | "failed";
+      cleanupFailed?: boolean;
+    }>(),
     manageUrl: t.text(),
 
     createdAt: t
@@ -1021,4 +1030,31 @@ export const platformAudienceRelations = relations(
       references: [personaTable.id],
     }),
   }),
+);
+
+/** One reusable asset per platform for each campaign audience. */
+export const campaignAudienceAssetTable = pgTable(
+  "campaign_audience_asset",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("caasset")),
+    audienceId: t
+      .text()
+      .notNull()
+      .references(() => audienceTable.id, { onDelete: "cascade" }),
+    platformAudienceId: t
+      .text()
+      .notNull()
+      .references(() => platformAudienceTable.id, { onDelete: "cascade" }),
+    platform: channelPlatformEnum().notNull(),
+  }),
+  (table) => [
+    uniqueIndex("campaign_audience_asset_platform_idx").on(
+      table.audienceId,
+      table.platform,
+    ),
+    index("campaign_audience_asset_asset_idx").on(table.platformAudienceId),
+  ],
 );

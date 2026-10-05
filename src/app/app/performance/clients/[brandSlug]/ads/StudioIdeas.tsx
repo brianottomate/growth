@@ -1,10 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect } from "react";
 import { AdIdeaCard } from "@/app/app/brands/[brandSlug]/ads/_views/AdIdeaCard";
+import { BookingTargetPicker } from "@/app/app/brands/[brandSlug]/ads/_views/BookingTargetPicker";
 import { TextAdCard } from "@/app/app/brands/[brandSlug]/ads/_views/TextAdCard";
 import { AdTile } from "@/app/app/brands/[brandSlug]/ads/_views/AdWall";
-import { toWallAd } from "@/lib/ad-wall";
+import { type AdState, toWallAd } from "@/lib/ad-wall";
 import type { WorkspaceHome } from "./AdPreviewsWorkspace";
 import type { AdContent, AdCreativeContent } from "@/server/db/schema";
 
@@ -13,8 +15,12 @@ export type StudioIdea = {
   name: string;
   content: AdContent;
   updatedAt: string;
+  bookingTargetId: string | null;
   homeId: string | null;
   status: string;
+  campaignId: string | null;
+  campaignName: string | null;
+  deliveryState?: AdState;
   home: { name: string; url: string | null; externalId: string } | null;
 };
 
@@ -44,6 +50,7 @@ export function StudioIdeas({
   homes,
   website,
   focusHomeId,
+  connected,
 }: {
   ideas: StudioIdea[];
   brandId: string;
@@ -53,6 +60,7 @@ export function StudioIdeas({
   homes: WorkspaceHome[];
   website: string | null;
   focusHomeId?: string | null;
+  connected: boolean;
 }) {
   useEffect(() => {
     if (focusHomeId)
@@ -85,25 +93,55 @@ export function StudioIdeas({
             <h2 className="flex items-baseline gap-2 text-sm font-semibold">
               {group.label}
               <span className="text-xs font-normal text-muted-foreground">
-                {group.ideas.length} idea{group.ideas.length === 1 ? "" : "s"} ·{" "}
+                {group.ideas.length} ad{group.ideas.length === 1 ? "" : "s"} ·{" "}
                 {frozen} approved
               </span>
             </h2>
             {group.ideas.map((idea) => {
+              const assignment = idea.campaignId ? (
+                <Link
+                  href={`/app/performance/clients/${brandSlug}/campaigns/${idea.campaignId}`}
+                  className="text-xs text-muted-foreground underline underline-offset-4"
+                >
+                  Campaign: {idea.campaignName ?? "Assigned"}
+                </Link>
+              ) : (
+                <p className="text-xs text-muted-foreground">Unassigned</p>
+              );
+              const wrap = (node: React.ReactNode) => (
+                <div key={idea.id} className="space-y-2">
+                  {assignment}
+                  {node}
+                  {connected &&
+                    idea.status !== "approved" &&
+                    idea.deliveryState !== "pushed" && (
+                      <BookingTargetPicker
+                        key={`${idea.id}:${idea.updatedAt}`}
+                        adId={idea.id}
+                        brandId={brandId}
+                        brandSlug={brandSlug}
+                        targetId={idea.bookingTargetId}
+                      />
+                    )}
+                </div>
+              );
               if (!("media" in idea.content))
-                return (
+                return wrap(
                   <TextAdCard
                     key={idea.id}
                     ad={{ ...idea, content: idea.content }}
                     brandId={brandId}
                     website={website}
-                  />
+                    deliveryState={idea.deliveryState}
+                  />,
                 );
               if (editable(idea.content))
-                return (
+                return wrap(
                   <AdIdeaCard
                     key={idea.id}
-                    studio
+                    studio={!idea.campaignId}
+                    campaignId={idea.campaignId ?? undefined}
+                    deliveryState={idea.deliveryState}
                     ad={{ ...idea, content: idea.content }}
                     brandId={brandId}
                     brandName={brandName}
@@ -113,7 +151,7 @@ export function StudioIdeas({
                         ? { name: idea.home.name, url: idea.home.url }
                         : undefined
                     }
-                  />
+                  />,
                 );
               const wall = toWallAd({
                 ...idea,
@@ -122,21 +160,27 @@ export function StudioIdeas({
                   ? { ...idea.home, url: idea.home.url }
                   : null,
               });
-              return wall ? (
-                <ul key={idea.id}>
-                  <AdTile
-                    ad={wall}
-                    brandId={brandId}
-                    brandSlug={brandSlug}
-                    brandName={brandName}
-                    brandLogo={brandLogo}
-                    landingUrl={website}
-                    homes={homes}
-                    surface="instagram"
-                    states={{}}
-                  />
-                </ul>
-              ) : null;
+              return wall
+                ? wrap(
+                    <ul key={idea.id}>
+                      <AdTile
+                        ad={wall}
+                        brandId={brandId}
+                        brandSlug={brandSlug}
+                        brandName={brandName}
+                        brandLogo={brandLogo}
+                        landingUrl={website}
+                        homes={homes}
+                        surface="instagram"
+                        states={
+                          idea.deliveryState
+                            ? { [idea.id]: idea.deliveryState }
+                            : {}
+                        }
+                      />
+                    </ul>,
+                  )
+                : null;
             })}
           </section>
         );

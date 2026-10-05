@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 
 import { CopyButton } from "@/components/copy-button";
 import { ButtonLink } from "@/components/ui/button";
+import { HomePreview } from "@/components/home-preview";
 
 import { intakeAnswerRows, type IntakeAnswerValue } from "@/lib/intake-answers";
 
@@ -79,11 +79,17 @@ export function IntakeHomes({
   }));
   const suffix = sharedSuffix(picked.flatMap(({ home }) => home?.name ?? []));
   const grid = (rows: typeof picked) => (
-    <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+    <ul className="grid grid-cols-1 gap-3 @3xl:grid-cols-2">
       {rows.map(({ url, home }) => (
         <li key={url} className="min-w-0">
           {home ? (
-            <HomeTile home={home} name={trimSuffix(home.name, suffix)} />
+            <HomePreview
+              href={home.href}
+              name={trimSuffix(home.name, suffix)}
+              imageUrl={home.thumbUrl}
+              location={home.location}
+              facts={home.facts}
+            />
           ) : (
             <OutLink url={url} />
           )}
@@ -109,33 +115,6 @@ export function IntakeHomes({
         </details>
       )}
     </div>
-  );
-}
-
-function HomeTile({ home, name }: { home: IntakeHome; name: string }) {
-  return (
-    <Link href={home.href} className="group/home block space-y-1.5">
-      <div className="aspect-[4/3] overflow-hidden rounded-lg bg-muted">
-        {home.thumbUrl ? (
-          // oxlint-disable-next-line nextjs/no-img-element -- remote listing thumbnails
-          <img
-            src={home.thumbUrl}
-            alt=""
-            loading="lazy"
-            className="size-full object-cover transition-transform group-hover/home:scale-[1.03]"
-          />
-        ) : null}
-      </div>
-      <p className="text-sm leading-snug break-words group-hover/home:underline">
-        {name}
-      </p>
-      {home.location && (
-        <p className="text-xs text-muted-foreground">{home.location}</p>
-      )}
-      {home.facts && (
-        <p className="text-xs text-muted-foreground">{home.facts}</p>
-      )}
-    </Link>
   );
 }
 

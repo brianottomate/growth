@@ -44,7 +44,7 @@ import {
   withoutKey,
   withUnfrozen,
 } from "@/lib/ad-placement-edits";
-import { db } from "@/server/db";
+import { db, withTransaction } from "@/server/db";
 import { isGeminiImageConfigured } from "@/server/clients/gemini-image.client";
 import {
   freezeCompositionSchema,
@@ -946,13 +946,18 @@ export async function buildAdSet(input: {
   };
 }
 
-/** The brand's drafted set, newest build first. */
+/** The full brand collection, including ads assigned to campaigns. */
 export async function listAdSet(input: { brandId: string; orgId: string }) {
   const brand = await requireOwnedBrand(input);
   return db.query.adTable.findMany({
-    where: and(eq(adTable.brandId, brand.id), isNull(adTable.campaignId)),
+    where: eq(adTable.brandId, brand.id),
     orderBy: (t, { asc }) => asc(t.createdAt),
     with: {
+      campaign: { columns: { id: true, name: true } },
+      platformAds: {
+        columns: { id: true },
+        with: { platformCampaign: { columns: { externalId: true } } },
+      },
       home: { columns: { id: true, name: true, externalId: true, url: true } },
     },
   });
@@ -974,6 +979,7 @@ export async function addAdShell(input: {
   /** Land in this campaign rather than on the brand's wall. */
   campaignId?: string | null;
   name?: string | null;
+  linkUrl?: string;
 }) {
   const brand = await requireOwnedBrand(input);
   const campaign = input.campaignId
@@ -984,7 +990,9 @@ export async function addAdShell(input: {
     format: input.format,
     headline: bound.name ?? brand.name,
     body: "",
-    ...(bound.url ? { linkUrl: bound.url } : {}),
+    ...((input.linkUrl ?? bound.url)
+      ? { linkUrl: input.linkUrl ?? bound.url! }
+      : {}),
     ...(bound.name ? { propertyName: bound.name } : {}),
     callToAction: PERFORMANCE_AD_DEFAULTS.callToAction,
     media: [],
@@ -1363,15 +1371,7 @@ export async function attachAdSet(input: {
   adIds?: string[];
 }) {
   const brand = await requireOwnedBrand(input);
-  const campaign = await db.query.campaignTable.findFirst({
-    where: and(
-      eq(campaignTable.id, input.campaignId),
-      eq(campaignTable.brandId, brand.id),
-      isNull(campaignTable.deletedAt),
-    ),
-    columns: { id: true, name: true },
-  });
-  if (!campaign) throw new AdSetError(404, "Campaign not found on this brand");
+  const campaign = await campaignFor(brand.id, input.campaignId);
   const draftsQuery = () =>
     db.query.adTable.findMany({
       where: and(eq(adTable.brandId, brand.id), isNull(adTable.campaignId)),
@@ -1384,12 +1384,29 @@ export async function attachAdSet(input: {
   // An idea approved before the studio froze on approval has no images yet;
   // save them now so it arrives with its media.
   let drafts = await draftsQuery();
+  if (
+    input.adIds &&
+    (input.adIds.length === 0 ||
+      new Set(input.adIds).size !== input.adIds.length ||
+      input.adIds.some((id) => !drafts.some((ad) => ad.id === id)))
+  ) {
+    throw new AdSetError(
+      422,
+      "Choose unassigned ads from this brand. Reload if their assignment changed.",
+    );
+  }
   let frozeAny = false;
   for (const ad of pick(drafts)) {
     if (await freezeApprovedAd(ad.id)) frozeAny = true;
   }
   if (frozeAny) drafts = await draftsQuery();
   const wanted = pick(drafts);
+  if (input.adIds && wanted.length !== input.adIds.length) {
+    throw new AdSetError(
+      422,
+      "An ad was assigned elsewhere. Reload before trying again.",
+    );
+  }
   if (wanted.length === 0) {
     throw new AdSetError(
       422,
@@ -1403,7 +1420,10 @@ export async function attachAdSet(input: {
       "media" in (ad.content as object) &&
       (ad.content as AdCreativeContent).media.length === 0,
   );
-  if (empty.length > 0) {
+  if (
+    empty.length > 0 &&
+    (!input.adIds?.length || empty.some((ad) => ad.status === "approved"))
+  ) {
     throw new AdSetError(
       422,
       `${empty.length} ad${empty.length === 1 ? " has" : "s have"} no creative yet: ${empty
@@ -1411,15 +1431,30 @@ export async function attachAdSet(input: {
         .join(", ")}`,
     );
   }
-  await db
-    .update(adTable)
-    .set({ campaignId: campaign.id })
-    .where(
-      inArray(
-        adTable.id,
-        wanted.map((ad) => ad.id),
-      ),
-    );
+  // A concurrent attachment must fail as a whole rather than move ads out
+  // of another campaign or leave a partially assigned selection.
+  await withTransaction(async (tx) => {
+    const assigned = await tx
+      .update(adTable)
+      .set({ campaignId: campaign.id })
+      .where(
+        and(
+          eq(adTable.brandId, brand.id),
+          isNull(adTable.campaignId),
+          inArray(
+            adTable.id,
+            wanted.map((ad) => ad.id),
+          ),
+        ),
+      )
+      .returning({ id: adTable.id });
+    if (assigned.length !== wanted.length) {
+      throw new AdSetError(
+        422,
+        "An ad was assigned elsewhere. Reload before trying again.",
+      );
+    }
+  });
   return {
     campaignId: campaign.id,
     campaignName: campaign.name,

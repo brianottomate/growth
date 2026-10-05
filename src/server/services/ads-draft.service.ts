@@ -1,5 +1,8 @@
 import { completeLaunchMilestones } from "./launch-checklist.service";
-import { listHomesInGroup, resolveBookingTarget } from "./home-groups.service";
+import {
+  listHomesInGroup,
+  studioBookingDestination,
+} from "./home-groups.service";
 import { resolveMetaSchedule, metaScheduleIssue } from "@/lib/meta-schedule";
 import "server-only";
 import { assertAdNotPushed } from "./ad-approval.service";
@@ -18,7 +21,9 @@ import {
 } from "./campaign-media-cleanup.service";
 import {
   adTable,
+  homeTable,
   audienceTable,
+  campaignAudienceAssetTable,
   mediaAssetTable,
   homeMediaTable,
   brandTable,
@@ -435,6 +440,7 @@ export async function addAudience(input: {
   campaignId: string;
   name: string;
   personaId?: string | null;
+  homeIds?: string[] | null;
   description?: string | null;
   type?: AudienceType | null;
   ageMin?: number | null;
@@ -457,6 +463,18 @@ export async function addAudience(input: {
       throw new Error("That persona belongs to a different brand");
     }
   }
+  if (input.homeIds?.length) {
+    const owned = await db.query.homeTable.findMany({
+      where: and(
+        eq(homeTable.brandId, brand.id),
+        inArray(homeTable.id, input.homeIds),
+        isNull(homeTable.deletedAt),
+      ),
+      columns: { id: true },
+    });
+    if (owned.length !== new Set(input.homeIds).size)
+      throw new Error("A selected home is not owned by this brand");
+  }
   const [audience] = await db
     .insert(audienceTable)
     .values({
@@ -464,6 +482,7 @@ export async function addAudience(input: {
       campaignId: campaign.id,
       brandId: brand.id,
       personaId: input.personaId ?? null,
+      homeIds: input.homeIds ?? null,
       name: input.name.trim(),
       description: input.description ?? null,
       type: input.type ?? "segment",
@@ -482,6 +501,8 @@ export async function updateAudience(input: {
   organizationId: string;
   audienceId: string;
   name?: string;
+  personaId?: string | null;
+  homeIds?: string[] | null;
   description?: string | null;
   ageMin?: number | null;
   ageMax?: number | null;
@@ -494,6 +515,28 @@ export async function updateAudience(input: {
   });
   if (!audience) throw new Error("Audience not found");
   await requireOwnedCampaign(audience.campaignId, input.organizationId);
+  if (input.personaId) {
+    const persona = await db.query.personaTable.findFirst({
+      where: and(
+        eq(personaTable.id, input.personaId),
+        isNull(personaTable.deletedAt),
+      ),
+    });
+    if (persona?.brandId !== audience.brandId)
+      throw new Error("Persona belongs to another brand");
+  }
+  if (input.homeIds?.length) {
+    const homes = await db.query.homeTable.findMany({
+      where: and(
+        eq(homeTable.brandId, audience.brandId),
+        inArray(homeTable.id, input.homeIds),
+        isNull(homeTable.deletedAt),
+      ),
+      columns: { id: true },
+    });
+    if (homes.length !== new Set(input.homeIds).size)
+      throw new Error("Home belongs to another brand");
+  }
   const { organizationId: _org, audienceId: _id, geography, ...patch } = input;
   // Geography merges key-by-key: sending only countries must not clear the
   // stored regions. Explicit null still clears the whole object.
@@ -647,7 +690,11 @@ export async function adIdeaHomePhotos(input: {
 /** Add starter ideas in creation order; retries preserve existing ideas and edits. */
 export async function addStarterAdIdeas(input: {
   organizationId: string;
-  campaignId: string;
+  campaignId?: string;
+  brandId?: string;
+  /** Stable request identity for a new brand batch and its retries. */
+  batchId?: string;
+  bookingTargetId?: string;
   /**
    * blank: unbound placeholders. featured: the featured homes, filled with
    * their listing photos. shells: the featured homes as empty ads sized for
@@ -656,14 +703,15 @@ export async function addStarterAdIdeas(input: {
   source?: "blank" | "featured" | "shells";
   homeIds?: string[];
 }) {
-  const { campaign, brand } = await requireOwnedCampaign(
-    input.campaignId,
-    input.organizationId,
-  );
-  if (campaign.deletedAt) throw new Error("Campaign not found");
+  const { campaign, brand } = await resolveAdAuthoringScope(input);
   const source = input.source ?? "blank";
   const existing = await db.query.adTable.findMany({
-    where: eq(adTable.campaignId, campaign.id),
+    where: and(
+      eq(adTable.brandId, brand.id),
+      campaign
+        ? eq(adTable.campaignId, campaign.id)
+        : isNull(adTable.campaignId),
+    ),
     columns: { businessKey: true },
   });
   const keyFor = {
@@ -671,10 +719,12 @@ export async function addStarterAdIdeas(input: {
     featured: "featured-starter-v1",
     shells: "shells-starter-v1",
   } as const;
-  const prefix = `${campaign.id}:${keyFor[source]}:`;
+  const ownerKey =
+    campaign?.id ?? `${brand.id}:${input.batchId ?? createId("batch")}`;
+  const prefix = `${ownerKey}:${keyFor[source]}:`;
   const otherPrefixes = Object.values(keyFor)
     .filter((key) => key !== keyFor[source])
-    .map((key) => `${campaign.id}:${key}:`);
+    .map((key) => `${ownerKey}:${key}:`);
   if (
     existing.some((ad) =>
       otherPrefixes.some((other) => ad.businessKey?.startsWith(other)),
@@ -713,8 +763,9 @@ export async function addStarterAdIdeas(input: {
     if (ideas[0]!.content.ideaStudio)
       ideas[0]!.content.ideaStudio.document.copy.linkUrl = brand.website;
   }
-  const booking = campaign.bookingTargetId
-    ? await resolveBookingTarget(campaign.bookingTargetId, input.organizationId)
+  const targetId = input.bookingTargetId ?? campaign?.bookingTargetId;
+  const booking = targetId
+    ? await studioBookingDestination(brand.id, targetId, input.organizationId)
     : null;
   let created = 0;
   for (const idea of ideas) {
@@ -736,14 +787,14 @@ export async function addStarterAdIdeas(input: {
       .insert(adTable)
       .values({
         brandId: brand.id,
-        campaignId: campaign.id,
+        campaignId: campaign?.id ?? null,
         name: idea.name,
         type: "creative",
         status: "drawn",
         ...projected,
         homeId: "homeId" in idea ? (idea.homeId as string) : null,
         businessKey: `${prefix}${idea.key}`,
-        bookingTargetId: booking?.target.id ?? null,
+        bookingTargetId: booking?.targetId ?? null,
       })
       .onConflictDoNothing()
       .returning({ id: adTable.id });
@@ -895,12 +946,25 @@ export async function getDraftCampaign(
           externalId: true,
           audienceId: true,
           personaId: true,
+          source: true,
+          sourceId: true,
+          seedMetadata: true,
         },
         with: { channel: { columns: { platform: true } } },
       }),
     ]);
 
+  const assetLinks = await db
+    .select()
+    .from(campaignAudienceAssetTable)
+    .where(
+      inArray(
+        campaignAudienceAssetTable.audienceId,
+        audiences.map((a) => a.id),
+      ),
+    );
   return {
+    assetLinks,
     campaign,
     brand,
     audiences,
@@ -1227,56 +1291,51 @@ export async function linkPlatformAudience(input: {
   if (brand?.organizationId !== input.organizationId) {
     throw new Error("No access to this audience");
   }
+  const channel = await db.query.channelTable.findFirst({
+    where: eq(channelTable.id, asset.channelId),
+    columns: { platform: true },
+  });
+  if (!channel) throw new Error("Audience platform not found");
+  if (asset.seedMetadata && asset.seedMetadata.status !== "ready")
+    throw new Error("This seed upload is not ready");
   if (input.audienceId) {
-    const planAudience = await db.query.audienceTable.findFirst({
+    const plan = await db.query.audienceTable.findFirst({
       where: eq(audienceTable.id, input.audienceId),
       columns: { brandId: true },
     });
-    if (planAudience?.brandId !== asset.brandId) {
+    if (plan?.brandId !== asset.brandId)
       throw new Error("That audience belongs to a different brand");
-    }
-    // One asset per platform fulfils a plan audience — the compile resolves
-    // one externalId per platform, so a second link on the same platform
-    // would make the targeted asset arbitrary. Linking here supersedes any
-    // same-platform sibling. Links on OTHER platforms stay: the same plan
-    // audience legitimately maps to one Meta asset and one Google asset.
-    const channel = await db.query.channelTable.findFirst({
-      where: eq(channelTable.id, asset.channelId),
-      columns: { platform: true },
-    });
-    if (channel) {
-      const siblings = await db
-        .select({ id: platformAudienceTable.id })
-        .from(platformAudienceTable)
-        .innerJoin(
-          channelTable,
-          eq(channelTable.id, platformAudienceTable.channelId),
-        )
+    await db
+      .insert(campaignAudienceAssetTable)
+      .values({
+        audienceId: input.audienceId,
+        platformAudienceId: asset.id,
+        platform: channel.platform,
+      })
+      .onConflictDoUpdate({
+        target: [
+          campaignAudienceAssetTable.audienceId,
+          campaignAudienceAssetTable.platform,
+        ],
+        set: { platformAudienceId: asset.id },
+      });
+  } else {
+    // Legacy null-unlink only removes this asset's original link; never other campaigns.
+    if (asset.audienceId)
+      await db
+        .delete(campaignAudienceAssetTable)
         .where(
           and(
-            eq(platformAudienceTable.audienceId, input.audienceId),
-            eq(channelTable.platform, channel.platform),
+            eq(campaignAudienceAssetTable.audienceId, asset.audienceId),
+            eq(campaignAudienceAssetTable.platformAudienceId, asset.id),
           ),
         );
-      for (const sibling of siblings) {
-        if (sibling.id === asset.id) continue;
-        await db
-          .update(platformAudienceTable)
-          .set({ audienceId: null })
-          .where(eq(platformAudienceTable.id, sibling.id));
-      }
-    }
+    await db
+      .update(platformAudienceTable)
+      .set({ audienceId: null })
+      .where(eq(platformAudienceTable.id, asset.id));
   }
-  const [updated] = await db
-    .update(platformAudienceTable)
-    .set({ audienceId: input.audienceId })
-    .where(eq(platformAudienceTable.id, asset.id))
-    .returning({
-      id: platformAudienceTable.id,
-      audienceId: platformAudienceTable.audienceId,
-      name: platformAudienceTable.name,
-    });
-  return updated!;
+  return { id: asset.id, audienceId: input.audienceId, name: asset.name };
 }
 
 /**

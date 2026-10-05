@@ -158,7 +158,7 @@ export function AdIdeasList({
       fallback(ad.id)
     );
   return (
-    <section aria-labelledby="ad-ideas-heading" className="space-y-4">
+    <section aria-label="Ads" className="space-y-4">
       <WorkspaceCardHeader
         title="Ads"
         icon={Images}

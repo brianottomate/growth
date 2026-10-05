@@ -2206,3 +2206,12 @@ export async function listZernioPixels(accountId: string, adAccountId: string) {
   );
   return (result.tags ?? []).map(({ id, name }) => ({ id, name }));
 }
+
+/** Cleanup of a newly created audience only. Official DELETE /ads/audiences/{id}. */
+export async function deleteZernioAdAudience(
+  audienceId: string,
+): Promise<void> {
+  await zernioFetch(`/ads/audiences/${encodeURIComponent(audienceId)}`, {
+    method: "DELETE",
+  });
+}

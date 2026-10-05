@@ -15,6 +15,7 @@ const listPersonaItemSchema = z.strictObject({
   createdAt: z.iso.datetime(),
   deletedAt: z.iso.datetime().nullable(),
   demandGeography: demandGeographySchema.nullable(),
+  destinationGeography: demandGeographySchema.nullable(),
   description: z.string().nullable(),
   geographies: z.array(z.string()).nullable(),
   id: z.string(),

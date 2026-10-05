@@ -950,6 +950,8 @@ export const addAudienceAction = growthAction({
       .min(1)
       .optional()
       .describe("The brand persona (pers_) this audience narrows."),
+    description: z.string().trim().max(2000).optional(),
+    homeIds: z.array(z.string().min(1)).max(100).optional(),
     ageMin: z.number().int().min(13).max(100).optional(),
     ageMax: z.number().int().min(13).max(100).optional(),
     countries: z
@@ -985,6 +987,8 @@ export const addAudienceAction = growthAction({
       campaignId: input.campaignId,
       name: input.name,
       personaId: input.personaId ?? null,
+      description: input.description ?? null,
+      homeIds: input.homeIds ?? null,
       ageMin: input.ageMin ?? null,
       ageMax: input.ageMax ?? null,
       geography:
@@ -1012,6 +1016,9 @@ export const updateAudienceAction = growthAction({
   inputSchema: z.object({
     audienceId: z.string().trim().min(1),
     name: z.string().trim().min(1).max(300).optional(),
+    description: z.string().trim().max(2000).nullish(),
+    personaId: z.string().min(1).nullish(),
+    homeIds: z.array(z.string().min(1)).max(100).nullish(),
     ageMin: z.number().int().min(13).max(100).nullish(),
     ageMax: z.number().int().min(13).max(100).nullish(),
     countries: z.array(z.string().length(2)).max(20).optional(),
@@ -1031,6 +1038,9 @@ export const updateAudienceAction = growthAction({
     updateAudience({
       audienceId: input.audienceId,
       name: input.name,
+      description: input.description,
+      personaId: input.personaId,
+      homeIds: input.homeIds,
       ageMin: input.ageMin,
       ageMax: input.ageMax,
       geography:
@@ -1476,10 +1486,11 @@ export const setAdPlatformsAction = growthAction({
 
 export const generateStarterIdeasAction = growthAction({
   description:
-    "Generate starter ad ideas for a campaign or standalone brand studio, the same as Generate ideas on the campaign page: from the brand's featured homes (source featured, the default: per home a static and a carousel with photos chosen from its gallery, plus a portfolio hero carousel) or three copy-only brand concepts (source brand). Every idea lands as an unapproved draft for the operator to review and approve; nothing is pushed. Waits for the run to finish and reports what it made.",
+    "Generate starter ad ideas for a campaign or standalone brand studio. Home-aware batch creation lives in Ad Studio; selected home IDs snapshot the group membership. Optional bookingTargetId copies this brand's resolved booking destination onto the generated ads. Create ideas from the brand's featured homes (source featured, the default: per home a static and a carousel with photos chosen from its gallery, plus a portfolio hero carousel) or three copy-only brand concepts (source brand). Every idea lands as an unapproved draft for the operator to review and approve; nothing is pushed. Waits for the run to finish and reports what it made.",
   inputSchema: z
     .object({
       ...adAuthoringFields,
+      bookingTargetId: z.string().min(1).optional(),
       source: z.enum(["featured", "brand"]).default("featured"),
       homeIds: z
         .array(z.string().min(1))
@@ -1526,6 +1537,7 @@ export const generateStarterIdeasAction = growthAction({
       campaignId: input.campaignId,
       brandId: input.brandId,
       source: input.source,
+      bookingTargetId: input.bookingTargetId,
       homeIds,
       intendedPlacements: [
         "facebook-feed" as const,
@@ -1556,9 +1568,17 @@ export const generateStarterIdeasAction = growthAction({
 export const addAdShellAction = growthAction({
   outputSchema: addAdShellActionOutputSchema,
   description:
-    "Add one empty ad of a declared format (static, carousel, catalog or video), bound to one of their homes by WanderOS listing id, or by name alone when the brand's site is not connected. Lands on the brand's wall, or straight in a campaign when campaignId is given. The creative comes afterwards with editAdCards, by upload into the library or from it. Use this when the operator wants the ads to exist first and fill them in, or wants an ad the build does not make.",
+    "Add one empty visual ad of a declared format (static, carousel, catalog or video). Supply linkUrl for an arbitrary HTTP or HTTPS destination. Optional propertyId or homeName supports home-aware studio authoring. Lands on the brand's wall, or straight in a campaign when campaignId is given. The creative comes afterwards with editAdCards, by upload into the library or from it. Use this when the operator wants the ads to exist first and fill them in, or wants an ad the build does not make.",
   inputSchema: z.object({
     brandId: z.string().min(1),
+    linkUrl: z
+      .string()
+      .url()
+      .refine(
+        (value) => ["http:", "https:"].includes(new URL(value).protocol),
+        "Use an HTTP or HTTPS destination.",
+      )
+      .optional(),
     format: z.enum(HAND_MADE_AD_FORMATS),
     propertyId: z
       .string()
@@ -1585,7 +1605,7 @@ export const addAdShellAction = growthAction({
       .trim()
       .max(300)
       .optional()
-      .describe("Omit for the house name."),
+      .describe("Omit for a generated ad name."),
   }),
   examples: [
     { brandId: "brand_01", format: "static", propertyId: "1234567890123" },
@@ -1673,7 +1693,7 @@ export const setHomeHeroAction = growthAction({
 export const suggestCampaignAudiencesAction = growthAction({
   outputSchema: suggestCampaignAudiencesActionOutputSchema,
   description:
-    "Propose the next audience for a Performance client's campaign (one by default, up to 5 with count), skipping what the campaign already targets, from the evidence: the brand's market (feeder cities), what its direct bookings say about the booking window, and the audiences already synced in its ad account. Each suggestion says why; add the ones the operator wants with addAudience (geo: cities, states, countries, ages; lookalike or retargeting: the platformAudienceId names the asset). Nothing is saved or pushed. Guest-origin data is not available for WanderOS sites, so geo suggestions rest on the market on Setup.",
+    "Propose the next audience for a Performance client's campaign (one by default, up to 5 with count), skipping what the campaign already targets, from brand personas, story, home fit, and the evidence: the brand's market (feeder cities), what its direct bookings say about the booking window, and the audiences already synced in its ad account. Each suggestion says why; add the ones the operator wants with addAudience (geo: cities, states, countries, ages; lookalike or retargeting: the platformAudienceId names the asset). Nothing is saved or pushed. Guest-origin data is not available for WanderOS sites, so geo suggestions rest on the market on Setup.",
   inputSchema: z.object({
     campaignId: z.string().min(1),
     count: z.number().int().min(1).max(5).optional(),
@@ -1830,7 +1850,7 @@ export const editAdCardsAction = growthAction({
 export const attachAdSetAction = growthAction({
   outputSchema: attachAdSetActionOutputSchema,
   description:
-    "Put the brand's approved drafted ads, or the ones named, into a campaign so the push can send them. Refuses an ad with no creative. Local only; nothing reaches a platform until adsWrite.push.",
+    "Assign the brand's approved unassigned ads, or explicitly selected unassigned drafts, to a draft campaign. Named drafts may still need creative and copy; delivery requires completed, approved ads. Keeps the ads in the brand collection. Refuses cross-brand or previously assigned selections and pushed campaigns. Local only; nothing reaches a platform until adsWrite.push.",
   inputSchema: z.object({
     brandId: z.string().min(1),
     campaignId: z.string().min(1),
