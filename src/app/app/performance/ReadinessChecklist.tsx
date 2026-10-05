@@ -118,23 +118,27 @@ export function ReadinessChecklist({
                         </span>
                       </span>
                     </AccordionTrigger>
-                    {sharedActions.map((action) => (
-                      <Link
-                        key={action.to}
-                        href={links[action.to]!}
-                        className="z-10 col-span-full col-start-1 row-start-2 mb-2 inline-flex min-h-9 items-center gap-2 justify-self-end rounded-full border bg-card px-3 text-xs font-medium hover:bg-muted @lg:col-span-1 @lg:col-start-2 @lg:row-start-1 @lg:mb-0"
-                      >
-                        {action.label}
-                        <span className="text-muted-foreground">
-                          {
-                            shared.filter(
-                              (item) => item.action?.to === action.to,
-                            ).length
-                          }{" "}
-                          items
-                        </span>
-                      </Link>
-                    ))}
+                    {sharedActions.length > 0 && (
+                      <div className="z-10 col-span-full col-start-1 row-start-2 mb-2 flex flex-wrap justify-end gap-2 @lg:col-span-1 @lg:col-start-2 @lg:row-start-1 @lg:mb-0">
+                        {sharedActions.map((action) => (
+                          <Link
+                            key={action.to}
+                            href={links[action.to]!}
+                            className="inline-flex min-h-9 items-center gap-2 rounded-full border bg-card px-3 text-xs font-medium hover:bg-muted"
+                          >
+                            {action.label}
+                            <span className="text-muted-foreground">
+                              {
+                                shared.filter(
+                                  (item) => item.action?.to === action.to,
+                                ).length
+                              }{" "}
+                              items
+                            </span>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <AccordionContent className="pb-2">
                     <ul className="divide-y divide-border/60">
