@@ -36,6 +36,13 @@
       "when": 1791217481974,
       "tag": "0004_home_groups_custom_source",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791218738535,
+      "tag": "0005_drop_featured_and_kind",
+      "breakpoints": true
     }
   ]
 }
