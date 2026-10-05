@@ -9,6 +9,7 @@ import { useMutation } from "@tanstack/react-query";
 import {
   AlignJustify,
   Rows3,
+  Rows4,
   ListChecks,
   MoreHorizontal,
   Check,
@@ -23,7 +24,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { PerformanceNote } from "./PerformanceNote";
-import { ReadinessProgress, ReadinessNextStep } from "./ReadinessProgress";
+import { ReadinessProgress } from "./ReadinessProgress";
+import { statusChips, statusTone } from "./AccountStatus";
 import {
   Dialog,
   DialogContent,
@@ -69,7 +71,7 @@ import {
 } from "@/lib/performance-card-state";
 import { type PerformancePipelineCard } from "@/lib/performance-card";
 
-export type CardDetail = "Compact" | "Overview" | "Detailed";
+export type CardDetail = "Dense" | "Compact" | "Overview" | "Detailed";
 export type CardView = "All" | "Commercial" | "Creative" | "Delivery";
 export const CARD_VIEWS: CardView[] = [
   "All",
@@ -102,16 +104,34 @@ export function PerformanceClientCard({
   detailSignal?: { detail: CardDetail; revision: number };
   context?: "board" | "client";
 }) {
-  const [detail, setDetail] = useState<CardDetail>("Compact");
+  const [detail, setDetail] = useState<CardDetail>(
+    detailSignal?.detail ?? "Compact",
+  );
   const [editing, setEditing] = useState(false);
+  const signalDetail = detailSignal?.detail;
+  const signalRevision = detailSignal?.revision;
   useEffect(() => {
-    if (detailSignal) setDetail(detailSignal.detail);
-  }, [detailSignal]);
+    if (signalDetail) setDetail(signalDetail);
+  }, [signalDetail, signalRevision]);
   const compact = detail === "Compact";
   const show = (section: CardView) => view === "All" || view === section;
   const state = card.state;
   const platforms = recordedPlatforms(state);
   const intakeUrl = performanceWebsiteUrl(card.intakeUrl ?? null);
+  if (context === "board" && detail === "Dense")
+    return (
+      <>
+        <DenseCard
+          card={card}
+          view={view}
+          onDetail={setDetail}
+          onEdit={() => setEditing(true)}
+        />
+        {editing && (
+          <EditClientState card={card} onClose={() => setEditing(false)} />
+        )}
+      </>
+    );
   return (
     <article
       aria-label={`${card.name} client card`}
@@ -176,6 +196,7 @@ export function PerformanceClientCard({
             >
               {(
                 [
+                  { name: "Dense", label: "Dense", icon: Rows4 },
                   { name: "Compact", label: "Compact", icon: AlignJustify },
                   { name: "Overview", label: "Summary", icon: Rows3 },
                   { name: "Detailed", label: "Milestones", icon: ListChecks },
@@ -459,13 +480,6 @@ export function PerformanceClientCard({
             </span>
           </div>
           <ReadinessProgress checklist={card.readiness.checklist} compact />
-          {card.stage !== "paused" ? (
-            <ReadinessNextStep
-              checklist={card.readiness.checklist}
-              links={card.readiness.links}
-              compact
-            />
-          ) : null}
         </section>
       ) : null}
       <PerformanceNote
@@ -476,6 +490,122 @@ export function PerformanceClientCard({
       {editing && (
         <EditClientState card={card} onClose={() => setEditing(false)} />
       )}
+    </article>
+  );
+}
+
+/**
+ * The card at a glance: name and money on top, every recorded status as a
+ * coloured dot with its name, the checklist as one bar, and the next step as
+ * one line. About a third the height of Compact; the value sits in the title.
+ */
+function DenseCard({
+  card,
+  view,
+  onDetail,
+  onEdit,
+}: {
+  card: PerformancePipelineCard;
+  view: CardView;
+  onDetail: (detail: CardDetail) => void;
+  onEdit: () => void;
+}) {
+  const chips = statusChips(card.state).filter(
+    (chip) =>
+      chip.value &&
+      (view === "All" ? chip.lens !== "Commercial" : chip.lens === view),
+  );
+  const checklist = card.readiness?.checklist;
+  return (
+    <article
+      aria-label={`${card.name} client card`}
+      className="rounded-xl border bg-card px-3 py-2.5"
+      style={cardTheme}
+    >
+      <div className="flex items-center gap-2.5">
+        <BrandLogo brand={card} className="size-7 text-[10px]" />
+        <div className="min-w-0 flex-1">
+          <Link
+            href={card.href}
+            className="block truncate text-[13px] font-semibold hover:underline"
+          >
+            {card.name}
+          </Link>
+          <p className="truncate text-[11px] text-muted-foreground tabular-nums">
+            {card.management == null && card.spend == null
+              ? (card.website?.replace(/^https?:\/\//, "") ?? "—")
+              : `${card.management == null ? "—" : money(card.management)} · ${card.spend == null ? "—" : money(card.spend)}`}
+          </p>
+        </div>
+        {checklist ? (
+          <div className="w-14 shrink-0 space-y-1 text-right">
+            <span className="block text-[10px] text-muted-foreground tabular-nums">
+              {checklist.done}/{checklist.total}
+            </span>
+            <div className="h-[3px] overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-foreground"
+                style={{
+                  width: `${checklist.total ? (checklist.done / checklist.total) * 100 : 0}%`,
+                }}
+              />
+            </div>
+          </div>
+        ) : null}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className="-mr-1"
+              aria-label={`Options for ${card.name}`}
+            >
+              <MoreHorizontal />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={() => onDetail("Compact")}>
+              Show more on this card
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() =>
+                sendAssistantIntent({
+                  type: "work_performance_client",
+                  newThread: true,
+                  brandId: card.id,
+                  brandName: card.name,
+                  visibleText: `Open ${card.name}'s Performance account in chat.`,
+                })
+              }
+            >
+              Open in chat
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={onEdit}>
+              Edit client state…
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      {chips.length > 0 ? (
+        <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px]">
+          {chips.map((chip) => (
+            <span
+              key={chip.label}
+              title={`${chip.label} · ${chip.value}`}
+              className="inline-flex items-center gap-1 text-muted-foreground"
+            >
+              <span
+                aria-hidden="true"
+                className="size-1.5 rounded-full bg-muted-foreground/40"
+                style={{
+                  backgroundColor: statusTone(chip.value)?.color ?? undefined,
+                }}
+              />
+              {chip.label}
+            </span>
+          ))}
+        </div>
+      ) : null}
     </article>
   );
 }

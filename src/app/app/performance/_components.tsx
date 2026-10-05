@@ -41,40 +41,14 @@ export const tile = "bg-muted/40 rounded-xl border px-3 py-2.5";
 /** Pill buttons, the section's button shape. */
 export const pill = "rounded-full";
 
-const STATE_LABEL: Record<DeskCampaignState, string> = {
-  draft: "draft",
-  pushed: "paused",
-  live: "live",
-  ended: "ended",
-};
-const DOT: Record<DeskCampaignState, string> = {
-  live: "bg-emerald-400",
-  pushed: "bg-amber-400",
-  draft: "bg-white/25",
-  ended: "bg-white/15",
+const STATE_WORD: Record<DeskCampaignState, string> = {
+  draft: "Draft",
+  pushed: "Pushed, paused",
+  live: "Live",
+  ended: "Ended",
 };
 
-/** A coloured dot for a campaign state: green live, amber paused, grey draft. */
-export function StateDot({
-  state,
-  className,
-}: {
-  state: DeskCampaignState;
-  className?: string;
-}) {
-  return (
-    <span
-      aria-label={STATE_LABEL[state]}
-      className={cn(
-        "inline-block size-[7px] shrink-0 rounded-full",
-        DOT[state],
-        className,
-      )}
-    />
-  );
-}
-
-/** A bordered pill naming the state, for lists that mix states. */
+/** A small pill naming a campaign's state: green live, amber paused, grey otherwise. */
 export function StateChip({
   state,
   className,
@@ -85,16 +59,16 @@ export function StateChip({
   return (
     <span
       className={cn(
-        "shrink-0 rounded-full border border-border/80 px-2 py-0.5 text-[10px] font-medium whitespace-nowrap",
+        "inline-flex h-5 shrink-0 items-center rounded-full border border-border/80 px-2 text-[10.5px] font-medium whitespace-nowrap",
         state === "live"
-          ? "text-emerald-300"
+          ? "text-[var(--color-success)]"
           : state === "pushed"
-            ? "text-amber-300"
+            ? "text-[var(--color-warning)]"
             : "text-muted-foreground",
         className,
       )}
     >
-      {STATE_LABEL[state]}
+      {STATE_WORD[state]}
     </span>
   );
 }
@@ -185,14 +159,7 @@ export function SpendCell({ campaign }: { campaign: DeskCampaign }) {
   );
 }
 
-/** One campaign as a row: dot, name over its client, platforms, money. */
-const STATE_WORD: Record<DeskCampaign["state"], string> = {
-  draft: "Draft",
-  pushed: "Pushed, paused",
-  live: "Live",
-  ended: "Ended",
-};
-
+/** One campaign as a row: name and state over its client, platforms, money. */
 /** "Sep 21", with the year only when it is not this one. */
 function createdOn(date: Date) {
   const sameYear = date.getFullYear() === new Date().getFullYear();
@@ -233,21 +200,22 @@ export function CampaignRow({
     .filter((row) => row.status !== "draft")
     .map((row) => row.id);
   return (
-    <li className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1.5 px-4 py-3 @lg:flex">
-      <StateDot state={campaign.state} />
+    <li className="grid grid-cols-1 items-center gap-x-3 gap-y-1.5 px-4 py-3 @lg:flex">
       <div className="min-w-0 @lg:flex-1">
-        <Link
-          href={campaignHref(brand, campaign)}
-          title={campaign.name}
-          className="block text-[13px] font-semibold [overflow-wrap:anywhere] hover:underline @lg:truncate"
-        >
-          {campaign.name}
-        </Link>
+        <span className="flex items-center gap-2">
+          <Link
+            href={campaignHref(brand, campaign)}
+            title={campaign.name}
+            className="min-w-0 text-[13px] font-semibold [overflow-wrap:anywhere] hover:underline @lg:truncate"
+          >
+            {campaign.name}
+          </Link>
+          <StateChip state={campaign.state} />
+        </span>
         <span className="block text-[11px] text-muted-foreground @lg:truncate">
           {[
             showBrand ? client : null,
             `Created ${createdOn(campaign.createdAt)}`,
-            STATE_WORD[campaign.state],
             campaign.adCount
               ? `${campaign.adCount} ad${campaign.adCount === 1 ? "" : "s"}${campaign.approvedCount ? ` · ${campaign.approvedCount} approved` : ""}`
               : "no ads",
@@ -268,7 +236,7 @@ export function CampaignRow({
           />
         ))}
       </span>
-      <span className="col-span-2 flex items-center gap-1.5 text-muted-foreground @lg:col-span-1 @lg:w-20 @lg:shrink-0">
+      <span className="flex items-center gap-1.5 text-muted-foreground @lg:w-20 @lg:shrink-0">
         {campaign.platforms.map((row) => (
           <span
             key={row.id}
@@ -288,7 +256,7 @@ export function CampaignRow({
         <SpendCell campaign={campaign} />
       </span>
       {deletable ? (
-        <span className="col-start-2 justify-self-end @lg:col-auto @lg:w-8 @lg:shrink-0">
+        <span className="justify-self-end @lg:w-8 @lg:shrink-0">
           <DeleteCampaignButton
             campaignId={campaign.id}
             campaignName={campaign.name}

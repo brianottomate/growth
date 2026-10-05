@@ -16,16 +16,21 @@ import {
 } from "@/server/services/performance-desk.service";
 
 import { CampaignRow, panel } from "../_components";
+import { PerformancePageHeader } from "../PageHeader";
 import { CampaignGroups, type CampaignGroup } from "./CampaignGroups";
 
 export const metadata: Metadata = { title: "Campaigns · Wander Performance" };
 export const dynamic = "force-dynamic";
 
 const GROUPS: { state: DeskCampaignState; title: string; dot: string }[] = [
-  { state: "live", title: "Live", dot: "bg-emerald-400" },
-  { state: "pushed", title: "Pushed, paused", dot: "bg-amber-400" },
-  { state: "draft", title: "Drafts", dot: "bg-white/25" },
-  { state: "ended", title: "Ended", dot: "bg-white/15" },
+  { state: "live", title: "Live", dot: "bg-[var(--color-success)]" },
+  {
+    state: "pushed",
+    title: "Pushed, paused",
+    dot: "bg-[var(--color-warning)]",
+  },
+  { state: "draft", title: "Drafts", dot: "bg-muted-foreground/35" },
+  { state: "ended", title: "Ended", dot: "bg-muted-foreground/20" },
 ];
 
 /** Every client campaign, grouped by where it stands, with chips to pick a group. */
@@ -43,13 +48,22 @@ export default async function PerformanceCampaignsPage() {
   const desk = narrowDesk(await loadPerformanceDesk(org.id), "client");
   const brandById = new Map(desk.brands.map((brand) => [brand.id, brand]));
 
+  const header = (
+    <PerformancePageHeader
+      title="Campaigns"
+      description="Every client campaign, grouped by where it stands."
+    />
+  );
   if (desk.campaigns.length === 0) {
     return (
-      <EmptyState
-        icon={Megaphone}
-        title="No campaigns yet"
-        description="Start one from a client."
-      />
+      <div className="space-y-6">
+        {header}
+        <EmptyState
+          icon={Megaphone}
+          title="No campaigns yet"
+          description="Start one from a client."
+        />
+      </div>
     );
   }
 
@@ -91,5 +105,10 @@ export default async function PerformanceCampaignsPage() {
     .filter(Boolean)
     .join(" · ");
 
-  return <CampaignGroups groups={groups} summary={summary} />;
+  return (
+    <div className="space-y-6">
+      {header}
+      <CampaignGroups groups={groups} summary={summary} />
+    </div>
+  );
 }

@@ -61,15 +61,21 @@ export function useContentWidth() {
     () => readOverrides()[prefix] ?? fallback,
     () => fallback,
   );
-  const toggle = useCallback(() => {
-    const next: ContentWidth = width === "full" ? "contained" : "full";
-    const overrides = readOverrides();
-    if (next === fallback) delete overrides[prefix];
-    else overrides[prefix] = next;
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(overrides));
-    window.dispatchEvent(new Event(CHANGE_EVENT));
-  }, [width, fallback, prefix]);
-  return { width, toggle };
+  const set = useCallback(
+    (next: ContentWidth) => {
+      const overrides = readOverrides();
+      if (next === fallback) delete overrides[prefix];
+      else overrides[prefix] = next;
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(overrides));
+      window.dispatchEvent(new Event(CHANGE_EVENT));
+    },
+    [fallback, prefix],
+  );
+  const toggle = useCallback(
+    () => set(width === "full" ? "contained" : "full"),
+    [set, width],
+  );
+  return { width, toggle, set };
 }
 
 export function ContentWidthToggle({ className }: { className?: string }) {

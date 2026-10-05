@@ -4,6 +4,9 @@ import { workspaceActor } from "@/server/workspace-actor";
 import { loadPerformanceDesk } from "@/server/services/performance-desk.service";
 import { performanceCardFromBrand } from "@/lib/performance-card";
 import { PipelineBoard } from "./PipelineBoard";
+import { PerformancePageHeader } from "./PageHeader";
+import { HeaderNewClient } from "./HeaderNewClient";
+import { clientDetails } from "./ClientCard";
 import {
   loadBrandReadiness,
   readinessLinks,
@@ -35,15 +38,16 @@ export default async function PerformanceOverviewPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6">
-      <header className="flex shrink-0 flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Client journey, recorded status, and the next step.
-          </p>
-        </div>
-      </header>
-      <PipelineBoard cards={cards} />
+      <PerformancePageHeader
+        title="Dashboard"
+        description="Every account by stage, with recorded status and the next step."
+        action={<HeaderNewClient />}
+      />
+      <PipelineBoard
+        cards={cards}
+        defaultLayout="board"
+        details={clientDetails(desk.brands, readiness)}
+      />
     </div>
   );
 }

@@ -31,6 +31,7 @@ import {
   Sparkles,
   Target,
   Users,
+  Landmark,
 } from "lucide-react";
 
 /**
@@ -61,18 +62,25 @@ export const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
         icon: Crosshair,
         exact: true,
       },
+      { label: "Prospects", href: "/app/performance/prospects", icon: Target },
+      { label: "Finance", href: "/app/performance/finance", icon: Landmark },
+      {
+        label: "Campaigns",
+        href: "/app/performance/campaigns",
+        icon: Megaphone,
+      },
+    ],
+  },
+  {
+    // Performance pages the Dashboard now covers, kept reachable until retired.
+    label: "Archive",
+    items: [
       { label: "Clients", href: "/app/performance/clients", icon: Building2 },
       {
         label: "Tracker",
         href: "/app/performance/tracker",
         icon: Table2,
       },
-      {
-        label: "Campaigns",
-        href: "/app/performance/campaigns",
-        icon: Megaphone,
-      },
-      { label: "Prospects", href: "/app/performance/prospects", icon: Target },
       {
         label: "Prototype",
         href: "/app/performance/prototype",

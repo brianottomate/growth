@@ -3,19 +3,25 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { parseAsString, useQueryState } from "nuqs";
+import { Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { plausibleWanderOsId } from "@/lib/wanderos-site-detection";
-import { cn } from "@/components/ui/lib/utils";
 import type { DeskBrand } from "@/server/services/performance-desk.service";
-import { brandAdsHref, BrandLogo, panel, SectionLabel } from "../_components";
-import { StageChips } from "../StageChip";
+import { brandAdsHref, BrandLogo } from "../_components";
+import { BusinessChip } from "../StageChip";
 import { BrandRowMenu } from "../BrandRowMenu";
 import { SendLink } from "../SendLink";
 import { PitchChatButton } from "../PitchChatButton";
 import { SiteTag } from "../SiteTag";
 import { HeaderNewClient } from "../HeaderNewClient";
+import { PerformancePageHeader } from "../PageHeader";
 import { ProspectSearch } from "./ProspectSearch";
 
+/**
+ * Prospects on the same frame as Clients: one row each, the row opens the
+ * account, and the two links a rep sends sit on the right. The search box
+ * doubles as the way in to new leads, which is why it stays on this page.
+ */
 export function ProspectDesk({
   prospects,
   existingDomains,
@@ -47,97 +53,102 @@ export function ProspectDesk({
       ),
   );
   return (
-    <div className="space-y-7 pt-1">
-      <div className="flex items-center gap-3">
-        <input
-          value={query}
-          onChange={(event) => void setQuery(event.target.value)}
-          maxLength={160}
-          autoFocus
-          aria-label="Search company or website"
-          placeholder="Search a company or paste their website…"
-          className="min-h-10 min-w-0 flex-1 rounded-full border bg-muted/40 px-4 text-[13.5px]"
-        />
-        <HeaderNewClient />
-      </div>
-      <section className="space-y-2.5">
-        <SectionLabel>
-          {term ? "Your prospects" : "Current prospects"} · {brands.length}
-        </SectionLabel>
+    <div className="flex flex-col gap-6">
+      <PerformancePageHeader
+        title="Prospects"
+        description="Companies we are pitching, and the search that finds the next one."
+        action={<HeaderNewClient />}
+      >
+        <div className="relative">
+          <Search
+            aria-hidden="true"
+            className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-muted-foreground"
+          />
+          <input
+            value={query}
+            onChange={(event) => void setQuery(event.target.value)}
+            maxLength={160}
+            autoFocus
+            aria-label="Search company or website"
+            placeholder="Search prospects, or paste a website to find a new one…"
+            className="h-12 w-full rounded-xl border bg-background pr-28 pl-11 text-[15px] shadow-sm focus:ring-2 focus:ring-ring focus:outline-none"
+          />
+          <span className="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-xs text-muted-foreground tabular-nums">
+            {brands.length} {brands.length === 1 ? "prospect" : "prospects"}
+          </span>
+        </div>
+      </PerformancePageHeader>
+      <section className="space-y-2">
         {brands.length ? (
-          <ul className={cn(panel, "divide-y")}>
-            {brands.map((brand) => (
-              <li
-                key={brand.id}
-                className="flex flex-wrap items-center gap-3 px-4 py-3"
-              >
-                <BrandLogo brand={brand} className="size-8 text-[11px]" />
-                <div className="min-w-0 flex-1 basis-[calc(100%-3rem)] @3xl:basis-0">
-                  <div className="flex flex-wrap items-baseline gap-x-2">
-                    <Link
-                      href={`/app/performance/clients/${brand.slug ?? brand.id}`}
-                      className="text-[13px] font-semibold hover:underline"
-                    >
-                      {brand.name}
-                    </Link>
-                    <StageChips
+          <ul className="divide-y overflow-hidden rounded-xl border bg-card">
+            {brands.map((brand) => {
+              const href = `/app/performance/clients/${brand.slug ?? brand.id}`;
+              return (
+                <li
+                  key={brand.id}
+                  className="relative flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 transition-colors hover:bg-muted/40"
+                >
+                  <BrandLogo brand={brand} className="size-8 text-[11px]" />
+                  <div className="min-w-0 flex-1 basis-[calc(100%-3rem)] @3xl:basis-0">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <Link
+                        href={href}
+                        className="text-[13px] font-semibold after:absolute after:inset-0 hover:underline"
+                      >
+                        {brand.name}
+                      </Link>
+                      <BusinessChip stage={brand.business} />
+                      {plausibleWanderOsId(brand.wanderOsWebsiteId) && (
+                        <Badge variant="secondary">WanderOS</Badge>
+                      )}
+                    </div>
+                    <div className="relative z-10 flex flex-wrap items-center gap-x-2 text-[11.5px] text-muted-foreground">
+                      <SiteTag website={brand.website} />
+                      {brand.campaigns.length > 0 ? (
+                        <Link
+                          href={brandAdsHref(brand)}
+                          className="hover:underline"
+                        >
+                          {brand.campaigns.length} draft campaign
+                          {brand.campaigns.length === 1 ? "" : "s"}
+                        </Link>
+                      ) : (
+                        <span>Nothing started</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="relative z-10 flex w-full flex-wrap items-center gap-2 @3xl:w-auto">
+                    {brand.pitchUrl ? (
+                      <SendLink label="Pitch page" url={brand.pitchUrl} />
+                    ) : null}
+                    {brand.intakeUrl ? (
+                      <SendLink label="Intake form" url={brand.intakeUrl} />
+                    ) : null}
+                    <PitchChatButton brandId={brand.id} name={brand.name} />
+                    <BrandRowMenu
+                      brandId={brand.id}
+                      brandName={brand.name}
                       business={brand.business}
                       delivery={brand.delivery}
+                      billing={brand.billing}
+                      setupWebsite={brand.website}
                     />
-                    <SiteTag website={brand.website} />
-                    {plausibleWanderOsId(brand.wanderOsWebsiteId) && (
-                      <Badge variant="secondary">WanderOS</Badge>
-                    )}
                   </div>
-                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                    {brand.campaigns.length > 0 ? (
-                      <Link
-                        href={brandAdsHref(brand)}
-                        className="hover:underline"
-                      >
-                        {brand.campaigns.length} draft campaign
-                        {brand.campaigns.length === 1 ? "" : "s"}
-                      </Link>
-                    ) : (
-                      <span>nothing started</span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex w-full flex-wrap items-center gap-3 @3xl:w-auto">
-                  <Link
-                    className="text-xs hover:underline"
-                    href={`/app/performance/clients/${brand.slug ?? brand.id}/pitch`}
-                  >
-                    Open pitch
-                  </Link>
-                  {brand.pitchUrl ? (
-                    <SendLink label="Pitch page" url={brand.pitchUrl} />
-                  ) : null}
-                  {brand.intakeUrl ? (
-                    <SendLink label="Intake form" url={brand.intakeUrl} />
-                  ) : null}
-                  <PitchChatButton brandId={brand.id} name={brand.name} />
-                  <BrandRowMenu
-                    brandId={brand.id}
-                    brandName={brand.name}
-                    business={brand.business}
-                    delivery={brand.delivery}
-                    billing={brand.billing}
-                    setupWebsite={brand.website}
-                  />
-                </div>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         ) : (
-          <p className="text-xs text-muted-foreground">
+          <p className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
             {term ? "No matching prospects." : "No prospects yet."}
           </p>
         )}
       </section>
       {term.length >= 2 && (
         <section className="space-y-2.5">
-          <SectionLabel>Find new prospects</SectionLabel>
+          <div className="flex items-baseline gap-2 px-1">
+            <h2 className="text-[13px] font-semibold">Find new prospects</h2>
+          </div>
           {term !== leadTerm ? (
             <p role="status" className="text-xs text-muted-foreground">
               Searching leads…

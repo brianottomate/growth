@@ -17,7 +17,6 @@ import {
 } from "@/components/ui/accordion";
 import type { ReadinessChecklist as Checklist } from "@/lib/performance-readiness";
 import {
-  ReadinessNextStep,
   ReadinessProgress,
   readinessGroupLabel,
   type ReadinessLinks,
@@ -72,7 +71,6 @@ export function ReadinessChecklist({
           <ReadinessProgress checklist={checklist} />
         </div>
         <AccordionContent className="space-y-4 pb-4">
-          <ReadinessNextStep checklist={checklist} links={links} />
           <Accordion
             type="multiple"
             defaultValue={checklist.groups

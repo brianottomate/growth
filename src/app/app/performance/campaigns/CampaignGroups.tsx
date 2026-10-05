@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 
 import { cn } from "@/components/ui/lib/utils";
+import { FilterPill } from "../PageHeader";
 
 export type CampaignGroup = {
   id: string;
@@ -23,27 +24,21 @@ export function CampaignGroups({
   const [picked, setPicked] = useState<string>("all");
   const shown =
     picked === "all" ? groups : groups.filter((group) => group.id === picked);
-  const chip = (id: string, label: string) => (
-    <button
+  const chip = (id: string, label: string, count?: number) => (
+    <FilterPill
       key={id}
-      type="button"
+      active={picked === id}
       onClick={() => setPicked(id)}
-      aria-pressed={picked === id}
-      className={cn(
-        "min-h-11 rounded-full border px-3.5 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors @lg:min-h-0",
-        picked === id
-          ? "border-foreground bg-foreground text-background"
-          : "border-border/80 text-muted-foreground hover:text-foreground",
-      )}
+      count={count}
     >
       {label}
-    </button>
+    </FilterPill>
   );
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-2">
         {chip("all", "All")}
-        {groups.map((group) => chip(group.id, `${group.title} ${group.count}`))}
+        {groups.map((group) => chip(group.id, group.title, group.count))}
         <span className="ml-auto text-[11.5px] text-muted-foreground">
           {summary}
         </span>

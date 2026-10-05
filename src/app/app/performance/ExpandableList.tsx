@@ -24,7 +24,8 @@ export function ExpandableList({
         <button
           type="button"
           onClick={() => setOpen(!open)}
-          className="text-[11.5px] text-sky-300 hover:underline"
+          className="text-[11.5px] hover:underline"
+          style={{ color: "var(--color-link)" }}
         >
           {open ? "Show fewer" : `Show all ${rows.length} ${noun}`}
         </button>
