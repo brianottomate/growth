@@ -57,6 +57,16 @@ const write = (
 });
 
 export const growthActionPolicies = {
+  creativeRead: { list: read(), get: read() },
+  creativeWrite: {
+    create: write(),
+    save: write(),
+    select: write(),
+    produce: write({ consequence: "model-write" }),
+    cancel: write({ idempotent: true }),
+    pullDato: write({ consequence: "provider-read" }),
+    pushDato: write({ consequence: "provider-write" }),
+  },
   initiativeRead: { list: read(), get: read(), options: read() },
   initiativeWrite: {
     save: write(),

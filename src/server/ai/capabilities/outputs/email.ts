@@ -1,4 +1,4 @@
-import { emailGenerationStatusEnum } from "@/server/db/email-document-schema";
+import { creativeRunStatusEnum } from "@/server/db/creative-work-schema";
 import { messageSendStatusEnum } from "@/server/db/email-document-schema";
 import { contentStatusEnum } from "@/server/db/content-schema";
 import { z } from "zod";
@@ -74,7 +74,6 @@ export const getEmailDraftOutputSchema = z.strictObject({
     createdBy: z.string().nullable(),
     ctaLabel: z.string().nullable(),
     ctaUrl: z.string().nullable(),
-    currentRevision: z.number(),
     digest: digestSchema.nullable(),
     handoffTargetRepo: z.string().nullable(),
     id: z.string(),
@@ -87,18 +86,11 @@ export const getEmailDraftOutputSchema = z.strictObject({
   }),
   latestJob: z
     .strictObject({
-      brief: z.string().nullable(),
-      completedAt: z.iso.datetime().nullable(),
-      createdAt: z.iso.datetime(),
-      createdBy: z.string().nullable(),
-      emailDocumentId: z.string(),
-      error: z.string().nullable(),
       id: z.string(),
-      model: z.string(),
-      platformPostId: z.string(),
-      startedAt: z.iso.datetime().nullable(),
-      status: z.enum(emailGenerationStatusEnum.enumValues),
-      updatedAt: z.iso.datetime(),
+      status: z.enum(creativeRunStatusEnum.enumValues),
+      error: z.string().nullable(),
+      createdAt: z.iso.datetime(),
+      completedAt: z.iso.datetime().nullable(),
     })
     .optional(),
   messageSends: z.array(
@@ -110,10 +102,10 @@ export const getEmailDraftOutputSchema = z.strictObject({
       createdAt: z.iso.datetime(),
       error: z.string().nullable(),
       id: z.string(),
+      contentHash: z.string(),
       provider: z.literal("customerio"),
       providerBroadcastId: z.string(),
       providerMessageId: z.string().nullable(),
-      revision: z.number(),
       sentAt: z.iso.datetime().nullable(),
       status: z.enum(messageSendStatusEnum.enumValues),
     }),
@@ -137,28 +129,6 @@ export const getEmailDraftOutputSchema = z.strictObject({
     status: z.enum(contentStatusEnum.enumValues),
   }),
   url: z.string(),
-  versions: z.array(
-    z.strictObject({
-      createdAt: z.iso.datetime(),
-      createdBy: z.string().nullable(),
-      emailDocumentId: z.string(),
-      id: z.string(),
-      note: z.string().nullable(),
-      revision: z.number(),
-      snapshot: z.strictObject({
-        bodyMarkdown: z.string(),
-        ctaLabel: z.string().nullable(),
-        ctaUrl: z.string().nullable(),
-        digest: digestSchema.nullable().optional(),
-        handoffTargetRepo: z.string().nullable(),
-        preheader: z.string().nullable(),
-        productUpdate: productUpdateSchema.nullable().optional(),
-        subject: z.string(),
-        templateKey: z.string(),
-      }),
-      source: z.enum(["manual", "generation", "restore"]),
-    }),
-  ),
 });
 
 export const createEmailSlotOutputSchema = z.strictObject({
@@ -210,7 +180,6 @@ export const setDigestImageOutputSchema = z.strictObject({
 
 export const updateEmailDraftOutputSchema = z.strictObject({
   ok: z.literal(true),
-  revision: z.number(),
   url: z.string(),
 });
 
@@ -218,7 +187,6 @@ export const createProductUpdateDraftOutputSchema = z.strictObject({
   contentPostId: z.string(),
   emailDocumentId: z.string(),
   platformPostId: z.string(),
-  revision: z.number(),
   url: z.string(),
 });
 
@@ -235,7 +203,7 @@ export const draftEmailFromTemplateOutputSchema = z.strictObject({
 
 export const generateEmailDraftOutputSchema = z.strictObject({
   jobId: z.string(),
-  status: z.enum(emailGenerationStatusEnum.enumValues),
+  status: z.enum(creativeRunStatusEnum.enumValues),
   url: z.string(),
 });
 

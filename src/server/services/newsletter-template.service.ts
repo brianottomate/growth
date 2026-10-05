@@ -1,3 +1,10 @@
+import {
+  beginDocumentRun,
+  claimDocumentRun,
+  failDocumentRun,
+  documentForPlatform,
+  saveCreativeDocument,
+} from "./creative-document.service";
 import { emailCopyGuidance } from "@/lib/brand-email-style";
 import "server-only";
 
@@ -161,8 +168,12 @@ function unsupportedClaims(output: z.infer<typeof outputSchema>) {
   });
 }
 
-export async function draftNewsletterFromTemplate(
-  input: DraftFromTemplateInput & { organizationId: string; userId: string },
+async function draftNewsletterFromTemplateUnlocked(
+  input: DraftFromTemplateInput & {
+    organizationId: string;
+    userId: string;
+    runId: string;
+  },
 ) {
   const template = newsletterTemplate(input.template);
   const brand = await db.query.brandTable.findFirst({
@@ -498,7 +509,7 @@ export async function draftNewsletterFromTemplate(
       templateKey: DIGEST_TEMPLATE_KEY,
       digest,
     },
-    expectedRevision: existing?.document.currentRevision,
+    runId: input.runId,
     note: `Drafted from the ${template.label} template`,
   });
 
@@ -583,4 +594,59 @@ export async function newsletterTemplateOptions(input: {
     seasons,
     collections,
   };
+}
+
+export async function draftNewsletterFromTemplate(
+  input: DraftFromTemplateInput & { organizationId: string; userId: string },
+) {
+  const slot = input.platformPostId
+    ? { platformPostId: input.platformPostId }
+    : await createEmailSlot({
+        ...input,
+        title: input.angle || newsletterTemplate(input.template).label,
+        format: "newsletter.blast",
+        purpose: input.brief,
+      });
+  const { document, spot } = await ensureEmailDocument({
+    ...input,
+    platformPostId: slot.platformPostId,
+  });
+  if (spot.brandId !== input.brandId)
+    throw new Error("The email belongs to another brand.");
+  const packet = await documentForPlatform(
+    slot.platformPostId,
+    input.organizationId,
+  );
+  if (!packet) throw new Error("Document not found.");
+  await saveCreativeDocument({
+    ...input,
+    documentId: packet.id,
+    document: {
+      ...packet.document,
+      brief: {
+        ...packet.document.brief,
+        direction: input.brief ?? input.angle ?? "",
+        purpose: input.offer ?? packet.document.brief.purpose,
+      },
+    },
+  });
+  const run = await beginDocumentRun({
+    ...input,
+    documentId: document.id,
+    operation: "template",
+    provider: "anthropic",
+    model: "claude-sonnet-5",
+    extra: { template: input, platformPostId: slot.platformPostId },
+  });
+  await claimDocumentRun(run.id);
+  try {
+    return await draftNewsletterFromTemplateUnlocked({
+      ...input,
+      platformPostId: slot.platformPostId,
+      runId: run.id,
+    });
+  } catch (error) {
+    await failDocumentRun(run.id, error);
+    throw error;
+  }
 }

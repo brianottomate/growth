@@ -71,6 +71,10 @@ const pitchOperations = new Set([
 ]);
 
 const common = new Set([
+  "initiativeRead",
+  "initiativeWrite",
+  "creativeRead",
+  "creativeWrite",
   "presentNextOptions",
   "workspaceOverview",
   "navigateWorkspace",

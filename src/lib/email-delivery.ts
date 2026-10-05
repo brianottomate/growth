@@ -21,7 +21,7 @@ export type MessageSendStatus = (typeof MESSAGE_SEND_STATUSES)[number];
 
 export type MessageSendSummary = {
   id: string;
-  revision: number;
+  contentHash: string;
   provider: "customerio";
   providerBroadcastId: string;
   providerMessageId: string | null;
@@ -44,7 +44,7 @@ export function messageSendSummary(
 ): MessageSendSummary {
   return {
     id: send.id,
-    revision: send.revision,
+    contentHash: send.contentHash,
     provider: send.provider,
     providerBroadcastId: send.providerBroadcastId,
     providerMessageId: send.providerMessageId,
@@ -62,7 +62,7 @@ export function messageSendSummary(
 export type MessageSendSnapshot = {
   schema: "wander-growth.message-send.v1";
   format: "newsletter.broadcast" | "newsletter.blast";
-  revision: number;
+  contentHash: string;
   email: {
     subject: string;
     preheader: string | null;
@@ -153,7 +153,7 @@ export function customerIoBroadcastData(
     messageSendId,
     growth: {
       format: snapshot.format,
-      revision: snapshot.revision,
+      content_hash: snapshot.contentHash,
       audienceKind: snapshot.audience.kind,
       email: snapshot.email,
     },

@@ -407,7 +407,7 @@ export const setDigestImage = growthAction({
 export const updateEmailDraft = growthAction({
   outputSchema: updateEmailDraftOutputSchema,
   description:
-    "Save an agreed conversational refinement to one email's canonical document and create a revision checkpoint. Pass only the fields that changed — but pass each changed field WHOLE: read the current value with getEmailDraft, rewrite the entire field with the change incorporated, and send the full replacement. Never attempt surgical partial edits or describe a diff; a field is replaced in its entirety. Personalization fields like {{first_name|there}} are allowed in subject and body; preserve their fallback text. Read currentRevision and pass it as expectedRevision when saving.",
+    "Save an agreed conversational refinement to one email's canonical document and save the current document. Pass only the fields that changed — but pass each changed field WHOLE: read the current value with getEmailDraft, rewrite the entire field with the change incorporated, and send the full replacement. Never attempt surgical partial edits or describe a diff; a field is replaced in its entirety. Personalization fields like {{first_name|there}} are allowed in subject and body; preserve their fallback text.",
   inputSchema: z.object({
     platformPostId: z.string(),
     // Without the override, partial() still applies templateKey's default and
@@ -416,9 +416,8 @@ export const updateEmailDraft = growthAction({
       .extend({ templateKey: z.string().trim().min(1).max(80) })
       .partial(),
     note: z.string().trim().max(300).optional(),
-    expectedRevision: z.number().int().nonnegative().optional(),
   }),
-  execute: async ({ platformPostId, changes, note, expectedRevision }, ctx) => {
+  execute: async ({ platformPostId, changes, note }, ctx) => {
     const workspace = await getEmailWorkspace({
       platformPostId,
       organizationId: ctx.orgId,
@@ -438,17 +437,15 @@ export const updateEmailDraft = growthAction({
       digest: workspace.document.digest,
       ...changes,
     });
-    const saved = await saveEmailDocument({
+    await saveEmailDocument({
       platformPostId,
       organizationId: ctx.orgId,
       userId: ctx.userId,
       draft: document,
-      expectedRevision: expectedRevision ?? workspace.document.currentRevision,
       note: note ?? "Saved from the Growth conversation",
     });
     return {
       ok: true as const,
-      revision: saved.currentRevision,
       url: `/app/newsletters/${platformPostId}`,
     };
   },

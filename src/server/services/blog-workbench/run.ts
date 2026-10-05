@@ -126,6 +126,9 @@ const MetadataOutput = z.object({
 });
 
 export type BlogRunOptions = {
+  /** Production passes explicit inputs and stores receipts in creative_run. */
+  persist?: boolean;
+  prompt?: string;
   fixtureDirectory?: string;
   response?: SeoEngineResponse;
   grounding?: GroundingContextRecord;
@@ -142,9 +145,10 @@ export async function executeBlogGoldenRun(
     fixtureDirectory,
     "seo-engine-response.json",
   );
-  const previousRun = options.fixtureDirectory
-    ? null
-    : await loadLatestBlogRun();
+  const previousRun =
+    options.persist === false || options.fixtureDirectory
+      ? null
+      : await loadLatestBlogRun();
   const previousComments = previousRun
     ? (
         previousRun.comments ??
@@ -183,7 +187,8 @@ export async function executeBlogGoldenRun(
       );
     }
 
-  const promptText = buildContentBriefPagePrompt(brief, grounding.context);
+  const promptText =
+    options.prompt ?? buildContentBriefPagePrompt(brief, grounding.context);
 
   const usage: UsageEntry[] = [];
   const transportAdjustments: string[] = [];
@@ -196,7 +201,7 @@ export async function executeBlogGoldenRun(
       output: Output.object({ schema: generatedStoryboardSchema }),
       maxOutputTokens: 8_000,
       system: [
-        "Plan the editorial structure for a grounded vacation-rental guide.",
+        "Plan the editorial structure for a grounded article for the audience and purpose in the brief.",
         "Keep one section for every supplied outline heading, in the same order.",
         "Give each section one job. Assign a visual only when it helps the reader make a decision.",
         "Use only registered visual IDs. Promotion must serve the section rather than interrupt it.",
@@ -234,7 +239,7 @@ export async function executeBlogGoldenRun(
     maxOutputTokens: 32_000,
     system: promptText,
     prompt: [
-      "Write the guide now as markdown, following the section outline",
+      "Write the article now as markdown, following the section outline",
       "exactly: one `## ` heading per outline heading, verbatim, in order.",
       "No title line before the first heading, no closing sign-off after",
       "the last section.",
@@ -415,6 +420,7 @@ export async function executeBlogGoldenRun(
     },
   };
 
+  if (options.persist === false) return record;
   const runDirectory = path.join(fixtureDirectory, "runs", runId);
   await mkdir(runDirectory, { recursive: true });
   await writeFile(

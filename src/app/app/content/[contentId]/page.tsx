@@ -1,3 +1,4 @@
+import { CreativeDocuments } from "./CreativeDocuments";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { and, eq, inArray, isNull, ne } from "drizzle-orm";
@@ -432,6 +433,13 @@ export default async function ContentDetailPage({
         contentPostId={content.id}
         contentTitle={content.title ?? "Untitled"}
         readiness={readiness}
+      />
+
+      <CreativeDocuments
+        contentPostId={content.id}
+        brandId={content.brandId}
+        title={content.title ?? "Untitled"}
+        direction={content.body ?? ""}
       />
 
       {/* aggregate analytics */}

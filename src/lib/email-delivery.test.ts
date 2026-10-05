@@ -8,7 +8,7 @@ import {
 const snapshot: MessageSendSnapshot = {
   schema: "wander-growth.message-send.v1",
   format: "newsletter.broadcast",
-  revision: 3,
+  contentHash: "test-content-hash",
   email: {
     subject: "This week in WanderOS",
     preheader: "Three customer-facing improvements",
@@ -40,7 +40,7 @@ describe("customerIoBroadcastData", () => {
       messageSendId: "msg_123",
       growth: {
         format: "newsletter.broadcast",
-        revision: 3,
+        content_hash: "test-content-hash",
         audienceKind: "wanderos_operators",
         email: snapshot.email,
       },

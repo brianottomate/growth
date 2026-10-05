@@ -1975,7 +1975,7 @@ export const createPlatformPost = growthAction({
 export const publishBlogDraft = growthAction({
   outputSchema: publishBlogDraftOutputSchema,
   description:
-    "Push a drafted blog platform post into the wander.com CMS (DatoCMS) as a DRAFT article: converts the markdown draft to structured text, uploads the hero image, and links the spot to the created item. Never publishes; a human reviews and publishes in the Dato editor. Requires drafted text and a hero image on the spot or its idea pool.",
+    "Push a drafted blog platform post into the wander.com CMS (DatoCMS) as a DRAFT article: converts the markdown draft to structured text, uploads the hero image, and links the spot to the created item. Never publishes; a human reviews and publishes in the Dato editor. Requires a selected article document; uses its saved body and hero image.",
   inputSchema: z.object({
     platformPostId: z.string(),
   }),
@@ -1992,6 +1992,8 @@ export const publishBlogDraft = growthAction({
     }
     const result = await publishBlogDraftToDato({
       platformPostId: input.platformPostId,
+      organizationId: ctx.orgId,
+      userId: ctx.userId,
     });
     return {
       ok: true as const,

@@ -8,7 +8,6 @@ import {
   isClaudeConfigured,
 } from "@/server/clients/claude.client";
 import { isDatoCmsConfigured } from "@/server/clients/datocms.client";
-import { linkDatoBlogArticle } from "@/server/services/dato-blog-link.service";
 import { BLOG_AGENT_PERSONA } from "./persona";
 import { buildBlogTools, type BlogToolTrailEntry } from "./tools";
 
@@ -70,7 +69,7 @@ export async function runBlogAgent(input: {
     input.task,
     input.itemId ? `The article this concerns: ${input.itemId}` : null,
     input.attachmentUrl
-      ? "The operator explicitly supplied a current chat image for this task. Use uploadAttachment if the requested edit needs it."
+      ? "An image was supplied. The parent assistant can add it to the media library and select it on the creative document."
       : null,
   ]
     .filter(Boolean)
@@ -79,7 +78,9 @@ export async function runBlogAgent(input: {
   try {
     const result = await generateText({
       model: anthropic(CLAUDE_MODELS.SONNET_5),
-      system: BLOG_AGENT_PERSONA,
+      system:
+        BLOG_AGENT_PERSONA +
+        "\nThis invocation is read-only. Describe the existing article and schema. All creation, editing and transfers now use creativeRead/creativeWrite and a saved article document. Do not claim to have made changes.",
       prompt,
       tools,
       // Room to discover, act, and verify without running dry mid-task —
@@ -88,18 +89,6 @@ export async function runBlogAgent(input: {
       // instead of grinding against the production CMS.
       stopWhen: stepCountIs(20),
     });
-
-    for (const itemId of touchedItemIds) {
-      const linked = await linkDatoBlogArticle({
-        itemId,
-        organizationId: input.organizationId,
-        linkedBy: "blog-agent-reconciliation",
-      });
-      trail.push({
-        tool: "reconcileGrowth",
-        summary: `${linked.created ? "created" : "updated"} spot ${linked.platformPostId} for ${itemId}`,
-      });
-    }
 
     return {
       ok: true,

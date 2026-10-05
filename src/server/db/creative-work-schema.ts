@@ -1,11 +1,19 @@
+import type { CreativeDocument } from "@/lib/creative-document";
+import { sql } from "drizzle-orm";
 import type { QueuedPayload } from "@/lib/chat-turns";
 import type { UIMessage } from "ai";
 import { relations } from "drizzle-orm";
-import { index, pgEnum, pgTable, uniqueIndex } from "drizzle-orm/pg-core";
+import {
+  check,
+  index,
+  pgEnum,
+  pgTable,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 
 import { organizationTable, userTable } from "./auth-schema";
 import { brandTable } from "./brand-schema";
-import { contentPostTable } from "./content-schema";
+import { contentPostTable, platformPostTable } from "./content-schema";
 import { mediaAssetTable } from "./media-schema";
 import { createId } from "./utils";
 
@@ -266,6 +274,12 @@ export const productionPacketTable = pgTable(
       .references(() => assistantThreadTable.id, { onDelete: "set null" }),
     sourceMessageId: t.text(),
     title: t.text().notNull(),
+    documentType: t
+      .text()
+      .$type<CreativeDocument["type"]>()
+      .notNull()
+      .default("image"),
+    document: t.jsonb().$type<CreativeDocument>().notNull(),
     purpose: t.text(),
     prompt: t.text().notNull(),
     negativePrompt: t.text(),
@@ -294,6 +308,10 @@ export const productionPacketTable = pgTable(
       .notNull(),
   }),
   (table) => [
+    check(
+      "production_packet_document_type_check",
+      sql`${table.documentType} IN ('article','email','image','video') AND ${table.document} @> jsonb_build_object('type',${table.documentType},'schemaVersion',1)`,
+    ),
     index("production_packet_brand_idx").on(table.brandId),
     index("production_packet_content_idx").on(table.contentPostId),
     index("production_packet_thread_idx").on(table.threadId),
@@ -345,10 +363,13 @@ export const creativeRunTable = pgTable(
       .text()
       .references(() => productionPacketTable.id, { onDelete: "set null" }),
     provider: t.text().notNull(),
-    kind: t.text({ enum: ["image", "video"] }).notNull(),
+    kind: t.text({ enum: ["image", "video", "article", "email"] }).notNull(),
     model: t.text().notNull(),
     prompt: t.text().notNull(),
     input: t.jsonb().$type<Record<string, unknown>>().notNull(),
+    operation: t.text().notNull().default("generate"),
+    expiresAt: t.timestamp({ withTimezone: true }),
+    result: t.jsonb().$type<CreativeDocument>(),
     providerRequestId: t.text(),
     webhookTokenHash: t.text(),
     status: creativeRunStatusEnum().default("queued").notNull(),
@@ -373,6 +394,11 @@ export const creativeRunTable = pgTable(
     completedAt: t.timestamp(),
   }),
   (table) => [
+    uniqueIndex("creative_run_active_packet_idx")
+      .on(table.packetId)
+      .where(
+        sql`${table.packetId} IS NOT NULL AND ${table.status} IN ('queued', 'processing')`,
+      ),
     index("creative_run_brand_idx").on(table.brandId),
     index("creative_run_packet_idx").on(table.packetId),
     index("creative_run_thread_idx").on(table.threadId),
@@ -466,3 +492,15 @@ export type AssistantToolReceipt =
   typeof assistantToolReceiptTable.$inferSelect;
 export type ProductionPacket = typeof productionPacketTable.$inferSelect;
 export type CreativeRun = typeof creativeRunTable.$inferSelect;
+
+/** One primary creative document per channel version; ownership stays with content. */
+export const platformDocumentTable = pgTable("platform_document", (t) => ({
+  platformPostId: t
+    .text()
+    .primaryKey()
+    .references(() => platformPostTable.id, { onDelete: "cascade" }),
+  documentId: t
+    .text()
+    .notNull()
+    .references(() => productionPacketTable.id, { onDelete: "cascade" }),
+}));

@@ -5,6 +5,16 @@
  * handling all key off this one public ID/action map.
  */
 export const GROWTH_CAPABILITY_ACTIONS = {
+  creativeRead: ["list", "get"],
+  creativeWrite: [
+    "create",
+    "save",
+    "select",
+    "produce",
+    "cancel",
+    "pullDato",
+    "pushDato",
+  ],
   initiativeRead: ["list", "get", "options"],
   initiativeWrite: ["save", "link", "unlink"],
   operationRead: ["status"],
@@ -291,6 +301,8 @@ export const GROWTH_CAPABILITY_LABELS = {
   brandRead: "Reading brands",
   brandWrite: "Updating brands",
   productAtlasRead: "Reading Product Atlas",
+  creativeRead: "Reading creative documents",
+  creativeWrite: "Working on creative documents",
   initiativeRead: "Reading initiatives",
   initiativeWrite: "Updating initiatives",
   productAtlasWrite: "Updating Product Atlas",

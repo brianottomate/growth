@@ -1,7 +1,19 @@
+import {
+  creativeDocumentSchema,
+  emptyCreativeDocument,
+} from "@/lib/creative-document";
+import {
+  beginDocumentRun,
+  claimDocumentRun,
+  latestDocumentRun,
+  lockDocument,
+  assertUnlocked,
+  failDocumentRun,
+} from "./creative-document.service";
 import "server-only";
 
 import { createHash, randomBytes } from "node:crypto";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, inArray, sql, eq, isNull } from "drizzle-orm";
 
 import { env } from "@/env";
 import {
@@ -197,6 +209,27 @@ export async function createProductionPacket(input: {
       contentPostId: input.contentPostId,
       threadId: input.threadId,
       sourceMessageId: input.sourceMessageId,
+      documentType: "image",
+      document: creativeDocumentSchema.parse({
+        ...emptyCreativeDocument("image"),
+        brief: {
+          purpose: input.purpose ?? "",
+          direction: input.prompt,
+          constraints: [input.instructions, input.negativePrompt].filter(
+            Boolean,
+          ),
+          assets: (input.referenceMediaAssetIds ?? []).map((assetId) => ({
+            assetId,
+            role: "reference",
+          })),
+        },
+        content: {
+          aspectRatio: input.aspectRatio ?? "1:1",
+          composition: input.prompt,
+          avoid: input.negativePrompt ?? "",
+          outputFormat: input.outputFormat === "jpeg" ? "jpeg" : "png",
+        },
+      }),
       title: input.title,
       purpose: input.purpose,
       prompt: input.prompt,
@@ -235,149 +268,206 @@ export async function submitPacketForImageGeneration(input: {
   });
   if (!packet) throw new Error("Production packet not found.");
 
-  const token = randomBytes(32).toString("hex");
-  const runId = createId("crun");
-  const imageSize = falImageSize(packet.aspectRatio);
-  const aspectRatio = falAspectRatio(packet.aspectRatio);
-  const format = outputFormat(packet.outputFormat);
-
-  // Reference assets on the packet steer generation: their public R2 URLs go
-  // straight to the image-conditioned model (mixing real brand imagery into
-  // the output). Without references this stays cheap text-to-image.
-  const referenceAssetIds = (packet.references ?? []).map(
-    (reference) => reference.mediaAssetId,
-  );
-  const referenceAssets = referenceAssetIds.length
-    ? await db.query.mediaAssetTable.findMany({
-        where: and(
-          inArray(mediaAssetTable.id, referenceAssetIds),
-          eq(mediaAssetTable.brandId, packet.brandId),
-        ),
-        columns: { id: true, url: true, kind: true },
-      })
-    : [];
-  const referenceImageUrls = referenceAssets
-    .filter((asset) => asset.kind === "image" && asset.url)
-    .map((asset) => asset.url!);
-  const generationPrompt = buildCreativeImagePrompt({
-    prompt: packet.prompt,
-    purpose: packet.purpose,
-    instructions: packet.instructions,
-    negativePrompt: packet.negativePrompt,
-    hasReferenceImages: referenceImageUrls.length > 0,
+  const started = await beginDocumentRun({
+    ...input,
+    documentId: packet.id,
+    operation: "generate",
+    provider: modelProfile === "google" ? "google" : "fal",
+    model: modelProfile === "google" ? GEMINI_IMAGE_MODEL : "pending",
   });
+  const runId = started.id;
+  if (!(await claimDocumentRun(runId)))
+    throw new Error("Production was cancelled before dispatch.");
+  try {
+    const token = randomBytes(32).toString("hex");
+    const document = creativeDocumentSchema.parse(started.input.document);
+    if (document.type !== "image")
+      throw new Error("Select an image document for image generation.");
+    packet.prompt =
+      document.brief.direction +
+      "\n" +
+      document.content.composition +
+      "\n" +
+      document.content.overlayCopy;
+    packet.purpose = document.brief.purpose;
+    packet.instructions = document.brief.constraints.join("\n");
+    packet.negativePrompt = document.content.avoid;
+    packet.aspectRatio = document.content.aspectRatio;
+    packet.outputFormat = document.content.outputFormat;
+    packet.references = document.brief.assets.map((a) => ({
+      mediaAssetId: a.assetId,
+      role: a.role === "output" ? "reference" : a.role,
+      note: a.note,
+    }));
+    const imageSize = falImageSize(packet.aspectRatio);
+    const aspectRatio = falAspectRatio(packet.aspectRatio);
+    const format = outputFormat(packet.outputFormat);
 
-  if (modelProfile === "google") {
-    const ownedReferenceImageUrls = referenceImageUrls
-      .filter((url) => R2.isPublicUrl(url))
-      .slice(0, 4);
-    const providerInput = {
-      prompt: generationPrompt,
-      aspectRatio,
-      imageSize: "1K",
-      referenceImageUrls: ownedReferenceImageUrls,
-    };
-
-    await db.insert(creativeRunTable).values({
-      id: runId,
-      organizationId: input.organizationId,
-      brandId: packet.brandId,
-      contentPostId: packet.contentPostId,
-      threadId: packet.threadId,
-      packetId: packet.id,
-      provider: "google",
-      kind: "image",
-      model: GEMINI_IMAGE_MODEL,
-      prompt: generationPrompt,
-      input: providerInput,
-      status: "processing",
-      createdBy: input.userId,
+    // Reference assets on the packet steer generation: their public R2 URLs go
+    // straight to the image-conditioned model (mixing real brand imagery into
+    // the output). Without references this stays cheap text-to-image.
+    const referenceAssetIds = (packet.references ?? []).map(
+      (reference) => reference.mediaAssetId,
+    );
+    const referenceAssets = referenceAssetIds.length
+      ? await db.query.mediaAssetTable.findMany({
+          where: and(
+            inArray(mediaAssetTable.id, referenceAssetIds),
+            eq(mediaAssetTable.brandId, packet.brandId),
+          ),
+          columns: { id: true, url: true, kind: true },
+        })
+      : [];
+    const referenceImageUrls = referenceAssets
+      .filter((asset) => asset.kind === "image" && asset.url)
+      .map((asset) => asset.url!);
+    const generationPrompt = buildCreativeImagePrompt({
+      prompt: packet.prompt,
+      purpose: packet.purpose,
+      instructions: packet.instructions,
+      negativePrompt: packet.negativePrompt,
+      hasReferenceImages: referenceImageUrls.length > 0,
     });
 
-    try {
-      const generated = await generateGeminiImage({
+    if (modelProfile === "google") {
+      const ownedReferenceImageUrls = referenceImageUrls
+        .filter((url) => R2.isPublicUrl(url))
+        .slice(0, 4);
+      const providerInput = {
         prompt: generationPrompt,
         aspectRatio,
+        imageSize: "1K",
         referenceImageUrls: ownedReferenceImageUrls,
-      });
-      const extension = generated.contentType === "image/jpeg" ? "jpg" : "png";
-      const key = R2.buildKey(packet.brandId, runId, `candidate.${extension}`);
-      const url = await R2.putBuffer(
-        key,
-        generated.bytes,
-        generated.contentType,
-      );
-      const [run] = await db
+      };
+
+      await db
         .update(creativeRunTable)
         .set({
-          status: "ready",
-          candidates: [{ url, contentType: generated.contentType }],
-          providerOutput: generated.providerOutput,
-          completedAt: new Date(),
+          input: { ...started.input, providerInput },
+          prompt: generationPrompt,
         })
-        .where(eq(creativeRunTable.id, runId))
+        .where(eq(creativeRunTable.id, runId));
+
+      try {
+        const generated = await generateGeminiImage({
+          prompt: generationPrompt,
+          aspectRatio,
+          referenceImageUrls: ownedReferenceImageUrls,
+        });
+        const extension =
+          generated.contentType === "image/jpeg" ? "jpg" : "png";
+        const key = R2.buildKey(
+          packet.brandId,
+          runId,
+          `candidate.${extension}`,
+        );
+        const url = await R2.putBuffer(
+          key,
+          generated.bytes,
+          generated.contentType,
+        );
+        const [run] = await db
+          .update(creativeRunTable)
+          .set({
+            status: "ready",
+            candidates: [{ url, contentType: generated.contentType }],
+            providerOutput: generated.providerOutput,
+            completedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(creativeRunTable.id, runId),
+              inArray(creativeRunTable.status, ["queued", "processing"]),
+              sql`(${creativeRunTable.expiresAt} IS NULL OR ${creativeRunTable.expiresAt} > now())`,
+            ),
+          )
+          .returning();
+        if (!run)
+          throw new Error("Could not persist the Google Gemini result.");
+        return run;
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Google Gemini generation failed";
+        await db
+          .update(creativeRunTable)
+          .set({ status: "error", error: message, completedAt: new Date() })
+          .where(
+            and(
+              eq(creativeRunTable.id, runId),
+              inArray(creativeRunTable.status, ["queued", "processing"]),
+              sql`(${creativeRunTable.expiresAt} IS NULL OR ${creativeRunTable.expiresAt} > now())`,
+            ),
+          );
+        throw error;
+      }
+    }
+
+    const { model, providerInput } = buildFalImageRequest({
+      profile: "flux",
+      prompt: generationPrompt,
+      imageSize,
+      aspectRatio,
+      outputFormat: format,
+      referenceImageUrls,
+    });
+
+    await db
+      .update(creativeRunTable)
+      .set({
+        model,
+        input: { ...started.input, providerInput },
+        prompt: generationPrompt,
+      })
+      .where(eq(creativeRunTable.id, runId));
+    await db
+      .update(creativeRunTable)
+      .set({ webhookTokenHash: sha256(token) })
+      .where(
+        and(
+          eq(creativeRunTable.id, runId),
+          inArray(creativeRunTable.status, ["queued", "processing"]),
+          sql`(${creativeRunTable.expiresAt} IS NULL OR ${creativeRunTable.expiresAt} > now())`,
+        ),
+      );
+
+    try {
+      const submitted = await submitFalImage({
+        model,
+        providerInput,
+        webhookUrl: falWebhookUrl(runId, token),
+      });
+      const [run] = await db
+        .update(creativeRunTable)
+        .set({ providerRequestId: submitted.request_id })
+        .where(
+          and(
+            eq(creativeRunTable.id, runId),
+            inArray(creativeRunTable.status, ["queued", "processing"]),
+            sql`(${creativeRunTable.expiresAt} IS NULL OR ${creativeRunTable.expiresAt} > now())`,
+          ),
+        )
         .returning();
-      if (!run) throw new Error("Could not persist the Google Gemini result.");
+      if (!run) throw new Error("Could not persist the Fal request.");
       return run;
     } catch (error) {
       const message =
-        error instanceof Error
-          ? error.message
-          : "Google Gemini generation failed";
+        error instanceof Error ? error.message : "Fal submission failed";
       await db
         .update(creativeRunTable)
         .set({ status: "error", error: message, completedAt: new Date() })
-        .where(eq(creativeRunTable.id, runId));
+        .where(
+          and(
+            eq(creativeRunTable.id, runId),
+            inArray(creativeRunTable.status, ["queued", "processing"]),
+            sql`(${creativeRunTable.expiresAt} IS NULL OR ${creativeRunTable.expiresAt} > now())`,
+          ),
+        );
       throw error;
     }
-  }
-
-  const { model, providerInput } = buildFalImageRequest({
-    profile: "flux",
-    prompt: generationPrompt,
-    imageSize,
-    aspectRatio,
-    outputFormat: format,
-    referenceImageUrls,
-  });
-
-  await db.insert(creativeRunTable).values({
-    id: runId,
-    organizationId: input.organizationId,
-    brandId: packet.brandId,
-    contentPostId: packet.contentPostId,
-    threadId: packet.threadId,
-    packetId: packet.id,
-    provider: "fal",
-    kind: "image",
-    model,
-    prompt: generationPrompt,
-    input: providerInput,
-    webhookTokenHash: sha256(token),
-    status: "queued",
-    createdBy: input.userId,
-  });
-
-  try {
-    const submitted = await submitFalImage({
-      model,
-      providerInput,
-      webhookUrl: falWebhookUrl(runId, token),
-    });
-    const [run] = await db
-      .update(creativeRunTable)
-      .set({ providerRequestId: submitted.request_id })
-      .where(eq(creativeRunTable.id, runId))
-      .returning();
-    if (!run) throw new Error("Could not persist the Fal request.");
-    return run;
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Fal submission failed";
-    await db
-      .update(creativeRunTable)
-      .set({ status: "error", error: message, completedAt: new Date() })
-      .where(eq(creativeRunTable.id, runId));
+    await failDocumentRun(runId, error);
     throw error;
   }
 }
@@ -386,13 +476,19 @@ export async function refreshCreativeRun(input: {
   runId: string;
   organizationId: string;
 }) {
-  const run = await db.query.creativeRunTable.findFirst({
+  let run = await db.query.creativeRunTable.findFirst({
     where: and(
       eq(creativeRunTable.id, input.runId),
       eq(creativeRunTable.organizationId, input.organizationId),
     ),
   });
   if (!run) throw new Error("Creative run not found.");
+  if (run.packetId) {
+    await latestDocumentRun(run.packetId, input.organizationId);
+    run = (await db.query.creativeRunTable.findFirst({
+      where: eq(creativeRunTable.id, run.id),
+    }))!;
+  }
   if (run.provider !== "fal" || !run.providerRequestId) return run;
   if (["ready", "error", "cancelled"].includes(run.status)) return run;
 
@@ -403,7 +499,13 @@ export async function refreshCreativeRun(input: {
       .set({
         status: status.status === "IN_PROGRESS" ? "processing" : "queued",
       })
-      .where(eq(creativeRunTable.id, run.id))
+      .where(
+        and(
+          eq(creativeRunTable.id, run.id),
+          inArray(creativeRunTable.status, ["queued", "processing"]),
+          sql`(${creativeRunTable.expiresAt} IS NULL OR ${creativeRunTable.expiresAt} > now())`,
+        ),
+      )
       .returning();
     return updated ?? run;
   }
@@ -420,7 +522,13 @@ export async function refreshCreativeRun(input: {
       error: candidates.length ? null : "Fal returned no image candidates.",
       completedAt: new Date(),
     })
-    .where(eq(creativeRunTable.id, run.id))
+    .where(
+      and(
+        eq(creativeRunTable.id, run.id),
+        inArray(creativeRunTable.status, ["queued", "processing"]),
+        sql`(${creativeRunTable.expiresAt} IS NULL OR ${creativeRunTable.expiresAt} > now())`,
+      ),
+    )
     .returning();
   return updated ?? run;
 }
@@ -462,7 +570,13 @@ export async function applyFalWebhook(input: {
             : "Fal returned no image candidates.",
       completedAt: new Date(),
     })
-    .where(eq(creativeRunTable.id, run.id))
+    .where(
+      and(
+        eq(creativeRunTable.id, run.id),
+        inArray(creativeRunTable.status, ["queued", "processing"]),
+        sql`(${creativeRunTable.expiresAt} IS NULL OR ${creativeRunTable.expiresAt} > now())`,
+      ),
+    )
     .returning();
   return updated ?? run;
 }
@@ -505,6 +619,32 @@ export async function acceptCreativeCandidate(input: {
   const r2Url = await R2.putFromUrl(r2Key, candidate.url);
 
   await withTransaction(async (tx) => {
+    if (run.packetId) {
+      const packet = await lockDocument(tx, run.packetId, input.organizationId);
+      await assertUnlocked(tx, packet.id);
+      const current = creativeDocumentSchema.parse(packet.document);
+      if (current.type !== "image")
+        throw new Error("Expected an image document.");
+      await tx
+        .update(productionPacketTable)
+        .set({
+          document: {
+            ...current,
+            content: { ...current.content, selectedAssetId: mediaId },
+          },
+          updatedAt: new Date(),
+        })
+        .where(eq(productionPacketTable.id, packet.id));
+    }
+    const [fresh] = await tx
+      .select()
+      .from(creativeRunTable)
+      .where(eq(creativeRunTable.id, run.id))
+      .for("update");
+    if (fresh?.acceptedMediaAssetId)
+      throw new Error(
+        "This candidate was already accepted. Refresh to see the saved image.",
+      );
     await tx.insert(mediaAssetTable).values({
       id: mediaId,
       brandId: run.brandId,
@@ -535,10 +675,11 @@ export async function acceptCreativeCandidate(input: {
     });
 
     if (run.contentPostId) {
-      const content = await tx.query.contentPostTable.findFirst({
-        where: eq(contentPostTable.id, run.contentPostId),
-        columns: { media: true },
-      });
+      const [content] = await tx
+        .select({ media: contentPostTable.media })
+        .from(contentPostTable)
+        .where(eq(contentPostTable.id, run.contentPostId))
+        .for("update");
       const item: MediaItem = {
         url: r2Url,
         type: "image",

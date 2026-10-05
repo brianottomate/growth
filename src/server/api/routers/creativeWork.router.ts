@@ -1,3 +1,15 @@
+import {
+  listCreativeDocuments,
+  readCreativeDocument,
+  createCreativeDocumentAction,
+  saveCreativeDocumentAction,
+  selectCreativeDocumentAction,
+  produceCreativeDocument,
+  cancelCreativeDocumentRun,
+  pullCreativeDato,
+  pushCreativeDato,
+} from "@/server/ai/capabilities/creative-documents";
+import { actionProcedure } from "@/server/api/orpc";
 import { ORPCError } from "@orpc/server";
 import { and, desc, eq, isNull, or } from "drizzle-orm";
 import { z } from "zod";
@@ -54,6 +66,15 @@ async function accessibleThread(
 }
 
 export const creativeWorkRouter = {
+  documents: actionProcedure(listCreativeDocuments),
+  document: actionProcedure(readCreativeDocument),
+  createDocument: actionProcedure(createCreativeDocumentAction),
+  saveDocument: actionProcedure(saveCreativeDocumentAction),
+  selectDocument: actionProcedure(selectCreativeDocumentAction),
+  produceDocument: actionProcedure(produceCreativeDocument),
+  cancelDocumentRun: actionProcedure(cancelCreativeDocumentRun),
+  pullDato: actionProcedure(pullCreativeDato),
+  pushDato: actionProcedure(pushCreativeDato),
   pageContext: workspaceProcedure
     .input(z.object({ path: z.string() }))
     .handler(({ input, context }) =>

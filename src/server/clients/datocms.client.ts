@@ -138,12 +138,14 @@ export async function createUploadFromUrl(
 export async function getItem(itemId: string): Promise<{
   id: string;
   attributes: Record<string, unknown>;
+  relationships?: { item_type?: { data?: { id: string } } };
   meta: { status: string };
 }> {
   const { data } = await request<
     JsonApi<{
       id: string;
       attributes: Record<string, unknown>;
+      relationships?: { item_type?: { data?: { id: string } } };
       meta: { status: string };
     }>
   >(`/items/${itemId}?version=current&nested=true`);

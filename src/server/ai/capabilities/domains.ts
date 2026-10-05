@@ -1,4 +1,15 @@
 import {
+  listCreativeDocuments,
+  readCreativeDocument,
+  createCreativeDocumentAction,
+  saveCreativeDocumentAction,
+  selectCreativeDocumentAction,
+  produceCreativeDocument,
+  cancelCreativeDocumentRun,
+  pullCreativeDato,
+  pushCreativeDato,
+} from "./creative-documents";
+import {
   getInitiativeAction,
   initiativeOptionsAction,
   linkInitiativeAction,
@@ -262,6 +273,24 @@ import {
 import { readWebPage, webSearch } from "./research";
 import { growthDomainTool } from "./types";
 
+export const creativeRead = growthDomainTool({
+  description:
+    "Read typed creative briefs and current documents for articles, emails, images and videos.",
+  actions: { list: listCreativeDocuments, get: readCreativeDocument },
+});
+export const creativeWrite = growthDomainTool({
+  description:
+    "Prepare, edit and produce typed creative documents; explicitly transfer article drafts to or from Dato.",
+  actions: {
+    create: createCreativeDocumentAction,
+    save: saveCreativeDocumentAction,
+    select: selectCreativeDocumentAction,
+    produce: produceCreativeDocument,
+    cancel: cancelCreativeDocumentRun,
+    pullDato: pullCreativeDato,
+    pushDato: pushCreativeDato,
+  },
+});
 export const initiativeRead = growthDomainTool({
   description:
     "Read workspace initiatives and their organic and paid membership.",
@@ -765,6 +794,8 @@ export const listeningWrite = growthDomainTool({
 });
 
 export const DOMAIN_CAPABILITY_TOOLS = {
+  creativeRead,
+  creativeWrite,
   initiativeRead,
   initiativeWrite,
   driveRead,

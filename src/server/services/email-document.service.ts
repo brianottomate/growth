@@ -3,7 +3,7 @@ import "server-only";
 
 import { anthropic } from "@ai-sdk/anthropic";
 import { generateText, Output } from "ai";
-import { and, count, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, count, desc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -21,15 +21,28 @@ import {
   brandTable,
   channelTable,
   contentPostTable,
-  emailDocumentTable,
-  emailDocumentVersionTable,
-  emailGenerationJobTable,
+  productionPacketTable,
+  platformDocumentTable,
   homeTable,
   messageSendTable,
   platformPostTable,
   seriesTable,
   type EmailDocumentSnapshot,
 } from "@/server/db/schema";
+import {
+  emptyCreativeDocument,
+  creativeDocumentSchema,
+  type CreativeDocument,
+} from "@/lib/creative-document";
+import {
+  beginDocumentRun,
+  claimDocumentRun,
+  documentForPlatform,
+  failDocumentRun,
+  finishDocumentRun,
+  latestDocumentRun,
+  saveCreativeDocument,
+} from "./creative-document.service";
 import { HOMES_MARKER } from "@/lib/listings-digest";
 import {
   leftoverTemplateSyntax,
@@ -105,85 +118,86 @@ export async function ensureEmailDocument(input: {
     input.platformPostId,
     input.organizationId,
   );
-  await db
-    .insert(emailDocumentTable)
-    .values({
-      platformPostId: spot.id,
-      subject: spot.text ?? spot.contentPost?.title ?? "",
-      handoffTargetRepo: spot.brand?.slug ?? null,
-      createdBy: input.userId,
-    })
-    .onConflictDoNothing({ target: emailDocumentTable.platformPostId });
-  const document = await db.query.emailDocumentTable.findFirst({
-    where: eq(emailDocumentTable.platformPostId, spot.id),
-  });
-  if (!document) throw new Error("Could not create the email document.");
-  return { document, spot };
+  let selected = await documentForPlatform(spot.id, input.organizationId);
+  if (!selected) {
+    await withTransaction(async (tx) => {
+      const [currentSpot] = await tx
+        .select()
+        .from(platformPostTable)
+        .where(eq(platformPostTable.id, spot.id))
+        .for("update");
+      if (!currentSpot) throw new Error("Email slot no longer exists.");
+      const existing = await tx.query.platformDocumentTable.findFirst({
+        where: eq(platformDocumentTable.platformPostId, spot.id),
+      });
+      if (existing) return;
+      let contentPostId = currentSpot.contentPostId;
+      const title =
+        spot.contentPost?.title ?? currentSpot.text ?? "Email draft";
+      if (!contentPostId) {
+        const [content] = await tx
+          .insert(contentPostTable)
+          .values({
+            brandId: spot.brandId,
+            title,
+            status: "draft",
+            createdById: input.userId,
+            origin: "human",
+          })
+          .returning();
+        contentPostId = content!.id;
+        await tx
+          .update(platformPostTable)
+          .set({ contentPostId })
+          .where(eq(platformPostTable.id, spot.id));
+      }
+      const document = emptyCreativeDocument("email", title);
+      document.brief.direction = spot.contentPost?.captionDirection ?? "";
+      const [packet] = await tx
+        .insert(productionPacketTable)
+        .values({
+          organizationId: input.organizationId,
+          brandId: spot.brandId,
+          contentPostId,
+          title,
+          documentType: "email",
+          document,
+          prompt: document.brief.direction,
+          createdBy: input.userId,
+          status: "draft",
+        })
+        .returning();
+      await tx
+        .insert(platformDocumentTable)
+        .values({ platformPostId: spot.id, documentId: packet!.id });
+    });
+    selected = await documentForPlatform(spot.id, input.organizationId);
+  }
+  if (selected?.document.type !== "email")
+    throw new Error("Expected an email document.");
+  return { document: emailView(selected, spot.id), spot };
 }
 
-async function persistRevision(input: {
-  emailDocumentId: string;
-  platformPostId: string;
-  contentPostId?: string | null;
-  draft: EmailDocumentDraft;
-  source: "generation" | "manual" | "restore";
-  note?: string;
-  userId: string | null;
-  expectedRevision?: number;
-}) {
-  const snapshot = snapshotOf(input.draft);
-  return withTransaction(async (tx) => {
-    const current = await tx.query.emailDocumentTable.findFirst({
-      where: eq(emailDocumentTable.id, input.emailDocumentId),
-    });
-    if (!current) throw new Error("Email document not found.");
-    if (
-      input.expectedRevision !== undefined &&
-      input.expectedRevision !== current.currentRevision
-    ) {
-      throw new Error(
-        "The email has a newer revision. Load it before saving your changes.",
-      );
-    }
-    const revision = current.currentRevision + 1;
-    const [document] = await tx
-      .update(emailDocumentTable)
-      .set({ ...snapshot, currentRevision: revision, updatedAt: new Date() })
-      .where(
-        and(
-          eq(emailDocumentTable.id, current.id),
-          eq(emailDocumentTable.currentRevision, current.currentRevision),
-        ),
-      )
-      .returning();
-    if (!document)
-      throw new Error(
-        "The email changed during this save. Load its newest revision and retry.",
-      );
-    await tx.insert(emailDocumentVersionTable).values({
-      emailDocumentId: current.id,
-      revision,
-      snapshot,
-      source: input.source,
-      note: input.note,
-      createdBy: input.userId,
-    });
-    await tx
-      .update(platformPostTable)
-      .set(
-        current.currentRevision === 0
-          ? { text: snapshot.subject || null, status: "draft" }
-          : { text: snapshot.subject || null },
-      )
-      .where(eq(platformPostTable.id, input.platformPostId));
-    if (input.contentPostId && current.currentRevision === 0) {
-      await tx
-        .update(contentPostTable)
-        .set({ status: "draft" })
-        .where(eq(contentPostTable.id, input.contentPostId));
-    }
-    return document;
-  });
+function emailView(
+  row: {
+    id: string;
+    document: CreativeDocument | null;
+    createdAt: Date;
+    updatedAt: Date;
+    createdBy: string | null;
+  },
+  platformPostId: string,
+) {
+  const document = creativeDocumentSchema.parse(row.document);
+  if (document.type !== "email") throw new Error("Expected email document.");
+  return {
+    ...snapshotOf(document.content),
+    id: row.id,
+    platformPostId,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    createdBy: row.createdBy,
+  };
 }
 
 export async function getEmailWorkspace(input: {
@@ -196,27 +210,25 @@ export async function getEmailWorkspace(input: {
     input.platformPostId,
     input.organizationId,
   );
-  const document = await db.query.emailDocumentTable.findFirst({
-    where: eq(emailDocumentTable.platformPostId, spot.id),
-  });
-  if (!document) throw new Error("Email document has not been initialized.");
-  const [versions, latestJob, rawMessageSends, [homes]] = await Promise.all([
-    db.query.emailDocumentVersionTable.findMany({
-      where: eq(emailDocumentVersionTable.emailDocumentId, document.id),
-      orderBy: [desc(emailDocumentVersionTable.revision)],
-      limit: 30,
-    }),
-    db.query.emailGenerationJobTable.findFirst({
-      where: eq(emailGenerationJobTable.emailDocumentId, document.id),
-      orderBy: [desc(emailGenerationJobTable.createdAt)],
-    }),
+  const { document } = await ensureEmailDocument(input);
+  const run = await latestDocumentRun(document.id, input.organizationId);
+  const latestJob = run
+    ? {
+        id: run.id,
+        status: run.status,
+        error: run.error,
+        createdAt: run.createdAt,
+        completedAt: run.completedAt,
+      }
+    : undefined;
+  const [rawMessageSends, [homes]] = await Promise.all([
     db.query.messageSendTable.findMany({
-      where: eq(messageSendTable.emailDocumentId, document.id),
+      where: eq(messageSendTable.documentId, document.id),
       orderBy: [desc(messageSendTable.createdAt)],
       limit: 20,
       columns: {
         id: true,
-        revision: true,
+        contentHash: true,
         provider: true,
         providerBroadcastId: true,
         providerMessageId: true,
@@ -244,7 +256,6 @@ export async function getEmailWorkspace(input: {
   const homeCount = homes?.count ?? 0;
   return {
     document,
-    versions,
     latestJob,
     messageSends: rawMessageSends.map(messageSendSummary),
     canDeliver: input.canDeliver ?? false,
@@ -288,45 +299,36 @@ export async function saveEmailDocument(input: {
   userId: string;
   draft: EmailDocumentDraft;
   note?: string;
-  expectedRevision?: number;
-}) {
-  const parsed = emailDocumentDraftSchema.parse(input.draft);
-  const { document, spot } = await ensureEmailDocument(input);
-  return persistRevision({
-    emailDocumentId: document.id,
-    platformPostId: spot.id,
-    contentPostId: spot.contentPostId,
-    draft: parsed,
-    source: "manual",
-    note: input.note ?? "Manual save",
-    expectedRevision: input.expectedRevision,
-    userId: input.userId,
-  });
-}
-
-export async function restoreEmailDocumentVersion(input: {
-  platformPostId: string;
-  versionId: string;
-  organizationId: string;
-  userId: string;
+  runId?: string;
 }) {
   const { document, spot } = await ensureEmailDocument(input);
-  const version = await db.query.emailDocumentVersionTable.findFirst({
-    where: and(
-      eq(emailDocumentVersionTable.id, input.versionId),
-      eq(emailDocumentVersionTable.emailDocumentId, document.id),
-    ),
-  });
-  if (!version) throw new Error("Email revision not found.");
-  return persistRevision({
-    emailDocumentId: document.id,
-    platformPostId: spot.id,
-    contentPostId: spot.contentPostId,
-    draft: version.snapshot,
-    source: "restore",
-    note: `Restored revision ${version.revision}`,
-    userId: input.userId,
-  });
+  const selected = await documentForPlatform(spot.id, input.organizationId);
+  if (selected?.document.type !== "email")
+    throw new Error("Email document not found.");
+  const next: CreativeDocument = {
+    ...selected.document,
+    content: emailDocumentDraftSchema.parse(input.draft),
+  };
+  if (input.runId) {
+    const applied = await finishDocumentRun(input.runId, next);
+    if (!applied)
+      throw new Error(
+        "Generation was cancelled or timed out. The saved email was preserved.",
+      );
+  } else
+    await saveCreativeDocument({
+      ...input,
+      documentId: document.id,
+      document: next,
+    });
+  await db
+    .update(platformPostTable)
+    .set({
+      text: next.content.subject,
+      ...(spot.status === "slot" ? { status: "draft" as const } : {}),
+    })
+    .where(eq(platformPostTable.id, spot.id));
+  return (await ensureEmailDocument(input)).document;
 }
 
 export async function createEmailSlot(input: {
@@ -423,12 +425,29 @@ export async function createEmailSlot(input: {
       })
       .returning({ id: platformPostTable.id });
     if (!spot) throw new Error("Could not create the newsletter spot.");
-    await tx.insert(emailDocumentTable).values({
-      platformPostId: spot.id,
-      subject: input.title,
-      handoffTargetRepo: brand.slug,
-      createdBy: input.userId,
-    });
+    const document = emptyCreativeDocument("email", input.title);
+    if (document.type !== "email") throw new Error("Invalid email type.");
+    document.content.handoffTargetRepo = brand.slug;
+    document.brief.purpose = input.purpose ?? "";
+    document.brief.direction = input.hook ?? "";
+    document.brief.cta = input.ctaText ?? "";
+    const [packet] = await tx
+      .insert(productionPacketTable)
+      .values({
+        organizationId: input.organizationId,
+        brandId: brand.id,
+        contentPostId: content.id,
+        title: input.title,
+        prompt: document.brief.direction,
+        documentType: "email",
+        document,
+        createdBy: input.userId,
+        status: "draft",
+      })
+      .returning();
+    await tx
+      .insert(platformDocumentTable)
+      .values({ platformPostId: spot.id, documentId: packet!.id });
     return {
       contentPostId: content.id,
       platformPostId: spot.id,
@@ -474,7 +493,6 @@ export async function createProductUpdateDraft(input: {
   return {
     ...slot,
     emailDocumentId: document.id,
-    revision: document.currentRevision,
   };
 }
 
@@ -485,45 +503,41 @@ export async function startEmailGeneration(input: {
   brief?: string;
 }) {
   const { document } = await ensureEmailDocument(input);
-  const active = await db.query.emailGenerationJobTable.findFirst({
-    where: and(
-      eq(emailGenerationJobTable.emailDocumentId, document.id),
-      inArray(emailGenerationJobTable.status, ["queued", "running"]),
-    ),
-    orderBy: [desc(emailGenerationJobTable.createdAt)],
+  const selected = await documentForPlatform(
+    input.platformPostId,
+    input.organizationId,
+  );
+  if (!selected) throw new Error("Document not found.");
+  if (input.brief?.trim())
+    await saveCreativeDocument({
+      ...input,
+      documentId: document.id,
+      document: {
+        ...selected.document,
+        brief: { ...selected.document.brief, direction: input.brief.trim() },
+      },
+    });
+  return beginDocumentRun({
+    ...input,
+    documentId: document.id,
+    operation: "write",
+    provider: "anthropic",
+    model: EMAIL_GENERATION_MODEL,
+    extra: { platformPostId: input.platformPostId },
   });
-  if (active) return active;
-  const [job] = await db
-    .insert(emailGenerationJobTable)
-    .values({
-      emailDocumentId: document.id,
-      platformPostId: input.platformPostId,
-      status: "queued",
-      brief: input.brief,
-      model: EMAIL_GENERATION_MODEL,
-      createdBy: input.userId,
-    })
-    .returning();
-  if (!job) throw new Error("Could not queue the email draft.");
-  return job;
 }
 
 export async function runEmailGenerationJob(jobId: string) {
-  const job = await db.query.emailGenerationJobTable.findFirst({
-    where: eq(emailGenerationJobTable.id, jobId),
-  });
-  if (job?.status !== "queued") return;
-  await db
-    .update(emailGenerationJobTable)
-    .set({ status: "running", startedAt: new Date(), error: null })
-    .where(eq(emailGenerationJobTable.id, job.id));
-
+  const job = await claimDocumentRun(jobId);
+  if (!job) return;
   try {
-    const document = await db.query.emailDocumentTable.findFirst({
-      where: eq(emailDocumentTable.id, job.emailDocumentId),
-    });
+    const source = creativeDocumentSchema.parse(job.input.document);
+    if (source.type !== "email" || !job.createdBy)
+      throw new Error("Invalid email run.");
+    const document = source.content;
+    const platformPostId = String(job.input.platformPostId);
     const spot = await db.query.platformPostTable.findFirst({
-      where: eq(platformPostTable.id, job.platformPostId),
+      where: eq(platformPostTable.id, platformPostId),
       with: {
         brand: true,
         channel: true,
@@ -583,8 +597,8 @@ export async function runEmailGenerationJob(jobId: string) {
           ? `Visual direction: ${content.visualDirection}`
           : null,
         content?.ctaText ? `CTA intent: ${content.ctaText}` : null,
-        job.brief?.trim()
-          ? `Latest refinement brief:\n${job.brief.trim()}`
+        source.brief.direction.trim()
+          ? `Latest refinement brief:\n${source.brief.direction.trim()}`
           : null,
         document.digest
           ? `The homes in this issue, by place:\n${document.digest.sections
@@ -612,38 +626,20 @@ export async function runEmailGenerationJob(jobId: string) {
         .join("\n\n"),
     });
 
-    await persistRevision({
-      emailDocumentId: document.id,
+    await saveEmailDocument({
       platformPostId: spot.id,
-      contentPostId: spot.contentPostId,
-      expectedRevision: document.currentRevision,
-      draft: {
-        ...output,
-        templateKey: document.templateKey,
-        handoffTargetRepo: document.handoffTargetRepo,
-        productUpdate: document.productUpdate,
-        // The model writes words; the homes are data it never returns. Left
-        // out, a generation on a property digest wiped every home.
-        digest: document.digest,
-      },
-      source: "generation",
-      note: job.brief?.trim() || "Generated from the selected content slot",
+      organizationId: job.organizationId,
       userId: job.createdBy,
+      runId: job.id,
+      draft: {
+        ...document,
+        ...output,
+        digest: document.digest,
+        productUpdate: document.productUpdate,
+      },
     });
-    await db
-      .update(emailGenerationJobTable)
-      .set({ status: "succeeded", completedAt: new Date() })
-      .where(eq(emailGenerationJobTable.id, job.id));
   } catch (error) {
-    await db
-      .update(emailGenerationJobTable)
-      .set({
-        status: "failed",
-        error:
-          error instanceof Error ? error.message : "Email generation failed",
-        completedAt: new Date(),
-      })
-      .where(eq(emailGenerationJobTable.id, job.id));
+    await failDocumentRun(jobId, error);
     throw error;
   }
 }
@@ -778,7 +774,6 @@ export async function exportEmailHandoff(input: {
     contentPostId: workspace.content?.id ?? "standalone",
     platformPostId: workspace.spot.id,
     format: workspace.spot.format,
-    revision: workspace.document.currentRevision,
     seriesName: workspace.content?.series?.name,
     plannedAt: workspace.content?.plannedAt?.toISOString(),
     scheduledAt: workspace.spot.scheduledAt?.toISOString(),

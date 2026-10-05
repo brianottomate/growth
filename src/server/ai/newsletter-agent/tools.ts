@@ -73,7 +73,7 @@ export function buildNewsletterTools(ctx: NewsletterToolContext): ToolSet {
 
     getIssue: tool({
       description:
-        "Read one newsletter issue: its current subject, preheader, body markdown, CTA, and revision history. Always call before editing an existing issue.",
+        "Read one newsletter issue: its current subject, preheader, body markdown, CTA, and generation status. Always call before editing an existing issue.",
       inputSchema: z.object({
         platformPostId: z
           .string()
@@ -96,7 +96,6 @@ export function buildNewsletterTools(ctx: NewsletterToolContext): ToolSet {
             ctaLabel: d.ctaLabel,
             ctaUrl: d.ctaUrl,
             templateKey: d.templateKey,
-            revision: d.currentRevision,
           };
         } catch (error) {
           return { error: (error as Error).message };
@@ -144,7 +143,7 @@ export function buildNewsletterTools(ctx: NewsletterToolContext): ToolSet {
 
     saveIssue: tool({
       description:
-        'Save changed fields to an issue\'s document and create a revision checkpoint. Pass only what changed — unspecified fields keep their current value — but pass each changed field WHOLE: read the issue first, rewrite the entire field with the change worked in, and send the full replacement. Never surgical partial edits. Liquid tokens like {{ customer.first_name | default: "there" }} are allowed; Customer.io expands them per recipient.',
+        'Save changed fields to an issue\'s document and save the current document. Pass only what changed — unspecified fields keep their current value — but pass each changed field WHOLE: read the issue first, rewrite the entire field with the change worked in, and send the full replacement. Never surgical partial edits. Liquid tokens like {{ customer.first_name | default: "there" }} are allowed; Customer.io expands them per recipient.',
       inputSchema: z.object({
         platformPostId: z.string(),
         changes: emailDocumentDraftSchema.partial(),
@@ -186,13 +185,12 @@ export function buildNewsletterTools(ctx: NewsletterToolContext): ToolSet {
           note(
             ctx,
             "saveIssue",
-            `saved ${keys.join(", ")} on ${platformPostId} (rev ${saved.currentRevision})`,
+            `saved ${keys.join(", ")} on ${platformPostId} `,
           );
           return {
             ok: true,
             platformPostId,
             updated: keys,
-            revision: saved.currentRevision,
           };
         } catch (error) {
           return { error: (error as Error).message };

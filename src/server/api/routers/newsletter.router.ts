@@ -34,7 +34,6 @@ import { MESSAGE_AUDIENCE_KINDS } from "@/lib/email-delivery";
 import {
   exportEmailHandoff,
   renderEmailPreview,
-  restoreEmailDocumentVersion,
   rewriteEmailBlock,
 } from "@/server/services/email-document.service";
 import {
@@ -124,20 +123,6 @@ export const newsletterRouter = {
     }),
 
   saveDocument: actionProcedure(updateEmailDraftAction),
-
-  restoreVersion: protectedProcedure
-    .input(z.object({ platformPostId: z.string(), versionId: z.string() }))
-    .handler(async ({ context: ctx, input }) => {
-      const organizationId = await organizationIdForUser(
-        ctx.db,
-        ctx.session.user.id,
-      );
-      return restoreEmailDocumentVersion({
-        ...input,
-        organizationId,
-        userId: ctx.session.user.id,
-      });
-    }),
 
   renderPreview: protectedProcedure
     .input(

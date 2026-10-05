@@ -1,3 +1,4 @@
+import { migrateCreativeDocuments } from "./migrate-creative-documents";
 import { migrateInitiatives } from "./migrate-initiatives";
 import postgres from "postgres";
 import {
@@ -26,6 +27,7 @@ try {
     for (const statement of launchRetirementStatements(source))
       await tx.unsafe(statement);
     await migrateInitiatives(tx);
+    await migrateCreativeDocuments(tx, true);
   });
   console.log("Launch retirement and Initiative cutover committed.");
 } finally {

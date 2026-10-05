@@ -24,7 +24,7 @@ import { growthTool } from "./types";
 export const blogAgent = growthTool({
   resultSchema: blogAgentOutputSchema,
   description:
-    "Delegate a wander.com blog task to the DatoCMS blog agent. It can inspect the blog schema, read or review a full article, create a separate full-body draft, safely replace an existing draft body from Markdown, patch metadata, upload the operator's current chat image, and append body blocks, then report back with a preview link. Use for any 'review/create/edit/add to the blog' request. It works in DRAFTS only — it cannot publish. Give it a complete task description in one go, plus the article id when the task concerns an existing post.",
+    "Inspect Wander.com Dato blog schemas, existing articles and rich body blocks. This specialist is read-only. For writing and editing use creativeRead/creativeWrite: create or pull an article document, save its brief, produce, review, and explicitly push the draft.",
   inputSchema: z.object({
     action: z.literal("run"),
     task: z

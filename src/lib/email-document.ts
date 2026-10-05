@@ -121,7 +121,6 @@ export type EmailHandoffInput = EmailDocumentDraft & {
   contentPostId: string;
   platformPostId: string;
   format: EmailDocumentFormat;
-  revision: number;
   seriesName?: string | null;
   campaignName?: string | null;
   plannedAt?: string | null;
@@ -155,7 +154,6 @@ export function formatEmailImplementationHandoff(
     `format: ${yaml(input.format)}`,
     `contentPostId: ${yaml(input.contentPostId)}`,
     `platformPostId: ${yaml(input.platformPostId)}`,
-    `revision: ${input.revision}`,
     `plannedAt: ${yaml(input.plannedAt)}`,
     `scheduledAt: ${yaml(input.scheduledAt)}`,
     "---",

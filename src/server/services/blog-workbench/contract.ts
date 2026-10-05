@@ -55,6 +55,7 @@ export type ContentBriefInput = {
 };
 
 export type ContentBriefGroundingContext = {
+  sourceUrls?: string[];
   businessName: string;
   summary: string | null;
   locations: string[];

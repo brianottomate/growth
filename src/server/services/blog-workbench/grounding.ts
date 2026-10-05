@@ -26,7 +26,8 @@ export type GroundingContextRecord = {
   version:
     | typeof GROUNDING_VERSION
     | "synthetic-fixture/v1"
-    | "source-article-derived/v1";
+    | "source-article-derived/v1"
+    | "production-brief/v1";
   provenance: string;
   targetDomain: string;
   crawledUrls: string[];

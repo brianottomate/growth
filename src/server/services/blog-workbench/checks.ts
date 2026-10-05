@@ -156,7 +156,10 @@ function checkLinkProvenance(
     ),
   ].filter(Boolean);
 
-  const permitted = new Set(context.properties.map((p) => p.href));
+  const permitted = new Set([
+    ...context.properties.map((p) => p.href),
+    ...(context.sourceUrls ?? []),
+  ]);
   const rows = hrefs.map((href) => ({
     label: href,
     detail: permitted.has(href)

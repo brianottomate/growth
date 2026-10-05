@@ -1,3 +1,4 @@
+import { getInitiative } from "@/server/services/initiative.service";
 import { resolvePageContext } from "./resolve-page-context";
 import "server-only";
 
@@ -101,6 +102,17 @@ export async function composePageContextSection(options: {
   const pathname = path.split(/[?#]/)[0]!;
   const header = `# Operator location\nThe operator currently has ${path} open in the growth workspace. ${options.contextMode === "pinned" ? "The operator selected a pinned conversation focus. Use the verified work-item context for implicit references; this location is navigation context only. Do not silently switch to this page." : "The operator selected the current page. Resolve implicit references such as this campaign from this verified page context. Earlier conversation focus does not override it."}`;
 
+  const initiativeId = /^\/app\/initiatives\/([^/]+)$/.exec(pathname)?.[1];
+  if (initiativeId) {
+    const detail = await getInitiative(
+      initiativeId,
+      options.organizationId,
+    ).catch(() => null);
+    if (detail)
+      return `${header}\nThis is initiative “${detail.initiative.name}” (initiativeId: ${initiativeId}). Read initiativeRead.get for its current brief and linked work. For a blog, email, image or video request: prepare a content idea linked with initiativeWrite.link, then use creativeWrite.create for its typed brief, creativeWrite.select for its channel version, and creativeWrite.produce only when writing or production is requested. Transfer Dato content only on an explicit pull or push request. Initiative notes and draft ads are source context, not evidence that proposed claims have shipped.`;
+  }
+  if (pathname.startsWith("/app/creative/"))
+    return `${header}\nUse creativeRead.get for documentId ${pathname.split("/").at(-1)}. Edit with creativeWrite.save, produce with creativeWrite.produce; Dato pull/push are explicit overwrites. Production locks editing.`;
   const page = await resolvePageContext(pathname, options.organizationId);
   if (page.label)
     return `${header}\nVerified page context: ${page.label}. ${page.brand ? `brandId: ${page.brand.id}.` : ""} ${page.campaign ? `campaignId: ${page.campaign.id}. Read adsRead.openCampaign before editing.` : ""} ${page.platformCampaign ? `platformCampaignId: ${page.platformCampaign.id}.` : ""} ${page.home ? `homeId: ${page.home.id}.` : ""} ${page.account ? `accountId: ${page.account.id}, status: ${page.account.status}.` : ""}\n${guidanceForPath(pathname) ?? ""}`;
@@ -146,7 +158,7 @@ export async function composePageContextSection(options: {
     if (post?.brand?.organizationId !== options.organizationId) return header;
     const status =
       post.publishedAt && post.status === "published" ? "published" : "draft";
-    return `${header}\nThis is the ${status} blog article “${post.text ?? "Untitled"}” (platformPostId: ${post.id}${post.externalId ? `, Dato itemId: ${post.externalId}` : ""}) for ${post.brand.name} (brandId: ${post.brand.id}). Use blogAgent to read, review, or edit this article. When the operator refers to “this blog” or “this article,” pass its Dato itemId to blogAgent; an attached replacement image should be passed as blogAgent attachmentUrl. The agent may edit the Dato draft but cannot publish it.`;
+    return `${header}\nThis is the ${status} blog article “${post.text ?? "Untitled"}” (platformPostId: ${post.id}${post.externalId ? `, Dato itemId: ${post.externalId}` : ""}) for ${post.brand.name} (brandId: ${post.brand.id}). For new writing, use the typed creative document workflow (creativeRead / creativeWrite) and its shared editorial pipeline. Use blogAgent only for legacy CMS inspection. When the operator refers to “this blog” or “this article,” pass its Dato itemId to blogAgent; an attached replacement image should be passed as blogAgent attachmentUrl. The agent may edit the Dato draft but cannot publish it.`;
   }
 
   const productId = /^\/app\/product-atlas\/([^/]+)$/.exec(pathname)?.[1];

@@ -9,7 +9,6 @@ import {
   MessageSquare,
   Pencil,
   RefreshCw,
-  RotateCcw,
   Save,
   Sparkles,
 } from "lucide-react";
@@ -80,18 +79,14 @@ function Editor({ workspace }: { workspace: Workspace }) {
   const [savedDraft, setSavedDraft] = useState(() =>
     editableDraft(workspace.document),
   );
-  const [revision, setRevision] = useState(workspace.document.currentRevision);
   const dirty = JSON.stringify(draft) !== JSON.stringify(savedDraft);
-  const stale = revision !== workspace.document.currentRevision;
-  const loadRevision = () => {
-    const next = editableDraft(workspace.document);
-    setDraft(next);
-    setSavedDraft(next);
-    setRevision(workspace.document.currentRevision);
-  };
   useEffect(() => {
-    if (stale && !dirty) loadRevision();
-  }, [workspace.document.currentRevision]); // oxlint-disable-line react/exhaustive-deps
+    if (!dirty) {
+      const next = editableDraft(workspace.document);
+      setDraft(next);
+      setSavedDraft(next);
+    }
+  }, [workspace.document.updatedAt]); // oxlint-disable-line react/exhaustive-deps
   useEffect(() => {
     if (!dirty) return;
     const beforeUnload = (event: BeforeUnloadEvent) => event.preventDefault();
@@ -113,16 +108,10 @@ function Editor({ workspace }: { workspace: Workspace }) {
   const save = useMutation(
     orpc.newsletter.saveDocument.mutationOptions({
       onMutate: () => draft,
-      onSuccess: async (result, _variables, submitted) => {
+      onSuccess: async (_result, _variables, submitted) => {
         if (submitted) setSavedDraft(submitted);
-        setRevision(result.revision);
         await refreshWorkspace();
       },
-    }),
-  );
-  const restore = useMutation(
-    orpc.newsletter.restoreVersion.mutationOptions({
-      onSuccess: refreshWorkspace,
     }),
   );
   const preview = useMutation(orpc.newsletter.renderPreview.mutationOptions());
@@ -166,7 +155,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
 
   const activeJob =
     workspace.latestJob?.status === "queued" ||
-    workspace.latestJob?.status === "running";
+    workspace.latestJob?.status === "processing";
   const formatLabel =
     workspace.spot.format === "newsletter.blast"
       ? "One-off blast"
@@ -213,6 +202,12 @@ function Editor({ workspace }: { workspace: Workspace }) {
             <MessageSquare className="size-4" /> Work in chat
           </button>
           <Link
+            className="text-sm underline"
+            href={`/app/creative/${workspace.document.id}`}
+          >
+            Creative brief
+          </Link>
+          <Link
             href={
               workspace.content
                 ? // ?card=1 bypasses the email-only redirect on the content
@@ -227,27 +222,17 @@ function Editor({ workspace }: { workspace: Workspace }) {
         </div>
       </div>
 
-      {stale && dirty && (
-        <div role="alert" className="rounded-lg border p-3 text-sm">
-          A newer email revision is available. Your edits are kept here.{" "}
-          <button
-            type="button"
-            className="underline"
-            onClick={() => {
-              if (
-                window.confirm(
-                  "Discard your edits and load the newer revision?",
-                )
-              )
-                loadRevision();
-            }}
-          >
-            Load revision
-          </button>
-        </div>
+      {activeJob && (
+        <p className="text-sm text-muted-foreground">
+          Producing this document. Editing is locked until completion.
+        </p>
       )}
       <div className="grid grid-cols-1 gap-5 @5xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.9fr)]">
-        <div className="space-y-4">
+        <fieldset
+          disabled={activeJob}
+          inert={activeJob}
+          className="min-w-0 space-y-4 disabled:opacity-60"
+        >
           {/* Chat-first: the conversation is the write path for words (subject,
               intro, CTA); the one clicky exception is photos, because picking
               an image is a recognition task a grid does better than prose. The
@@ -267,7 +252,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
           <EmailBlocksCard
             // A saved, restored or generated revision replaces the body; the
             // blocks re-read it.
-            key={revision}
+            key={workspace.document.updatedAt.toISOString()}
             platformPostId={workspace.spot.id}
             brandId={workspace.brand.id}
             campaign={workspace.content?.title || draft.subject}
@@ -309,11 +294,10 @@ function Editor({ workspace }: { workspace: Workspace }) {
                   save.mutate({
                     platformPostId: workspace.spot.id,
                     changes: draft,
-                    expectedRevision: revision,
                     note: "Saved from the newsletter workspace",
                   })
                 }
-                disabled={save.isPending || stale || !dirty}
+                disabled={save.isPending || activeJob || !dirty}
                 className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
               >
                 {save.isPending ? (
@@ -321,7 +305,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
                 ) : (
                   <Save className="size-4" />
                 )}
-                Save revision
+                Save document
               </button>
               <button
                 type="button"
@@ -341,9 +325,6 @@ function Editor({ workspace }: { workspace: Workspace }) {
               >
                 <Pencil className="size-4" /> Edit fields manually
               </button>
-              <span className="text-xs text-muted-foreground">
-                Revision {workspace.document.currentRevision}
-              </span>
             </div>
             {(save.error || preview.error) && (
               <p className="mt-2 text-sm text-red-500">
@@ -452,53 +433,12 @@ function Editor({ workspace }: { workspace: Workspace }) {
             <p className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="size-4 animate-spin" /> Writing a new draft
             </p>
-          ) : workspace.latestJob?.status === "failed" ? (
+          ) : workspace.latestJob?.status === "error" ? (
             <p className="text-sm text-red-500">
               {workspace.latestJob.error || "Generation failed."}
             </p>
           ) : null}
-
-          {workspace.versions.length > 0 && (
-            <section className="rounded-xl border bg-card p-4">
-              <h2 className="font-semibold">Revision history</h2>
-              <div className="mt-3 divide-y">
-                {workspace.versions.map((version) => (
-                  <div
-                    key={version.id}
-                    className="flex items-center justify-between gap-3 py-2 text-sm"
-                  >
-                    <div>
-                      <span className="font-medium">
-                        Revision {version.revision}
-                      </span>
-                      <span className="ml-2 text-muted-foreground">
-                        {version.source} · {version.createdAt.toLocaleString()}
-                      </span>
-                      {version.note && (
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {version.note}
-                        </p>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        restore.mutate({
-                          platformPostId: workspace.spot.id,
-                          versionId: version.id,
-                        })
-                      }
-                      disabled={restore.isPending || dirty || stale}
-                      className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs hover:bg-accent"
-                    >
-                      <RotateCcw className="size-3.5" /> Restore
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-        </div>
+        </fieldset>
 
         <div className="@5xl:sticky @5xl:top-4 @5xl:self-start">
           <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
@@ -632,7 +572,7 @@ function ManualFieldsDialog({
             ) : (
               <Save className="size-4" />
             )}
-            Save revision
+            Save document
           </button>
         </div>
       }
@@ -713,7 +653,7 @@ export function NewsletterIssueWorkspace({
     ...orpc.newsletter.workspace.queryOptions({ input: { platformPostId } }),
     refetchInterval: (result) => {
       const status = result.state.data?.latestJob?.status;
-      return status === "queued" || status === "running" ? 2_000 : false;
+      return status === "queued" || status === "processing" ? 2_000 : false;
     },
   });
   // Chat edits this email beside the page; reload when it writes.
