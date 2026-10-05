@@ -33,7 +33,7 @@ import { adTable, brandTable, creativeRunTable } from "@/server/db/schema";
 import { fetchWanderOsListingDetail } from "@/server/clients/wanderos-site.client";
 import { campaignCopyRules } from "@/server/ai/prompts/campaign-copy";
 import { runCopyRequest, type CopyRequest } from "@/server/ai/copy-request";
-import { requireOwnedCampaign, starterIdeaHomes } from "./ads-draft.service";
+import { resolveAdAuthoringScope, starterIdeaHomes } from "./ads-draft.service";
 import { brandListings, brandWebsiteId } from "./wanderos-listings.service";
 import { listAllBrandHomes } from "./homes.service";
 import { resolveBookingTarget } from "./home-groups.service";
@@ -46,11 +46,7 @@ type Input = z.infer<typeof starterGenerationSchema> & {
 };
 
 export async function startStarterGeneration(input: Input) {
-  const { campaign, brand } = await requireOwnedCampaign(
-    input.campaignId,
-    input.organizationId,
-  );
-  if (campaign.deletedAt) throw new Error("Campaign not found");
+  const { brand } = await resolveAdAuthoringScope(input);
   const homes = await listAllBrandHomes(brand.id);
   if (input.source !== "brand" && !input.homeIds.length)
     throw new Error("Choose at least one home");
@@ -85,12 +81,10 @@ export async function startStarterGeneration(input: Input) {
 
 export async function starterGenerationStatus(input: {
   organizationId: string;
-  campaignId: string;
+  campaignId?: string;
+  brandId?: string;
 }) {
-  const { brand } = await requireOwnedCampaign(
-    input.campaignId,
-    input.organizationId,
-  );
+  const { brand } = await resolveAdAuthoringScope(input);
   const runs = await db.query.creativeRunTable.findMany({
     where: and(
       eq(creativeRunTable.organizationId, input.organizationId),
@@ -99,7 +93,11 @@ export async function starterGenerationStatus(input: {
     ),
     orderBy: desc(creativeRunTable.createdAt),
   });
-  const run = runs.find((r) => r.input.campaignId === input.campaignId);
+  const run = runs.find((r) =>
+    input.campaignId
+      ? r.input.campaignId === input.campaignId
+      : r.input.brandId === input.brandId && !r.input.campaignId,
+  );
   if (!run) return null;
   return {
     id: run.id,
@@ -285,17 +283,14 @@ export async function runStarterGeneration(runId: string, input: Input) {
       .where(eq(creativeRunTable.id, runId));
   };
   try {
-    const { campaign, brand } = await requireOwnedCampaign(
-      input.campaignId,
-      input.organizationId,
-    );
+    const { campaign, brand } = await resolveAdAuthoringScope(input);
     const clientNotes = await performanceCopyNotes(
       brand.id,
       input.organizationId,
     );
-    const booking = campaign.bookingTargetId
+    const booking = campaign?.bookingTargetId
       ? await resolveBookingTarget(
-          campaign.bookingTargetId,
+          campaign?.bookingTargetId,
           input.organizationId,
         )
       : null;
@@ -310,7 +305,7 @@ export async function runStarterGeneration(runId: string, input: Input) {
           website: brand.website,
           story: fullBrand?.story ?? null,
           brandContext: fullBrand?.brandFingerprint,
-          campaign: campaign.name,
+          campaign: campaign?.name ?? `${brand.name} ad studio`,
         }),
         { appendix: clientNotes },
       );
@@ -330,7 +325,7 @@ export async function runStarterGeneration(runId: string, input: Input) {
         document.exportShapes = ["portrait", "square", "story", "wide"];
         await db.insert(adTable).values({
           brandId: brand.id,
-          campaignId: campaign.id,
+          campaignId: campaign?.id ?? null,
           name: idea.name,
           type: "creative",
           status: "drawn",
@@ -381,7 +376,7 @@ export async function runStarterGeneration(runId: string, input: Input) {
       if (booking) document.copy.linkUrl = booking.url;
       await db.insert(adTable).values({
         brandId: brand.id,
-        campaignId: campaign.id,
+        campaignId: campaign?.id ?? null,
         name,
         type: "creative",
         status: "drawn",
@@ -420,7 +415,7 @@ export async function runStarterGeneration(runId: string, input: Input) {
           brandName: brand.name,
           brandStory: fullBrand?.story ?? null,
           voice: fullBrand?.brandFingerprint,
-          campaign: campaign.name,
+          campaign: campaign?.name ?? `${brand.name} ad studio`,
           home: {
             name: home.name,
             city: listing?.city,

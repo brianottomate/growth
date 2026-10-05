@@ -1,3 +1,8 @@
+import {
+  isReplaceableStudioAd,
+  textAdCopySchema,
+  textAdReady,
+} from "@/lib/ad-authoring";
 import { projectIdea, type IdeaShape } from "@/lib/ad-idea-studio";
 import {
   assertAdNotPushed,
@@ -791,9 +796,9 @@ export async function buildAdSet(input: {
   // it. Anything already approved or attached to a campaign is left alone.
   const stale = await db.query.adTable.findMany({
     where: and(eq(adTable.brandId, brand.id), isNull(adTable.campaignId)),
-    columns: { id: true, status: true },
+    columns: { id: true, status: true, type: true },
   });
-  const replaceable = stale.filter((ad) => ad.status !== "approved");
+  const replaceable = stale.filter(isReplaceableStudioAd);
   if (replaceable.length > 0) {
     // `ad` has no soft delete, and a replaced draft is not history worth
     // keeping: it was never on a platform and nobody approved it.
@@ -1442,7 +1447,31 @@ export async function setAdStatus(input: {
   exportShapes?: IdeaShape[];
 }) {
   const ad = await requireOwnedAd(input, true);
-  if (input.status === "drawn") await assertAdNotPushed(ad.id);
+  await assertAdNotPushed(ad.id);
+  if (ad.type === "text") {
+    if (!input.expectedUpdatedAt)
+      throw new Error("Review the current ad before changing approval.");
+    if (
+      input.status === "approved" &&
+      !textAdReady(ad.content as AdTextContent)
+    )
+      throw new Error(
+        "Add at least 3 headlines and 2 descriptions within the search copy limits before approving.",
+      );
+    const saved = await db
+      .update(adTable)
+      .set({ status: input.status })
+      .where(
+        and(
+          eq(adTable.id, ad.id),
+          eq(adTable.updatedAt, new Date(input.expectedUpdatedAt)),
+        ),
+      )
+      .returning({ id: adTable.id });
+    if (!saved.length)
+      throw new Error("This ad changed. Refresh before changing approval.");
+    return { adId: ad.id, status: input.status };
+  }
   if (
     "media" in ad.content &&
     ad.content.media.every((card) => card.type === "image") &&
@@ -1530,8 +1559,33 @@ export async function setAdCopy(input: {
   description?: string;
   /** Per carousel card, in order; a blank field inherits the ad's. */
   cards?: { headline?: string; description?: string }[];
+  text?: AdTextContent;
+  expectedUpdatedAt?: string;
 }) {
   const ad = await requireOwnedAd(input);
+  if (ad.type === "text") {
+    if (!input.text || !input.expectedUpdatedAt)
+      throw new Error(
+        "Supply the text pool and its current version before saving.",
+      );
+    const content = textAdCopySchema.parse(input.text);
+    const saved = await db
+      .update(adTable)
+      .set({ content })
+      .where(
+        and(
+          eq(adTable.id, ad.id),
+          eq(adTable.updatedAt, new Date(input.expectedUpdatedAt)),
+          eq(adTable.status, "drawn"),
+        ),
+      )
+      .returning({ id: adTable.id });
+    if (!saved.length)
+      throw new Error("This ad changed. Refresh before saving your copy.");
+    return { adId: ad.id };
+  }
+  if (input.text)
+    throw new Error("This is a creative ad. Use its creative editor.");
   const content = creativeContent(ad);
   const headline = input.headline ?? content.headline;
   const body = input.body ?? content.body;

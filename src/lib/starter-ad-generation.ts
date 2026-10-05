@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { adAuthoringFields, hasOneAdOwner } from "./ad-authoring";
 import { compositionImagePositionSchema } from "./compositions";
 import {
   IDEA_SHAPES,
@@ -8,15 +9,17 @@ import {
 import { META_PLACEMENTS, metaPlacementSchema } from "./meta-placement-plan";
 import type { StarterHome } from "./starter-ad-ideas";
 
-export const starterGenerationSchema = z.object({
-  campaignId: z.string().min(1),
-  source: z.enum(["featured", "brand"]).default("featured"),
-  homeIds: z.array(z.string().min(1)).max(10),
-  intendedPlacements: z
-    .array(metaPlacementSchema)
-    .min(1)
-    .max(META_PLACEMENTS.length),
-});
+export const starterGenerationSchema = z
+  .object({
+    ...adAuthoringFields,
+    source: z.enum(["featured", "brand"]).default("featured"),
+    homeIds: z.array(z.string().min(1)).max(10),
+    intendedPlacements: z
+      .array(metaPlacementSchema)
+      .min(1)
+      .max(META_PLACEMENTS.length),
+  })
+  .refine(hasOneAdOwner, { message: "Supply either campaignId or brandId." });
 export const generatedCopySchema = z.object({
   headline: z.string().min(1).max(70),
   body: z.string().min(1).max(1200),

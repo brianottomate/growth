@@ -1,3 +1,4 @@
+import { TextAdCard } from "./TextAdCard";
 import { WorkspaceCardHeader } from "@/app/app/performance/WorkspaceCard";
 import { Images } from "lucide-react";
 import type { AdContent } from "@/server/db/schema";
@@ -48,9 +49,11 @@ export function AdIdeasList({
   actions,
   emptyState,
   plannedPlatforms = [],
+  landingUrl = null,
 }: {
   /** The campaign's planned platforms; an idea can be narrowed to some. */
   plannedPlatforms?: ChannelPlatform[];
+  landingUrl?: string | null;
   /** Add starter ideas, Add ad, Assets: they act on the list below them. */
   actions?: React.ReactNode;
   emptyState?: React.ReactNode;
@@ -120,11 +123,22 @@ export function AdIdeasList({
     </div>
   );
   const renderIdea = (ad: (typeof ordered)[number]) =>
-    "media" in ad.content &&
-    ad.content.media.every((m) => m.type === "image") &&
-    (!ad.content.format ||
-      ad.content.format === "static" ||
-      ad.content.format === "carousel") ? (
+    !("media" in ad.content) ? (
+      <TextAdCard
+        ad={{
+          ...ad,
+          content: ad.content,
+          updatedAt: ad.updatedAt.toISOString(),
+        }}
+        brandId={brandId}
+        website={landingUrl}
+        deliveryState={states[ad.id]}
+      />
+    ) : "media" in ad.content &&
+      ad.content.media.every((m) => m.type === "image") &&
+      (!ad.content.format ||
+        ad.content.format === "static" ||
+        ad.content.format === "carousel") ? (
       <AdIdeaCard
         campaignId={campaignId}
         brandId={brandId}

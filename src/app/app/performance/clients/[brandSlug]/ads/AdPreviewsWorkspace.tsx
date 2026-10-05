@@ -31,6 +31,9 @@ import type { HotelFeedHome } from "@/lib/meta-hotel-feed";
 import { MAX_SET_HOMES } from "@/lib/performance-ads";
 import { orpc } from "@/orpc/client";
 
+import { StudioGeneration } from "./StudioGeneration";
+import { NewTextAdButton } from "@/app/app/brands/[brandSlug]/ads/_views/TextAdCard";
+import { CreativeDrop } from "./CreativeDrop";
 import { HomePicker } from "../HomePicker";
 import { AddAdDialog } from "./AddAdDialog";
 import { StudioIdeas, type StudioIdea } from "./StudioIdeas";
@@ -57,6 +60,7 @@ export function AdPreviewsWorkspace({
   brandSlug,
   brandName,
   brandLogo,
+  website,
   homes,
   homeGroups,
   withoutPhoto,
@@ -71,6 +75,7 @@ export function AdPreviewsWorkspace({
   brandName: string;
   /** The resolved brand mark (vector/PNG), used on the feed mocks. */
   brandLogo: string | null;
+  website: string | null;
   homes: WorkspaceHome[];
   homeGroups: { id: string; name: string; homeIds: string[] }[];
   withoutPhoto: number;
@@ -85,6 +90,7 @@ export function AdPreviewsWorkspace({
   const router = useRouter();
   const pathname = usePathname();
   const [filter, setFilter] = useState<"all" | "review" | "approved">("all");
+  const [kind, setKind] = useState<"all" | "text" | "creative">("all");
   const [search, setSearch] = useState("");
   const [count, setCount] = useState(DEFAULT_COUNT);
   const [campaignId, setCampaignId] = useState(campaigns[0]?.id ?? "");
@@ -167,6 +173,9 @@ export function AdPreviewsWorkspace({
   const approved = allAds.filter((ad) => ad.status === "approved").length;
   const drafted = allAds.length > 0;
   const unapproved = allAds.length - approved;
+  const replaceable = allAds.filter(
+    (ad) => ad.status !== "approved" && "media" in ad.content,
+  ).length;
   const runBuild = () =>
     build.mutate(
       pickedHomes.length > 0
@@ -176,6 +185,7 @@ export function AdPreviewsWorkspace({
 
   const visible = ideas.filter(
     (idea) =>
+      (kind === "all" || (kind === "creative") === "media" in idea.content) &&
       (filter === "all" ||
         (filter === "approved"
           ? idea.status === "approved"
@@ -184,16 +194,42 @@ export function AdPreviewsWorkspace({
         .toLowerCase()
         .includes(search.trim().toLowerCase()),
   );
-  const addAction = <AddAdDialog brandId={brandId} homes={homes} />;
+  const addAction = (
+    <div className="flex flex-wrap gap-2">
+      <AddAdDialog brandId={brandId} homes={homes} />
+      <NewTextAdButton brandId={brandId} website={website} />
+    </div>
+  );
   return (
     <div className="space-y-4">
+      <div
+        className="flex w-fit max-w-full flex-wrap gap-1 rounded-lg border p-0.5"
+        role="group"
+        aria-label="Ad approach"
+      >
+        {(["all", "text", "creative"] as const).map((value) => (
+          <Button
+            key={value}
+            size="sm"
+            variant={kind === value ? "secondary" : "ghost"}
+            aria-pressed={kind === value}
+            onClick={() => setKind(value)}
+          >
+            {value === "all"
+              ? "All ads"
+              : value === "text"
+                ? "Text-first"
+                : "Creative-first"}
+          </Button>
+        ))}
+      </div>
       <AlertDialog open={confirmRebuild} onOpenChange={setConfirmRebuild}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Rebuild the shells?</AlertDialogTitle>
             <AlertDialogDescription>
-              {unapproved} unapproved ad{unapproved === 1 ? "" : "s"} and any
-              edits on {unapproved === 1 ? "it" : "them"} are replaced.
+              {replaceable} unapproved creative ad{replaceable === 1 ? "" : "s"}{" "}
+              and any edits on {replaceable === 1 ? "it" : "them"} are replaced.
               {approved > 0
                 ? ` ${approved} approved ${approved === 1 ? "stays as it is" : "stay as they are"}.`
                 : ""}
@@ -212,166 +248,170 @@ export function AdPreviewsWorkspace({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      <WorkspaceCard
-        title="Build ads"
-        icon={House}
-        count={`${picked.length}/${MAX_SET_HOMES}`}
-        actions={
-          <>
-            {hasHomes && (
-              <HomePicker
-                homes={homes}
-                picked={picked}
-                max={MAX_SET_HOMES}
-                onChange={commit}
-                label={picked.length ? "Change homes" : "Choose homes"}
-              />
-            )}
-            {hasHomes && (
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={build.isPending}
-                onClick={() =>
-                  drafted && unapproved > 0
-                    ? setConfirmRebuild(true)
-                    : runBuild()
-                }
-              >
-                {build.isPending ? (
-                  <Loader2 className="size-3.5 animate-spin" />
-                ) : (
-                  <Sparkles className="size-3.5" />
-                )}
-                {drafted ? "Rebuild ads" : "Build ads"}
-              </Button>
-            )}
-            {drafted && (
-              <Button
-                size="sm"
-                variant="outline"
-                loading={writeCopy.isPending}
-                onClick={() => writeCopy.mutate({ brandId })}
-              >
-                <Sparkles className="size-3.5" />
-                Write copy
-              </Button>
-            )}
-            <ShapeBrandButton
-              brandId={brandId}
-              brandName={brandName}
-              section="home selection for ad ideas"
-            />
-          </>
-        }
-      >
-        {homeGroups.length > 0 && (
-          <select
-            aria-label="Select a home group"
-            value=""
-            disabled={build.isPending}
-            className="rounded-md border bg-background px-3 py-2 text-sm"
-            onChange={(event) => {
-              const group = homeGroups.find(
-                (group) => group.id === event.target.value,
-              );
-              if (group) commit(group.homeIds);
-            }}
-          >
-            <option value="">Use a home group</option>
-            {homeGroups.map((group) => (
-              <option
-                key={group.id}
-                value={group.id}
-                disabled={
-                  !group.homeIds.length || group.homeIds.length > MAX_SET_HOMES
-                }
-              >
-                {group.name} · {group.homeIds.length} homes
-                {group.homeIds.length > MAX_SET_HOMES
-                  ? " (pick up to 10 individually)"
-                  : ""}
-              </option>
-            ))}
-          </select>
-        )}
-        {pickedHomes.length > 0 ? (
-          <div className="space-y-3">
-            <ul className="grid grid-cols-1 gap-2 @xl:grid-cols-2 @4xl:grid-cols-3">
-              {pickedHomes.map((home) => (
-                <li
-                  key={home.id}
-                  className="flex min-w-0 items-center gap-3 rounded-lg bg-muted/40 p-2"
+      {kind !== "text" && (
+        <WorkspaceCard
+          title="Build creative ads"
+          icon={House}
+          count={`${picked.length}/${MAX_SET_HOMES}`}
+          actions={
+            <>
+              {hasHomes && (
+                <HomePicker
+                  homes={homes}
+                  picked={picked}
+                  max={MAX_SET_HOMES}
+                  onChange={commit}
+                  label={picked.length ? "Change homes" : "Choose homes"}
+                />
+              )}
+              {hasHomes && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={build.isPending}
+                  onClick={() =>
+                    drafted && replaceable > 0
+                      ? setConfirmRebuild(true)
+                      : runBuild()
+                  }
                 >
-                  <img
-                    src={home.thumbUrl ?? home.imageUrl}
-                    alt=""
-                    className="size-12 shrink-0 rounded-md object-cover"
-                  />
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                    {home.name}
-                  </span>
-                  <Button
-                    size="icon-sm"
-                    variant="ghost"
-                    aria-label={`Remove ${home.name} from selection`}
-                    onClick={() => toggle(home.id)}
-                  >
-                    <X className="size-4" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
-            <Button size="sm" variant="ghost" onClick={() => commit([])}>
-              Clear selection
-            </Button>
-          </div>
-        ) : hasHomes ? (
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-2 text-sm">
-              <span>Choose automatically</span>
-              <Input
-                aria-label="Number of homes to choose"
-                type="number"
-                min={1}
-                max={MAX_SET_HOMES}
-                value={count}
-                onChange={(event) =>
-                  setCount(
-                    Math.min(
-                      MAX_SET_HOMES,
-                      Math.max(1, Number(event.target.value) || 1),
-                    ),
-                  )
-                }
-                className="w-20"
+                  {build.isPending ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="size-3.5" />
+                  )}
+                  {drafted ? "Rebuild ads" : "Build ads"}
+                </Button>
+              )}
+              {drafted && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  loading={writeCopy.isPending}
+                  onClick={() => writeCopy.mutate({ brandId })}
+                >
+                  <Sparkles className="size-3.5" />
+                  Write copy
+                </Button>
+              )}
+              <ShapeBrandButton
+                brandId={brandId}
+                brandName={brandName}
+                section="home selection for ad ideas"
               />
-              <span>homes</span>
-            </label>
-          </div>
-        ) : (
-          <EmptyState
-            compact
-            icon={House}
-            title="Add homes to build ads"
-            description="Use saved homes, or add an ad and upload creative below."
-            actions={
-              <Link
-                href={`/app/performance/clients/${brandSlug}/wanderos`}
-                className="text-sm font-medium underline underline-offset-4"
-              >
-                Open WanderOS
-              </Link>
-            }
-          />
-        )}
-        {withoutPhoto > 0 && (
-          <p className="text-xs text-muted-foreground">
-            {withoutPhoto} {withoutPhoto === 1 ? "home needs" : "homes need"} a
-            photo before they can be selected.
-          </p>
-        )}
-      </WorkspaceCard>
+            </>
+          }
+        >
+          {homeGroups.length > 0 && (
+            <select
+              aria-label="Select a home group"
+              value=""
+              disabled={build.isPending}
+              className="rounded-md border bg-background px-3 py-2 text-sm"
+              onChange={(event) => {
+                const group = homeGroups.find(
+                  (group) => group.id === event.target.value,
+                );
+                if (group) commit(group.homeIds);
+              }}
+            >
+              <option value="">Use a home group</option>
+              {homeGroups.map((group) => (
+                <option
+                  key={group.id}
+                  value={group.id}
+                  disabled={
+                    !group.homeIds.length ||
+                    group.homeIds.length > MAX_SET_HOMES
+                  }
+                >
+                  {group.name} · {group.homeIds.length} homes
+                  {group.homeIds.length > MAX_SET_HOMES
+                    ? " (pick up to 10 individually)"
+                    : ""}
+                </option>
+              ))}
+            </select>
+          )}
+          {pickedHomes.length > 0 ? (
+            <div className="space-y-3">
+              <ul className="grid grid-cols-1 gap-2 @xl:grid-cols-2 @4xl:grid-cols-3">
+                {pickedHomes.map((home) => (
+                  <li
+                    key={home.id}
+                    className="flex min-w-0 items-center gap-3 rounded-lg bg-muted/40 p-2"
+                  >
+                    <img
+                      src={home.thumbUrl ?? home.imageUrl}
+                      alt=""
+                      className="size-12 shrink-0 rounded-md object-cover"
+                    />
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                      {home.name}
+                    </span>
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      aria-label={`Remove ${home.name} from selection`}
+                      onClick={() => toggle(home.id)}
+                    >
+                      <X className="size-4" />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+              <Button size="sm" variant="ghost" onClick={() => commit([])}>
+                Clear selection
+              </Button>
+            </div>
+          ) : hasHomes ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex items-center gap-2 text-sm">
+                <span>Choose automatically</span>
+                <Input
+                  aria-label="Number of homes to choose"
+                  type="number"
+                  min={1}
+                  max={MAX_SET_HOMES}
+                  value={count}
+                  onChange={(event) =>
+                    setCount(
+                      Math.min(
+                        MAX_SET_HOMES,
+                        Math.max(1, Number(event.target.value) || 1),
+                      ),
+                    )
+                  }
+                  className="w-20"
+                />
+                <span>homes</span>
+              </label>
+            </div>
+          ) : (
+            <EmptyState
+              compact
+              icon={House}
+              title="Add homes to build ads"
+              description="Use saved homes, or add an ad and upload creative below."
+              actions={
+                <Link
+                  href={`/app/performance/clients/${brandSlug}/wanderos`}
+                  className="text-sm font-medium underline underline-offset-4"
+                >
+                  Open WanderOS
+                </Link>
+              }
+            />
+          )}
+          {withoutPhoto > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {withoutPhoto} {withoutPhoto === 1 ? "home needs" : "homes need"}{" "}
+              a photo before they can be selected.
+            </p>
+          )}
+        </WorkspaceCard>
+      )}
+      {kind !== "text" && <CreativeDrop brandId={brandId} homes={homes} />}
       <WorkspaceCard
         title="Ad ideas"
         icon={Images}
@@ -387,6 +427,7 @@ export function AdPreviewsWorkspace({
           </>
         }
       >
+        <StudioGeneration brandId={brandId} website={website} />
         {drafted ? (
           <>
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -460,6 +501,9 @@ export function AdPreviewsWorkspace({
                 brandId={brandId}
                 brandName={brandName}
                 brandLogo={brandLogo}
+                brandSlug={brandSlug}
+                homes={homes}
+                website={website}
                 focusHomeId={focusHomeId}
               />
             ) : (
@@ -473,7 +517,11 @@ export function AdPreviewsWorkspace({
             compact
             icon={Images}
             title="Create the first ad idea"
-            description="Build ads from homes, start a blank ad, or upload finished creative."
+            description={
+              kind === "text"
+                ? "Write a text ad or generate copy from a landing page and search themes."
+                : "Build ads from homes, start a blank ad, or upload finished creative."
+            }
             actions={addAction}
           />
         )}

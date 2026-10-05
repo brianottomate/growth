@@ -5,6 +5,8 @@ import {
 } from "@/server/ai/capabilities/ads";
 import {
   catalogStateAction,
+  importWanderOsAction,
+  wanderOsImportStatusAction,
   catalogWriteStatusAction,
   deleteCatalogExportAction,
   exportCatalogAction,
@@ -20,6 +22,8 @@ import {
 /** The catalog Studio, served from the same actions chat and MCP call. */
 export const catalogRouter = {
   state: actionProcedure(catalogStateAction),
+  importWanderOs: actionProcedure(importWanderOsAction),
+  wanderOsImportStatus: actionProcedure(wanderOsImportStatusAction),
   refreshHomes: actionProcedure(refreshCatalogHomesAction),
   editCard: actionProcedure(editCatalogCardAction),
   setHero: actionProcedure(setHomeHeroAction),

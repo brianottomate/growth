@@ -1,3 +1,4 @@
+import { brandPageSnapshotSchema } from "@/lib/brand-website-content";
 import { getClientPageActivity } from "@/server/services/client-page-activity.service";
 import { brandEmailThemeSchema } from "@/lib/brand-email-style";
 import type { BrandingProfile } from "@mendable/firecrawl-js";
@@ -267,6 +268,8 @@ export const brandRouter = {
                 favicon: z.string().optional(),
                 ogImage: z.string().optional(),
                 scrapedAt: z.string().optional(),
+                homepage: brandPageSnapshotSchema.optional(),
+                about: brandPageSnapshotSchema.optional(),
               })
               .nullish(),
             brandIdentity: z

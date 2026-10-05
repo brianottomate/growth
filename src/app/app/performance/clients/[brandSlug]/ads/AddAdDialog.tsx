@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { useMutation } from "@tanstack/react-query";
+import { useWorkspaceMutation } from "../useWorkspaceMutation";
 import { CreativeDrop } from "./CreativeDrop";
 import { Plus } from "lucide-react";
 
@@ -36,7 +35,6 @@ export function AddAdDialog({
   /** Land in this campaign rather than on the brand's wall. */
   campaignId?: string | null;
 }) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"create" | "import">("create");
   const [format, setFormat] = useState<Format>("static");
@@ -46,7 +44,7 @@ export function AddAdDialog({
   const home = homeId ? (homes.find((row) => row.id === homeId) ?? null) : null;
   const byName = homes.length === 0;
 
-  const add = useMutation(
+  const add = useWorkspaceMutation(
     orpc.ads.addAdShell.mutationOptions({
       onSuccess: (result) => {
         toast.success(
@@ -56,7 +54,6 @@ export function AddAdDialog({
         setName("");
         setHomeId(null);
         setHomeName("");
-        router.refresh();
       },
       onError: (error) => toast.error(error.message),
     }),
@@ -65,7 +62,9 @@ export function AddAdDialog({
   return (
     <SimpleDialog
       open={open}
-      onOpenChange={setOpen}
+      onOpenChange={(next) => {
+        if (!add.isPending) setOpen(next);
+      }}
       title="Add an ad"
       size={mode === "import" ? "lg" : "sm"}
       trigger={

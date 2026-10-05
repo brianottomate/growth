@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useMutation } from "@tanstack/react-query";
+import { useWorkspaceMutation } from "./useWorkspaceMutation";
 import { Loader2, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -35,25 +34,22 @@ export function AddHomesByHand({
   brandWebsite: string | null;
   homes: HandHome[];
 }) {
-  const router = useRouter();
   const [paste, setPaste] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const shells = useMutation(
+  const shells = useWorkspaceMutation(
     orpc.brand.homesShellsFromText.mutationOptions({
       onSuccess: (result) => {
         toast.success(
           `Added ${result.added} home${result.added === 1 ? "" : "s"}.`,
         );
         setPaste("");
-        router.refresh();
       },
       onError: (error) => toast.error(error.message),
     }),
   );
-  const drop = useMutation(
+  const drop = useWorkspaceMutation(
     orpc.brand.homesRemove.mutationOptions({
-      onSuccess: () => router.refresh(),
       onError: (error) => toast.error(error.message),
       onSettled: () => setBusyId(null),
     }),
@@ -89,7 +85,7 @@ export function AddHomesByHand({
                   setBusyId(home.id);
                   drop.mutate({ brandId, homeId: home.id });
                 }}
-                disabled={busyId === home.id}
+                disabled={drop.isPending || shells.isPending}
               >
                 {busyId === home.id ? (
                   <Loader2 className="size-3.5 animate-spin" />
@@ -122,7 +118,9 @@ export function AddHomesByHand({
         <Button
           size="sm"
           onClick={() => shells.mutate({ brandId, text: paste })}
-          disabled={shells.isPending || paste.trim().length === 0}
+          disabled={
+            shells.isPending || drop.isPending || paste.trim().length === 0
+          }
         >
           {shells.isPending ? (
             <>

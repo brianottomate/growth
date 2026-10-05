@@ -103,6 +103,8 @@ export const BRAND_VOICE_TYPES = [
 export type BrandVoiceType = (typeof BRAND_VOICE_TYPES)[number];
 
 export type BrandWebsiteMeta = {
+  homepage?: import("@/lib/brand-website-content").BrandPageSnapshot;
+  about?: import("@/lib/brand-website-content").BrandPageSnapshot;
   title?: string;
   description?: string;
   favicon?: string;

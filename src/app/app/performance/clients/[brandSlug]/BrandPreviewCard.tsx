@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import type { BrandPreviewCopy } from "@/lib/brand-preview-copy";
-import { useRouter } from "next/navigation";
-import { useMutation } from "@tanstack/react-query";
+import { useWorkspaceMutation } from "./useWorkspaceMutation";
 
 import {
   BrandFontPicker,
@@ -35,7 +34,6 @@ export function BrandPreviewCard({
   previewCopy?: BrandPreviewCopy | null;
   children?: React.ReactNode;
 }) {
-  const router = useRouter();
   const saved = brandFonts(identity);
   const [editing, setEditing] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -45,12 +43,11 @@ export function BrandPreviewCard({
     draft !== null &&
     (draft.heading !== saved.heading || draft.body !== saved.body);
 
-  const setFonts = useMutation(
+  const setFonts = useWorkspaceMutation(
     orpc.brand.setFonts.mutationOptions({
       onSuccess: () => {
         setDraft(null);
         setEditing(false);
-        router.refresh();
       },
       onError: (error) => toast.error(error.message),
     }),
@@ -89,6 +86,7 @@ export function BrandPreviewCard({
         <Button
           size="sm"
           variant="outline"
+          disabled={setFonts.isPending}
           onClick={() => {
             setDraft(null);
             setEditing(true);
@@ -152,7 +150,8 @@ export function BrandPreviewCard({
             </Button>
             <Button
               size="sm"
-              disabled={!dirty || setFonts.isPending}
+              loading={setFonts.isPending}
+              disabled={!dirty}
               onClick={() => setFonts.mutate({ id: brandId, ...fonts })}
             >
               {setFonts.isPending ? "Saving…" : "Save fonts"}

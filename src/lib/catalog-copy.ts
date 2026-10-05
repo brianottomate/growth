@@ -28,8 +28,3 @@ export function brandWideAmenities(
     .filter((row) => row.count / homes.length >= BRAND_WIDE_SHARE)
     .map((row) => row.label);
 }
-
-/** Catalog copy never carries an em dash; it reads as machine-written. */
-export const EM_DASH_MESSAGE =
-  "No em dashes: use a comma, a colon or two short phrases instead.";
-export const hasEmDash = (text: string) => text.includes("—");

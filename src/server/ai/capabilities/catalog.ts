@@ -37,6 +37,13 @@ import {
 } from "./outputs/catalog";
 import { growthAction } from "./types";
 
+import { wanderOsImportRunSchema } from "@/lib/wanderos-import";
+import {
+  startWanderOsImport,
+  runWanderOsImport,
+  wanderOsImportStatus,
+} from "@/server/services/wanderos-import.service";
+
 const brandInput = z.object({ brandId: z.string().min(1) });
 const homeInput = brandInput.extend({
   homeId: z.string().min(1).describe("The WanderOS listing id."),
@@ -46,6 +53,32 @@ const homeInput = brandInput.extend({
     .describe(
       "Local development only: change an approved card anyway. Ignored when deployed.",
     ),
+});
+
+export const importWanderOsAction = growthAction({
+  inputSchema: brandInput,
+  outputSchema: z.object({
+    started: z.boolean(),
+    run: wanderOsImportRunSchema,
+  }),
+  description:
+    "Import WanderOS in the background: import homes and baseline catalog inventory, select up to five Featured homes while keeping existing selections, and create destinations if none exist. Follow wanderOsImportStatus for progress. Retry resumes unfinished steps. Does not write catalog copy or approve/export cards.",
+  examples: [{ brandId: "brd_01" }],
+  execute: async (input, ctx) => {
+    const actor = { ...input, userId: ctx.userId };
+    const result = await startWanderOsImport(actor);
+    if (result.started) after(() => runWanderOsImport(result.run.id, actor));
+    return result;
+  },
+});
+export const wanderOsImportStatusAction = growthAction({
+  inputSchema: brandInput,
+  outputSchema: z.object({ run: wanderOsImportRunSchema.nullable() }),
+  description:
+    "Read the latest WanderOS import workflow and progress of its homes, Featured selection and destination steps.",
+  examples: [{ brandId: "brd_01" }],
+  execute: (input, ctx) =>
+    wanderOsImportStatus({ ...input, userId: ctx.userId }),
 });
 
 export const catalogStateAction = growthAction({
@@ -92,11 +125,26 @@ export const newCatalogCopyAction = growthAction({
 export const newCatalogPhotoAction = growthAction({
   outputSchema: newCatalogPhotoActionOutputSchema,
   description:
-    "Pick a better hero for one home's catalog card from its listing photos and make it the home's hero, so its ads and previews follow. One model call; never picks the current hero again. Refused on an approved card. Fails with the reason when no clean photo is left.",
+    "Pick a better hero for one home's catalog card from its listing photos and make it the home's hero, so its ads and previews follow. Then rewrite the card copy for the new photo; never picks the current hero again. Refused on an approved card. Fails with the reason when no clean photo is left.",
   inputSchema: homeInput,
   examples: [{ brandId: "brd_01", homeId: "1234567890123" }],
   execute: async (input, ctx) => {
+    const state = await catalogState(ctx.userId, input.brandId);
+    if (
+      state.draft.cards.find((card) => card.homeId === input.homeId)?.mode ===
+      "finished"
+    )
+      throw new Error(
+        "This card uses supplied artwork. Choose new artwork instead of regenerating its photo and copy.",
+      );
     const picked = await newCatalogPhoto({ ...input, userId: ctx.userId });
+    try {
+      await newCatalogCopy({ ...input, userId: ctx.userId });
+    } catch (error) {
+      throw new Error(
+        `The photo was updated, but copy could not be rewritten. Use New copy to retry. ${error instanceof Error ? error.message : ""}`,
+      );
+    }
     return {
       homeId: picked.homeId,
       photoNumber: picked.photoNumber ?? null,

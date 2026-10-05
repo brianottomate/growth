@@ -44,27 +44,17 @@ export default async function PerformanceBrandAdsPage({
     listAdSet({ brandId: brand.id, orgId: org.id }),
     homeGroupContext(brand.id, org.id),
   ]);
-  const ideas: StudioIdea[] = drafted.flatMap((ad) =>
-    "media" in ad.content
-      ? [
-          {
-            id: ad.id,
-            name: ad.name,
-            content: ad.content,
-            status: ad.status,
-            updatedAt: ad.updatedAt.toISOString(),
-            homeId: ad.homeId,
-            home: ad.home
-              ? {
-                  name: ad.home.name,
-                  url: ad.home.url,
-                  externalId: ad.home.externalId,
-                }
-              : null,
-          },
-        ]
-      : [],
-  );
+  const ideas: StudioIdea[] = drafted.map((ad) => ({
+    id: ad.id,
+    name: ad.name,
+    content: ad.content,
+    status: ad.status,
+    updatedAt: ad.updatedAt.toISOString(),
+    homeId: ad.homeId,
+    home: ad.home
+      ? { name: ad.home.name, url: ad.home.url, externalId: ad.home.externalId }
+      : null,
+  }));
   const homes: WorkspaceHome[] = listings
     .filter((home) => home.imageUrl)
     .map((home) => ({
@@ -132,6 +122,7 @@ export default async function PerformanceBrandAdsPage({
         brandSlug={slug}
         brandName={brand.name}
         brandLogo={avatarUrl}
+        website={brand.website}
         homes={homes}
         withoutPhoto={withoutPhoto}
         initialPicked={initialPicked}

@@ -1,13 +1,19 @@
 "use client";
 
 import { useEffect } from "react";
-import {
-  AdIdeaCard,
-  type StudioAd,
-} from "@/app/app/brands/[brandSlug]/ads/_views/AdIdeaCard";
-import type { AdCreativeContent } from "@/server/db/schema";
+import { AdIdeaCard } from "@/app/app/brands/[brandSlug]/ads/_views/AdIdeaCard";
+import { TextAdCard } from "@/app/app/brands/[brandSlug]/ads/_views/TextAdCard";
+import { AdTile } from "@/app/app/brands/[brandSlug]/ads/_views/AdWall";
+import { toWallAd } from "@/lib/ad-wall";
+import type { WorkspaceHome } from "./AdPreviewsWorkspace";
+import type { AdContent, AdCreativeContent } from "@/server/db/schema";
 
-export type StudioIdea = StudioAd & {
+export type StudioIdea = {
+  id: string;
+  name: string;
+  content: AdContent;
+  updatedAt: string;
+  homeId: string | null;
   status: string;
   home: { name: string; url: string | null; externalId: string } | null;
 };
@@ -34,12 +40,18 @@ export function StudioIdeas({
   brandId,
   brandName,
   brandLogo,
+  brandSlug,
+  homes,
+  website,
   focusHomeId,
 }: {
   ideas: StudioIdea[];
   brandId: string;
   brandName: string;
   brandLogo: string | null;
+  brandSlug: string;
+  homes: WorkspaceHome[];
+  website: string | null;
   focusHomeId?: string | null;
 }) {
   useEffect(() => {
@@ -62,7 +74,7 @@ export function StudioIdeas({
     <div className="divide-y">
       {[...groups.entries()].map(([key, group]) => {
         const frozen = group.ideas.filter(
-          (idea) => idea.content.ideaStudio?.approval,
+          (idea) => idea.status === "approved",
         ).length;
         return (
           <section
@@ -77,33 +89,55 @@ export function StudioIdeas({
                 {frozen} approved
               </span>
             </h2>
-            {group.ideas.map((idea) =>
-              editable(idea.content) ? (
-                <AdIdeaCard
-                  key={idea.id}
-                  studio
-                  ad={idea}
-                  brandId={brandId}
-                  brandName={brandName}
-                  brandLogo={brandLogo}
-                  home={
-                    idea.home?.url
-                      ? { name: idea.home.name, url: idea.home.url }
-                      : undefined
-                  }
-                />
-              ) : (
-                <p
-                  key={idea.id}
-                  className="rounded-xl border px-4 py-3 text-xs text-muted-foreground"
-                >
-                  {idea.name} ·{" "}
-                  {idea.content.format === "catalog"
-                    ? "catalog ad, drawn by Meta from the Catalog tab's feed"
-                    : "video, edit it in a campaign"}
-                </p>
-              ),
-            )}
+            {group.ideas.map((idea) => {
+              if (!("media" in idea.content))
+                return (
+                  <TextAdCard
+                    key={idea.id}
+                    ad={{ ...idea, content: idea.content }}
+                    brandId={brandId}
+                    website={website}
+                  />
+                );
+              if (editable(idea.content))
+                return (
+                  <AdIdeaCard
+                    key={idea.id}
+                    studio
+                    ad={{ ...idea, content: idea.content }}
+                    brandId={brandId}
+                    brandName={brandName}
+                    brandLogo={brandLogo}
+                    home={
+                      idea.home?.url
+                        ? { name: idea.home.name, url: idea.home.url }
+                        : undefined
+                    }
+                  />
+                );
+              const wall = toWallAd({
+                ...idea,
+                updatedAt: new Date(idea.updatedAt),
+                home: idea.home?.url
+                  ? { ...idea.home, url: idea.home.url }
+                  : null,
+              });
+              return wall ? (
+                <ul key={idea.id}>
+                  <AdTile
+                    ad={wall}
+                    brandId={brandId}
+                    brandSlug={brandSlug}
+                    brandName={brandName}
+                    brandLogo={brandLogo}
+                    landingUrl={website}
+                    homes={homes}
+                    surface="instagram"
+                    states={{}}
+                  />
+                </ul>
+              ) : null;
+            })}
           </section>
         );
       })}

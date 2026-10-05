@@ -116,3 +116,11 @@ analysis. Drafts are saved as each home finishes and remain unapproved. Next `af
 runs the job after the start response; a `creative_run` record stores progress and
 errors, and the campaign polls every two seconds while it is active. Completed drafts
 remain available if generation fails. There is no automatic retry or reconciliation.
+
+## Standalone Ad Studio
+
+Performance clients can create ads before choosing a campaign. The All ads, Text-first and Creative-first filters describe the authoring approach; they do not change platform compilation eligibility. Search still compiles text ads and feed placements compile supported creative formats.
+
+Studio supports home-photo and brand-concept generation, uploaded media, the shared image/composition editor, video/catalog tiles, and complete text headline/description pools. Text drafts can contain partial copy; approval requires 3–15 headlines (30 characters each) and 2–4 descriptions (90 characters each). Reopen approved text ads before editing. Text editing and approval require the current `updatedAt` version, preventing a stale browser from approving or overwriting newer copy. Creative-set rebuilds preserve text drafts and approved ads.
+
+The existing `draftAd`, `writeGoogleTextAds`, and `generateStarterIdeas` capabilities accept exactly one of `brandId` (standalone Studio) or `campaignId`. Brand-scoped generation uses the same services as campaign authoring. `writeGoogleTextAds` optionally accepts a landing URL and search themes. `setAdCopy` accepts a complete `text` pool with `expectedUpdatedAt`. Approved standalone ads can subsequently be attached to a campaign using the existing attachment flow; the current relationship still assigns each ad to one campaign.

@@ -1,3 +1,4 @@
+import type { AiNotes } from "@/lib/ai-notes";
 import { relations, sql } from "drizzle-orm";
 import { index, pgEnum, pgTable, uniqueIndex } from "drizzle-orm/pg-core";
 
@@ -120,6 +121,7 @@ export const homeTable = pgTable(
     // Catalog card overrides. Null means the computed default: the plain
     // "Sleeps N in place" headline, the bed/bath/guest line, the hero photo.
     // Only an edit writes.
+    aiNotes: t.jsonb().$type<AiNotes>(),
     catalogTitle: t.text(),
     catalogSubtitle: t.text(),
     catalogTemplateId: t.text(),

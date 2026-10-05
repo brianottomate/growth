@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { useMutation } from "@tanstack/react-query";
+import { useWorkspaceMutation } from "./useWorkspaceMutation";
 import { FileText, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -26,22 +25,19 @@ export function BrandStoryCard({
   brandName: string;
   story: string | null;
 }) {
-  const router = useRouter();
   const [draft, setDraft] = useState<string | null>(null);
   const editing = draft !== null;
 
-  const save = useMutation(
+  const save = useWorkspaceMutation(
     orpc.brand.setStory.mutationOptions({
       onSuccess: () => {
         setDraft(null);
-        router.refresh();
       },
       onError: (error) => toast.error(error.message),
     }),
   );
-  const write = useMutation(
+  const write = useWorkspaceMutation(
     orpc.brand.draftStory.mutationOptions({
-      onSuccess: () => router.refresh(),
       onError: (error) => toast.error(error.message),
     }),
   );
@@ -49,7 +45,12 @@ export function BrandStoryCard({
   const actions = (primary = false) => (
     <>
       {story ? (
-        <Button size="sm" variant="outline" onClick={() => setDraft(story)}>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={save.isPending || write.isPending}
+          onClick={() => setDraft(story)}
+        >
           Edit
         </Button>
       ) : (
@@ -106,6 +107,7 @@ export function BrandStoryCard({
       </div>
       {editing ? (
         <textarea
+          disabled={save.isPending}
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           rows={10}

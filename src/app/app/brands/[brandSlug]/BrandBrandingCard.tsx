@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMutation } from "@tanstack/react-query";
+import { useWorkspaceMutation } from "@/app/app/performance/clients/[brandSlug]/useWorkspaceMutation";
 import { Palette, RefreshCw, Sparkles } from "lucide-react";
 
 import {
@@ -46,16 +46,15 @@ export function BrandBrandingCard({
   previewImages?: PreviewImageOption[];
 }) {
   const router = useRouter();
-  const enrich = useMutation(
+  const enrich = useWorkspaceMutation(
     orpc.brand.enrich.mutationOptions({
       onSuccess: () => {
         toast.success("Identity refreshed");
-        router.refresh();
       },
       onError: (error) => toast.error(error.message),
     }),
   );
-  const create = useMutation({
+  const create = useWorkspaceMutation({
     mutationFn: async () => {
       if (!identity?.extractedAt && website)
         await orpc.brand.enrich.call({ brandId });
@@ -63,16 +62,14 @@ export function BrandBrandingCard({
     },
     onSuccess: () => {
       toast.success("Brand mark created");
-      router.refresh();
     },
     onError: (error: Error) => {
       toast.error(error.message);
       router.refresh();
     },
   });
-  const settings = useMutation(
+  const settings = useWorkspaceMutation(
     orpc.brand.setPerformanceSettings.mutationOptions({
-      onSuccess: () => router.refresh(),
       onError: (error) => toast.error(error.message),
     }),
   );
@@ -84,6 +81,7 @@ export function BrandBrandingCard({
           size="sm"
           variant={primary ? "default" : "outline"}
           disabled={busy}
+          loading={create.isPending}
           onClick={() => create.mutate()}
         >
           <Sparkles className="size-3.5" />

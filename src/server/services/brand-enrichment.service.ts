@@ -1,4 +1,5 @@
 import "server-only";
+import { brandPageSnapshot } from "@/lib/brand-website-content";
 
 import type { BrandingProfile } from "@mendable/firecrawl-js";
 
@@ -124,6 +125,7 @@ export async function enrichBrandFromWebsite(
     logo: selectBrandLogo({ logo: brandIdentity?.logo, favicon, ogImage }),
     brandIdentity,
     websiteMeta: {
+      homepage: brandPageSnapshot(url, result),
       title,
       description,
       favicon,

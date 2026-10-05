@@ -1,8 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useMutation } from "@tanstack/react-query";
+import { useWorkspaceMutation } from "./useWorkspaceMutation";
 import { Check, Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -37,7 +36,6 @@ export function HeroHomePicker({
   label: string;
   primary?: boolean;
 }) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const shown = useMemo(() => {
@@ -46,11 +44,9 @@ export function HeroHomePicker({
       ? options.filter((option) => option.name.toLowerCase().includes(q))
       : options;
   }, [options, query]);
-  // The dialog closes on the click; the save and the page refresh follow
-  // behind it rather than holding the dialog open until they land.
-  const feature = useMutation(
+  const feature = useWorkspaceMutation(
     orpc.brand.setPreviewSource.mutationOptions({
-      onSuccess: () => router.refresh(),
+      onSuccess: () => setOpen(false),
       onError: (error) => toast.error(error.message),
     }),
   );
@@ -61,11 +57,17 @@ export function HeroHomePicker({
       <Button
         size="sm"
         variant={primary ? "default" : "outline"}
+        loading={feature.isPending}
         onClick={() => setOpen(true)}
       >
         {label}
       </Button>
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog
+        open={open}
+        onOpenChange={(next) => {
+          if (!feature.isPending) setOpen(next);
+        }}
+      >
         <DialogContent size="2xl">
           <DialogHeader>
             <DialogTitle>Hero home</DialogTitle>
@@ -91,8 +93,8 @@ export function HeroHomePicker({
                 <li key={option.url}>
                   <button
                     type="button"
+                    disabled={feature.isPending}
                     onClick={() => {
-                      setOpen(false);
                       feature.mutate({
                         id: brandId,
                         listingUrl: option.url,
@@ -100,7 +102,7 @@ export function HeroHomePicker({
                       });
                     }}
                     className={cn(
-                      "group block w-full space-y-1.5 rounded-lg border p-1.5 text-left text-xs transition hover:border-foreground",
+                      "group block w-full space-y-1.5 rounded-lg border p-1.5 text-left text-xs transition hover:border-foreground disabled:cursor-wait disabled:opacity-60",
                       selected && "border-foreground",
                     )}
                   >
@@ -124,6 +126,11 @@ export function HeroHomePicker({
               );
             })}
           </ul>
+          {feature.isPending && (
+            <p role="status" className="text-sm text-muted-foreground">
+              Saving preview image…
+            </p>
+          )}
         </DialogContent>
       </Dialog>
     </>

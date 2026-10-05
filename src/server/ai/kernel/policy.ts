@@ -302,6 +302,7 @@ export const growthActionPolicies = {
     catalogHomeFacts: read(),
     // Reading can ingest a home new since the last read, so it has a row.
     catalogState: read(),
+    wanderOsImportStatus: read(),
     catalogWriteStatus: read(),
     suggestCampaignAudiences: read("model-read"),
     // Renders via Meta's preview API; creates nothing.
@@ -342,6 +343,7 @@ export const growthActionPolicies = {
     editCatalogCard: write({ idempotent: true }),
     // Catalog: local home rows and our own R2 renders, no provider call.
     refreshCatalogHomes: write({ idempotent: true }),
+    importWanderOs: write({ consequence: "background-run", idempotent: true }),
     newCatalogCopy: write({ consequence: "model-write" }),
     newCatalogPhoto: write({ consequence: "model-write" }),
     // Open cards only (never approved ones); a running run is returned, not doubled.

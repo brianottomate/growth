@@ -117,6 +117,7 @@ async function catalogRows(brandId: string) {
       galleryCache: true,
       rating: true,
       catalogTitle: true,
+      aiNotes: true,
       catalogSubtitle: true,
       catalogTemplateId: true,
       catalogImagePosition: true,
@@ -257,6 +258,10 @@ async function catalogHomes(brand: CatalogBrand, refresh = false) {
     DEFAULT_CATALOG_FORMAT,
     brand.settings?.logoOnCreatives !== false,
   );
+  for (const card of draft.cards) {
+    const review = rows.get(card.homeId)?.aiNotes?.catalog;
+    if (review) card.aiReview = review;
+  }
   // Cards still on the starter headline that nobody wrote, approved or gave
   // supplied artwork: what "Write all cards" works through.
   const unwritten = draft.cards

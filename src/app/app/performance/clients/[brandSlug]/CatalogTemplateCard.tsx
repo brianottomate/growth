@@ -1,10 +1,13 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useWorkspaceMutation } from "./useWorkspaceMutation";
+
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Combobox } from "@/components/ui/compound/combobox";
 import { cn } from "@/components/ui/lib/utils";
 import { toast } from "@/components/ui/toast";
 import {
@@ -38,7 +41,16 @@ function useTemplatePreview(brandId: string, previewHomeId: string | null) {
     cards.find((c) => c.homeId === previewHomeId) ?? drawn[0] ?? cards[0];
   const card = pick && { ...pick, mode: "compose" as const };
   const current = query.data?.defaultTemplate ?? DEFAULT_CATALOG_TEMPLATE;
-  return { card, format, current, cards, homes: query.data?.homes ?? [] };
+  return {
+    card,
+    format,
+    current,
+    cards,
+    homes: query.data?.homes ?? [],
+    pending: query.isPending,
+    error: query.error,
+    refetch: query.refetch,
+  };
 }
 
 const templateLabel = (templateId: CatalogTemplateId) =>
@@ -101,15 +113,13 @@ export function CatalogTemplateCard({
   /** Optional initial sample home; defaults to an included card. */
   previewHomeId?: string | null;
 }) {
-  const router = useRouter();
   const client = useQueryClient();
   const state = orpc.catalog.state.queryOptions({ input: { brandId } });
-  const save = useMutation(
+  const save = useWorkspaceMutation(
     orpc.catalog.setDefaultTemplate.mutationOptions({
       onError: () => toast.error("Unable to save the catalog card"),
       onSuccess: async () => {
         await client.invalidateQueries({ queryKey: state.queryKey });
-        router.refresh();
       },
     }),
   );
@@ -117,29 +127,58 @@ export function CatalogTemplateCard({
     previewHomeId,
   );
   const saving = save.isPending ? (save.variables?.templateId ?? null) : null;
-  const { card, format, current, cards, homes } = useTemplatePreview(
-    brandId,
-    selectedHomeId,
-  );
+  const { card, format, current, cards, homes, pending, error, refetch } =
+    useTemplatePreview(brandId, selectedHomeId);
 
-  if (!card) return null;
+  if (pending)
+    return (
+      <div role="status" aria-label="Loading catalog templates">
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  if (error)
+    return (
+      <div className="space-y-2">
+        <p role="alert" className="text-sm text-destructive">
+          {error.message}
+        </p>
+        <Button size="sm" variant="outline" onClick={() => void refetch()}>
+          Try again
+        </Button>
+      </div>
+    );
+  if (!card)
+    return (
+      <p className="text-sm text-muted-foreground">
+        Include a home to preview catalog templates.
+      </p>
+    );
   return (
     <div className="space-y-3">
-      <label className="flex items-center gap-3 text-sm">
-        Preview home
-        <select
-          className="rounded-md border bg-background p-2"
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <span className="text-muted-foreground">Preview home</span>
+        <Combobox
+          className="w-full max-w-sm"
+          triggerClassName="[&>svg]:ml-auto overflow-hidden text-left"
           value={card.homeId}
-          onChange={(event) => setSelectedHomeId(event.target.value)}
-        >
-          {cards.map((option) => (
-            <option key={option.homeId} value={option.homeId}>
-              {homes.find((home) => home.id === option.homeId)?.name ??
-                option.title}
-            </option>
-          ))}
-        </select>
-      </label>
+          onValueChange={(value) => {
+            if (value) setSelectedHomeId(value);
+          }}
+          placeholder="Choose a preview home"
+          searchPlaceholder="Search homes…"
+          emptyText="No matching homes."
+          options={cards.map((option) => {
+            const home = homes.find((home) => home.id === option.homeId);
+            const name = home?.name ?? option.title;
+            return {
+              value: option.homeId,
+              label: name,
+              keywords: [name],
+              imageUrl: home?.thumbUrl ?? home?.imageUrl,
+            };
+          })}
+        />
+      </div>
       <div className="grid grid-cols-2 gap-3 @2xl:grid-cols-3 @5xl:grid-cols-4">
         {CATALOG_TEMPLATES.map((templateId) => {
           const label = templateLabel(templateId);

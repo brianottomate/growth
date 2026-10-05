@@ -8,6 +8,7 @@ import {
   assignPersonaAudienceOutputSchema,
 } from "./outputs/personas";
 import "server-only";
+import { requirePersonaEvidence } from "@/lib/brand-evidence";
 
 import { z } from "zod";
 import { anthropic } from "@ai-sdk/anthropic";
@@ -278,13 +279,18 @@ export const suggestPersonas = growthAction({
       system,
       prompt,
       output: Output.object({
-        schema: z.object({ suggestions: z.array(suggestionSchema).max(3) }),
+        schema: z.object({
+          suggestions: z.array(suggestionSchema).max(3),
+          insufficientEvidence: z.boolean(),
+          reason: z.string(),
+        }),
       }),
     });
     if (!output)
       throw new Error(
         "No persona suggestions were returned. Try again or Shape them in conversation.",
       );
+    requirePersonaEvidence(output, existing.length);
     return {
       suggestions: newPersonaSuggestions(
         output.suggestions,

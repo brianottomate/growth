@@ -2,7 +2,7 @@ import "server-only";
 
 import { anthropic } from "@ai-sdk/anthropic";
 import { Output, generateText } from "ai";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { brandStorySection } from "@/server/ai/prompts";
@@ -13,7 +13,7 @@ import type { AdCreativeContent } from "@/server/db/ads-schema";
 import { createId } from "@/server/db/utils";
 import { searchTerms } from "@/lib/search-terms";
 
-import { requireOwnedCampaign } from "./ads-draft.service";
+import { resolveAdAuthoringScope } from "./ads-draft.service";
 import { GOOGLE_RSA } from "./ads-write.service";
 
 // Search text ads for a campaign, written on demand from what the landing
@@ -40,16 +40,16 @@ const DraftSchema = z.object({
 
 export async function writeGoogleTextAds(input: {
   organizationId: string;
-  campaignId: string;
+  campaignId?: string;
+  brandId?: string;
+  landingUrl?: string;
+  keywords?: string[];
   count?: number;
 }) {
-  const { campaign, brand } = await requireOwnedCampaign(
-    input.campaignId,
-    input.organizationId,
-  );
-  const landingUrl = campaign.landingUrl ?? brand.website;
+  const { campaign, brand } = await resolveAdAuthoringScope(input);
+  const landingUrl = input.landingUrl ?? campaign?.landingUrl ?? brand.website;
   if (!landingUrl) {
-    throw new Error("Set a landing URL on the campaign first");
+    throw new Error("Supply a landing URL or set the brand website first");
   }
   const count = Math.min(Math.max(input.count ?? 2, 1), 3);
   const [story, page, audiences, ideas] = await Promise.all([
@@ -58,21 +58,28 @@ export async function writeGoogleTextAds(input: {
       columns: { story: true },
     }),
     scrapeBasicContent({ url: landingUrl }),
-    db.query.audienceTable.findMany({
-      where: eq(audienceTable.campaignId, campaign.id),
-      columns: { name: true, keywords: true },
-    }),
+    campaign
+      ? db.query.audienceTable.findMany({
+          where: eq(audienceTable.campaignId, campaign.id),
+          columns: { name: true, keywords: true },
+        })
+      : Promise.resolve([]),
     db.query.adTable.findMany({
-      where: eq(adTable.campaignId, campaign.id),
+      where: campaign
+        ? eq(adTable.campaignId, campaign.id)
+        : and(eq(adTable.brandId, brand.id), isNull(adTable.campaignId)),
       columns: { type: true, content: true },
     }),
   ]);
   if (!page?.content) {
     throw new Error(`Could not read ${landingUrl}; check the landing URL`);
   }
-  const terms = audiences.flatMap((audience) =>
-    searchTerms(audience.keywords).map((term) => term.text),
-  );
+  const terms = [
+    ...(input.keywords ?? []),
+    ...audiences.flatMap((audience) =>
+      searchTerms(audience.keywords).map((term) => term.text),
+    ),
+  ];
   const messages = ideas
     .filter((idea) => idea.type === "creative")
     .map((idea) => idea.content as AdCreativeContent)
@@ -134,14 +141,14 @@ export async function writeGoogleTextAds(input: {
       drafts.map((draft) => ({
         id: createId("ad"),
         brandId: brand.id,
-        campaignId: campaign.id,
+        campaignId: campaign?.id ?? null,
         name: `Search · ${draft.angle}`,
         type: "text" as const,
         status: "drawn" as const,
         content: {
           headlines: draft.headlines,
           descriptions: draft.descriptions,
-          linkUrl: campaign.landingUrl ? undefined : landingUrl,
+          linkUrl: landingUrl,
         },
       })),
     )

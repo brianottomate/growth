@@ -14,6 +14,8 @@ export function brandMarketsDraftPrompt(input: {
   return {
     system: `You map where ${input.brandName}'s vacation homes are into markets, the way a guest thinks about the trip.${input.story}
 
+The imported home towns are the required source of truth for geographic coverage. The brand story and listing descriptions are optional context: never exclude or invent a destination because of the story. Missing optional context is not a reason to fail.
+
 A market is a destination a guest would search for and plan around. Group towns that a guest would see as one trip (the villages around a state park, the neighbourhoods of one city); keep a town apart when it is a different trip. Most brands have one market; split only when the homes really are in different destinations.
 
 label: how a guest would say it, at most 40 characters. Prefer the destination or region guests search for over a small town's postal name ("Hocking Hills, Ohio" over "Logan, OH"). For a well-known city, the city and its common short state form ("Louisville, KY", "Napa, CA"); spell a state out when that is how people say it or the short form is unclear. One label per market, used on every card.

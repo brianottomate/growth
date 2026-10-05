@@ -1,3 +1,4 @@
+import { adAuthoringScopeSchema } from "@/lib/ad-authoring";
 import { after } from "next/server";
 import { starterGenerationSchema } from "@/lib/starter-ad-generation";
 import { compositionFormatIdSchema } from "@/lib/compositions";
@@ -19,7 +20,6 @@ import {
   setCardCopy,
 } from "@/server/services/ad-set.service";
 import { researchGoogleKeywords } from "@/server/services/ads-write.service";
-import { writeGoogleTextAds } from "@/server/services/google-text-ads.service";
 import {
   addStarterAdIdeas,
   starterIdeaHomes,
@@ -29,6 +29,8 @@ import {
   topAds,
   setDeliveryAction,
   draftCampaignAction,
+  draftAdAction,
+  writeGoogleTextAdsAction,
   buildAdSetAction,
   writeSetCopyAction,
   addAdShellAction,
@@ -90,6 +92,7 @@ export const adsRouter = {
   /** The copy pass: AI words onto the drafts already drawn. Captions and editable image words together. */
   writeSetCopy: actionProcedure(writeSetCopyAction),
 
+  draftAd: actionProcedure(draftAdAction),
   saveIdea: actionProcedure(saveIdeaAction),
   /** The AI's crop for a newly chosen photo at one ad size. */
   suggestCrop: workspaceProcedure
@@ -105,6 +108,7 @@ export const adsRouter = {
           campaignId: z.string().min(1).optional(),
           brandId: z.string().min(1).optional(),
           groupId: z.string().min(1).optional(),
+          allHomes: z.boolean().optional(),
         })
         .refine((value) => value.campaignId || value.brandId, {
           message: "campaignId or brandId is required",
@@ -141,7 +145,7 @@ export const adsRouter = {
       return run;
     }),
   starterGenerationStatus: workspaceProcedure
-    .input(z.object({ campaignId: z.string().min(1) }))
+    .input(adAuthoringScopeSchema)
     .handler(async ({ context: ctx, input }) =>
       starterGenerationStatus({
         ...input,
@@ -165,16 +169,7 @@ export const adsRouter = {
     ),
 
   /** Google Search text ideas from the landing page and audiences' terms. */
-  writeGoogleTextAds: workspaceProcedure
-    .input(
-      z.object({
-        campaignId: z.string().min(1),
-        count: z.number().int().min(1).max(3).optional(),
-      }),
-    )
-    .handler(async ({ context: ctx, input }) =>
-      writeGoogleTextAds({ ...input, organizationId: ctx.workspace.orgId }),
-    ),
+  writeGoogleTextAds: actionProcedure(writeGoogleTextAdsAction),
 
   /** An empty ad of a declared format, waiting for its creative. */
   addAdShell: actionProcedure(addAdShellAction),

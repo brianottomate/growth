@@ -96,6 +96,25 @@ async function requireOwnedBrand(input: {
   return brand;
 }
 
+/** One authoring owner, checked before any generation, media import or write. */
+export async function resolveAdAuthoringScope(input: {
+  organizationId: string;
+  campaignId?: string;
+  brandId?: string;
+}) {
+  if (Boolean(input.campaignId) === Boolean(input.brandId))
+    throw new Error("Supply either campaignId or brandId.");
+  if (input.campaignId) {
+    const owned = await requireOwnedCampaign(
+      input.campaignId,
+      input.organizationId,
+    );
+    if (owned.campaign.deletedAt) throw new Error("Campaign not found");
+    return owned;
+  }
+  return { campaign: null, brand: await requireOwnedBrand(input) };
+}
+
 export async function requireOwnedCampaign(
   campaignId: string,
   organizationId: string,
@@ -743,19 +762,17 @@ export async function addStarterAdIdeas(input: {
 /** Add a drafted ad: a suggestion the push transforms per platform. */
 export async function addDraftAd(input: {
   organizationId: string;
-  campaignId: string;
+  campaignId?: string;
+  brandId?: string;
   name: string;
   type?: "creative" | "text";
   content: AdContent;
   businessKey?: string | null;
 }) {
-  const { campaign, brand } = await requireOwnedCampaign(
-    input.campaignId,
-    input.organizationId,
-  );
+  const { campaign, brand } = await resolveAdAuthoringScope(input);
   const businessKey =
     input.businessKey ??
-    `${campaign.id}:${input.name.trim().toLowerCase().replace(/\s+/g, "-")}`;
+    `${campaign?.id ?? brand.id}:${input.name.trim().toLowerCase().replace(/\s+/g, "-")}`;
 
   // `business_key` carries a UNIQUE index, and every ad has one — a caller's,
   // or one derived from the name. A bare insert therefore threw a raw Postgres
@@ -765,10 +782,20 @@ export async function addDraftAd(input: {
   // refresh it, not fail.
   const existing = await db.query.adTable.findFirst({
     where: eq(adTable.businessKey, businessKey),
-    columns: { id: true, campaignId: true, content: true, status: true },
+    columns: {
+      id: true,
+      brandId: true,
+      campaignId: true,
+      content: true,
+      status: true,
+    },
   });
 
-  if (existing && existing.campaignId !== campaign.id) {
+  if (
+    existing &&
+    (existing.campaignId !== (campaign?.id ?? null) ||
+      existing.brandId !== brand.id)
+  ) {
     // Keys are globally unique, so silently updating would edit an ad on a
     // DIFFERENT campaign. Refuse and say which.
     throw new Error(
@@ -777,7 +804,7 @@ export async function addDraftAd(input: {
   }
 
   const values = {
-    campaignId: campaign.id,
+    campaignId: campaign?.id ?? null,
     brandId: brand.id,
     name: input.name.trim(),
     type: input.type ?? "creative",

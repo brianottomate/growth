@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { useMutation } from "@tanstack/react-query";
+import { useWorkspaceMutation } from "./useWorkspaceMutation";
 import { MapPin, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -32,22 +31,19 @@ export function DestinationsCard({
   /** Every town the brand's homes are in, with how many homes. */
   towns: { town: string; homes: number }[];
 }) {
-  const router = useRouter();
   const [draft, setDraft] = useState<Market[] | null>(null);
   const list = draft ?? markets?.markets ?? [];
 
-  const save = useMutation(
+  const save = useWorkspaceMutation(
     orpc.brand.setMarkets.mutationOptions({
       onSuccess: () => {
         setDraft(null);
-        router.refresh();
       },
       onError: (error) => toast.error(error.message),
     }),
   );
-  const write = useMutation(
+  const write = useWorkspaceMutation(
     orpc.brand.draftMarkets.mutationOptions({
-      onSuccess: () => router.refresh(),
       onError: (error) => toast.error(error.message),
     }),
   );
@@ -66,6 +62,7 @@ export function DestinationsCard({
         <Button
           size="sm"
           variant="outline"
+          disabled={save.isPending || write.isPending}
           onClick={() => setDraft(markets?.markets ?? [])}
         >
           Edit
@@ -127,6 +124,7 @@ export function DestinationsCard({
               {draft ? (
                 <Input
                   aria-label="Market label"
+                  disabled={save.isPending}
                   value={market.label}
                   maxLength={40}
                   onChange={(e) => edit(index, { label: e.target.value })}

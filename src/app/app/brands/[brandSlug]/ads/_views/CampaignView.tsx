@@ -362,6 +362,7 @@ export async function CampaignView({
           brandLogo={brand.logo}
           states={states}
           plannedPlatforms={plannedPlatforms}
+          landingUrl={campaign.landingUrl ?? brand.website}
           fallback={(id) => (
             <ul>
               <AdTile

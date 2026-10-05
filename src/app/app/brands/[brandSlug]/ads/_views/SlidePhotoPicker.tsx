@@ -4,13 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Combobox } from "@/components/ui/compound/combobox";
 import { sameIdeaSource, type IdeaSource } from "@/lib/ad-idea-studio";
 
 export type PickerHome = {
@@ -70,18 +64,20 @@ export function SlidePhotoPicker({
         </Button>
       </div>
       {homes.length > 1 && (
-        <Select value={home?.id} onValueChange={setChosenHomeId}>
-          <SelectTrigger aria-label="House" className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent position="popper" className="max-h-96">
-            {homes.map((h) => (
-              <SelectItem key={h.id} value={h.id} textValue={h.name}>
-                {h.name} · {h.photos.length} photos
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Combobox
+          value={home?.id}
+          onValueChange={(value) => {
+            if (value) setChosenHomeId(value);
+          }}
+          placeholder="Choose a home"
+          searchPlaceholder="Search homes…"
+          options={homes.map((h) => ({
+            value: h.id,
+            label: `${h.name} · ${h.photos.length} photos`,
+            keywords: [h.name],
+            imageUrl: h.photos[0] ? thumbOf(h.photos[0].url) : undefined,
+          }))}
+        />
       )}
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading photos…</p>

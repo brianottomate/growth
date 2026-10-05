@@ -115,7 +115,9 @@ export function PersonaAudiences({
       toast.info(
         created
           ? `Created ${created} personas`
-          : "No additional personas needed.",
+          : suggestions.length
+            ? "The suggested personas already exist. No new personas were added."
+            : "No additional personas were suggested. Existing personas were kept.",
       );
     } catch (error) {
       toast.error(errorText(error));

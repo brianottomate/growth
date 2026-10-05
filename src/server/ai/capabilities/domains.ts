@@ -95,6 +95,8 @@ import {
 } from "./ads";
 import {
   catalogStateAction,
+  importWanderOsAction,
+  wanderOsImportStatusAction,
   catalogWriteStatusAction,
   deleteCatalogExportAction,
   exportCatalogAction,
@@ -531,6 +533,7 @@ export const adsRead = growthDomainTool({
     ideaContext: ideaContextAction,
     catalogHomeFacts: catalogHomeFactsAction,
     catalogState: catalogStateAction,
+    wanderOsImportStatus: wanderOsImportStatusAction,
     catalogWriteStatus: catalogWriteStatusAction,
     suggestCampaignAudiences: suggestCampaignAudiencesAction,
     previewAd: previewAdAction,
@@ -559,6 +562,7 @@ export const adsWrite = growthDomainTool({
     setHomeHero: setHomeHeroAction,
     editCatalogCard: editCatalogCardAction,
     refreshCatalogHomes: refreshCatalogHomesAction,
+    importWanderOs: importWanderOsAction,
     newCatalogCopy: newCatalogCopyAction,
     newCatalogPhoto: newCatalogPhotoAction,
     writeCatalogCards: writeCatalogCardsAction,

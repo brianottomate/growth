@@ -69,7 +69,9 @@ export async function draftBrandMarkets(input: { brandId: string }) {
   if (!brand) throw new Error("Brand not found");
   const towns = await brandTowns(brand.id);
   if (!towns.length)
-    throw new Error("This brand has no homes with a town yet.");
+    throw new Error(
+      "Import homes with city or town details before defining destinations.",
+    );
   const websiteId = await brandWebsiteId(brand.id);
   let reads = 0;
   const described = await Promise.all(

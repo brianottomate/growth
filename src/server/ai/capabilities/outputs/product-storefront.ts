@@ -1,3 +1,4 @@
+import { brandPageSnapshotSchema } from "@/lib/brand-website-content";
 import {
   productAtlasSchema,
   storefrontContentSchema,
@@ -409,6 +410,8 @@ const websiteMetaSchema = z.strictObject({
   favicon: z.string().optional(),
   ogImage: z.string().optional(),
   scrapedAt: z.string().optional(),
+  homepage: brandPageSnapshotSchema.optional(),
+  about: brandPageSnapshotSchema.optional(),
   title: z.string().optional(),
 });
 

@@ -1,3 +1,4 @@
+import { catalogAiReviewSchema } from "./ai-notes";
 import { z } from "zod";
 import {
   COMPOSITION_FORMATS,
@@ -16,6 +17,7 @@ import {
 
 export const catalogCardSchema = z.object({
   homeId: z.string().min(1),
+  aiReview: catalogAiReviewSchema.optional(),
   mode: z.enum(["compose", "finished"]).optional(),
   finishedArtwork: z
     .object({

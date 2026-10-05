@@ -20,6 +20,7 @@ export type ComboboxOption = {
   value: string;
   label: string;
   keywords?: string[];
+  imageUrl?: string | null;
 };
 
 interface ComboboxProps {
@@ -64,7 +65,11 @@ export function Combobox({
               className={cn("w-full justify-between", triggerClassName)}
               disabled={disabled}
             >
-              {selectedOption ? selectedOption.label : placeholder}
+              {selectedOption ? (
+                <OptionLabel option={selectedOption} />
+              ) : (
+                placeholder
+              )}
               <svg
                 className="ml-2 h-4 w-4 shrink-0 opacity-50"
                 fill="none"
@@ -108,7 +113,11 @@ export function Combobox({
             className={cn("w-full justify-between", triggerClassName)}
             disabled={disabled}
           >
-            {selectedOption ? selectedOption.label : placeholder}
+            {selectedOption ? (
+              <OptionLabel option={selectedOption} />
+            ) : (
+              placeholder
+            )}
             <svg
               className="ml-2 h-4 w-4 shrink-0 opacity-50"
               fill="none"
@@ -193,11 +202,28 @@ function OptionsList({
                   d="M5 13l4 4L19 7"
                 />
               </svg>
-              {option.label}
+              <OptionLabel option={option} />
             </CommandItem>
           ))}
         </CommandGroup>
       </CommandList>
     </Command>
+  );
+}
+
+function OptionLabel({ option }: { option: ComboboxOption }) {
+  if (!option.imageUrl)
+    return <span className="min-w-0 truncate">{option.label}</span>;
+  return (
+    <span className="flex min-w-0 items-center gap-2">
+      {/* oxlint-disable-next-line nextjs/no-img-element */}
+      <img
+        src={option.imageUrl}
+        alt=""
+        loading="lazy"
+        className="h-7 w-9 shrink-0 rounded object-cover"
+      />
+      <span className="truncate">{option.label}</span>
+    </span>
   );
 }

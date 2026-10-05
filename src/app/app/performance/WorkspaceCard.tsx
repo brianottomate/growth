@@ -8,6 +8,7 @@ export function WorkspaceCard({
   icon: Icon,
   count,
   actions,
+  titleAccessory,
   children,
   className,
   id,
@@ -16,6 +17,7 @@ export function WorkspaceCard({
   icon: LucideIcon;
   count?: number | string;
   actions?: ReactNode;
+  titleAccessory?: ReactNode;
   children: ReactNode;
   className?: string;
   id?: string;
@@ -30,6 +32,7 @@ export function WorkspaceCard({
         icon={Icon}
         count={count}
         actions={actions}
+        titleAccessory={titleAccessory}
       />
       {children}
     </section>
@@ -41,26 +44,31 @@ export function WorkspaceCardHeader({
   icon: Icon,
   count,
   actions,
+  titleAccessory,
 }: {
   title: string;
   icon: LucideIcon;
   count?: number | string;
   actions?: ReactNode;
+  titleAccessory?: ReactNode;
 }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-3">
-      <h2 className="flex min-w-0 items-center gap-2 text-base font-semibold">
-        <Icon
-          aria-hidden="true"
-          className="size-4 shrink-0 text-muted-foreground"
-        />
-        {title}
-        {count !== undefined && (
-          <span className="font-normal text-muted-foreground tabular-nums">
-            {count}
-          </span>
-        )}
-      </h2>
+      <div className="flex flex-wrap items-center gap-3">
+        <h2 className="flex min-w-0 items-center gap-2 text-base font-semibold">
+          <Icon
+            aria-hidden="true"
+            className="size-4 shrink-0 text-muted-foreground"
+          />
+          {title}
+          {count !== undefined && (
+            <span className="font-normal text-muted-foreground tabular-nums">
+              {count}
+            </span>
+          )}
+        </h2>
+        {titleAccessory}
+      </div>
       {actions && (
         <div className="flex flex-wrap items-center gap-2">{actions}</div>
       )}

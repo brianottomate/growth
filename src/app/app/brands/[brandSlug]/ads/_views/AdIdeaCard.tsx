@@ -28,6 +28,7 @@ import { DeleteAlert } from "@/components/ui/alert-dialog";
 import { AdIdeaPreview } from "./AdIdeaPreview";
 import { AdIdeaSlideRow } from "./AdIdeaSlideRow";
 import { SlidePhotoPicker } from "./SlidePhotoPicker";
+import { Combobox } from "@/components/ui/compound/combobox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -1235,88 +1236,28 @@ export function AdIdeaCard({
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-wrap gap-2">
-            <Select
+            <Combobox
+              className="w-full max-w-sm"
               value={selectedHomeId || "all"}
-              onValueChange={(value) =>
-                setSelectedHomeId(value === "all" ? "" : value)
-              }
-            >
-              <SelectTrigger
-                aria-label="House"
-                className="h-auto! min-h-16 w-full max-w-full sm:w-96"
-              >
-                <SelectValue>
-                  <span className="flex min-w-0 items-center gap-3 text-left">
-                    {galleryHome?.photos[0] && (
-                      <Image
-                        unoptimized
-                        src={galleryHome.photos[0].url}
-                        alt=""
-                        width={48}
-                        height={48}
-                        className="size-12 shrink-0 rounded-md object-cover"
-                      />
-                    )}
-                    <span className="min-w-0">
-                      <span className="block truncate font-medium">
-                        {galleryHome?.name ?? "All houses"}
-                      </span>
-                      <span className="block text-xs text-muted-foreground">
-                        {galleryHome
-                          ? `${galleryHome.photos.length} photos`
-                          : `${homes.length} houses`}
-                      </span>
-                    </span>
-                  </span>
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent position="popper" className="max-h-96">
-                <SelectItem value="all">
-                  All houses · {homes.length} homes
-                </SelectItem>
-                {homes.map((home) => (
-                  <SelectItem
-                    key={home.id}
-                    value={home.id}
-                    textValue={home.name}
-                  >
-                    <span className="flex items-center gap-3">
-                      {home.photos[0] && (
-                        <Image
-                          unoptimized
-                          src={home.photos[0].url}
-                          alt=""
-                          width={64}
-                          height={64}
-                          className="size-16 shrink-0 rounded-md object-cover"
-                        />
-                      )}
-                      <span className="min-w-0">
-                        <span className="block text-sm font-medium">
-                          {home.name}
-                        </span>
-                        <span className="mt-1 flex items-center gap-1">
-                          {home.photos.slice(1, 4).map((photo) => (
-                            <Image
-                              key={photo.url}
-                              unoptimized
-                              src={photo.url}
-                              alt=""
-                              width={32}
-                              height={24}
-                              className="h-6 w-8 rounded object-cover"
-                            />
-                          ))}
-                          <span className="ml-1 text-xs text-muted-foreground">
-                            {home.photos.length} photos
-                          </span>
-                        </span>
-                      </span>
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              onValueChange={(value) => {
+                if (value) setSelectedHomeId(value === "all" ? "" : value);
+              }}
+              placeholder="Choose a home"
+              searchPlaceholder="Search homes…"
+              options={[
+                {
+                  value: "all",
+                  label: `All houses · ${homes.length} homes`,
+                  keywords: ["all houses"],
+                },
+                ...homes.map((home) => ({
+                  value: home.id,
+                  label: `${home.name} · ${home.photos.length} photos`,
+                  keywords: [home.name],
+                  imageUrl: home.photos[0]?.url,
+                })),
+              ]}
+            />
             <Input
               aria-label="Search house photos"
               placeholder="Search house photos…"

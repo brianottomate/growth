@@ -1,3 +1,8 @@
+import {
+  adAuthoringFields,
+  hasOneAdOwner,
+  textAdCopySchema,
+} from "@/lib/ad-authoring";
 import { env } from "@/env";
 import { campaignPath } from "@/lib/campaign-navigation";
 import {
@@ -64,7 +69,6 @@ import {
   compositionImagePositionSchema,
   compositionTemplateIdSchema,
 } from "@/lib/compositions";
-import { EM_DASH_MESSAGE, hasEmDash } from "@/lib/catalog-copy";
 import "server-only";
 import { ideaSaveSchema, ideaExportShapesSchema } from "@/lib/ad-idea-studio";
 import { saveAdIdea } from "@/server/services/ad-idea-studio.service";
@@ -127,6 +131,7 @@ import {
 } from "@/server/services/catalog-studio.service";
 import {
   requireOwnedCampaign,
+  resolveAdAuthoringScope,
   starterIdeaHomes,
 } from "@/server/services/ads-draft.service";
 import { MediaService } from "@/server/services/media.service";
@@ -564,10 +569,10 @@ export const addAudienceUsersAction = growthAction({
 export const draftAdAction = growthAction({
   outputSchema: draftAdActionOutputSchema,
   description:
-    "Add a drafted ad to a LOCAL campaign — a suggestion the push transforms per platform. Local only. Type creative (default) carries copy plus media: one image, several images (a carousel, in order), or a video — for Meta. Media the operator attached this turn can be passed by its chat url directly; it is saved into the brand's library and its video poster resolved for you. Type text is a pool of headlines and descriptions, for Google/OpenAI.",
+    "Add a drafted ad to a LOCAL campaign or to the brand ad studio — a suggestion the push transforms per platform. Local only. Type creative (default) carries copy plus media: one image, several images (a carousel, in order), or a video — for Meta. Media the operator attached this turn can be passed by its chat url directly; it is saved into the brand's library and its video poster resolved for you. Type text is a pool of headlines and descriptions, for Google/OpenAI.",
   inputSchema: z
     .object({
-      campaignId: z.string().trim().min(1),
+      ...adAuthoringFields,
       name: z.string().trim().min(1).max(300),
       type: z.enum(["creative", "text"]).default("creative"),
       headline: z
@@ -641,6 +646,7 @@ export const draftAdAction = growthAction({
         .optional()
         .describe("media_asset id when the image comes from the library."),
     })
+    .refine(hasOneAdOwner, { message: "Supply either campaignId or brandId." })
     .refine(
       (input) =>
         input.type === "text" ||
@@ -676,7 +682,10 @@ export const draftAdAction = growthAction({
   execute: async (input, ctx) => {
     let media: MediaItem[] = [];
     if (input.type === "creative") {
-      const { brand } = await requireOwnedCampaign(input.campaignId, ctx.orgId);
+      const { brand } = await resolveAdAuthoringScope({
+        ...input,
+        organizationId: ctx.orgId,
+      });
       const resolve = (url: string) =>
         MediaService.resolveLibraryMedia({
           brandId: brand.id,
@@ -719,6 +728,7 @@ export const draftAdAction = growthAction({
 
     return addDraftAd({
       campaignId: input.campaignId,
+      brandId: input.brandId,
       name: input.name,
       type: input.type,
       content:
@@ -1431,11 +1441,15 @@ export const writeSetCopyAction = growthAction({
 
 export const writeGoogleTextAdsAction = growthAction({
   description:
-    "Write Google Search text ads for a campaign from its landing page and its audiences' search terms: each a pool of up to 15 headlines (30 chars) and 4 descriptions (90 chars). Lands as unapproved text ideas; nothing is pushed. The same as Write search ads on the campaign page.",
-  inputSchema: z.object({
-    campaignId: z.string().min(1),
-    count: z.number().int().min(1).max(3).default(2),
-  }),
+    "Write Google Search text ads for a campaign or brand studio from a landing page and optional search terms: each a pool of up to 15 headlines (30 chars) and 4 descriptions (90 chars). Lands as unapproved text ideas; nothing is pushed. The same as Write search ads on the campaign page.",
+  inputSchema: z
+    .object({
+      ...adAuthoringFields,
+      landingUrl: z.string().url().optional(),
+      keywords: z.array(z.string().trim().min(1)).max(40).optional(),
+      count: z.number().int().min(1).max(3).default(2),
+    })
+    .refine(hasOneAdOwner, { message: "Supply either campaignId or brandId." }),
   outputSchema: z.object({
     created: z.number(),
     adIds: z.array(z.string()),
@@ -1462,22 +1476,26 @@ export const setAdPlatformsAction = growthAction({
 
 export const generateStarterIdeasAction = growthAction({
   description:
-    "Generate a campaign's starter ad ideas, the same as Generate ideas on the campaign page: from the brand's featured homes (source featured, the default: per home a static and a carousel with photos chosen from its gallery, plus a portfolio hero carousel) or three copy-only brand concepts (source brand). Every idea lands as an unapproved draft for the operator to review and approve; nothing is pushed. Waits for the run to finish and reports what it made.",
-  inputSchema: z.object({
-    campaignId: z.string().min(1),
-    source: z.enum(["featured", "brand"]).default("featured"),
-    homeIds: z
-      .array(z.string().min(1))
-      .max(10)
-      .optional()
-      .describe(
-        "Featured home row ids. Omit for every featured home that has photos, up to ten.",
-      ),
-    stories: z
-      .boolean()
-      .default(true)
-      .describe("Also plan Facebook and Instagram Stories for featured ideas."),
-  }),
+    "Generate starter ad ideas for a campaign or standalone brand studio, the same as Generate ideas on the campaign page: from the brand's featured homes (source featured, the default: per home a static and a carousel with photos chosen from its gallery, plus a portfolio hero carousel) or three copy-only brand concepts (source brand). Every idea lands as an unapproved draft for the operator to review and approve; nothing is pushed. Waits for the run to finish and reports what it made.",
+  inputSchema: z
+    .object({
+      ...adAuthoringFields,
+      source: z.enum(["featured", "brand"]).default("featured"),
+      homeIds: z
+        .array(z.string().min(1))
+        .max(10)
+        .optional()
+        .describe(
+          "Featured home row ids. Omit for every featured home that has photos, up to ten.",
+        ),
+      stories: z
+        .boolean()
+        .default(true)
+        .describe(
+          "Also plan Facebook and Instagram Stories for featured ideas.",
+        ),
+    })
+    .refine(hasOneAdOwner, { message: "Supply either campaignId or brandId." }),
   outputSchema: z.object({
     runId: z.string(),
     status: z.enum(["queued", "processing", "ready", "error", "cancelled"]),
@@ -1497,6 +1515,7 @@ export const generateStarterIdeasAction = growthAction({
           (
             await starterIdeaHomes({
               campaignId: input.campaignId,
+              brandId: input.brandId,
               organizationId: ctx.orgId,
             })
           )
@@ -1505,6 +1524,7 @@ export const generateStarterIdeasAction = growthAction({
             .map((home) => home.id));
     const args = {
       campaignId: input.campaignId,
+      brandId: input.brandId,
       source: input.source,
       homeIds,
       intendedPlacements: [
@@ -1520,6 +1540,7 @@ export const generateStarterIdeasAction = growthAction({
     await runStarterGeneration(runId, args);
     const run = await starterGenerationStatus({
       campaignId: input.campaignId,
+      brandId: input.brandId,
       organizationId: ctx.orgId,
     });
     return {
@@ -1686,18 +1707,8 @@ export const editCatalogCardAction = growthAction({
   inputSchema: z.object({
     brandId: z.string().min(1),
     homeId: z.string().min(1).describe("The WanderOS listing id."),
-    title: z
-      .string()
-      .trim()
-      .min(1)
-      .max(120)
-      .refine((text) => !hasEmDash(text), EM_DASH_MESSAGE)
-      .optional(),
-    subtitle: z
-      .string()
-      .max(220)
-      .refine((text) => !hasEmDash(text), EM_DASH_MESSAGE)
-      .optional(),
+    title: z.string().trim().min(1).max(120).optional(),
+    subtitle: z.string().max(220).optional(),
     templateId: compositionTemplateIdSchema.optional(),
     imagePosition: compositionImagePositionSchema.optional(),
     showLogo: z.boolean().optional(),
@@ -1853,9 +1864,11 @@ export const setAdStatusAction = growthAction({
 export const setAdCopyAction = growthAction({
   outputSchema: setAdCopyActionOutputSchema,
   description:
-    "Rewrite the words on one drafted ad: its headline, primary text, description, and each carousel card's own Meta headline and description. The images are left alone. Emoji belong in primary text and never in the words drawn onto a card.",
+    "Rewrite a drafted ad. For text-first ads supply the full text pool and expectedUpdatedAt from the latest read. For creative ads: its headline, primary text, description, and each carousel card's own Meta headline and description. The images are left alone. Emoji belong in primary text and never in the words drawn onto a card.",
   inputSchema: z.object({
     adId: z.string().min(1),
+    text: textAdCopySchema.optional(),
+    expectedUpdatedAt: z.string().datetime().optional(),
     headline: z
       .string()
       .max(60)
@@ -1898,6 +1911,8 @@ export const setAdCopyAction = growthAction({
       body: input.body,
       description: input.description,
       cards: input.cards,
+      text: input.text,
+      expectedUpdatedAt: input.expectedUpdatedAt,
     }),
 });
 

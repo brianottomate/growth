@@ -206,6 +206,7 @@ function Button({
           density,
         }),
       )}
+      aria-busy={loading || undefined}
       disabled={disabled || loading}
       {...props}
     >

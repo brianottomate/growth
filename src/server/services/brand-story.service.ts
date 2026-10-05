@@ -1,8 +1,14 @@
 import "server-only";
+import {
+  brandStoryResultSchema,
+  requireBrandStory,
+} from "@/lib/brand-evidence";
+import { loadBrandStoryPages } from "@/lib/brand-website-content";
+import { scrapeUrl } from "@/server/clients/firecrawl.client";
 
 import { anthropic } from "@ai-sdk/anthropic";
-import { generateText } from "ai";
-import { and, eq, isNull } from "drizzle-orm";
+import { generateText, Output } from "ai";
+import { and, eq, isNull, sql } from "drizzle-orm";
 
 import { brandStoryDraftPrompt } from "@/server/ai/prompts";
 import { executeQuery } from "@/server/clients/bigquery.client";
@@ -70,6 +76,7 @@ export async function draftBrandStory(input: { brandId: string }) {
       tagline: true,
       description: true,
       brandIdentity: true,
+      websiteMeta: true,
     },
   });
   if (!brand) throw new Error("Brand not found");
@@ -87,7 +94,28 @@ export async function draftBrandStory(input: { brandId: string }) {
     },
     limit: 40,
   });
+  const pages = brand.website
+    ? await loadBrandStoryPages(brand.website, brand.websiteMeta, scrapeUrl)
+    : { homepage: undefined, about: undefined };
+  const snapshots = Object.fromEntries(
+    Object.entries(pages).filter(([, page]) => Boolean(page)),
+  );
+  if (Object.keys(snapshots).length) {
+    await db
+      .update(brandTable)
+      .set({
+        websiteMeta: sql`coalesce(${brandTable.websiteMeta}, '{}'::jsonb) || ${JSON.stringify(snapshots)}::jsonb`,
+      })
+      .where(eq(brandTable.id, brand.id));
+  }
   const { system, prompt } = brandStoryDraftPrompt({
+    websiteContent: [pages.homepage, pages.about]
+      .filter(Boolean)
+      .map(
+        (page) =>
+          `Source: ${page!.url} (scraped ${page!.scrapedAt})\n${page!.markdown.slice(0, 18000)}`,
+      )
+      .join("\n\n"),
     brandName: brand.name,
     website: brand.website,
     identity: JSON.stringify({
@@ -110,10 +138,15 @@ export async function draftBrandStory(input: { brandId: string }) {
         .map((home) => home.externalId),
     ),
   });
-  const { text } = await generateText({
+  const { output } = await generateText({
     model: anthropic(MODEL),
     system,
     prompt,
+    output: Output.object({ schema: brandStoryResultSchema }),
   });
-  return setBrandStory({ brandId: brand.id, story: text });
+  if (!output)
+    throw new Error(
+      "No story was returned. Check the website or import homes before trying again.",
+    );
+  return setBrandStory({ brandId: brand.id, story: requireBrandStory(output) });
 }

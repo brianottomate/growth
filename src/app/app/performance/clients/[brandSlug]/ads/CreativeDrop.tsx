@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { useMutation } from "@tanstack/react-query";
+import { useWorkspaceMutation } from "../useWorkspaceMutation";
 
 import { Button } from "@/components/ui/button";
 import { SimpleDialog } from "@/components/ui/dialog";
@@ -39,7 +38,6 @@ export function CreativeDrop({
   /** Land in this campaign rather than on the brand's wall. */
   campaignId?: string | null;
 }) {
-  const router = useRouter();
   const { uploadFiles, uploading, progress } = useMediaUpload(brandId);
   const [dropped, setDropped] = useState<Dropped[]>([]);
   const [as, setAs] = useState<"statics" | "carousel">("statics");
@@ -48,7 +46,7 @@ export function CreativeDrop({
   const home = homeId ? (homes.find((row) => row.id === homeId) ?? null) : null;
   const byName = homes.length === 0;
 
-  const create = useMutation(
+  const create = useWorkspaceMutation(
     orpc.ads.createAdsFromAssets.mutationOptions({
       onSuccess: (result) => {
         const bound = result.ads.filter((ad) => ad.homeName).length;
@@ -62,7 +60,6 @@ export function CreativeDrop({
         setDropped([]);
         setHomeId(null);
         setHomeName("");
-        router.refresh();
       },
       onError: (error) => toast.error(error.message),
     }),
@@ -100,7 +97,9 @@ export function CreativeDrop({
       />
       <SimpleDialog
         open={dropped.length > 0}
-        onOpenChange={(next) => !next && setDropped([])}
+        onOpenChange={(next) => {
+          if (!next && !create.isPending) setDropped([]);
+        }}
         title={`${dropped.length} file${dropped.length === 1 ? "" : "s"} in the library`}
         size="default"
         footer={
