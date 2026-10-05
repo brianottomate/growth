@@ -13,12 +13,10 @@ export function CreativeDocuments({
   contentPostId,
   brandId,
   title,
-  direction,
 }: {
   contentPostId: string;
   brandId: string;
   title: string;
-  direction: string;
 }) {
   const router = useRouter();
   const query = useQuery(
@@ -43,8 +41,6 @@ export function CreativeDocuments({
             disabled={create.isPending}
             onClick={() => {
               const document = emptyCreativeDocument(type, title);
-              document.brief.purpose = title;
-              document.brief.direction = direction;
               create.mutate({
                 brandId,
                 contentPostId,
@@ -53,7 +49,7 @@ export function CreativeDocuments({
               });
             }}
           >
-            New {type}
+            {type === "article" ? "Prepare blog brief" : `New ${type}`}
           </Button>
         ))}
       </div>
@@ -61,14 +57,74 @@ export function CreativeDocuments({
       {query.error && <p role="alert">{query.error.message}</p>}
       <div className="space-y-2">
         {query.data?.documents.map((doc) => (
-          <Link
-            className="block rounded-md border p-3 text-sm hover:bg-muted"
+          <article
             key={doc.id}
-            href={doc.url}
+            className="space-y-3 rounded-md border p-4 text-sm"
           >
-            {doc.title}{" "}
-            <span className="text-muted-foreground">· {doc.type}</span>
-          </Link>
+            <h3 className="font-medium">{doc.title}</h3>
+            <p className="text-muted-foreground">
+              {doc.type === "article"
+                ? doc.hasArticleBody
+                  ? "Article draft"
+                  : "Brief ready · article not written"
+                : doc.type}
+            </p>
+            <dl className="grid grid-cols-1 gap-3 @xl:grid-cols-2">
+              {(
+                [
+                  ["Purpose", doc.brief.purpose],
+                  ["Audience", doc.brief.audience],
+                  ["Writing direction", doc.brief.direction],
+                  ["CTA", doc.brief.cta],
+                  ["Constraints", doc.brief.constraints.join("\n")],
+                ] as const
+              )
+                .filter(([, value]) => value.trim())
+                .map(([label, value]) => (
+                  <div key={label}>
+                    <dt className="font-medium">{label}</dt>
+                    <dd className="mt-1 whitespace-pre-wrap text-muted-foreground">
+                      {value}
+                    </dd>
+                  </div>
+                ))}
+            </dl>
+            {doc.brief.facts.length > 0 && (
+              <div>
+                <h4 className="font-medium">Facts and sources</h4>
+                <ul className="mt-1 space-y-2">
+                  {doc.brief.facts.map((fact, index) => (
+                    <li key={index}>
+                      {fact.claim}
+                      {fact.sourceUrl && (
+                        <a
+                          className="ml-2 underline"
+                          href={fact.sourceUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Source
+                        </a>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {doc.brief.assets.length > 0 && (
+              <p className="text-muted-foreground">
+                {doc.brief.assets.length} reference assets · inspect in the
+                brief editor
+              </p>
+            )}
+            <Button asChild variant="outline" size="sm">
+              <Link href={doc.url}>
+                {doc.type === "article" && doc.hasArticleBody
+                  ? "Open article"
+                  : "Edit brief"}
+              </Link>
+            </Button>
+          </article>
         ))}
       </div>
     </section>

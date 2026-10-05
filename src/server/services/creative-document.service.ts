@@ -148,6 +148,23 @@ export async function createCreativeDocument(
       ),
     });
     if (!post) throw new Error("Content does not belong to this brand.");
+    // Seed missing brief fields on every creation path, including assistant tools.
+    document.brief.purpose ||= post.title ?? input.title;
+    document.brief.direction ||= [
+      post.hook && `Hook: ${post.hook}`,
+      post.captionDirection,
+      post.body,
+      post.visualDirection && `Visual direction: ${post.visualDirection}`,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+    document.brief.cta ||= post.ctaText ?? "";
+    if (!document.brief.constraints.length) {
+      document.brief.constraints = [
+        post.ctaKeyword && `CTA keyword: ${post.ctaKeyword}`,
+        post.kpi && `Primary KPI: ${post.kpi}`,
+      ].filter((value): value is string => !!value);
+    }
   }
   await validateAssets(document, brand.id);
   const [row] = await db

@@ -2,7 +2,10 @@ import "server-only";
 import { waitUntil } from "@vercel/functions";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
-import { creativeDocumentSchema } from "@/lib/creative-document";
+import {
+  creativeBriefSchema,
+  creativeDocumentSchema,
+} from "@/lib/creative-document";
 import { db } from "@/server/db";
 import {
   brandTable,
@@ -51,6 +54,8 @@ export const listCreativeDocuments = growthAction({
         title: z.string(),
         type: z.enum(["article", "email", "image", "video"]),
         contentPostId: z.string().nullable(),
+        brief: creativeBriefSchema,
+        hasArticleBody: z.boolean(),
         url: z.string(),
       }),
     ),
@@ -78,6 +83,10 @@ export const listCreativeDocuments = growthAction({
         title: r.title,
         type: r.documentType,
         contentPostId: r.contentPostId,
+        brief: r.document.brief,
+        hasArticleBody:
+          r.document.type === "article" &&
+          !!r.document.content.bodyMarkdown.trim(),
         url: reference(r.id).url,
       })),
     };

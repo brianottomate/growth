@@ -108,7 +108,9 @@ export function CreativeDocumentWorkspace({
             ? "Write script and scenes"
             : document.type === "image"
               ? "Generate image"
-              : "Write draft"}
+              : document.type === "article"
+                ? "Write article"
+                : "Write draft"}
         </Button>
         {locked &&
           data.run &&

@@ -233,6 +233,7 @@ export async function initiativePreviews(
     ? await db
         .select({
           platformPostId: platformDocumentTable.platformPostId,
+          documentId: productionPacketTable.id,
           document: productionPacketTable.document,
         })
         .from(platformDocumentTable)
@@ -283,6 +284,12 @@ export async function initiativePreviews(
             contentPostId: spot.contentPostId,
             seriesId: spot.seriesId,
             externalId: spot.externalId,
+            documentId:
+              editorialDocuments.find((row) => row.platformPostId === spot.id)
+                ?.documentId ?? null,
+            hasArticleBody:
+              document?.type === "article" &&
+              !!document.content.bodyMarkdown.trim(),
             kind:
               spot.platform === "newsletter"
                 ? ("email" as const)

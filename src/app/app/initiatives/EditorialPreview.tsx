@@ -11,6 +11,8 @@ type EditorialItem = {
   id: string;
   contentPostId: string;
   externalId: string | null;
+  documentId: string | null;
+  hasArticleBody: boolean;
   kind: "email" | "blog";
   title: string;
   description: string | null;
@@ -50,9 +52,11 @@ export function EditorialPreview({
     );
   const href = email
     ? `/app/newsletters/${item.id}`
-    : item.externalId
-      ? `/app/blog/${item.id}`
-      : `/app/content/${item.contentPostId}`;
+    : item.documentId && item.hasArticleBody
+      ? `/app/creative/${item.documentId}`
+      : item.externalId
+        ? `/app/blog/${item.id}`
+        : `/app/content/${item.contentPostId}`;
   const cover = item.media[0];
   return (
     <article className="space-y-3 rounded-xl border bg-card p-4">
@@ -106,7 +110,14 @@ export function EditorialPreview({
       </div>
       {actions}
       <Button variant="outline" size="sm" asChild>
-        <Link href={href}>Open {email ? "email" : "article"}</Link>
+        <Link href={href}>
+          Open{" "}
+          {email
+            ? "email"
+            : item.hasArticleBody || item.externalId
+              ? "article"
+              : "brief"}
+        </Link>
       </Button>
     </article>
   );

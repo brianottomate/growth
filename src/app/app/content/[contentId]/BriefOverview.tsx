@@ -16,7 +16,7 @@ export function BriefOverview({
 }) {
   const fields = [
     { label: "Hook", value: brief.hook },
-    { label: "Caption direction", value: brief.captionDirection },
+    { label: "Writing direction", value: brief.captionDirection },
     { label: "Visual direction", value: brief.visualDirection },
     { label: "CTA", value: brief.ctaText },
     { label: "Trigger keyword", value: brief.ctaKeyword },

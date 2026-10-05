@@ -44,14 +44,18 @@ export function InitiativeActions({
       visibleText:
         mode === "shape"
           ? `Help me shape the ${labels[section]} for this initiative. Read the linked work and discuss the direction before saving changes.`
-          : `Help me create one ${labels[section]} for this initiative. Start with its brief and save only that selected item.`,
+          : section === "blog"
+            ? "Prepare one blog brief for this initiative. Create and link its content post with a blog platform version, then create a typed article document with the brief and select it for that blog version. Include the audience, direction, CTA, known facts and sources, and flag unconfirmed claims. Save the brief only; do not write the article or push to Dato. Return a link to the content post where I can inspect the brief."
+            : `Help me create one ${labels[section]} for this initiative. Start with its brief and save only that selected item.`,
     });
   return (
     <div className="flex flex-wrap items-center gap-2">
       {create && (
         <Button size="sm" variant="outline" onClick={() => open("create")}>
           <Plus />
-          Create {labels[section]}
+          {section === "blog"
+            ? "Prepare blog brief"
+            : `Create ${labels[section]}`}
         </Button>
       )}
       <Button size="sm" variant="outline" onClick={() => open("shape")}>

@@ -77,6 +77,8 @@ const detail = z.object({
         ...previewBase,
         contentPostId: z.string(),
         externalId: z.string().nullable(),
+        documentId: z.string().nullable(),
+        hasArticleBody: z.boolean(),
         seriesId: z.string().nullable(),
         kind: z.enum(["email", "blog"]),
         title: z.string(),

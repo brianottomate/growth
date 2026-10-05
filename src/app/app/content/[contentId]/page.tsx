@@ -440,7 +440,6 @@ export default async function ContentDetailPage({
         contentPostId={content.id}
         brandId={content.brandId}
         title={content.title ?? "Untitled"}
-        direction={content.body ?? ""}
       />
 
       {/* aggregate analytics */}
