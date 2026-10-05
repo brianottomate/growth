@@ -27,7 +27,7 @@ import { createId } from "./utils";
 // own brand instead; those campaigns still attach through their cycle, which
 // is how the desk names the client behind a Wander-brand campaign.
 //
-// `brandId` here is the amplifier.promotedBrandId graduation pattern: a brand
+// `brandId` here is the amplifier.linkedBrandId graduation pattern: a brand
 // row holding the customer's identity, promotable to real connected channels,
 // which is why ad_account is a per-brand allowlist rather than a 1:1
 // brand↔account map.

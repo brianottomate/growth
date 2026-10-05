@@ -42,6 +42,7 @@ export function latestAssistantFocus(
 }
 
 export type AssistantFocus = {
+  initiativeContext?: import("./assistant-events").WorkInitiativeIntent | null;
   brandId?: string;
   contextMode?: "page" | "pinned";
   catalogHomeContext?:
@@ -65,6 +66,7 @@ export function catalogFocusForTurn(input: {
 }
 
 export function assistantFocusLabel(focus?: AssistantFocus) {
+  if (focus?.initiativeContext) return "Initiative";
   if (focus?.catalogHomeContext) return focus.catalogHomeContext.homeName;
   if (focus?.adWorkContext)
     return `${focus.adWorkContext.campaignName}${focus.adWorkContext.adId ? " · Selected ad" : ""}`;
@@ -106,6 +108,7 @@ export function sameTurnFocus(
         campaign?.brandId ??
         work?.brandId ??
         (intent && "brandId" in intent ? intent.brandId : context.brandId),
+      intent?.type === "work_initiative" ? intent.initiativeId : undefined,
       home?.homeId,
       campaign?.campaignId,
       campaign?.adId,

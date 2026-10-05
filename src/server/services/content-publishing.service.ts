@@ -16,12 +16,14 @@ import {
 } from "@/server/clients/zernio.client";
 import { db } from "@/server/db";
 import {
+  amplificationTargetTable,
   brandTable,
   channelTable,
   type MediaItem,
   platformPostTable,
   type PublishSettings,
 } from "@/server/db/schema";
+import { assertAmplificationOutputIdentity } from "@/lib/amplification-plan";
 import { isStoryFormat, sequenceScheduledAt } from "@/lib/platform-sequence";
 import { deliveryMediaFor } from "@/server/services/video-delivery.service";
 import { firstCommentLimit } from "@/lib/first-comment";
@@ -491,6 +493,37 @@ async function loadSocialSpot(platformPostId: string, resolveMentions = false) {
     throw new Error("Publish the first post in this thread group");
   }
   if (spot.source !== "owned") throw new Error("Only owned posts can publish");
+  const assignment = await db.query.amplificationTargetTable.findFirst({
+    where: eq(amplificationTargetTable.outputPlatformPostId, spot.id),
+    with: { amplifier: true },
+  });
+  if (assignment) {
+    if (
+      !assignment.amplifier.linkedBrandId ||
+      assignment.amplifier.deletedAt ||
+      assignment.amplifier.organizationId !== spot.brand?.organizationId
+    )
+      throw new Error("Amplifier publishing identity is unavailable");
+    assertAmplificationOutputIdentity(
+      assignment.amplifier.linkedBrandId,
+      assignment.destinationPlatform,
+      spot,
+    );
+    if (
+      spot.channel &&
+      spot.channel.brandId !== assignment.amplifier.linkedBrandId
+    )
+      throw new Error("Choose the amplifier’s own connected account");
+    if (assignment.actionKind !== "adaptation")
+      throw new Error(
+        "Native amplification actions use manual handoff; only adapted posts use the ordinary publishing workflow.",
+      );
+    if (!spot.brand?.zernioProfileId)
+      throw new Error(
+        "Connect the amplifier’s personal brand to publish, or use manual handoff.",
+      );
+  }
+
   if (!SUPPORTED_PLATFORMS.has(spot.platform as SocialPublishingPlatform)) {
     throw new Error(
       "Zernio publishing supports Facebook, Instagram, LinkedIn, TikTok, and X",

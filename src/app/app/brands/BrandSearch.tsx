@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 
 export type BrandSearchEntry = {
   key: string;
@@ -12,10 +12,7 @@ export type BrandSearchEntry = {
 export type BrandSearchGroup = {
   label: string;
   entries: BrandSearchEntry[];
-  /**
-   * Off until asked for. Prospects are the group that grows without bound, and
-   * they are reached by searching for one rather than by scrolling past them.
-   */
+  /** Off until explicitly enabled. The default directory shows our company and personal brands. */
   defaultHidden?: boolean;
 };
 
@@ -29,6 +26,32 @@ export function BrandSearch({ groups }: { groups: BrandSearchGroup[] }) {
   const [hidden, setHidden] = useState<string[]>(() =>
     groups.filter((group) => group.defaultHidden).map((group) => group.label),
   );
+
+  // A company card can link directly to a tracked brand below. Reveal that
+  // group before scrolling, even though it is absent from the default view.
+  useEffect(() => {
+    const revealLinkedBrand = () => {
+      const anchor = window.location.hash.slice(1);
+      const group = groups.find((item) =>
+        item.entries.some((entry) => `tracked-brand-${entry.key}` === anchor),
+      );
+      if (group)
+        setHidden((current) =>
+          current.includes(group.label)
+            ? current.filter((label) => label !== group.label)
+            : current,
+        );
+    };
+    revealLinkedBrand();
+    window.addEventListener("hashchange", revealLinkedBrand);
+    return () => window.removeEventListener("hashchange", revealLinkedBrand);
+  }, [groups]);
+
+  useEffect(() => {
+    const anchor = window.location.hash.slice(1);
+    if (anchor.startsWith("tracked-brand-"))
+      document.getElementById(anchor)?.scrollIntoView();
+  }, [hidden]);
 
   const shown = groups.filter((group) => !hidden.includes(group.label));
 
@@ -67,7 +90,7 @@ export function BrandSearch({ groups }: { groups: BrandSearchGroup[] }) {
           aria-label="Search brands"
           className="w-72 rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
         />
-        {groups.length > 1 &&
+        {(groups.length > 1 || groups.some((group) => group.defaultHidden)) &&
           groups.map((group) => {
             const on = !hidden.includes(group.label);
             return (
@@ -91,6 +114,12 @@ export function BrandSearch({ groups }: { groups: BrandSearchGroup[] }) {
       {query.trim() !== "" && total === 0 && (
         <p className="mt-10 text-sm text-muted-foreground">
           No brands match “{query}” in the groups you have on.
+        </p>
+      )}
+      {query.trim() === "" && total === 0 && (
+        <p className="mt-10 text-sm text-muted-foreground">
+          No brands in the selected groups. Choose a group above or create a new
+          brand.
         </p>
       )}
 

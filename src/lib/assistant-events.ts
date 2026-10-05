@@ -174,7 +174,30 @@ export type WorkPerformanceClientIntent = {
   visibleText: string;
 };
 
+export type WorkInitiativeIntent = {
+  type: "work_initiative";
+  newThread: true;
+  initiativeId: string;
+  contentPostId?: string;
+  platformPostId?: string;
+  brandId?: string;
+  section:
+    | "overview"
+    | "campaigns"
+    | "series"
+    | "social"
+    | "email"
+    | "blog"
+    | "ads"
+    | "audiences"
+    | "platforms";
+  mode: "shape" | "create";
+  campaignId?: string;
+  visibleText: string;
+};
+
 export type AssistantIntent =
+  | WorkInitiativeIntent
   | WorkEmailAudienceIntent
   | WorkPerformanceClientIntent
   | ReviewEmailIntent

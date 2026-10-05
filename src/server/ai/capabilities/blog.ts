@@ -1,6 +1,9 @@
 import { blogAgentOutputSchema } from "./outputs/blog";
 import "server-only";
 
+import { and, eq, isNull } from "drizzle-orm";
+import { db } from "@/server/db";
+import { contentPostTable, platformPostTable } from "@/server/db/schema";
 import { z } from "zod";
 
 import { isOwnedChatImageUrl } from "@/lib/chat-attachment";
@@ -35,6 +38,12 @@ export const blogAgent = growthTool({
       .describe(
         "The full task, in plain language. Include the intent and any copy the operator supplied.",
       ),
+    contentPostId: z
+      .string()
+      .optional()
+      .describe(
+        "Existing Growth content post whose linked Dato article should be inspected. No content or membership changes are made.",
+      ),
     itemId: z
       .string()
       .trim()
@@ -59,9 +68,36 @@ export const blogAgent = growthTool({
         "That image is not an owned attachment from this operator's chat.",
       );
     }
+    const parent = input.contentPostId
+      ? await db.query.contentPostTable.findFirst({
+          where: and(
+            eq(contentPostTable.id, input.contentPostId),
+            isNull(contentPostTable.deletedAt),
+          ),
+          with: { brand: { columns: { organizationId: true } } },
+        })
+      : null;
+    if (input.contentPostId && parent?.brand.organizationId !== ctx.orgId)
+      throw new Error("Content post not found in this workspace.");
+    const existingBlog = parent
+      ? await db.query.platformPostTable.findFirst({
+          where: and(
+            eq(platformPostTable.contentPostId, parent.id),
+            eq(platformPostTable.brandId, parent.brandId),
+            eq(platformPostTable.platform, "blog"),
+          ),
+        })
+      : null;
+    if (
+      existingBlog?.externalId &&
+      input.itemId &&
+      input.itemId !== existingBlog.externalId
+    )
+      throw new Error("That content post already has a different article.");
     const result = await runBlogAgent({
       task: input.task,
-      itemId: input.itemId,
+      itemId: existingBlog?.externalId ?? input.itemId,
+      contentPostId: parent?.id,
       attachmentUrl: input.attachmentUrl,
       organizationId: ctx.orgId,
     });

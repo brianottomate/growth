@@ -45,8 +45,8 @@ No action publishes content or launches paid delivery.
 The production release schema hook runs `scripts/migrate-initiatives.ts` in a
 transaction before Drizzle's schema diff. Existing organic Campaign associations
 are converted to typed memberships, preserving their paired paid campaign; then
-the legacy columns are dropped. Replay is safe. VRMA gets the reviewed shared
-Initiative and its Series and paid Campaign. The original records, media,
+the legacy columns are dropped. Replay is safe and preserves subsequent operator edits. Historical VRMA
+bootstrap inserts have been removed so releases cannot recreate unlinked work. The original records, media,
 platform drafts and amplification asks remain intact.
 
 PGlite integration tests run the actual migration in an isolated PostgreSQL

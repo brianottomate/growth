@@ -12,6 +12,8 @@ import {
   platformAdTable,
   seriesTable,
   mediaAssetTable,
+  platformDocumentTable,
+  productionPacketTable,
 } from "@/server/db/schema";
 import type { MediaItem } from "@/server/db/schema";
 
@@ -46,6 +48,12 @@ export async function initiativePreviews(
               brand: { columns: { organizationId: true } },
               platformPosts: {
                 columns: {
+                  id: true,
+                  externalId: true,
+                  text: true,
+                  metadata: true,
+                  scheduledAt: true,
+                  publishedAt: true,
                   platform: true,
                   format: true,
                   media: true,
@@ -57,6 +65,7 @@ export async function initiativePreviews(
             },
             columns: {
               id: true,
+              title: true,
               seriesId: true,
               hook: true,
               captionDirection: true,
@@ -126,7 +135,12 @@ export async function initiativePreviews(
         : [],
       campaignIds.length
         ? db
-            .select({ campaignId: audienceTable.campaignId })
+            .select({
+              id: audienceTable.id,
+              name: audienceTable.name,
+              description: audienceTable.description,
+              campaignId: audienceTable.campaignId,
+            })
             .from(audienceTable)
             .innerJoin(brandTable, eq(audienceTable.brandId, brandTable.id))
             .where(
@@ -139,6 +153,8 @@ export async function initiativePreviews(
       campaignIds.length
         ? db
             .select({
+              id: platformCampaignTable.id,
+              externalId: platformCampaignTable.externalId,
               campaignId: platformCampaignTable.campaignId,
               platform: platformCampaignTable.platform,
               status: platformCampaignTable.status,
@@ -198,9 +214,95 @@ export async function initiativePreviews(
     : [];
   const dimensions = new Map(adAssets.map((asset) => [asset.id, asset]));
   const ownedPosts = posts.filter((p) => p.brand.organizationId === orgId);
+  const editorialSpots = ownedPosts.flatMap((post) =>
+    post.platformPosts
+      .filter(
+        (spot) =>
+          spot.brand.organizationId === orgId &&
+          ["newsletter", "blog"].includes(spot.platform),
+      )
+      .map((spot) => ({
+        ...spot,
+        contentPostId: post.id,
+        seriesId: post.seriesId,
+        contentTitle: post.title,
+      })),
+  );
+  const editorialIds = editorialSpots.map((spot) => spot.id);
+  const editorialDocuments = editorialIds.length
+    ? await db
+        .select({
+          platformPostId: platformDocumentTable.platformPostId,
+          document: productionPacketTable.document,
+        })
+        .from(platformDocumentTable)
+        .innerJoin(
+          productionPacketTable,
+          eq(productionPacketTable.id, platformDocumentTable.documentId),
+        )
+        .where(
+          and(
+            inArray(platformDocumentTable.platformPostId, editorialIds),
+            eq(productionPacketTable.organizationId, orgId),
+          ),
+        )
+    : [];
+  const documents = new Map(
+    editorialDocuments.map((row) => [row.platformPostId, row.document]),
+  );
+  const editorial = [
+    ...new Map(
+      editorialSpots.map((spot) => {
+        const document = documents.get(spot.id);
+        const copy =
+          spot.platform === "newsletter" && document?.type === "email"
+            ? {
+                title: document.content.subject,
+                description: document.content.preheader,
+              }
+            : spot.platform === "blog" && document?.type === "article"
+              ? {
+                  title: document.content.title,
+                  description: document.content.description,
+                }
+              : null;
+        const metadata =
+          spot.metadata && typeof spot.metadata === "object"
+            ? (spot.metadata as Record<string, unknown>)
+            : {};
+        const description =
+          typeof metadata.metaDescription === "string"
+            ? metadata.metaDescription
+            : typeof metadata.description === "string"
+              ? metadata.description
+              : null;
+        return [
+          spot.id,
+          {
+            id: spot.id,
+            contentPostId: spot.contentPostId,
+            seriesId: spot.seriesId,
+            externalId: spot.externalId,
+            kind:
+              spot.platform === "newsletter"
+                ? ("email" as const)
+                : ("blog" as const),
+            title: copy?.title || spot.text || spot.contentTitle || "Untitled",
+            description: copy?.description || description,
+            status: String(spot.status),
+            scheduledAt: spot.scheduledAt?.toISOString() ?? null,
+            publishedAt: spot.publishedAt?.toISOString() ?? null,
+            media: media(spot.media ?? []),
+          },
+        ];
+      }),
+    ).values(),
+  ];
   const postPreviews = ownedPosts.map((p) => {
     const spots = p.platformPosts.filter(
-      (s) => s.brand.organizationId === orgId,
+      (s) =>
+        s.brand.organizationId === orgId &&
+        !["newsletter", "blog"].includes(s.platform),
     );
     return {
       id: p.id,
@@ -219,6 +321,7 @@ export async function initiativePreviews(
   });
   return {
     posts: postPreviews,
+    editorial,
     series: series.map((s) => ({
       id: s.id,
       description: s.description,
@@ -293,6 +396,9 @@ export async function initiativePreviews(
                 a.name
               : a.content.headlines[0] || a.name,
           ),
+        audiences: audiences
+          .filter((a) => a.campaignId === c.id)
+          .map((a) => ({ id: a.id, name: a.name, description: a.description })),
         audienceCount: audiences.filter((a) => a.campaignId === c.id).length,
         media: media([
           ...creatives.flatMap((a) =>
@@ -314,7 +420,12 @@ export async function initiativePreviews(
         ]),
         platforms: platforms
           .filter((p) => p.campaignId === c.id)
-          .map((p) => ({ platform: p.platform, status: String(p.status) })),
+          .map((p) => ({
+            id: p.id,
+            platform: p.platform,
+            status: String(p.status),
+            pushed: !!p.externalId,
+          })),
       };
     }),
   };

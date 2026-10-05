@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
@@ -105,13 +104,13 @@ export function TrackedBrands({
           key={t.inspirationId}
           className="group inline-flex items-center gap-1"
         >
-          <Link
+          <a
             href={`#tracked-brand-${t.id}`}
             className="font-medium text-foreground/80 hover:text-foreground"
             title={`${t.purpose} · jump to ${t.name}`}
           >
             {t.name}
-          </Link>
+          </a>
           <button
             onClick={() => untrackM.mutate({ inspirationId: t.inspirationId })}
             disabled={untrackM.isPending}

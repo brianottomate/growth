@@ -1,8 +1,11 @@
 "use client";
 import { WorkPreview, previewDate } from "./WorkPreview";
 import { StatusBoard, workLane } from "./StatusBoard";
+import { EditorialPreview } from "./EditorialPreview";
 import { AdPreview } from "./AdPreview";
-import { useState } from "react";
+import { InitiativeActions, CampaignPlanPreview } from "./InitiativeActions";
+import { CampaignShellEditor } from "./CampaignShellEditor";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -217,6 +220,7 @@ export function InitiativesClient() {
 }
 export function InitiativeDetail({ id }: { id: string }) {
   const [editing, setEditing] = useState(false);
+  const [creatingCampaign, setCreatingCampaign] = useState(false);
   const [linking, setLinking] = useState(false);
   const [kind, setKind] = useState("contentPostId");
   const [picked, setPicked] = useState("");
@@ -228,6 +232,13 @@ export function InitiativeDetail({ id }: { id: string }) {
     ...orpc.initiative.options.queryOptions({ input: {} }),
     enabled: linking,
   });
+  useEffect(() => {
+    const refresh = () => {
+      void client.invalidateQueries({ queryKey: orpc.initiative.key() });
+    };
+    window.addEventListener("growth:write", refresh);
+    return () => window.removeEventListener("growth:write", refresh);
+  }, [client]);
   const invalidate = () =>
     client.invalidateQueries({ queryKey: orpc.initiative.key() });
   const unlink = useMutation(
@@ -249,6 +260,7 @@ export function InitiativeDetail({ id }: { id: string }) {
   if (error) return <p role="alert">{error.message}</p>;
   if (isLoading || !data) return <p>Loading initiative…</p>;
   const i = data.initiative;
+  const scope = { initiativeId: id, brandId: i.leadBrandId ?? undefined };
   const brandName = (brandId: string) =>
     data.brands.find((b) => b.id === brandId)?.name ?? "Brand";
   const targets =
@@ -280,9 +292,20 @@ export function InitiativeDetail({ id }: { id: string }) {
   const standalone = data.contentPosts.filter(
     (post) => !post.seriesId || !linkedSeries.has(post.seriesId),
   );
+  const socialPosts = (posts: typeof data.contentPosts) =>
+    posts.filter((post) => {
+      const channels =
+        data.previews.posts.find((preview) => preview.id === post.id)
+          ?.channels ?? [];
+      return (
+        channels.length > 0 ||
+        !data.previews.editorial.some((item) => item.contentPostId === post.id)
+      );
+    });
+  const standaloneSocial = socialPosts(standalone);
   const postBoard = (posts: typeof data.contentPosts) => (
     <StatusBoard
-      items={posts.map((post) => {
+      items={socialPosts(posts).map((post) => {
         const preview = data.previews.posts.find((item) => item.id === post.id);
         const live =
           preview?.channels.filter((channel) => channel.status === "published")
@@ -300,6 +323,7 @@ export function InitiativeDetail({ id }: { id: string }) {
           card: (
             <WorkPreview
               board
+              contentPostId={post.id}
               title={post.title ?? "Untitled"}
               href={`/app/content/${post.id}`}
               brand={brandName(post.brandId)}
@@ -314,7 +338,7 @@ export function InitiativeDetail({ id }: { id: string }) {
               description={preview?.description}
               media={preview?.media}
               platforms={preview?.channels.map((channel) => channel.platform)}
-              detail={`${preview?.channels.length ?? 0} channel versions`}
+              detail={`${preview?.channels.length ?? 0} channel version${preview?.channels.length === 1 ? "" : "s"}`}
               date={previewDate(preview?.plannedAt ?? null)}
               onUnlink={
                 post.direct
@@ -352,6 +376,11 @@ export function InitiativeDetail({ id }: { id: string }) {
               Edit
             </Button>
             <Button onClick={() => setLinking(true)}>Link work</Button>
+            <InitiativeActions
+              scope={scope}
+              section="overview"
+              create={false}
+            />
           </div>
         </div>
         <div className="flex flex-wrap gap-x-8 gap-y-3 text-xs text-muted-foreground">
@@ -383,16 +412,32 @@ export function InitiativeDetail({ id }: { id: string }) {
         </div>
       </section>
       <section className="space-y-4">
-        <h2 className="font-semibold">
-          Campaigns{" "}
-          <span className="ml-2 text-sm font-normal text-muted-foreground">
-            {data.campaigns.length}
-          </span>
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-semibold">
+            Campaigns{" "}
+            <span className="ml-2 text-sm font-normal text-muted-foreground">
+              {data.campaigns.length}
+            </span>
+          </h2>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setCreatingCampaign(true)}
+            >
+              Create campaign
+            </Button>
+            <InitiativeActions
+              scope={scope}
+              section="campaigns"
+              create={false}
+            />
+          </div>
+        </div>
         {data.campaigns.length === 0 && (
           <p className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">
-            No campaigns linked. Link a paid campaign to include its ads and
-            audience plans.
+            Start with a campaign brief. Add its ads, audiences and platforms as
+            the direction takes shape.
           </p>
         )}
         {data.campaigns.map((campaign) => {
@@ -446,6 +491,11 @@ export function InitiativeDetail({ id }: { id: string }) {
                   Unlink
                 </Button>
               </div>
+              {(preview?.ads.length ?? 0) === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  No ads yet. Open the campaign to add creative work.
+                </p>
+              )}
               <StatusBoard
                 paid
                 items={(preview?.ads ?? []).map((ad) => {
@@ -485,17 +535,24 @@ export function InitiativeDetail({ id }: { id: string }) {
                   };
                 })}
               />
+              <CampaignPlanPreview
+                audiences={preview?.audiences ?? []}
+                platforms={preview?.platforms ?? []}
+              />
             </article>
           );
         })}
       </section>
       <section className="space-y-4">
-        <h2 className="font-semibold">
-          Series{" "}
-          <span className="ml-2 text-sm font-normal text-muted-foreground">
-            {data.series.length}
-          </span>
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-semibold">
+            Series{" "}
+            <span className="ml-2 text-sm font-normal text-muted-foreground">
+              {data.series.length}
+            </span>
+          </h2>
+          <InitiativeActions scope={scope} section="series" />
+        </div>
         {data.series.length === 0 && (
           <p className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">
             No series linked. You can coordinate standalone social posts below,
@@ -550,17 +607,20 @@ export function InitiativeDetail({ id }: { id: string }) {
         })}
       </section>
       <section className="space-y-4">
-        <h2 className="font-semibold">
-          Standalone social posts{" "}
-          <span className="ml-2 text-sm font-normal text-muted-foreground">
-            {standalone.length}
-          </span>
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-semibold">
+            Standalone social posts{" "}
+            <span className="ml-2 text-sm font-normal text-muted-foreground">
+              {standaloneSocial.length}
+            </span>
+          </h2>
+          <InitiativeActions scope={scope} section="social" />
+        </div>
         <p className="text-xs text-muted-foreground">
           Linked directly to this initiative, outside the series shown above.
         </p>
-        {standalone.length ? (
-          postBoard(standalone)
+        {standaloneSocial.length ? (
+          postBoard(standaloneSocial)
         ) : (
           <p className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">
             No standalone posts. Link individual social posts, or open a linked
@@ -568,7 +628,62 @@ export function InitiativeDetail({ id }: { id: string }) {
           </p>
         )}
       </section>
+      <section className="@container space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-semibold">
+            Email &amp; blog{" "}
+            <span className="ml-2 text-sm font-normal text-muted-foreground">
+              {data.previews.editorial.length}
+            </span>
+          </h2>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Email and blog versions from linked content posts and series.
+        </p>
+        <div className="grid grid-cols-1 gap-3 @3xl:grid-cols-2">
+          {data.previews.editorial.map((item) => (
+            <EditorialPreview
+              key={item.id}
+              item={item}
+              seriesName={
+                data.series.find((series) => series.id === item.seriesId)?.name
+              }
+            />
+          ))}
+          {!data.previews.editorial.some((item) => item.kind === "email") && (
+            <EditorialPreview
+              kind="email"
+              actions={<InitiativeActions scope={scope} section="email" />}
+            />
+          )}
+          {!data.previews.editorial.some((item) => item.kind === "blog") && (
+            <EditorialPreview
+              kind="blog"
+              actions={<InitiativeActions scope={scope} section="blog" />}
+            />
+          )}
+        </div>
+      </section>
       <MomentAmplifiers momentId={id} />
+      <Dialog open={creatingCampaign} onOpenChange={setCreatingCampaign}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create campaign shell</DialogTitle>
+            <DialogDescription>
+              Give this campaign a name and brief. Develop its individual pieces
+              after saving.
+            </DialogDescription>
+          </DialogHeader>
+          {creatingCampaign && (
+            <CampaignShellEditor
+              initiativeId={id}
+              primaryBrandId={i.leadBrandId}
+              brands={data.brands}
+              close={() => setCreatingCampaign(false)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
       <Dialog open={editing} onOpenChange={setEditing}>
         <DialogContent className="@container">
           <DialogHeader>

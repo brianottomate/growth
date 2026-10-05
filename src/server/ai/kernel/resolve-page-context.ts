@@ -2,6 +2,7 @@ import "server-only";
 import { and, eq, isNull, or } from "drizzle-orm";
 import { db } from "@/server/db";
 import {
+  initiativeTable,
   brandTable,
   campaignTable,
   platformCampaignTable,
@@ -15,6 +16,15 @@ export async function resolvePageContext(
   organizationId: string,
 ) {
   const route = assistantPageRoute(pagePath);
+  const initiative = route.initiativeId
+    ? await db.query.initiativeTable.findFirst({
+        where: and(
+          eq(initiativeTable.id, route.initiativeId),
+          eq(initiativeTable.organizationId, organizationId),
+        ),
+        columns: { id: true, name: true, leadBrandId: true },
+      })
+    : undefined;
   const account = route.accountId
     ? await db.query.performanceAccountTable.findFirst({
         where: and(
@@ -26,7 +36,7 @@ export async function resolvePageContext(
       })
     : undefined;
   const brand =
-    route.brandSlug || account?.brandId
+    route.brandSlug || account?.brandId || initiative?.leadBrandId
       ? await db.query.brandTable.findFirst({
           where: and(
             eq(brandTable.organizationId, organizationId),
@@ -36,7 +46,10 @@ export async function resolvePageContext(
                   eq(brandTable.slug, route.brandSlug),
                   eq(brandTable.id, route.brandSlug),
                 )
-              : eq(brandTable.id, account!.brandId!),
+              : eq(
+                  brandTable.id,
+                  (account?.brandId ?? initiative!.leadBrandId)!,
+                ),
           ),
           columns: {
             id: true,
@@ -96,6 +109,7 @@ export async function resolvePageContext(
         })
       : undefined;
   return {
+    initiative: initiative ?? null,
     brand: brand ?? null,
     campaign: campaign ?? null,
     platformCampaign: platformCampaign ?? null,
@@ -103,6 +117,7 @@ export async function resolvePageContext(
     account: account ?? brandAccount ?? null,
     label:
       [
+        initiative?.name,
         brand?.name,
         campaign?.name,
         platformCampaign?.name,

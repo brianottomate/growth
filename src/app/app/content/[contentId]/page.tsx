@@ -1,3 +1,4 @@
+import { AmplificationPanel } from "../../campaigns/[campaignId]/MomentAmplifiers";
 import { CreativeDocuments } from "./CreativeDocuments";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -604,6 +605,9 @@ export default async function ContentDetailPage({
         contentPostId={content.id}
         currentUserId={session.user.id}
       />
+      <div className="mt-8">
+        <AmplificationPanel scope={{ contentPostId: content.id }} />
+      </div>
     </div>
   );
 }

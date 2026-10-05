@@ -115,7 +115,7 @@ export async function composePageContextSection(options: {
     return `${header}\nUse creativeRead.get for documentId ${pathname.split("/").at(-1)}. Edit with creativeWrite.save, produce with creativeWrite.produce; Dato pull/push are explicit overwrites. Production locks editing.`;
   const page = await resolvePageContext(pathname, options.organizationId);
   if (page.label)
-    return `${header}\nVerified page context: ${page.label}. ${page.brand ? `brandId: ${page.brand.id}.` : ""} ${page.campaign ? `campaignId: ${page.campaign.id}. Read adsRead.openCampaign before editing.` : ""} ${page.platformCampaign ? `platformCampaignId: ${page.platformCampaign.id}.` : ""} ${page.home ? `homeId: ${page.home.id}.` : ""} ${page.account ? `accountId: ${page.account.id}, status: ${page.account.status}.` : ""}\n${guidanceForPath(pathname) ?? ""}`;
+    return `${header}\nVerified page context: ${page.label}. ${page.initiative ? `initiativeId: ${page.initiative.id}. Read initiativeRead.get before planning or editing linked work. Link content posts, series and campaigns, never platform posts. Creation and generation are separate; do not fill an initiative automatically.` : ""} ${page.brand ? `brandId: ${page.brand.id}.` : ""} ${page.campaign ? `campaignId: ${page.campaign.id}. Read adsRead.openCampaign before editing.` : ""} ${page.platformCampaign ? `platformCampaignId: ${page.platformCampaign.id}.` : ""} ${page.home ? `homeId: ${page.home.id}.` : ""} ${page.account ? `accountId: ${page.account.id}, status: ${page.account.status}.` : ""}\n${guidanceForPath(pathname) ?? ""}`;
 
   const seriesId = /^\/app\/series\/([^/]+)$/.exec(pathname)?.[1];
   if (seriesId) {

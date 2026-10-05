@@ -117,6 +117,12 @@ export function createChatToolScope(input: {
   const selected = new Set<Domain>();
   let performanceExpanded = false;
   if (input.pitch) selected.add("research");
+  if (/\/initiatives(\/|$)/.test(input.pagePath ?? "")) {
+    selected.add("performance");
+    selected.add("content");
+    selected.add("email");
+    selected.add("research");
+  }
   const path = input.pagePath?.split(/[?#]/)[0] ?? "";
   if (input.performance || /\/(performance|ads|campaigns)(\/|$)/.test(path))
     selected.add("performance");

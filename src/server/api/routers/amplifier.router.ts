@@ -1,14 +1,9 @@
-import { getInitiative } from "@/server/services/initiative.service";
 import type { Database } from "@/server/db";
 import { z } from "zod";
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
 
-import {
-  protectedProcedure,
-  actionProcedure,
-  workspaceProcedure,
-} from "@/server/api/orpc";
+import { protectedProcedure, actionProcedure } from "@/server/api/orpc";
 import {
   amplificationTargetTable,
   amplifierTable,
@@ -16,12 +11,15 @@ import {
   memberTable,
   platformPostTable,
 } from "@/server/db/schema";
-import { isSlackMemberId } from "@/lib/amplification-slack";
 import { discoverAmplifierHandles } from "@/server/services/social-discovery.service";
 import {
   listAmplifiers,
   notifyAmplification,
   requestAmplification,
+  saveAmplifier,
+  updateAmplification,
+  createAmplificationOutput,
+  readAmplificationTargets,
 } from "@/server/ai/capabilities/amplification";
 
 type Ctx = {
@@ -82,43 +80,6 @@ async function assertTargetAccess(ctx: Ctx, id: string) {
   return target;
 }
 
-async function platformPostsForInitiative(
-  ctx: Ctx,
-  initiativeId: string,
-  orgId: string,
-) {
-  const detail = await getInitiative(initiativeId, orgId);
-  const contents = detail.contentPosts;
-  if (contents.length === 0) return [];
-  const titleById = new Map(contents.map((c) => [c.id, c.title]));
-  const posts = await ctx.db.query.platformPostTable.findMany({
-    where: inArray(
-      platformPostTable.contentPostId,
-      contents.map((c) => c.id),
-    ),
-    columns: {
-      id: true,
-      contentPostId: true,
-      platform: true,
-      status: true,
-      scheduledAt: true,
-    },
-  });
-  return posts.map((post) => ({
-    ...post,
-    title: post.contentPostId
-      ? (titleById.get(post.contentPostId) ?? null)
-      : null,
-  }));
-}
-
-const handleSchema = z.object({ platform: z.string(), handle: z.string() });
-const slackUserIdSchema = z
-  .string()
-  .trim()
-  .toUpperCase()
-  .refine(isSlackMemberId, "Use a Slack member ID such as U012ABCDEF");
-
 /**
  * Amplifiers — the lightweight contacts (investors / press / partners) recruited
  * to boost a launch, plus their per-moment targets. Discovery reuses the brand
@@ -127,61 +88,11 @@ const slackUserIdSchema = z
 export const amplifierRouter = {
   list: actionProcedure(listAmplifiers),
 
-  create: protectedProcedure
-    .input(
-      z.object({
-        name: z.string().min(1),
-        type: z.string().optional(),
-        handles: z.array(handleSchema).optional(),
-        notes: z.string().max(1000).optional(),
-        slackUserId: slackUserIdSchema.optional(),
-      }),
-    )
-    .handler(async ({ context: ctx, input }) => {
-      const org = await orgIdFor(ctx);
-      if (!org) throw new ORPCError("FORBIDDEN");
-      const [a] = await ctx.db
-        .insert(amplifierTable)
-        .values({
-          organizationId: org,
-          name: input.name,
-          type: input.type,
-          handles: input.handles ?? [],
-          notes: input.notes,
-          slackUserId: input.slackUserId,
-        })
-        .returning();
-      return a;
-    }),
-
-  /** Edit a rolodex amplifier (name / type / handles / notes). */
-  update: protectedProcedure
-    .input(
-      z.object({
-        id: z.string(),
-        name: z.string().min(1).optional(),
-        type: z.string().optional(),
-        handles: z.array(handleSchema).optional(),
-        notes: z.string().optional(),
-        slackUserId: slackUserIdSchema.nullable().optional(),
-      }),
-    )
-    .handler(async ({ context: ctx, input }) => {
-      const org = await orgIdFor(ctx);
-      if (!org) throw new ORPCError("FORBIDDEN");
-      const { id, ...patch } = input;
-      const [a] = await ctx.db
-        .update(amplifierTable)
-        .set(patch)
-        .where(
-          and(
-            eq(amplifierTable.id, id),
-            eq(amplifierTable.organizationId, org),
-          ),
-        )
-        .returning();
-      return a;
-    }),
+  create: actionProcedure(saveAmplifier),
+  update: actionProcedure(saveAmplifier),
+  createOutput: actionProcedure(createAmplificationOutput),
+  updateTarget: actionProcedure(updateAmplification),
+  targets: actionProcedure(readAmplificationTargets),
 
   /** Soft-delete a rolodex amplifier (keeps past moment history intact). */
   remove: protectedProcedure
@@ -212,50 +123,6 @@ export const amplifierRouter = {
   /** Recruit amplifiers for one platform post. */
   addTarget: actionProcedure(requestAmplification),
 
-  /** All targets across a campaign's posts (the roll-up view). */
-  targetsForInitiative: workspaceProcedure
-    .input(z.object({ initiativeId: z.string() }))
-    .handler(async ({ context: ctx, input }) => {
-      const posts = await platformPostsForInitiative(
-        ctx,
-        input.initiativeId,
-        ctx.workspace.orgId,
-      );
-      if (posts.length === 0) return { targets: [], posts: [] };
-      const targets = await ctx.db.query.amplificationTargetTable.findMany({
-        where: inArray(
-          amplificationTargetTable.platformPostId,
-          posts.map((post) => post.id),
-        ),
-        with: { amplifier: true },
-        orderBy: [desc(amplificationTargetTable.createdAt)],
-      });
-      return { targets, posts };
-    }),
-
-  /** Advance/rewind the recruitment status of a target. */
-  setTargetAsk: protectedProcedure
-    .input(
-      z.object({
-        targetId: z.string(),
-        ask: z.enum(["planned", "asked", "confirmed", "fulfilled"]),
-      }),
-    )
-    .handler(async ({ context: ctx, input }) => {
-      await assertTargetAccess(ctx, input.targetId);
-      const [t] = await ctx.db
-        .update(amplificationTargetTable)
-        .set({
-          ask: input.ask,
-          // Stamp/clear fulfillment when toggled by hand (the retweet-matcher
-          // sets fulfilledByPostId separately).
-          fulfilledAt: input.ask === "fulfilled" ? new Date() : null,
-        })
-        .where(eq(amplificationTargetTable.id, input.targetId))
-        .returning();
-      return t;
-    }),
-
   /** Explicit external handoff. Planning a target never sends Slack. */
   notifyTarget: actionProcedure(notifyAmplification),
 
@@ -263,7 +130,11 @@ export const amplifierRouter = {
   removeTarget: protectedProcedure
     .input(z.object({ targetId: z.string() }))
     .handler(async ({ context: ctx, input }) => {
-      await assertTargetAccess(ctx, input.targetId);
+      const target = await assertTargetAccess(ctx, input.targetId);
+      if (target.outputPlatformPostId)
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Remove the output draft before removing its assignment.",
+        });
       await ctx.db
         .delete(amplificationTargetTable)
         .where(eq(amplificationTargetTable.id, input.targetId));

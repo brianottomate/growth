@@ -3,6 +3,7 @@ import {
   catalogFocusForTurn,
   latestAssistantFocus,
 } from "@/lib/assistant-focus";
+import { getInitiative } from "@/server/services/initiative.service";
 import { after } from "next/server";
 import {
   claimChatTurn,
@@ -43,6 +44,7 @@ import {
   brandTable,
   campaignTable,
   contentPostTable,
+  platformPostTable,
 } from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
 import {
@@ -317,6 +319,70 @@ export async function POST(req: Request): Promise<Response> {
     const savedFocus = latestAssistantFocus(
       persisted.map((row) => row.message),
     );
+    const requestedInitiative = assistantIntent
+      ? assistantIntent.type === "work_initiative"
+        ? assistantIntent
+        : undefined
+      : contextMode !== "page"
+        ? savedFocus?.initiativeContext
+        : undefined;
+    const initiativeState = requestedInitiative
+      ? await getInitiative(
+          requestedInitiative.initiativeId,
+          organizationId,
+        ).catch(() => null)
+      : null;
+    if (requestedInitiative && !initiativeState) {
+      return Response.json(
+        { error: "Initiative not found in this workspace." },
+        { status: 404 },
+      );
+    }
+    const initiativeCampaign = initiativeState?.campaigns.find(
+      (c) => c.id === requestedInitiative?.campaignId,
+    );
+    if (requestedInitiative?.campaignId && !initiativeCampaign) {
+      return Response.json(
+        { error: "Campaign is not linked to this initiative." },
+        { status: 404 },
+      );
+    }
+    const initiativePost = initiativeState?.contentPosts.find(
+      (p) => p.id === requestedInitiative?.contentPostId,
+    );
+    if (requestedInitiative?.contentPostId && !initiativePost)
+      return Response.json(
+        { error: "Content post is not included in this initiative." },
+        { status: 404 },
+      );
+    const initiativeSpot =
+      requestedInitiative?.platformPostId && initiativePost
+        ? await db.query.platformPostTable.findFirst({
+            where: and(
+              eq(platformPostTable.id, requestedInitiative.platformPostId),
+              eq(platformPostTable.contentPostId, initiativePost.id),
+              eq(platformPostTable.brandId, initiativePost.brandId),
+            ),
+            columns: { id: true },
+          })
+        : null;
+    if (requestedInitiative?.platformPostId && !initiativeSpot)
+      return Response.json(
+        { error: "Channel version does not belong to this content post." },
+        { status: 404 },
+      );
+    const activeInitiativeIntent =
+      requestedInitiative && initiativeState
+        ? {
+            ...requestedInitiative,
+            brandId:
+              initiativePost?.brandId ??
+              initiativeCampaign?.brandId ??
+              initiativeState.initiative.leadBrandId ??
+              undefined,
+            campaignId: initiativeCampaign?.id,
+          }
+        : undefined;
     const savedAdContext = savedFocus?.adWorkContext ?? undefined;
     const requestedCampaignContext =
       assistantIntent && assistantIntent.type !== "work_ad_campaign"
@@ -408,6 +474,7 @@ export async function POST(req: Request): Promise<Response> {
       : undefined;
 
     const requestedBrandId =
+      activeInitiativeIntent?.brandId ??
       catalogHome?.brand.id ??
       activeCampaignContext?.brandId ??
       activeWorkContext?.brandId ??
@@ -430,7 +497,10 @@ export async function POST(req: Request): Promise<Response> {
       surface === "create" || surface === "next"
         ? `\n\n# Current surface\nThe operator is in the unified Next conversation${brand ? ` for ${brand.name} (brandId: ${brand.id})` : ""}${intent ? ` with intent \"${intent}\"` : ""}. The default operating horizon is the next 14 days. Treat questions, pasted images, links, and rough thoughts as one continuous iteration loop. First establish readiness with brandRead action next when a brand is known. Do not pretend this is an editing studio. Prefer the smallest useful action, keep suggestions to at most three and usually one, execute authorized workspace changes without redundant approval cards, then point or navigate the operator to the existing content, schedule, calendar, media, or review surface where the result belongs. When the creative direction is genuinely ready for production, call prepareProductionPacket action prepare. Copying that packet into Claude Design, ChatGPT, a video editor, or an agency workflow is a first-class outcome; Fal is only an optional experiment that consumes the same reviewed packet.`
         : "";
-    const intentContext = triggeredIntentPrompt(assistantIntent, brand ?? null);
+    const intentContext = triggeredIntentPrompt(
+      activeInitiativeIntent ?? assistantIntent,
+      brand ?? null,
+    );
     const campaignContextPrompt =
       activeCampaignContext?.campaignId &&
       activeCampaignContext.focus !== "copy" &&
@@ -638,6 +708,9 @@ export async function POST(req: Request): Promise<Response> {
     if (incoming.role === "user") {
       incoming.metadata = {
         ...((incoming.metadata ?? {}) as Record<string, unknown>),
+        initiativeContext: activeInitiativeIntent
+          ? { ...activeInitiativeIntent, mode: "shape" }
+          : null,
         adWorkContext: activeCampaignContext,
         catalogHomeContext: activeCatalogContext ?? null,
         workContext: activeWorkContext,

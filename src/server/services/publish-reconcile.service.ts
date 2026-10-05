@@ -6,7 +6,9 @@ import { and, asc, between, eq, isNotNull, isNull, ne } from "drizzle-orm";
 import { z } from "zod";
 
 import { db, withTransaction } from "../db";
+import { reconcileAmplificationTargetsForPosts } from "./amplification.service";
 import {
+  amplificationTargetTable,
   contentPostTable,
   platformPostLinkTable,
   platformPostTable,
@@ -184,7 +186,7 @@ export async function applyLivePostMatch(input: {
   platformPostId: string;
   livePlatformPostId: string;
 }) {
-  return withTransaction(async (tx) => {
+  const result = await withTransaction(async (tx) => {
     const [spot] = await tx
       .select()
       .from(platformPostTable)
@@ -229,6 +231,8 @@ export async function applyLivePostMatch(input: {
         stats: live.stats ?? spot.stats,
         username: spot.username ?? live.username,
         scrapedAt: live.scrapedAt,
+        externalKind: live.externalKind ?? spot.externalKind,
+        amplifiedFrom: live.amplifiedFrom ?? spot.amplifiedFrom,
       })
       .where(eq(platformPostTable.id, spot.id));
 
@@ -243,6 +247,18 @@ export async function applyLivePostMatch(input: {
       .set({ toPlatformPostId: spot.id })
       .where(eq(platformPostLinkTable.toPlatformPostId, live.id));
 
+    await tx
+      .update(amplificationTargetTable)
+      .set({ platformPostId: spot.id })
+      .where(eq(amplificationTargetTable.platformPostId, live.id));
+    await tx
+      .update(amplificationTargetTable)
+      .set({ outputPlatformPostId: spot.id })
+      .where(eq(amplificationTargetTable.outputPlatformPostId, live.id));
+    await tx
+      .update(amplificationTargetTable)
+      .set({ fulfilledByPostId: spot.id })
+      .where(eq(amplificationTargetTable.fulfilledByPostId, live.id));
     await tx.delete(platformPostTable).where(eq(platformPostTable.id, live.id));
 
     let ideaRolledUp: string | null = null;
@@ -279,4 +295,6 @@ export async function applyLivePostMatch(input: {
       ideaRolledUp,
     };
   });
+  await reconcileAmplificationTargetsForPosts([result.platformPostId]);
+  return result;
 }

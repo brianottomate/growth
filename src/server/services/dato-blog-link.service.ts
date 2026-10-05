@@ -1,10 +1,14 @@
 import "server-only";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 import { getBlogArticleDraft } from "@/server/clients/datocms-cda.client";
 import { db } from "@/server/db";
-import { brandTable, platformPostTable } from "@/server/db/schema";
+import {
+  brandTable,
+  contentPostTable,
+  platformPostTable,
+} from "@/server/db/schema";
 
 const PUBLIC_BASE = "https://www.wander.com/article";
 
@@ -13,6 +17,7 @@ export async function linkDatoBlogArticle(input: {
   organizationId: string;
   brandName?: string;
   linkedBy?: string;
+  contentPostId?: string;
 }) {
   const article = await getBlogArticleDraft(input.itemId);
   if (!article) {
@@ -23,11 +28,28 @@ export async function linkDatoBlogArticle(input: {
     where: eq(brandTable.organizationId, input.organizationId),
     columns: { id: true, name: true },
   });
+  const parent = input.contentPostId
+    ? await db.query.contentPostTable.findFirst({
+        where: and(
+          eq(contentPostTable.id, input.contentPostId),
+          isNull(contentPostTable.deletedAt),
+        ),
+        with: { brand: { columns: { organizationId: true } } },
+      })
+    : null;
+  if (
+    input.contentPostId &&
+    parent?.brand.organizationId !== input.organizationId
+  )
+    throw new Error("Content post not found in this workspace.");
   const brandName = input.brandName?.trim() || "Wander";
   const needle = brandName.toLowerCase();
-  const brand =
-    brands.find((candidate) => candidate.name.toLowerCase() === needle) ??
-    brands.find((candidate) => candidate.name.toLowerCase().includes(needle));
+  const brand = parent
+    ? brands.find((b) => b.id === parent.brandId)
+    : (brands.find((candidate) => candidate.name.toLowerCase() === needle) ??
+      brands.find((candidate) =>
+        candidate.name.toLowerCase().includes(needle),
+      ));
   if (!brand) {
     throw new Error(
       `No brand matching "${brandName}". Known: ${brands.map((candidate) => candidate.name).join(", ")}`,
@@ -41,11 +63,26 @@ export async function linkDatoBlogArticle(input: {
       eq(platformPostTable.externalId, input.itemId),
     ),
   });
+  if (parent && existing?.contentPostId && existing.contentPostId !== parent.id)
+    throw new Error("Article already belongs to a different content post.");
+  const slot =
+    parent && !existing
+      ? await db.query.platformPostTable.findFirst({
+          where: and(
+            eq(platformPostTable.contentPostId, parent.id),
+            eq(platformPostTable.brandId, parent.brandId),
+            eq(platformPostTable.platform, "blog"),
+            isNull(platformPostTable.externalId),
+          ),
+        })
+      : null;
+  const target = existing ?? slot;
   const existingMetadata =
-    existing?.metadata && typeof existing.metadata === "object"
-      ? (existing.metadata as Record<string, unknown>)
+    target?.metadata && typeof target.metadata === "object"
+      ? (target.metadata as Record<string, unknown>)
       : {};
   const values = {
+    ...(parent ? { contentPostId: parent.id } : {}),
     brandId: brand.id,
     platform: "blog" as const,
     username: "wander.com/blog",
@@ -74,13 +111,13 @@ export async function linkDatoBlogArticle(input: {
     },
   };
 
-  if (existing) {
+  if (target) {
     await db
       .update(platformPostTable)
       .set(values)
-      .where(eq(platformPostTable.id, existing.id));
+      .where(eq(platformPostTable.id, target.id));
     return {
-      platformPostId: existing.id,
+      platformPostId: target.id,
       itemId: input.itemId,
       created: false,
       status: values.status,

@@ -11,11 +11,11 @@ import { createId } from "./utils";
  * The earned-amplification layer.
  *
  * An `amplifier` is a lightweight CONTACT we recruit to boost a post
- * (investor, press, partner, creator, team). `promotedBrandId` optionally
- * links one to an owned brand (e.g. a founder's personal brand) — for those
- * we can mint the repost draft ourselves instead of asking.
- * `amplification_target` ties an amplifier to ONE platform_post with a
- * recruitment status — the live version of the "who's reposting" spreadsheet.
+ * (investor, press, partner, creator, team). `linkedBrandId` optionally
+ * links one to a personal content workspace. This does not grant publishing
+ * access or change the person's handoff preference.
+ * `amplification_target` is one request: source post, person, destination and
+ * action. Its optional output is a normal platform post under the personal brand.
  * Which posts deserve amplification is a judgment call made per post (by a
  * human or the assistant), deliberately not a standing rule in the schema.
  */
@@ -47,9 +47,14 @@ export const amplifierTable = pgTable(
     // Keeping identity on the reusable contact avoids hiding people in a
     // campaign-specific metadata blob.
     slackUserId: t.text(),
+    handoffPreference: t
+      .text()
+      .$type<"manual" | "slack">()
+      .default("manual")
+      .notNull(),
 
-    // Set if this amplifier graduated into a tracked brand (handles → channels).
-    promotedBrandId: t
+    // Optional personal content workspace; a publishing connection is independent.
+    linkedBrandId: t
       .text()
       .references(() => brandTable.id, { onDelete: "set null" }),
 
@@ -91,18 +96,20 @@ export const amplificationTargetTable = pgTable(
       .references(() => amplifierTable.id, { onDelete: "cascade" })
       .notNull(),
 
-    // planned → asked → confirmed → fulfilled (soft text). Fulfillment is
-    // auto-set by matching the hero post's retweeters against the amplifier's
-    // handles.
+    // Coordination only: planned → asked → confirmed → fulfilled.
+    // Draft approval/publication lives on the optional output platform post.
     ask: t.text().default("planned").notNull(),
     // What the person is being asked to do. This is deliberately separate
     // from the platform post format: amplification is a relationship/action.
     actionKind: t.text().default("repost").notNull(),
+    destinationPlatform: t.text().notNull(),
+    outputPlatformPostId: t
+      .text()
+      .references(() => platformPostTable.id, { onDelete: "set null" }),
     draftText: t.text(),
     plannedAt: t.timestamp({ withTimezone: true }),
     fulfilledAt: t.timestamp({ withTimezone: true }),
-    // Soft pointer to the platform_post that fulfilled it (no FK — avoids a
-    // cross-file cycle; resolve in app code).
+    // Observed fulfillment evidence, distinct from the planned output draft.
     fulfilledByPostId: t.text(),
     notes: t.text(),
 
@@ -139,6 +146,8 @@ export const amplificationTargetTable = pgTable(
     uniqueIndex("amplification_target_unique_idx").on(
       table.platformPostId,
       table.amplifierId,
+      table.destinationPlatform,
+      table.actionKind,
     ),
   ],
 );
@@ -156,8 +165,8 @@ export const amplifierRelations = relations(
       fields: [amplifierTable.organizationId],
       references: [organizationTable.id],
     }),
-    promotedBrand: one(brandTable, {
-      fields: [amplifierTable.promotedBrandId],
+    linkedBrand: one(brandTable, {
+      fields: [amplifierTable.linkedBrandId],
       references: [brandTable.id],
     }),
     targets: many(amplificationTargetTable),
@@ -168,8 +177,14 @@ export const amplificationTargetRelations = relations(
   amplificationTargetTable,
   ({ one }) => ({
     platformPost: one(platformPostTable, {
+      relationName: "amplificationSource",
       fields: [amplificationTargetTable.platformPostId],
       references: [platformPostTable.id],
+    }),
+    outputPlatformPost: one(platformPostTable, {
+      fields: [amplificationTargetTable.outputPlatformPostId],
+      references: [platformPostTable.id],
+      relationName: "amplificationOutput",
     }),
     amplifier: one(amplifierTable, {
       fields: [amplificationTargetTable.amplifierId],

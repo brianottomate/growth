@@ -1,4 +1,5 @@
 "use client";
+import { AmplificationSummary } from "../campaigns/[campaignId]/MomentAmplifiers";
 import Link from "next/link";
 import { ImageIcon, CalendarDays, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,7 @@ export function previewDate(start: string | null, end?: string | null) {
 }
 export function WorkPreview({
   title,
+  contentPostId,
   href,
   brand,
   status,
@@ -43,6 +45,7 @@ export function WorkPreview({
   textOnly = false,
 }: {
   title: string;
+  contentPostId?: string;
   href: string;
   brand: string;
   status: string;
@@ -176,6 +179,9 @@ export function WorkPreview({
           </div>
           {execution && (
             <p className="text-[11px] text-muted-foreground">{execution}</p>
+          )}
+          {contentPostId && (
+            <AmplificationSummary contentPostId={contentPostId} />
           )}
           {inherited && (
             <p className="text-[11px] text-muted-foreground">

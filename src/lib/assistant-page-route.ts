@@ -19,6 +19,7 @@ export function assistantPageRoute(path: string) {
     );
   const account = /^\/app\/performance\/(perf_[^/]+)$/.exec(pathname);
   return {
+    initiativeId: /^\/app\/initiatives\/([^/]+)$/.exec(pathname)?.[1],
     brandSlug: brand?.[1],
     campaignId: campaign?.[1],
     platformCampaignId: platform?.[1],

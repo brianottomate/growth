@@ -754,7 +754,10 @@ export const planningWrite = growthDomainTool({
 export const amplificationRead = growthDomainTool({
   description:
     "Read the amplifier rolodex with per-contact ask history — who can boost a post and how reliably they deliver.",
-  actions: { list: AMPLIFICATION_TOOLS.listAmplifiers },
+  actions: {
+    list: AMPLIFICATION_TOOLS.listAmplifiers,
+    targets: AMPLIFICATION_TOOLS.readAmplificationTargets,
+  },
 });
 
 export const amplificationWrite = growthDomainTool({
@@ -762,6 +765,9 @@ export const amplificationWrite = growthDomainTool({
     "Plan amplification for a specific platform post, then explicitly notify one human through Slack when approved.",
   actions: {
     request: AMPLIFICATION_TOOLS.requestAmplification,
+    saveContact: AMPLIFICATION_TOOLS.saveAmplifier,
+    update: AMPLIFICATION_TOOLS.updateAmplification,
+    createOutput: AMPLIFICATION_TOOLS.createAmplificationOutput,
     notify: AMPLIFICATION_TOOLS.notifyAmplification,
   },
 });

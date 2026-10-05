@@ -20,6 +20,7 @@ export async function notifyAmplificationTarget(input: {
     where: eq(amplificationTargetTable.id, input.targetId),
     with: {
       amplifier: true,
+      outputPlatformPost: true,
       platformPost: {
         with: { brand: true, contentPost: { columns: { title: true } } },
       },
@@ -35,6 +36,19 @@ export async function notifyAmplificationTarget(input: {
       messageTs: target.slackMessageTs,
     };
   }
+  if (
+    target.platformPost.brand?.organizationId !== input.organizationId ||
+    target.amplifier.deletedAt
+  )
+    throw new Error("Amplification target not found");
+  if (target.amplifier.handoffPreference !== "slack")
+    throw new Error(
+      "This contact uses manual handoff. Enable Slack explicitly before notifying.",
+    );
+  if (target.ask === "fulfilled")
+    throw new Error("This assignment is already complete");
+  if (!target.platformPost.externalUrl && target.actionKind !== "adaptation")
+    throw new Error("Publish the source post before requesting a share.");
   if (!env.SLACK_AMPLIFICATION_CHANNEL_ID) {
     throw new Error("SLACK_AMPLIFICATION_CHANNEL_ID is not configured");
   }
@@ -58,8 +72,11 @@ export async function notifyAmplificationTarget(input: {
     actionKind: target.actionKind as AmplificationAction,
     brandName: target.platformPost.brand?.name ?? "Wander",
     platform: target.platformPost.platform,
+    destinationPlatform: target.destinationPlatform,
     title: target.platformPost.contentPost?.title,
-    draftText: target.draftText,
+    draftText: target.outputPlatformPost
+      ? target.outputPlatformPost.text
+      : target.draftText,
     notes: target.notes,
     plannedAt: target.plannedAt,
     sourceUrl: target.platformPost.externalUrl,

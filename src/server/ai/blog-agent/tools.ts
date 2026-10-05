@@ -28,6 +28,7 @@ export interface BlogToolContext {
   trail: BlogToolTrailEntry[];
   /** Org the invoking operator belongs to, for scoping brand lookups. */
   organizationId: string;
+  contentPostId?: string;
   /** Dato records written during this run, reconciled before handoff. */
   touchedItemIds: Set<string>;
   /** Operator-owned image attached to the invoking chat turn. */

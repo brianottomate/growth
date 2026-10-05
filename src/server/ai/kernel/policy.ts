@@ -606,8 +606,11 @@ export const growthActionPolicies = {
     previewSlots: read("model-read", ALL),
   },
   planningWrite: { generateSlots: write() },
-  amplificationRead: { list: read() },
+  amplificationRead: { list: read(), targets: read() },
   amplificationWrite: {
+    saveContact: write(),
+    update: write({ idempotent: true }),
+    createOutput: write({ idempotent: true }),
     request: write({ idempotent: true }),
     notify: write({
       consequence: "provider-write",

@@ -72,6 +72,19 @@ const platform = z.object({
 });
 const detail = z.object({
   previews: z.object({
+    editorial: z.array(
+      z.object({
+        ...previewBase,
+        contentPostId: z.string(),
+        externalId: z.string().nullable(),
+        seriesId: z.string().nullable(),
+        kind: z.enum(["email", "blog"]),
+        title: z.string(),
+        status: z.string(),
+        scheduledAt: z.string().nullable(),
+        publishedAt: z.string().nullable(),
+      }),
+    ),
     posts: z.array(
       z.object({
         ...previewBase,
@@ -99,7 +112,16 @@ const detail = z.object({
         ),
         creativeLines: z.array(z.string()),
         audienceCount: z.number(),
-        platforms: z.array(platform),
+        audiences: z.array(
+          z.object({
+            id: z.string(),
+            name: z.string(),
+            description: z.string().nullable(),
+          }),
+        ),
+        platforms: z.array(
+          platform.extend({ id: z.string(), pushed: z.boolean() }),
+        ),
       }),
     ),
   }),

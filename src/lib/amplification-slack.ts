@@ -3,6 +3,7 @@ export const AMPLIFICATION_ACTIONS = [
   "quote",
   "comment",
   "story_share",
+  "adaptation",
 ] as const;
 
 export type AmplificationAction = (typeof AMPLIFICATION_ACTIONS)[number];
@@ -16,6 +17,7 @@ const ACTION_LABELS: Record<AmplificationAction, string> = {
   quote: "quote-post",
   comment: "comment",
   story_share: "share to Stories",
+  adaptation: "adapt",
 };
 
 const slackText = (value: string) =>
@@ -28,6 +30,7 @@ export function buildAmplificationSlackMessage(input: {
   actionKind: AmplificationAction;
   brandName: string;
   platform: string;
+  destinationPlatform?: string;
   title?: string | null;
   draftText?: string | null;
   notes?: string | null;
@@ -35,7 +38,7 @@ export function buildAmplificationSlackMessage(input: {
   sourceUrl?: string | null;
   workUrl: string;
 }) {
-  const request = `${ACTION_LABELS[input.actionKind]} this ${slackText(input.platform)} post for ${slackText(input.brandName)}`;
+  const request = `${ACTION_LABELS[input.actionKind]} this ${slackText(input.platform)} post${input.destinationPlatform ? ` on ${slackText(input.destinationPlatform)}` : ""} for ${slackText(input.brandName)}`;
   const headline =
     input.recipientRole === "coordinator"
       ? `<@${input.slackUserId}> amplification handoff: ask ${slackText(input.amplifierName)} to ${request}.`

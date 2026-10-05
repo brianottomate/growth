@@ -531,7 +531,6 @@ export default async function BrandsPage() {
     by.push(`${insp.purpose} · ${insp.brand?.name ?? "?"}`);
     peerTrackedBy.set(insp.inspirationBrand.id, by);
   }
-  const distinctTracked = peerBrands.length;
 
   const toLite = (c: typeof channelTable.$inferSelect): ChannelLite => ({
     id: c.id,
@@ -613,26 +612,40 @@ export default async function BrandsPage() {
   const ours = brands.filter(
     (b) => b.relationship !== "client" && b.relationship !== "prospect",
   );
+  const companyBrands = ours
+    .filter((b) => b.type === "company")
+    .sort((a, b) => Number(b.slug === "wander") - Number(a.slug === "wander"));
+  const personalBrands = ours.filter((b) => b.type === "personal");
 
   const searchGroups = [
-    { label: "Clients", brands: clients, render: renderBrand },
+    {
+      label: "Company brands",
+      brands: companyBrands,
+      render: renderBrand,
+    },
+    {
+      label: "Personal brands",
+      brands: personalBrands,
+      render: renderBrand,
+    },
+    {
+      label: "Tracked brands",
+      brands: peerBrands,
+      render: renderPeerBrand,
+      defaultHidden: true,
+    },
+    {
+      label: "Clients",
+      brands: clients,
+      render: renderBrand,
+      defaultHidden: true,
+    },
     {
       label: "Prospects",
       brands: prospects,
       render: renderBrand,
       defaultHidden: true,
     },
-    {
-      label: "Company brands",
-      brands: ours.filter((b) => b.type === "company"),
-      render: renderBrand,
-    },
-    {
-      label: "Personal brands",
-      brands: ours.filter((b) => b.type === "personal"),
-      render: renderBrand,
-    },
-    { label: "Tracked brands", brands: peerBrands, render: renderPeerBrand },
   ]
     .filter((group) => group.brands.length > 0)
     .map((group) => ({
@@ -651,9 +664,9 @@ export default async function BrandsPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Brands</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {clients.length} client{clients.length === 1 ? "" : "s"} ·{" "}
-            {prospects.length} prospect{prospects.length === 1 ? "" : "s"} ·{" "}
-            {ours.length} ours · {distinctTracked} tracked
+            {companyBrands.length} company brand
+            {companyBrands.length === 1 ? "" : "s"} · {personalBrands.length}{" "}
+            personal brand{personalBrands.length === 1 ? "" : "s"}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

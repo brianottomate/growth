@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import {
@@ -9,12 +9,14 @@ import {
   brandTable,
   platformPostTable,
 } from "@/server/db/schema";
+import { matchesAmplificationAction } from "@/lib/amplification-plan";
 import { amplifierHandlesAccount } from "./amplification-matching";
 
 /**
  * Best-effort reconciliation after canonical post ingest. A repost/quote made
  * by a recruited account fulfills its target on the original post directly —
- * targets are keyed by (platformPostId, amplifierId).
+ * matches must agree on source, person, destination, and action. A published
+ * assigned output is explicit evidence; unrelated adaptations are never guessed.
  */
 export async function reconcileAmplificationTargetsForPosts(postIds: string[]) {
   if (!postIds.length) return 0;
@@ -24,6 +26,44 @@ export async function reconcileAmplificationTargetsForPosts(postIds: string[]) {
   let fulfilled = 0;
 
   for (const post of posts) {
+    if (!post.publishedAt && post.status !== "published") continue;
+    const outputs = await db.query.amplificationTargetTable.findMany({
+      where: eq(amplificationTargetTable.outputPlatformPostId, post.id),
+      with: { amplifier: true, platformPost: { with: { brand: true } } },
+    });
+    for (const target of outputs) {
+      if (
+        target.ask === "fulfilled" ||
+        target.amplifier.deletedAt ||
+        target.amplifier.linkedBrandId !== post.brandId ||
+        target.destinationPlatform !== post.platform ||
+        target.platformPost.brand.organizationId !==
+          target.amplifier.organizationId ||
+        (target.actionKind !== "adaptation" &&
+          !matchesAmplificationAction(
+            target.destinationPlatform,
+            target.actionKind,
+            post.platform,
+            post.externalKind,
+          ))
+      )
+        continue;
+      const [updated] = await db
+        .update(amplificationTargetTable)
+        .set({
+          ask: "fulfilled",
+          fulfilledAt: post.publishedAt ?? new Date(),
+          fulfilledByPostId: post.id,
+        })
+        .where(
+          and(
+            eq(amplificationTargetTable.id, target.id),
+            eq(amplificationTargetTable.ask, target.ask),
+          ),
+        )
+        .returning({ id: amplificationTargetTable.id });
+      if (updated) fulfilled++;
+    }
     const originalExternalId = post.amplifiedFrom?.externalId;
     if (!originalExternalId) continue;
     const originals = await db.query.platformPostTable.findMany({
@@ -32,7 +72,9 @@ export async function reconcileAmplificationTargetsForPosts(postIds: string[]) {
         eq(platformPostTable.externalId, originalExternalId),
       ),
     });
-    const original = originals.find((candidate) => candidate.contentPostId);
+    const original =
+      originals.find((candidate) => candidate.source === "owned") ??
+      originals[0];
     if (!original) continue;
 
     // Amplifiers are org-scoped; resolve the org from the original's brand.
@@ -42,11 +84,14 @@ export async function reconcileAmplificationTargetsForPosts(postIds: string[]) {
     if (!brand?.organizationId) continue;
 
     const amplifiers = await db.query.amplifierTable.findMany({
-      where: eq(amplifierTable.organizationId, brand.organizationId),
+      where: and(
+        eq(amplifierTable.organizationId, brand.organizationId),
+        isNull(amplifierTable.deletedAt),
+      ),
     });
     const amplifier = amplifiers.find(
       (candidate) =>
-        candidate.promotedBrandId === post.brandId ||
+        candidate.linkedBrandId === post.brandId ||
         amplifierHandlesAccount(
           candidate.handles,
           post.platform,
@@ -55,22 +100,39 @@ export async function reconcileAmplificationTargetsForPosts(postIds: string[]) {
     );
     if (!amplifier) continue;
 
-    const [updated] = await db
-      .update(amplificationTargetTable)
-      .set({
-        ask: "fulfilled",
-        fulfilledAt: new Date(),
-        fulfilledByPostId: post.id,
-      })
-      .where(
-        and(
-          eq(amplificationTargetTable.platformPostId, original.id),
-          eq(amplificationTargetTable.amplifierId, amplifier.id),
-        ),
+    const targets = await db.query.amplificationTargetTable.findMany({
+      where: and(
+        eq(amplificationTargetTable.platformPostId, original.id),
+        eq(amplificationTargetTable.amplifierId, amplifier.id),
+      ),
+    });
+    for (const target of targets) {
+      if (
+        target.ask === "fulfilled" ||
+        !matchesAmplificationAction(
+          target.destinationPlatform,
+          target.actionKind,
+          post.platform,
+          post.externalKind,
+        )
       )
-      .returning({ id: amplificationTargetTable.id });
-    if (updated) fulfilled++;
+        continue;
+      const [updated] = await db
+        .update(amplificationTargetTable)
+        .set({
+          ask: "fulfilled",
+          fulfilledAt: post.publishedAt ?? new Date(),
+          fulfilledByPostId: post.id,
+        })
+        .where(
+          and(
+            eq(amplificationTargetTable.id, target.id),
+            eq(amplificationTargetTable.ask, target.ask),
+          ),
+        )
+        .returning({ id: amplificationTargetTable.id });
+      if (updated) fulfilled++;
+    }
   }
-
   return fulfilled;
 }

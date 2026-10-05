@@ -58,6 +58,8 @@ type Amplifier = {
   handles: AmplifierHandle[] | null;
   notes: string | null;
   slackUserId: string | null;
+  handoffPreference: "manual" | "slack";
+  linkedBrandId: string | null;
 };
 
 export function AmplifierRolodex() {
@@ -150,7 +152,9 @@ export function AmplifierRolodex() {
                 )}
                 {a.slackUserId ? (
                   <span className="shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                    Slack {a.slackUserId}
+                    {a.handoffPreference === "slack"
+                      ? "Slack handoff"
+                      : "Manual handoff"}
                   </span>
                 ) : null}
                 <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
@@ -200,6 +204,8 @@ export function AmplifierRolodex() {
                         handles: a.handles,
                         notes: a.notes,
                         slackUserId: a.slackUserId,
+                        handoffPreference: a.handoffPreference,
+                        linkedBrandId: a.linkedBrandId,
                       })
                     }
                     title="Edit"
@@ -250,6 +256,11 @@ function AmplifierDialog({
   onSaved: () => Promise<void> | void;
 }) {
   const isEdit = !!initial;
+  const { data: contacts } = useQuery(
+    orpc.amplifier.list.queryOptions({ input: {} }),
+  );
+  const [handoff, setHandoff] = useState<"manual" | "slack">("manual");
+  const [brandId, setBrandId] = useState("none");
 
   const [name, setName] = useState("");
   const [type, setType] = useState("creator");
@@ -268,6 +279,8 @@ function AmplifierDialog({
     setHandles(initial?.handles ?? []);
     setNotes(initial?.notes ?? "");
     setSlackUserId(initial?.slackUserId ?? "");
+    setHandoff(initial?.handoffPreference ?? "manual");
+    setBrandId(initial?.linkedBrandId ?? "none");
     setPlatform("x");
     setHandle("");
   }, [open, initial]);
@@ -309,6 +322,8 @@ function AmplifierDialog({
       update.mutate({
         id: initial.id,
         name: trimmed,
+        handoffPreference: handoff,
+        linkedBrandId: brandId === "none" ? null : brandId,
         type,
         handles,
         notes,
@@ -317,6 +332,8 @@ function AmplifierDialog({
     } else {
       create.mutate({
         name: trimmed,
+        handoffPreference: handoff,
+        linkedBrandId: brandId === "none" ? null : brandId,
         type,
         handles,
         notes: notes || undefined,
@@ -416,6 +433,31 @@ function AmplifierDialog({
             </Button>
           </div>
 
+          <SimpleSelect
+            aria-label="Handoff preference"
+            value={handoff}
+            onValueChange={(value) => setHandoff(value as "manual" | "slack")}
+            options={[
+              { value: "manual", label: "Manual handoff" },
+              { value: "slack", label: "Slack handoff" },
+            ]}
+          />
+          <SimpleSelect
+            aria-label="Personal brand"
+            value={brandId}
+            onValueChange={setBrandId}
+            options={[
+              { value: "none", label: "Lightweight contact" },
+              ...(contacts?.brands ?? []).map((b) => ({
+                value: b.id,
+                label: b.name,
+              })),
+            ]}
+          />
+          <p className="text-xs text-muted-foreground">
+            A personal brand adds a content workspace. Connecting a publishing
+            account is optional.
+          </p>
           <Input
             value={slackUserId}
             onChange={(event) =>

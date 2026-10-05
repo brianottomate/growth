@@ -56,6 +56,51 @@ describe("Initiative cutover and membership integrity", () => {
       (await database.query("SELECT * FROM initiative_member")).rows,
     ).toHaveLength(3);
   });
+  test("redeploy does not restore deliberately removed VRMA membership", async () => {
+    const isolated = new PGlite();
+    try {
+      await isolated.exec(`CREATE TABLE organization (id text PRIMARY KEY);
+        CREATE TABLE "user" (id text PRIMARY KEY);
+        CREATE TABLE brand (id text PRIMARY KEY, organization_id text REFERENCES organization(id));
+        CREATE TABLE campaign (id text PRIMARY KEY, brand_id text REFERENCES brand(id), name text, description text, status text, start_at timestamptz, end_at timestamptz);
+        CREATE TABLE series (id text PRIMARY KEY, brand_id text REFERENCES brand(id), campaign_id text REFERENCES campaign(id));
+        CREATE TABLE content_post (id text PRIMARY KEY, brand_id text REFERENCES brand(id), series_id text REFERENCES series(id), campaign_id text REFERENCES campaign(id));
+        INSERT INTO organization VALUES ('org_4Kpk3KEBWbQcTEa6');
+        INSERT INTO brand VALUES ('brand', 'org_4Kpk3KEBWbQcTEa6');
+        INSERT INTO campaign VALUES ('camp_VezPHGsaUwngW7Dj', 'brand', 'VRMA', 'Brief', 'planned', NULL, NULL);
+        INSERT INTO series VALUES ('series_cabGCKZhN29H52CP', 'brand', 'camp_VezPHGsaUwngW7Dj');`);
+      const apply = () =>
+        isolated.transaction(async (tx) =>
+          migrateInitiatives({
+            unsafe: async (sql) => (await tx.query(sql)).rows,
+          }),
+        );
+      await apply();
+      await isolated.exec(
+        "DELETE FROM initiative_member WHERE series_id = 'series_cabGCKZhN29H52CP'",
+      );
+      await apply();
+      expect(
+        (
+          await isolated.query(
+            "SELECT * FROM initiative_member WHERE series_id = 'series_cabGCKZhN29H52CP'",
+          )
+        ).rows,
+      ).toHaveLength(0);
+      expect((await isolated.query("SELECT * FROM series")).rows).toHaveLength(
+        1,
+      );
+      expect(
+        (
+          await isolated.query(
+            "SELECT * FROM initiative_member WHERE campaign_id = 'camp_VezPHGsaUwngW7Dj'",
+          )
+        ).rows,
+      ).toHaveLength(1);
+    } finally {
+      await isolated.close();
+    }
+  });
   test("database rejects missing, ambiguous, dangling, and duplicate memberships", async () => {
     const invalid = [
       "INSERT INTO initiative_member VALUES ('empty', 'init_paid', NULL, NULL, NULL, now())",

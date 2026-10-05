@@ -1,3 +1,4 @@
+import { migrateAmplification } from "./migrate-amplification";
 import { migrateCampaignAudiences } from "./migrate-campaign-audiences";
 import { migrateCreativeDocuments } from "./migrate-creative-documents";
 import { migrateInitiatives } from "./migrate-initiatives";
@@ -28,6 +29,7 @@ try {
     for (const statement of launchRetirementStatements(source))
       await tx.unsafe(statement);
     await migrateInitiatives(tx);
+    await migrateAmplification(tx);
     await migrateCampaignAudiences(tx);
     await migrateCreativeDocuments(tx, true);
   });

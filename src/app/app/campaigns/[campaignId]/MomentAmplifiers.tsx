@@ -1,507 +1,544 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Plus, Search, Send, Sparkles, X } from "lucide-react";
-
+import { Plus, Send, Pencil, X } from "lucide-react";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { SimpleSelect } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
 import { ChannelLogo } from "@/components/channel-logos";
+import {
+  amplificationActionSchema,
+  amplificationAskSchema,
+  amplificationPlatformSchema,
+} from "@/lib/amplification-plan";
+import { amplificationTargetsOutputSchema } from "@/server/ai/capabilities/outputs/amplification";
 import { orpc } from "@/orpc/client";
 
-// planned → asked → confirmed → fulfilled (matches amplification_target.ask)
-const ASKS = ["planned", "asked", "confirmed", "fulfilled"] as const;
-type Ask = (typeof ASKS)[number];
+type Data = z.infer<typeof amplificationTargetsOutputSchema>;
+type Target = Data["targets"][number];
+type Scope =
+  | { initiativeId: string; contentPostId?: never }
+  | { contentPostId: string; initiativeId?: never };
+const label = (value: string) =>
+  value === "x"
+    ? "X"
+    : value === "linkedin"
+      ? "LinkedIn"
+      : value === "fulfilled"
+        ? "Completed"
+        : value.replaceAll("_", " ").replace(/^./, (c) => c.toUpperCase());
+const options = (values: readonly string[]) =>
+  values.map((value) => ({ value, label: label(value) }));
 
-const ASK_META: Record<Ask, { label: string }> = {
-  planned: { label: "Planned" },
-  asked: { label: "Asked" },
-  confirmed: { label: "Confirmed" },
-  fulfilled: { label: "Completed" },
-};
-
-const TYPE_OPTIONS = [
-  { value: "friend", label: "Friend of the company" },
-  { value: "creator", label: "Creator" },
-  { value: "investor", label: "Investor" },
-  { value: "press", label: "Press" },
-  { value: "partner", label: "Partner" },
-  { value: "team", label: "Team" },
-];
+export function AmplificationSummary({
+  contentPostId,
+}: {
+  contentPostId: string;
+}) {
+  const { data } = useQuery(
+    orpc.amplifier.targets.queryOptions({ input: { contentPostId } }),
+  );
+  if (!data?.targets.length) return null;
+  return (
+    <div className="flex flex-wrap gap-1.5 border-t pt-2">
+      {data.targets.map((t) => (
+        <Link
+          key={t.id}
+          href={`/app/content/${contentPostId}#amplification`}
+          className="inline-flex items-center gap-1 rounded-md border px-1.5 py-1 text-[10px] text-muted-foreground hover:text-foreground"
+          title={`${t.amplifier.name} · ${label(t.actionKind)} · ${label(t.ask)}`}
+        >
+          <ChannelLogo platform={t.destinationPlatform} className="size-3" />
+          {t.amplifier.name.split(" ")[0]} · {label(t.ask)}
+        </Link>
+      ))}
+    </div>
+  );
+}
 
 export function MomentAmplifiers({ momentId }: { momentId: string }) {
-  const queryClient = useQueryClient();
-  const [addOpen, setAddOpen] = useState(false);
+  return <AmplificationPanel scope={{ initiativeId: momentId }} />;
+}
 
-  const { data, isLoading } = useQuery(
-    orpc.amplifier.targetsForInitiative.queryOptions({
-      input: {
-        initiativeId: momentId,
-      },
-    }),
+export function AmplificationPanel({ scope }: { scope: Scope }) {
+  const client = useQueryClient();
+  const { data, isLoading, error } = useQuery(
+    orpc.amplifier.targets.queryOptions({ input: scope }),
   );
-  const targets = data?.targets;
-  const posts = data?.posts ?? [];
-
-  const invalidate = () =>
-    queryClient.invalidateQueries(
-      orpc.amplifier.targetsForInitiative.queryOptions({
-        input: {
-          initiativeId: momentId,
-        },
-      }),
-    );
-
-  const setAsk = useMutation(
-    orpc.amplifier.setTargetAsk.mutationOptions({
-      onSuccess: invalidate,
-      onError: (e) => toast.error(e.message || "Failed to update status"),
-    }),
-  );
-  const removeTarget = useMutation(
+  const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<Target | null>(null);
+  const refresh = () =>
+    client.invalidateQueries({ queryKey: orpc.amplifier.key() });
+  const remove = useMutation(
     orpc.amplifier.removeTarget.mutationOptions({
-      onSuccess: invalidate,
-      onError: (e) => toast.error(e.message || "Failed to remove"),
+      onSuccess: refresh,
+      onError: (e) => toast.error(e.message),
     }),
   );
-  const notifyTarget = useMutation(
+  const update = useMutation(
+    orpc.amplifier.updateTarget.mutationOptions({
+      onSuccess: refresh,
+      onError: (e) => toast.error(e.message),
+    }),
+  );
+  const notify = useMutation(
     orpc.amplifier.notifyTarget.mutationOptions({
-      onSuccess: async (result) => {
-        await invalidate();
-        toast.success(
-          result.status === "already_sent"
-            ? "Slack request was already sent"
-            : "Slack request sent",
-        );
+      onSuccess: async () => {
+        await refresh();
+        toast.success("Slack request sent");
       },
-      onError: (error) => toast.error(error.message || "Slack request failed"),
+      onError: (e) => toast.error(e.message),
     }),
   );
-
+  const targets = data?.targets ?? [];
   return (
-    <section className="@container space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <section id="amplification" className="@container space-y-4">
+      <div className="flex flex-col items-start justify-between gap-3 @md:flex-row @md:items-center">
         <div>
           <h2 className="font-semibold">
             Team amplification{" "}
             <span className="ml-2 text-sm font-normal text-muted-foreground">
-              {targets?.length ?? 0}
+              {targets.length} actions
             </span>
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Coordinate team shares and track who has followed through.
+            Who is sharing, where, and what happens next.
           </p>
         </div>
-        <Button size="sm" variant="outline" onClick={() => setAddOpen(true)}>
-          <Plus className="size-3.5" />
-          Add amplifier
+        <Button variant="outline" size="sm" onClick={() => setAdding(true)}>
+          <Plus />
+          Add assignment
         </Button>
       </div>
-
-      {isLoading ? (
-        <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" /> Loading…
-        </div>
-      ) : !targets || targets.length === 0 ? (
-        <p className="mt-4 text-sm text-muted-foreground">
-          Add teammates or partners to help share the initiative.
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error.message}
         </p>
-      ) : (
-        <div className="space-y-3">
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            {ASKS.map((ask) => {
-              const count = targets.filter(
-                (target) => target.ask === ask,
-              ).length;
-              return count > 0 ? (
-                <span key={ask}>
-                  {count} {ASK_META[ask].label.toLowerCase()}
-                </span>
-              ) : null;
-            })}
-          </div>
-          {targets.map((t) => {
-            return (
-              <div
-                key={t.id}
-                className="group flex flex-wrap items-center gap-3 rounded-xl border bg-card p-3"
-              >
-                <span
-                  aria-hidden="true"
-                  className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium"
-                >
-                  {t.amplifier.name
-                    .split(" ")
-                    .filter(Boolean)
-                    .map((part) => part[0])
-                    .slice(0, 2)
-                    .join("")}
-                </span>
-                <span className="text-sm font-medium">{t.amplifier.name}</span>
-                {t.amplifier.type && (
-                  <span className="shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground capitalize">
-                    {t.amplifier.type}
-                  </span>
-                )}
-                <span className="text-[10px] text-muted-foreground capitalize">
-                  {t.actionKind.replace("_", " ")}
-                </span>
-                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-                  {(t.amplifier.handles ?? []).map((h) => (
-                    <span
-                      key={`${h.platform}:${h.handle}`}
-                      className="flex items-center gap-1 text-[11px] text-muted-foreground"
-                      title={`${h.platform}: @${h.handle}`}
-                    >
-                      <ChannelLogo platform={h.platform} className="size-3.5" />
-                      <span className="truncate">@{h.handle}</span>
-                    </span>
-                  ))}
-                </div>
-                <SimpleSelect
-                  size="sm"
-                  className="w-32 shrink-0"
-                  value={t.ask}
-                  onValueChange={(ask) =>
-                    setAsk.mutate({ targetId: t.id, ask: ask as Ask })
-                  }
-                  options={ASKS.map((a) => ({
-                    value: a,
-                    label: ASK_META[a].label,
-                  }))}
-                  aria-label="Recruitment status"
-                />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={
-                    t.slackStatus === "sent" ||
-                    (notifyTarget.isPending &&
-                      notifyTarget.variables?.targetId === t.id)
-                  }
-                  onClick={() => notifyTarget.mutate({ targetId: t.id })}
-                  title={
-                    t.slackStatus === "sent"
-                      ? "Slack request sent"
-                      : "Notify the configured amplification coordinator in Slack"
-                  }
-                >
-                  {notifyTarget.isPending &&
-                  notifyTarget.variables?.targetId === t.id ? (
-                    <Loader2 className="size-3.5 animate-spin" />
-                  ) : (
-                    <Send className="size-3.5" />
-                  )}
-                  {t.slackStatus === "sent" ? "Sent" : "Notify"}
-                </Button>
-                <button
-                  type="button"
-                  aria-label="Remove amplifier"
-                  onClick={() => removeTarget.mutate({ targetId: t.id })}
-                  className="shrink-0 text-muted-foreground opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:text-foreground pointer-coarse:opacity-100"
-                >
-                  <X className="size-3.5" />
-                </button>
-              </div>
-            );
-          })}
-        </div>
       )}
-
-      <AddAmplifierDialog
-        open={addOpen}
-        onOpenChange={setAddOpen}
-        posts={posts}
-        existingAmplifierIds={
-          new Set((targets ?? []).map((t) => t.amplifierId))
-        }
-        onAdded={invalidate}
-      />
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      ) : (
+        !targets.length && (
+          <p className="text-sm text-muted-foreground">
+            Plan a share or adaptation with a teammate or partner.
+          </p>
+        )
+      )}
+      {(data?.posts ?? [])
+        .filter((p) => targets.some((t) => t.platformPostId === p.id))
+        .map((post) => (
+          <div key={post.id} className="space-y-2 rounded-xl border p-3">
+            <div className="flex items-center gap-2 text-xs font-medium">
+              <ChannelLogo platform={post.platform} className="size-3.5" />
+              <Link
+                href={`/app/content/${post.contentPostId}`}
+                className="hover:underline"
+              >
+                {post.title ?? "Source post"}
+              </Link>
+            </div>
+            {targets
+              .filter((t) => t.platformPostId === post.id)
+              .map((t) => (
+                <div
+                  key={t.id}
+                  className="flex flex-wrap items-center gap-2 rounded-lg bg-muted/30 p-2.5 text-xs"
+                >
+                  <div className="w-full min-w-0 @md:w-auto @md:flex-1">
+                    <span className="font-medium">{t.amplifier.name}</span>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-muted-foreground">
+                      <ChannelLogo
+                        platform={t.destinationPlatform}
+                        className="size-3.5"
+                      />
+                      {label(t.destinationPlatform)} · {label(t.actionKind)}
+                      <span>
+                        ·{" "}
+                        {t.outputPlatformPostId
+                          ? `${label(t.outputStatus ?? "draft")} output`
+                          : t.amplifier.handoffPreference === "slack"
+                            ? "Slack handoff"
+                            : "Manual handoff"}
+                      </span>
+                    </div>
+                  </div>
+                  <SimpleSelect
+                    className="w-28"
+                    size="sm"
+                    value={t.ask}
+                    options={options(amplificationAskSchema.options)}
+                    aria-label={`Status for ${t.amplifier.name} on ${label(t.destinationPlatform)}`}
+                    disabled={update.isPending}
+                    onValueChange={(ask) =>
+                      update.mutate({
+                        targetId: t.id,
+                        ask: amplificationAskSchema.parse(ask),
+                      })
+                    }
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`Edit ${t.amplifier.name} assignment`}
+                    onClick={() => setEditing(t)}
+                  >
+                    <Pencil className="size-3.5" />
+                  </Button>
+                  {t.amplifier.handoffPreference === "slack" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={
+                        notify.isPending ||
+                        t.slackStatus === "sent" ||
+                        t.ask === "fulfilled"
+                      }
+                      onClick={() => notify.mutate({ targetId: t.id })}
+                    >
+                      <Send className="size-3.5" />
+                      {t.slackStatus === "sent" ? "Sent" : "Notify"}
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`Remove ${t.amplifier.name} assignment`}
+                    disabled={remove.isPending}
+                    onClick={() => remove.mutate({ targetId: t.id })}
+                  >
+                    <X className="size-3.5" />
+                  </Button>
+                </div>
+              ))}
+          </div>
+        ))}
+      <Dialog open={adding} onOpenChange={setAdding}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add amplification assignment</DialogTitle>
+            <DialogDescription>
+              Plan one action. Notifications and publishing happen separately.
+            </DialogDescription>
+          </DialogHeader>
+          {adding && (
+            <AddAssignment
+              posts={data?.posts ?? []}
+              done={async () => {
+                await refresh();
+                setAdding(false);
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={!!editing}
+        onOpenChange={(open) => {
+          if (!open) setEditing(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editing?.amplifier.name}</DialogTitle>
+            <DialogDescription>
+              Coordinate this action and its output.
+            </DialogDescription>
+          </DialogHeader>
+          {editing && (
+            <AssignmentEditor
+              key={editing.id}
+              target={editing}
+              done={async () => {
+                await refresh();
+                setEditing(null);
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
 
-type CampaignPost = {
-  id: string;
-  platform: string;
-  title: string | null;
-  scheduledAt: Date | string | null;
-};
-
-const postLabel = (post: CampaignPost) =>
-  `${post.platform} · ${post.title ?? "Untitled"}${
-    post.scheduledAt
-      ? ` · ${new Date(post.scheduledAt).toLocaleDateString()}`
-      : ""
-  }`;
-
-// ---- add / recruit dialog -------------------------------------------
-
-function AddAmplifierDialog({
-  open,
-  onOpenChange,
+function AddAssignment({
   posts,
-  existingAmplifierIds,
-  onAdded,
+  done,
 }: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  posts: CampaignPost[];
-  existingAmplifierIds: Set<string>;
-  onAdded: () => Promise<void> | void;
+  posts: Data["posts"];
+  done: () => Promise<void>;
 }) {
-  const queryClient = useQueryClient();
-  const [tab, setTab] = useState<"pick" | "new">("pick");
-  // Asks anchor to one platform post; default to the first of the launch.
-  const [postId, setPostId] = useState<string>("");
-  const selectedPostId = postId || posts[0]?.id || "";
-
-  // ---- pick from the org rolodex ----
-  const [q, setQ] = useState("");
-  const { data, isLoading } = useQuery({
-    ...orpc.amplifier.list.queryOptions({ input: {} }),
-    enabled: open,
-  });
-  const rolodex = data?.amplifiers;
-  const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    const list = (rolodex ?? []).filter((a) => !existingAmplifierIds.has(a.id));
-    if (!needle) return list;
-    return list.filter((a) => a.name.toLowerCase().includes(needle));
-  }, [rolodex, q, existingAmplifierIds]);
-
-  const addTarget = useMutation(
-    orpc.amplifier.addTarget.mutationOptions({
-      onSuccess: async () => {
-        await onAdded();
-        onOpenChange(false);
-      },
-      onError: (e) => toast.error(e.message || "Failed to add amplifier"),
-    }),
-  );
-
-  // ---- create a brand-new amplifier ----
+  const { data } = useQuery(orpc.amplifier.list.queryOptions({ input: {} }));
+  const [postId, setPostId] = useState(posts[0]?.id ?? "");
+  const [amplifierId, setAmplifierId] = useState("");
   const [name, setName] = useState("");
-  const [type, setType] = useState("friend");
-  const [platform, setPlatform] = useState("x");
-  const [handle, setHandle] = useState("");
-
-  const createAndAdd = useMutation(
-    orpc.amplifier.create.mutationOptions({
-      onSuccess: async (amp) => {
-        if (!amp || !selectedPostId) return;
-        await queryClient.invalidateQueries(
-          orpc.amplifier.list.queryOptions({ input: {} }),
-        );
-        addTarget.mutate({
-          platformPostId: selectedPostId,
-          amplifierIds: [amp.id],
-        });
-        setName("");
-        setHandle("");
-      },
-      onError: (e) => toast.error(e.message || "Failed to create amplifier"),
-    }),
-  );
-
-  const busy = addTarget.isPending || createAndAdd.isPending;
-
+  const [destination, setDestination] = useState("linkedin");
+  const [action, setAction] = useState("repost");
+  const [copy, setCopy] = useState("");
+  const [createdId, setCreatedId] = useState<string | null>(null);
+  const create = useMutation(orpc.amplifier.create.mutationOptions());
+  const request = useMutation(orpc.amplifier.addTarget.mutationOptions());
+  const [busy, setBusy] = useState(false);
+  const source = posts.find((p) => p.id === postId);
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[520px]">
-        <DialogHeader>
-          <DialogTitle>Add amplifier</DialogTitle>
-          <DialogDescription>
-            Recruit someone to boost one post of this launch. Amplifiers are
-            shared across the whole org — pick an existing one or create a new
-            contact.
-          </DialogDescription>
-        </DialogHeader>
-
-        {posts.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            This launch has no posts yet — create content first, then recruit
-            amplification for the post that matters.
-          </p>
-        ) : (
+    <form
+      className="space-y-3"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (busy) return;
+        setBusy(true);
+        try {
+          let id = amplifierId === "new" ? createdId : amplifierId;
+          if (!id && amplifierId === "new") {
+            id = (await create.mutateAsync({ name: name.trim() })).id;
+            setCreatedId(id);
+          }
+          if (!id) throw new Error("Choose an amplifier");
+          await request.mutateAsync({
+            platformPostId: postId,
+            amplifierId: id,
+            destinationPlatform: amplificationPlatformSchema.parse(destination),
+            actionKind: amplificationActionSchema.parse(action),
+            draftText: copy || undefined,
+          });
+          await done();
+        } catch (err) {
+          toast.error(
+            err instanceof Error ? err.message : "Could not save assignment",
+          );
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <label className="block space-y-1 text-sm">
+        Source post
+        <SimpleSelect
+          value={postId}
+          options={posts.map((p) => ({
+            value: p.id,
+            label: `${label(p.platform)} · ${p.title ?? "Untitled"}`,
+          }))}
+          onValueChange={setPostId}
+        />
+      </label>
+      <label className="block space-y-1 text-sm">
+        Amplifier
+        <SimpleSelect
+          value={amplifierId}
+          placeholder="Choose contact"
+          options={[
+            ...(data?.amplifiers ?? []).map((a) => ({
+              value: a.id,
+              label: a.name,
+            })),
+            { value: "new", label: "New contact…" },
+          ]}
+          onValueChange={setAmplifierId}
+        />
+      </label>
+      {amplifierId === "new" && (
+        <Input
+          placeholder="Contact name"
+          value={name}
+          disabled={!!createdId}
+          onChange={(e) => setName(e.target.value)}
+          required
+        />
+      )}
+      <div className="grid grid-cols-2 gap-3">
+        <label className="space-y-1 text-sm">
+          Destination
           <SimpleSelect
-            value={selectedPostId}
-            onValueChange={setPostId}
-            options={posts.map((post) => ({
-              value: post.id,
-              label: postLabel(post),
-            }))}
-            aria-label="Post to amplify"
+            value={destination}
+            options={options(amplificationPlatformSchema.options)}
+            onValueChange={(v) => {
+              setDestination(v);
+              if (source?.platform !== v) setAction("adaptation");
+            }}
+          />
+        </label>
+        <label className="space-y-1 text-sm">
+          Action
+          <SimpleSelect
+            value={action}
+            options={options(amplificationActionSchema.options)}
+            onValueChange={setAction}
+          />
+        </label>
+      </div>
+      <label className="block space-y-1 text-sm">
+        Suggested copy
+        <Textarea
+          value={copy}
+          onChange={(e) => setCopy(e.target.value)}
+          rows={3}
+        />
+      </label>
+      <Button type="submit" disabled={busy || !postId || !amplifierId}>
+        {busy ? "Saving…" : "Add assignment"}
+      </Button>
+    </form>
+  );
+}
+
+function AssignmentEditor({
+  target: t,
+  done,
+}: {
+  target: Target;
+  done: () => Promise<void>;
+}) {
+  const { data } = useQuery(orpc.amplifier.list.queryOptions({ input: {} }));
+  const [copy, setCopy] = useState(t.draftText ?? "");
+  const [notes, setNotes] = useState(t.notes ?? "");
+  const [handoff, setHandoff] = useState(t.amplifier.handoffPreference);
+  const [slack, setSlack] = useState(t.amplifier.slackUserId ?? "");
+  const [brandId, setBrandId] = useState(t.amplifier.linkedBrandId ?? "none");
+  const [busy, setBusy] = useState(false);
+  const update = useMutation(orpc.amplifier.updateTarget.mutationOptions());
+  const contact = useMutation(orpc.amplifier.update.mutationOptions());
+  const output = useMutation(orpc.amplifier.createOutput.mutationOptions());
+  const save = async (createOutput = false) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      if (
+        handoff !== t.amplifier.handoffPreference ||
+        slack !== (t.amplifier.slackUserId ?? "") ||
+        brandId !== (t.amplifier.linkedBrandId ?? "none")
+      )
+        await contact.mutateAsync({
+          id: t.amplifierId,
+          handoffPreference: handoff,
+          slackUserId: slack || null,
+          linkedBrandId: brandId === "none" ? null : brandId,
+        });
+      await update.mutateAsync({
+        targetId: t.id,
+        notes,
+        ...(copy !== (t.draftText ?? "")
+          ? t.outputPlatformPostId
+            ? { outputText: copy }
+            : { draftText: copy }
+          : {}),
+      });
+      if (createOutput) await output.mutateAsync({ targetId: t.id });
+      await done();
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Could not save assignment",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <form
+      className="space-y-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void save();
+      }}
+    >
+      <p className="text-sm text-muted-foreground">
+        {label(t.destinationPlatform)} · {label(t.actionKind)}
+        {t.outputPlatformPostId
+          ? ` · ${label(t.outputStatus ?? "draft")} under the linked personal brand`
+          : ""}
+      </p>
+      <label className="block space-y-1 text-sm">
+        {t.outputPlatformPostId ? "Output copy" : "Suggested copy"}
+        <Textarea
+          value={copy}
+          onChange={(e) => setCopy(e.target.value)}
+          rows={4}
+        />
+      </label>
+      <label className="block space-y-1 text-sm">
+        Notes
+        <Textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={2}
+        />
+      </label>
+      <details className="space-y-3 rounded-lg border p-3">
+        <summary className="cursor-pointer text-sm">
+          Contact & personal brand
+        </summary>
+        <p className="text-xs text-muted-foreground">
+          These settings apply to this contact across assignments.
+        </p>
+        <SimpleSelect
+          aria-label="Handoff preference"
+          value={handoff}
+          options={[
+            { value: "manual", label: "Manual handoff" },
+            { value: "slack", label: "Slack handoff" },
+          ]}
+          onValueChange={(v) => setHandoff(v as "manual" | "slack")}
+        />
+        {handoff === "slack" && (
+          <Input
+            aria-label="Slack member ID"
+            placeholder="Slack member ID (optional with a coordinator)"
+            value={slack}
+            onChange={(e) => setSlack(e.target.value)}
           />
         )}
-
-        <div className="flex gap-1 rounded-lg bg-muted p-1">
-          {(["pick", "new"] as const).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTab(t)}
-              className={`flex-1 rounded-md px-3 py-1.5 text-sm transition-colors ${
-                tab === t
-                  ? "bg-background shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {t === "pick" ? "From rolodex" : "New contact"}
-            </button>
-          ))}
-        </div>
-
-        {tab === "pick" ? (
-          <>
-            <div className="relative">
-              <Search className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Search amplifiers…"
-                leading="icon"
-              />
-            </div>
-            <div className="-mx-1 max-h-72 overflow-y-auto px-1">
-              {isLoading ? (
-                <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-                  <Loader2 className="size-4 animate-spin" /> Loading…
-                </div>
-              ) : filtered.length === 0 ? (
-                <p className="py-6 text-sm text-muted-foreground">
-                  {q
-                    ? "No matches."
-                    : rolodex && rolodex.length > 0
-                      ? "Everyone in the rolodex is already on this launch."
-                      : "Rolodex is empty — create a new contact."}
-                </p>
-              ) : (
-                <div className="flex flex-col">
-                  {filtered.map((a) => (
-                    <button
-                      key={a.id}
-                      type="button"
-                      disabled={busy || !selectedPostId}
-                      onClick={() =>
-                        addTarget.mutate({
-                          platformPostId: selectedPostId,
-                          amplifierIds: [a.id],
-                        })
-                      }
-                      className="flex items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/40 disabled:opacity-50"
-                    >
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                        {a.name}
-                      </span>
-                      {a.type && (
-                        <span className="shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground capitalize">
-                          {a.type}
-                        </span>
-                      )}
-                      <div className="flex shrink-0 items-center gap-1">
-                        {(a.handles ?? []).map((h) => (
-                          <ChannelLogo
-                            key={`${h.platform}:${h.handle}`}
-                            platform={h.platform}
-                            className="size-3.5"
-                          />
-                        ))}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </>
-        ) : (
-          <div className="flex flex-col gap-3">
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Name (e.g. David Ternyak)"
-              autoFocus
-            />
-            <div className="flex gap-2">
-              <SimpleSelect
-                className="w-36"
-                value={type}
-                onValueChange={setType}
-                options={TYPE_OPTIONS}
-                aria-label="Amplifier type"
-              />
-              <SimpleSelect
-                className="w-32"
-                value={platform}
-                onValueChange={setPlatform}
-                options={[
-                  { value: "x", label: "X" },
-                  { value: "linkedin", label: "LinkedIn" },
-                  { value: "instagram", label: "Instagram" },
-                  { value: "youtube", label: "YouTube" },
-                  { value: "tiktok", label: "TikTok" },
-                ]}
-                aria-label="Platform"
-              />
-              <div className="relative flex-1">
-                <span className="absolute top-1/2 left-2.5 -translate-y-1/2 text-sm text-muted-foreground">
-                  @
-                </span>
-                <Input
-                  value={handle}
-                  onChange={(e) => setHandle(e.target.value.replace(/^@/, ""))}
-                  placeholder="handle"
-                  leading="handle"
-                />
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              You can auto-discover their other handles later from the rolodex.
-            </p>
-          </div>
-        )}
-
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={busy}
-          >
-            Cancel
-          </Button>
-          {tab === "new" && (
+        <label className="block space-y-1 text-sm">
+          Personal brand
+          <SimpleSelect
+            value={brandId}
+            disabled={!!t.outputPlatformPostId}
+            options={[
+              { value: "none", label: "Lightweight contact" },
+              ...(data?.brands ?? []).map((b) => ({
+                value: b.id,
+                label: b.name,
+              })),
+            ]}
+            onValueChange={setBrandId}
+          />
+        </label>
+        <p className="text-xs text-muted-foreground">
+          A personal brand enables drafts and planning. Connecting an account is
+          optional.
+        </p>
+        <Link href="/app/brands" className="text-xs underline">
+          Manage personal brands
+        </Link>
+      </details>
+      <div className="flex flex-wrap gap-2">
+        <Button disabled={busy} type="submit">
+          {busy ? "Saving…" : "Save"}
+        </Button>
+        {!t.outputPlatformPostId &&
+          brandId !== "none" &&
+          t.actionKind !== "comment" &&
+          t.ask !== "fulfilled" && (
             <Button
-              onClick={() =>
-                createAndAdd.mutate({
-                  name: name.trim(),
-                  type,
-                  handles: handle.trim()
-                    ? [{ platform, handle: handle.trim() }]
-                    : [],
-                })
-              }
-              disabled={!name.trim() || busy}
+              disabled={busy}
+              variant="outline"
+              type="button"
+              onClick={() => void save(true)}
             >
-              {busy ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Sparkles className="size-3.5" />
-              )}
-              Create &amp; recruit
+              Create output draft
             </Button>
           )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </form>
   );
 }

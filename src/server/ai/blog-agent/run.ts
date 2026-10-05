@@ -38,6 +38,7 @@ export async function runBlogAgent(input: {
   attachmentUrl?: string;
   /** Scopes brand lookups when the agent links an article into Growth. */
   organizationId: string;
+  contentPostId?: string;
 }): Promise<BlogAgentResult> {
   if (!isClaudeConfigured) {
     return {
@@ -61,12 +62,16 @@ export async function runBlogAgent(input: {
   const tools = buildBlogTools({
     trail,
     organizationId: input.organizationId,
+    contentPostId: input.contentPostId,
     touchedItemIds,
     attachmentUrl: input.attachmentUrl,
   });
 
   const prompt = [
     input.task,
+    input.contentPostId
+      ? `Inspect the article associated with Growth contentPostId ${input.contentPostId}. This is read-only; authoring is handled by the parent assistant through creative documents.`
+      : null,
     input.itemId ? `The article this concerns: ${input.itemId}` : null,
     input.attachmentUrl
       ? "An image was supplied. The parent assistant can add it to the media library and select it on the creative document."
@@ -83,6 +88,7 @@ export async function runBlogAgent(input: {
         "\nThis invocation is read-only. Describe the existing article and schema. All creation, editing and transfers now use creativeRead/creativeWrite and a saved article document. Do not claim to have made changes.",
       prompt,
       tools,
+      providerOptions: { anthropic: { disableParallelToolUse: true } },
       // Room to discover, act, and verify without running dry mid-task —
       // an agent that stops halfway through a CMS edit is worse than one that
       // takes a few more steps. Still bounded so a confused loop gives up
