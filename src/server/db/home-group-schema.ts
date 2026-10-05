@@ -15,6 +15,12 @@ export const homeGroupKindEnum = pgEnum("home_group_kind", [
   "featured",
   "custom",
 ]);
+/** Where a group's homes came from: our suggestion, the client's intake, or a person. */
+export const homeGroupSourceEnum = pgEnum("home_group_source", [
+  "suggested",
+  "intake",
+  "manual",
+]);
 export const homeGroupTable = pgTable(
   "home_group",
   (t) => ({
@@ -27,7 +33,15 @@ export const homeGroupTable = pgTable(
       .notNull()
       .references((): AnyPgColumn => brandTable.id, { onDelete: "cascade" }),
     name: t.text().notNull(),
+    /** Retiring: mirrors isPrimary ("featured") by trigger until it is dropped. */
     kind: homeGroupKindEnum().notNull().default("custom"),
+    source: homeGroupSourceEnum().notNull().default("manual"),
+    /**
+     * The homes the brand leads with: ads, previews, newsletters and the
+     * catalog order draw from it, and `home.featured` mirrors its members.
+     * At most one per brand.
+     */
+    isPrimary: t.boolean().notNull().default(false),
     description: t.text(),
     createdAt: t.timestamp({ withTimezone: true }).defaultNow().notNull(),
     updatedAt: t.timestamp({ withTimezone: true }).defaultNow().notNull(),
@@ -37,6 +51,9 @@ export const homeGroupTable = pgTable(
     uniqueIndex("home_group_featured_unique")
       .on(t.brandId)
       .where(sql`${t.kind} = 'featured'`),
+    uniqueIndex("home_group_primary_unique")
+      .on(t.brandId)
+      .where(sql`${t.isPrimary}`),
   ],
 );
 export const homeGroupMemberTable = pgTable(

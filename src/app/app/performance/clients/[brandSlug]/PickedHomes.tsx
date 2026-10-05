@@ -70,6 +70,8 @@ export function PickedHomes({
   picked,
   embedded = false,
   groupActions,
+  title = "Featured homes",
+  label,
 }: {
   brandId: string;
   brandName: string;
@@ -77,6 +79,10 @@ export function PickedHomes({
   picked: PickedHome[];
   embedded?: boolean;
   groupActions?: ReactNode;
+  /** The group's name when it is not our Featured suggestion. */
+  title?: string;
+  /** Beside the count: which group this is and where it came from. */
+  label?: ReactNode;
 }) {
   const TitleTag = embedded ? "h3" : "h2";
   const router = useRouter();
@@ -155,9 +161,7 @@ export function PickedHomes({
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-baseline gap-2">
-          <TitleTag className="text-base font-semibold">
-            Featured homes
-          </TitleTag>
+          <TitleTag className="text-base font-semibold">{title}</TitleTag>
           <span
             className={cn(
               "text-[11px]",
@@ -167,6 +171,7 @@ export function PickedHomes({
             {count}/{MAX}
             {count < MIN ? " · pick at least three" : ""}
           </span>
+          {label}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {actions()}

@@ -7,6 +7,7 @@ import {
   homeGroupsAction,
   saveBookingTargetAction,
   saveHomeGroupAction,
+  setPrimaryHomeGroupAction,
   setWanderOsEnabledAction,
 } from "@/server/ai/capabilities/home-groups";
 export const homeGroupsRouter = {
@@ -14,6 +15,7 @@ export const homeGroupsRouter = {
   save: actionProcedure(saveHomeGroupAction),
   changeHomes: actionProcedure(changeHomeGroupHomesAction),
   delete: actionProcedure(deleteHomeGroupAction),
+  setPrimary: actionProcedure(setPrimaryHomeGroupAction),
   targets: actionProcedure(bookingTargetsAction),
   saveTarget: actionProcedure(saveBookingTargetAction),
   attachTarget: actionProcedure(attachBookingTargetAction),

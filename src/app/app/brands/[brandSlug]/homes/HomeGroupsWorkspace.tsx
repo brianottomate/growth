@@ -1,6 +1,7 @@
 "use client";
 import { useState, type ReactNode, type ComponentProps } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowUp,
@@ -44,7 +45,8 @@ type Group = {
   id: string;
   name: string;
   description: string | null;
-  kind: "featured" | "custom";
+  isPrimary: boolean;
+  source: "suggested" | "intake" | "manual";
   homeIds: string[];
 };
 type Target = {
@@ -78,6 +80,7 @@ export function HomeGroupsWorkspace({
   const targets = useQuery(
     orpc.homeGroups.targets.queryOptions({ input: { brandId } }),
   );
+  const router = useRouter();
   const [groupEditor, setGroupEditor] = useState<Group | "new" | null>(null);
   const [targetEditor, setTargetEditor] = useState<Target | "new" | null>(null);
   const refresh = async () => {
@@ -86,6 +89,15 @@ export function HomeGroupsWorkspace({
   const remove = useMutation(
     orpc.homeGroups.delete.mutationOptions({
       onSuccess: refresh,
+      onError: (e) => toast.error(e.message),
+    }),
+  );
+  const makePrimary = useMutation(
+    orpc.homeGroups.setPrimary.mutationOptions({
+      onSuccess: async () => {
+        await refresh();
+        router.refresh();
+      },
       onError: (e) => toast.error(e.message),
     }),
   );
@@ -124,18 +136,17 @@ export function HomeGroupsWorkspace({
         </div>
         <div className="space-y-4">
           {[...data.groups]
-            .sort(
-              (a, b) =>
-                Number(b.kind === "featured") - Number(a.kind === "featured"),
-            )
+            .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary))
             .map((group) =>
-              group.kind === "featured" && featuredHomes ? (
+              group.isPrimary && featuredHomes ? (
                 <div
                   key={group.id}
                   className="border-t pt-4 first:border-t-0 first:pt-0"
                 >
                   <PickedHomes
                     {...featuredHomes}
+                    title={group.name}
+                    label={<GroupLabel group={group} />}
                     embedded
                     groupActions={
                       <Button
@@ -160,13 +171,25 @@ export function HomeGroupsWorkspace({
                         {group.homeIds.length}{" "}
                         {group.homeIds.length === 1 ? "home" : "homes"}
                       </span>
-                      {group.kind === "featured" && (
-                        <span className="ml-2 inline-block rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                          Default
-                        </span>
-                      )}
+                      <GroupLabel group={group} />
                     </h3>
                     <div className="flex gap-2">
+                      {!group.isPrimary && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          loading={
+                            makePrimary.isPending &&
+                            makePrimary.variables?.groupId === group.id
+                          }
+                          disabled={makePrimary.isPending}
+                          onClick={() =>
+                            makePrimary.mutate({ groupId: group.id })
+                          }
+                        >
+                          Make primary
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="outline"
@@ -174,7 +197,7 @@ export function HomeGroupsWorkspace({
                       >
                         Edit group
                       </Button>
-                      {group.kind === "custom" && (
+                      {!group.isPrimary && (
                         <Button
                           size="sm"
                           variant="ghost"
@@ -683,6 +706,27 @@ function HomeSummary({ home }: { home?: Home }) {
       )}
       <span className="min-w-0 text-xs leading-snug font-medium [overflow-wrap:anywhere]">
         {home?.name ?? "Home unavailable"}
+      </span>
+    </span>
+  );
+}
+
+const SOURCE_LABEL: Record<Group["source"], string> = {
+  suggested: "Suggested",
+  intake: "From client",
+  manual: "Hand-picked",
+};
+
+function GroupLabel({ group }: { group: Group }) {
+  return (
+    <span className="ml-2 inline-flex gap-1 align-middle text-xs font-normal">
+      {group.isPrimary && (
+        <span className="rounded-full bg-foreground px-2 py-0.5 text-background">
+          Primary
+        </span>
+      )}
+      <span className="rounded-full bg-muted px-2 py-0.5 text-muted-foreground">
+        {SOURCE_LABEL[group.source]}
       </span>
     </span>
   );

@@ -601,7 +601,7 @@ export async function buildAdSet(input: {
       MAX_SET_HOMES,
     );
     const groups = await homeGroupContext(brand.id, input.orgId);
-    const featured = groups.groups.find((group) => group.kind === "featured");
+    const featured = groups.groups.find((group) => group.isPrimary);
     const onRecord = (featured?.homeIds ?? []).flatMap((id) => {
       const home = listings.find((home) => home.homeId === id);
       return home ? [home.url] : [];
@@ -624,7 +624,7 @@ export async function buildAdSet(input: {
     ).length;
     note =
       fromRecord > 0
-        ? `${fromRecord} of ${chosen.length} homes are from Featured homes; the rest follow saved inventory order.`
+        ? `${fromRecord} of ${chosen.length} homes are from ${featured?.name ?? "the primary group"}; the rest follow saved inventory order.`
         : `Chose the first ${chosen.length} homes with a photo in saved inventory order.`;
   }
 

@@ -7,6 +7,7 @@ import {
   pitchFieldsSchema,
 } from "@/lib/pitch-settings";
 import "server-only";
+import { makePrimaryGroup, sourceGroup } from "./home-groups.service";
 import {
   appliedEvidenceSchema,
   type AppliedEvidence,
@@ -26,7 +27,6 @@ import { listAllBrandHomes, listBrandHomes } from "./homes.service";
 import { fillSettingsFromIntake } from "./performance-settings.service";
 import {
   brandTable,
-  homeGroupTable,
   homeGroupMemberTable,
   performanceAccountTable,
   performanceCycleTable,
@@ -753,23 +753,10 @@ export async function applyPerformanceIntake(
       written.push("No budget set, client asked for a recommendation");
     }
 
-    // The featured group owns current selection. Existing campaigns keep their snapshots.
+    // The client's picks get their own group, which becomes primary. Our
+    // suggestion stays beside it; existing campaigns keep their snapshots.
     const brandId = intake.brand!.id;
-    const [group] = await tx
-      .select()
-      .from(homeGroupTable)
-      .where(
-        and(
-          eq(homeGroupTable.brandId, brandId),
-          eq(homeGroupTable.kind, "featured"),
-        ),
-      )
-      .for("update");
-    if (!group)
-      throw new PerformanceError(
-        "BAD_REQUEST",
-        "The brand's featured group is missing. Sync its home groups first.",
-      );
+    const group = await sourceGroup(tx, brandId, "intake");
     await tx
       .delete(homeGroupMemberTable)
       .where(eq(homeGroupMemberTable.groupId, group.id));
@@ -781,15 +768,12 @@ export async function applyPerformanceIntake(
           sortOrder,
         })),
       );
-    await tx
-      .update(homeGroupTable)
-      .set({ updatedAt: new Date() })
-      .where(eq(homeGroupTable.id, group.id));
+    await makePrimaryGroup(tx, brandId, group.id);
     record("brand", brandId, {
       featuredHomeIds: preview.featuredHomes.map((home) => home.id),
     });
     written.push(
-      `Replaced featured homes with ${preview.featuredHomes.length} selected home(s)`,
+      `Set ${group.name} to ${preview.featuredHomes.length} selected home(s) and made it primary`,
     );
 
     // Keep commercial property rows aligned, retaining history via soft deletion.

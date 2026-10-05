@@ -170,6 +170,9 @@ export const growthActionPolicies = {
     recordLaunchChecklist: write(),
     changeHomeGroupHomes: write({ idempotent: true }),
     deleteHomeGroup: write(),
+    // Moves which group leads; members and campaigns are untouched and it
+    // can be switched back.
+    setPrimaryHomeGroup: write({ idempotent: true }),
     saveBookingTarget: write(),
     attachBookingTarget: write({ idempotent: true }),
     setWanderOsEnabled: write({ idempotent: true }),

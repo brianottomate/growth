@@ -10,12 +10,13 @@ import {
   listBookingTargets,
   saveBookingTarget,
   saveHomeGroup,
+  setPrimaryHomeGroup,
   setWanderOsEnabled,
 } from "@/server/services/home-groups.service";
 const brandInput = z.object({ brandId: z.string().min(1) });
 export const homeGroupsAction = growthAction({
   description:
-    "Read a brand's named home groups, ordered membership, all active homes and WanderOS connection readiness. Featured is its default group. Groups work for brands without WanderOS; use returned Growth home IDs to edit membership.",
+    "Read a brand's named home groups, ordered membership, all active homes and WanderOS connection readiness. Each group says where its homes came from (source: suggested by us, intake from the client's form, or manual) and whether it is the brand's primary group, the one ads, previews and newsletters draw from by default; home.featured mirrors the primary group. Groups work for brands without WanderOS; use returned Growth home IDs to edit membership.",
   inputSchema: brandInput,
   outputSchema: z.object({
     wanderOsEnabled: z.boolean(),
@@ -24,7 +25,8 @@ export const homeGroupsAction = growthAction({
       z.object({
         id: z.string(),
         name: z.string(),
-        kind: z.enum(["featured", "custom"]),
+        isPrimary: z.boolean(),
+        source: z.enum(["suggested", "intake", "manual"]),
         description: z.string().nullable(),
         homeIds: z.array(z.string()),
       }),
@@ -56,7 +58,7 @@ export const saveHomeGroupAction = growthAction({
 });
 export const changeHomeGroupHomesAction = growthAction({
   description:
-    "Add or remove homes from a group, or replace its membership with an ordered set. Each home must belong to the group's brand. Featured membership updates existing Featured controls. Does not change approved ads.",
+    "Add or remove homes from a group, or replace its membership with an ordered set. Each home must belong to the group's brand. Changing the primary group's membership updates the featured ticks. Does not change approved ads.",
   inputSchema: z.object({
     groupId: z.string().min(1),
     homeIds: z.array(z.string().min(1)).max(1000),
@@ -67,10 +69,17 @@ export const changeHomeGroupHomesAction = growthAction({
 });
 export const deleteHomeGroupAction = growthAction({
   description:
-    "Delete a custom group without deleting homes. Featured cannot be deleted; a group used by a booking target must be retained.",
+    "Delete a group without deleting homes. The primary group cannot be deleted (make another primary first); a group used by a booking target must be retained.",
   inputSchema: z.object({ groupId: z.string().min(1) }),
   outputSchema: z.object({ groupId: z.string() }),
   execute: (input, ctx) => deleteHomeGroup(input.groupId, ctx.orgId),
+});
+export const setPrimaryHomeGroupAction = growthAction({
+  description:
+    "Make a group the brand's primary home group: the default set ads, previews and newsletters draw from, mirrored by the featured ticks. Replaces the previous primary, which stays as an ordinary group. Changes no existing ads or campaigns.",
+  inputSchema: z.object({ groupId: z.string().min(1) }),
+  outputSchema: z.object({ groupId: z.string(), brandId: z.string() }),
+  execute: (input, ctx) => setPrimaryHomeGroup(input.groupId, ctx.orgId),
 });
 export const bookingTargetsAction = growthAction({
   description:

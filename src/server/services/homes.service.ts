@@ -461,7 +461,7 @@ export async function listAllBrandHomes(brandId: string) {
   });
 }
 
-/** Every featured home for a brand, newest picks last, for the setup grid. */
+/** The homes in the brand's primary group, in group order, for the setup grid. */
 export async function listBrandHomes(brandId: string): Promise<BrandHome[]> {
   const members = await db
     .select({ homeId: homeGroupMemberTable.homeId })
@@ -473,7 +473,7 @@ export async function listBrandHomes(brandId: string): Promise<BrandHome[]> {
     .where(
       and(
         eq(homeGroupTable.brandId, brandId),
-        eq(homeGroupTable.kind, "featured"),
+        eq(homeGroupTable.isPrimary, true),
       ),
     )
     .orderBy(asc(homeGroupMemberTable.sortOrder));

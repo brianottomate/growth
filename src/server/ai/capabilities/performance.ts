@@ -317,7 +317,7 @@ export const listIntakesAction = growthAction({
 export const previewIntakeApplyAction = growthAction({
   outputSchema: previewIntakeApplyActionOutputSchema,
   description:
-    "Show exactly what applying an intake would write: the billing period and budget, the featured homes that replace the existing featured group, which commercial property rows are new, and anything blocking it. Read-only. Always call this before applyIntake and show the operator the result.",
+    "Show exactly what applying an intake would write: the billing period and budget, the homes that become the brand's Client’s picks group (made primary, beside our Featured homes suggestion), which commercial property rows are new, and anything blocking it. Read-only. Always call this before applyIntake and show the operator the result.",
   inputSchema: z.object({ intakeId: z.string().min(1) }),
   examples: [{ intakeId: "pint_01" }],
   execute: async (input, ctx) => {
@@ -336,7 +336,7 @@ export const previewIntakeApplyAction = growthAction({
 
 export const applyIntakeAction = growthAction({
   description:
-    "Promote a filed intake into the records that own each fact: the account's status and notes, the month's media budget on its cycle, and replaces the brand's featured home group with the selected catalog homes, aligning commercial property rows and locations. Existing campaign snapshots stay unchanged. Applies once per intake and refuses a second run. Growth's own tables only; nothing reaches an ad platform.",
+    "Promote a filed intake into the records that own each fact: the account's status and notes, the month's media budget on its cycle, and sets the brand's Client’s picks home group to the selected catalog homes and makes it the primary group (our Featured homes suggestion stays as its own group), aligning commercial property rows and locations. Existing campaign snapshots stay unchanged. Applies once per intake and refuses a second run. Growth's own tables only; nothing reaches an ad platform.",
   inputSchema: z.object({
     intakeId: z.string().min(1),
     mediaBudgetDollars: z.number().int().min(0).nullable().optional(),

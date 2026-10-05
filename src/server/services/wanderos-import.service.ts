@@ -8,10 +8,11 @@ import {
 import { prepareInitialCatalog } from "./catalog-quick-fix.service";
 import "server-only";
 import { and, desc, eq } from "drizzle-orm";
-import { db } from "@/server/db";
+import { db, withTransaction } from "@/server/db";
 import {
   brandTable,
   workflowRunTable,
+  homeGroupMemberTable,
   homeGroupTable,
 } from "@/server/db/schema";
 import {
@@ -21,11 +22,12 @@ import {
 } from "@/lib/wanderos-import";
 import { featuredHomeAdditions } from "@/lib/featured-home-selection";
 import { catalogBrand, catalogState } from "./catalog-studio.service";
+import { ingestBrandHomes } from "./homes.service";
 import {
-  ingestBrandHomes,
-  listAllBrandHomes,
-  setHomeFeatured,
-} from "./homes.service";
+  changeGroupHomes,
+  makePrimaryGroup,
+  sourceGroup,
+} from "./home-groups.service";
 import { suggestFeaturedHomes } from "./featured-home-suggestions.service";
 import { draftBrandMarkets } from "./brand-markets.service";
 
@@ -137,20 +139,30 @@ export async function runWanderOsImport(
         },
         featured: async () => {
           await authorize();
-          await db
-            .insert(homeGroupTable)
-            .values({
-              brandId: brand.id,
-              kind: "featured",
-              name: "Featured homes",
-            })
-            .onConflictDoNothing();
-          const homes = await listAllBrandHomes(brand.id);
-          const existing = homes
-            .filter((home) => home.featured)
-            .map((home) => home.id);
+          // Our suggestion lives in its own group beside any client's picks,
+          // and only leads when the brand has no primary group yet.
+          const group = await withTransaction(async (tx) => {
+            const suggested = await sourceGroup(tx, brand.id, "suggested");
+            const [primary] = await tx
+              .select({ id: homeGroupTable.id })
+              .from(homeGroupTable)
+              .where(
+                and(
+                  eq(homeGroupTable.brandId, brand.id),
+                  eq(homeGroupTable.isPrimary, true),
+                ),
+              );
+            if (!primary) await makePrimaryGroup(tx, brand.id, suggested.id);
+            return suggested;
+          });
+          const existing = (
+            await db
+              .select({ homeId: homeGroupMemberTable.homeId })
+              .from(homeGroupMemberTable)
+              .where(eq(homeGroupMemberTable.groupId, group.id))
+          ).map((row) => row.homeId);
           if (existing.length >= 5)
-            return `${existing.length} Featured homes kept`;
+            return `${existing.length} ${group.name} kept`;
           const result = await suggestFeaturedHomes({
             brandId: brand.id,
             brandName: brand.name,
@@ -165,13 +177,12 @@ export async function runWanderOsImport(
             0,
             5 - existing.length,
           );
-          for (const homeId of additions)
-            await setHomeFeatured({
-              homeId,
-              orgId: brand.organizationId,
-              featured: true,
-            });
-          return `${existing.length + additions.length} Featured homes selected`;
+          if (additions.length)
+            await changeGroupHomes(
+              { groupId: group.id, homeIds: additions, operation: "add" },
+              brand.organizationId,
+            );
+          return `${existing.length + additions.length} ${group.name} selected`;
         },
         catalog: () => prepareInitialCatalog({ ...input, parentRunId: runId }),
         destinations: async () => {

@@ -88,6 +88,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "recordLaunchChecklist",
     "changeHomeGroupHomes",
     "deleteHomeGroup",
+    "setPrimaryHomeGroup",
     "saveBookingTarget",
     "attachBookingTarget",
     "setWanderOsEnabled",

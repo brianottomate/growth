@@ -1,6 +1,6 @@
 import "server-only";
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
-import { db, withTransaction } from "@/server/db";
+import { and, asc, eq, inArray, isNull, ne } from "drizzle-orm";
+import { db, withTransaction, type TransactionClient } from "@/server/db";
 import {
   adTable,
   bookingTargetTable,
@@ -70,7 +70,8 @@ export async function homeGroupContext(brandId: string, orgId: string) {
     groups: groups.map((g) => ({
       id: g.id,
       name: g.name,
-      kind: g.kind,
+      isPrimary: g.isPrimary,
+      source: g.source,
       description: g.description,
       homeIds: memberships
         .filter(
@@ -196,11 +197,80 @@ export async function changeGroupHomes(
 }
 export async function deleteHomeGroup(groupId: string, orgId: string) {
   const group = await ownedGroup(groupId, orgId);
-  if (group.kind === "featured")
-    throw new Error("Keep the Featured group; edit its membership instead.");
+  if (group.isPrimary)
+    throw new Error(
+      "This is the brand's primary group. Make another group primary first.",
+    );
   await db.delete(homeGroupTable).where(eq(homeGroupTable.id, group.id));
   return { groupId };
 }
+/**
+ * Make one group the brand's primary. Clears the old one first: the unique
+ * index allows one primary per brand at a time. A trigger then hands the new
+ * group's members to `home.featured`.
+ */
+export async function makePrimaryGroup(
+  tx: TransactionClient,
+  brandId: string,
+  groupId: string,
+) {
+  await tx
+    .update(homeGroupTable)
+    .set({ isPrimary: false, updatedAt: new Date() })
+    .where(
+      and(
+        eq(homeGroupTable.brandId, brandId),
+        eq(homeGroupTable.isPrimary, true),
+        ne(homeGroupTable.id, groupId),
+      ),
+    );
+  await tx
+    .update(homeGroupTable)
+    .set({ isPrimary: true, updatedAt: new Date() })
+    .where(
+      and(eq(homeGroupTable.brandId, brandId), eq(homeGroupTable.id, groupId)),
+    );
+}
+
+export async function setPrimaryHomeGroup(groupId: string, orgId: string) {
+  const group = await ownedGroup(groupId, orgId);
+  if (!group.isPrimary)
+    await withTransaction((tx) =>
+      makePrimaryGroup(tx, group.brandId, group.id),
+    );
+  return { groupId: group.id, brandId: group.brandId };
+}
+
+/** The brand's group from one source, created on first use. */
+export async function sourceGroup(
+  tx: TransactionClient,
+  brandId: string,
+  source: "suggested" | "intake",
+) {
+  const [existing] = await tx
+    .select()
+    .from(homeGroupTable)
+    .where(
+      and(
+        eq(homeGroupTable.brandId, brandId),
+        eq(homeGroupTable.source, source),
+      ),
+    )
+    .orderBy(asc(homeGroupTable.createdAt))
+    .limit(1)
+    .for("update");
+  if (existing) return existing;
+  const [created] = await tx
+    .insert(homeGroupTable)
+    .values({
+      brandId,
+      source,
+      name: source === "intake" ? "Client’s picks" : "Featured homes",
+    })
+    .returning();
+  return created!;
+}
+
 export async function setWanderOsEnabled(
   brandId: string,
   enabled: boolean,
