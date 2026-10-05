@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
-import { cn } from "@/components/ui/lib/utils";
+import { Megaphone } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
+import { WorkspaceCard } from "../../../WorkspaceCard";
+import { ShapeBrandButton } from "../ShapeBrandButton";
 
-import { CampaignRow, panel, SectionLabel } from "../../../_components";
+import { CampaignRow } from "../../../_components";
 import { NewCampaignButton } from "../../../NewCampaignButton";
 import { loadPerformanceBrand } from "../_data";
 
@@ -25,16 +28,25 @@ export default async function PerformanceBrandCampaignsPage({
   if (!brand) notFound();
 
   const campaigns = deskBrand?.campaigns ?? [];
+  const actions = (
+    <>
+      <NewCampaignButton brandSlug={brandSlug} />
+      <ShapeBrandButton
+        brandId={brand.id}
+        brandName={brand.name}
+        section="campaigns"
+      />
+    </>
+  );
   return (
-    <div className="space-y-4">
-      <div className="flex items-baseline justify-between">
-        <SectionLabel>
-          Campaigns{campaigns.length ? ` · ${campaigns.length}` : ""}
-        </SectionLabel>
-        <NewCampaignButton brandSlug={brandSlug} />
-      </div>
+    <WorkspaceCard
+      title="Campaigns"
+      icon={Megaphone}
+      count={campaigns.length}
+      actions={actions}
+    >
       {deskBrand && campaigns.length > 0 ? (
-        <ul className={cn(panel, "divide-y")}>
+        <ul className="divide-y">
           {campaigns.map((campaign) => (
             <CampaignRow
               key={campaign.id}
@@ -45,15 +57,14 @@ export default async function PerformanceBrandCampaignsPage({
           ))}
         </ul>
       ) : (
-        <p
-          className={cn(
-            panel,
-            "px-4 py-8 text-center text-xs text-muted-foreground",
-          )}
-        >
-          No campaign yet.
-        </p>
+        <EmptyState
+          compact
+          icon={Megaphone}
+          title="Create the first campaign"
+          description="Add ads, choose audiences, and prepare platform delivery."
+          actions={actions}
+        />
       )}
-    </div>
+    </WorkspaceCard>
   );
 }

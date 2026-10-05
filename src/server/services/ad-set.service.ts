@@ -15,9 +15,8 @@ import {
   adTable,
   brandTable,
   campaignTable,
+  homeTable,
   mediaAssetTable,
-  performanceAccountTable,
-  performancePropertyTable,
 } from "@/server/db/schema";
 import sharp from "sharp";
 
@@ -81,10 +80,13 @@ import {
 import { deleteDraftAd } from "./ads-draft.service";
 import { extendToCanvas } from "./card-director.service";
 import { freezeComposition } from "./composition.service";
-import { ensureHome, setHomeHero } from "./homes.service";
+import { setHomeHero } from "./homes.service";
 import { importImageBuffer } from "./media.service";
 import { pickHeroPhoto } from "./hero-pick.service";
-import { brandListings, brandWebsiteId } from "./wanderos-listings.service";
+import { brandWebsiteId } from "./wanderos-listings.service";
+import { studioListings } from "./studio-homes.service";
+import { homeGroupContext } from "./home-groups.service";
+import type { SavedStudioHome } from "@/lib/studio-homes";
 import { videoAdCardFor } from "@/server/services/video-delivery.service";
 
 // Building the set a Performance client actually runs.
@@ -221,31 +223,6 @@ function creativeContent(ad: { content: unknown }): AdCreativeContent {
 }
 
 /**
- * The homes the client named on their Performance record, by listing URL and
- * in their order. Empty for a brand with no account, or one that asked for
- * every home.
- */
-async function onRecordHomeUrls(brandId: string): Promise<string[]> {
-  const account = await db.query.performanceAccountTable.findFirst({
-    where: and(
-      eq(performanceAccountTable.brandId, brandId),
-      isNull(performanceAccountTable.deletedAt),
-    ),
-    columns: { id: true },
-  });
-  if (!account) return [];
-  const rows = await db.query.performancePropertyTable.findMany({
-    where: and(
-      eq(performancePropertyTable.accountId, account.id),
-      isNull(performancePropertyTable.deletedAt),
-    ),
-    columns: { siteUrl: true },
-    orderBy: (t, { asc }) => asc(t.createdAt),
-  });
-  return rows.flatMap((row) => (row.siteUrl ? [row.siteUrl] : []));
-}
-
-/**
  * The campaign shells land in, when one is named: this brand's, and not yet
  * on a platform, since an ad added to a pushed campaign would never be sent.
  */
@@ -269,33 +246,43 @@ async function campaignFor(brandId: string, campaignId: string) {
   return campaign;
 }
 
-/**
- * The home an ad is about, from a listing when their site has one, or from
- * a name alone when it does not. A brand whose WanderOS site is not
- * connected yet still gets its ads filed by home; the listing takes over
- * once the site is read.
- */
+/** Bind an ad to a saved home, or keep a name-only idea unbound. */
 async function homeBinding(
   brand: OwnedBrand,
   input: { propertyId?: string | null; homeName?: string | null },
 ) {
   if (input.propertyId) {
     const listing = await listingFor(brand, input.propertyId);
-    const home = await ensureHome({ brandId: brand.id, listing });
+    const home = await savedHomeFor(brand.id, listing.id);
     return { home, name: listing.name, url: listing.url as string | null };
   }
   return { home: null, name: input.homeName?.trim() || null, url: null };
 }
 
-/** The listing behind a WanderOS id, or 422 when it is not on their site. */
+/** The saved listing behind an external id, scoped to this brand. */
 async function listingFor(brand: OwnedBrand, propertyId: string) {
-  const listings = await brandListings({
+  const listings = await studioListings({
     id: brand.id,
     website: brand.website,
   });
   const listing = listings.find((row) => row.id === propertyId);
-  if (!listing) throw new AdSetError(422, "That home is not on their site");
+  if (!listing)
+    throw new AdSetError(422, "That home is not in the saved inventory");
   return listing;
+}
+
+/** Resolve identity inside the same saved inventory used by the picker. */
+async function savedHomeFor(brandId: string, externalId: string) {
+  const home = await db.query.homeTable.findFirst({
+    where: and(
+      eq(homeTable.brandId, brandId),
+      eq(homeTable.externalId, externalId),
+      isNull(homeTable.deletedAt),
+    ),
+  });
+  if (!home)
+    throw new AdSetError(422, "That home is not in the saved inventory");
+  return home;
 }
 
 /** The library asset as a card, or 422 when it is not this brand's to use. */
@@ -579,33 +566,41 @@ export async function buildAdSet(input: {
   note: string | null;
 }> {
   const brand = await requireOwnedBrand(input);
-  const listings = await brandListings({
+  const listings = await studioListings({
     id: brand.id,
     website: brand.website,
   });
 
-  let chosen: WanderOsListing[];
+  let chosen: SavedStudioHome[];
   let note: string | null = null;
   if (input.propertyIds?.length) {
     chosen = input.propertyIds.flatMap((id) => {
       const listing = listings.find((row) => row.id === id);
       return listing ? [listing] : [];
     });
-    if (chosen.length === 0) {
-      throw new AdSetError(422, "None of those homes are on their site");
+    if (chosen.length !== input.propertyIds.length) {
+      throw new AdSetError(
+        422,
+        "Some selected homes are not in the saved inventory",
+      );
     }
   } else {
     const count = Math.min(
       Math.max(input.count ?? DEFAULT_SET_SIZE, 1),
       MAX_SET_HOMES,
     );
-    const onRecord = await onRecordHomeUrls(brand.id);
+    const groups = await homeGroupContext(brand.id, input.orgId);
+    const featured = groups.groups.find((group) => group.kind === "featured");
+    const onRecord = (featured?.homeIds ?? []).flatMap((id) => {
+      const home = listings.find((home) => home.homeId === id);
+      return home ? [home.url] : [];
+    });
     chosen = orderHomesForSet(listings, onRecord, count);
     if (chosen.length === 0) {
       throw new AdSetError(
         422,
         listings.length === 0
-          ? "No homes on their site to draw from"
+          ? "No saved homes to draw from"
           : "None of their homes have a photo to draw on",
       );
     }
@@ -618,28 +613,29 @@ export async function buildAdSet(input: {
     ).length;
     note =
       fromRecord > 0
-        ? `${fromRecord} of ${chosen.length} homes are the ones on their Performance record; the rest follow their site's order.`
-        : `Chose the first ${chosen.length} homes with a photo in their site's own order.`;
+        ? `${fromRecord} of ${chosen.length} homes are from Featured homes; the rest follow saved inventory order.`
+        : `Chose the first ${chosen.length} homes with a photo in saved inventory order.`;
   }
 
-  // The detail endpoint is what carries amenities and the full gallery; the
-  // search feed the roster uses carries neither.
+  // Explicit generation can enrich imported WanderOS homes with details.
+  // Manual homes use their saved photos and never call the provider.
   const websiteId = await brandWebsiteId(brand.id);
   const details = await Promise.all(
     chosen.map(async (listing) => {
-      const detail = websiteId
-        ? await fetchWanderOsListingDetail({
-            websiteId,
-            propertyId: listing.id,
-          })
-        : {
-            photos: [],
-            description: null,
-            amenities: [],
-            locationDescription: null,
-            petsAllowed: null,
-          };
-      const home = await ensureHome({ brandId: brand.id, listing });
+      const detail =
+        websiteId && listing.source === "wanderos"
+          ? await fetchWanderOsListingDetail({
+              websiteId,
+              propertyId: listing.id,
+            })
+          : {
+              photos: [],
+              description: null,
+              amenities: [],
+              locationDescription: null,
+              petsAllowed: null,
+            };
+      const home = await savedHomeFor(brand.id, listing.id);
       const photos = detail.photos.length
         ? detail.photos.map((photo) => photo.url)
         : (listing.gallery ?? []).map((photo) => photo.url);
@@ -1037,7 +1033,7 @@ export async function createAdsFromAssets(input: {
   for (const id of input.mediaAssetIds) {
     cards.push(await cardFromAsset(brand.id, id));
   }
-  const listings = await brandListings({
+  const listings = await studioListings({
     id: brand.id,
     website: brand.website,
   });
@@ -1048,7 +1044,7 @@ export async function createAdsFromAssets(input: {
     ? (listings.find((row) => row.id === input.propertyId) ?? null)
     : null;
   if (input.propertyId && !pinned) {
-    throw new AdSetError(422, "That home is not on their site");
+    throw new AdSetError(422, "That home is not in the saved inventory");
   }
   // The home a file names, as a listing when their site has it, else as a
   // name alone: a brand off WanderOS still gets its ads filed under the home
@@ -1111,9 +1107,7 @@ export async function createAdsFromAssets(input: {
   const created: { adId: string; name: string; homeName: string | null }[] = [];
   for (const group of groups) {
     const { listing, label } = homeFor(group.cards[0]?.name ?? null);
-    const home = listing
-      ? await ensureHome({ brandId: brand.id, listing })
-      : null;
+    const home = listing ? await savedHomeFor(brand.id, listing.id) : null;
     // A video is its own format; a still in the same batch stays what it was.
     const format =
       group.cards.length === 1 && group.cards[0]!.item.type === "video"
@@ -1919,7 +1913,7 @@ export async function writeSetCopy(input: {
       drafts.flatMap((ad) => (ad.home?.externalId ? [ad.home.externalId] : [])),
     ),
   ];
-  const listings = await brandListings({
+  const listings = await studioListings({
     id: brand.id,
     website: brand.website,
   });
@@ -1930,18 +1924,19 @@ export async function writeSetCopy(input: {
     externalIds.map(async (externalId) => {
       const listing = listings.find((row) => row.id === externalId);
       if (!listing) return;
-      const detail = websiteId
-        ? await fetchWanderOsListingDetail({
-            websiteId,
-            propertyId: externalId,
-          })
-        : {
-            photos: [],
-            description: null,
-            amenities: [],
-            locationDescription: null,
-            petsAllowed: null,
-          };
+      const detail =
+        websiteId && listing.source === "wanderos"
+          ? await fetchWanderOsListingDetail({
+              websiteId,
+              propertyId: externalId,
+            })
+          : {
+              photos: [],
+              description: null,
+              amenities: [],
+              locationDescription: null,
+              petsAllowed: null,
+            };
       homeById.set(externalId, {
         name: listing.name,
         place: [listing.city, listing.state].filter(Boolean).join(", "),

@@ -1,8 +1,18 @@
 "use client";
 
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useState, type ReactNode } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { orpc } from "@/orpc/client";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Settings } from "lucide-react";
+import { WorkspaceCard } from "../../../WorkspaceCard";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,11 +22,20 @@ export function EmailDnsSetup({
   brandId,
   rootDomain,
   sendingDomain,
+  styleAction,
 }: {
   brandId: string;
   rootDomain: string;
   sendingDomain?: string;
+  styleAction?: ReactNode;
 }) {
+  const [open, setOpen] = useState(false);
+  const dns = useQuery(
+    orpc.brand.emailDnsStatus.queryOptions({
+      input: { brandId },
+      enabled: Boolean(sendingDomain),
+    }),
+  );
   const [root, setRoot] = useState(rootDomain);
   const [subdomain, setSubdomain] = useState(
     sendingDomain?.slice(0, -(rootDomain.length + 1)) ||
@@ -32,6 +51,7 @@ export function EmailDnsSetup({
         setUrl(`${window.location.origin}${result.path}`);
         setExpiresAt(result.expiresAt);
         setCopied(false);
+        void dns.refetch();
       },
     }),
   );
@@ -54,88 +74,144 @@ export function EmailDnsSetup({
   }
 
   return (
-    <section className="space-y-4 rounded-xl border p-5">
-      <div>
-        <h2 className="text-lg font-semibold">Marketing email domain</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Prepare email authentication and a seven-day connection link for the
-          person who manages this brand&apos;s DNS.
-        </p>
-      </div>
-      {sendingDomain && (
-        <p className="text-sm">Currently configured: {sendingDomain}</p>
-      )}
-      <div className="grid grid-cols-1 gap-4 @lg:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="email-root-domain">Brand domain</Label>
-          <Input
-            id="email-root-domain"
-            value={root}
-            onChange={(event) => setRoot(event.target.value)}
-            placeholder="wander.com"
-            disabled={prepare.isPending}
-          />
+    <WorkspaceCard
+      title="Email settings"
+      icon={Settings}
+      actions={
+        <>
+          {(sendingDomain || prepare.data) && (
+            <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+              Configure domain
+            </Button>
+          )}
+          {styleAction}
+        </>
+      }
+    >
+      {sendingDomain || prepare.data ? (
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <span className="text-muted-foreground">Sending domain</span>
+          <span className="font-medium">
+            {prepare.data?.sendingDomain ?? sendingDomain ?? "Not configured"}
+          </span>
+          {(sendingDomain || prepare.data) && (
+            <span className="rounded-md border px-2 py-1 text-xs">
+              {dns.isFetching
+                ? "Checking authentication…"
+                : dns.error
+                  ? "Authentication status unavailable"
+                  : dns.data?.status.verified
+                    ? "Authenticated"
+                    : dns.data
+                      ? "Authentication pending"
+                      : "Authentication not checked"}
+            </span>
+          )}
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="email-marketing-subdomain">Marketing subdomain</Label>
-          <Input
-            id="email-marketing-subdomain"
-            value={subdomain}
-            onChange={(event) => setSubdomain(event.target.value)}
-            placeholder={DEFAULT_MARKETING_SUBDOMAIN}
-            disabled={prepare.isPending}
-          />
-        </div>
-      </div>
-      <p className="text-sm text-muted-foreground">
-        {subdomain || "…"}.{root || "your-domain.com"} · Preparing registers the
-        domain in Postmark and keeps an active link for the same domain;
-        changing the domain replaces it. It does not change DNS or enable
-        sending.
-      </p>
-      <Button
-        onClick={() => void prepareLink()}
-        disabled={prepare.isPending || !root || !subdomain}
-      >
-        {prepare.isPending ? "Preparing…" : "Get connection link"}
-      </Button>
-      {prepare.error && (
-        <p role="alert" className="text-sm text-destructive">
-          {prepare.error.message}
-        </p>
+      ) : (
+        <EmptyState
+          compact
+          icon={Settings}
+          title="Set up your sending domain"
+          description="Connect a domain for branded marketing emails."
+          actions={
+            <Button size="sm" onClick={() => setOpen(true)}>
+              Configure domain
+            </Button>
+          }
+        />
       )}
-      <Button
-        variant="outline"
-        disabled={prepare.isPending || !root || !subdomain}
-        onClick={() => void prepareLink(true)}
-      >
-        Replace link
-      </Button>
-      {url && (
-        <div className="space-y-3">
-          <a
-            href={`${url}?noping=1`}
-            target="_blank"
-            rel="noreferrer"
-            className="block text-sm break-all underline"
-          >
-            {url}
-          </a>
-          <Button variant="outline" onClick={copy}>
-            {copied ? "Copied" : "Copy email connection link"}
-          </Button>
-          <p className="text-sm text-muted-foreground">
-            {expiresAt && <>Expires {new Date(expiresAt).toLocaleString()}. </>}
-            Share only with this brand&apos;s DNS administrator. This link
-            grants email setup access only.
-          </p>
-        </div>
-      )}
-      {copyError && (
-        <p role="alert" className="text-sm text-destructive">
-          {copyError}
-        </p>
-      )}
-    </section>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent scrollable size="lg">
+          <DialogHeader>
+            <DialogTitle>Configure email domain</DialogTitle>
+            <DialogDescription>
+              Prepare a connection link for the person who manages this brand’s
+              DNS.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {sendingDomain && (
+              <p className="text-sm">Currently configured: {sendingDomain}</p>
+            )}
+            <div className="grid grid-cols-1 gap-4 @lg:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="email-root-domain">Brand domain</Label>
+                <Input
+                  id="email-root-domain"
+                  value={root}
+                  onChange={(event) => setRoot(event.target.value)}
+                  placeholder="wander.com"
+                  disabled={prepare.isPending}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email-marketing-subdomain">
+                  Marketing subdomain
+                </Label>
+                <Input
+                  id="email-marketing-subdomain"
+                  value={subdomain}
+                  onChange={(event) => setSubdomain(event.target.value)}
+                  placeholder={DEFAULT_MARKETING_SUBDOMAIN}
+                  disabled={prepare.isPending}
+                />
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {subdomain || "…"}.{root || "your-domain.com"} · Preparing
+              registers the domain in Postmark and keeps an active link for the
+              same domain; changing the domain replaces it. It does not change
+              DNS or enable sending.
+            </p>
+            <Button
+              onClick={() => void prepareLink()}
+              disabled={prepare.isPending || !root || !subdomain}
+            >
+              {prepare.isPending ? "Preparing…" : "Get connection link"}
+            </Button>
+            {prepare.error && (
+              <p role="alert" className="text-sm text-destructive">
+                {prepare.error.message}
+              </p>
+            )}
+            <Button
+              variant="outline"
+              disabled={prepare.isPending || !root || !subdomain}
+              onClick={() => void prepareLink(true)}
+            >
+              Replace link
+            </Button>
+            {url && (
+              <div className="space-y-3">
+                <a
+                  href={`${url}?noping=1`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block text-sm break-all underline"
+                >
+                  {url}
+                </a>
+                <Button variant="outline" onClick={copy}>
+                  {copied ? "Copied" : "Copy email connection link"}
+                </Button>
+                <p className="text-sm text-muted-foreground">
+                  {expiresAt && (
+                    <>Expires {new Date(expiresAt).toLocaleString()}. </>
+                  )}
+                  Share only with this brand&apos;s DNS administrator. This link
+                  grants email setup access only.
+                </p>
+              </div>
+            )}
+            {copyError && (
+              <p role="alert" className="text-sm text-destructive">
+                {copyError}
+              </p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </WorkspaceCard>
   );
 }

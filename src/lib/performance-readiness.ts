@@ -25,6 +25,7 @@ export type ReadinessItem = {
   done: boolean;
   /** The fact behind the tick, short enough to sit beside the label. */
   detail: string | null;
+  provenance?: string;
   /** The verb on the link, and where it goes; null when nothing is left to do. */
   action: { label: string; to: ReadinessFix } | null;
 };

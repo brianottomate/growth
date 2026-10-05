@@ -1,3 +1,4 @@
+import { completeLaunchMilestones } from "./launch-checklist.service";
 import "server-only";
 
 import { and, eq, inArray, isNull } from "drizzle-orm";
@@ -211,6 +212,13 @@ export async function addBrandAdPreview(input: {
     .update(brandTable)
     .set({ adPreviews: next })
     .where(eq(brandTable.id, input.brandId));
+  await completeLaunchMilestones(
+    input.brandId,
+    ["previews"],
+    `Preview ${asset.id}`,
+    `preview:${asset.id}`,
+    input.userId,
+  );
   return next;
 }
 

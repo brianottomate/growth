@@ -1,4 +1,5 @@
 import "server-only";
+import { completeLaunchMilestones } from "./launch-checklist.service";
 
 import { and, desc, eq, gte, ilike, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
@@ -478,7 +479,7 @@ export async function openPerformanceCycle(
   actor: PerformanceActor,
   input: z.infer<typeof openPerformanceCycleSchema>,
 ) {
-  await requireAccount(actor, input.accountId);
+  const account = await requireAccount(actor, input.accountId);
   const [cycle] = await db
     .insert(performanceCycleTable)
     .values({
@@ -487,6 +488,13 @@ export async function openPerformanceCycle(
       endAt: input.endAt ? new Date(input.endAt) : null,
     })
     .returning();
+  if (input.mediaBudget && account.brandId)
+    await completeLaunchMilestones(
+      account.brandId,
+      ["budget"],
+      "Cycle media budget set",
+      `cycle-budget:${cycle!.id}:${cycle!.updatedAt.toISOString()}`,
+    );
   return { cycle: cycle! };
 }
 
@@ -494,7 +502,8 @@ export async function updatePerformanceCycle(
   actor: PerformanceActor,
   input: z.infer<typeof updatePerformanceCycleSchema>,
 ) {
-  await requireCycle(actor, input.cycleId);
+  const currentCycle = await requireCycle(actor, input.cycleId);
+  const account = await requireAccount(actor, currentCycle.accountId);
   const { cycleId, startAt, endAt, ...changes } = input;
   const [cycle] = await db
     .update(performanceCycleTable)
@@ -507,6 +516,13 @@ export async function updatePerformanceCycle(
     })
     .where(eq(performanceCycleTable.id, cycleId))
     .returning();
+  if (input.mediaBudget && account.brandId)
+    await completeLaunchMilestones(
+      account.brandId,
+      ["budget"],
+      "Cycle media budget set",
+      `cycle-budget:${cycle!.id}:${cycle!.updatedAt.toISOString()}`,
+    );
   return { cycle: cycle! };
 }
 

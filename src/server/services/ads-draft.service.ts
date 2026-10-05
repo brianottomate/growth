@@ -1,3 +1,4 @@
+import { completeLaunchMilestones } from "./launch-checklist.service";
 import { listHomesInGroup, resolveBookingTarget } from "./home-groups.service";
 import { resolveMetaSchedule, metaScheduleIssue } from "@/lib/meta-schedule";
 import "server-only";
@@ -206,6 +207,12 @@ export async function createDraftCampaign(input: {
     });
   }
 
+  await completeLaunchMilestones(
+    brand.id,
+    ["campaign"],
+    `Campaign ${campaign!.id}`,
+    `campaign-created:${campaign!.id}`,
+  );
   return {
     campaign: campaign!,
     brandSlug: brand.slug,
@@ -723,6 +730,13 @@ export async function addStarterAdIdeas(input: {
       .returning({ id: adTable.id });
     created += rows.length;
   }
+  if (created > 0)
+    await completeLaunchMilestones(
+      brand.id,
+      ["ads"],
+      "Starter ads saved",
+      `starter-ads:${prefix}`,
+    );
   return { created };
 }
 
@@ -785,6 +799,12 @@ export async function addDraftAd(input: {
       .set({ ...values, updatedAt: new Date() })
       .where(eq(adTable.id, existing.id))
       .returning();
+    await completeLaunchMilestones(
+      brand.id,
+      ["ads"],
+      `Draft ad ${updated!.id}`,
+      `ad-saved:${updated!.id}:${updated!.updatedAt.toISOString()}`,
+    );
     return updated!;
   }
 
@@ -792,6 +812,12 @@ export async function addDraftAd(input: {
     .insert(adTable)
     .values({ id: createId("ad"), ...values })
     .returning();
+  await completeLaunchMilestones(
+    brand.id,
+    ["ads"],
+    `Draft ad ${ad!.id}`,
+    `ad-created:${ad!.id}`,
+  );
   return ad!;
 }
 

@@ -42,7 +42,6 @@ import {
   type CompositionFormatId,
 } from "@/lib/compositions";
 import { brandHomeInventory } from "./home-inventory.service";
-import { ingestBrandHomes } from "./homes.service";
 import { brandWebsiteId } from "./wanderos-listings.service";
 import { freezeComposition } from "./composition.service";
 import { deleteMedia, importRemoteImage } from "./media.service";
@@ -103,6 +102,16 @@ async function catalogRows(brandId: string) {
     columns: {
       id: true,
       externalId: true,
+      name: true,
+      url: true,
+      heroSourceUrl: true,
+      bedrooms: true,
+      bathrooms: true,
+      guests: true,
+      city: true,
+      state: true,
+      country: true,
+      nightlyFrom: true,
       amenities: true,
       description: true,
       galleryCache: true,
@@ -164,27 +173,47 @@ function overridesOf(
  * overrides, and the cards built from both.
  */
 async function catalogHomes(brand: CatalogBrand, refresh = false) {
-  const inventory = await brandHomeInventory(brand, refresh);
-  let rows = await catalogRows(brand.id);
-  // A brand not yet ingested, or a listing new since the last ingest, gets
-  // its rows on first read so every card has somewhere to keep an edit.
-  if (inventory.homes.some((home) => !rows.has(home.id))) {
-    await ingestBrandHomes({ brandId: brand.id, website: brand.website });
-    rows = await catalogRows(brand.id);
-  }
-  const homes: CatalogHome[] = inventory.homes.map((home) => {
-    const row = rows.get(home.id);
-    return row
-      ? {
-          ...home,
-          amenities: row.amenities ?? home.amenities,
-          gallery: row.galleryCache ?? home.gallery,
-          // Ingestion keeps the rating on the row; the cached inventory can
-          // predate it.
-          rating: row.rating ?? home.rating,
-        }
-      : home;
-  });
+  // Ordinary reads only use saved inventory. Importing or refreshing homes
+  // is an explicit action, never a side effect of opening Catalog.
+  const inventory = refresh
+    ? await brandHomeInventory(brand, true)
+    : (brand.settings?.homeInventory ?? { homes: [], syncedAt: "" });
+  const rows = await catalogRows(brand.id);
+  const storedIds = new Set(inventory.homes.map((home) => home.id));
+  const savedHomes: CatalogHome[] = [...rows.values()]
+    .filter((row) => !storedIds.has(row.externalId))
+    .map((row) => ({
+      id: row.externalId,
+      slug: row.externalId,
+      name: row.name,
+      url: row.url,
+      imageUrl: row.heroSourceUrl ?? undefined,
+      bedrooms: row.bedrooms ?? undefined,
+      bathrooms: row.bathrooms ?? undefined,
+      guests: row.guests ?? undefined,
+      city: row.city ?? undefined,
+      state: row.state ?? undefined,
+      country: row.country ?? undefined,
+      nightlyFrom: row.nightlyFrom ?? undefined,
+      amenities: row.amenities ?? [],
+      gallery: row.galleryCache ?? [],
+    }));
+  const homes: CatalogHome[] = [...inventory.homes, ...savedHomes]
+    .filter((home) => rows.has(home.id))
+    .map((home) => {
+      const row = rows.get(home.id);
+      return row
+        ? {
+            ...home,
+            imageUrl: row.heroSourceUrl ?? home.imageUrl,
+            amenities: row.amenities ?? home.amenities,
+            gallery: row.galleryCache ?? home.gallery,
+            // Ingestion keeps the rating on the row; the cached inventory can
+            // predate it.
+            rating: row.rating ?? home.rating,
+          }
+        : home;
+    });
   const assetIds = [...rows.values()].flatMap((row) =>
     [row.catalogImageAssetId, row.catalogFinishedAssetId].filter(
       (id): id is string => Boolean(id),

@@ -1,9 +1,8 @@
 // The MANUAL performance checklist: one place an operator records where a
 // client stands, whether or not they filed the intake. Each field carries who
 // last set it and when, like a comment, so the desk can see who moved what.
-// The derived readiness checklist (`performance-readiness`) stays beside this
-// and will later feed a "suggested complete" hint into it. Client-safe: the
-// page renders from the field schema below, so a new item is one row here.
+// Explicit launch milestones live alongside tracker fields in `launch`.
+// Neither is inferred from asset or provider state. Client-safe.
 
 export type ChecklistStatus = "yes" | "no" | "in_progress";
 export type ChecklistValue = string | number | null;
@@ -15,7 +14,10 @@ export type ChecklistItemMeta = {
   at: string;
 };
 
+import type { LaunchRecord } from "./launch-checklist";
+
 export type PerformanceChecklist = {
+  launch?: LaunchRecord;
   values?: Record<string, ChecklistValue>;
   meta?: Record<string, ChecklistItemMeta>;
 };

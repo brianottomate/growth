@@ -224,6 +224,8 @@ function ClientRow({
       {readiness ? (
         <div className="mt-4 border-t pt-1">
           <ReadinessChecklist
+            brandId={brand.id}
+            revision={readiness.revision}
             checklist={readiness.checklist}
             links={readinessLinks(brand)}
           />

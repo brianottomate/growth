@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
 import { EmailAudiencesClient } from "@/app/app/newsletters/audiences/EmailAudiencesClient";
+import { BrandEmailStyle } from "@/app/app/newsletters/BrandEmailStyle";
 import { NewslettersView } from "@/app/app/newsletters/NewslettersView";
 
 import { loadPerformanceBrand } from "../_data";
@@ -42,31 +43,41 @@ export default async function PerformanceBrandNewslettersPage({
   });
   const setup = sender?.emailSender?.marketingDomain;
   return (
-    <div className="space-y-6">
-      <EmailDnsSetup
-        brandId={brand.id}
-        rootDomain={setup?.rootDomain ?? suggestedEmailRoot(brand.website)}
-        sendingDomain={setup?.sendingDomain}
-      />
-      <NewslettersView
-        brands={[{ id: brand.id, name: brand.name, slug: brand.slug }]}
-        brand={{ id: brand.id, name: brand.name, slug: brand.slug }}
-        basePath={`/app/performance/clients/${slug}/newsletters`}
-        kindFilter={kind}
-        view={view === "wall" || view === "read" ? view : "list"}
-      />
-      <EmailAudiencesClient
-        key={brand.id}
-        embedded
-        brands={[
-          {
-            id: brand.id,
-            name: brand.name,
-            slug: brand.slug,
-            wanderOsWebsiteId: sender?.wanderOsWebsiteId ?? null,
-          },
-        ]}
-      />
-    </div>
+    <NewslettersView
+      brands={[{ id: brand.id, name: brand.name, slug: brand.slug }]}
+      brand={{ id: brand.id, name: brand.name, slug: brand.slug }}
+      basePath={`/app/performance/clients/${slug}/newsletters`}
+      kindFilter={kind}
+      view={view === "wall" || view === "read" ? view : "list"}
+      audiencesCard={
+        <EmailAudiencesClient
+          key={brand.id}
+          embedded
+          brands={[
+            {
+              id: brand.id,
+              name: brand.name,
+              slug: brand.slug,
+              wanderOsWebsiteId: sender?.wanderOsWebsiteId ?? null,
+            },
+          ]}
+        />
+      }
+      settingsCard={
+        <EmailDnsSetup
+          brandId={brand.id}
+          rootDomain={setup?.rootDomain ?? suggestedEmailRoot(brand.website)}
+          sendingDomain={setup?.sendingDomain}
+          styleAction={
+            <BrandEmailStyle
+              brandId={brand.id}
+              brandName={brand.name}
+              theme={sender?.emailSender?.theme}
+              copyGuide={sender?.emailSender?.copyGuide}
+            />
+          }
+        />
+      }
+    />
   );
 }

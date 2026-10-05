@@ -32,7 +32,13 @@ function defaultSendTime() {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T10:00`;
 }
 
-export function NewsletterTemplateStart({ brandId }: { brandId: string }) {
+export function NewsletterTemplateStart({
+  brandId,
+  primary = false,
+}: {
+  brandId: string;
+  primary?: boolean;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [template, setTemplate] =
@@ -68,7 +74,11 @@ export function NewsletterTemplateStart({ brandId }: { brandId: string }) {
 
   return (
     <>
-      <Button variant="outline" onClick={() => setOpen(true)}>
+      <Button
+        variant={primary ? "default" : "outline"}
+        size="sm"
+        onClick={() => setOpen(true)}
+      >
         <LayoutTemplate className="size-4" /> Start from a template
       </Button>
       <Dialog

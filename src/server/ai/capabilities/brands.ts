@@ -394,7 +394,7 @@ export const setBrandRelationshipAction = growthAction({
 export const enrichBrandAction = growthAction({
   outputSchema: enrichBrandActionOutputSchema,
   description:
-    "Scrape a brand's website (Firecrawl) and write the logo, tagline, description, and page metadata onto the brand. Idempotent — re-running refreshes the same fields. Pass website to set or override the brand's URL in the same step.",
+    "Scrape a brand's website (Firecrawl) and write the logo, tagline, description, and page metadata onto the brand. Also probe and save WanderOS detection without importing homes. Idempotent — re-running refreshes the same fields. Pass website to set or override the brand's URL in the same step.",
   inputSchema: z.object({
     brandId: z.string().trim().min(1),
     website: z

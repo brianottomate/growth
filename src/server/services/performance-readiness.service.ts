@@ -2,18 +2,18 @@ import "server-only";
 
 import { and, inArray, isNull } from "drizzle-orm";
 
-import {
-  readinessChecklist,
-  type ReadinessChecklist,
-} from "@/lib/performance-readiness";
+import { type ReadinessChecklist } from "@/lib/performance-readiness";
 import { db } from "@/server/db";
 import {
   brandTable,
-  performanceCycleTable,
   performanceIntakeTable,
   performancePropertyTable,
-  platformAudienceTable,
 } from "@/server/db/schema";
+
+import {
+  emptyLaunchRecord,
+  recordedLaunchChecklist,
+} from "@/lib/launch-checklist";
 
 import type { DeskBrand } from "./performance-desk.service";
 
@@ -39,10 +39,11 @@ export type IntakeSummary = {
 export type BrandReadiness = {
   intake: IntakeSummary | null;
   checklist: ReadinessChecklist;
+  revision: number;
 };
 
 /**
- * The intake summary and the derived production checklist for each brand on
+ * The intake summary and the explicitly recorded launch checklist for each brand on
  * the desk, in a handful of queries however many brands there are. The
  * Clients list reads every client; a brand's Overview reads one.
  */
@@ -54,7 +55,7 @@ export async function loadBrandReadiness(
     .map((brand) => brand.account?.id)
     .filter((id): id is string => Boolean(id));
 
-  const [intakes, properties, cycles] = accountIds.length
+  const [intakes, properties] = accountIds.length
     ? await Promise.all([
         db.query.performanceIntakeTable.findMany({
           where: inArray(performanceIntakeTable.accountId, accountIds),
@@ -67,29 +68,20 @@ export async function loadBrandReadiness(
           ),
           columns: { accountId: true },
         }),
-        db.query.performanceCycleTable.findMany({
-          where: inArray(performanceCycleTable.accountId, accountIds),
-          columns: { accountId: true, mediaBudget: true },
-          orderBy: (t, { desc }) => desc(t.period),
-        }),
-      ])
-    : [[], [], []];
-  const [previewRows, audienceRows] = brandIds.length
-    ? await Promise.all([
-        db.query.brandTable.findMany({
-          where: inArray(brandTable.id, brandIds),
-          columns: {
-            id: true,
-            adPreviews: true,
-            performanceSettings: true,
-          },
-        }),
-        db.query.platformAudienceTable.findMany({
-          where: inArray(platformAudienceTable.brandId, brandIds),
-          columns: { brandId: true, type: true },
-        }),
       ])
     : [[], []];
+  const recordedRows = brandIds.length
+    ? await db.query.brandTable.findMany({
+        where: inArray(brandTable.id, brandIds),
+        columns: { id: true, performanceChecklist: true },
+      })
+    : [];
+  const records = new Map(
+    recordedRows.map((row) => [
+      row.id,
+      row.performanceChecklist?.launch ?? emptyLaunchRecord(),
+    ]),
+  );
 
   const homesByAccount = new Map<string, number>();
   for (const row of properties) {
@@ -97,13 +89,6 @@ export async function loadBrandReadiness(
       row.accountId,
       (homesByAccount.get(row.accountId) ?? 0) + 1,
     );
-  }
-  // Newest cycle with a media budget per account; the intake's figure stands in until one is opened.
-  const mediaBudgetByAccount = new Map<string, number>();
-  for (const row of cycles) {
-    if (row.mediaBudget != null && !mediaBudgetByAccount.has(row.accountId)) {
-      mediaBudgetByAccount.set(row.accountId, row.mediaBudget);
-    }
   }
   const intakeByAccount = new Map<string, IntakeSummary>();
   for (const row of intakes) {
@@ -135,77 +120,15 @@ export async function loadBrandReadiness(
           .join(" · ") || null,
     });
   }
-  const previewByBrand = new Map(
-    previewRows.map((row) => [
-      row.id,
-      {
-        kept: row.adPreviews?.length ?? 0,
-        settings: row.performanceSettings ?? null,
-      },
-    ]),
-  );
-  const audiencesByBrand = new Map<
-    string,
-    { total: number; lookalikes: number }
-  >();
-  for (const row of audienceRows) {
-    const current = audiencesByBrand.get(row.brandId) ?? {
-      total: 0,
-      lookalikes: 0,
-    };
-    current.total += 1;
-    if (row.type === "lookalike") current.lookalikes += 1;
-    audiencesByBrand.set(row.brandId, current);
-  }
-
   const out = new Map<string, BrandReadiness>();
   for (const brand of brands) {
-    const intake = brand.account
-      ? (intakeByAccount.get(brand.account.id) ?? null)
-      : null;
-    const previews = previewByBrand.get(brand.id) ?? {
-      kept: 0,
-      settings: null,
-    };
-    // Settings first, the receipt second: a rep may have set these on behalf.
-    const settings = previews.settings;
-    const audiences = audiencesByBrand.get(brand.id) ?? {
-      total: 0,
-      lookalikes: 0,
-    };
-    const cycleBudget = brand.account
-      ? mediaBudgetByAccount.get(brand.account.id)
-      : undefined;
+    const record = records.get(brand.id) ?? emptyLaunchRecord();
     out.set(brand.id, {
-      intake,
-      checklist: readinessChecklist({
-        intakeFiled: Boolean(intake),
-        mediaBudget: cycleBudget ?? intake?.budget ?? null,
-        accessVerified: intake?.accessVerified ?? false,
-        accessClaimed: intake?.accessClaimed ?? false,
-        homesOnRecord: brand.account
-          ? (homesByAccount.get(brand.account.id) ?? 0)
-          : 0,
-        homesAll: intake?.homes === "all",
-        hasMark: brand.hasMark,
-        reportEmails: Boolean(settings?.reportEmails ?? intake?.reportEmails),
-        invoiceEmail: Boolean(settings?.invoiceEmail ?? intake?.invoiceEmail),
-        creativeFolder:
-          Boolean(settings?.creativeDriveUrl) || (intake?.creative ?? false),
-        previewsKept: previews.kept,
-        adsDrafted: brand.campaigns.reduce(
-          (sum, campaign) => sum + campaign.adCount,
-          0,
-        ),
-        campaigns: brand.campaigns.length,
-        audiences: audiences.total,
-        lookalikes: audiences.lookalikes,
-        pushed:
-          brand.best === "pushed" ||
-          brand.best === "live" ||
-          brand.best === "ended",
-        live: brand.best === "live",
-      }),
+      intake: brand.account
+        ? (intakeByAccount.get(brand.account.id) ?? null)
+        : null,
+      checklist: recordedLaunchChecklist(record),
+      revision: record.revision,
     });
   }
   return out;

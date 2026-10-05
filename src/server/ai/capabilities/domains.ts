@@ -1,4 +1,8 @@
 import {
+  launchChecklistAction,
+  recordLaunchChecklistAction,
+} from "./launch-checklist";
+import {
   listEmailAudiencesAction,
   previewEmailAudienceAction,
   saveEmailAudienceAction,
@@ -325,6 +329,7 @@ export const performanceRead = growthDomainTool({
     clientCampaignContext: clientCampaignContextAction,
     featuredHomes: featuredHomesAction,
     homeGroups: homeGroupsAction,
+    launchChecklist: launchChecklistAction,
     bookingTargets: bookingTargetsAction,
     suggestFeaturedHomes: suggestFeaturedHomesAction,
     reviewPortfolio: reviewPortfolioAction,
@@ -352,6 +357,7 @@ export const performanceWrite = growthDomainTool({
     verifyIntakeAccess: verifyIntakeAccessAction,
     updateHome: updateHomeAction,
     saveHomeGroup: saveHomeGroupAction,
+    recordLaunchChecklist: recordLaunchChecklistAction,
     changeHomeGroupHomes: changeHomeGroupHomesAction,
     deleteHomeGroup: deleteHomeGroupAction,
     saveBookingTarget: saveBookingTargetAction,

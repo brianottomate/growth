@@ -136,6 +136,7 @@ export const growthActionPolicies = {
     clientCampaignContext: read(),
     featuredHomes: read(),
     homeGroups: read(),
+    launchChecklist: read(),
     bookingTargets: read(),
     // BigQuery reads plus one look at the shortlist's hero photos.
     suggestFeaturedHomes: read("model-read"),
@@ -150,6 +151,7 @@ export const growthActionPolicies = {
   performanceWrite: {
     savePitch: write({ undoWith: "performanceWrite.savePitch" }),
     saveHomeGroup: write(),
+    recordLaunchChecklist: write(),
     changeHomeGroupHomes: write({ idempotent: true }),
     deleteHomeGroup: write(),
     saveBookingTarget: write(),

@@ -67,6 +67,7 @@ export async function wanderOsWebsiteId(
 ): Promise<string | null> {
   try {
     const response = await fetch(siteUrl, {
+      signal: AbortSignal.timeout(8000),
       headers: { accept: "text/html" },
       cache: "no-store",
     });
@@ -78,6 +79,32 @@ export async function wanderOsWebsiteId(
   } catch {
     return null;
   }
+}
+
+/** Verify the site's search without importing listings or reading details. */
+export async function probeWanderOsWebsite(
+  siteUrl: string,
+): Promise<string | null> {
+  const websiteId = await wanderOsWebsiteId(siteUrl);
+  if (!websiteId) return null;
+  const response = await fetch(`${SEARCH_URL}?page=1&take=1`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-wander-client": "wander-customer-website",
+      "x-website-id": websiteId,
+    },
+    body: JSON.stringify({ filters: {} }),
+    cache: "no-store",
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!response.ok)
+    throw new Error("Could not verify WanderOS. Try checking again.");
+  const body = (await response.json()) as { results?: unknown[] };
+  if (!Array.isArray(body.results))
+    throw new Error("Unexpected WanderOS search response. Try checking again.");
+  // An empty published portfolio still belongs to a WanderOS website.
+  return websiteId;
 }
 
 /**

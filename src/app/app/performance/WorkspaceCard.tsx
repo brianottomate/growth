@@ -1,0 +1,69 @@
+import type { ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
+import { cn } from "@/components/ui/lib/utils";
+
+/** Shared section chrome; records and mutations remain owned by the caller. */
+export function WorkspaceCard({
+  title,
+  icon: Icon,
+  count,
+  actions,
+  children,
+  className,
+  id,
+}: {
+  title: string;
+  icon: LucideIcon;
+  count?: number | string;
+  actions?: ReactNode;
+  children: ReactNode;
+  className?: string;
+  id?: string;
+}) {
+  return (
+    <section
+      id={id}
+      className={cn("space-y-4 rounded-xl border bg-background p-4", className)}
+    >
+      <WorkspaceCardHeader
+        title={title}
+        icon={Icon}
+        count={count}
+        actions={actions}
+      />
+      {children}
+    </section>
+  );
+}
+
+export function WorkspaceCardHeader({
+  title,
+  icon: Icon,
+  count,
+  actions,
+}: {
+  title: string;
+  icon: LucideIcon;
+  count?: number | string;
+  actions?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <h2 className="flex min-w-0 items-center gap-2 text-base font-semibold">
+        <Icon
+          aria-hidden="true"
+          className="size-4 shrink-0 text-muted-foreground"
+        />
+        {title}
+        {count !== undefined && (
+          <span className="font-normal text-muted-foreground tabular-nums">
+            {count}
+          </span>
+        )}
+      </h2>
+      {actions && (
+        <div className="flex flex-wrap items-center gap-2">{actions}</div>
+      )}
+    </div>
+  );
+}

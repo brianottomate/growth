@@ -104,12 +104,9 @@ export function AddHomesByHand({
 
       <div className="space-y-2">
         <div className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-          No WanderOS feed — paste the homes
+          Paste the homes
         </div>
         <p className="max-w-2xl text-xs text-muted-foreground">
-          {brandWebsite
-            ? "Their site is not a WanderOS site, so there is no feed to read."
-            : "No website on record."}{" "}
           Paste an email, a list, or a table and the agent pulls out the homes
           it names. Only stated facts are kept.
         </p>

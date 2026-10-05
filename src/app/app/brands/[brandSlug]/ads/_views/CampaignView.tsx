@@ -1,3 +1,4 @@
+import { WorkspaceCardHeader } from "@/app/app/performance/WorkspaceCard";
 import { BookingTargetPicker } from "./BookingTargetPicker";
 import { WorkspaceBreadcrumbs } from "@/components/workspace-breadcrumbs";
 import {
@@ -12,7 +13,7 @@ import { isImportedMetaCatalog } from "@/lib/meta-import";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
-import { Radio } from "lucide-react";
+import { Radio, Megaphone, Users, ChartNoAxesCombined } from "lucide-react";
 
 import { db } from "@/server/db";
 import { homeTable, platformAdTable } from "@/server/db/schema";
@@ -230,8 +231,8 @@ export async function CampaignView({
     </AddStarterIdeasButton>
   );
   return (
-    <div className="space-y-8">
-      <header className="space-y-3">
+    <div className="space-y-4">
+      <header className="space-y-3 rounded-xl border bg-background p-4">
         {/* The Performance brand layout already crumbs Clients / brand and
             its Campaigns tab is the way back, so only the brand workspace
             needs a trail. */}
@@ -251,12 +252,16 @@ export async function CampaignView({
         <div className="flex flex-col items-start justify-between gap-3 @3xl:flex-row">
           <div className="w-full min-w-0 @3xl:flex-1">
             <div className="flex flex-wrap items-start gap-2.5">
-              <h1
+              <Megaphone
+                aria-hidden="true"
+                className="mt-1 size-4 text-muted-foreground"
+              />
+              <h2
                 title={campaign.name}
                 className="min-w-0 text-lg leading-snug font-semibold tracking-tight [overflow-wrap:anywhere]"
               >
                 {campaign.name}
-              </h1>
+              </h2>
               <span
                 className={cn(
                   "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium",
@@ -344,7 +349,10 @@ export async function CampaignView({
         />
       </header>
 
-      <section id="campaign-ads" className="scroll-mt-4 space-y-4">
+      <section
+        id="campaign-ads"
+        className="scroll-mt-4 space-y-4 rounded-xl border bg-background p-4"
+      >
         <AdIdeasList
           actions={adActions(false)}
           emptyState={adActions(true)}
@@ -379,22 +387,8 @@ export async function CampaignView({
           )}
         />
       </section>
-      <section className="space-y-4 border-t pt-6">
-        <h2 className="font-semibold">Delivery</h2>
-        <p className="text-sm text-muted-foreground">
-          {
-            editableAds.filter(
-              (ad) =>
-                ad.status === "approved" &&
-                (!("media" in ad.content) ||
-                  !ad.content.ideaStudio ||
-                  ad.content.ideaStudio.approval),
-            ).length
-          }{" "}
-          of {editableAds.length} creative ads approved. Approve every creative
-          before pushing. Approval does not publish or start spending.
-        </p>
-        <ol className="space-y-8">
+      <section>
+        <ol className="space-y-4">
           <Step
             title="Audiences"
             hideHeading
@@ -421,7 +415,6 @@ export async function CampaignView({
                 ? planned.map((row) => platformLabel(row.platform)).join(", ")
                 : undefined
             }
-            description="Where this campaign runs, with a separate budget and delivery setup for each platform."
             actions={
               <>
                 <PlanPlatformButton
@@ -509,7 +502,7 @@ export async function CampaignView({
 
           {anyPushed ? (
             <Step
-              title="Live"
+              title="Results"
               meta={anyLive ? "spending" : "paused"}
               actions={ask("live", `How is “${campaign.name}” doing?`)}
             >
@@ -551,11 +544,9 @@ function Step({
   meta,
   actions,
   children,
-  description,
   hideHeading = false,
 }: {
   title: string;
-  description?: string;
   hideHeading?: boolean;
   meta?: string;
   actions?: React.ReactNode;
@@ -564,25 +555,21 @@ function Step({
   return (
     <li
       id={`campaign-${title.toLowerCase()}`}
-      className="scroll-mt-4 space-y-3"
+      className="scroll-mt-4 space-y-4 rounded-xl border bg-background p-4"
     >
       {!hideHeading && (
-        <div className="flex flex-wrap items-end justify-between gap-2">
-          <h2 className="text-sm font-semibold">
-            {title}
-            {meta ? (
-              <span className="ml-1.5 font-medium tracking-normal normal-case">
-                · {meta}
-              </span>
-            ) : null}
-          </h2>
-          {actions ? (
-            <div className="flex flex-wrap items-center gap-2">{actions}</div>
-          ) : null}
-        </div>
-      )}
-      {description && (
-        <p className="text-sm text-muted-foreground">{description}</p>
+        <WorkspaceCardHeader
+          title={title}
+          icon={
+            title === "Platforms"
+              ? Radio
+              : title === "Results"
+                ? ChartNoAxesCombined
+                : Users
+          }
+          count={meta}
+          actions={actions}
+        />
       )}
       {children}
     </li>

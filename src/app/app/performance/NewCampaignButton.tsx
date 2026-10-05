@@ -30,8 +30,6 @@ export function NewCampaignButton({ brandSlug }: { brandSlug: string }) {
   return (
     <Button
       size="sm"
-      shape="round"
-      density="editorial"
       disabled={create.isPending || refreshing}
       loading={create.isPending || refreshing}
       onClick={() => create.mutate({ brandSlug })}

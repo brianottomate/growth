@@ -69,7 +69,7 @@ export function AddAdDialog({
       title="Add an ad"
       size={mode === "import" ? "lg" : "sm"}
       trigger={
-        <Button size="sm" variant="outline" shape="round" density="editorial">
+        <Button size="sm" variant="outline">
           <Plus className="size-3" />
           Add ad
         </Button>

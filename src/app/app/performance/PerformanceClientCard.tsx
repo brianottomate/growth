@@ -449,11 +449,11 @@ export function PerformanceClientCard({
       )}
       {context === "board" && card.readiness ? (
         <section
-          aria-label="Observed launch readiness"
+          aria-label="Recorded launch progress"
           className="mt-3 space-y-3 border-t pt-3"
         >
           <div className="flex items-baseline justify-between gap-2 text-[11px] text-muted-foreground">
-            <span>Launch checklist · app records</span>
+            <span>Launch checklist · recorded</span>
             <span className="whitespace-nowrap tabular-nums">
               {card.readiness.checklist.done}/{card.readiness.checklist.total}
             </span>

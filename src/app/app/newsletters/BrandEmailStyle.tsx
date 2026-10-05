@@ -57,6 +57,7 @@ export function BrandEmailStyle({
     <>
       <Button
         variant="outline"
+        size="sm"
         onClick={() => {
           setBackground(theme?.backgroundColor ?? "");
           setAccent(theme?.accentColor ?? "");
@@ -65,7 +66,7 @@ export function BrandEmailStyle({
           setOpen(true);
         }}
       >
-        Brand email style
+        Edit style
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>

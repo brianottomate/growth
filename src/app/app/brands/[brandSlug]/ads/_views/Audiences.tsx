@@ -1,4 +1,5 @@
 "use client";
+import { WorkspaceCardHeader } from "@/app/app/performance/WorkspaceCard";
 
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
@@ -90,19 +91,12 @@ export function Audiences({
   );
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <h2 className="text-sm font-semibold">
-          Audiences{" "}
-          <span className="text-muted-foreground">
-            · {audiences.length || "broad"}
-          </span>
-        </h2>
-        <div className="flex flex-wrap gap-2">{actions()}</div>
-      </div>
-      <p className="text-sm text-muted-foreground">
-        Who this campaign reaches, using guest origins, markets and trip
-        motivations.
-      </p>
+      <WorkspaceCardHeader
+        title="Audiences"
+        icon={Users}
+        count={audiences.length || "Broad"}
+        actions={actions()}
+      />
       {audiences.length === 0 ? (
         <EmptyState
           compact
@@ -116,10 +110,6 @@ export function Audiences({
           <section className="space-y-4 rounded-xl border bg-card p-5">
             <div>
               <h3 className="font-semibold">Guest-origin coverage</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Where this campaign will look for guests. Each audience becomes
-                a separate ad set.
-              </p>
             </div>
             {audiences.map((row) => (
               <div key={row.id} className="space-y-3 rounded-xl border p-4">

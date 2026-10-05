@@ -1,4 +1,5 @@
 import "server-only";
+import { completeLaunchMilestones } from "./launch-checklist.service";
 import { and, eq, isNull } from "drizzle-orm";
 import type { z } from "zod";
 import {
@@ -91,5 +92,12 @@ export async function saveAdIdea(
     throw new Error(
       "This ad changed while saving. Reload before trying again.",
     );
+  await completeLaunchMilestones(
+    brand.id,
+    ["ads"],
+    `Ad idea ${saved.id}`,
+    `idea-saved:${saved.id}:${saved.updatedAt.toISOString()}`,
+    context.userId,
+  );
   return saved;
 }

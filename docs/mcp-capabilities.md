@@ -66,6 +66,12 @@ without recursive access to itself. It is useful for hosts that prefer one agent
 tool over loading the full detailed interface; the capability tools remain
 available for deterministic composition and inspection.
 
+The Performance launch checklist supports atomic bulk milestone updates through
+`performanceRead__launchChecklist` and `performanceWrite__recordLaunchChecklist`.
+These record progress with provenance without performing the underlying tasks.
+See [recorded launch checklist](performance-launch-checklist.md) for item IDs,
+workflow completion points, and revision handling.
+
 Notable portable workflows:
 
 - inspect the workspace, brands, brand maps, audiences, content, ads, and signals;

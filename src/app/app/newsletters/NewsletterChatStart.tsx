@@ -1,7 +1,8 @@
 "use client";
 
-import { MessageSquarePlus } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 
 export function NewsletterChatStart({
@@ -12,8 +13,9 @@ export function NewsletterChatStart({
   brandName?: string;
 }) {
   return (
-    <button
-      type="button"
+    <Button
+      size="sm"
+      variant="outline"
       onClick={() =>
         sendAssistantIntent({
           type: "plan_email",
@@ -23,9 +25,8 @@ export function NewsletterChatStart({
             "Help me plan a newsletter issue or one-off email blast. Talk through the premise, whether it belongs to a series or pillar, and its content-calendar timing before creating an empty slot. Do not generate the full email until we select that individual slot.",
         })
       }
-      className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
     >
-      <MessageSquarePlus className="size-4" /> Plan an email in chat
-    </button>
+      <MessageSquare className="size-4" /> Shape
+    </Button>
   );
 }

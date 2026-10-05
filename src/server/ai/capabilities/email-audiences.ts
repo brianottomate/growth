@@ -22,6 +22,14 @@ const audience = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
   latestSnapshotId: z.string().nullable(),
+  latestSnapshot: z
+    .object({
+      status: z.enum(["compiling", "ready", "failed"]),
+      recipientCount: z.number().nullable(),
+      expiresAt: z.string(),
+      revision: z.number(),
+    })
+    .nullable(),
 });
 const snapshot = z.object({
   id: z.string(),

@@ -3,19 +3,21 @@ import { DestinationsCard } from "../DestinationsCard";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
-import { brandHomeInventory } from "@/server/services/home-inventory.service";
+import { EmptyState } from "@/components/ui/empty-state";
+import { RefreshHomes } from "../RefreshHomes";
 import {
   listAllBrandHomes,
   listBrandHomes,
 } from "@/server/services/homes.service";
 
-import { House } from "lucide-react";
+import { House, Link2, Unlink, CircleHelp } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { HomeRowsGrid } from "../HomeRowsGrid";
-import { HomesStrip } from "../HomesStrip";
 import { AddHomesByHand } from "../AddHomesByHand";
 import { type PickedHome } from "../PickedHomes";
 import { brandTabHref, loadPerformanceBrand } from "../_data";
 import { ButtonLink } from "@/components/ui/button";
+import { PreparationAction } from "../PreparationAction";
 
 export const metadata: Metadata = { title: "WanderOS · Wander Performance" };
 export const dynamic = "force-dynamic";
@@ -42,32 +44,77 @@ export default async function PerformanceWanderOsPage({
     listAllBrandHomes(brand.id),
     listBrandHomes(brand.id),
   ]);
-  // Ingested brands work from their rows. The live feed is read only for a
-  // brand not ingested yet, which still browses it through `HomesStrip`.
-  const feedRows = rows.filter((home) => home.source === "wanderos");
-  const inventory =
-    feedRows.length > 0
-      ? null
-      : await brandHomeInventory({ id: brand.id, website: brand.website });
-  const homes = inventory?.homes ?? [];
-  const withPhoto = homes.filter((home) => home.imageUrl);
-  // Use stored homes when available, otherwise the live feed for destinations.
-  const inventoryHomes =
-    rows.length > 0
-      ? rows
-      : withPhoto.map((home) => ({
-          name: home.name,
-          url: home.url,
-          city: home.city ?? null,
-          state: home.state ?? null,
-          bedrooms: home.bedrooms ?? null,
-          bathrooms: home.bathrooms ?? null,
-          guests: home.guests ?? null,
-          rating: home.rating ?? null,
-          heroSourceUrl: home.imageUrl ?? null,
-          featured: false,
-        }));
   const slug = brand.slug ?? brand.id;
+  const connected = Boolean(brand.wanderOsEnabled && brand.wanderOsWebsiteId);
+  const connectionStatus = (
+    <Badge variant={connected ? "secondary" : "outline"}>
+      {connected ? (
+        <Link2 />
+      ) : brand.wanderOsCheckedAt ? (
+        <Unlink />
+      ) : (
+        <CircleHelp />
+      )}
+      {connected
+        ? "WanderOS connected"
+        : brand.wanderOsCheckedAt
+          ? "WanderOS not connected"
+          : "WanderOS not checked"}
+    </Badge>
+  );
+  if (!rows.length) {
+    return (
+      <section className="rounded-xl border p-6">
+        <div className="mb-4">{connectionStatus}</div>
+        <EmptyState
+          icon={House}
+          title={
+            connected
+              ? "Import homes when you’re ready"
+              : brand.wanderOsCheckedAt
+                ? "WanderOS is not connected"
+                : "Check for a WanderOS website"
+          }
+          description={
+            connected
+              ? "Import the client’s WanderOS homes to prepare destinations, home groups, featured homes, and catalog cards."
+              : "Check now, or return once the client’s WanderOS website is deployed. Checking the website does not import homes."
+          }
+          actions={
+            connected ? (
+              <RefreshHomes brandId={brand.id} label="Import homes" primary />
+            ) : brand.website ? (
+              <PreparationAction
+                brandId={brand.id}
+                kind="wanderos"
+                label={
+                  brand.wanderOsCheckedAt
+                    ? "Recheck WanderOS"
+                    : "Check WanderOS"
+                }
+              />
+            ) : (
+              <ButtonLink href={brandTabHref(slug, "settings")}>
+                Add website
+              </ButtonLink>
+            )
+          }
+        />
+        <details className="mt-4">
+          <summary className="cursor-pointer text-sm text-muted-foreground">
+            Add homes manually
+          </summary>
+          <AddHomesByHand
+            brandId={brand.id}
+            brandSlug={slug}
+            brandWebsite={brand.website}
+            homes={[]}
+          />
+        </details>
+      </section>
+    );
+  }
+  const inventoryHomes = rows;
   // Tiles draw the hero's gallery thumbnail, a fifth the weight of the file.
   const heroThumb = (home: {
     heroSourceUrl: string | null;
@@ -88,11 +135,6 @@ export default async function PerformanceWanderOsPage({
     ]
       .filter(Boolean)
       .join(" · ");
-  // The legacy strip's tick keys the set by feed id → home row id.
-  const picked = committed.map((home) => ({
-    externalId: home.externalId,
-    homeId: home.id,
-  }));
   // The in-focus band shows each featured home from its row: ingestion
   // stored the full gallery on it.
   const pickedHomes: PickedHome[] = committed.map((home) => {
@@ -123,11 +165,14 @@ export default async function PerformanceWanderOsPage({
 
   return (
     <div className="space-y-4">
-      {inventory?.enrichmentError && (
-        <p className="text-sm text-muted-foreground">
-          {inventory.enrichmentError}
-        </p>
-      )}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {connectionStatus}
+        <PreparationAction
+          brandId={brand.id}
+          kind="wanderos"
+          label="Recheck WanderOS"
+        />
+      </div>
       <HomeGroupsWorkspace
         brandId={brand.id}
         brandName={brand.name}
@@ -159,9 +204,7 @@ export default async function PerformanceWanderOsPage({
           <h2 className="flex items-center gap-2 text-base font-semibold">
             <House className="size-4 text-muted-foreground" />
             All homes
-            {(rows.length || homes.length) > 0
-              ? ` · ${rows.length || homes.length}`
-              : ""}
+            {` · ${rows.length}`}
           </h2>
           <div className="flex items-center gap-2">
             <ButtonLink
@@ -173,64 +216,18 @@ export default async function PerformanceWanderOsPage({
             </ButtonLink>
           </div>
         </div>
-        {rows.length > 0 ? (
-          <HomeRowsGrid
-            homes={rows.map((home) => ({
-              id: home.id,
-              externalId: home.externalId,
-              name: home.name,
-              url: home.url,
-              heroThumbUrl: heroThumb(home),
-              featured: home.featured,
-              facts: factsOf(home),
-            }))}
-            brandSlug={slug}
-          />
-        ) : homes.length === 0 ? (
-          <AddHomesByHand
-            brandId={brand.id}
-            brandSlug={slug}
-            brandWebsite={brand.website}
-            homes={committed.map((home) => ({
-              id: home.id,
-              name: home.name,
-              facts: factsOf(home),
-            }))}
-          />
-        ) : (
-          <>
-            <HomesStrip
-              homes={withPhoto.map((home) => ({
-                id: home.id,
-                name: home.name,
-                url: home.url,
-                imageUrl: home.imageUrl!,
-                thumbUrl: home.thumbUrl ?? null,
-                city: home.city ?? null,
-                state: home.state ?? null,
-                bedrooms: home.bedrooms ?? null,
-                bathrooms: home.bathrooms ?? null,
-                guests: home.guests ?? null,
-                rating: home.rating ?? null,
-                facts: factsOf({
-                  bedrooms: home.bedrooms ?? null,
-                  guests: home.guests ?? null,
-                  city: home.city ?? null,
-                  state: home.state ?? null,
-                }),
-              }))}
-              brandId={brand.id}
-              brandSlug={brand.slug}
-              picked={picked}
-            />
-            {homes.length > withPhoto.length ? (
-              <p className="text-[11px] text-muted-foreground">
-                {homes.length - withPhoto.length} more on their site have no
-                photo on the feed.
-              </p>
-            ) : null}
-          </>
-        )}
+        <HomeRowsGrid
+          homes={rows.map((home) => ({
+            id: home.id,
+            externalId: home.externalId,
+            name: home.name,
+            url: home.url,
+            heroThumbUrl: heroThumb(home),
+            featured: home.featured,
+            facts: factsOf(home),
+          }))}
+          brandSlug={slug}
+        />
       </section>
     </div>
   );

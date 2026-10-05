@@ -1,7 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { CircleCheck, Circle, ListChecks } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useMutation } from "@tanstack/react-query";
+import { Checkbox } from "@/components/ui/checkbox";
+import { orpc } from "@/orpc/client";
+import { toast } from "@/components/ui/toast";
+import type { LaunchItem } from "@/lib/launch-checklist";
+import { ListChecks } from "lucide-react";
 
 import {
   Accordion,
@@ -17,16 +23,30 @@ import {
   type ReadinessLinks,
 } from "./ReadinessProgress";
 
-/** Completion follows app records. The circles are status indicators, not inputs. */
+/** Checked values come from the server; clicks record explicit milestones. */
 export function ReadinessChecklist({
   checklist,
   links,
   defaultOpen = false,
+  brandId,
+  revision,
 }: {
   checklist: Checklist;
   links: ReadinessLinks;
   defaultOpen?: boolean;
+  brandId?: string;
+  revision?: number;
 }) {
+  const router = useRouter();
+  const save = useMutation(
+    orpc.performance.setLaunchChecklist.mutationOptions({
+      onSuccess: () => router.refresh(),
+      onError: (error) => {
+        toast.error(error.message);
+        router.refresh();
+      },
+    }),
+  );
   return (
     <Accordion
       type="single"
@@ -125,17 +145,27 @@ export function ReadinessChecklist({
                             key={item.id}
                             className="flex flex-wrap items-start gap-x-3 gap-y-1 py-3"
                           >
-                            {item.done ? (
-                              <CircleCheck
-                                aria-hidden="true"
-                                className="mt-0.5 size-4 shrink-0 text-foreground"
-                              />
-                            ) : (
-                              <Circle
-                                aria-hidden="true"
-                                className="mt-0.5 size-4 shrink-0 text-muted-foreground/50"
-                              />
-                            )}
+                            <Checkbox
+                              aria-label={item.label}
+                              checked={item.done}
+                              disabled={
+                                !brandId || revision == null || save.isPending
+                              }
+                              onCheckedChange={(checked) => {
+                                if (brandId && revision != null)
+                                  save.mutate({
+                                    brandId,
+                                    expectedRevision: revision,
+                                    patch: [
+                                      {
+                                        item: item.id as LaunchItem,
+                                        checked: checked === true,
+                                      },
+                                    ],
+                                  });
+                              }}
+                              className="mt-0.5"
+                            />
                             <span className="min-w-0 flex-1 basis-40">
                               <span className="sr-only">
                                 {item.done ? "Complete: " : "Incomplete: "}
@@ -144,7 +174,10 @@ export function ReadinessChecklist({
                                 {item.label}
                               </span>
                               {item.detail ? (
-                                <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">
+                                <span
+                                  title={item.provenance}
+                                  className="mt-0.5 block text-xs leading-5 text-muted-foreground"
+                                >
                                   {item.detail}
                                 </span>
                               ) : null}
@@ -167,7 +200,7 @@ export function ReadinessChecklist({
             })}
           </Accordion>
           <p className="text-xs text-muted-foreground">
-            Updates automatically from intake, creative, and campaign records.
+            Recorded by your team and completed workflows.
           </p>
         </AccordionContent>
       </AccordionItem>

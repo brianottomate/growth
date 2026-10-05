@@ -67,6 +67,10 @@ export async function listEmailAudiences(
         .selectDistinctOn([emailAudienceSnapshotTable.audienceId], {
           audienceId: emailAudienceSnapshotTable.audienceId,
           id: emailAudienceSnapshotTable.id,
+          status: emailAudienceSnapshotTable.status,
+          recipientCount: emailAudienceSnapshotTable.recipientCount,
+          expiresAt: emailAudienceSnapshotTable.expiresAt,
+          revision: emailAudienceSnapshotTable.revision,
         })
         .from(emailAudienceSnapshotTable)
         .where(
@@ -80,10 +84,18 @@ export async function listEmailAudiences(
           desc(emailAudienceSnapshotTable.createdAt),
         )
     : [];
-  const snapshots = new Map(latest.map((s) => [s.audienceId, s.id]));
+  const snapshots = new Map(latest.map((s) => [s.audienceId, s]));
   return audiences.map((audience) => ({
     ...audience,
-    latestSnapshotId: snapshots.get(audience.id) ?? null,
+    latestSnapshotId: snapshots.get(audience.id)?.id ?? null,
+    latestSnapshot: snapshots.has(audience.id)
+      ? {
+          status: snapshots.get(audience.id)!.status,
+          recipientCount: snapshots.get(audience.id)!.recipientCount,
+          expiresAt: snapshots.get(audience.id)!.expiresAt.toISOString(),
+          revision: snapshots.get(audience.id)!.revision,
+        }
+      : null,
     createdAt: audience.createdAt.toISOString(),
     updatedAt: audience.updatedAt.toISOString(),
   }));

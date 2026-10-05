@@ -3,8 +3,6 @@
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 
-import { PerformanceHeader } from "./PerformanceHeader";
-
 /**
  * Wander Performance: the paid-media desk for the people who run client
  * campaigns and nothing else in this app. No section tabs: the sidebar and
@@ -22,7 +20,6 @@ export default function PerformanceLayout({
     <div
       className={overview ? "flex h-full min-h-0 flex-col gap-6" : "space-y-6"}
     >
-      <PerformanceHeader />
       {children}
     </div>
   );

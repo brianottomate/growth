@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 
 import {
   listWanderOsListings,
-  wanderOsWebsiteId,
+  probeWanderOsWebsite,
   type WanderOsListing,
 } from "@/server/clients/wanderos-site.client";
 import { db } from "@/server/db";
@@ -40,19 +40,18 @@ export async function brandWebsiteId(brandId: string): Promise<string | null> {
   });
   if (!brand?.website) return null;
   if (brand.wanderOsWebsiteId && !plausibleWanderOsId(brand.wanderOsWebsiteId))
-    return discoverAndRemember(brand.id, brand.website);
+    return null;
   if (brand.wanderOsWebsiteId)
     return brand.wanderOsEnabled ? brand.wanderOsWebsiteId : null;
-  // Looked before and found nothing. Asking again is a decision someone makes.
-  if (brand.wanderOsCheckedAt) return null;
-  return discoverAndRemember(brand.id, brand.website);
+  // Detection runs during enrichment or an explicit recheck, never a read.
+  return null;
 }
 
 async function discoverAndRemember(
   brandId: string,
   website: string,
 ): Promise<string | null> {
-  const discovered = await wanderOsWebsiteId(website);
+  const discovered = await probeWanderOsWebsite(website);
   await db
     .update(brandTable)
     .set({
@@ -95,13 +94,15 @@ export async function brandWebsiteState(
 /** Look at their site again, whatever we concluded last time. */
 export async function recheckBrandWebsite(
   brandId: string,
+  websiteOverride?: string,
 ): Promise<BrandWebsiteState> {
   const brand = await db.query.brandTable.findFirst({
     where: eq(brandTable.id, brandId),
     columns: { id: true, website: true },
   });
-  if (!brand?.website) return brandWebsiteState(brandId);
-  await discoverAndRemember(brand.id, brand.website);
+  if (!brand || !(websiteOverride ?? brand.website))
+    return brandWebsiteState(brandId);
+  await discoverAndRemember(brand.id, websiteOverride ?? brand.website!);
   return brandWebsiteState(brandId);
 }
 

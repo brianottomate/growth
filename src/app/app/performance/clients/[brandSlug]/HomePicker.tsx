@@ -76,7 +76,7 @@ export function HomePicker({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" variant="outline" shape="round" density="editorial">
+        <Button size="sm" variant="outline">
           {label}
         </Button>
       </DialogTrigger>

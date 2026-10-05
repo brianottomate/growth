@@ -59,18 +59,22 @@ export function StudioIdeas({
     groups.set(key, group);
   }
   return (
-    <div className="space-y-6">
+    <div className="divide-y">
       {[...groups.entries()].map(([key, group]) => {
         const frozen = group.ideas.filter(
           (idea) => idea.content.ideaStudio?.approval,
         ).length;
         return (
-          <section key={key} id={`home-${key}`} className="space-y-3">
+          <section
+            key={key}
+            id={`home-${key}`}
+            className="space-y-3 py-4 first:pt-0 last:pb-0"
+          >
             <h2 className="flex items-baseline gap-2 text-sm font-semibold">
               {group.label}
               <span className="text-xs font-normal text-muted-foreground">
                 {group.ideas.length} idea{group.ideas.length === 1 ? "" : "s"} ·{" "}
-                {frozen} frozen
+                {frozen} approved
               </span>
             </h2>
             {group.ideas.map((idea) =>

@@ -1,3 +1,8 @@
+import type { ReactNode } from "react";
+import { MailCheck } from "lucide-react";
+import { WorkspaceCard } from "@/app/app/performance/WorkspaceCard";
+import { EmptyState } from "@/components/ui/empty-state";
+import { EmailDraftsCard } from "./EmailDraftsCard";
 import { BrandEmailStyle } from "./BrandEmailStyle";
 import Link from "next/link";
 import { and, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
@@ -26,8 +31,6 @@ import {
   CompetitorNewsletters,
   type CompetitorNewsletterRow,
 } from "./CompetitorNewsletters";
-import { NewsletterChatStart } from "./NewsletterChatStart";
-import { NewsletterTemplateStart } from "./NewsletterTemplateStart";
 
 const fmt = (n: number) =>
   n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}K` : `${n}`;
@@ -51,6 +54,8 @@ export async function NewslettersView({
   basePath,
   kindFilter,
   view,
+  audiencesCard,
+  settingsCard,
 }: {
   /** Every brand in the organization, for the overview's brand picker. */
   brands: ViewBrand[];
@@ -60,6 +65,8 @@ export async function NewslettersView({
   basePath: string;
   kindFilter?: string;
   view: "list" | "wall" | "read";
+  audiencesCard?: ReactNode;
+  settingsCard?: ReactNode;
 }) {
   const selectedBrand = brand;
   const emailIdentity = brand
@@ -109,34 +116,6 @@ export async function NewslettersView({
         ],
       })
     : [];
-  const emailBuckets = [
-    {
-      label: "Slots",
-      description: "Seeded premises waiting for individual drafting",
-      items: ownedEmails.filter((email) => email.status === "slot"),
-    },
-    {
-      label: "Drafts",
-      description: "Authored issues without a content-calendar date",
-      items: ownedEmails.filter(
-        (email) =>
-          email.status !== "slot" &&
-          email.status !== "published" &&
-          !email.scheduledAt,
-      ),
-    },
-    {
-      label: "Planned",
-      description: "Attached to the Wander Growth content calendar",
-      items: ownedEmails.filter(
-        (email) =>
-          email.status !== "slot" &&
-          email.status !== "published" &&
-          Boolean(email.scheduledAt),
-      ),
-    },
-  ].filter((bucket) => bucket.items.length > 0);
-
   // ---- Competitor newsletters (forwarded via inspo+<brandId>@) ----
   // The reference brands our owned brands track, their newsletter-capture
   // channel (if provisioned), and the issues forwarded in so far.
@@ -292,288 +271,207 @@ export async function NewslettersView({
   }
 
   return (
-    <div>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {selectedBrand ? `${selectedBrand.name} email` : "Email"}
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {ownedEmails.filter((email) => email.status !== "published").length}{" "}
-            in editorial production · {tagged.length} sent issues ·{" "}
-            {fmt(totalReach)} reached ·{" "}
-            {avgOpen != null ? `${Math.round(avgOpen * 100)}%` : "—"} avg open ·
-            delivery history
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href={
-              basePath.startsWith("/app/performance/clients/")
-                ? `${basePath}#email-audiences`
-                : "/app/newsletters/audiences"
-            }
-            className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted"
-          >
-            Email audiences
-          </Link>
-          <NewsletterChatStart
-            brandId={selectedBrand?.id}
-            brandName={selectedBrand?.name}
-          />
-          {selectedBrand ? (
-            <>
-              <NewsletterTemplateStart brandId={selectedBrand.id} />
+    <div className="space-y-4">
+      {!basePath.startsWith("/app/performance/clients/") && (
+        <h1 className="text-2xl font-semibold">
+          {selectedBrand ? `${selectedBrand.name} email` : "Email"}
+        </h1>
+      )}
+      <EmailDraftsCard
+        brandId={selectedBrand?.id}
+        brandName={selectedBrand?.name}
+        emails={ownedEmails
+          .filter((email) => email.status !== "published")
+          .map((email) => ({
+            id: email.id,
+            title: email.contentPost?.title || email.text || "Untitled email",
+            bucket:
+              email.status === "slot"
+                ? "Slots"
+                : email.scheduledAt
+                  ? "Planned"
+                  : "Drafts",
+            scheduledAt: email.scheduledAt?.toISOString() ?? null,
+          }))}
+        extraActions={
+          <>
+            {!selectedBrand && (
+              <BrandPagePicker
+                brands={brands.flatMap((row) =>
+                  row.slug ? [{ slug: row.slug, name: row.name }] : [],
+                )}
+              />
+            )}
+            {!settingsCard && selectedBrand && (
               <BrandEmailStyle
                 brandId={selectedBrand.id}
                 brandName={selectedBrand.name}
                 theme={emailIdentity?.emailSender?.theme}
                 copyGuide={emailIdentity?.emailSender?.copyGuide}
               />
-            </>
-          ) : null}
-          {selectedBrand ? null : (
-            <BrandPagePicker
-              brands={brands.flatMap((row) =>
-                row.slug ? [{ slug: row.slug, name: row.name }] : [],
-              )}
-            />
-          )}
-        </div>
-      </div>
-
-      <div className="mt-6 grid grid-cols-1 gap-3 @3xl:grid-cols-3">
-        <section className="rounded-xl border bg-card p-4">
-          <h2 className="font-semibold">Blast</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            A one-time email for an offer, announcement or collection of homes.
-          </p>
-        </section>
-        {[
-          {
-            name: "Newsletter",
-            description:
-              "Recurring emails that keep guests connected to your brand.",
-          },
-          {
-            name: "Sequence",
-            description:
-              "Plan a guest’s email journey in Lifecycle and review the sequences already running. Sending from Email is coming soon.",
-          },
-        ].map((type) => (
-          <section
-            key={type.name}
-            className="rounded-xl border bg-muted/20 p-4"
-          >
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="font-semibold">{type.name}</h2>
-              <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                {type.name === "Sequence"
-                  ? "Sending coming soon"
-                  : "Coming soon"}
-              </span>
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {type.description}
-            </p>
-            {type.name === "Sequence" && (
-              <Link
-                href="/app/lifecycle"
-                className="mt-3 inline-block text-sm font-medium underline underline-offset-4"
-              >
-                Open Lifecycle
-              </Link>
             )}
-          </section>
-        ))}
-      </div>
-
-      {emailBuckets.length > 0 && (
-        <section className="mt-6 rounded-2xl border p-4">
-          <div>
-            <h2 className="font-semibold">Blast pipeline</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Plan, draft and review one-time emails before sending.
-            </p>
+          </>
+        }
+      />
+      {audiencesCard}
+      <WorkspaceCard title="Sent emails" icon={MailCheck} count={tagged.length}>
+        {tagged.length > 0 && (
+          <div className="flex flex-wrap gap-6 text-sm">
+            <span>{fmt(totalReach)} reached</span>
+            <span>
+              {avgOpen != null ? `${Math.round(avgOpen * 100)}%` : "—"} average
+              open rate
+            </span>
           </div>
-          <div className="mt-4 grid grid-cols-1 gap-4 @4xl:grid-cols-3">
-            {emailBuckets.map((bucket) => (
-              <div key={bucket.label}>
-                <div className="mb-2 flex items-baseline justify-between gap-2">
-                  <div>
-                    <h3 className="text-xs font-semibold tracking-wide uppercase">
-                      {bucket.label} · {bucket.items.length}
-                    </h3>
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">
-                      {bucket.description}
-                    </p>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  {bucket.items.map((email) => (
-                    <Link
-                      key={email.id}
-                      href={`/app/newsletters/${email.id}`}
-                      className="block rounded-lg border p-3 transition-colors hover:bg-accent/40"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="min-w-0 truncate text-sm font-medium">
-                          {email.contentPost?.title ||
-                            email.text ||
-                            "Untitled email"}
-                        </span>
-                        <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                          {email.format === "newsletter.blast"
-                            ? "Blast"
-                            : "Issue"}
-                        </span>
-                      </div>
-                      <div className="mt-1 text-[11px] text-muted-foreground">
-                        {email.scheduledAt
-                          ? email.scheduledAt.toLocaleString()
-                          : "No calendar date"}
-                        {email.contentPost?.seriesId ? " · Series" : ""}
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Kinds overview */}
-      <div className="mt-5 flex flex-wrap gap-2.5">
-        <Link
-          href={newsletterHref()}
-          className={`rounded-xl border px-3 py-2 text-xs transition-colors ${
-            !kindFilter
-              ? "border-foreground bg-accent/40"
-              : "hover:bg-accent/40"
-          }`}
-        >
-          <div className="font-semibold">All</div>
-          <div className="text-muted-foreground">{tagged.length} issues</div>
-        </Link>
-        {kindCards.map(([kind, a]) => {
-          const meta = NEWSLETTER_KIND_META[kind];
-          const active = kindFilter === kind;
-          return (
-            <Link
-              key={kind}
-              href={newsletterHref({ kind })}
-              className={`rounded-xl border px-3 py-2 text-xs transition-colors ${
-                active ? "border-foreground bg-accent/40" : "hover:bg-accent/40"
-              }`}
-            >
-              <div className="flex items-center gap-1.5 font-semibold">
-                <span
-                  className="size-1.5 rounded-full"
-                  style={{ background: meta.color }}
-                />
-                {meta.label}
-              </div>
-              <div className="mt-0.5 text-muted-foreground">
-                {a.count} · {meta.cadence}
-              </div>
-              <div className="text-muted-foreground tabular-nums">
-                {fmt(a.reach)} reach ·{" "}
-                {a.openN ? `${Math.round((a.openSum / a.openN) * 100)}%` : "—"}{" "}
-                open
-              </div>
-            </Link>
-          );
-        })}
-      </div>
-
-      {/* view toggle */}
-      <div className="mt-4 flex flex-wrap items-center gap-2 border-t pt-4">
-        {(["list", "wall", "read"] as const).map((v) => (
-          <Link
-            key={v}
-            href={newsletterHref({ view: v, kind: kindFilter })}
-            className={`rounded-full border px-3 py-1 text-xs font-medium capitalize transition-colors ${
-              view === v
-                ? "border-foreground bg-foreground text-background"
-                : "border-border text-muted-foreground hover:bg-accent"
-            }`}
-          >
-            {v === "read" ? "Read" : v}
-          </Link>
-        ))}
-        {truncated && (
-          <span className="text-xs text-muted-foreground">
-            showing latest {cap} of {visible.length}
-          </span>
         )}
-      </div>
-
-      {view === "wall" && (
-        <div className="mt-6">
-          <CoverWall items={previews} />
-        </div>
-      )}
-      {view === "read" && (
-        <div className="mt-6">
-          <DocumentReader items={previews} />
-        </div>
-      )}
-
-      {/* Chronological issues (list) */}
-      {view === "list" &&
-        months.map((m) => (
-          <section key={m.key} className="mt-8">
-            <h2 className="mb-2 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-              {m.key} · {m.items.length}
-            </h2>
-            <div className="flex flex-col">
-              {m.items.map(({ issue, kind, openRate }) => {
+        {tagged.length > 0 && (
+          <>
+            {/* Kinds overview */}
+            <div className="mt-5 flex flex-wrap gap-2.5">
+              <Link
+                href={newsletterHref()}
+                className={`rounded-xl border px-3 py-2 text-xs transition-colors ${
+                  !kindFilter
+                    ? "border-foreground bg-accent/40"
+                    : "hover:bg-accent/40"
+                }`}
+              >
+                <div className="font-semibold">All</div>
+                <div className="text-muted-foreground">
+                  {tagged.length} issues
+                </div>
+              </Link>
+              {kindCards.map(([kind, a]) => {
                 const meta = NEWSLETTER_KIND_META[kind];
-                const s = issue.stats;
+                const active = kindFilter === kind;
                 return (
                   <Link
-                    key={issue.id}
-                    href={`/app/newsletters/${issue.id}`}
-                    className="-mx-2 flex items-center gap-3 rounded-lg border-b px-2 py-3 text-sm transition-colors last:border-0 hover:bg-accent/40"
+                    key={kind}
+                    href={newsletterHref({ kind })}
+                    className={`rounded-xl border px-3 py-2 text-xs transition-colors ${
+                      active
+                        ? "border-foreground bg-accent/40"
+                        : "hover:bg-accent/40"
+                    }`}
                   >
-                    <span className="w-12 shrink-0 text-xs text-muted-foreground tabular-nums">
-                      {issue.publishedAt!.toLocaleDateString([], {
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </span>
-                    <span
-                      className="size-1.5 shrink-0 rounded-full"
-                      style={{ background: meta.color }}
-                      title={meta.label}
-                    />
-                    <span className="min-w-0 flex-1 truncate">
-                      {issue.text}
-                    </span>
-                    <span className="hidden w-28 shrink-0 text-right text-xs text-muted-foreground tabular-nums @xl:block">
-                      {s?.sent ? `${fmt(s.sent)} sent` : "—"}
-                    </span>
-                    <span className="w-16 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
-                      {openRate != null
-                        ? pct(s?.opened ?? 0, s?.delivered ?? 0)
-                        : "—"}
-                    </span>
-                    <span className="w-4 shrink-0 text-right text-xs text-muted-foreground">
-                      ↗
-                    </span>
+                    <div className="flex items-center gap-1.5 font-semibold">
+                      <span
+                        className="size-1.5 rounded-full"
+                        style={{ background: meta.color }}
+                      />
+                      {meta.label}
+                    </div>
+                    <div className="mt-0.5 text-muted-foreground">
+                      {a.count} · {meta.cadence}
+                    </div>
+                    <div className="text-muted-foreground tabular-nums">
+                      {fmt(a.reach)} reach ·{" "}
+                      {a.openN
+                        ? `${Math.round((a.openSum / a.openN) * 100)}%`
+                        : "—"}{" "}
+                      open
+                    </div>
                   </Link>
                 );
               })}
             </div>
-          </section>
-        ))}
 
-      {visible.length === 0 && (
-        <p className="mt-10 text-sm text-muted-foreground">
-          No issues for this filter.
-        </p>
-      )}
+            {/* view toggle */}
+            <div className="mt-4 flex flex-wrap items-center gap-2 border-t pt-4">
+              {(["list", "wall", "read"] as const).map((v) => (
+                <Link
+                  key={v}
+                  href={newsletterHref({ view: v, kind: kindFilter })}
+                  className={`rounded-md border px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
+                    view === v
+                      ? "border-border bg-muted text-foreground"
+                      : "border-border text-muted-foreground hover:bg-accent"
+                  }`}
+                >
+                  {v === "read" ? "Read" : v}
+                </Link>
+              ))}
+              {truncated && (
+                <span className="text-xs text-muted-foreground">
+                  showing latest {cap} of {visible.length}
+                </span>
+              )}
+            </div>
+
+            {view === "wall" && (
+              <div className="mt-6">
+                <CoverWall items={previews} />
+              </div>
+            )}
+            {view === "read" && (
+              <div className="mt-6">
+                <DocumentReader items={previews} />
+              </div>
+            )}
+          </>
+        )}
+        {/* Chronological issues (list) */}
+        {view === "list" &&
+          months.map((m) => (
+            <section key={m.key} className="mt-8">
+              <h2 className="mb-2 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                {m.key} · {m.items.length}
+              </h2>
+              <div className="flex flex-col">
+                {m.items.map(({ issue, kind, openRate }) => {
+                  const meta = NEWSLETTER_KIND_META[kind];
+                  const s = issue.stats;
+                  return (
+                    <Link
+                      key={issue.id}
+                      href={`/app/newsletters/${issue.id}`}
+                      className="-mx-2 flex items-center gap-3 rounded-lg border-b px-2 py-3 text-sm transition-colors last:border-0 hover:bg-accent/40"
+                    >
+                      <span className="w-12 shrink-0 text-xs text-muted-foreground tabular-nums">
+                        {issue.publishedAt!.toLocaleDateString([], {
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </span>
+                      <span
+                        className="size-1.5 shrink-0 rounded-full"
+                        style={{ background: meta.color }}
+                        title={meta.label}
+                      />
+                      <span className="min-w-0 flex-1 truncate">
+                        {issue.text}
+                      </span>
+                      <span className="hidden w-28 shrink-0 text-right text-xs text-muted-foreground tabular-nums @xl:block">
+                        {s?.sent ? `${fmt(s.sent)} sent` : "—"}
+                      </span>
+                      <span className="w-16 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
+                        {openRate != null
+                          ? pct(s?.opened ?? 0, s?.delivered ?? 0)
+                          : "—"}
+                      </span>
+                      <span className="w-4 shrink-0 text-right text-xs text-muted-foreground">
+                        ↗
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
+
+        {visible.length === 0 && (
+          <EmptyState
+            compact
+            icon={MailCheck}
+            title={
+              tagged.length
+                ? "No sent emails match this filter"
+                : "No sent emails yet"
+            }
+          />
+        )}
+      </WorkspaceCard>
+      {settingsCard}
 
       <CompetitorNewsletters
         rows={competitorRows}

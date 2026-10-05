@@ -35,6 +35,7 @@ import {
 import { newConnectToken } from "@/server/services/brand-connect.service";
 import { MediaService } from "@/server/services/media.service";
 import { enrichBrandFromWebsite } from "@/server/services/brand-enrichment.service";
+import { recheckBrandWebsite } from "@/server/services/wanderos-listings.service";
 
 // ---- BRAND OPS: create + enrich, shared by oRPC and chat/MCP ----------
 //
@@ -120,6 +121,12 @@ export async function createOwnedBrand(input: {
       }),
     })
     .returning();
+  // Preview-enriched creation skips enrichBrandById, so probe here too.
+  if (website && input.enrichment) {
+    await recheckBrandWebsite(brand!.id).catch((error) =>
+      console.error("WanderOS probe failed", brand!.id, error),
+    );
+  }
   return brand!;
 }
 
@@ -140,7 +147,12 @@ export async function enrichBrandById(
   const website = normalizeWebsiteUrl(websiteOverride) ?? existing.website;
   if (!website) throw new Error("Add a website URL before enriching");
 
-  const enrichment = await enrichBrandFromWebsite(website);
+  const [enrichment] = await Promise.all([
+    enrichBrandFromWebsite(website),
+    recheckBrandWebsite(brandId, website).catch((error) =>
+      console.error("WanderOS probe failed", brandId, error),
+    ),
+  ]);
   if (!enrichment) return null;
   // Fonts an operator picked outlive a re-read of the site.
   const chosen = existing.brandIdentity?.fontsChosen;

@@ -1,6 +1,5 @@
 import { WorkspaceBreadcrumbs } from "@/components/workspace-breadcrumbs";
 import type { ReactNode } from "react";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ExternalLink } from "lucide-react";
 
@@ -45,9 +44,9 @@ export default async function PerformanceBrandLayout({
         <BrandLogo brand={brand} className="size-11 text-sm" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-lg font-semibold tracking-tight">
+            <h1 className="text-lg font-semibold tracking-tight">
               {brand.name}
-            </h2>
+            </h1>
             {deskBrand ? (
               <Badge variant="outline" title="Manual client journey">
                 {
@@ -70,21 +69,6 @@ export default async function PerformanceBrandLayout({
                 <ExternalLink className="size-3" />
               </a>
             ) : null}
-            <Link href={`/app/brands/${slug}`} className="hover:underline">
-              Open brand workspace
-            </Link>
-            <Link
-              href={`/app/brands/${slug}/content`}
-              className="hover:underline"
-            >
-              Content
-            </Link>
-            <Link
-              href={`/app/brands/${slug}/previews`}
-              className="hover:underline"
-            >
-              Organic previews
-            </Link>
           </div>
         </div>
       </div>

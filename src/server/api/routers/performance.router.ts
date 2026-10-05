@@ -37,7 +37,32 @@ import {
 // Delivery itself stays in campaign / lifecycle / amplification; this is the
 // commercial layer plus a read of what is attached to each cycle.
 
+import { launchPatchSchema } from "@/lib/launch-checklist";
+import { recordLaunchChecklist } from "@/server/services/launch-checklist.service";
+import {
+  launchChecklistAction,
+  recordLaunchChecklistAction,
+} from "@/server/ai/capabilities/launch-checklist";
+
 export const performanceRouter = {
+  launchChecklist: actionProcedure(launchChecklistAction),
+  recordLaunchChecklist: actionProcedure(recordLaunchChecklistAction),
+  setLaunchChecklist: workspaceProcedure
+    .input(
+      z.object({
+        brandId: z.string().min(1),
+        patch: launchPatchSchema,
+        expectedRevision: z.number().int().nonnegative(),
+      }),
+    )
+    .handler(({ context: ctx, input }) =>
+      recordLaunchChecklist({
+        ...input,
+        orgId: ctx.workspace.orgId,
+        by: ctx.workspace.userId,
+        source: "manual",
+      }),
+    ),
   setPipelineStage: workspaceProcedure
     .input(
       z.object({

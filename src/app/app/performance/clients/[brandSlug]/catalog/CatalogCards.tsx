@@ -10,14 +10,22 @@ import {
   ChevronDown,
   Sparkles,
   Layers,
+  Download,
+  Search,
 } from "lucide-react";
 import { ORPCError } from "@orpc/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ShapeBrandButton } from "../ShapeBrandButton";
+import { WorkspaceCard } from "../../../WorkspaceCard";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/components/ui/lib/utils";
 import { Input } from "@/components/ui/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 import {
   Dialog,
   DialogContent,
@@ -111,6 +119,7 @@ export function CatalogCards({
   );
   /** A home to scroll to in Studio, set by the links on an export's images. */
   const [focusHome, setFocusHome] = useQueryState("home", parseAsString);
+  const [search, setSearch] = useState("");
   const [layout, setLayout] = useState<"grid" | "list">("list");
   const [details, setDetails] = useState<CatalogCard | null>(null);
   const [gridExports, setGridExports] = useState<string[]>([]);
@@ -139,6 +148,12 @@ export function CatalogCards({
   const homes = query.data?.homes ?? [];
   const homeOf = (card: CatalogCard) => homes.find((h) => h.id === card.homeId);
   const reload = () => client.invalidateQueries({ queryKey: state.queryKey });
+  const importHomes = useMutation(
+    orpc.catalog.refreshHomes.mutationOptions({
+      onSuccess: reload,
+      onError: (e) => setError(errorMessage(e, "Could not import homes")),
+    }),
+  );
   // Chat edits the same rows; show its writes as they land.
   useEffect(() => {
     const onWrite = () => {
@@ -318,12 +333,17 @@ export function CatalogCards({
   const approvedCards = (draft?.cards ?? []).filter(
     (c) => c.included && c.approved,
   );
-  const visible =
+  const filtered =
     filter === "review"
       ? unapproved
       : filter === "approved"
         ? approvedCards
         : (draft?.cards ?? []);
+  const visible = filtered.filter((card) =>
+    `${homeOf(card)?.name ?? ""} ${card.title}`
+      .toLowerCase()
+      .includes(search.trim().toLowerCase()),
+  );
   useEffect(() => {
     if (view !== "studio" || !focusHome || !draft) return;
     const index = visible.findIndex((card) => card.homeId === focusHome);
@@ -345,7 +365,10 @@ export function CatalogCards({
       () => orpc.catalog.exportCatalog.call({ brandId, fresh }),
       "Unable to export",
     );
-    if (done) void setView("exports");
+    if (done)
+      document
+        .getElementById("catalog-exports")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
     setBusy(false);
   }
   const cardActions = (primary = false) => (
@@ -371,117 +394,428 @@ export function CatalogCards({
   );
   const activeExport = query.data?.exports.some((e) => running(e.status));
   return (
-    <section className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold">Catalog</h2>
-        <div className="flex flex-wrap gap-2">{cardActions()}</div>
-      </div>
-      <p className="text-sm text-muted-foreground">
-        Home cards with photography and copy, ready for review and export. Write
-        cards fills or rewrites every included, unapproved composed card.
-      </p>
-      <div className="flex flex-wrap gap-2">
-        <Button
-          variant={view === "studio" ? "secondary" : "ghost"}
-          onClick={() => setView("studio")}
-        >
-          Studio
-        </Button>
-        <Button
-          variant={view === "preview" ? "secondary" : "ghost"}
-          onClick={() => setView("preview")}
-        >
-          Preview
-        </Button>
-        <Button
-          variant={view === "exports" ? "secondary" : "ghost"}
-          onClick={() => setView("exports")}
-        >
-          Exports {query.data?.exports.length || ""}
-        </Button>
-      </div>
-      {(error || query.error) && (
-        <p role="alert" className="text-destructive">
-          {error || query.error?.message}
-        </p>
-      )}
-      {query.data?.enrichmentError && (
-        <p className="text-sm text-muted-foreground">
-          {query.data.enrichmentError}
-        </p>
-      )}
-      {query.isLoading && <p>Loading homes…</p>}
-      {view === "studio" && draft && (
-        <>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <span>
-              {draft.cards.filter((c) => c.included).length} of{" "}
-              {draft.cards.length} homes included ·{" "}
-              {draft.cards.filter((c) => c.included && c.approved).length}{" "}
-              approved
-            </span>
-            <div className="flex flex-wrap gap-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline">
-                    {writing
-                      ? `${writing.pass === "copy" ? "Rewriting" : "Fixing"} ${writing.done}/${writing.total}`
-                      : "Bulk actions"}
-                    <ChevronDown aria-hidden="true" className="size-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="min-w-52">
-                  <DropdownMenuItem
-                    onSelect={() =>
-                      reviewInChat({ brandId, brandName, surface: "catalog" })
-                    }
-                  >
-                    <MessageSquare aria-hidden="true" />
-                    Review in chat
-                  </DropdownMenuItem>
-                  {CATALOG_WRITE_PASSES.map((pass) => (
+    <div className="space-y-4">
+      <WorkspaceCard
+        title="Catalog cards"
+        icon={Layers}
+        count={draft?.cards.length ?? 0}
+        actions={cardActions()}
+      >
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant={view === "studio" ? "secondary" : "ghost"}
+            onClick={() => setView("studio")}
+          >
+            Cards
+          </Button>
+          <Button
+            variant={view === "preview" ? "secondary" : "ghost"}
+            onClick={() => setView("preview")}
+          >
+            Preview
+          </Button>
+        </div>
+        {(error || query.error) && (
+          <p role="alert" className="text-destructive">
+            {error || query.error?.message}
+          </p>
+        )}
+        {query.data?.enrichmentError && (
+          <p className="text-sm text-muted-foreground">
+            {query.data.enrichmentError}
+          </p>
+        )}
+        {query.isLoading && <p>Loading homes…</p>}
+        {view !== "preview" && draft && (
+          <>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span>
+                {draft.cards.filter((c) => c.included).length} of{" "}
+                {draft.cards.length} homes included ·{" "}
+                {draft.cards.filter((c) => c.included && c.approved).length}{" "}
+                approved
+              </span>
+              <div className="flex flex-wrap gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline">
+                      {writing
+                        ? `${writing.pass === "copy" ? "Rewriting" : "Fixing"} ${writing.done}/${writing.total}`
+                        : "Bulk actions"}
+                      <ChevronDown aria-hidden="true" className="size-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="min-w-52">
                     <DropdownMenuItem
-                      key={pass}
-                      disabled={busy || Boolean(writing) || open.length === 0}
-                      onSelect={() => startWrite.mutate({ brandId, pass })}
-                    >
-                      <Sparkles aria-hidden="true" />
-                      {pass === "copy" ? "Rewrite copy" : "Fix photos + copy"}
-                      <DropdownMenuShortcut>{open.length}</DropdownMenuShortcut>
-                    </DropdownMenuItem>
-                  ))}
-                  <DropdownMenuSeparator />
-                  {([true, false] as const).map((included) => (
-                    <DropdownMenuItem
-                      key={String(included)}
-                      disabled={busy}
                       onSelect={() =>
-                        void act(
-                          () =>
-                            orpc.catalog.setIncluded.call({
-                              brandId,
-                              included,
-                            }),
-                          "Unable to update the catalog",
-                        )
+                        reviewInChat({ brandId, brandName, surface: "catalog" })
                       }
                     >
-                      {included ? "Include all" : "Exclude all"}
+                      <MessageSquare aria-hidden="true" />
+                      Review in chat
                     </DropdownMenuItem>
-                  ))}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    disabled={busy || unapproved.length === 0}
-                    onSelect={() => approve(unapproved, true)}
+                    {CATALOG_WRITE_PASSES.map((pass) => (
+                      <DropdownMenuItem
+                        key={pass}
+                        disabled={busy || Boolean(writing) || open.length === 0}
+                        onSelect={() => startWrite.mutate({ brandId, pass })}
+                      >
+                        <Sparkles aria-hidden="true" />
+                        {pass === "copy" ? "Rewrite copy" : "Fix photos + copy"}
+                        <DropdownMenuShortcut>
+                          {open.length}
+                        </DropdownMenuShortcut>
+                      </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      disabled={importHomes.isPending}
+                      onSelect={() => importHomes.mutate({ brandId })}
+                    >
+                      {importHomes.isPending
+                        ? "Refreshing homes…"
+                        : "Refresh homes"}
+                    </DropdownMenuItem>
+                    {([true, false] as const).map((included) => (
+                      <DropdownMenuItem
+                        key={String(included)}
+                        disabled={busy}
+                        onSelect={() =>
+                          void act(
+                            () =>
+                              orpc.catalog.setIncluded.call({
+                                brandId,
+                                included,
+                              }),
+                            "Unable to update the catalog",
+                          )
+                        }
+                      >
+                        {included ? "Include all" : "Exclude all"}
+                      </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      disabled={busy || unapproved.length === 0}
+                      onSelect={() => approve(unapproved, true)}
+                    >
+                      <Check aria-hidden="true" />
+                      Approve all
+                      <DropdownMenuShortcut>
+                        {unapproved.length}
+                      </DropdownMenuShortcut>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+              <InputGroup>
+                <InputGroupAddon>
+                  <Search className="size-4" />
+                </InputGroupAddon>
+                <InputGroupInput
+                  aria-label="Search catalog homes"
+                  placeholder="Search homes"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                />
+              </InputGroup>
+              <div className="flex rounded-lg border p-0.5">
+                {(["grid", "list"] as const).map((l) => (
+                  <Button
+                    key={l}
+                    variant={layout === l ? "secondary" : "ghost"}
+                    size="sm"
+                    aria-pressed={layout === l}
+                    onClick={() => {
+                      setLayout(l);
+                      setDetails(null);
+                    }}
                   >
-                    <Check aria-hidden="true" />
-                    Approve all
-                    <DropdownMenuShortcut>
-                      {unapproved.length}
-                    </DropdownMenuShortcut>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                    {l === "grid" ? "Compact" : "List"}
+                  </Button>
+                ))}
+              </div>
+              <div className="flex rounded-lg border p-0.5">
+                {(["all", "review", "approved"] as const).map((key) => (
+                  <Button
+                    key={key}
+                    variant={filter === key ? "secondary" : "ghost"}
+                    size="sm"
+                    aria-pressed={filter === key}
+                    onClick={() => setFilter(key)}
+                  >
+                    {key === "review"
+                      ? `Needs review ${unapproved.length}`
+                      : key === "approved"
+                        ? `Approved ${approvedCards.length}`
+                        : "All"}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            {visible.length === 0 && draft.cards.length > 0 && (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                No catalog cards match these filters.
+              </p>
+            )}
+            {catalogArtworkIssues(draft).length > 0 && (
+              <p role="alert" className="text-sm text-destructive">
+                {catalogArtworkIssues(draft).join(" · ")}
+              </p>
+            )}
+            {!draft.cards.length && (
+              <EmptyState
+                icon={Layers}
+                title="Import homes to start your catalog"
+                description="Import the client’s WanderOS homes when you’re ready to build catalog cards. Then choose a template and write their copy."
+                actions={
+                  <Button
+                    disabled={importHomes.isPending}
+                    onClick={() => importHomes.mutate({ brandId })}
+                  >
+                    {importHomes.isPending ? "Importing…" : "Import homes"}
+                  </Button>
+                }
+              />
+            )}
+            {layout === "grid" ? (
+              <div className="grid grid-cols-1 gap-3 @xl:grid-cols-2 @2xl:gap-4 @4xl:grid-cols-3 @6xl:grid-cols-4">
+                {visible.slice(0, limit).map((card) => (
+                  <div
+                    key={card.homeId}
+                    id={`home-${card.homeId}`}
+                    className={`relative scroll-mt-20 overflow-hidden rounded-xl border bg-card ${card.included ? "" : "opacity-50"} ${focusHome === card.homeId ? "ring-2 ring-ring" : ""}`}
+                  >
+                    {card.approved && (
+                      <ApprovedStamp
+                        fresh={stamped.has(card.homeId)}
+                        className="pointer-events-none absolute top-3 right-3 z-10 bg-card/85 backdrop-blur-sm"
+                      />
+                    )}
+                    <button
+                      className="block w-full"
+                      disabled={locked(card)}
+                      title={locked(card) ? LOCKED_TITLE : undefined}
+                      onClick={() => setDetails({ ...card })}
+                      aria-label={`Edit ${homeOf(card)?.name}`}
+                    >
+                      <CardPreview
+                        brandId={brandId}
+                        card={card}
+                        format={format}
+                      />
+                    </button>
+                    {card.mode === "finished" && (
+                      <p className="px-3 pt-2 text-xs text-muted-foreground">
+                        Artwork
+                        {card.finishedArtwork ? "" : " · Choose image"}
+                      </p>
+                    )}
+                    <div className="flex items-end justify-between gap-2 p-3">
+                      <button
+                        className="line-clamp-2 text-left text-sm"
+                        title={locked(card) ? LOCKED_TITLE : homeOf(card)?.name}
+                        disabled={locked(card)}
+                        onClick={() => setDetails({ ...card })}
+                      >
+                        {homeOf(card)?.name}
+                      </button>
+                      <HomeLink url={homeOf(card)?.url} />
+                      <IncludeButton
+                        card={card}
+                        onInclude={(included) => update({ ...card, included })}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {visible.slice(0, limit).map((card) => {
+                  const editing = details?.homeId === card.homeId;
+                  const shown = editing ? details : card;
+                  return (
+                    <section
+                      key={card.homeId}
+                      id={`home-${card.homeId}`}
+                      aria-label={homeOf(card)?.name}
+                      className={`scroll-mt-20 rounded-lg border p-4 ${card.included || editing ? "" : "opacity-50"} ${focusHome === card.homeId ? "ring-2 ring-ring" : ""}`}
+                    >
+                      <div className="grid grid-cols-1 items-start gap-5 @xl:grid-cols-[minmax(0,240px)_minmax(0,1fr)]">
+                        <div className="mx-auto w-full max-w-xs overflow-hidden rounded-lg">
+                          <CardPreview
+                            brandId={brandId}
+                            card={shown}
+                            format={format}
+                          />
+                        </div>
+                        <div className="min-w-0 space-y-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="flex items-center gap-1.5 text-sm font-medium">
+                              {homeOf(card)?.name}
+                              <HomeLink url={homeOf(card)?.url} />
+                            </p>
+                            {!editing && (
+                              <div className="flex flex-wrap gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => workInChat(card)}
+                                >
+                                  <MessageSquare className="size-3.5" />
+                                  Shape
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  disabled={locked(card)}
+                                  title={
+                                    locked(card) ? LOCKED_TITLE : undefined
+                                  }
+                                  onClick={() => setDetails({ ...card })}
+                                >
+                                  Edit
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                          {editing ? (
+                            <CardEditor
+                              card={details}
+                              home={homeOf(card)}
+                              onChange={setDetails}
+                              onHero={(photoUrl) =>
+                                void setHero(details, photoUrl)
+                              }
+                              onLibrary={() => setLibrary(true)}
+                              onApply={() => {
+                                update({ ...details, included: card.included });
+                                setDetails(null);
+                              }}
+                              onCancel={() => setDetails(null)}
+                            />
+                          ) : card.mode === "finished" ? (
+                            <p className="text-sm text-muted-foreground">
+                              Artwork used as-is, with no added text or logo.
+                            </p>
+                          ) : (
+                            <dl className="space-y-3 text-sm">
+                              {[
+                                ["Headline", card.title],
+                                ["Facts", card.subtitle],
+                                [
+                                  "Composition",
+                                  COMPOSITION_TEMPLATES.find(
+                                    (t) => t.id === card.templateId,
+                                  )?.label ?? card.templateId,
+                                ],
+                              ].map(([label, value]) => (
+                                <div key={label}>
+                                  <dt className="text-xs text-muted-foreground">
+                                    {label}
+                                  </dt>
+                                  <dd className="break-words">
+                                    {value || "Not set"}
+                                  </dd>
+                                </div>
+                              ))}
+                              <Amenities list={homeOf(card)?.amenities ?? []} />
+                            </dl>
+                          )}
+                          {!editing && (
+                            <div className="flex flex-wrap items-center gap-1 border-t pt-3">
+                              <span className="mr-1.5 text-xs text-muted-foreground">
+                                Quick changes
+                              </span>
+                              {(
+                                [
+                                  ["Choose photo", () => choosePhoto(card)],
+                                  [
+                                    fixing[card.homeId] === "photo"
+                                      ? "Finding a photo…"
+                                      : "New photo",
+                                    () => void quickFix(card, "photo"),
+                                  ],
+                                  [
+                                    fixing[card.homeId] === "copy"
+                                      ? "Writing copy…"
+                                      : "New copy",
+                                    () => void quickFix(card, "copy"),
+                                  ],
+                                ] as const
+                              ).map(([label, onClick]) => (
+                                <Button
+                                  key={label}
+                                  size="xs"
+                                  variant="ghost"
+                                  disabled={
+                                    Boolean(fixing[card.homeId]) || locked(card)
+                                  }
+                                  title={
+                                    locked(card) ? LOCKED_TITLE : undefined
+                                  }
+                                  onClick={onClick}
+                                >
+                                  {label}
+                                </Button>
+                              ))}
+                              <div className="ml-auto flex gap-2">
+                                <IncludeButton
+                                  card={card}
+                                  onInclude={(included) =>
+                                    update({ ...card, included })
+                                  }
+                                />
+                                <ApproveButton
+                                  card={card}
+                                  onApprove={(approved) =>
+                                    approve([card], approved)
+                                  }
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </section>
+                  );
+                })}
+              </div>
+            )}
+            {limit < visible.length && (
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" onClick={() => setLimit(limit + 10)}>
+                  Load more homes
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setLimit(visible.length)}
+                >
+                  Load all homes
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+        {view === "preview" && draft && (
+          <CatalogPreview
+            brandId={brandId}
+            brandName={brandName}
+            homes={homes}
+            draft={draft}
+          />
+        )}
+      </WorkspaceCard>
+      <WorkspaceCard
+        id="catalog-exports"
+        title="Exports"
+        icon={Download}
+        count={query.data?.exports.length ?? 0}
+        actions={
+          draft ? (
+            <>
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
@@ -507,286 +841,18 @@ export function CatalogCards({
               >
                 {busy ? "Working…" : "Create export"}
               </Button>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-3 text-sm">
-            <div className="flex rounded-lg border p-0.5">
-              {(["grid", "list"] as const).map((l) => (
-                <Button
-                  key={l}
-                  variant={layout === l ? "secondary" : "ghost"}
-                  size="sm"
-                  aria-pressed={layout === l}
-                  onClick={() => {
-                    setLayout(l);
-                    setDetails(null);
-                  }}
-                >
-                  {l === "grid" ? "Compact" : "List"}
-                </Button>
-              ))}
-            </div>
-            <div className="flex rounded-lg border p-0.5">
-              {(["all", "review", "approved"] as const).map((key) => (
-                <Button
-                  key={key}
-                  variant={filter === key ? "secondary" : "ghost"}
-                  size="sm"
-                  aria-pressed={filter === key}
-                  onClick={() => setFilter(key)}
-                >
-                  {key === "review"
-                    ? `Needs review ${unapproved.length}`
-                    : key === "approved"
-                      ? `Approved ${approvedCards.length}`
-                      : "All"}
-                </Button>
-              ))}
-            </div>
-          </div>
-          {catalogArtworkIssues(draft).length > 0 && (
-            <p role="alert" className="text-sm text-destructive">
-              {catalogArtworkIssues(draft).join(" · ")}
-            </p>
-          )}
-          {!draft.cards.length && (
-            <EmptyState
-              icon={Layers}
-              title="Build reusable home cards"
-              description="Add homes with photos to create catalog cards. Then choose a template and write their copy using the brand story, or Shape the creative direction."
-              actions={cardActions(true)}
-            />
-          )}
-          {layout === "grid" ? (
-            <div className="grid grid-cols-1 gap-3 @xl:grid-cols-2 @2xl:gap-4 @4xl:grid-cols-3 @6xl:grid-cols-4">
-              {visible.slice(0, limit).map((card) => (
-                <div
-                  key={card.homeId}
-                  id={`home-${card.homeId}`}
-                  className={`relative scroll-mt-20 overflow-hidden rounded-xl border bg-card ${card.included ? "" : "opacity-50"} ${focusHome === card.homeId ? "ring-2 ring-ring" : ""}`}
-                >
-                  {card.approved && (
-                    <ApprovedStamp
-                      fresh={stamped.has(card.homeId)}
-                      className="pointer-events-none absolute top-3 right-3 z-10 bg-card/85 backdrop-blur-sm"
-                    />
-                  )}
-                  <button
-                    className="block w-full"
-                    disabled={locked(card)}
-                    title={locked(card) ? LOCKED_TITLE : undefined}
-                    onClick={() => setDetails({ ...card })}
-                    aria-label={`Edit ${homeOf(card)?.name}`}
-                  >
-                    <CardPreview
-                      brandId={brandId}
-                      card={card}
-                      format={format}
-                    />
-                  </button>
-                  {card.mode === "finished" && (
-                    <p className="px-3 pt-2 text-xs text-muted-foreground">
-                      Artwork
-                      {card.finishedArtwork ? "" : " · Choose image"}
-                    </p>
-                  )}
-                  <div className="flex items-end justify-between gap-2 p-3">
-                    <button
-                      className="line-clamp-2 text-left text-sm"
-                      title={locked(card) ? LOCKED_TITLE : homeOf(card)?.name}
-                      disabled={locked(card)}
-                      onClick={() => setDetails({ ...card })}
-                    >
-                      {homeOf(card)?.name}
-                    </button>
-                    <HomeLink url={homeOf(card)?.url} />
-                    <IncludeButton
-                      card={card}
-                      onInclude={(included) => update({ ...card, included })}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {visible.slice(0, limit).map((card) => {
-                const editing = details?.homeId === card.homeId;
-                const shown = editing ? details : card;
-                return (
-                  <section
-                    key={card.homeId}
-                    id={`home-${card.homeId}`}
-                    aria-label={homeOf(card)?.name}
-                    className={`scroll-mt-20 rounded-lg border p-4 ${card.included || editing ? "" : "opacity-50"} ${focusHome === card.homeId ? "ring-2 ring-ring" : ""}`}
-                  >
-                    <div className="grid grid-cols-1 items-start gap-5 @xl:grid-cols-[minmax(0,240px)_minmax(0,1fr)]">
-                      <div className="mx-auto w-full max-w-xs overflow-hidden rounded-lg">
-                        <CardPreview
-                          brandId={brandId}
-                          card={shown}
-                          format={format}
-                        />
-                      </div>
-                      <div className="min-w-0 space-y-3">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <p className="flex items-center gap-1.5 text-sm font-medium">
-                            {homeOf(card)?.name}
-                            <HomeLink url={homeOf(card)?.url} />
-                          </p>
-                          {!editing && (
-                            <div className="flex flex-wrap gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => workInChat(card)}
-                              >
-                                <MessageSquare className="size-3.5" />
-                                Shape
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                disabled={locked(card)}
-                                title={locked(card) ? LOCKED_TITLE : undefined}
-                                onClick={() => setDetails({ ...card })}
-                              >
-                                Edit
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                        {editing ? (
-                          <CardEditor
-                            card={details}
-                            home={homeOf(card)}
-                            onChange={setDetails}
-                            onHero={(photoUrl) =>
-                              void setHero(details, photoUrl)
-                            }
-                            onLibrary={() => setLibrary(true)}
-                            onApply={() => {
-                              update({ ...details, included: card.included });
-                              setDetails(null);
-                            }}
-                            onCancel={() => setDetails(null)}
-                          />
-                        ) : card.mode === "finished" ? (
-                          <p className="text-sm text-muted-foreground">
-                            Artwork used as-is, with no added text or logo.
-                          </p>
-                        ) : (
-                          <dl className="space-y-3 text-sm">
-                            {[
-                              ["Headline", card.title],
-                              ["Facts", card.subtitle],
-                              [
-                                "Composition",
-                                COMPOSITION_TEMPLATES.find(
-                                  (t) => t.id === card.templateId,
-                                )?.label ?? card.templateId,
-                              ],
-                            ].map(([label, value]) => (
-                              <div key={label}>
-                                <dt className="text-xs text-muted-foreground">
-                                  {label}
-                                </dt>
-                                <dd className="break-words">
-                                  {value || "Not set"}
-                                </dd>
-                              </div>
-                            ))}
-                            <Amenities list={homeOf(card)?.amenities ?? []} />
-                          </dl>
-                        )}
-                        {!editing && (
-                          <div className="flex flex-wrap items-center gap-1 border-t pt-3">
-                            <span className="mr-1.5 text-xs text-muted-foreground">
-                              Quick changes
-                            </span>
-                            {(
-                              [
-                                ["Choose photo", () => choosePhoto(card)],
-                                [
-                                  fixing[card.homeId] === "photo"
-                                    ? "Finding a photo…"
-                                    : "New photo",
-                                  () => void quickFix(card, "photo"),
-                                ],
-                                [
-                                  fixing[card.homeId] === "copy"
-                                    ? "Writing copy…"
-                                    : "New copy",
-                                  () => void quickFix(card, "copy"),
-                                ],
-                              ] as const
-                            ).map(([label, onClick]) => (
-                              <Button
-                                key={label}
-                                size="xs"
-                                variant="ghost"
-                                disabled={
-                                  Boolean(fixing[card.homeId]) || locked(card)
-                                }
-                                title={locked(card) ? LOCKED_TITLE : undefined}
-                                onClick={onClick}
-                              >
-                                {label}
-                              </Button>
-                            ))}
-                            <div className="ml-auto flex gap-2">
-                              <IncludeButton
-                                card={card}
-                                onInclude={(included) =>
-                                  update({ ...card, included })
-                                }
-                              />
-                              <ApproveButton
-                                card={card}
-                                onApprove={(approved) =>
-                                  approve([card], approved)
-                                }
-                              />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </section>
-                );
-              })}
-            </div>
-          )}
-          {limit < visible.length && (
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={() => setLimit(limit + 10)}>
-                Load more homes
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setLimit(visible.length)}
-              >
-                Load all homes
-              </Button>
-            </div>
-          )}
-        </>
-      )}
-      {view === "preview" && draft && (
-        <CatalogPreview
-          brandId={brandId}
-          brandName={brandName}
-          homes={homes}
-          draft={draft}
-        />
-      )}
-      {view === "exports" && (
-        <div className="space-y-5">
+            </>
+          ) : undefined
+        }
+      >
+        <div className="space-y-4">
           {!query.data?.exports.length && (
-            <p className="text-muted-foreground">
-              No exports yet. Review the Studio cards and create your first
-              export.
-            </p>
+            <EmptyState
+              compact
+              icon={Download}
+              title="No exports yet"
+              description="Approve the included catalog cards, then create an export."
+            />
           )}
           {query.data?.exports.map((item) => (
             <article key={item.id} className="space-y-3 rounded-xl border p-4">
@@ -903,7 +969,7 @@ export function CatalogCards({
             </article>
           ))}
         </div>
-      )}
+      </WorkspaceCard>
       <DeleteAlert
         open={deletingExport !== null}
         onOpenChange={(open) => {
@@ -1053,7 +1119,7 @@ export function CatalogCards({
           }
         }}
       />
-    </section>
+    </div>
   );
 }
 

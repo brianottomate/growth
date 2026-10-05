@@ -1,3 +1,8 @@
+import {
+  WorkspaceCard,
+  WorkspaceCardHeader,
+} from "@/app/app/performance/WorkspaceCard";
+import { ChartNoAxesCombined, Images } from "lucide-react";
 import { workspaceActor } from "@/server/workspace-actor";
 
 import {
@@ -101,38 +106,37 @@ export async function PlatformCampaignView({
   );
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6 p-6">
-      <header className="space-y-3">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Link
-            href={
-              workspace === "performance"
-                ? "/app/performance/clients"
-                : "/app/brands"
-            }
-            className="hover:underline"
-          >
-            {workspace === "performance" ? "Clients" : "Brands"}
-          </Link>
-          <span>/</span>
-          <Link
-            href={
-              workspace === "performance"
-                ? `/app/performance/clients/${brandSlug}`
-                : `/app/brands/${brandSlug}`
-            }
-            className="hover:underline"
-          >
-            {brand.name}
-          </Link>
-          <span>/</span>
-          <Link
-            href={campaignListPath(brandSlug, workspace)}
-            className="hover:underline"
-          >
-            Ads
-          </Link>
-        </div>
+    <div
+      className={
+        workspace === "performance"
+          ? "space-y-4"
+          : "mx-auto w-full max-w-5xl space-y-4 p-6"
+      }
+    >
+      <header className="space-y-3 rounded-xl border bg-background p-4">
+        {workspace !== "performance" && (
+          <>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Link href={"/app/brands"} className="hover:underline">
+                Brands
+              </Link>
+              <span>/</span>
+              <Link
+                href={`/app/brands/${brandSlug}`}
+                className="hover:underline"
+              >
+                {brand.name}
+              </Link>
+              <span>/</span>
+              <Link
+                href={campaignListPath(brandSlug, workspace)}
+                className="hover:underline"
+              >
+                Ads
+              </Link>
+            </div>
+          </>
+        )}
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2.5">
@@ -140,9 +144,9 @@ export async function PlatformCampaignView({
                 platform={platformCampaign.platform}
                 className="size-6"
               />
-              <h1 className="truncate text-xl font-semibold tracking-tight">
+              <h2 className="truncate text-base font-semibold tracking-tight">
                 {platformCampaign.name}
-              </h1>
+              </h2>
               <span
                 className={`rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${statusStyle(
                   platformCampaign.status,
@@ -201,24 +205,20 @@ export async function PlatformCampaignView({
         </div>
       </header>
 
-      <div className="grid grid-cols-2 gap-3 @xl:grid-cols-4">
-        {statCards.map((card) => (
-          <div key={card.label} className="rounded-xl border bg-card p-3">
-            <p className="text-xs text-muted-foreground">{card.label}</p>
-            <p className="mt-1 text-lg font-semibold tabular-nums">
-              {card.value}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      <section className="space-y-3">
-        <h2 className="text-base font-semibold">
-          Ads{" "}
-          <span className="text-sm font-normal text-muted-foreground">
-            {spots.length}
-          </span>
-        </h2>
+      <WorkspaceCard title="Results" icon={ChartNoAxesCombined}>
+        <div className="grid grid-cols-2 gap-3 @xl:grid-cols-4">
+          {statCards.map((card) => (
+            <div key={card.label} className="rounded-xl border bg-card p-3">
+              <p className="text-xs text-muted-foreground">{card.label}</p>
+              <p className="mt-1 text-lg font-semibold tabular-nums">
+                {card.value}
+              </p>
+            </div>
+          ))}
+        </div>
+      </WorkspaceCard>
+      <section className="space-y-4 rounded-xl border bg-background p-4">
+        <WorkspaceCardHeader title="Ads" icon={Images} count={spots.length} />
         {spots.length === 0 ? (
           <div className="space-y-1 text-sm text-muted-foreground">
             <p>

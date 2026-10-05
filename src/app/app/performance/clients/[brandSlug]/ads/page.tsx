@@ -1,8 +1,8 @@
-import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
-import { brandListings } from "@/server/services/wanderos-listings.service";
+import { studioListings } from "@/server/services/studio-homes.service";
+import { homeGroupContext } from "@/server/services/home-groups.service";
 import { listAdSet } from "@/server/services/ad-set.service";
 
 import { brandAvatarUrl, loadPerformanceBrand } from "../_data";
@@ -10,7 +10,6 @@ import { brandAvatarUrl, loadPerformanceBrand } from "../_data";
 import { MAX_SET_HOMES } from "@/lib/performance-ads";
 
 import { AdPreviewsWorkspace, type WorkspaceHome } from "./AdPreviewsWorkspace";
-import { ReviewInChatButton } from "../ReviewInChatButton";
 import type { StudioIdea } from "./StudioIdeas";
 
 export const metadata: Metadata = {
@@ -39,10 +38,11 @@ export default async function PerformanceBrandAdsPage({
     return <div className="text-muted-foreground">No organization found.</div>;
   if (!brand) notFound();
 
-  const [listings, avatarUrl, drafted] = await Promise.all([
-    brandListings({ id: brand.id, website: brand.website }),
+  const [listings, avatarUrl, drafted, groupContext] = await Promise.all([
+    studioListings({ id: brand.id, website: brand.website }),
     brandAvatarUrl(brand),
     listAdSet({ brandId: brand.id, orgId: org.id }),
+    homeGroupContext(brand.id, org.id),
   ]);
   const ideas: StudioIdea[] = drafted.flatMap((ad) =>
     "media" in ad.content
@@ -127,24 +127,6 @@ export default async function PerformanceBrandAdsPage({
 
   return (
     <>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-lg font-semibold">Ad studio · {ideas.length}</h1>
-        <div className="flex items-center gap-3">
-          {drafted.length > 0 ? (
-            <ReviewInChatButton
-              brandId={brand.id}
-              brandName={brand.name}
-              surface="ads"
-            />
-          ) : null}
-          <Link
-            className="text-sm underline"
-            href={`/app/performance/clients/${slug}/campaigns`}
-          >
-            View campaign ads
-          </Link>
-        </div>
-      </div>
       <AdPreviewsWorkspace
         brandId={brand.id}
         brandSlug={slug}
@@ -155,8 +137,15 @@ export default async function PerformanceBrandAdsPage({
         initialPicked={initialPicked}
         ideas={ideas}
         campaigns={campaigns}
-        hasSite={listings.length > 0}
-        website={brand.website}
+        hasHomes={listings.length > 0}
+        homeGroups={groupContext.groups.map((group) => ({
+          id: group.id,
+          name: group.name,
+          homeIds: group.homeIds.flatMap((id) => {
+            const home = groupContext.homes.find((home) => home.id === id);
+            return home && ids.has(home.externalId) ? [home.externalId] : [];
+          }),
+        }))}
         focusHomeId={focused}
       />
     </>

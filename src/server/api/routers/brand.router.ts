@@ -537,7 +537,9 @@ export const brandRouter = {
       }
       const [updated] = await ctx.db
         .update(brandTable)
-        .set({ performanceChecklist: { values, meta } })
+        .set({
+          performanceChecklist: sql`coalesce(${brandTable.performanceChecklist}, '{}'::jsonb) || ${JSON.stringify({ values, meta })}::jsonb`,
+        })
         .where(eq(brandTable.id, input.id))
         .returning({
           performanceChecklist: brandTable.performanceChecklist,

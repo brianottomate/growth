@@ -1,3 +1,5 @@
+import { WorkspaceCardHeader } from "@/app/app/performance/WorkspaceCard";
+import { Images } from "lucide-react";
 import type { AdContent } from "@/server/db/schema";
 import { ideaDocumentFromAd } from "@/lib/ad-idea-studio";
 import { isImportedMetaCatalog } from "@/lib/meta-import";
@@ -143,14 +145,12 @@ export function AdIdeasList({
     );
   return (
     <section aria-labelledby="ad-ideas-heading" className="space-y-4">
-      {ideas.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="ad-ideas-heading" className="text-sm font-semibold">
-            Ads <span className="text-muted-foreground">· {ideas.length}</span>
-          </h2>
-          {actions}
-        </div>
-      )}
+      <WorkspaceCardHeader
+        title="Ads"
+        icon={Images}
+        count={ads.length}
+        actions={actions}
+      />
       {preparingHero && (
         <div
           className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground"

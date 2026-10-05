@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { Mail, Plus } from "lucide-react";
 
+import { WorkspaceCard } from "@/app/app/performance/WorkspaceCard";
 import { CopyButton } from "@/components/copy-button";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
@@ -83,15 +84,11 @@ export function CompetitorNewsletters({
   }
 
   return (
-    <section className="mt-10 border-t pt-6">
-      <h2 className="flex items-center gap-2 text-sm font-semibold">
-        <Mail className="size-4" /> Newsletter capture
-      </h2>
-      <p className="mt-1 text-xs text-muted-foreground">
-        Subscribe with a capture address and forwarded issues land here. Confirm
-        the double opt-in once from the Resend inbox.
-      </p>
-
+    <WorkspaceCard
+      title="Newsletter capture"
+      icon={Mail}
+      count={rows.filter((row) => row.tracked).length}
+    >
       {own ? (
         <div className="mt-4 rounded-xl border p-3">
           <div className="flex items-center justify-between gap-3">
@@ -209,6 +206,6 @@ export function CompetitorNewsletters({
           ))}
         </div>
       )}
-    </section>
+    </WorkspaceCard>
   );
 }
