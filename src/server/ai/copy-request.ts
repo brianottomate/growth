@@ -1,7 +1,12 @@
 import "server-only";
 
 import { anthropic } from "@ai-sdk/anthropic";
-import { generateText, Output, type UserContent } from "ai";
+import {
+  generateText,
+  NoObjectGeneratedError,
+  Output,
+  type UserContent,
+} from "ai";
 import type { z } from "zod";
 
 // One copy call as data: the prompt a generator would send, so production and
@@ -48,32 +53,46 @@ export async function runCopyRequest<T>(
       ? request.content.filter((part) => part.type !== "file")
       : request.content;
   const problems: string[] = [];
-  const attempts = request.problem ? (request.attempts ?? 3) : 1;
+  // A reply that misses the schema is retried like a rejected one; without a
+  // code check that is the only reason to ask twice.
+  const attempts = request.problem ? (request.attempts ?? 3) : 2;
   const usage = { inputTokens: 0, outputTokens: 0 };
   for (let attempt = 0; attempt < attempts; attempt++) {
     const last = problems.at(-1);
-    const { output, usage: used } = await generateText({
-      model: anthropic(model),
-      system,
-      messages: [
-        {
-          role: "user",
-          content: last
-            ? [
-                ...content,
-                {
-                  type: "text",
-                  text:
-                    request.rejected?.(last) ??
-                    `Your last answer was rejected: ${last} Write another.`,
-                },
-              ]
-            : content,
-        },
-      ],
-      output: Output.object({ schema: request.schema }),
-      ...(effort ? { providerOptions: { anthropic: { effort } } } : {}),
-    });
+    let generated;
+    try {
+      generated = await generateText({
+        model: anthropic(model),
+        system,
+        messages: [
+          {
+            role: "user",
+            content: last
+              ? [
+                  ...content,
+                  {
+                    type: "text",
+                    text:
+                      request.rejected?.(last) ??
+                      `Your last answer was rejected: ${last} Write another.`,
+                  },
+                ]
+              : content,
+          },
+        ],
+        output: Output.object({ schema: request.schema }),
+        ...(effort ? { providerOptions: { anthropic: { effort } } } : {}),
+      });
+    } catch (error) {
+      if (!NoObjectGeneratedError.isInstance(error)) throw error;
+      usage.inputTokens += error.usage?.inputTokens ?? 0;
+      usage.outputTokens += error.usage?.outputTokens ?? 0;
+      problems.push(
+        "It did not match the required JSON shape. Answer with every field, using the types the schema asks for.",
+      );
+      continue;
+    }
+    const { output, usage: used } = generated;
     usage.inputTokens += used.inputTokens ?? 0;
     usage.outputTokens += used.outputTokens ?? 0;
     const problem = request.problem?.(output) ?? null;
