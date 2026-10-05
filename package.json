@@ -240,6 +240,6 @@
     "ffmpeg-static"
   ],
   "lint-staged": {
-    "*.{ts,tsx,js,jsx,mjs,cjs,json,mdx}": "oxfmt"
+    "*.{ts,tsx,js,jsx,mjs,cjs,json,mdx}": "oxfmt --no-error-on-unmatched-pattern"
   }
 }
