@@ -22,9 +22,6 @@ export default async function PerformanceBrandExtraPage({
     <div className="space-y-5">
       <div className="space-y-1">
         <h2 className="text-lg font-semibold">Extra</h2>
-        <p className="text-sm text-muted-foreground">
-          Additional tools and information awaiting a permanent home.
-        </p>
       </div>
       <ClientPageActivity brandId={brand.id} orgId={org.id} />
     </div>

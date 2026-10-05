@@ -1,10 +1,18 @@
 "use client";
 
+import {
+  adHomeContext,
+  adTypeLabel,
+  groupCollectionAds,
+  toggleAdSelection,
+  type AdGrouping,
+} from "@/lib/ad-collection-groups";
+import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { SimpleDialog } from "@/components/ui/dialog";
+import { destinationLabel } from "@/lib/ad-preview-links";
 import { orpc } from "@/orpc/client";
 import { toast } from "@/components/ui/toast";
 import { useWorkspaceMutation } from "../useWorkspaceMutation";
@@ -13,20 +21,31 @@ import { useWorkspaceMutation } from "../useWorkspaceMutation";
 export function AddExistingAdsDialog({
   brandId,
   campaignId,
-  studioPath,
 }: {
   brandId: string;
   campaignId: string;
-  studioPath: string;
 }) {
   const [open, setOpen] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
+  const [search, setSearch] = useState("");
+  const [grouping, setGrouping] = useState<AdGrouping>("home");
+  const homes = useQuery({
+    ...orpc.homeGroups.context.queryOptions({ input: { brandId } }),
+    enabled: open,
+  });
   const ads = useQuery({
     ...orpc.ads.brandAds.queryOptions({ input: { brandId } }),
     enabled: open,
   });
   const available = (ads.data ?? []).filter((ad) => !ad.campaignId);
   const selected = picked.filter((id) => available.some((ad) => ad.id === id));
+  const visible = available.filter((ad) =>
+    `${ad.name} ${adHomeContext(ad, homes.data?.homes).label} ${adTypeLabel(ad)}`
+      .toLowerCase()
+      .includes(search.trim().toLowerCase()),
+  );
+  const groups = groupCollectionAds(visible, grouping, homes.data?.homes);
+  const assigned = (ads.data ?? []).length - available.length;
   const attach = useWorkspaceMutation(
     orpc.ads.attachAdSet.mutationOptions({
       onSuccess: (result) => {
@@ -45,35 +64,49 @@ export function AddExistingAdsDialog({
           setOpen(next);
           if (next) {
             setPicked([]);
+            setSearch("");
             void ads.refetch();
           }
         }
       }}
       title="Add existing ads"
       size="lg"
+      scrollable
+      className="flex max-h-[90dvh] flex-col"
       trigger={
         <Button size="sm" variant="outline">
           Add existing ads
         </Button>
       }
       footer={
-        <Button
-          size="sm"
-          disabled={!selected.length || ads.isPending || ads.isError}
-          loading={attach.isPending}
-          onClick={() =>
-            attach.mutate({ brandId, campaignId, adIds: selected })
-          }
-        >
-          Add {selected.length || "selected"} ads
-        </Button>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span className="text-xs text-muted-foreground">
+            {selected.length} selected
+            {selected.length > 0 && (
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={attach.isPending}
+                onClick={() => setPicked([])}
+              >
+                Clear selection
+              </Button>
+            )}
+          </span>
+          <Button
+            size="sm"
+            disabled={!selected.length || ads.isPending || ads.isError}
+            loading={attach.isPending}
+            onClick={() =>
+              attach.mutate({ brandId, campaignId, adIds: selected })
+            }
+          >
+            Add {selected.length || "selected"} ads
+          </Button>
+        </div>
       }
     >
       <div className="space-y-3">
-        <p className="text-sm text-muted-foreground">
-          Choose unassigned ads from this brand’s Ad Studio. Drafts can be
-          edited here and reviewed before delivery.
-        </p>
         {ads.isPending ? (
           <p role="status">Loading brand ads…</p>
         ) : ads.isError ? (
@@ -84,45 +117,135 @@ export function AddExistingAdsDialog({
             </Button>
           </p>
         ) : available.length ? (
-          <ul className="max-h-96 divide-y overflow-auto rounded-lg border">
-            {available.map((ad) => (
-              <li key={ad.id} className="p-3">
-                <label className="flex items-start gap-3 text-sm">
-                  <input
-                    type="checkbox"
-                    disabled={attach.isPending}
-                    checked={selected.includes(ad.id)}
-                    onChange={(event) =>
-                      setPicked(
-                        event.target.checked
-                          ? [...selected, ad.id]
-                          : selected.filter((id) => id !== ad.id),
-                      )
-                    }
-                  />
-                  <span>
-                    {ad.name}
-                    <span className="block text-xs text-muted-foreground">
-                      {ad.type === "text" ? "Text" : "Creative"} ·{" "}
-                      {ad.status === "approved" ? "Approved" : "Draft"}
-                    </span>
-                  </span>
-                </label>
-              </li>
-            ))}
-          </ul>
+          <div className="space-y-3">
+            <Input
+              aria-label="Search available ads"
+              placeholder="Search ads or homes"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+            <div
+              role="group"
+              aria-label="Group available ads"
+              className="flex flex-wrap gap-1"
+            >
+              {(["home", "type"] as const).map((value) => (
+                <Button
+                  key={value}
+                  size="sm"
+                  variant={grouping === value ? "secondary" : "ghost"}
+                  aria-pressed={grouping === value}
+                  onClick={() => setGrouping(value)}
+                >
+                  {value === "home" ? "By home" : "By ad type"}
+                </Button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {visible.length} of {available.length} unassigned ads
+              {assigned > 0
+                ? ` · ${assigned} already assigned and unavailable`
+                : ""}
+            </p>
+            <div className="max-h-96 space-y-3 overflow-auto">
+              {groups.map((group) => {
+                const ids = group.ads.map((ad) => ad.id);
+                const allPicked = ids.every((id) => selected.includes(id));
+                return (
+                  <section key={group.key} className="rounded-lg border">
+                    <div className="flex items-center justify-between gap-2 bg-muted/40 p-3">
+                      <h3 className="min-w-0 text-sm font-medium">
+                        {group.label}{" "}
+                        <span className="text-xs font-normal text-muted-foreground">
+                          · {ids.length} ad{ids.length === 1 ? "" : "s"}
+                        </span>
+                      </h3>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={attach.isPending}
+                        onClick={() =>
+                          setPicked(toggleAdSelection(selected, ids))
+                        }
+                      >
+                        {allPicked ? "Deselect group" : "Select group"}
+                      </Button>
+                    </div>
+                    <ul className="divide-y">
+                      {group.ads.map((ad) => {
+                        const home = adHomeContext(ad, homes.data?.homes);
+                        const preview =
+                          "media" in ad.content
+                            ? ad.content.media.find(
+                                (media) => media.type === "image",
+                              )?.url
+                            : null;
+                        const photo = home.photo ?? preview;
+                        return (
+                          <li key={ad.id} className="p-3">
+                            <label className="flex items-start gap-3 text-sm">
+                              <input
+                                type="checkbox"
+                                disabled={attach.isPending}
+                                checked={selected.includes(ad.id)}
+                                onChange={() =>
+                                  setPicked(
+                                    toggleAdSelection(selected, [ad.id]),
+                                  )
+                                }
+                              />
+                              {photo && (
+                                <img
+                                  src={photo}
+                                  alt=""
+                                  className="size-14 shrink-0 rounded-md object-cover"
+                                />
+                              )}
+                              <span className="min-w-0 break-words">
+                                {ad.name}
+                                <span className="block text-xs font-medium">
+                                  {home.label}
+                                </span>
+                                <span className="block text-xs text-muted-foreground">
+                                  {adTypeLabel(ad)} ·{" "}
+                                  {ad.status === "approved"
+                                    ? "Approved"
+                                    : "Draft"}{" "}
+                                  · Unassigned
+                                  {"media" in ad.content &&
+                                  !ad.content.media.length
+                                    ? " · Needs creative"
+                                    : ""}
+                                </span>
+                                <span className="block text-xs break-all text-muted-foreground">
+                                  {ad.content.linkUrl
+                                    ? `Destination: ${destinationLabel(ad.content.linkUrl)}`
+                                    : "No ad-specific destination"}
+                                </span>
+                              </span>
+                            </label>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </section>
+                );
+              })}
+              {!visible.length && (
+                <p className="text-sm text-muted-foreground">
+                  No ads match this search.{" "}
+                  <Button variant="link" onClick={() => setSearch("")}>
+                    Clear search
+                  </Button>
+                </p>
+              )}
+            </div>
+          </div>
         ) : (
           <p className="text-sm text-muted-foreground">
-            No unassigned ads are available. Create an ad here, or prepare a
-            batch in Ad Studio.
+            No unassigned ads available.
           </p>
         )}
-        <Link
-          href={studioPath}
-          className="text-sm underline underline-offset-4"
-        >
-          Open Ad Studio
-        </Link>
       </div>
     </SimpleDialog>
   );

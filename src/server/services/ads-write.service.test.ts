@@ -1,3 +1,4 @@
+import { compileMetaCampaignName } from "@/lib/performance-ads";
 import type { CreateZernioStandaloneAdInput } from "@/server/clients/zernio.client";
 import { describe, expect, it } from "bun:test";
 import {
@@ -210,5 +211,44 @@ describe("what a Meta ad set optimises toward", () => {
         host: "winterparkescapes.com",
       }),
     ).toThrow(/Recreate/);
+  });
+});
+
+/** Meta names classify client spend and must retain the operator's label. */
+describe("Meta campaign label compilation", () => {
+  it("retains custom labels under the correct spend prefix", () => {
+    const input = {
+      name: "VRMA: Booth #747 & Sahil talk",
+      customer: "Wander",
+      period: "202610",
+    };
+    expect(compileMetaCampaignName({ ...input, isClient: false })).toBe(
+      "META_WANDER_SALES_PURCHASE_202610_vrma_booth_747_sahil_talk",
+    );
+    expect(
+      compileMetaCampaignName({
+        ...input,
+        customer: "Porchlit Properties",
+        isClient: true,
+      }),
+    ).toBe(
+      "META_PERF+PORCHLIT+PROPERTIES_SALES_PURCHASE_202610_vrma_booth_747_sahil_talk",
+    );
+  });
+  it("preserves legacy names and compiles the readable default without repeating the month", () => {
+    const name =
+      "META_PERF+PORCHLIT+PROPERTIES_SALES_PURCHASE_202610_tangy_cactus";
+    const input = {
+      customer: "Porchlit Properties",
+      isClient: true,
+      period: "202610",
+    };
+    expect(compileMetaCampaignName({ ...input, name })).toBe(name);
+    expect(
+      compileMetaCampaignName({
+        ...input,
+        name: "Sales · October 2026 · Tangy Cactus",
+      }),
+    ).toBe(name);
   });
 });

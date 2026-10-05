@@ -155,21 +155,40 @@ export function performanceCampaignName(input: {
   ].join("_");
 }
 
-/**
- * The name a new campaign draft starts with, so every draft is born in the
- * house convention instead of whatever was typed in the moment. Always
- * editable in the form; this is the default, not a rule.
- */
+/** Readable starting label; platform conventions are applied on push. */
 export function campaignDraftName(input: {
   brandName: string;
   isClient: boolean;
   period?: string;
 }): string {
-  return performanceCampaignName({
-    customer: input.brandName,
-    isClient: input.isClient,
-    period: input.period,
+  const period = input.period ?? performancePeriod();
+  const month = new Date(
+    Date.UTC(Number(period.slice(0, 4)), Number(period.slice(4)) - 1, 1),
+  ).toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
   });
+  return `Sales · ${month}`;
+}
+
+/** Keep legacy names intact; compile an editable label at the Meta boundary. */
+export function compileMetaCampaignName(input: {
+  name: string;
+  customer: string;
+  isClient: boolean;
+  period?: string;
+}): string {
+  if (input.name.startsWith("META_")) return input.name;
+  const label = /^Sales · [A-Za-z]+ \d{4}(?: · (.+))?$/.exec(input.name);
+  const suffix = (label ? (label[1] ?? "") : input.name)
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  const prefix = performanceCampaignName(input);
+  return suffix ? `${prefix}_${suffix}` : prefix;
 }
 
 /** The three audience families an ad set is named by. */

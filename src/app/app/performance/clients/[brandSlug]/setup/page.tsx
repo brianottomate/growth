@@ -48,7 +48,6 @@ export default async function PerformanceBrandSetupPage({
               ? "Read the brand’s website"
               : "Add the brand’s website"
           }
-          description="Collect the logo, colors, fonts, and brand information, and check whether the website uses WanderOS. Then prepare the brand’s story and personas."
           actions={
             brand.website ? (
               <PreparationAction

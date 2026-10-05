@@ -3,17 +3,95 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SimpleDialog } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/toast";
 import { orpc } from "@/orpc/client";
 import Link from "next/link";
-import { Check, House } from "lucide-react";
-import { WorkspaceCard } from "../../../WorkspaceCard";
+import {
+  House,
+  Info,
+  Loader2,
+  Square,
+  RectangleVertical,
+  RectangleHorizontal,
+} from "lucide-react";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { IDEA_SHAPE_LABELS, type IdeaShape } from "@/lib/ad-idea-studio";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useWorkspaceMutation } from "../useWorkspaceMutation";
+
+function useStudioGenerationRun(brandId: string) {
+  return useQuery({
+    ...orpc.ads.starterGenerationStatus.queryOptions({ input: { brandId } }),
+    refetchInterval: (query) =>
+      ["queued", "processing"].includes(query.state.data?.status ?? "")
+        ? 2000
+        : false,
+  });
+}
+
+export function StudioGenerationProgress({ brandId }: { brandId: string }) {
+  const progress = useStudioGenerationRun(brandId);
+  const router = useRouter();
+  const seen = useRef("");
+  const run = progress.data;
+  useEffect(() => {
+    if (!run) return;
+    const version = `${run.id}:${run.created}:${run.status}`;
+    if (seen.current === version) return;
+    seen.current = version;
+    router.refresh();
+  }, [run, router]);
+  if (progress.error)
+    return (
+      <div role="alert" className="space-y-2 rounded-xl border p-4 text-sm">
+        <p>Could not load ad generation progress.</p>
+        <Button
+          variant="outline"
+          size="sm"
+          loading={progress.isFetching}
+          onClick={() => void progress.refetch()}
+        >
+          Try again
+        </Button>
+      </div>
+    );
+  if (!run || !["queued", "processing", "error"].includes(run.status))
+    return null;
+  const failed = run.status === "error";
+  return (
+    <div
+      role={failed ? "alert" : "status"}
+      className="space-y-2 rounded-xl border p-4 text-sm"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <p className="flex items-center gap-2 font-medium">
+          {!failed && (
+            <Loader2
+              aria-hidden="true"
+              className="size-4 shrink-0 animate-spin"
+            />
+          )}
+          {failed ? "Ad generation needs attention" : "Generating ads"}
+        </p>
+        <span className="shrink-0 text-muted-foreground">
+          {run.created}/{run.total} ads
+        </span>
+      </div>
+      <p className="break-words text-muted-foreground">{run.message}</p>
+      {run.error && <p>{run.error}</p>}
+    </div>
+  );
+}
 
 /** Batch creation snapshots group membership into the saved ads/run. */
 export function StudioGeneration({
@@ -25,7 +103,6 @@ export function StudioGeneration({
   brandSlug: string;
   connected: boolean;
 }) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [groupId, setGroupId] = useState("");
   const [bookingTargetId, setBookingTargetId] = useState("");
@@ -37,35 +114,28 @@ export function StudioGeneration({
     (target) => target.id === bookingTargetId,
   );
   const [groupFilter, setGroupFilter] = useState("");
-  const [ai, setAi] = useState(false);
+  const [ai, setAi] = useState(true);
   const [batchId, setBatchId] = useState("");
-  const [stories, setStories] = useState(true);
   const groups = useQuery({
     ...orpc.homeGroups.context.queryOptions({ input: { brandId } }),
     enabled: open && connected,
   });
-  const selected = groups.data?.groups.find((group) => group.id === groupId);
+  const selectedGroupId = groupId || groups.data?.groups[0]?.id || "";
+  const selected = groups.data?.groups.find(
+    (group) => group.id === selectedGroupId,
+  );
+  const [exportShapes, setExportShapes] = useState<IdeaShape[]>([
+    "square",
+    "story",
+  ]);
   const homes = useQuery({
-    ...orpc.ads.starterIdeaHomes.queryOptions({ input: { brandId, groupId } }),
+    ...orpc.ads.starterIdeaHomes.queryOptions({
+      input: { brandId, groupId: selectedGroupId },
+    }),
     enabled: open && connected && Boolean(selected),
   });
   const available = homes.data ?? [];
-  const progress = useQuery({
-    ...orpc.ads.starterGenerationStatus.queryOptions({ input: { brandId } }),
-    refetchInterval: (query) =>
-      ["queued", "processing"].includes(query.state.data?.status ?? "")
-        ? 2000
-        : false,
-  });
-  const seen = useRef("");
-  useEffect(() => {
-    const run = progress.data;
-    if (!run) return;
-    const version = `${run.id}:${run.created}:${run.status}`;
-    if (seen.current === version) return;
-    seen.current = version;
-    router.refresh();
-  }, [progress.data, router]);
+  const progress = useStudioGenerationRun(brandId);
   const running = ["queued", "processing"].includes(
     progress.data?.status ?? "",
   );
@@ -89,6 +159,7 @@ export function StudioGeneration({
   const pending = generate.isPending || starter.isPending;
   const ready =
     (!bookingTargetId || Boolean(chosenTarget?.url)) &&
+    exportShapes.length > 0 &&
     connected &&
     groups.data?.connected &&
     selected &&
@@ -106,419 +177,417 @@ export function StudioGeneration({
       {connected ? "Manage home groups in WanderOS" : "Connect WanderOS"}
     </Link>
   );
-  return (
-    <WorkspaceCard
-      title="Create a batch from a home group"
-      icon={House}
-      actions={
-        <div className="flex flex-wrap items-center gap-3">
-          {manage}
-          {connected && (
-            <Link
-              href={`/app/performance/clients/${brandSlug}/catalog`}
-              className="text-sm underline underline-offset-4"
-            >
-              Open Catalog
-            </Link>
-          )}
-        </div>
-      }
-    >
-      <div className="space-y-3">
-        <p className="text-sm text-muted-foreground">
-          Choose a WanderOS home group to create editable ads. Group membership
-          is captured when you create the batch; later group changes leave
-          existing ads as they are.
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {connected ? (
-            <SimpleDialog
-              open={open}
-              onOpenChange={(next) => {
-                if (!pending) {
-                  if (next) {
-                    setBatchId(crypto.randomUUID());
-                    setGroupFilter("");
-                  }
-                  setOpen(next);
-                }
+  const batchAction = (
+    <>
+      {connected ? (
+        <SimpleDialog
+          open={open}
+          onOpenChange={(next) => {
+            if (!pending) {
+              if (next) {
+                setBatchId(crypto.randomUUID());
+                setGroupFilter("");
+                setGroupId("");
+              }
+              setOpen(next);
+            }
+          }}
+          title="Create ads from a home group"
+          size="lg"
+          scrollable
+          className="flex max-h-[90dvh] flex-col"
+          trigger={
+            <Button size="sm" variant="outline" disabled={running}>
+              <House aria-hidden="true" className="size-3.5" />
+              From home group
+            </Button>
+          }
+          footer={
+            <Button
+              size="sm"
+              disabled={!ready || running}
+              loading={pending}
+              onClick={() => {
+                const homeIds = available.map((home) => home.id);
+                if (ai)
+                  generate.mutate({
+                    brandId,
+                    source: "featured",
+                    homeIds,
+                    bookingTargetId: bookingTargetId || undefined,
+                    exportShapes,
+                    intendedPlacements: [
+                      ...(exportShapes.some((shape) => shape !== "story")
+                        ? (["facebook-feed", "instagram-feed"] as const)
+                        : []),
+                      ...(exportShapes.includes("story")
+                        ? (["facebook-story", "instagram-story"] as const)
+                        : []),
+                    ],
+                  });
+                else
+                  starter.mutate({
+                    brandId,
+                    batchId,
+                    exportShapes,
+                    source: "featured",
+                    homeIds,
+                    bookingTargetId: bookingTargetId || undefined,
+                  });
               }}
-              title="Create ads from a home group"
-              size="lg"
-              scrollable
-              className="flex max-h-[90dvh] flex-col"
-              trigger={
-                <Button size="sm" disabled={running}>
-                  From home group
-                </Button>
-              }
-              footer={
-                <Button
-                  size="sm"
-                  disabled={!ready || running}
-                  loading={pending}
-                  onClick={() => {
-                    const homeIds = available.map((home) => home.id);
-                    if (ai)
-                      generate.mutate({
-                        brandId,
-                        source: "featured",
-                        homeIds,
-                        bookingTargetId: bookingTargetId || undefined,
-                        intendedPlacements: [
-                          "facebook-feed",
-                          "instagram-feed",
-                          ...(stories
-                            ? (["facebook-story", "instagram-story"] as const)
-                            : []),
-                        ],
-                      });
-                    else
-                      starter.mutate({
-                        brandId,
-                        batchId,
-                        source: "featured",
-                        homeIds,
-                        bookingTargetId: bookingTargetId || undefined,
-                      });
-                  }}
-                >
-                  {ai ? "Generate ads with AI" : "Create starter ads"}
-                </Button>
-              }
             >
-              <div className="space-y-4">
-                {groups.isPending ? (
-                  <p role="status">Loading home groups…</p>
-                ) : groups.isError ? (
-                  <p role="alert">
-                    Could not load home groups.{" "}
-                    <Button
-                      variant="link"
-                      onClick={() => void groups.refetch()}
-                    >
-                      Try again
-                    </Button>
-                  </p>
-                ) : !groups.data.connected ? (
-                  <p>Connect WanderOS before creating a home-group batch.</p>
-                ) : !groups.data.groups.some(
-                    (group) =>
-                      group.homeIds.length > 0 && group.homeIds.length <= 10,
-                  ) ? (
-                  <EmptyState
-                    compact
-                    icon={House}
-                    title="Prepare a home group"
-                    description="Create a group with 1–10 homes and source photos in WanderOS."
-                    actions={manage}
+              {ai ? "Generate ads with AI" : "Create starter ads"}
+            </Button>
+          }
+        >
+          <div className="space-y-4">
+            {groups.isPending ? (
+              <p role="status">Loading home groups…</p>
+            ) : groups.isError ? (
+              <p role="alert">
+                Could not load home groups.{" "}
+                <Button variant="link" onClick={() => void groups.refetch()}>
+                  Try again
+                </Button>
+              </p>
+            ) : !groups.data.connected ? (
+              <p>Connect WanderOS before creating a home-group batch.</p>
+            ) : !groups.data.groups.some(
+                (group) =>
+                  group.homeIds.length > 0 && group.homeIds.length <= 10,
+              ) ? (
+              <EmptyState
+                compact
+                icon={House}
+                title="Prepare a home group"
+                description="Create a group with 1–10 homes and source photos in WanderOS."
+                actions={manage}
+              />
+            ) : (
+              <>
+                <fieldset className="min-w-0 space-y-3" disabled={pending}>
+                  <legend className="text-sm font-medium">Home group</legend>
+                  <Input
+                    aria-label="Filter home groups"
+                    placeholder="Filter home groups…"
+                    value={groupFilter}
+                    onChange={(event) => setGroupFilter(event.target.value)}
                   />
-                ) : (
-                  <>
-                    <fieldset className="min-w-0 space-y-3" disabled={pending}>
-                      <legend className="text-sm font-medium">
-                        Home group
-                      </legend>
-                      <Input
-                        aria-label="Filter home groups"
-                        placeholder="Filter home groups…"
-                        value={groupFilter}
-                        onChange={(event) => setGroupFilter(event.target.value)}
-                      />
-                      <div className="grid max-h-72 grid-cols-1 gap-3 overflow-y-auto p-1 sm:grid-cols-2">
-                        {groups.data.groups
-                          .filter((group) =>
-                            group.name
-                              .toLowerCase()
-                              .includes(groupFilter.trim().toLowerCase()),
-                          )
-                          .map((group) => {
-                            const disabled =
-                              !group.homeIds.length ||
-                              group.homeIds.length > 10;
-                            const previews = group.homeIds
-                              .map(
-                                (id) =>
-                                  groups.data.homes.find(
-                                    (home) => home.id === id,
-                                  )?.heroSourceUrl,
-                              )
-                              .filter((url): url is string => Boolean(url))
-                              .slice(0, 3);
-                            return (
-                              <label
-                                key={group.id}
-                                className={`relative min-w-0 overflow-hidden rounded-lg border bg-background transition-colors focus-within:ring-2 focus-within:ring-ring ${group.id === groupId ? "border-primary ring-1 ring-primary" : "border-border"} ${disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:border-primary"}`}
-                              >
-                                <input
-                                  type="radio"
-                                  name="studio-home-group"
-                                  value={group.id}
-                                  checked={group.id === groupId}
-                                  disabled={disabled}
-                                  onChange={() => setGroupId(group.id)}
-                                  className="sr-only"
-                                />
-                                <div
-                                  aria-hidden="true"
-                                  className="flex h-24 overflow-hidden bg-muted"
-                                >
-                                  {(previews.length ? previews : [null]).map(
-                                    (url, index) => (
-                                      <GroupPreviewPhoto
-                                        key={`${group.id}-${index}`}
-                                        url={url}
-                                      />
-                                    ),
-                                  )}
-                                </div>
-                                <div className="space-y-1 p-3">
-                                  <div className="flex items-start justify-between gap-2">
-                                    <span className="min-w-0 text-sm font-medium break-words">
-                                      {group.name}
-                                    </span>
-                                    {group.id === groupId && (
-                                      <Check
-                                        aria-hidden="true"
-                                        className="size-4 shrink-0 text-primary"
-                                      />
-                                    )}
-                                  </div>
-                                  <p className="text-xs text-muted-foreground">
-                                    {group.homeIds.length}{" "}
-                                    {group.homeIds.length === 1
-                                      ? "home"
-                                      : "homes"}
-                                    {disabled
-                                      ? group.homeIds.length
-                                        ? " · Maximum 10"
-                                        : " · Add homes in WanderOS"
-                                      : ""}
-                                  </p>
-                                  {!previews.some(Boolean) && (
-                                    <p className="text-xs text-muted-foreground">
-                                      No preview photos
-                                    </p>
-                                  )}
-                                  {group.id === groupId && (
-                                    <span className="text-xs font-medium text-primary">
-                                      Selected
-                                    </span>
-                                  )}
-                                </div>
-                              </label>
-                            );
-                          })}
-                      </div>
-                      {!groups.data.groups.some((group) =>
+                  <div className="space-y-2">
+                    {groups.data.groups
+                      .filter((group) =>
                         group.name
                           .toLowerCase()
                           .includes(groupFilter.trim().toLowerCase()),
-                      ) && (
-                        <p
-                          role="status"
-                          className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground"
-                        >
-                          No home groups match “{groupFilter.trim()}”.{" "}
-                          <Button
-                            size="sm"
-                            variant="link"
-                            onClick={() => setGroupFilter("")}
+                      )
+                      .map((group) => {
+                        const disabled =
+                          !group.homeIds.length || group.homeIds.length > 10;
+                        const active = group.id === selectedGroupId;
+                        const preview = group.homeIds
+                          .map(
+                            (id) =>
+                              groups.data.homes.find((home) => home.id === id)
+                                ?.heroSourceUrl,
+                          )
+                          .find(Boolean);
+                        return (
+                          <div
+                            key={group.id}
+                            className={`overflow-hidden rounded-lg border ${active ? "border-primary bg-muted/30" : "border-border"}`}
                           >
-                            Clear filter
-                          </Button>
-                        </p>
-                      )}
-                      {selected && (
-                        <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                          <p role="status">
-                            Selected: {selected.name} ·{" "}
-                            {selected.homeIds.length} homes
-                          </p>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setGroupId("")}
-                          >
-                            Clear selection
-                          </Button>
-                        </div>
-                      )}
-                      {manage}
-                    </fieldset>
-                    <div className="space-y-2">
-                      <Label htmlFor="batch-booking-target">
-                        Booking destination
-                      </Label>
-                      <select
-                        id="batch-booking-target"
-                        value={bookingTargetId}
-                        disabled={pending || targets.isPending}
-                        onChange={(event) =>
-                          setBookingTargetId(event.target.value)
-                        }
-                        className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-                      >
-                        <option value="">Home pages and brand website</option>
-                        {targets.data?.targets.map((target) => (
-                          <option
-                            key={target.id}
-                            value={target.id}
-                            disabled={!target.url}
-                          >
-                            {target.name}
-                            {target.issue ? " (needs attention)" : ""}
-                          </option>
-                        ))}
-                      </select>
-                      {targets.isError && (
-                        <p role="alert" className="text-xs">
-                          Could not load booking targets.{" "}
-                          <Button
-                            variant="link"
-                            onClick={() => void targets.refetch()}
-                          >
-                            Try again
-                          </Button>
-                        </p>
-                      )}
-                      {chosenTarget?.url && (
-                        <a
-                          href={chosenTarget.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="block text-xs break-all underline"
-                        >
-                          {chosenTarget.url}
-                        </a>
-                      )}
-                      {chosenTarget?.issue && (
-                        <p role="alert" className="text-xs">
-                          {chosenTarget.issue}
-                        </p>
-                      )}
-                      <p className="text-xs text-muted-foreground">
-                        A selected target applies to every ad in this batch. Its
-                        current URL is saved with the ads; later target changes
-                        leave their destinations unchanged.
-                      </p>
-                      <Link
-                        href={`/app/performance/clients/${brandSlug}/wanderos`}
-                        className="text-xs underline"
-                      >
-                        Manage groups and booking targets in WanderOS
-                      </Link>
-                    </div>
-                    {selected &&
-                      (homes.isPending ? (
-                        <p role="status">Loading group photos…</p>
-                      ) : homes.isError ? (
-                        <p role="alert">
-                          Could not load home photos.{" "}
-                          <Button
-                            variant="link"
-                            onClick={() => void homes.refetch()}
-                          >
-                            Try again
-                          </Button>
-                        </p>
-                      ) : (
-                        <>
-                          <ul className="max-h-48 divide-y overflow-y-auto rounded-md border">
-                            {available.map((home) => (
-                              <li
-                                key={home.id}
-                                className="space-y-2 p-3 text-sm"
+                            <label
+                              className={`flex items-center gap-3 p-3 ${disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
+                            >
+                              <div
+                                className="flex h-12 w-16 shrink-0 overflow-hidden rounded-md bg-muted"
+                                aria-hidden="true"
                               >
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                  <span className="font-medium">
-                                    {home.name}
-                                  </span>
-                                  <span className="text-xs text-muted-foreground">
-                                    {home.photos.length
-                                      ? `${home.photos.length} source photos`
-                                      : "Needs a photo in WanderOS"}
-                                  </span>
-                                </div>
-                                <div className="flex h-16 w-48 max-w-full overflow-hidden rounded-md border">
-                                  {home.photos.slice(0, 3).map((photo) => (
-                                    <GroupPreviewPhoto
-                                      key={photo.url}
-                                      url={photo.url}
-                                    />
-                                  ))}
-                                </div>
-                                <a
-                                  href={home.url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="block text-xs break-all underline"
-                                >
-                                  {home.url}
-                                </a>
-                              </li>
-                            ))}
-                          </ul>
-                          {available.some((home) => !home.photos.length) && (
-                            <p role="alert" className="text-sm">
-                              Every home in this group needs a source photo.
-                              Update the group in WanderOS before creating the
-                              batch.
-                            </p>
-                          )}
-                        </>
-                      ))}
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={ai}
-                        disabled={pending}
-                        onChange={(event) => setAi(event.target.checked)}
-                      />
-                      Write copy, choose photos and compose with AI
-                    </label>
-                    <p className="text-sm text-muted-foreground">
-                      {ai
-                        ? "Generates fresh drafts with AI copy and editable compositions using real home photos."
-                        : "Creates starter layouts from real photos and home names. Write persuasive copy in the shared ad editor afterward."}{" "}
-                      One static and one carousel per home, plus a shared hero
-                      carousel. Existing ads are preserved.
+                                <GroupPreviewPhoto url={preview ?? null} />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <span className="text-sm font-medium">
+                                  {group.name}
+                                </span>
+                                <p className="text-xs text-muted-foreground">
+                                  {group.homeIds.length}{" "}
+                                  {group.homeIds.length === 1
+                                    ? "home"
+                                    : "homes"}
+                                  {disabled
+                                    ? group.homeIds.length
+                                      ? " · Maximum 10"
+                                      : " · Add homes in WanderOS"
+                                    : ""}
+                                </p>
+                              </div>
+                              <input
+                                type="radio"
+                                name="studio-home-group"
+                                value={group.id}
+                                checked={active}
+                                disabled={disabled}
+                                onChange={() => setGroupId(group.id)}
+                                aria-label={group.name}
+                                className="size-4 accent-primary"
+                              />
+                            </label>
+                            {active && (
+                              <div className="space-y-3 px-3 pb-3">
+                                {homes.isPending ? (
+                                  <p role="status" className="text-sm">
+                                    Loading home photos…
+                                  </p>
+                                ) : homes.isError ? (
+                                  <p role="alert" className="text-sm">
+                                    Could not load home photos.{" "}
+                                    <Button
+                                      variant="link"
+                                      onClick={() => void homes.refetch()}
+                                    >
+                                      Try again
+                                    </Button>
+                                  </p>
+                                ) : (
+                                  <>
+                                    <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                                      {available.map((home) => (
+                                        <li
+                                          key={home.id}
+                                          className="min-w-0 space-y-1"
+                                        >
+                                          <a
+                                            href={home.url}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            title={`Open listing: ${home.name}`}
+                                            className="block space-y-1 rounded-md focus-visible:outline-2 focus-visible:outline-ring"
+                                          >
+                                            <div className="flex h-20 overflow-hidden rounded-md bg-muted">
+                                              <GroupPreviewPhoto
+                                                url={
+                                                  home.photos[0]?.url ?? null
+                                                }
+                                              />
+                                            </div>
+                                            <span className="block truncate text-xs font-medium">
+                                              {home.name}
+                                            </span>
+                                          </a>
+                                          <p className="text-xs text-muted-foreground">
+                                            {home.photos.length
+                                              ? `${home.photos.length} photos`
+                                              : "Needs photos"}
+                                          </p>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                    {available.some(
+                                      (home) => !home.photos.length,
+                                    ) && (
+                                      <p role="alert" className="text-sm">
+                                        Every home needs a source photo before
+                                        generating.
+                                      </p>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+                  {!groups.data.groups.some((group) =>
+                    group.name
+                      .toLowerCase()
+                      .includes(groupFilter.trim().toLowerCase()),
+                  ) && (
+                    <p
+                      role="status"
+                      className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground"
+                    >
+                      No home groups match “{groupFilter.trim()}”.{" "}
+                      <Button
+                        size="sm"
+                        variant="link"
+                        onClick={() => setGroupFilter("")}
+                      >
+                        Clear filter
+                      </Button>
+                      <ButtonLink
+                        size="sm"
+                        variant="link"
+                        href={`/app/performance/clients/${brandSlug}/wanderos#home-groups`}
+                        onClick={() => setOpen(false)}
+                      >
+                        Manage home groups
+                      </ButtonLink>
                     </p>
-                    {ai && (
-                      <label className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={stories}
-                          disabled={pending}
-                          onChange={(event) => setStories(event.target.checked)}
-                        />
-                        Include Story compositions
-                      </label>
-                    )}
-                  </>
+                  )}
+                </fieldset>
+                {selected && (
+                  <div
+                    className="rounded-lg border bg-muted/30 p-3 text-sm"
+                    role="status"
+                  >
+                    <p className="font-medium">
+                      {selected.homeIds.length * 2 + 1} draft ads
+                    </p>
+                    <p className="text-muted-foreground">
+                      {selected.homeIds.length} static ·{" "}
+                      {selected.homeIds.length} home carousels · 1 group
+                      carousel
+                    </p>
+                  </div>
                 )}
-              </div>
-            </SimpleDialog>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Connect a WanderOS site and prepare a home group to use this
-              workflow. You can create individual ads below.
-            </p>
-          )}
-        </div>
-        {progress.data && (running || progress.data.status === "error") && (
-          <p
-            className="text-sm text-muted-foreground"
-            role={progress.data.status === "error" ? "alert" : "status"}
-          >
-            {progress.data.message} · {progress.data.created}/
-            {progress.data.total}
-            {progress.data.error ? ` · ${progress.data.error}` : ""}
-          </p>
-        )}
-      </div>
-    </WorkspaceCard>
+                <fieldset className="space-y-2" disabled={pending}>
+                  <legend className="mb-2 text-sm font-medium">
+                    Creative sizes
+                  </legend>
+                  <div className="flex flex-wrap gap-2">
+                    {(["square", "story", "portrait", "wide"] as const).map(
+                      (size) => {
+                        const Icon =
+                          size === "square"
+                            ? Square
+                            : size === "wide"
+                              ? RectangleHorizontal
+                              : RectangleVertical;
+                        const checked = exportShapes.includes(size);
+                        return (
+                          <label
+                            key={size}
+                            className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${checked ? "border-primary bg-muted/30" : "border-border text-muted-foreground"}`}
+                          >
+                            <input
+                              type="checkbox"
+                              className="size-4 accent-current"
+                              aria-label={IDEA_SHAPE_LABELS[size]}
+                              checked={checked}
+                              onChange={(event) =>
+                                setExportShapes((current) =>
+                                  event.target.checked
+                                    ? [...current, size]
+                                    : current.filter((shape) => shape !== size),
+                                )
+                              }
+                            />
+                            <Icon aria-hidden="true" className="size-4" />
+                            {IDEA_SHAPE_LABELS[size]}
+                          </label>
+                        );
+                      },
+                    )}
+                  </div>
+                </fieldset>
+                <Accordion type="single" collapsible>
+                  <AccordionItem value="destination">
+                    <AccordionTrigger appearance="compact">
+                      Override destination (optional)
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="space-y-2">
+                        <Alert role="status">
+                          <Info aria-hidden="true" />
+                          <AlertDescription>
+                            {targets.data?.targets.length
+                              ? "Use one booking target for every ad in this batch."
+                              : "No booking targets yet. Ads use home pages and the brand website."}{" "}
+                            <Link
+                              href={`/app/performance/clients/${brandSlug}/wanderos#booking-targets`}
+                              onClick={() => setOpen(false)}
+                              className="underline underline-offset-4"
+                            >
+                              Manage booking targets
+                            </Link>
+                          </AlertDescription>
+                        </Alert>
+                        {Boolean(targets.data?.targets.length) && (
+                          <>
+                            <Label htmlFor="batch-booking-target">
+                              Booking target
+                            </Label>
+                            <select
+                              id="batch-booking-target"
+                              value={bookingTargetId}
+                              disabled={pending || targets.isPending}
+                              onChange={(event) =>
+                                setBookingTargetId(event.target.value)
+                              }
+                              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                            >
+                              <option value="">
+                                Home pages and brand website
+                              </option>
+                              {targets.data?.targets.map((target) => (
+                                <option
+                                  key={target.id}
+                                  value={target.id}
+                                  disabled={!target.url}
+                                >
+                                  {target.name}
+                                  {target.issue ? " (needs attention)" : ""}
+                                </option>
+                              ))}
+                            </select>
+                          </>
+                        )}
+                        {targets.isError && (
+                          <p role="alert" className="text-xs">
+                            Could not load booking targets.{" "}
+                            <Button
+                              variant="link"
+                              onClick={() => void targets.refetch()}
+                            >
+                              Try again
+                            </Button>
+                          </p>
+                        )}
+                        {chosenTarget?.url && (
+                          <a
+                            href={chosenTarget.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block text-xs break-all underline"
+                          >
+                            {chosenTarget.url}
+                          </a>
+                        )}
+                        {chosenTarget?.issue && (
+                          <p role="alert" className="text-xs">
+                            {chosenTarget.issue}
+                          </p>
+                        )}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={ai}
+                    disabled={pending}
+                    onChange={(event) => setAi(event.target.checked)}
+                  />
+                  Write copy, choose photos and compose with AI
+                </label>
+              </>
+            )}
+          </div>
+        </SimpleDialog>
+      ) : (
+        <ButtonLink
+          size="sm"
+          variant="outline"
+          href={`/app/performance/clients/${brandSlug}/wanderos`}
+        >
+          Connect WanderOS
+        </ButtonLink>
+      )}
+    </>
   );
+  return batchAction;
 }
 
 /** A failed or missing preview remains a useful placeholder. */

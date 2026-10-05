@@ -111,7 +111,7 @@ import {
   audienceLabelForPlan,
   performanceAdName,
   performanceAdSetName,
-  performanceCampaignName,
+  compileMetaCampaignName,
 } from "@/lib/performance-ads";
 import {
   adAccountTable,
@@ -3163,9 +3163,15 @@ async function pushToMeta(args: PushArgs) {
 
   // House naming at every level. A campaign, ad set or ad already in the
   // convention keeps its name; anything else is renamed on the way out.
-  const metaCampaignName = campaign.name.startsWith("META_")
-    ? campaign.name
-    : performanceCampaignName({ customer: brand.name, isClient });
+  const metaCampaignName = compileMetaCampaignName({
+    name: campaign.name,
+    customer: brand.name,
+    isClient,
+    period: (draft.startAt ?? campaign.startAt ?? campaign.createdAt)
+      .toISOString()
+      .slice(0, 7)
+      .replace("-", ""),
+  });
   const adSetNameFor = (audience: PlanAudience | null) =>
     performanceAdSetName({
       customer: brand.name,
@@ -3553,6 +3559,7 @@ async function pushToMeta(args: PushArgs) {
     budgetAmount,
     budgetType,
     externalCampaignId: shellId,
+    platformName: metaCampaignName,
     heroThumbnailUrl: usable[0]!.content.media[0]?.url ?? null,
     sets: perSet.map(({ audience, spec, set }) => ({
       audience,
@@ -4010,6 +4017,7 @@ async function recordCompiledCampaign(input: {
   budgetAmount: number;
   budgetType: "daily" | "lifetime";
   externalCampaignId: string | null;
+  platformName?: string;
   heroThumbnailUrl: string | null;
   /** The account the campaign was created under, for the manage deep link. */
   adAccountId: string;
@@ -4036,6 +4044,7 @@ async function recordCompiledCampaign(input: {
     .update(platformCampaignTable)
     .set({
       externalId: input.externalCampaignId,
+      ...(input.platformName ? { name: input.platformName } : {}),
       status: input.status,
       budget: input.budgetAmount,
       budgetType: input.budgetType,

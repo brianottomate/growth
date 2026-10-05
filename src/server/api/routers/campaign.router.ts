@@ -75,7 +75,7 @@ const statusSchema = z.enum(campaignStatusEnum.enumValues);
 const platformSchema = z.enum(channelPlatformEnum.enumValues);
 
 const campaignFields = {
-  name: z.string().min(1).max(200),
+  name: z.string().trim().min(1).max(300),
   description: z.string().max(2000).nullish(),
   goal: z.string().max(100).nullish(),
   status: statusSchema.optional(),

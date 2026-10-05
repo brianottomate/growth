@@ -85,11 +85,11 @@ export function Audiences({
     }),
   );
 
-  const actions = (primary = false) => (
+  const actions = () => (
     <>
       <Button
         size="sm"
-        variant={primary ? "default" : "outline"}
+        variant="outline"
         disabled={busy}
         onClick={() => void run()}
       >
@@ -121,9 +121,8 @@ export function Audiences({
         <EmptyState
           compact
           icon={Users}
-          title="Broad, for now"
+          title="Broad"
           description="Keep broad targeting, or add audiences from the brand’s evidence to narrow by age or place. Shape lets you explore the targeting before changing it."
-          actions={actions(true)}
         />
       ) : (
         <div className="grid grid-cols-1 gap-4 @4xl:grid-cols-2">

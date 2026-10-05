@@ -58,6 +58,20 @@ export function PerformanceBoard() {
           Brand workspace fixture
           <ArrowUpRight className="size-3.5" aria-hidden="true" />
         </Link>
+        <Link
+          href="/lab/performance-board/workflow-runs"
+          className="mt-3 ml-3 inline-flex items-center gap-1.5 rounded-md border px-3 py-2 text-xs hover:bg-muted"
+        >
+          Workflow activity fixture
+          <ArrowUpRight className="size-3.5" aria-hidden="true" />
+        </Link>
+        <Link
+          href="/lab/performance-board/creative-workspaces"
+          className="mt-3 ml-3 inline-flex items-center gap-1.5 rounded-md border px-3 py-2 text-xs hover:bg-muted"
+        >
+          Creative workspaces fixture
+          <ArrowUpRight className="size-3.5" aria-hidden="true" />
+        </Link>
         <p className="mt-2 text-xs text-muted-foreground">
           Loose lenses: Kyle · overview & detail / Sil · production / Brooke ·
           launch / Mikayla · financials / Brian · email & lifecycle. Nothing is

@@ -381,9 +381,7 @@ export function projectIdea(
         ),
       };
   }
-  const baseShape = doc.shapes.includes("portrait")
-    ? "portrait"
-    : doc.shapes[0]!;
+  const baseShape = doc.shapes.includes("square") ? "square" : doc.shapes[0]!;
   const baseCopy = doc.copyOverrides[baseShape] ?? doc.copy;
   const stories = doc.shapes.includes("story") ? cardsFor("story") : [];
   const baseCards = cardsFor(baseShape);

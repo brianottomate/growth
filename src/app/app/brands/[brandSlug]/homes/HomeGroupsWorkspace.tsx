@@ -95,7 +95,10 @@ export function HomeGroupsWorkspace({
   if (!data) return null;
   return (
     <div className="space-y-4">
-      <section className="space-y-4 rounded-xl border p-4">
+      <section
+        id="home-groups"
+        className="scroll-mt-4 space-y-4 rounded-xl border p-4"
+      >
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="flex items-center gap-2 text-base font-semibold">
             <Layers className="size-4 text-muted-foreground" />

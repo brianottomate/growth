@@ -13,7 +13,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
 import {
   Check,
@@ -443,38 +443,8 @@ export function CatalogCards({
     if (done) void setView("exports");
     setBusy(false);
   }
-  const cardActions = (primary = false) => (
+  const cardActions = () => (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            size="sm"
-            variant={primary ? "default" : "outline"}
-            loading={Boolean(writing)}
-            disabled={busy || Boolean(writing) || open.length === 0}
-          >
-            <Sparkles className="size-3.5" />
-            {writing
-              ? `Preparing ${writing.done}/${writing.total}`
-              : "Prepare catalog"}
-            <ChevronDown className="size-3.5" aria-hidden="true" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem
-            onSelect={() =>
-              startWrite.mutate({ brandId, pass: "photosAndCopy" })
-            }
-          >
-            Select photos + write copy
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onSelect={() => startWrite.mutate({ brandId, pass: "copy" })}
-          >
-            Write copy only
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
       <Button size="sm" variant="outline" onClick={() => setPicker(true)}>
         Choose template
       </Button>
@@ -534,35 +504,6 @@ export function CatalogCards({
           {query.isLoading && <p>Loading homes…</p>}
           {view !== "preview" && draft && (
             <>
-              {writeQuery.isSuccess && writeRun === null && open.length > 0 && (
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed bg-muted/30 p-4">
-                  <div className="flex items-start gap-3">
-                    <Sparkles
-                      className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-                      aria-hidden="true"
-                    />
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium">
-                        Prepare your first catalog
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Select photos and write copy for your included cards,
-                        then review and approve.
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    size="sm"
-                    loading={startWrite.isPending}
-                    disabled={busy || Boolean(writing)}
-                    onClick={() =>
-                      startWrite.mutate({ brandId, pass: "photosAndCopy" })
-                    }
-                  >
-                    Prepare catalog
-                  </Button>
-                </div>
-              )}
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <span>
                   {draft.cards.filter((c) => c.included).length} of{" "}
@@ -575,7 +516,7 @@ export function CatalogCards({
                     <DropdownMenuTrigger asChild>
                       <Button variant="outline">
                         {writing
-                          ? `${writing.pass === "copy" ? "Rewriting" : "Fixing"} ${writing.done}/${writing.total}`
+                          ? `Preparing ${writing.done}/${writing.total}`
                           : "Bulk actions"}
                         <ChevronDown aria-hidden="true" className="size-4" />
                       </Button>
@@ -592,6 +533,35 @@ export function CatalogCards({
                       >
                         <MessageSquare aria-hidden="true" />
                         Review in chat
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        disabled={
+                          busy ||
+                          Boolean(writing) ||
+                          startWrite.isPending ||
+                          open.length === 0
+                        }
+                        onSelect={() =>
+                          startWrite.mutate({ brandId, pass: "photosAndCopy" })
+                        }
+                      >
+                        <Sparkles aria-hidden="true" />
+                        Select photos + write copy
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        disabled={
+                          busy ||
+                          Boolean(writing) ||
+                          startWrite.isPending ||
+                          open.length === 0
+                        }
+                        onSelect={() =>
+                          startWrite.mutate({ brandId, pass: "copy" })
+                        }
+                      >
+                        <Sparkles aria-hidden="true" />
+                        Write copy only
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
@@ -769,7 +739,7 @@ export function CatalogCards({
                     <div
                       key={card.homeId}
                       id={`home-${card.homeId}`}
-                      className={`relative scroll-mt-20 overflow-hidden rounded-xl border bg-card ${card.included || inclusion === "excluded" ? "" : "opacity-50"} ${focusHome === card.homeId ? "ring-2 ring-ring" : ""}`}
+                      className={`relative flex scroll-mt-20 flex-col overflow-hidden rounded-xl border bg-card ${card.included || inclusion === "excluded" ? "" : "opacity-50"} ${focusHome === card.homeId ? "ring-2 ring-ring" : ""}`}
                     >
                       <div className="group/artwork relative">
                         {card.approved && (
@@ -799,9 +769,9 @@ export function CatalogCards({
                           {card.finishedArtwork ? "" : " · Choose image"}
                         </p>
                       )}
-                      <div className="flex items-end justify-between gap-2 p-3">
+                      <div className="flex min-w-0 items-start gap-2 p-3">
                         <button
-                          className="line-clamp-2 text-left text-sm"
+                          className="line-clamp-2 min-h-10 min-w-0 flex-1 text-left text-sm leading-5 font-medium break-words"
                           title={
                             locked(card) ? LOCKED_TITLE : homeOf(card)?.name
                           }
@@ -811,14 +781,14 @@ export function CatalogCards({
                           {homeOf(card)?.name}
                         </button>
                         <HomeLink url={homeOf(card)?.url} />
+                      </div>
+                      <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t p-3">
                         <IncludeButton
                           card={card}
                           onInclude={(included) =>
                             update({ ...card, included })
                           }
                         />
-                      </div>
-                      <div className="flex justify-end border-t p-3">
                         <ApproveButton
                           card={card}
                           disabled={Boolean(fixing[card.homeId]) || saving}
@@ -834,201 +804,193 @@ export function CatalogCards({
                     const editing = details?.homeId === card.homeId;
                     const shown = editing ? details : card;
                     return (
-                      <section
+                      <CatalogCardLayout
                         key={card.homeId}
                         id={`home-${card.homeId}`}
-                        aria-label={homeOf(card)?.name}
-                        className={`scroll-mt-20 rounded-lg border p-4 ${card.included || editing || inclusion === "excluded" ? "" : "opacity-50"} ${focusHome === card.homeId ? "ring-2 ring-ring" : ""}`}
+                        name={homeOf(card)?.name}
+                        dimmed={
+                          !card.included && !editing && inclusion !== "excluded"
+                        }
+                        highlighted={focusHome === card.homeId}
+                        approved={card.approved}
+                        fresh={stamped.has(card.homeId)}
+                        artwork={
+                          <CardPreview
+                            brandId={brandId}
+                            card={shown}
+                            format={format}
+                          />
+                        }
                       >
-                        <div className="grid grid-cols-1 items-stretch gap-5 @3xl:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
-                          <div className="group/artwork relative mx-auto w-full max-w-sm overflow-hidden rounded-lg">
-                            <CardPreview
-                              brandId={brandId}
-                              card={shown}
-                              format={format}
-                            />
-                            {card.approved && (
-                              <ApprovedStamp
-                                size="lg"
-                                fresh={stamped.has(card.homeId)}
-                                className="pointer-events-none absolute top-3 right-3 z-10 bg-card/85 text-[var(--color-success)] backdrop-blur-sm transition-opacity group-focus-within/artwork:opacity-0 group-hover/artwork:opacity-0 pointer-coarse:opacity-90"
-                              />
+                        <div className="flex min-w-0 flex-col gap-4">
+                          <div className="flex min-w-0 items-center gap-2">
+                            {!card.included && (
+                              <Badge variant="outline">Excluded</Badge>
+                            )}
+                            <p className="flex min-w-0 flex-1 items-center gap-1.5 text-sm font-medium">
+                              <span
+                                className="truncate"
+                                title={homeOf(card)?.name}
+                              >
+                                {homeOf(card)?.name}
+                              </span>
+                              <HomeLink url={homeOf(card)?.url} />
+                            </p>
+                            {!editing && (
+                              <div className="ml-auto flex shrink-0 flex-wrap gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => workInChat(card)}
+                                >
+                                  <MessageSquare className="size-3.5" />
+                                  Shape
+                                </Button>
+                              </div>
                             )}
                           </div>
-                          <div className="flex min-w-0 flex-col gap-4">
-                            <div className="flex min-w-0 items-center gap-2">
-                              {!card.included && (
-                                <Badge variant="outline">Excluded</Badge>
-                              )}
-                              <p className="flex min-w-0 flex-1 items-center gap-1.5 text-sm font-medium">
-                                <span
-                                  className="truncate"
-                                  title={homeOf(card)?.name}
-                                >
-                                  {homeOf(card)?.name}
-                                </span>
-                                <HomeLink url={homeOf(card)?.url} />
-                              </p>
-                              {!editing && (
-                                <div className="ml-auto flex shrink-0 flex-wrap gap-2">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => workInChat(card)}
-                                  >
-                                    <MessageSquare className="size-3.5" />
-                                    Shape
-                                  </Button>
-                                </div>
-                              )}
-                            </div>
-                            {editing ? (
-                              <CardEditor
-                                card={details}
-                                home={homeOf(card)}
-                                onChange={setDetails}
-                                onHero={(photoUrl) =>
-                                  void setHero(details, photoUrl)
-                                }
-                                onLibrary={() => setLibrary(true)}
-                                onApply={async () => {
-                                  setSaving(true);
-                                  const saved = await update({
-                                    ...details,
-                                    included: card.included,
-                                  });
-                                  setSaving(false);
-                                  if (saved) setDetails(null);
-                                }}
-                                saving={saving}
-                                onCancel={() =>
-                                  leaveEditor(() => setDetails(null))
-                                }
-                              />
-                            ) : card.mode === "finished" ? (
-                              <p className="text-sm text-muted-foreground">
-                                Artwork used as-is, with no added text or logo.
-                              </p>
-                            ) : (
-                              <div className="space-y-3">
-                                <div className="space-y-1.5">
-                                  <p className="text-lg leading-snug font-medium break-words">
-                                    {card.title || "No headline yet"}
+                          {editing ? (
+                            <CardEditor
+                              card={details}
+                              home={homeOf(card)}
+                              onChange={setDetails}
+                              onHero={(photoUrl) =>
+                                void setHero(details, photoUrl)
+                              }
+                              onLibrary={() => setLibrary(true)}
+                              onApply={async () => {
+                                setSaving(true);
+                                const saved = await update({
+                                  ...details,
+                                  included: card.included,
+                                });
+                                setSaving(false);
+                                if (saved) setDetails(null);
+                              }}
+                              saving={saving}
+                              onCancel={() =>
+                                leaveEditor(() => setDetails(null))
+                              }
+                            />
+                          ) : card.mode === "finished" ? (
+                            <p className="text-sm text-muted-foreground">
+                              Artwork used as-is, with no added text or logo.
+                            </p>
+                          ) : (
+                            <div className="space-y-3">
+                              <div className="space-y-1.5">
+                                <p className="text-lg leading-snug font-medium break-words">
+                                  {card.title || "No headline yet"}
+                                </p>
+                                {card.subtitle && (
+                                  <p className="text-sm text-muted-foreground">
+                                    {card.subtitle}
                                   </p>
-                                  {card.subtitle && (
-                                    <p className="text-sm text-muted-foreground">
-                                      {card.subtitle}
-                                    </p>
-                                  )}
-                                </div>
-                                <Amenities
-                                  list={homeOf(card)?.amenities ?? []}
-                                  headline={card.title}
+                                )}
+                              </div>
+                              <Amenities
+                                list={homeOf(card)?.amenities ?? []}
+                                headline={card.title}
+                              />
+                            </div>
+                          )}
+                          {card.aiReview?.fingerprint ===
+                            catalogCardFingerprint(card) &&
+                            card.aiReview.findings.length > 0 && (
+                              <details className="space-y-1 rounded-lg bg-muted/40 p-3 text-sm">
+                                <summary className="cursor-pointer font-medium">
+                                  Review notes · {card.aiReview.findings.length}
+                                </summary>
+                                {card.aiReview.findings.map((finding, i) => (
+                                  <p key={i} className="text-muted-foreground">
+                                    <span className="font-medium">
+                                      {finding.action === "check_image"
+                                        ? "Check image"
+                                        : finding.action ===
+                                            "consider_excluding"
+                                          ? "Consider excluding"
+                                          : "Check details"}
+                                      :
+                                    </span>{" "}
+                                    {finding.reason}
+                                  </p>
+                                ))}
+                              </details>
+                            )}
+                          {!editing && (
+                            <div className="mt-auto flex flex-wrap items-center gap-1 border-t pt-3">
+                              {(
+                                [
+                                  ["Choose photo", () => choosePhoto(card)],
+                                  [
+                                    fixing[card.homeId] === "photo"
+                                      ? "Updating photo + copy…"
+                                      : "New photo + copy",
+                                    () => void quickFix(card, "photo"),
+                                  ],
+                                  [
+                                    fixing[card.homeId] === "copy"
+                                      ? "Writing copy…"
+                                      : "New copy",
+                                    () => void quickFix(card, "copy"),
+                                  ],
+                                ] as const
+                              ).map(([label, onClick]) => (
+                                <Button
+                                  key={label}
+                                  size="xs"
+                                  variant="ghost"
+                                  disabled={
+                                    Boolean(fixing[card.homeId]) ||
+                                    locked(card) ||
+                                    (card.mode === "finished" &&
+                                      label !== "Choose photo")
+                                  }
+                                  title={
+                                    locked(card) ? LOCKED_TITLE : undefined
+                                  }
+                                  onClick={onClick}
+                                >
+                                  {label}
+                                </Button>
+                              ))}
+                              <div className="ml-auto flex flex-wrap items-center gap-2">
+                                <IncludeButton
+                                  card={card}
+                                  onInclude={(included) =>
+                                    update({ ...card, included })
+                                  }
+                                />
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  disabled={
+                                    locked(card) ||
+                                    Boolean(fixing[card.homeId]) ||
+                                    saving
+                                  }
+                                  title={
+                                    locked(card) ? LOCKED_TITLE : undefined
+                                  }
+                                  onClick={() => openEditor(card)}
+                                >
+                                  Edit
+                                </Button>
+                                <ApproveButton
+                                  card={card}
+                                  showStatus={false}
+                                  disabled={
+                                    Boolean(fixing[card.homeId]) || saving
+                                  }
+                                  onApprove={(approved) =>
+                                    approve([card], approved)
+                                  }
                                 />
                               </div>
-                            )}
-                            {card.aiReview?.fingerprint ===
-                              catalogCardFingerprint(card) &&
-                              card.aiReview.findings.length > 0 && (
-                                <details className="space-y-1 rounded-lg bg-muted/40 p-3 text-sm">
-                                  <summary className="cursor-pointer font-medium">
-                                    Review notes ·{" "}
-                                    {card.aiReview.findings.length}
-                                  </summary>
-                                  {card.aiReview.findings.map((finding, i) => (
-                                    <p
-                                      key={i}
-                                      className="text-muted-foreground"
-                                    >
-                                      <span className="font-medium">
-                                        {finding.action === "check_image"
-                                          ? "Check image"
-                                          : finding.action ===
-                                              "consider_excluding"
-                                            ? "Consider excluding"
-                                            : "Check details"}
-                                        :
-                                      </span>{" "}
-                                      {finding.reason}
-                                    </p>
-                                  ))}
-                                </details>
-                              )}
-                            {!editing && (
-                              <div className="mt-auto flex flex-wrap items-center gap-1 border-t pt-3">
-                                {(
-                                  [
-                                    ["Choose photo", () => choosePhoto(card)],
-                                    [
-                                      fixing[card.homeId] === "photo"
-                                        ? "Updating photo + copy…"
-                                        : "New photo + copy",
-                                      () => void quickFix(card, "photo"),
-                                    ],
-                                    [
-                                      fixing[card.homeId] === "copy"
-                                        ? "Writing copy…"
-                                        : "New copy",
-                                      () => void quickFix(card, "copy"),
-                                    ],
-                                  ] as const
-                                ).map(([label, onClick]) => (
-                                  <Button
-                                    key={label}
-                                    size="xs"
-                                    variant="ghost"
-                                    disabled={
-                                      Boolean(fixing[card.homeId]) ||
-                                      locked(card) ||
-                                      (card.mode === "finished" &&
-                                        label !== "Choose photo")
-                                    }
-                                    title={
-                                      locked(card) ? LOCKED_TITLE : undefined
-                                    }
-                                    onClick={onClick}
-                                  >
-                                    {label}
-                                  </Button>
-                                ))}
-                                <div className="ml-auto flex flex-wrap items-center gap-2">
-                                  <IncludeButton
-                                    card={card}
-                                    onInclude={(included) =>
-                                      update({ ...card, included })
-                                    }
-                                  />
-                                  <Button
-                                    size="sm"
-                                    variant="secondary"
-                                    disabled={
-                                      locked(card) ||
-                                      Boolean(fixing[card.homeId]) ||
-                                      saving
-                                    }
-                                    title={
-                                      locked(card) ? LOCKED_TITLE : undefined
-                                    }
-                                    onClick={() => openEditor(card)}
-                                  >
-                                    Edit
-                                  </Button>
-                                  <ApproveButton
-                                    card={card}
-                                    showStatus={false}
-                                    disabled={
-                                      Boolean(fixing[card.homeId]) || saving
-                                    }
-                                    onApprove={(approved) =>
-                                      approve([card], approved)
-                                    }
-                                  />
-                                </div>
-                              </div>
-                            )}
-                          </div>
+                            </div>
+                          )}
                         </div>
-                      </section>
+                      </CatalogCardLayout>
                     );
                   })}
                 </div>
@@ -1105,7 +1067,16 @@ export function CatalogCards({
                 compact
                 icon={Download}
                 title="No exports yet"
-                description="Approve the included catalog cards, then create an export."
+                description="Approve the included catalog cards, then create an export. Each export preserves the approved cards and home facts at that moment."
+                actions={
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void setView("studio")}
+                  >
+                    Review catalog cards
+                  </Button>
+                }
               />
             )}
             {query.data?.exports.map((item) => (
@@ -1276,8 +1247,7 @@ export function CatalogCards({
           <DialogHeader>
             <DialogTitle>Choose a catalog template</DialogTitle>
             <DialogDescription>
-              Choose the shared card layout. Existing copy stays as it is; use
-              Prepare catalog when you want to write for the new layout.
+              Choose the shared card layout.
             </DialogDescription>
           </DialogHeader>
           <CatalogTemplateCard brandId={brandId} />
@@ -1411,7 +1381,7 @@ export function CatalogCards({
 }
 
 /** Put a home in the export or take it out. */
-function IncludeButton({
+export function IncludeButton({
   card,
   onInclude,
 }: {
@@ -1426,7 +1396,7 @@ function IncludeButton({
 }
 
 /** Sign one card off as it stands, or take the sign-off back. */
-function ApproveButton({
+export function ApproveButton({
   card,
   onApprove,
   disabled = false,
@@ -1520,7 +1490,7 @@ function PreviewImage({
   );
 }
 
-function CardEditor({
+export function CardEditor({
   card,
   home,
   onChange,
@@ -1757,5 +1727,48 @@ function Amenities({
         </button>
       )}
     </div>
+  );
+}
+
+/** Shared presentation for live catalog rows and the comparison fixture. */
+export function CatalogCardLayout({
+  id,
+  name,
+  dimmed = false,
+  highlighted = false,
+  approved,
+  fresh = false,
+  artwork,
+  children,
+}: {
+  id?: string;
+  name?: string;
+  dimmed?: boolean;
+  highlighted?: boolean;
+  approved?: boolean;
+  fresh?: boolean;
+  artwork: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section
+      id={id}
+      aria-label={name}
+      className={`scroll-mt-20 rounded-lg border p-4 ${dimmed ? "opacity-50" : ""} ${highlighted ? "ring-2 ring-ring" : ""}`}
+    >
+      <div className="grid grid-cols-1 items-stretch gap-5 @3xl:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
+        <div className="group/artwork relative mx-auto w-full max-w-sm overflow-hidden rounded-lg">
+          {artwork}
+          {approved && (
+            <ApprovedStamp
+              size="lg"
+              fresh={fresh}
+              className="pointer-events-none absolute top-3 right-3 z-10 bg-card/85 text-[var(--color-success)] backdrop-blur-sm transition-opacity group-focus-within/artwork:opacity-0 group-hover/artwork:opacity-0 pointer-coarse:opacity-90"
+            />
+          )}
+        </div>
+        {children}
+      </div>
+    </section>
   );
 }

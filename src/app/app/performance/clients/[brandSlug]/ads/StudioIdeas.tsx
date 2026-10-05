@@ -1,6 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { Checkbox } from "@/components/ui/checkbox";
+import { campaignDisplayName } from "@/lib/campaign-navigation";
+import {
+  groupCollectionAds,
+  adHomeContext,
+  type AdGrouping,
+  type AdHomeContext,
+} from "@/lib/ad-collection-groups";
 import { useEffect } from "react";
 import { AdIdeaCard } from "@/app/app/brands/[brandSlug]/ads/_views/AdIdeaCard";
 import { BookingTargetPicker } from "@/app/app/brands/[brandSlug]/ads/_views/BookingTargetPicker";
@@ -51,6 +59,11 @@ export function StudioIdeas({
   website,
   focusHomeId,
   connected,
+  grouping,
+  homeContext,
+  selectedIds,
+  onSelect,
+  selectionDisabled,
 }: {
   ideas: StudioIdea[];
   brandId: string;
@@ -61,56 +74,102 @@ export function StudioIdeas({
   website: string | null;
   focusHomeId?: string | null;
   connected: boolean;
+  grouping: AdGrouping;
+  homeContext: AdHomeContext[];
+  selectedIds: ReadonlySet<string>;
+  onSelect: (ids: string[], checked: boolean) => void;
+  selectionDisabled: boolean;
 }) {
   useEffect(() => {
     if (focusHomeId)
       document
         .getElementById(`home-${focusHomeId}`)
         ?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [focusHomeId]);
-  const groups = new Map<string, { label: string; ideas: StudioIdea[] }>();
-  for (const idea of ideas) {
-    const key = idea.home?.externalId ?? idea.homeId ?? "brand";
-    const group = groups.get(key) ?? {
-      label: idea.home?.name ?? "Brand-wide",
-      ideas: [],
-    };
-    group.ideas.push(idea);
-    groups.set(key, group);
-  }
+  }, [focusHomeId, grouping, ideas]);
+  const groups = groupCollectionAds(ideas, grouping, homeContext);
   return (
     <div className="divide-y">
-      {[...groups.entries()].map(([key, group]) => {
-        const frozen = group.ideas.filter(
+      {groups.map((group) => {
+        const frozen = group.ads.filter(
           (idea) => idea.status === "approved",
+        ).length;
+        const selectable = group.ads.filter((ad) => !ad.campaignId);
+        const selectedCount = selectable.filter((ad) =>
+          selectedIds.has(ad.id),
         ).length;
         return (
           <section
-            key={key}
-            id={`home-${key}`}
+            key={group.key}
+            id={`home-${group.anchor}`}
             className="space-y-3 py-4 first:pt-0 last:pb-0"
           >
             <h2 className="flex items-baseline gap-2 text-sm font-semibold">
+              {selectable.length > 0 && (
+                <Checkbox
+                  aria-label={`Select ${group.label}`}
+                  disabled={selectionDisabled}
+                  checked={
+                    selectedCount === selectable.length
+                      ? true
+                      : selectedCount > 0
+                        ? "indeterminate"
+                        : false
+                  }
+                  onCheckedChange={(checked) =>
+                    onSelect(
+                      selectable.map((ad) => ad.id),
+                      checked === true,
+                    )
+                  }
+                />
+              )}
+              {group.photo && (
+                <img
+                  src={group.photo}
+                  alt=""
+                  className="size-10 self-center rounded-md object-cover"
+                />
+              )}
               {group.label}
               <span className="text-xs font-normal text-muted-foreground">
-                {group.ideas.length} ad{group.ideas.length === 1 ? "" : "s"} ·{" "}
+                {group.ads.length} ad{group.ads.length === 1 ? "" : "s"} ·{" "}
                 {frozen} approved
               </span>
             </h2>
-            {group.ideas.map((idea) => {
+            {group.ads.map((idea) => {
               const assignment = idea.campaignId ? (
                 <Link
                   href={`/app/performance/clients/${brandSlug}/campaigns/${idea.campaignId}`}
                   className="text-xs text-muted-foreground underline underline-offset-4"
                 >
-                  Campaign: {idea.campaignName ?? "Assigned"}
+                  Campaign:{" "}
+                  {idea.campaignName
+                    ? campaignDisplayName(idea.campaignName)
+                    : "Assigned"}
                 </Link>
               ) : (
                 <p className="text-xs text-muted-foreground">Unassigned</p>
               );
               const wrap = (node: React.ReactNode) => (
                 <div key={idea.id} className="space-y-2">
-                  {assignment}
+                  {grouping === "type" && (
+                    <p className="text-xs font-medium">
+                      {adHomeContext(idea, homeContext).label}
+                    </p>
+                  )}
+                  <div className="flex items-center gap-2">
+                    {!idea.campaignId && (
+                      <Checkbox
+                        aria-label={`Select ${idea.name}`}
+                        checked={selectedIds.has(idea.id)}
+                        disabled={selectionDisabled}
+                        onCheckedChange={(checked) =>
+                          onSelect([idea.id], checked === true)
+                        }
+                      />
+                    )}
+                    {assignment}
+                  </div>
                   {node}
                   {connected &&
                     idea.status !== "approved" &&

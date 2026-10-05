@@ -53,9 +53,20 @@ export function RadioGroupCardsField<
       return "grid gap-3";
     }
 
-    // Create responsive grid classes based on gridCols
-    const cols = Math.min(Math.max(gridCols, 1), 6); // Limit between 1-6 columns
-    return `grid grid-cols-1 gap-3 sm:grid-cols-${cols}`;
+    const columns = [
+      "sm:grid-cols-1",
+      "sm:grid-cols-2",
+      "sm:grid-cols-3",
+      "sm:grid-cols-4",
+      "sm:grid-cols-5",
+      "sm:grid-cols-6",
+    ];
+    const cols = Math.min(Math.max(gridCols, 1), 6);
+    return cn(
+      "grid gap-3",
+      cols === 1 ? "grid-cols-1" : "grid-cols-2",
+      columns[cols - 1],
+    );
   };
 
   return (
@@ -69,6 +80,7 @@ export function RadioGroupCardsField<
           )}
           <FormControl>
             <RadioGroup
+              aria-label={label}
               onValueChange={field.onChange}
               value={field.value}
               className={getGridClassName()}

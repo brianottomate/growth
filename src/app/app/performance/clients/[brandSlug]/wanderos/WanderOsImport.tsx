@@ -83,18 +83,16 @@ export function WanderOsImportProgress({ brandId }: { brandId: string }) {
         </Button>
       </div>
     );
-  if (!run) return null;
+  if (!run || run.status === "ready") return null;
   return (
     <div className="space-y-3 rounded-xl border p-4">
       <p role="status" className="text-sm font-medium">
-        {run.status === "ready"
-          ? "WanderOS import complete"
-          : run.status === "error"
-            ? "WanderOS import needs attention"
-            : run.steps.find((step) => step.step === "catalog")?.status ===
-                "processing"
-              ? "Preparing catalog"
-              : "Setting up WanderOS"}
+        {run.status === "error"
+          ? "WanderOS import needs attention"
+          : run.steps.find((step) => step.step === "catalog")?.status ===
+              "processing"
+            ? "Preparing catalog"
+            : "Setting up WanderOS"}
       </p>
       {active(run.status) &&
         run.steps.find((step) => step.step === "catalog")?.status ===
@@ -105,12 +103,6 @@ export function WanderOsImportProgress({ brandId }: { brandId: string }) {
             kept.
           </p>
         )}
-      {run.status === "ready" && (
-        <p className="text-sm text-muted-foreground">
-          Review Featured homes and destinations below. Catalog copy and AI
-          review notes are ready in Catalog.
-        </p>
-      )}
       <ol className="flex flex-wrap gap-x-6 gap-y-3 text-sm">
         {run.steps.map((step, index) => (
           <li key={step.step} className="flex items-start gap-2">

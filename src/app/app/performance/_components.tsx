@@ -1,8 +1,11 @@
-import Link from "next/link";
+import {
+  CampaignPlatforms,
+  CampaignSummary,
+  CampaignThumbnailStrip,
+} from "@/components/campaigns/campaign-summary";
 import type { ReactNode } from "react";
 
 import { DeleteCampaignButton } from "@/app/app/brands/[brandSlug]/ads/_views/DeleteCampaignButton";
-import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { cn } from "@/components/ui/lib/utils";
 import { deskMoney } from "@/lib/performance-desk";
 import type {
@@ -170,16 +173,6 @@ function createdOn(date: Date) {
   });
 }
 
-/**
- * A composition preview renders on request; its source photo is the cheap
- * stand-in at thumbnail size.
- */
-function thumbSrc(url: string) {
-  if (!url.includes("/api/compositions/preview")) return url;
-  const query = url.slice(url.indexOf("?") + 1);
-  return new URLSearchParams(query).get("sourceUrl") ?? url;
-}
-
 export function CampaignRow({
   brand,
   campaign,
@@ -202,52 +195,33 @@ export function CampaignRow({
   return (
     <li className="grid grid-cols-1 items-center gap-x-3 gap-y-1.5 px-4 py-3 @lg:flex">
       <div className="min-w-0 @lg:flex-1">
-        <span className="flex items-center gap-2">
-          <Link
-            href={campaignHref(brand, campaign)}
-            title={campaign.name}
-            className="min-w-0 text-[13px] font-semibold [overflow-wrap:anywhere] hover:underline @lg:truncate"
-          >
-            {campaign.name}
-          </Link>
-          <StateChip state={campaign.state} />
-        </span>
-        <span className="block text-[11px] text-muted-foreground @lg:truncate">
-          {[
+        <CampaignSummary
+          compact
+          status={STATE_WORD[campaign.state]}
+          name={campaign.name}
+          href={campaignHref(brand, campaign)}
+          detail={[
             showBrand ? client : null,
             `Created ${createdOn(campaign.createdAt)}`,
             campaign.adCount
               ? `${campaign.adCount} ad${campaign.adCount === 1 ? "" : "s"}${campaign.approvedCount ? ` · ${campaign.approvedCount} approved` : ""}`
-              : "no ads",
+              : "No ads yet",
           ]
             .filter(Boolean)
             .join(" · ")}
-        </span>
+        />
       </div>
-      <span className="hidden w-40 shrink-0 justify-end gap-1 @3xl:flex">
-        {[...new Set(campaign.thumbs.map(thumbSrc))].slice(0, 4).map((src) => (
-          // oxlint-disable-next-line nextjs/no-img-element
-          <img
-            key={src}
-            src={src}
-            alt=""
-            loading="lazy"
-            className="size-9 rounded-md bg-muted object-cover"
+      {campaign.thumbs.length > 0 && (
+        <div className="py-1 @lg:w-52 @lg:shrink-0 @lg:py-0">
+          <CampaignThumbnailStrip
+            urls={campaign.thumbs}
+            total={campaign.adCount}
+            href={campaignHref(brand, campaign)}
           />
-        ))}
-      </span>
+        </div>
+      )}
       <span className="flex items-center gap-1.5 text-muted-foreground @lg:w-20 @lg:shrink-0">
-        {campaign.platforms.map((row) => (
-          <span
-            key={row.id}
-            title={`${platformLabel(row.platform)} · ${row.status}`}
-          >
-            <ChannelLogo platform={row.platform} className="size-3.5" />
-          </span>
-        ))}
-        {campaign.platforms.length === 0 ? (
-          <span className="text-[11px]">no platform</span>
-        ) : null}
+        <CampaignPlatforms platforms={campaign.platforms} />
         <span className="ml-auto @lg:hidden">
           <SpendCell campaign={campaign} />
         </span>

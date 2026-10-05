@@ -205,6 +205,8 @@ export function TextAdCard({
                 onOpenChange={setOpen}
                 title="Edit text ad"
                 size="lg"
+                scrollable
+                className="flex max-h-[90dvh] flex-col"
                 trigger={
                   <Button size="sm" variant="outline">
                     Edit copy

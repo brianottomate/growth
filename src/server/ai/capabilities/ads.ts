@@ -296,7 +296,7 @@ export const draftCampaignAction = growthAction({
       .max(300)
       .optional()
       .describe(
-        "Omit to use the house convention: META_PERF+BRAND_SALES_PURCHASE_YYYYMM for a signed client, META_BRAND_SALES_PURCHASE_YYYYMM otherwise.",
+        "Editable campaign label. Omit for a readable monthly sales label with a nickname. Meta house naming is compiled separately on platform push.",
       ),
     platforms: z
       .array(z.enum(PLANNABLE_AD_PLATFORMS))

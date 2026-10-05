@@ -51,7 +51,7 @@ export function NewCampaignButton({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  // Born in the house convention, editable from the first keystroke.
+  // A readable label, editable from the first keystroke.
   const [name, setName] = useState(() =>
     campaignDraftName({ brandName, isClient }),
   );
@@ -126,12 +126,11 @@ export function NewCampaignButton({
               autoFocus
               value={name}
               onChange={(event) => setName(event.target.value)}
-              placeholder="WANDER_PROSPECTING_PURCHASES"
+              placeholder="Fall booking campaign"
             />
             <p className="text-xs text-muted-foreground">
-              {isClient
-                ? "META_PERF+BRAND_SALES_PURCHASE_YYYYMM. Finance filters client spend on PERF+, so it leads."
-                : "BRAND_STRATEGY_OBJECTIVE, upper snake case. Change the strategy or objective to match the campaign."}
+              Give it a name your team recognizes. Meta naming is prepared when
+              you push.
             </p>
           </div>
           <div className="space-y-1.5">

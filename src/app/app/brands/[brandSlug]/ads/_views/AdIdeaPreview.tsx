@@ -18,6 +18,7 @@ import {
   IDEA_SHAPE_LABELS,
   ideaEditorPreviewUrl,
   ideaSource,
+  type IdeaImage,
   type IdeaShape,
   type IdeaStudio,
 } from "@/lib/ad-idea-studio";
@@ -31,6 +32,7 @@ export function AdIdeaPreview({
   content,
   home,
   onExpand,
+  resolvePreview,
 }: {
   studio: IdeaStudio;
   brandId: string;
@@ -41,6 +43,8 @@ export function AdIdeaPreview({
   home?: { name: string; url: string };
   /** Shown beside the size switcher; opens the ad's full editor. */
   onExpand?: () => void;
+  /** A read-only renderer adapter for local fixtures. */
+  resolvePreview?: (card: IdeaImage, shape: IdeaShape) => string;
 }) {
   const [cards, setCards] = useState<Partial<Record<MetaPlacement, number>>>(
     {},
@@ -49,16 +53,18 @@ export function AdIdeaPreview({
   const sizes = studio.document.exportShapes?.length
     ? studio.document.exportShapes
     : studio.document.shapes;
-  const defaultShape = sizes.includes("portrait") ? "portrait" : sizes[0]!;
+  const defaultShape = sizes.includes("square") ? "square" : sizes[0]!;
   const [picked, setPicked] = useState<IdeaShape | null>(null);
   const shape = picked && sizes.includes(picked) ? picked : defaultShape;
   const mediaFor = (size: IdeaShape) =>
     studio.document.cards.flatMap((slide, index) => {
       const url =
         studio.approval?.renders[size]?.[index]?.url ??
-        (slide.mode === "supplied"
-          ? ideaSource(slide, size)?.url
-          : ideaEditorPreviewUrl(brandId, slide, size));
+        (resolvePreview
+          ? resolvePreview(slide, size)
+          : slide.mode === "supplied"
+            ? ideaSource(slide, size)?.url
+            : ideaEditorPreviewUrl(brandId, slide, size));
       return url
         ? [
             {

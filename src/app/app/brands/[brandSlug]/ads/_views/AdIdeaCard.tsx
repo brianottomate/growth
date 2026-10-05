@@ -189,7 +189,12 @@ export function AdIdeaCard({
     name: ad.name,
     version: ad.updatedAt,
   }));
-  const [shape, setShape] = useState<IdeaShape>("portrait");
+  const [shape, setShape] = useState<IdeaShape>(() => {
+    const sizes = savedState.document.exportShapes?.length
+      ? savedState.document.exportShapes
+      : savedState.document.shapes;
+    return sizes.includes("square") ? "square" : sizes[0]!;
+  });
   const [homePickerOpen, setHomePickerOpen] = useState(false);
   const [selectedHomeId, setSelectedHomeId] = useState(ad.homeId ?? "");
   const [photoSearch, setPhotoSearch] = useState("");

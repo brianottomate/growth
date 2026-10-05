@@ -54,7 +54,11 @@ import {
 import { listBrandHomes, listAllBrandHomes } from "./homes.service";
 import { listWanderOsListingPhotos } from "@/server/clients/wanderos-site.client";
 import { brandListings, brandWebsiteId } from "./wanderos-listings.service";
-import { ideaDocumentFromAd, projectIdea } from "@/lib/ad-idea-studio";
+import {
+  ideaDocumentFromAd,
+  projectIdea,
+  type IdeaShape,
+} from "@/lib/ad-idea-studio";
 import { campaignDraftName } from "@/lib/performance-ads";
 import { importRemoteImage } from "@/server/services/media.service";
 
@@ -201,7 +205,7 @@ export async function createDraftCampaign(input: {
     brandName: brand.name,
     isClient: brand.relationship === "client",
   });
-  // A house-named draft gets a codename; a typed or imported name is kept as is.
+  // Give the default label a nickname; a custom label is kept as typed.
   const codename =
     (input.name ?? houseName) === houseName
       ? await newCampaignCodename(input.organizationId)
@@ -212,7 +216,12 @@ export async function createDraftCampaign(input: {
     .values({
       id: createId("camp"),
       brandId: brand.id,
-      name: codename ? `${houseName}_${codename}` : (input.name ?? houseName),
+      name: codename
+        ? `${houseName} · ${codename
+            .split("_")
+            .map((word) => word[0]!.toUpperCase() + word.slice(1))
+            .join(" ")}`
+        : (input.name ?? houseName),
       status: "planned",
       goal: input.goal ?? null,
       landingUrl: input.landingUrl ?? null,
@@ -694,6 +703,7 @@ export async function addStarterAdIdeas(input: {
   brandId?: string;
   /** Stable request identity for a new brand batch and its retries. */
   batchId?: string;
+  exportShapes?: IdeaShape[];
   bookingTargetId?: string;
   /**
    * blank: unbound placeholders. featured: the featured homes, filled with
@@ -769,6 +779,10 @@ export async function addStarterAdIdeas(input: {
     : null;
   let created = 0;
   for (const idea of ideas) {
+    if (input.exportShapes && idea.content.ideaStudio) {
+      idea.content.ideaStudio.document.shapes = [...input.exportShapes];
+      idea.content.ideaStudio.document.exportShapes = [...input.exportShapes];
+    }
     if (booking) {
       idea.content.linkUrl = booking.url;
       if (idea.content.ideaStudio)

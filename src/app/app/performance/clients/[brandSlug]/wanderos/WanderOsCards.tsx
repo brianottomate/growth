@@ -131,11 +131,6 @@ export function ManualHomesCard({
   );
   return (
     <WorkspaceCard title="Non-WanderOS homes" icon={Plus} count={homes.length}>
-      <p className="text-sm text-muted-foreground">
-        {connected
-          ? "Add homes that aren’t on the WanderOS website yet. Paste a list, email, or table to prepare their details."
-          : "Prepare home details without a WanderOS connection. Paste a list, email, or table to get started."}
-      </p>
       {connected ? (
         <details>
           <summary className="cursor-pointer text-sm text-muted-foreground">

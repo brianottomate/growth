@@ -1,12 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import {
+  GalleryHorizontalEnd,
+  ImageIcon,
+  Layers,
+  Plus,
+  Type,
+  Video,
+} from "lucide-react";
+import { useForm, useWatch } from "react-hook-form";
 import { useWorkspaceMutation } from "../useWorkspaceMutation";
 import { TextAdForm } from "@/app/app/brands/[brandSlug]/ads/_views/TextAdCard";
 import { Button } from "@/components/ui/button";
 import { SimpleDialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Form } from "@/components/ui/form";
+import { RadioGroupCardsField } from "@/components/ui/radio-group-cards-field";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/toast";
 import { AD_FORMAT_LABEL, HAND_MADE_AD_FORMATS } from "@/lib/performance-ads";
@@ -14,6 +24,14 @@ import { safeHomeUrl } from "@/lib/ad-preview-links";
 import { orpc } from "@/orpc/client";
 
 type Format = (typeof HAND_MADE_AD_FORMATS)[number] | "text";
+
+const FORMAT_ICONS = {
+  static: ImageIcon,
+  carousel: GalleryHorizontalEnd,
+  catalog: Layers,
+  video: Video,
+  text: Type,
+} satisfies Record<Format, typeof ImageIcon>;
 
 /** Shared manual creation; home-aware authoring belongs in Ad Studio. */
 export function AddAdDialog({
@@ -26,7 +44,10 @@ export function AddAdDialog({
   campaignId?: string | null;
 }) {
   const [open, setOpen] = useState(false);
-  const [format, setFormat] = useState<Format>("static");
+  const formatForm = useForm<{ format: Format }>({
+    defaultValues: { format: "static" },
+  });
+  const format = useWatch({ control: formatForm.control, name: "format" });
   const [name, setName] = useState("");
   const [linkUrl, setLinkUrl] = useState(website ?? "");
   const add = useWorkspaceMutation(
@@ -77,22 +98,22 @@ export function AddAdDialog({
       }
     >
       <div className="space-y-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="ad-format">Format</Label>
-          <select
-            id="ad-format"
-            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-            value={format}
-            onChange={(e) => setFormat(e.target.value as Format)}
-          >
-            {HAND_MADE_AD_FORMATS.map((option) => (
-              <option key={option} value={option}>
-                {AD_FORMAT_LABEL[option]}
-              </option>
-            ))}
-            <option value="text">Text</option>
-          </select>
-        </div>
+        <Form {...formatForm}>
+          <RadioGroupCardsField
+            control={formatForm.control}
+            name="format"
+            label="Format"
+            gridCols={3}
+            options={[...HAND_MADE_AD_FORMATS, "text" as const].map((value) => {
+              const Icon = FORMAT_ICONS[value];
+              return {
+                value,
+                label: value === "text" ? "Text" : AD_FORMAT_LABEL[value],
+                icon: <Icon className="size-4" aria-hidden="true" />,
+              };
+            })}
+          />
+        </Form>
         {format === "text" ? (
           open && (
             <TextAdForm
@@ -128,9 +149,6 @@ export function AddAdDialog({
                 </p>
               ) : null}
             </div>
-            <p className="text-xs text-muted-foreground">
-              Add creative and copy in the ad editor after creating the draft.
-            </p>
           </>
         )}
       </div>

@@ -174,9 +174,6 @@ export default async function PerformanceBrandPage({
         {contacts.length === 0 ? (
           <div className="space-y-1 py-4">
             <p className="text-sm font-medium">No contacts on record.</p>
-            <p className="text-xs text-muted-foreground">
-              Client, reporting, and invoice contacts appear here when supplied.
-            </p>
           </div>
         ) : (
           <ul className="divide-y">
@@ -356,9 +353,6 @@ export default async function PerformanceBrandPage({
         {images.length === 0 ? (
           <div className="space-y-1 py-4">
             <p className="text-sm font-medium">Nothing in the library yet.</p>
-            <p className="text-xs text-muted-foreground">
-              Photos and saved creative previews appear here once added.
-            </p>
           </div>
         ) : (
           <MediaStrip

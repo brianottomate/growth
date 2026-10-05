@@ -4,6 +4,7 @@ import { compositionImagePositionSchema } from "./compositions";
 import {
   IDEA_SHAPES,
   ideaDocumentSchema,
+  ideaShapeSchema,
   type IdeaDocument,
 } from "./ad-idea-studio";
 import { META_PLACEMENTS, metaPlacementSchema } from "./meta-placement-plan";
@@ -12,6 +13,7 @@ import type { StarterHome } from "./starter-ad-ideas";
 export const starterGenerationSchema = z
   .object({
     ...adAuthoringFields,
+    exportShapes: z.array(ideaShapeSchema).min(1).max(4).optional(),
     bookingTargetId: z.string().min(1).optional(),
     source: z.enum(["featured", "brand"]).default("featured"),
     homeIds: z.array(z.string().min(1)).max(10),
@@ -109,10 +111,7 @@ export function generatedDocument(
   return ideaDocumentSchema.parse({
     role: format === "static" ? "hero_static" : "home_carousel",
     exportShapes: [...IDEA_SHAPES],
-    shapes: [
-      ...(hasFeed ? ["portrait"] : []),
-      ...(hasVertical ? ["story"] : []),
-    ],
+    shapes: [...(hasFeed ? ["square"] : []), ...(hasVertical ? ["story"] : [])],
     intendedPlacements: placements,
     copy: { ...generated.copy, linkUrl: home.url, callToAction: "BOOK_NOW" },
     copyOverrides: {},

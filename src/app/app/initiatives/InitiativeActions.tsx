@@ -1,5 +1,6 @@
 "use client";
 
+import { CampaignPlatforms } from "@/components/campaigns/campaign-summary";
 import { MessageSquare, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -74,10 +75,6 @@ export function CampaignPlanPreview({
     pushed: boolean;
   }[];
 }) {
-  const platformName = (value: string) =>
-    ({ meta_ads: "Meta", linkedin_ads: "LinkedIn", google_ads: "Google" })[
-      value
-    ] ?? value.replaceAll("_", " ");
   return (
     <div className="flex flex-wrap gap-x-6 gap-y-2 border-t pt-3 text-xs">
       <div className="flex flex-wrap items-center gap-2">
@@ -98,15 +95,13 @@ export function CampaignPlanPreview({
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-muted-foreground">Platforms</span>
-        {platforms.length ? (
-          platforms.map((p) => (
-            <span key={p.id} className="rounded-md bg-muted/40 px-2 py-1">
-              {platformName(p.platform)} · {p.pushed ? p.status : "Planned"}
-            </span>
-          ))
-        ) : (
-          <span className="text-muted-foreground">Not planned</span>
-        )}
+        <CampaignPlatforms
+          expanded
+          platforms={platforms.map((item) => ({
+            ...item,
+            status: item.pushed ? item.status : "Planned",
+          }))}
+        />
       </div>
     </div>
   );

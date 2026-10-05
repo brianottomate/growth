@@ -1,9 +1,8 @@
 "use client";
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { Pencil, Plus, Sparkles, Users } from "lucide-react";
+import { Pencil, Sparkles, Users } from "lucide-react";
 import { AudienceMap } from "@/components/audience-map";
 import { GeographyChips } from "@/components/geography-chips";
 import { Button } from "@/components/ui/button";
@@ -72,7 +71,6 @@ export function PersonaAudiences({
             <Sparkles className="size-3.5" />
             Define personas
           </Button>
-          <PersonaEditor brandId={brand.id} />
           <ShapeBrandButton
             brandId={brand.id}
             brandName={brand.name}
@@ -80,10 +78,6 @@ export function PersonaAudiences({
           />
         </div>
       </div>
-      <p className="text-sm text-muted-foreground">
-        Who we speak to and why. Personas inform campaign audiences and
-        creative; geography is optional.
-      </p>
       <div className="grid grid-cols-1 gap-3 @3xl:grid-cols-2">
         {personas.map((persona) => (
           <article
@@ -97,7 +91,7 @@ export function PersonaAudiences({
                   {persona.description}
                 </p>
               </div>
-              <PersonaEditor brandId={brand.id} persona={persona} />
+              <PersonaEditor persona={persona} />
             </div>
             {located(persona.demandGeography) && (
               <PersonaLocation
@@ -116,12 +110,6 @@ export function PersonaAudiences({
           </article>
         ))}
       </div>
-      <Link
-        className="text-xs underline"
-        href={`/app/performance/clients/${brand.slug}/campaigns`}
-      >
-        Create or select Meta audiences and lookalikes inside a campaign
-      </Link>
     </div>
   );
 }
@@ -148,13 +136,7 @@ function PersonaLocation({
     </section>
   );
 }
-function PersonaEditor({
-  brandId,
-  persona,
-}: {
-  brandId: string;
-  persona?: Persona;
-}) {
+function PersonaEditor({ persona }: { persona: Persona }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(persona?.name ?? "");
@@ -163,9 +145,8 @@ function PersonaEditor({
   const [destination, setDestination] = useState(
     persona?.destinationGeography ?? {},
   );
-  const create = useMutation(orpc.persona.create.mutationOptions());
   const update = useMutation(orpc.persona.update.mutationOptions());
-  const busy = create.isPending || update.isPending;
+  const busy = update.isPending;
   const save = async () => {
     try {
       const fields = {
@@ -174,9 +155,7 @@ function PersonaEditor({
         demandGeography: located(origin) ? origin : null,
         destinationGeography: located(destination) ? destination : null,
       };
-      if (persona)
-        await update.mutateAsync({ personaId: persona.id, ...fields });
-      else await create.mutateAsync({ brandId, ...fields });
+      await update.mutateAsync({ personaId: persona.id, ...fields });
       setOpen(false);
       router.refresh();
     } catch (error) {
@@ -187,8 +166,7 @@ function PersonaEditor({
   };
   return (
     <SimpleDialog
-      title={persona ? "Edit persona" : "New persona"}
-      description="Describe a motivation or need. Add geography only when it is part of the persona."
+      title="Edit persona"
       open={open}
       onOpenChange={(next) => {
         if (busy) return;
@@ -201,19 +179,8 @@ function PersonaEditor({
         setOpen(next);
       }}
       trigger={
-        <Button
-          size="sm"
-          variant="outline"
-          aria-label={persona ? `Edit ${persona.name}` : "New persona"}
-        >
-          {persona ? (
-            <Pencil className="size-3.5" />
-          ) : (
-            <>
-              <Plus className="size-3.5" />
-              New persona
-            </>
-          )}
+        <Button size="sm" variant="outline" aria-label={`Edit ${persona.name}`}>
+          <Pencil className="size-3.5" />
         </Button>
       }
       footer={

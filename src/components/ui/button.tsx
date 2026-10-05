@@ -22,7 +22,7 @@ const buttonVariants = cva(
         secondary:
           "border border-foreground/15 bg-muted text-foreground shadow-xs transition-colors hover:border-foreground/25 hover:bg-muted/80",
         ghost:
-          "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/80 dark:hover:text-accent-foreground",
+          "hover:bg-accent hover:text-accent-foreground aria-[pressed=false]:border aria-[pressed=false]:border-transparent dark:hover:bg-accent/80 dark:hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline dark:text-primary",
         unstyled: "",
       },

@@ -238,6 +238,7 @@ export const adsRouter = {
           campaignId: z.string().min(1).optional(),
           brandId: z.string().min(1).optional(),
           batchId: z.string().uuid().optional(),
+          exportShapes: z.array(ideaShapeSchema).min(1).max(4).optional(),
           bookingTargetId: z.string().min(1).optional(),
           source: z.enum(["blank", "featured", "shells"]).default("blank"),
           homeIds: z.array(z.string().min(1)).min(1).max(10).optional(),

@@ -179,7 +179,6 @@ export function PickedHomes({
           compact
           icon={House}
           title="Choose the homes that lead"
-          description="Rank homes using bookings, reviews and photography, then save an initial featured set. Shape lets you discuss the selection first; you can also tick homes in the grid below."
           actions={actions(true)}
         />
       ) : (

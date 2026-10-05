@@ -98,6 +98,7 @@ export default async function PerformanceBrandAdsPage({
         website={brand.website}
         homes={homes}
         ideas={ideas}
+        homeContext={groupContext.homes}
         campaigns={campaigns}
         connected={groupContext.connected}
         focusHomeId={focused}

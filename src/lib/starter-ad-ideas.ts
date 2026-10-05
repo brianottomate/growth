@@ -116,7 +116,7 @@ export function featuredStarterAdIdeas(homes: StarterHome[]) {
  * every feed; add 4:5 and 9:16 when the artwork exists.
  */
 export const ZERNIO_NATIVE_SHAPES = {
-  static: ["portrait", "square", "story"],
+  static: ["square", "portrait", "story"],
   carousel: ["square"],
 } as const satisfies Record<"static" | "carousel", readonly IdeaShape[]>;
 

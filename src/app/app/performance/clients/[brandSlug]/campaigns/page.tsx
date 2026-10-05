@@ -39,32 +39,32 @@ export default async function PerformanceBrandCampaignsPage({
     </>
   );
   return (
-    <WorkspaceCard
-      title="Campaigns"
-      icon={Megaphone}
-      count={campaigns.length}
-      actions={actions}
-    >
-      {deskBrand && campaigns.length > 0 ? (
-        <ul className="divide-y">
-          {campaigns.map((campaign) => (
-            <CampaignRow
-              key={campaign.id}
-              brand={deskBrand}
-              campaign={campaign}
-              deletable
-            />
-          ))}
-        </ul>
-      ) : (
-        <EmptyState
-          compact
-          icon={Megaphone}
-          title="Create the first campaign"
-          description="Add ads, choose audiences, and prepare platform delivery."
-          actions={actions}
-        />
-      )}
-    </WorkspaceCard>
+    <div className="space-y-4">
+      <WorkspaceCard
+        title="Campaigns"
+        icon={Megaphone}
+        count={campaigns.length}
+        actions={actions}
+      >
+        {deskBrand && campaigns.length > 0 ? (
+          <ul className="divide-y">
+            {campaigns.map((campaign) => (
+              <CampaignRow
+                key={campaign.id}
+                brand={deskBrand}
+                campaign={campaign}
+                deletable
+              />
+            ))}
+          </ul>
+        ) : (
+          <EmptyState
+            compact
+            icon={Megaphone}
+            title="Create the first campaign"
+          />
+        )}
+      </WorkspaceCard>
+    </div>
   );
 }

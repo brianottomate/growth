@@ -32,7 +32,6 @@ export default async function PerformanceBrandCatalogPage({
         <EmptyState
           icon={Layers}
           title="Add homes to start the catalog"
-          description="Import homes from WanderOS or add them manually. Then choose a template, prepare copy, and review the catalog cards."
           actions={
             <ButtonLink
               href={`/app/performance/clients/${brand.slug ?? brand.id}/wanderos`}

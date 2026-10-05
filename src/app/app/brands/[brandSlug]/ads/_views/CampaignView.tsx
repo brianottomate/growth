@@ -1,6 +1,7 @@
 import { WorkspaceCardHeader } from "@/app/app/performance/WorkspaceCard";
 import { WorkspaceBreadcrumbs } from "@/components/workspace-breadcrumbs";
 import {
+  campaignDisplayName,
   campaignListPath,
   campaignPath,
   type CampaignWorkspace,
@@ -8,16 +9,15 @@ import {
 import { workspaceActor } from "@/server/workspace-actor";
 import { listBrandHomes } from "@/server/services/homes.service";
 import { isImportedMetaCatalog } from "@/lib/meta-import";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
-import { Radio, Megaphone, Users, ChartNoAxesCombined } from "lucide-react";
+import { Images, Radio, Users, ChartNoAxesCombined } from "lucide-react";
 
 import { db } from "@/server/db";
 import { homeTable, platformAdTable } from "@/server/db/schema";
 import { destinationLabel, safeHomeUrl } from "@/lib/ad-preview-links";
 import { getSession } from "@/server/better-auth/server";
-import { ChannelLogo, platformLabel } from "@/components/channel-logos";
+import { platformLabel } from "@/components/channel-logos";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/components/ui/lib/utils";
 import { getDraftCampaign } from "@/server/services/ads-draft.service";
@@ -38,6 +38,7 @@ import { AddExistingAdsDialog } from "@/app/app/performance/clients/[brandSlug]/
 import { money } from "./format";
 import { PlanPlatformButton } from "./PlanPlatformButton";
 import { PlatformSection } from "./PlatformSection";
+import { EditCampaignLabel } from "./EditCampaignLabel";
 import { WorkInChatButton } from "./WorkInChatButton";
 
 /**
@@ -204,16 +205,11 @@ export async function CampaignView({
   const editableAds = ads.filter(
     (ad) => !("media" in ad.content) || !isImportedMetaCatalog(ad.content),
   );
-  const studioPath = `/app/performance/clients/${brandSlug}/ads`;
   const adActions = (
     <div className="flex flex-wrap items-center gap-2">
       {!anyPushed && (
         <>
-          <AddExistingAdsDialog
-            brandId={brand.id}
-            campaignId={campaign.id}
-            studioPath={studioPath}
-          />
+          <AddExistingAdsDialog brandId={brand.id} campaignId={campaign.id} />
           <AddAdDialog
             brandId={brand.id}
             website={campaign.landingUrl ?? brand.website}
@@ -221,12 +217,6 @@ export async function CampaignView({
           />
         </>
       )}
-      <Link
-        href={studioPath}
-        className="text-xs font-medium underline underline-offset-4"
-      >
-        Open Ad Studio
-      </Link>
       <CampaignAssetsDrawer count={pool.length} brandId={brand.id}>
         <CreativePool
           campaignId={campaign.id}
@@ -242,7 +232,7 @@ export async function CampaignView({
   );
   return (
     <div className="space-y-4">
-      <header className="space-y-3 rounded-xl border bg-background p-4">
+      <header className="space-y-3 py-1">
         {/* The Performance brand layout already crumbs Clients / brand and
             its Campaigns tab is the way back, so only the brand workspace
             needs a trail. */}
@@ -262,16 +252,16 @@ export async function CampaignView({
         <div className="flex flex-col items-start justify-between gap-3 @3xl:flex-row">
           <div className="w-full min-w-0 @3xl:flex-1">
             <div className="flex flex-wrap items-start gap-2.5">
-              <Megaphone
-                aria-hidden="true"
-                className="mt-1 size-4 text-muted-foreground"
-              />
               <h2
                 title={campaign.name}
-                className="min-w-0 text-lg leading-snug font-semibold tracking-tight [overflow-wrap:anywhere]"
+                className="min-w-0 text-2xl leading-snug font-semibold tracking-tight [overflow-wrap:anywhere]"
               >
-                {campaign.name}
+                {campaignDisplayName(campaign.name)}
               </h2>
+              <EditCampaignLabel
+                campaignId={campaign.id}
+                name={campaign.name}
+              />
               <span
                 className={cn(
                   "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium",
@@ -285,32 +275,24 @@ export async function CampaignView({
                 {anyLive ? "live" : anyPushed ? "pushed, paused" : "draft"}
               </span>
             </div>
-            <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-              {plannedPlatforms.length === 0 ? (
-                <span>No platform planned yet</span>
-              ) : (
-                plannedPlatforms.map((platform) => (
-                  <span key={platform} className="flex items-center gap-1">
-                    <ChannelLogo platform={platform} className="size-4" />
-                    {platformLabel(platform)}
-                  </span>
-                ))
-              )}
-              {campaign.budget != null ? (
-                <span>· {money(campaign.budget)} planned</span>
-              ) : null}
-              {campaign.landingUrl ? (
-                <a
-                  href={safeHomeUrl(campaign.landingUrl) ?? undefined}
-                  title={campaign.landingUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="max-w-full min-w-0 truncate underline underline-offset-4"
-                >
-                  {destinationLabel(campaign.landingUrl)} ↗
-                </a>
-              ) : null}
-            </p>
+            {(campaign.budget != null || campaign.landingUrl) && (
+              <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                {campaign.budget != null ? (
+                  <span>{money(campaign.budget)} planned</span>
+                ) : null}
+                {campaign.landingUrl ? (
+                  <a
+                    href={safeHomeUrl(campaign.landingUrl) ?? undefined}
+                    title={campaign.landingUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="max-w-full min-w-0 truncate underline underline-offset-4"
+                  >
+                    {destinationLabel(campaign.landingUrl)} ↗
+                  </a>
+                ) : null}
+              </p>
+            )}
             {campaign.description ? (
               <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
                 {campaign.description}
@@ -360,10 +342,12 @@ export async function CampaignView({
         <AdIdeasList
           actions={adActions}
           emptyState={
-            <p className="text-sm text-muted-foreground">
-              No ads assigned. Add existing brand ads or create one above. Batch
-              generation and the full collection are in Ad Studio.
-            </p>
+            <EmptyState
+              compact
+              icon={Images}
+              title="Add the campaign’s first ads"
+              description="Choose existing brand ads or create a new ad."
+            />
           }
           preparingHero={false}
           homeOrder={orderedHomes.map((home) => home.id)}
@@ -526,28 +510,6 @@ export async function CampaignView({
                 icon={Radio}
                 title="Choose where the campaign runs"
                 description="Create a Meta draft, or choose another platform. Review its account, tracking and budget before pushing. Shape lets you work through those choices together."
-                actions={
-                  <>
-                    <PlanPlatformButton
-                      brandId={brand.id}
-                      brandName={brandName}
-                      campaignId={campaign.id}
-                      campaignName={campaign.name}
-                      planned={plannedPlatforms}
-                      primary
-                    />
-                    <AskAssistantButton
-                      brandId={brand.id}
-                      brandName={brandName}
-                      campaignId={campaign.id}
-                      campaignName={campaign.name}
-                      focus="platforms"
-                      label="Shape"
-                      newThread
-                      ask={`Help me shape the platform plan for “${campaign.name}”. Read its current setup and discuss platforms, budget and tracking with me before changing anything.`}
-                    />
-                  </>
-                }
               />
             ) : (
               <div className="space-y-2">

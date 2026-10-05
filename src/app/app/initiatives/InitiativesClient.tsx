@@ -1,4 +1,7 @@
 "use client";
+import { CampaignSummary } from "@/components/campaigns/campaign-summary";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Megaphone, ImageIcon } from "lucide-react";
 import { WorkPreview, previewDate } from "./WorkPreview";
 import { StatusBoard, workLane } from "./StatusBoard";
 import { EditorialPreview } from "./EditorialPreview";
@@ -435,10 +438,21 @@ export function InitiativeDetail({ id }: { id: string }) {
           </div>
         </div>
         {data.campaigns.length === 0 && (
-          <p className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">
-            Start with a campaign brief. Add its ads, audiences and platforms as
-            the direction takes shape.
-          </p>
+          <EmptyState
+            compact
+            icon={Megaphone}
+            title="Give this initiative its first campaign"
+            description="Start with a brief, then bring together the ads, audience and platform plans."
+            actions={
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setCreatingCampaign(true)}
+              >
+                Create campaign
+              </Button>
+            }
+          />
         )}
         {data.campaigns.map((campaign) => {
           const preview = data.previews.campaigns.find(
@@ -462,26 +476,13 @@ export function InitiativeDetail({ id }: { id: string }) {
               className="space-y-4 rounded-xl border p-4"
             >
               <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Link href={href} className="font-semibold hover:underline">
-                      {campaign.name}
-                    </Link>
-                    <span className="rounded-md border px-2 py-0.5 text-xs text-muted-foreground">
-                      {isLive ? "Live" : "Not live"}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {brandName(campaign.brandId)} · {campaign.status} ·{" "}
-                    {preview?.adCount ?? 0} ads · {preview?.audienceCount ?? 0}{" "}
-                    {preview?.audienceCount === 1
-                      ? "audience plan"
-                      : "audience plans"}
-                  </p>
-                  <p className="line-clamp-2 max-w-3xl text-xs leading-relaxed text-muted-foreground">
-                    {preview?.description}
-                  </p>
-                </div>
+                <CampaignSummary
+                  name={campaign.name}
+                  href={href}
+                  status={isLive ? "Live" : "Not live"}
+                  detail={`${brandName(campaign.brandId)} · ${campaign.status} · ${preview?.adCount ?? 0} ads · ${preview?.audienceCount ?? 0} audience ${preview?.audienceCount === 1 ? "plan" : "plans"}`}
+                  description={preview?.description}
+                />
                 <Button
                   size="sm"
                   variant="ghost"
@@ -492,9 +493,17 @@ export function InitiativeDetail({ id }: { id: string }) {
                 </Button>
               </div>
               {(preview?.ads.length ?? 0) === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  No ads yet. Open the campaign to add creative work.
-                </p>
+                <EmptyState
+                  compact
+                  icon={ImageIcon}
+                  title="Ready for the first ad"
+                  description="Open the campaign to add existing ads or create something for this initiative."
+                  actions={
+                    <Button size="sm" variant="outline" asChild>
+                      <Link href={href}>Open campaign</Link>
+                    </Button>
+                  }
+                />
               )}
               <StatusBoard
                 paid

@@ -13,7 +13,14 @@ const CODENAME = /^[a-z]+_[a-z]+$/;
 
 /** The codename a campaign name ends with, if it has one. */
 export function campaignCodenameOf(name: string): string | null {
-  return /_([a-z]+_[a-z]+)$/.exec(name)?.[1] ?? null;
+  return (
+    /_([a-z]+_[a-z]+)$/.exec(name)?.[1] ??
+    /^Sales · .+ · ([A-Za-z]+ [A-Za-z]+)$/
+      .exec(name)?.[1]
+      ?.toLowerCase()
+      .replace(" ", "_") ??
+    null
+  );
 }
 
 /**

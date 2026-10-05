@@ -217,7 +217,7 @@ export function homeCompositionRequest(input: {
       META_HEADLINE +
       "\n\n" +
       META_DESCRIPTION +
-      "\n\nDo not reproduce the listing description, registration codes, or fee schedules. The first card is the opener and the last the closing card; the ones between are detail slides. Each card has a feed layout and a Story layout (storyLayout), written to the slide rules below; do not choose templates. The first card is also the standalone static and a card in the portfolio hero carousel. Opener and closing cards receive the Explore your next escape button; do not repeat it in the headline. For each layout choose imagePosition, the side of the photo the crop keeps: feed layouts crop to a square or 4:5 and lose the top and bottom, Story layouts crop to 9:16 and lose the sides. Pick top or bottom when the subject sits high or low, left or right when it sits to one side, center otherwise. Photo indices are 1-based labels on the contact sheet.\n\n" +
+      "\n\nDo not reproduce the listing description, registration codes, or fee schedules. The first card is the opener and the last the closing card; the ones between are detail slides. Each card has a feed layout and a Story layout (storyLayout), written to the slide rules below; do not choose templates. The first card is also the standalone static and a card in the portfolio hero carousel. Opener and closing cards receive the Explore your next escape button; do not repeat it in the headline. For each layout choose imagePosition, the side of the photo the crop keeps: feed layouts default to 1:1 square; compose for a square crop first, with 4:5 available as an alternate, Story layouts crop to 9:16 and lose the sides. Pick top or bottom when the subject sits high or low, left or right when it sits to one side, center otherwise. Photo indices are 1-based labels on the contact sheet.\n\n" +
       campaignCopyRules() +
       brandStorySection({
         brandName: input.brandName,
@@ -347,7 +347,13 @@ export async function runStarterGeneration(runId: string, input: Input) {
         };
         const document = ideaDocumentFromAd({ name: idea.name, content });
         document.intendedPlacements = input.intendedPlacements;
-        document.exportShapes = ["portrait", "square", "story", "wide"];
+        document.exportShapes = input.exportShapes ?? [
+          "portrait",
+          "square",
+          "story",
+          "wide",
+        ];
+        if (input.exportShapes) document.shapes = [...input.exportShapes];
         await db.insert(adTable).values({
           brandId: brand.id,
           campaignId: campaign?.id ?? null,
@@ -398,6 +404,10 @@ export async function runStarterGeneration(runId: string, input: Input) {
       document: IdeaDocument,
       homeId?: string,
     ) => {
+      if (input.exportShapes) {
+        document.shapes = [...input.exportShapes];
+        document.exportShapes = [...input.exportShapes];
+      }
       if (booking) document.copy.linkUrl = booking.url;
       await db.insert(adTable).values({
         brandId: brand.id,
