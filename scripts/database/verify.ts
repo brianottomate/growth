@@ -82,7 +82,10 @@ try {
     2,
   );
   await db.query(
-    "INSERT INTO home(id,brand_id,external_id,url,url_key,name,featured,created_at,updated_at) VALUES ('home','one','external','https://example.com','home','Home',true,now(),now())",
+    "INSERT INTO home(id,brand_id,external_id,url,url_key,name,created_at,updated_at) VALUES ('home','one','external','https://example.com','home','Home',now(),now())",
+  );
+  await db.query(
+    "INSERT INTO home_group_member(group_id,home_id) VALUES ('hgroup_featured_one','home')",
   );
   assert.equal(
     (
@@ -104,14 +107,15 @@ try {
     ),
     /another brand/,
   );
-  await db.query("DELETE FROM home_group_member WHERE home_id='home'");
+  // A home that leaves the record leaves its groups.
+  await db.query("UPDATE home SET deleted_at=now() WHERE id='home'");
   assert.equal(
     (
-      await db.query<{ featured: boolean }>(
-        "SELECT featured FROM home WHERE id='home'",
+      await db.query<{ count: number }>(
+        "SELECT count(*)::int AS count FROM home_group_member",
       )
-    ).rows[0]?.featured,
-    false,
+    ).rows[0]?.count,
+    0,
   );
 
   const repeat = await run();
