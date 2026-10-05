@@ -55,6 +55,34 @@ import { freezeComposition } from "./composition.service";
 import { deleteMedia, importRemoteImage } from "./media.service";
 
 const PROVIDER = "catalog-export";
+
+/**
+ * The catalog keys homes on the WanderOS listing id, but the brand's other
+ * reads (Featured homes, home groups) hand out Growth home ids. Accept either
+ * and return the listing id; anything unknown passes through to fail as usual.
+ */
+export async function catalogListingIds(
+  brandId: string,
+  ids: readonly string[],
+): Promise<string[]> {
+  const growthIds = ids.filter((id) => id.startsWith("home_"));
+  if (!growthIds.length) return [...ids];
+  const rows = await db.query.homeTable.findMany({
+    where: and(
+      eq(homeTable.brandId, brandId),
+      inArray(homeTable.id, growthIds),
+      isNull(homeTable.deletedAt),
+    ),
+    columns: { id: true, externalId: true },
+  });
+  const byId = new Map(rows.map((row) => [row.id, row.externalId]));
+  return ids.map((id) => byId.get(id) ?? id);
+}
+
+export async function catalogListingId(brandId: string, id: string) {
+  const [listingId] = await catalogListingIds(brandId, [id]);
+  return listingId!;
+}
 export async function catalogBrand(userId: string, brandId: string) {
   const [brand] = await db
     .select({

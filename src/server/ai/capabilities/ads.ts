@@ -126,6 +126,8 @@ import {
 } from "@/server/services/ads-draft.service";
 import {
   catalogHomeFacts,
+  catalogListingId,
+  catalogListingIds,
   editCatalogCard,
   setCatalogHomeHero,
 } from "@/server/services/catalog-studio.service";
@@ -1677,7 +1679,7 @@ export const setHomeHeroAction = growthAction({
       photoUrl: "https://example.com/photo.jpg",
     },
   ],
-  execute: ({ photoNumber, photoUrl, ...input }, ctx) => {
+  execute: async ({ photoNumber, photoUrl, ...input }, ctx) => {
     if ((photoNumber === undefined) === (photoUrl === undefined))
       throw new GrowthActionError(
         "invalid_input",
@@ -1685,6 +1687,7 @@ export const setHomeHeroAction = growthAction({
       );
     return setCatalogHomeHero({
       ...input,
+      homeId: await catalogListingId(input.brandId, input.homeId),
       userId: ctx.userId,
       photo: photoUrl ? { url: photoUrl } : { number: photoNumber! },
     });
@@ -1717,8 +1720,12 @@ export const catalogHomeFactsAction = growthAction({
       .describe("WanderOS listing ids."),
   }),
   examples: [{ brandId: "brd_01", homeIds: ["1234567890123"] }],
-  execute: ({ brandId, homeIds }, ctx) =>
-    catalogHomeFacts(ctx.userId, brandId, homeIds),
+  execute: async ({ brandId, homeIds }, ctx) =>
+    catalogHomeFacts(
+      ctx.userId,
+      brandId,
+      await catalogListingIds(brandId, homeIds),
+    ),
 });
 
 export const editCatalogCardAction = growthAction({
@@ -1778,8 +1785,14 @@ export const editCatalogCardAction = growthAction({
       title: "Exposed-brick loft in Louisville, KY",
     },
   ],
-  execute: ({ brandId, homeId, force, ...patch }, ctx) =>
-    editCatalogCard({ userId: ctx.userId, brandId, homeId, patch, force }),
+  execute: async ({ brandId, homeId, force, ...patch }, ctx) =>
+    editCatalogCard({
+      userId: ctx.userId,
+      brandId,
+      homeId: await catalogListingId(brandId, homeId),
+      patch,
+      force,
+    }),
 });
 
 export const setAdHomeAction = growthAction({

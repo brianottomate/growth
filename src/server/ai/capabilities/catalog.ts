@@ -13,6 +13,8 @@ import {
 } from "@/server/services/catalog-quick-fix.service";
 import {
   catalogBrand,
+  catalogListingId,
+  catalogListingIds,
   catalogState,
   deleteCatalogExport,
   renderCatalogExport,
@@ -123,7 +125,12 @@ export const newCatalogCopyAction = growthAction({
     "Write a new headline (and amenity pills, on the amenities cards) for one home's catalog card with the card's photo in view, and save it. One model call. Refused on an approved card (reopen it first) and on a finished card, whose headline is part of the supplied artwork.",
   inputSchema: homeInput,
   examples: [{ brandId: "brd_01", homeId: "1234567890123" }],
-  execute: (input, ctx) => newCatalogCopy({ ...input, userId: ctx.userId }),
+  execute: async (input, ctx) =>
+    newCatalogCopy({
+      ...input,
+      homeId: await catalogListingId(input.brandId, input.homeId),
+      userId: ctx.userId,
+    }),
 });
 
 export const newCatalogPhotoAction = growthAction({
@@ -132,7 +139,11 @@ export const newCatalogPhotoAction = growthAction({
     "Pick a better hero for one home's catalog card from its listing photos and make it the home's hero, so its ads and previews follow. Then rewrite the card copy for the new photo; never picks the current hero again. Refused on an approved card. Fails with the reason when no clean photo is left.",
   inputSchema: homeInput,
   examples: [{ brandId: "brd_01", homeId: "1234567890123" }],
-  execute: async (input, ctx) => {
+  execute: async (raw, ctx) => {
+    const input = {
+      ...raw,
+      homeId: await catalogListingId(raw.brandId, raw.homeId),
+    };
     const state = await catalogState(ctx.userId, input.brandId);
     if (
       state.draft.cards.find((card) => card.homeId === input.homeId)?.mode ===
@@ -209,7 +220,17 @@ export const setCatalogApprovalAction = growthAction({
       cards: [{ homeId: "1234567890123" }],
     },
   ],
-  execute: (input, ctx) => setCatalogApproval({ ...input, userId: ctx.userId }),
+  execute: async (input, ctx) => {
+    const ids = await catalogListingIds(
+      input.brandId,
+      input.cards.map((card) => card.homeId),
+    );
+    return setCatalogApproval({
+      ...input,
+      cards: input.cards.map((card, i) => ({ ...card, homeId: ids[i]! })),
+      userId: ctx.userId,
+    });
+  },
 });
 
 export const setCatalogIncludedAction = growthAction({
