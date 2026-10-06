@@ -18,6 +18,7 @@ import { campaignStatusEnum } from "@/server/db/ads-schema";
 import { audienceTypeEnum } from "@/server/db/ads-schema";
 import { platformCampaignStatusEnum } from "@/server/db/ads-schema";
 import { brandRelationshipEnum } from "@/server/db/brand-schema";
+import { adStatusEnum } from "@/server/db/ads-schema";
 import { channelPlatformEnum } from "@/server/db/channel-schema";
 import {
   homesSchema,
@@ -460,7 +461,12 @@ export const draftAdResultSchema = z.strictObject({
   name: z.string(),
   placements: placementsSchema.nullable(),
   platforms: z.array(z.enum(channelPlatformEnum.enumValues)).nullable(),
-  status: z.enum(["approved", "drawn", "kept"]),
+  status: z.enum(adStatusEnum.enumValues),
+  readyAt: z.date().nullable(),
+  readyBy: z.string().nullable(),
+  approvedAt: z.date().nullable(),
+  approvedBy: z.string().nullable(),
+  replacesAdId: z.string().nullable(),
   type: z.enum(["text", "creative"]),
   updatedAt: z.date(),
 });
@@ -476,6 +482,8 @@ const draftAdSchema = draftAdResultSchema.extend({
   ]),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
+  readyAt: z.iso.datetime().nullable(),
+  approvedAt: z.iso.datetime().nullable(),
 });
 export type DraftAdResult = z.output<typeof draftAdResultSchema>;
 
@@ -826,7 +834,12 @@ export const openCampaignActionOutputSchema = z.strictObject({
       name: z.string(),
       placements: placementsSchema.nullable(),
       platforms: z.array(z.enum(channelPlatformEnum.enumValues)).nullable(),
-      status: z.enum(["approved", "drawn", "kept"]),
+      status: z.enum(adStatusEnum.enumValues),
+      readyAt: z.iso.datetime().nullable(),
+      readyBy: z.string().nullable(),
+      approvedAt: z.iso.datetime().nullable(),
+      approvedBy: z.string().nullable(),
+      replacesAdId: z.string().nullable(),
       type: z.enum(["text", "creative"]),
       updatedAt: z.iso.datetime(),
     }),
@@ -1073,6 +1086,8 @@ export const deleteAudienceActionOutputSchema = z.strictObject({
 
 export const deleteAdDraftActionOutputSchema = z.strictObject({
   deleted: z.boolean(),
+  /** How many platform ads it was deleted from first. */
+  deletedOnPlatform: z.number().optional(),
 });
 
 export const pushDraftActionOutputSchema = z.union([
@@ -1336,9 +1351,17 @@ export const attachAdSetActionOutputSchema = z.strictObject({
 });
 
 export const setAdStatusActionOutputSchema = z.strictObject({
-  cleanupWarning: z.string().optional(),
   adId: z.string(),
-  status: z.enum(["approved", "drawn"]),
+  status: z.enum(["approved", "ready", "drawn"]),
+  /** The approved ad this one replaced, now retired. */
+  replaced: z.string().optional(),
+});
+
+export const editApprovedAdActionOutputSchema = z.strictObject({
+  adId: z.string(),
+  replacesAdId: z.string(),
+  /** False when a replacement draft was already open. */
+  created: z.boolean(),
 });
 
 export const setAdCopyActionOutputSchema = z.strictObject({ adId: z.string() });
@@ -1606,6 +1629,8 @@ export const openCampaignActionNativeResultSchema =
         ]),
         createdAt: z.date(),
         updatedAt: z.date(),
+        readyAt: z.date().nullable(),
+        approvedAt: z.date().nullable(),
       }),
     ),
     audiences: z.array(

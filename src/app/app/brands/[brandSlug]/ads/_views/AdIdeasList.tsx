@@ -6,6 +6,7 @@ import { Images } from "lucide-react";
 import type { AdContent } from "@/server/db/schema";
 import { ideaDocumentFromAd } from "@/lib/ad-idea-studio";
 import { isImportedMetaCatalog } from "@/lib/meta-import";
+import { adReviewOf } from "@/lib/ad-review";
 import { AdCard } from "./AdCard";
 import { AdIdeaGroups } from "./AdIdeaGroups";
 import { AdPlatformRouting } from "./AdPlatformRouting";
@@ -52,6 +53,11 @@ export function AdIdeasList({
     bookingTargetId?: string | null;
     createdAt: Date;
     platforms?: ChannelPlatform[] | null;
+    readyAt?: Date | null;
+    readyBy?: string | null;
+    approvedAt?: Date | null;
+    approvedBy?: string | null;
+    replacesAdId?: string | null;
   }[];
 }) {
   const catalogs = ads.filter(
@@ -131,6 +137,7 @@ export function AdIdeasList({
           content: ad.content,
           updatedAt: ad.updatedAt.toISOString(),
           homeId: ad.homeId,
+          review: adReviewOf(ad),
         }}
       />
     ) : "media" in ad.content && adFormat(ad.content) === "video" ? (

@@ -211,8 +211,6 @@ export function MetaPlatformCard({
       "Set a pixel and conversion event, or a custom conversion, in Edit setup.",
     !pc.budget && "Set a budget in Edit setup.",
     !creativeAds.length && "Add at least one creative ad.",
-    Boolean(unapprovedCount) &&
-      "Approve or delete all remaining ad ideas before validating or pushing.",
     missingCreative && "Add the missing artwork for the selected placements.",
     Boolean(catalogCount) &&
       "Catalog ads cannot be included in this creative push.",
@@ -570,7 +568,9 @@ export function MetaPlatformCard({
           )}
           {unapprovedCount > 0 && (
             <p className="text-sm">
-              Approve or delete {unapprovedCount} remaining ads before pushing.
+              {unapprovedCount} unapproved{" "}
+              {unapprovedCount === 1 ? "ad stays" : "ads stay"} out of this
+              push.
             </p>
           )}
           {!pc.budget && (

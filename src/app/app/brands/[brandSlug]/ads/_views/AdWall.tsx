@@ -613,16 +613,17 @@ export function AdTile({
             <button
               type="button"
               disabled={busy}
-              onClick={() =>
+              onClick={() => {
+                if (ad.status === "approved") return;
                 setStatus.mutate({
                   adId: ad.id,
-                  status: ad.status === "approved" ? "drawn" : "approved",
+                  status: "approved",
                   expectedUpdatedAt: ad.updatedAt,
-                })
-              }
+                });
+              }}
               title={
                 ad.status === "approved"
-                  ? "Approved. A rebuild leaves this one alone."
+                  ? "Approved and final. Open it to edit as a new draft."
                   : "Approve. Keeps it through the next rebuild."
               }
               className={cn(

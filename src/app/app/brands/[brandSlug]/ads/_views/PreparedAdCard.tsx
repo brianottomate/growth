@@ -100,6 +100,19 @@ export function PreparedAdCard({
       },
     }),
   );
+  const editApproved = useMutation(
+    orpc.ads.editApprovedAd.mutationOptions({
+      onSuccess: (result) => {
+        toast.success(
+          result.created
+            ? "Draft made. It replaces this ad once approved."
+            : "A replacement draft is already open.",
+        );
+        router.refresh();
+      },
+      onError: (error) => toast.error(error.message),
+    }),
+  );
   const status = useMutation(
     orpc.ads.setAdStatus.mutationOptions({
       onError,
@@ -683,16 +696,18 @@ export function PreparedAdCard({
                     !video.body.trim() ||
                     !safeHomeUrl(video.linkUrl ?? website)))
             }
-            loading={status.isPending}
+            loading={status.isPending || editApproved.isPending}
             onClick={() =>
-              status.mutate({
-                adId: ad.id,
-                status: approved ? "drawn" : "approved",
-                expectedUpdatedAt: ad.updatedAt,
-              })
+              approved
+                ? editApproved.mutate({ adId: ad.id })
+                : status.mutate({
+                    adId: ad.id,
+                    status: "approved",
+                    expectedUpdatedAt: ad.updatedAt,
+                  })
             }
           >
-            {approved ? "Reopen" : "Approve"}
+            {approved ? "Edit as new draft" : "Approve"}
           </Button>
         )}
       </footer>

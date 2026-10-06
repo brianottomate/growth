@@ -2350,17 +2350,11 @@ export async function pushDraftToPlatform(
       `No ads are set to run on ${platformName} — add it to an ad's platforms`,
     );
   }
-  const unapproved = ads.filter(
-    (ad) =>
-      ad.status !== "approved" ||
-      ("media" in ad.content &&
-        ad.content.ideaStudio &&
-        !ad.content.ideaStudio.approval),
-  );
-  if (unapproved.length)
-    throw new Error(
-      `Approve all ads before pushing: ${unapproved.map((ad) => ad.name).join(", ")}`,
-    );
+  // Only approved ads go out. Drafts, including one that will replace an
+  // approved ad, stay in the campaign and wait for their own approval.
+  ads = ads.filter((ad) => ad.status === "approved");
+  if (ads.length === 0)
+    throw new Error(`Approve at least one ad for ${platformName} to push`);
   const awaitingArtwork = ads.filter(
     (ad) =>
       "media" in ad.content &&
@@ -2380,12 +2374,15 @@ export async function pushDraftToPlatform(
     );
     if (batch.includes(true)) froze = true;
   }
-  if (froze)
-    ads = routed(
-      await db.query.adTable.findMany({
-        where: eq(adTable.campaignId, campaign.id),
-      }),
-    );
+  // Reload whenever images may have landed, here or in the background save
+  // that approval started, and keep only the approved ads: a reload must
+  // never bring a draft back into the push.
+  void froze;
+  ads = routed(
+    await db.query.adTable.findMany({
+      where: eq(adTable.campaignId, campaign.id),
+    }),
+  ).filter((ad) => ad.status === "approved");
   // A shell is an ad someone meant to fill and did not. Sending the rest
   // around it would ship a set with a hole nobody chose.
   const shells = ads.filter(

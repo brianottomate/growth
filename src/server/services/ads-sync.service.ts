@@ -1,10 +1,11 @@
 import "server-only";
 
-import { and, eq, inArray, isNotNull, ne, notInArray } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, ne, notInArray, sql } from "drizzle-orm";
 
 import { adPlatformFromZernioString, adPlatformSpec } from "@/lib/ad-platforms";
 import { db } from "@/server/db";
 import {
+  adTable,
   platformAdSetTable,
   platformAdTable,
   type AdStats,
@@ -445,6 +446,31 @@ async function syncCampaignChildren(input: {
       }
       adsWritten++;
     }
+  }
+
+  // An ad deleted on the platform, here or in Ads Manager, is deleted here
+  // too, unless it still runs somewhere else. Its platform_ad rows stay as
+  // the record of what ran.
+  const goneAdIds = await db
+    .selectDistinct({ adId: platformAdTable.adId })
+    .from(platformAdTable)
+    .where(
+      and(
+        eq(platformAdTable.brandId, input.brandId),
+        isNotNull(platformAdTable.adId),
+        sql`lower(${platformAdTable.status}) in ('deleted', 'removed', 'cancelled', 'canceled')`,
+      ),
+    );
+  for (const { adId } of goneAdIds) {
+    if (!adId) continue;
+    const stillRuns = await db.query.platformAdTable.findFirst({
+      where: and(
+        eq(platformAdTable.adId, adId),
+        sql`lower(coalesce(${platformAdTable.status}, '')) not in ('deleted', 'removed', 'cancelled', 'canceled')`,
+      ),
+      columns: { id: true },
+    });
+    if (!stillRuns) await db.delete(adTable).where(eq(adTable.id, adId));
   }
 
   return { adSets: setRowIdByExternalId.size, ads: adsWritten };

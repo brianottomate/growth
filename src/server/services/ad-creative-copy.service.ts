@@ -207,7 +207,9 @@ export async function rewriteAdCreative(input: {
     organizationId: input.orgId,
   });
   if (context.ad.approved)
-    throw new Error("Reopen this approved ad before writing new copy.");
+    throw new Error(
+      "Approved ads are final. Edit it to make a draft that replaces it.",
+    );
   const { output, problems } = await runCopyRequest(
     await adCreativeCopyRequest(context),
   );
@@ -238,7 +240,9 @@ export async function draftAdCreativeCopy(input: {
     organizationId: input.orgId,
   });
   if (context.ad.approved)
-    throw new Error("Reopen this approved ad before rewriting copy.");
+    throw new Error(
+      "Approved ads are final. Edit it to make a draft that replaces it.",
+    );
   if (
     new Date(context.ad.updatedAt).getTime() !==
     new Date(input.expectedUpdatedAt).getTime()

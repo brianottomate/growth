@@ -197,6 +197,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "writeGoogleTextAds",
     "setAdPlatforms",
     "setAdStatus",
+    "editApprovedAd",
     "setAdCopy",
     "saveIdea",
     "addAdShell",

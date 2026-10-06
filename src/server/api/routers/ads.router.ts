@@ -22,7 +22,6 @@ import {
 import { z } from "zod";
 import { ideaShapeSchema } from "@/lib/ad-idea-studio";
 import { draftAdCreativeCopy } from "@/server/services/ad-creative-copy.service";
-import { freezeIdea } from "@/server/services/ad-approval.service";
 import { channelPlatformEnum } from "@/server/db/channel-schema";
 
 import {
@@ -72,6 +71,7 @@ import {
   editAdCardsAction,
   attachAdSetAction,
   setAdStatusAction,
+  editApprovedAdAction,
   setAdCopyAction,
   setAdHomeAction,
   clearPlacementAction,
@@ -211,22 +211,6 @@ export const adsRouter = {
         organizationId: ctx.workspace.orgId,
       }),
     ),
-  /** The studio's Freeze: approve and save every size's images now. */
-  freezeIdea: workspaceProcedure
-    .input(
-      z.object({
-        adId: z.string().min(1),
-        expectedUpdatedAt: z.string().datetime(),
-        exportShapes: z.array(ideaShapeSchema).max(4).optional(),
-      }),
-    )
-    .handler(async ({ context: ctx, input }) =>
-      freezeIdea({
-        ...input,
-        orgId: ctx.workspace.orgId,
-        userId: ctx.session.user.id,
-      }),
-    ),
   generateStarterIdeas: workspaceProcedure
     .input(starterGenerationSchema)
     .handler(async ({ context: ctx, input }) => {
@@ -301,6 +285,7 @@ export const adsRouter = {
 
   /** Production state on one drafted ad. Touches no platform. */
   setAdStatus: actionProcedure(setAdStatusAction),
+  editApprovedAd: actionProcedure(editApprovedAdAction),
 
   /** The words on one drafted ad; its cards are left alone. */
   setAdCopy: actionProcedure(setAdCopyAction),

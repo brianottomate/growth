@@ -50,6 +50,20 @@
       "when": 1791310262488,
       "tag": "0006_email_sequences",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791320511268,
+      "tag": "0007_ad_review_lifecycle",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791320521067,
+      "tag": "0008_ad_ready_clears_on_edit",
+      "breakpoints": true
     }
   ]
 }

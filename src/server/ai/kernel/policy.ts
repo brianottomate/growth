@@ -370,6 +370,8 @@ export const growthActionPolicies = {
     writeGoogleTextAds: write({ consequence: "model-write" }),
     // Routing is local: which platforms an unpushed idea compiles to.
     setAdPlatforms: write({ idempotent: true }),
+    // Local copy of an approved ad as a draft; the original is untouched.
+    editApprovedAd: write(),
     // Approval is the person's sign-off that gates the push, so chat asks
     // for it with the approval card rather than deciding on its own.
     setAdStatus: write({
@@ -464,7 +466,13 @@ export const growthActionPolicies = {
       surfaces: APPROVAL_PRODUCT,
     }),
     deleteAudience: write({ reversible: false }),
-    deleteAdDraft: write({ reversible: false }),
+    // Deletes the ad on the platform too when it is live there.
+    deleteAdDraft: write({
+      consequence: "provider-write",
+      approval: "user",
+      reversible: false,
+      surfaces: APPROVAL_PRODUCT,
+    }),
     // Creates the campaign tree PAUSED, so approving the push does not start
     // spend — setDelivery does, separately. Idempotency-Key makes a retry
     // replay rather than duplicate.

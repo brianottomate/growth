@@ -151,24 +151,21 @@ export async function PlatformSection({
               config={linkedin}
             />
           )}
-          {pushable &&
-            draftAdCount > 0 &&
-            !googleBlocked &&
-            unapprovedCount === 0 && (
-              <PushToPlatform
-                campaignId={campaignId}
-                brandSlug={brandSlug}
-                platform={platform}
-                draftAdCount={draftAdCount}
-                audienceCount={audienceCount}
-                budget={platformCampaign.budget}
-                budgetType={platformCampaign.budgetType}
-              />
-            )}
+          {pushable && draftAdCount > 0 && !googleBlocked && (
+            <PushToPlatform
+              campaignId={campaignId}
+              brandSlug={brandSlug}
+              platform={platform}
+              draftAdCount={draftAdCount}
+              audienceCount={audienceCount}
+              budget={platformCampaign.budget}
+              budgetType={platformCampaign.budgetType}
+            />
+          )}
           {unapprovedCount > 0 && (
             <span className="text-xs text-muted-foreground">
-              Approve {unapprovedCount} ad{unapprovedCount === 1 ? "" : "s"} to
-              enable push
+              {unapprovedCount} unapproved ad{unapprovedCount === 1 ? "" : "s"}{" "}
+              stay out of the push
             </span>
           )}
           {!pushable && (

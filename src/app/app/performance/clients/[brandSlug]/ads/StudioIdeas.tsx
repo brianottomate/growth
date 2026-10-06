@@ -1,5 +1,6 @@
 "use client";
 
+import type { AdReview } from "@/lib/ad-review";
 import { adFormat } from "@/lib/ad-format";
 
 import Link from "next/link";
@@ -28,6 +29,7 @@ export type StudioIdea = {
   bookingTargetId: string | null;
   homeId: string | null;
   status: string;
+  review: AdReview;
   campaignId: string | null;
   campaignName: string | null;
   deliveryState?: AdState;

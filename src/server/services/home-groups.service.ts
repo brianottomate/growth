@@ -529,7 +529,7 @@ export async function attachBookingTarget(
     if (!ad) throw new Error("Ad not found in this brand.");
     if (ad.status === "approved")
       throw new Error(
-        "Reopen the approved ad before changing its booking target.",
+        "Approved ads are final. Edit it to make a draft that replaces it.",
       );
     await assertAdNotPushed(ad.id);
     const content = structuredClone(ad.content);
@@ -596,7 +596,7 @@ export async function attachBookingTarget(
     });
     if (approved.some((ad) => !ad.content.linkUrl))
       throw new Error(
-        "An approved ad uses this campaign's fallback URL. Reopen it or give it an explicit reviewed URL before changing the default.",
+        "An approved ad uses this campaign's fallback URL. Edit it into a replacement draft or give it an explicit reviewed URL before changing the default.",
       );
     // Existing ads can already have their own URLs; don't silently replace them.
     await db

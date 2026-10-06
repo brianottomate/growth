@@ -1,8 +1,15 @@
 import type { MetaPlacement } from "@/lib/meta-placement-plan";
 import type { IdeaStudio } from "@/lib/ad-idea-studio";
 import { relations, sql } from "drizzle-orm";
-import { index, pgEnum, pgTable, uniqueIndex } from "drizzle-orm/pg-core";
+import {
+  type AnyPgColumn,
+  index,
+  pgEnum,
+  pgTable,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 
+import { userTable } from "./auth-schema";
 import { brandTable, personaTable } from "./brand-schema";
 import { channelPlatformEnum, channelTable } from "./channel-schema";
 import type { AdFormat } from "@/lib/performance-ads";
@@ -69,7 +76,17 @@ export type AudienceSource = (typeof audienceSourceEnum.enumValues)[number];
  * `kept` sat between the two and carried no behaviour of its own. Nothing is
  * written with it; it stays listed because Postgres cannot drop an enum value.
  */
-export const adStatusEnum = pgEnum("ad_status", ["drawn", "kept", "approved"]);
+/**
+ * drawn is a draft; ready means its author marked it for review; approved is
+ * final. An approved ad never changes: editing one makes a new draft that
+ * replaces it (`replacesAdId`). `kept` is the retired rebuild marker.
+ */
+export const adStatusEnum = pgEnum("ad_status", [
+  "drawn",
+  "kept",
+  "approved",
+  "ready",
+]);
 export type AdStatus = (typeof adStatusEnum.enumValues)[number];
 
 export const campaignStatusEnum = pgEnum("campaign_status", [
@@ -564,6 +581,22 @@ export const adTable = pgTable(
      * tell a duplicate from a new ad.
      */
     businessKey: t.text(),
+
+    /** Marked ready for review, and by whom. Any edit clears it (trigger). */
+    readyAt: t.timestamp(),
+    readyBy: t.text().references(() => userTable.id, { onDelete: "set null" }),
+    /** Signed off, and by whom. Set once; an approved ad is final. */
+    approvedAt: t.timestamp(),
+    approvedBy: t
+      .text()
+      .references(() => userTable.id, { onDelete: "set null" }),
+    /**
+     * The approved ad this draft was made from. Approving it retires that
+     * one: deleted when it never ran, left for its stats when it did.
+     */
+    replacesAdId: t.text().references((): AnyPgColumn => adTable.id, {
+      onDelete: "set null",
+    }),
 
     createdAt: t
       .timestamp()

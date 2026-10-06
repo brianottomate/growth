@@ -6,33 +6,39 @@ Image ads offer Overview, Details, and an approximate Platform preview. Details
 keeps copy and composition edits in dialogs; slide ordering uses explicit buttons.
 Other formats reuse their existing editors in this workspace.
 
-## Image approval
+## Review lifecycle
 
-`ads.saveIdea` remains the shared UI/assistant edit operation. It checks ownership
-and `expectedUpdatedAt`, retains the editable document, and saves a draft.
-`ads.setAdStatus` is the shared approval/reopen operation. For studio-compatible
-image ads, it requires `expectedUpdatedAt` and renders every card in every included
-shape to a new media asset. Only after all renders succeed does a compare-and-swap
-update store the approval and projected content/placements together. The approval
-records the actor, time, source version, and exported assets. The editable document
-retains the approved copy, card order, sources, and recipes.
+An ad moves draft → ready → approved, and approved is final.
 
-Approved studio ads reject edits until reopened. Previews and delivery use the
-saved exports, including size-specific overrides. A missing export never falls
-back to a mutable preview URL. Push refuses unapproved ads and studio drafts
-without an approval record. Approval does not send anything to an ad platform.
+- **Draft** (`status = drawn`): editable from the campaign or the Ad studio.
+- **Ready** (`ready_at`, `ready_by`): its author marked it done for review. Any
+  edit to its content, placements, name, home, booking target or platforms sends
+  it back to draft. A database trigger (`growth_ad_ready_clears_on_edit`) does
+  this, so every write path obeys it.
+- **Approved** (`approved_at`, `approved_by`): the sign-off. The ad never changes
+  again. For image ads the images every included size needs are rendered and saved
+  in the background (`freezeApprovedAd`); the push and previews call it too, so
+  they never send live renders. The card reads "Approved · saving images…" until
+  they land.
 
-Reopen removes the local approval and rebuilds draft projections from the retained
-document. Generated assets used by a platform ad, another ad, campaign, or content
-post are retained. Other exports are soft-deleted from the media library; underlying
-object bytes remain for recovery. Source photos and supplied artwork are untouched.
-Failed or stale approval attempts soft-delete only the exports from that attempt.
-Physical object garbage collection is deliberately separate from reopening.
+`ads.setAdStatus` is the one status operation (`drawn | ready | approved`) for the
+app, chat and MCP. `drawn` only takes a ready mark back; an approved ad cannot
+return to draft.
 
-Existing video, catalog, portfolio, and text editors remain available. Their
-existing status operation remains in place; the render-and-freeze lifecycle above
-applies to static/carousel image studio ads. No schema migration is needed: the
-approval record is stored alongside the idea document in the ad content JSON.
+To change an approved ad, `ads.editApprovedAd` makes the draft that replaces it
+(same name, home, campaign, routing and creative; `replaces_ad_id` points at the
+original). The original keeps running until the draft is approved. Approving the
+draft retires it: an original that never ran is deleted with the images its
+approval saved; one that ran keeps its `platform_ad` rows and stats and keeps
+running until someone pauses it on the platform.
+
+The push sends a campaign's approved ads and leaves drafts in the campaign.
+
+Deleting an ad that is live on a platform deletes it there first (Zernio
+`DELETE /v1/ads/{adId}`, which takes the platform's ad id), then here. Its
+`platform_ad` rows stay, marked deleted, as the record of what ran. An ad deleted
+on the platform outside the app is deleted here by the next sync, unless it still
+runs elsewhere. Nothing blocks deletion.
 
 ## Media library export bundles
 
@@ -42,8 +48,8 @@ by size in slide order, with the existing individual asset actions. Source photo
 remain ordinary library items. Search, folder, and tag filters apply before
 grouping, so a filtered bundle shows only matching exports. New exports record
 ad and campaign names in their approval provenance; older exports still group
-using their existing ad ID and source version. Reopening removes unused exports
-through the existing soft-delete lifecycle, so their bundle disappears too.
+using their existing ad ID and source version. Retiring a replaced ad that never ran removes its unused exports through the
+existing soft-delete lifecycle, so their bundle disappears too.
 
 ## Meta delivery workspace
 
@@ -121,6 +127,6 @@ remain available if generation fails. There is no automatic retry or reconciliat
 
 Performance clients can create ads before choosing a campaign. The All ads, Text-first and Creative-first filters describe the authoring approach; they do not change platform compilation eligibility. Search still compiles text ads and feed placements compile supported creative formats.
 
-Studio supports home-photo and brand-concept generation, uploaded media, the shared image/composition editor, video/catalog tiles, and complete text headline/description pools. Text drafts can contain partial copy; approval requires 3–15 headlines (30 characters each) and 2–4 descriptions (90 characters each). Reopen approved text ads before editing. Text editing and approval require the current `updatedAt` version, preventing a stale browser from approving or overwriting newer copy. Creative-set rebuilds preserve text drafts and approved ads.
+Studio supports home-photo and brand-concept generation, uploaded media, the shared image/composition editor, video/catalog tiles, and complete text headline/description pools. Text drafts can contain partial copy; approval requires 3–15 headlines (30 characters each) and 2–4 descriptions (90 characters each). Approved text ads change through a replacement draft, like every other ad. Text editing and approval require the current `updatedAt` version, preventing a stale browser from approving or overwriting newer copy. Creative-set rebuilds preserve text drafts and approved ads.
 
 The existing `draftAd`, `writeGoogleTextAds`, and `generateStarterIdeas` capabilities accept exactly one of `brandId` (standalone Studio) or `campaignId`. Brand-scoped generation uses the same services as campaign authoring. `writeGoogleTextAds` optionally accepts a landing URL and search themes. `setAdCopy` accepts a complete `text` pool with `expectedUpdatedAt`. Approved standalone ads can subsequently be attached to a campaign using the existing attachment flow; the current relationship still assigns each ad to one campaign.

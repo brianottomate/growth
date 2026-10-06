@@ -80,7 +80,9 @@ export async function saveAdIdea(
     );
   }
   if (ad.content.ideaStudio?.approval)
-    throw new Error("Reopen this approved ad before editing it.");
+    throw new Error(
+      "Approved ads are final. Edit it to make a draft that replaces it.",
+    );
   if (
     args.reviewImportedCreative &&
     (!document.cards.length ||
@@ -102,6 +104,8 @@ export async function saveAdIdea(
       ...(bookingTargetId !== undefined ? { bookingTargetId } : {}),
       name: args.name,
       status: "drawn",
+      readyAt: null,
+      readyBy: null,
       updatedAt: new Date(),
     })
     .where(and(eq(adTable.id, ad.id), eq(adTable.updatedAt, ad.updatedAt)))

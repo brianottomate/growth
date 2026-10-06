@@ -1,3 +1,4 @@
+import { adReviewOf } from "@/lib/ad-review";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
@@ -41,6 +42,7 @@ export default async function PerformanceBrandAdsPage({
     name: ad.name,
     content: ad.content,
     status: ad.status,
+    review: adReviewOf(ad),
     updatedAt: ad.updatedAt.toISOString(),
     homeId: ad.homeId,
     bookingTargetId: ad.bookingTargetId,

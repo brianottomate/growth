@@ -59,6 +59,8 @@ import type {
 } from "@/lib/ad-idea-studio";
 import type { AdCreativeContent, MediaItem } from "@/server/db/schema";
 import { ApprovedStamp } from "@/components/approved-stamp";
+import { OwnerAvatar } from "@/components/assignment/assignee";
+import type { AdReview } from "@/lib/ad-review";
 
 const CALL_TO_ACTION_OPTIONS = [
   { value: "BOOK_NOW", label: "Book now" },
@@ -75,6 +77,7 @@ export type StudioAd = {
   updatedAt: string;
   homeId?: string | null;
   bookingTargetId?: string | null;
+  review?: AdReview;
 };
 
 export function AdCard({
@@ -92,10 +95,7 @@ export function AdCard({
   metadata?: React.ReactNode;
   /** The campaign it sits in; absent in the studio, where ideas have none. */
   campaignId?: string;
-  /**
-   * In the studio, Approve is Freeze: the images for every included size are
-   * saved on the spot, so the idea leaves ready for any campaign.
-   */
+  /** In the studio, where ideas have no campaign yet. */
   studio?: boolean;
   brandId: string;
   brandName: string;
@@ -104,18 +104,27 @@ export function AdCard({
   home?: { name: string; url: string };
 }) {
   const router = useRouter();
-  const savedApproved = Boolean(ad.content.ideaStudio?.approval);
-  // Approval can show immediately; reopening waits for the server to unlock it.
+  const review = ad.review;
+  const savedApproved = review
+    ? review.status === "approved"
+    : Boolean(ad.content.ideaStudio?.approval);
+  const ready = review?.status === "ready";
+  // Approval can show immediately; the server confirms it.
   const [optimistic, setOptimistic] = useState<boolean | null>(null);
   const [stamped, setStamped] = useState(false);
   useEffect(() => setOptimistic(null), [savedApproved]);
   const approved = optimistic ?? savedApproved;
-  // Pushed is read-only: Meta runs the frozen images, so there is no reopen.
+  // Approved is final and pushed is read-only: both change by a replacement.
   const pushed = Boolean(deliveryState);
   const locked = approved || pushed;
   const imagesSaved = Boolean(
     ad.content.ideaStudio && ideaImagesSaved(ad.content.ideaStudio),
   );
+  const { data: members = [] } = useQuery(
+    orpc.content.assignableMembers.queryOptions(),
+  );
+  const member = (id: string | null | undefined) =>
+    (id && members.find((m) => m.id === id)) || null;
   const [view, setView] = useState<"overview" | "details">(() =>
     !approved && ideaDocumentFromAd(ad).cards.length === 0
       ? "details"
@@ -134,15 +143,23 @@ export function AdCard({
     return () => window.removeEventListener("prepare-ad-creative", prepare);
   }, [ad.id]);
   const collapsed = view === "overview";
-  const freeze = useMutation(
-    orpc.ads.freezeIdea.mutationOptions({
-      onMutate: () => {
-        setOptimistic(true);
-        setStamped(true);
-        setView("overview");
+  const approval = useMutation(
+    orpc.ads.setAdStatus.mutationOptions({
+      onMutate: ({ status }) => {
+        if (status === "approved") {
+          setOptimistic(true);
+          setStamped(true);
+          setView("overview");
+        }
       },
-      onSuccess: () => {
-        toast.success("Frozen · images saved");
+      onSuccess: (_result, { status }) => {
+        toast.success(
+          status === "approved"
+            ? "Ad approved"
+            : status === "ready"
+              ? "Marked ready for review"
+              : "Back to draft",
+        );
         router.refresh();
       },
       onError: (error) => {
@@ -153,27 +170,17 @@ export function AdCard({
       },
     }),
   );
-  const approval = useMutation(
-    orpc.ads.setAdStatus.mutationOptions({
-      onMutate: ({ status }) => {
-        if (status === "approved") setOptimistic(true);
-        setStamped(status === "approved");
-        setView("overview");
-      },
-      onSuccess: (result, { status }) => {
-        if (result.cleanupWarning) toast.warning(result.cleanupWarning);
-        setOptimistic(status === "approved");
+  const editApproved = useMutation(
+    orpc.ads.editApprovedAd.mutationOptions({
+      onSuccess: (result) => {
         toast.success(
-          status === "approved" ? "Ad approved" : "Draft reopened.",
+          result.created
+            ? "Draft made. It replaces this ad once approved."
+            : "A replacement draft is already open.",
         );
         router.refresh();
       },
-      onError: (error) => {
-        setOptimistic(null);
-        setStamped(false);
-        toast.error(error.message);
-        router.refresh();
-      },
+      onError: (error) => toast.error(error.message),
     }),
   );
   const [document, setDocument] = useState(() => ideaDocumentFromAd(ad));
@@ -1032,9 +1039,16 @@ export function AdCard({
             </h3>
             {approved && (
               <ApprovedStamp
-                at={ad.content.ideaStudio?.approval?.approvedAt ?? new Date()}
+                at={
+                  review?.approvedAt ??
+                  ad.content.ideaStudio?.approval?.approvedAt ??
+                  new Date()
+                }
                 fresh={stamped}
               />
+            )}
+            {approved && member(review?.approvedBy) && (
+              <OwnerAvatar member={member(review?.approvedBy)} size="sm" />
             )}
           </div>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
@@ -1046,15 +1060,16 @@ export function AdCard({
             <span>
               {approved
                 ? imagesSaved
-                  ? studio
-                    ? "Frozen · images saved"
-                    : "Approved · images saved"
-                  : studio
-                    ? "Approved · images not saved"
-                    : "Approved"
-                : ad.content.metaImport
-                  ? "Needs local review"
-                  : "Draft ad"}
+                  ? "Approved"
+                  : "Approved · saving images…"
+                : ready
+                  ? `Ready for review${member(review?.readyBy)?.name ? ` · ${member(review?.readyBy)?.name}` : ""}`
+                  : ad.content.metaImport
+                    ? "Needs local review"
+                    : "Draft"}
+              {review?.replacesAdId && !approved
+                ? " · replaces an approved ad"
+                : ""}
               {deliveryState ? ` · ${deliveryState}` : ""}
             </span>
             {metadata && (
@@ -1264,9 +1279,9 @@ export function AdCard({
           </div>
           {locked && view === "details" && (
             <p className="text-sm text-muted-foreground">
-              {pushed
-                ? "Pushed and read-only. Make a new ad or campaign to change it."
-                : "Reopen the idea to edit. Approved exports remain fixed until you approve again."}
+              Approved ads are final. Edit makes a draft that replaces this ad
+              once it is approved
+              {pushed ? "; this one keeps running until then" : ""}.
             </p>
           )}
           {view === "details" && (
@@ -1439,13 +1454,31 @@ export function AdCard({
           {collapsed ? (locked ? "View details" : "Edit") : "Close details"}
         </Button>
 
-        {collapsed && studio && !pushed && (!approved || !imagesSaved) && (
+        {collapsed && !approved && (
           <Button
             size="sm"
-            disabled={busy || freeze.isPending || editor !== null}
+            variant="outline"
+            disabled={busy || approval.isPending || editor !== null}
             onClick={() =>
-              freeze.mutate({
+              approval.mutate({
                 adId: ad.id,
+                status: ready ? "drawn" : "ready",
+                expectedUpdatedAt: savedState.version,
+              })
+            }
+          >
+            {ready ? "Not ready" : "Mark ready"}
+          </Button>
+        )}
+        {collapsed && !approved && (
+          <Button
+            size="sm"
+            disabled={busy || approval.isPending || editor !== null}
+            loading={approval.isPending}
+            onClick={() =>
+              approval.mutate({
+                adId: ad.id,
+                status: "approved",
                 expectedUpdatedAt: savedState.version,
                 exportShapes: [
                   ...(savedState.document.exportShapes ??
@@ -1454,36 +1487,18 @@ export function AdCard({
               })
             }
           >
-            {freeze.isPending
-              ? "Saving images…"
-              : approved
-                ? "Save images"
-                : "Approve"}
+            Approve
           </Button>
         )}
-        {collapsed && !pushed && (!studio || approved) && (
+        {collapsed && approved && (
           <Button
             size="sm"
-            variant={approved ? "outline" : "default"}
-            disabled={busy || approval.isPending || editor !== null}
-            loading={approval.isPending}
-            onClick={() =>
-              approval.mutate({
-                adId: ad.id,
-                status: approved ? "drawn" : "approved",
-                expectedUpdatedAt: savedState.version,
-                ...(approved
-                  ? {}
-                  : {
-                      exportShapes: [
-                        ...(savedState.document.exportShapes ??
-                          savedState.document.shapes),
-                      ],
-                    }),
-              })
-            }
+            variant="outline"
+            disabled={busy || editApproved.isPending}
+            loading={editApproved.isPending}
+            onClick={() => editApproved.mutate({ adId: ad.id })}
           >
-            {approved ? "Reopen idea" : "Approve"}
+            Edit as new draft
           </Button>
         )}
       </footer>

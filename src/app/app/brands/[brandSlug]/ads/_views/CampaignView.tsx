@@ -200,6 +200,8 @@ export async function CampaignView({
   const editableAds = ads.filter(
     (ad) => !("media" in ad.content) || !isImportedMetaCatalog(ad.content),
   );
+  // The push sends approved ads; drafts stay here until they are approved.
+  const approvedAds = ads.filter((ad) => ad.status === "approved");
   const adActions = (
     <div className="flex flex-wrap items-center gap-2">
       {!anyPushed && (
@@ -509,18 +511,10 @@ export async function CampaignView({
                     campaignName={campaign.name}
                     campaignStartAt={campaign.startAt}
                     campaignEndAt={campaign.endAt}
-                    draftAds={ads}
+                    draftAds={approvedAds}
                     audiences={audiences}
-                    draftAdCount={ads.length}
-                    unapprovedCount={
-                      editableAds.filter(
-                        (ad) =>
-                          ad.status !== "approved" ||
-                          ("media" in ad.content &&
-                            ad.content.ideaStudio &&
-                            !ad.content.ideaStudio.approval),
-                      ).length
-                    }
+                    draftAdCount={approvedAds.length}
+                    unapprovedCount={editableAds.length - approvedAds.length}
                     audienceCount={audiences.length}
                     brandUrl={campaign.landingUrl ?? brand.website ?? null}
                   />

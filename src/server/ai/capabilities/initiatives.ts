@@ -108,7 +108,7 @@ const detail = z.object({
             ...previewBase,
             name: z.string(),
             textOnly: z.boolean(),
-            status: z.enum(["drawn", "kept", "approved"]),
+            status: z.enum(["drawn", "kept", "approved", "ready"]),
             executions: z.array(platform),
           }),
         ),

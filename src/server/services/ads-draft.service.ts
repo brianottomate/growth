@@ -866,7 +866,9 @@ export async function addDraftAd(input: {
   };
 
   if (existing?.status === "approved")
-    throw new Error("Reopen this approved ad before editing it.");
+    throw new Error(
+      "Approved ads are final. Edit it to make a draft that replaces it.",
+    );
   if (existing) await assertAdNotPushed(existing.id);
   if (existing && "media" in existing.content && existing.content.ideaStudio) {
     throw new Error(
@@ -1529,7 +1531,9 @@ export async function replaceDraftAdMedia(input: {
     input.organizationId,
   );
   if (ad.status === "approved")
-    throw new Error("Reopen this approved ad before editing it");
+    throw new Error(
+      "Approved ads are final. Edit it to make a draft that replaces it.",
+    );
   await assertAdNotPushed(ad.id);
   const content = ad.content;
   if (!("media" in content) || !Array.isArray(content.media)) {
@@ -1586,20 +1590,4 @@ export async function replaceDraftAdMedia(input: {
     .where(eq(adTable.id, ad.id))
     .returning();
   return { ad: updated!, replaced: previous };
-}
-
-export async function deleteDraftAd(input: {
-  organizationId: string;
-  adId: string;
-}) {
-  const ad = await db.query.adTable.findFirst({
-    where: eq(adTable.id, input.adId),
-  });
-  if (!ad) throw new Error("Ad not found");
-  if (!ad.campaignId) throw new Error("That ad is not in a campaign yet");
-  await requireOwnedCampaign(ad.campaignId, input.organizationId);
-  // Plan rows carry no externalId by design; the platform_ad children keep
-  // their nullable lineage, so deleting the draft never touches a platform.
-  await db.delete(adTable).where(eq(adTable.id, ad.id));
-  return { deleted: true };
 }

@@ -8,19 +8,22 @@ import {
 } from "@/lib/ad-authoring";
 import { projectIdea, type IdeaShape } from "@/lib/ad-idea-studio";
 import {
+  approveImageAd,
   assertAdNotPushed,
   freezeApprovedAd,
-  transitionAdApproval,
+  retireReplacedAd,
 } from "./ad-approval.service";
 import "server-only";
+import { waitUntil } from "@vercel/functions";
 import { rewriteAdCreative } from "./ad-creative-copy.service";
 import { listingCopyContext } from "./listing-copy-context.service";
 import { marketOf, type BrandMarkets } from "@/lib/markets";
 
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 
 import {
   adTable,
+  platformAdTable,
   brandTable,
   campaignTable,
   homeTable,
@@ -85,7 +88,7 @@ import {
   writeAdSetCopy,
   type CopyHome,
 } from "./ad-set-copy.service";
-import { deleteDraftAd } from "./ads-draft.service";
+import { deleteZernioAd } from "@/server/clients/zernio.client";
 import { extendToCanvas } from "./card-director.service";
 import { freezeComposition } from "./composition.service";
 import { setHomeHero } from "./homes.service";
@@ -214,7 +217,10 @@ async function requireOwnedAd(
     throw new AdSetError(404, "Ad not found");
   }
   if (!allowStudio && ad.status === "approved")
-    throw new AdSetError(422, "Reopen this approved ad before editing it.");
+    throw new AdSetError(
+      422,
+      "Approved ads are final. Edit it to make a draft that replaces it.",
+    );
   if (!allowStudio) await assertAdNotPushed(ad.id);
   if (!allowStudio && "media" in ad.content && ad.content.ideaStudio) {
     throw new AdSetError(
@@ -1197,7 +1203,9 @@ export async function setAdHome(input: {
   await assertAdNotPushed(ad.id);
   const content = creativeContent(ad);
   if (ad.status === "approved" || content.ideaStudio?.approval)
-    throw new Error("Reopen this approved ad before changing its home.");
+    throw new Error(
+      "Approved ads are final. Edit it to make a draft that replaces it.",
+    );
   const brand = ad.brand;
   const bound = await homeBinding(brand, input);
   const { home } = bound;
@@ -1493,99 +1501,141 @@ export async function attachAdSet(input: {
 }
 
 /** Remove one ad: a draft outright, a campaign ad through its own guard. */
+/** Platform statuses after which an ad no longer exists on the platform. */
+const GONE_ON_PLATFORM = ["deleted", "removed", "cancelled", "canceled"];
+
+/**
+ * Delete an ad, wherever it is. One that is live on a platform is deleted
+ * there first, so the two never disagree; its `platform_ad` rows stay as the
+ * record of what ran, with their stats, marked deleted. Nothing blocks
+ * deletion: an ad already gone from the platform is simply removed here.
+ */
 export async function deleteAd(input: { adId: string; orgId: string }) {
   const ad = await requireOwnedAd(input, true);
-  if (ad.campaignId) {
-    return deleteDraftAd({ adId: ad.id, organizationId: input.orgId });
+  const ran = await db.query.platformAdTable.findMany({
+    where: and(
+      eq(platformAdTable.adId, ad.id),
+      isNotNull(platformAdTable.externalId),
+    ),
+    columns: { id: true, externalId: true, status: true },
+  });
+  for (const row of ran) {
+    if (GONE_ON_PLATFORM.includes((row.status ?? "").toLowerCase())) continue;
+    // Zernio takes the platform's own ad id here and deletes it on Meta.
+    await deleteZernioAd(row.externalId!).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      // Already gone on the platform is the outcome we wanted.
+      if (!/\b404\b|not found/i.test(message)) throw error;
+    });
+    await db
+      .update(platformAdTable)
+      .set({ status: "deleted" })
+      .where(eq(platformAdTable.id, row.id));
   }
   await db.delete(adTable).where(eq(adTable.id, ad.id));
-  return { deleted: true };
+  return { deleted: true, deletedOnPlatform: ran.length };
 }
 
-/** Approve one ad, or put it back. Approved is what survives a rebuild. */
+/**
+ * Move an ad along draft → ready → approved. Ready is its author saying it is
+ * done; any edit sends it back to draft (a database trigger). Approved is
+ * final: the images are saved in the background and the ad never changes
+ * again. To change an approved ad, `editApprovedAd` makes the draft that
+ * replaces it, and approving that draft retires the original.
+ */
 export async function setAdStatus(input: {
   adId: string;
   orgId: string;
-  status: "drawn" | "approved";
+  status: "drawn" | "ready" | "approved";
   userId?: string;
   expectedUpdatedAt?: string;
   exportShapes?: IdeaShape[];
 }) {
   const ad = await requireOwnedAd(input, true);
-  await assertAdNotPushed(ad.id);
-  if (ad.type === "text") {
-    if (!input.expectedUpdatedAt)
-      throw new Error("Review the current ad before changing approval.");
-    if (
-      input.status === "approved" &&
-      !textAdReady(ad.content as AdTextContent)
-    )
-      throw new Error(
-        "Add at least 3 headlines and 2 descriptions within the search copy limits before approving.",
-      );
+  if (ad.status === "approved") {
+    if (input.status === "approved") {
+      // A retry finishes a retirement an earlier approval did not.
+      const retired = await retireReplacedAd(ad.id);
+      return {
+        adId: ad.id,
+        status: "approved" as const,
+        ...(retired.retired ? { replaced: retired.retired } : {}),
+      };
+    }
+    throw new AdSetError(
+      422,
+      "Approved ads are final. Edit it to make a draft that replaces it.",
+    );
+  }
+  if (!input.expectedUpdatedAt)
+    throw new Error("Review the current ad before changing its status.");
+  const version = new Date(input.expectedUpdatedAt);
+  if (input.status !== "approved") {
     const saved = await db
       .update(adTable)
-      .set({ status: input.status })
-      .where(
-        and(
-          eq(adTable.id, ad.id),
-          eq(adTable.updatedAt, new Date(input.expectedUpdatedAt)),
-        ),
+      .set(
+        input.status === "ready"
+          ? { status: "ready", readyAt: new Date(), readyBy: input.userId }
+          : { status: "drawn", readyAt: null, readyBy: null },
       )
+      .where(and(eq(adTable.id, ad.id), eq(adTable.updatedAt, version)))
       .returning({ id: adTable.id });
     if (!saved.length)
-      throw new Error("This ad changed. Refresh before changing approval.");
+      throw new Error("This ad changed. Refresh before changing its status.");
     return { adId: ad.id, status: input.status };
   }
+  if (!input.userId) throw new Error("Approval needs a signed-in person.");
+  const userId = input.userId;
   if (
     "media" in ad.content &&
     ad.content.media.every((card) => card.type === "image") &&
     (!ad.content.format || ["static", "carousel"].includes(ad.content.format))
   ) {
-    if (!input.userId || !input.expectedUpdatedAt)
-      throw new Error(
-        "Review the ad and supply expectedUpdatedAt before changing approval.",
-      );
-    return transitionAdApproval({
+    await approveImageAd({
       ...input,
-      userId: input.userId,
+      userId,
       expectedUpdatedAt: input.expectedUpdatedAt,
     });
-  }
-  const content = creativeContent(ad);
-  if (adFormatOf(content) === "video") {
-    if (!input.expectedUpdatedAt)
-      throw new Error("Reload this ad before changing approval.");
-    if (
-      input.status === "approved" &&
-      (!content.media.length ||
-        content.media.some((item) => item.type !== "video") ||
-        !content.headline.trim() ||
-        !content.body.trim() ||
-        (!content.linkUrl && !ad.brand.website))
-    )
+    // Saving every size's images takes seconds per card; the push and the
+    // previews wait on them if they are still being saved.
+    waitUntil(
+      freezeApprovedAd(ad.id).catch((error: unknown) =>
+        console.error("saving approved images failed", ad.id, error),
+      ),
+    );
+  } else {
+    if (ad.type === "text" && !textAdReady(ad.content as AdTextContent))
       throw new Error(
-        "Add a video, headline, primary text and destination before approval.",
+        "Add at least 3 headlines and 2 descriptions within the search copy limits before approving.",
       );
+    if (ad.type !== "text") {
+      const content = creativeContent(ad);
+      if (
+        adFormatOf(content) === "video" &&
+        (!content.media.length ||
+          content.media.some((item) => item.type !== "video") ||
+          !content.headline.trim() ||
+          !content.body.trim() ||
+          (!content.linkUrl && !ad.brand.website))
+      )
+        throw new Error(
+          "Add a video, headline, primary text and destination before approval.",
+        );
+    }
     const saved = await db
       .update(adTable)
-      .set({ status: input.status })
-      .where(
-        and(
-          eq(adTable.id, ad.id),
-          eq(adTable.updatedAt, new Date(input.expectedUpdatedAt)),
-        ),
-      )
+      .set({ status: "approved", approvedAt: new Date(), approvedBy: userId })
+      .where(and(eq(adTable.id, ad.id), eq(adTable.updatedAt, version)))
       .returning({ id: adTable.id });
     if (!saved.length)
-      throw new Error("This ad changed. Refresh before changing approval.");
-    return { adId: ad.id, status: input.status };
+      throw new Error("This ad changed. Refresh before approving.");
   }
-  await db
-    .update(adTable)
-    .set({ status: input.status })
-    .where(eq(adTable.id, ad.id));
-  return { adId: ad.id, status: input.status };
+  const retired = await retireReplacedAd(ad.id);
+  return {
+    adId: ad.id,
+    status: "approved" as const,
+    ...(retired.retired ? { replaced: retired.retired } : {}),
+  };
 }
 
 /**
@@ -1670,7 +1720,7 @@ export async function setAdCopy(input: {
         and(
           eq(adTable.id, ad.id),
           eq(adTable.updatedAt, new Date(input.expectedUpdatedAt)),
-          eq(adTable.status, "drawn"),
+          inArray(adTable.status, ["drawn", "ready"]),
         ),
       )
       .returning({ id: adTable.id });
@@ -2039,7 +2089,9 @@ export async function writeSetCopy(input: {
     if (!("media" in ad.content) || !editableIds.has(ad.id)) continue;
     if (ad.status === "approved" || ad.content.ideaStudio?.approval) {
       if (input.adId)
-        throw new Error("Reopen this approved ad before writing new copy.");
+        throw new Error(
+          "Approved ads are final. Edit it to make a draft that replaces it.",
+        );
       continue;
     }
     await rewriteAdCreative({
@@ -2285,7 +2337,7 @@ export async function saveAdSection(
     .where(
       and(
         eq(adTable.id, ad.id),
-        eq(adTable.status, "drawn"),
+        inArray(adTable.status, ["drawn", "ready"]),
         eq(adTable.updatedAt, new Date(input.expectedUpdatedAt)),
       ),
     )

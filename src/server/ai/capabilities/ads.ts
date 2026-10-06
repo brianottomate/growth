@@ -54,6 +54,7 @@ import {
   editAdCardsActionOutputSchema,
   attachAdSetActionOutputSchema,
   setAdStatusActionOutputSchema,
+  editApprovedAdActionOutputSchema,
   setAdCopyActionOutputSchema,
   setPlacementCopyActionOutputSchema,
   clearPlacementActionOutputSchema,
@@ -174,6 +175,7 @@ import {
   writeSetCopy,
   setAdPlatforms,
 } from "@/server/services/ad-set.service";
+import { editApprovedAd } from "@/server/services/ad-approval.service";
 import {
   runStarterGeneration,
   startStarterGeneration,
@@ -1361,7 +1363,7 @@ export const deleteAudienceAction = growthAction({
 export const deleteAdDraftAction = growthAction({
   outputSchema: deleteAdDraftActionOutputSchema,
   description:
-    "Delete a drafted ad, whether it sits on the brand's set or in a campaign. Local only — the platform ads it compiled to keep running and keep their history.",
+    "Delete an ad, wherever it is. If it is live on a platform it is deleted there first (Zernio deletes the platform ad, and an ad set or campaign Zernio created that is left empty). The record of what ran stays, with its stats. Pausing is the reversible alternative.",
   inputSchema: z.object({ adId: z.string().trim().min(1) }),
   execute: async (input, ctx) =>
     deleteAd({ adId: input.adId, orgId: ctx.orgId }),
@@ -1464,7 +1466,7 @@ export const buildAdSetAction = growthAction({
 
 export const writeSetCopyAction = growthAction({
   description:
-    "Generate a fresh copy set for local ads: caption and Meta headline plus editable image text for static/carousel ideas, preserving selected photos, slide order, templates and crops. Supply adId to rewrite only one ad. Approved editable ideas must be reopened first; pushed ads cannot be changed. Legacy artwork keeps its image text. The same as New copy on an ad or Write copy for a set.",
+    "Generate a fresh copy set for local ads: caption and Meta headline plus editable image text for static/carousel ideas, preserving selected photos, slide order, templates and crops. Supply adId to rewrite only one ad. Approved ads are final: adsWrite.editApprovedAd makes the draft that replaces one. Legacy artwork keeps its image text. The same as New copy on an ad or Write copy for a set.",
   inputSchema: z.object({
     brandId: z.string().min(1),
     campaignId: z.string().min(1).optional(),
@@ -1905,10 +1907,10 @@ export const attachAdSetAction = growthAction({
 export const setAdStatusAction = growthAction({
   outputSchema: setAdStatusActionOutputSchema,
   description:
-    "Approve an ad (a sign-off on copy and creative), or reopen it as an editable draft. Its images are rendered and saved at push, which waits for them before creating anything. Supply expectedUpdatedAt from the latest read. This never publishes to a platform.",
+    "Move an ad along draft → ready → approved. ready marks it done for review (any later edit sends it back to drawn); drawn takes a ready mark back. approved is the person's final sign-off: the ad never changes again and its images are saved in the background. Approving a draft made by editApprovedAd retires the ad it replaces. An approved ad cannot go back to draft; use editApprovedAd. Supply expectedUpdatedAt from the latest read. This never publishes to a platform.",
   inputSchema: z.object({
     adId: z.string().min(1),
-    status: z.enum(["drawn", "approved"]),
+    status: z.enum(["drawn", "ready", "approved"]),
     expectedUpdatedAt: z.string().datetime().optional(),
     exportShapes: ideaExportShapesSchema.optional(),
   }),
@@ -1921,6 +1923,16 @@ export const setAdStatusAction = growthAction({
       exportShapes: input.exportShapes,
       userId: ctx.userId,
     }),
+});
+
+export const editApprovedAdAction = growthAction({
+  outputSchema: editApprovedAdActionOutputSchema,
+  description:
+    "Change an approved ad: makes the draft that replaces it, with the same name, home, campaign, routing and creative, and returns its adId to edit. The approved ad keeps running until the draft is approved, which retires it (deleted if it never ran, kept for its stats if it did). Calling again returns the open draft.",
+  inputSchema: z.object({ adId: z.string().min(1) }),
+  examples: [{ adId: "ad_01" }],
+  execute: (input, ctx) =>
+    editApprovedAd({ adId: input.adId, orgId: ctx.orgId }),
 });
 
 export const setAdCopyAction = growthAction({
@@ -2066,7 +2078,7 @@ export const saveIdeaAction = growthAction({
   nativeOutputSchema: draftAdResultSchema,
   outputSchema: saveIdeaActionOutputSchema,
   description:
-    "Save an editable image ad idea: shared ad copy, ordered source images, per-image composition recipes and shape overrides. Read adsRead.ideaContext immediately before saving for this ad's current updatedAt and complete document. After reopening or any prior save, read again; never reuse the old version. Preserves recipes and returns the ad to draft; does not publish or materialize renders.",
+    "Save an editable image ad idea: shared ad copy, ordered source images, per-image composition recipes and shape overrides. Read adsRead.ideaContext immediately before saving for this ad's current updatedAt and complete document. After any prior save, read again; never reuse the old version. Preserves recipes and returns the ad to draft; does not publish or materialize renders.",
   inputSchema: ideaSaveSchema,
   execute: (input, ctx) =>
     saveAdIdea(input, { orgId: ctx.orgId, userId: ctx.userId }),
