@@ -1,3 +1,4 @@
+import { emailSequenceRouter } from "@/server/api/routers/email-sequence.router";
 import { workflowRouter } from "./routers/workflow.router";
 import { initiativeRouter } from "@/server/api/routers/initiative.router";
 import { homeGroupsRouter } from "@/server/api/routers/homeGroups.router";
@@ -80,6 +81,7 @@ export const appRouter = {
   instantly: instantlyRouter,
   leads: leadsRouter,
   lifecycle: lifecycleRouter,
+  emailSequence: emailSequenceRouter,
   pregenNative: pregenNativeRouter,
   transactional: transactionalRouter,
   listening: listeningRouter,

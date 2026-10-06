@@ -14,13 +14,12 @@ import {
   type MessageSendSnapshot,
 } from "@/lib/email-delivery";
 import { fillFields } from "@/lib/email-personalization";
-import { executeQuery } from "@/server/clients/bigquery.client";
+import { websiteEmailOptOuts } from "./email-opt-outs.service";
 import {
   postmarkServerToken,
   sendPostmarkBatch,
   type PostmarkOutgoingMessage,
 } from "@/server/clients/postmark.client";
-import { listGuestEmailOptOuts } from "@/server/clients/wander.client";
 import { db } from "@/server/db";
 import {
   emailAudienceSnapshotTable,
@@ -265,16 +264,6 @@ async function brokenLinks(html: string) {
   return broken;
 }
 
-async function websiteOrganizationId(websiteId: string) {
-  const [row] = await executeQuery<{ organizationId: string }>(
-    "SELECT organizationId FROM `wander-9fc9c.wos_datastream.public_SaasWebsite` WHERE id=@websiteId LIMIT 1",
-    { websiteId },
-  );
-  if (!row?.organizationId)
-    throw new Error(`WanderOS website ${websiteId} has no organization.`);
-  return row.organizationId;
-}
-
 async function failSend(id: string, message: string) {
   await db
     .update(messageSendTable)
@@ -362,10 +351,7 @@ export async function dispatchBrandSend(input: {
       throw new Error(
         "The brand has no WanderOS website to read opt-outs from.",
       );
-    const optedOut = await listGuestEmailOptOuts({
-      organizationId: await websiteOrganizationId(websiteId),
-      websiteId,
-    });
+    const optedOut = await websiteEmailOptOuts(websiteId);
     const token = await postmarkServerToken(audience.serverId);
     const sender = snapshot.sender;
 

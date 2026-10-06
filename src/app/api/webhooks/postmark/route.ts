@@ -1,6 +1,7 @@
 import { createHash, timingSafeEqual } from "crypto";
 import { type NextRequest, NextResponse } from "next/server";
 
+import { recordLifecyclePostmarkEvent } from "@/server/services/lifecycle-runtime/postmark-events";
 import { env } from "@/env";
 import { db } from "@/server/db";
 import { postmarkEventTable } from "@/server/db/schema";
@@ -86,5 +87,6 @@ export async function POST(request: NextRequest) {
     })
     .onConflictDoNothing();
 
+  await recordLifecyclePostmarkEvent(event, serverId);
   return NextResponse.json({ received: true });
 }

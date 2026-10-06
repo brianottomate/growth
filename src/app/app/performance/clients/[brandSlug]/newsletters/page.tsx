@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { EmailSequences } from "@/app/app/newsletters/sequences/EmailSequences";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
@@ -20,9 +22,14 @@ export default async function PerformanceBrandNewslettersPage({
   searchParams,
 }: {
   params: Promise<{ brandSlug: string }>;
-  searchParams: Promise<{ kind?: string; view?: string }>;
+  searchParams: Promise<{
+    kind?: string;
+    view?: string;
+    tab?: string;
+    sequence?: string;
+  }>;
 }) {
-  const [{ brandSlug }, { kind, view }] = await Promise.all([
+  const [{ brandSlug }, { kind, view, tab, sequence }] = await Promise.all([
     params,
     searchParams,
   ]);
@@ -42,42 +49,82 @@ export default async function PerformanceBrandNewslettersPage({
     columns: { emailSender: true, wanderOsWebsiteId: true },
   });
   const setup = sender?.emailSender?.marketingDomain;
-  return (
-    <NewslettersView
-      brands={[{ id: brand.id, name: brand.name, slug: brand.slug }]}
-      brand={{ id: brand.id, name: brand.name, slug: brand.slug }}
-      basePath={`/app/performance/clients/${slug}/newsletters`}
-      kindFilter={kind}
-      view={view === "wall" || view === "read" ? view : "list"}
-      audiencesCard={
-        <EmailAudiencesClient
-          key={brand.id}
-          embedded
-          brands={[
-            {
-              id: brand.id,
-              name: brand.name,
-              slug: brand.slug,
-              wanderOsWebsiteId: sender?.wanderOsWebsiteId ?? null,
-            },
-          ]}
-        />
-      }
-      settingsCard={
-        <EmailDnsSetup
+  const basePath = `/app/performance/clients/${slug}/newsletters`;
+  const activeTab = ["sequences", "audiences", "settings"].includes(tab ?? "")
+    ? tab
+    : "blasts";
+  const audiences = (
+    <EmailAudiencesClient
+      key={brand.id}
+      embedded
+      brands={[
+        {
+          id: brand.id,
+          name: brand.name,
+          slug: brand.slug,
+          wanderOsWebsiteId: sender?.wanderOsWebsiteId ?? null,
+        },
+      ]}
+    />
+  );
+  const settings = (
+    <EmailDnsSetup
+      brandId={brand.id}
+      rootDomain={setup?.rootDomain ?? suggestedEmailRoot(brand.website)}
+      sendingDomain={setup?.sendingDomain}
+      styleAction={
+        <BrandEmailStyle
           brandId={brand.id}
-          rootDomain={setup?.rootDomain ?? suggestedEmailRoot(brand.website)}
-          sendingDomain={setup?.sendingDomain}
-          styleAction={
-            <BrandEmailStyle
-              brandId={brand.id}
-              brandName={brand.name}
-              theme={sender?.emailSender?.theme}
-              copyGuide={sender?.emailSender?.copyGuide}
-            />
-          }
+          brandName={brand.name}
+          theme={sender?.emailSender?.theme}
+          copyGuide={sender?.emailSender?.copyGuide}
         />
       }
     />
+  );
+  return (
+    <div className="space-y-6">
+      <nav
+        aria-label="Email workspace"
+        className="flex flex-wrap gap-1 border-b pb-3"
+      >
+        {(
+          [
+            ["blasts", "Blasts"],
+            ["sequences", "Sequences"],
+            ["audiences", "Audiences"],
+            ["settings", "Settings"],
+          ] as const
+        ).map(([key, label]) => (
+          <Link
+            key={key}
+            href={key === "blasts" ? basePath : `${basePath}?tab=${key}`}
+            aria-current={activeTab === key ? "page" : undefined}
+            className={`rounded-md px-4 py-2 text-sm font-medium ${activeTab === key ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/50"}`}
+          >
+            {label}
+          </Link>
+        ))}
+      </nav>
+      {activeTab === "sequences" ? (
+        <EmailSequences
+          brandId={brand.id}
+          basePath={basePath}
+          sequenceId={sequence}
+        />
+      ) : activeTab === "audiences" ? (
+        audiences
+      ) : activeTab === "settings" ? (
+        settings
+      ) : (
+        <NewslettersView
+          brands={[{ id: brand.id, name: brand.name, slug: brand.slug }]}
+          brand={{ id: brand.id, name: brand.name, slug: brand.slug }}
+          basePath={basePath}
+          kindFilter={kind}
+          view={view === "wall" || view === "read" ? view : "list"}
+        />
+      )}
+    </div>
   );
 }

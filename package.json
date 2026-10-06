@@ -124,6 +124,7 @@
     "@tiptap/pm": "^3.31.3",
     "@tiptap/react": "^3.31.3",
     "@tiptap/starter-kit": "^3.31.3",
+    "@upstash/qstash": "^2.12.0",
     "@vercel/analytics": "^2.0.1",
     "@vercel/functions": "^3.9.5",
     "@wandercom/design-system-emails": "^0.6.56",

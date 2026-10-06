@@ -39,3 +39,6 @@ export * from "./client-page-schema";
 export * from "./email-audience-schema";
 
 export * from "./initiative-schema";
+export * from "./lifecycle-execution-schema";
+
+export * from "./email-sequence-schema";
