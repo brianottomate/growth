@@ -107,9 +107,9 @@ import {
 //
 // The shape is not invented here: `buildPerformanceAdPlan` has encoded it
 // since the first hand-built campaign — a static and a carousel per home,
-// then BOTH a portfolio carousel and a catalog ad, because the first fixes
-// the story and the second lets Meta rank the same homes per viewer. It was
-// written, tested and never called. This calls it.
+// then a portfolio carousel. The plan also names the catalog ad, which lets
+// Meta rank the same homes per viewer; that one is drawn from the approved
+// catalog the Catalog tab owns, so the set leaves it out.
 //
 // Every ad lands as a row with no campaign. That is the point: the set is
 // reviewed and adjusted against the brand, and attached to the month it runs

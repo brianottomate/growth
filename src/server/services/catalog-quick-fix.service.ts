@@ -774,6 +774,8 @@ const WRITE_PROVIDER = "catalog-write";
 
 /** Room under that limit for the cards in flight when the budget runs out. */
 const WRITE_BUDGET_MS = 10 * 60_000;
+/** Tries per card before it keeps its imported copy. */
+const CARD_ATTEMPTS = 3;
 
 function catalogWriteRun(run: typeof workflowRunTable.$inferSelect) {
   const output = run.progress ?? {};
@@ -942,20 +944,23 @@ export async function prepareInitialCatalog(input: {
     Array.from({ length: 5 }, async () => {
       while (queue.length && Date.now() < until) {
         const row = queue.shift()!;
-        try {
-          if (!row.catalogTitle)
+        let written = false;
+        const prepare = async () => {
+          if (!row.catalogTitle && !written) {
             await newCatalogCopy({
               ...input,
               homeId: row.externalId,
               initial: true,
             });
+            written = true;
+          }
           const ctx = await catalogHomeContext(
             input.userId,
             brand.id,
             row.externalId,
           );
-          if (!ctx.card) continue;
-          if (ctx.card.approved) continue;
+          if (!ctx.card) return;
+          if (ctx.card.approved) return;
           const fingerprint = catalogCardFingerprint(ctx.card);
           const photo = await photoForModel(ctx.card.imageUrl).catch(
             () => null,
@@ -1007,12 +1012,12 @@ export async function prepareInitialCatalog(input: {
             brand.id,
             row.externalId,
           );
-          if (!latest.card) continue;
+          if (!latest.card) return;
           if (
             latest.card.approved ||
             catalogCardFingerprint(latest.card) !== fingerprint
           )
-            continue;
+            return;
           await db
             .update(homeTable)
             .set({
@@ -1043,7 +1048,23 @@ export async function prepareInitialCatalog(input: {
           await updateWorkflowRun(run, {
             progress: { done, total, failed: failures.length },
           });
-        } catch (error) {
+        };
+        // A card is a few model calls, any of which can come back unusable
+        // or overloaded. Retry the card rather than give it up.
+        let failure: unknown = null;
+        for (let attempt = 0; attempt < CARD_ATTEMPTS; attempt++) {
+          try {
+            await prepare();
+            failure = null;
+            break;
+          } catch (error) {
+            failure = error;
+            if (attempt < CARD_ATTEMPTS - 1)
+              await new Promise((r) => setTimeout(r, 2_000 * (attempt + 1)));
+          }
+        }
+        if (failure) {
+          const error = failure;
           const reason =
             error instanceof Error ? error.message : "Preparation failed";
           failures.push(`${row.name}: ${reason}`);
