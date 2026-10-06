@@ -501,6 +501,15 @@ export async function catalogHomeFacts(
             (row?.description ?? detail?.description)?.slice(0, 4000) ?? null,
           locationDescription:
             detail?.locationDescription?.slice(0, 800) ?? null,
+          // Numbered as setHomeHero reads them, so a hero can be chosen by
+          // room without trying numbers one at a time.
+          photos: (detail?.photos.length
+            ? detail.photos
+            : (row?.galleryCache ?? home.gallery ?? []).map((photo) => ({
+                ...photo,
+                room: null,
+              }))
+          ).map((photo, index) => ({ number: index + 1, room: photo.room })),
         };
       }),
     );

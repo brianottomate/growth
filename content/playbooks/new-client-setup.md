@@ -42,6 +42,8 @@ Work in this order. Each step reads before it writes, and re-running any step is
 
 `adsWrite.generateStarterIdeas` with the campaignId. It makes a static and a carousel per featured home plus a portfolio carousel, choosing photos from each home's gallery and writing the copy. Every idea lands unapproved. Say in one line how many it made; if it failed, say why.
 
+The in-app chat does not have `generateStarterIdeas`: it keeps batch writes for the app and MCP. There, do not search for it or build the ads one shell at a time. Ask the operator to press From home group on Ad studio, choose Featured homes and Generate ads with AI, then attach the drafts it made to the campaign with `adsWrite.attachAdSet` and their adIds.
+
 ## 7. Hand back
 
 Give the campaign page (`handoff.reviewPath` from `adsWrite.draftCampaign`) and what is left for the operator: review and approve each idea, add an audience if broad is not right, set the platform budget, preview and push. Do not call `adsWrite.push` or `adsWrite.setDelivery` from this playbook.

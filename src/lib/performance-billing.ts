@@ -9,6 +9,12 @@
 /** Performance by Wander is $2,500 a month until plans are modelled. */
 export const PERFORMANCE_FEE_DOLLARS = 2500;
 
+/** The plan slugs an account can carry; Plus is the default. */
+export const PERFORMANCE_PLANS = [
+  "performance_plus",
+  "performance_pro",
+] as const;
+
 export type BillingLine = {
   /** Whole dollars, or null when nobody has set the amount yet. */
   amount: number | null;

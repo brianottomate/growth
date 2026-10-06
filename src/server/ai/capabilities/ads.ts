@@ -1682,7 +1682,7 @@ export const createAdsFromAssetsAction = growthAction({
 export const setHomeHeroAction = growthAction({
   outputSchema: setHomeHeroActionOutputSchema,
   description:
-    "Make one of a Performance client's home photos that home's hero: the photo its ads, previews and catalog card draw on. photoNumber is the 1-based number printed on the home's contact sheet in the catalog conversation; photoUrl is one of the home's gallery photo URLs instead. Replaces the previous hero; run it again to change it. Refused while the home's catalog card is approved.",
+    "Make one of a Performance client's home photos that home's hero: the photo its ads, previews and catalog card draw on. photoNumber is the 1-based number from catalogHomeFacts photos, the same one the catalog contact sheets print; photoUrl is one of the home's gallery photo URLs instead. Replaces the previous hero; run it again to change it. Refused while the home's catalog card is approved.",
   inputSchema: z.object({
     brandId: z.string().min(1),
     homeId: z.string().min(1).describe("The WanderOS listing id."),
@@ -1738,7 +1738,7 @@ export const suggestCampaignAudiencesAction = growthAction({
 export const catalogHomeFactsAction = growthAction({
   outputSchema: catalogHomeFactsActionOutputSchema,
   description:
-    "Read what homes' listings say, for writing their catalog cards: the complete amenity list, the description, the location paragraph (what the home is near), pets, bedrooms, baths, guests, the listing URL, current catalog card and related ads (captions and image recipes), brand story, market and production copy guidance. Use this instead of reading the public listing page, which shows only the first few amenities. Up to 16 homes per call; for a whole catalog, call it once per batch.",
+    "Read what homes' listings say, for writing their catalog cards: the complete amenity list, the description, the location paragraph (what the home is near), pets, bedrooms, baths, guests, the listing URL, every gallery photo numbered with its room (the numbers setHomeHero takes), current catalog card and related ads (captions and image recipes), brand story, market and production copy guidance. Use this instead of reading the public listing page, which shows only the first few amenities. Up to 16 homes per call; for a whole catalog, call it once per batch.",
   inputSchema: z.object({
     brandId: z.string().min(1),
     homeIds: z

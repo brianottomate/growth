@@ -1295,6 +1295,12 @@ export const catalogHomeFactsActionOutputSchema = z.strictObject({
       amenities: z.array(z.string()),
       description: z.string().nullable(),
       locationDescription: z.string().nullable(),
+      photos: z.array(
+        z.strictObject({
+          number: z.number(),
+          room: z.string().nullable(),
+        }),
+      ),
     }),
   ),
   unknown: z.array(z.string()),

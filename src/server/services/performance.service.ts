@@ -3,6 +3,7 @@ import "server-only";
 import { and, desc, eq, gte, ilike, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 
+import { PERFORMANCE_PLANS } from "@/lib/performance-billing";
 import { db } from "@/server/db";
 import {
   platformAdTable,
@@ -40,7 +41,7 @@ export const createPerformanceAccountSchema = z.object({
   contactName: z.string().trim().min(1).max(160).nullable().default(null),
   contactEmail: z.string().trim().email().nullable().default(null),
   website: z.string().trim().url().nullable().default(null),
-  plan: z.string().trim().min(1).max(80).nullable().default(null),
+  plan: z.enum(PERFORMANCE_PLANS).nullable().default(null),
   status: z
     .enum(["prospect", "onboarding", "active", "paused", "churned"])
     .default("prospect"),
@@ -54,7 +55,7 @@ export const updatePerformanceAccountSchema = z.object({
   contactName: z.string().trim().min(1).max(160).nullable().optional(),
   contactEmail: z.string().trim().email().nullable().optional(),
   website: z.string().trim().url().nullable().optional(),
-  plan: z.string().trim().min(1).max(80).nullable().optional(),
+  plan: z.enum(PERFORMANCE_PLANS).nullable().optional(),
   status: z
     .enum(["prospect", "onboarding", "active", "paused", "churned"])
     .optional(),

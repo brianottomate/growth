@@ -21,7 +21,7 @@ Run this when the operator asks to start a campaign for a client that already ex
 
 ## 3. Starter ideas
 
-The ideas are made from the brand's featured homes. If none are featured, stop and ask the operator to pick them on Setup (or feature the homes the intake named with `performanceWrite.updateHome`, one call per home, when the operator says so). Then `adsWrite.generateStarterIdeas` with the campaignId: a static and a carousel per featured home plus a portfolio carousel, every one unapproved. Say in one line how many it made.
+The ideas are made from the brand's featured homes. If none are featured, stop and ask the operator to pick them on Setup (or feature the homes the intake named with `performanceWrite.updateHome`, one call per home, when the operator says so). Then `adsWrite.generateStarterIdeas` with the campaignId: a static and a carousel per featured home plus a portfolio carousel, every one unapproved. Say in one line how many it made. In the in-app chat, which does not have that tool, ask the operator to press From home group on Ad studio instead, then attach the drafts with `adsWrite.attachAdSet`.
 
 ## 4. Hand back
 

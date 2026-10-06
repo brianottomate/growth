@@ -56,9 +56,16 @@ export function WorkflowActivity({ brandId }: { brandId: string }) {
     }
   }, [query.data, router, client]);
   const runs = query.data ?? [];
+  // Runs arrive active first, then newest first. A finished run is superseded
+  // by a newer one of the same kind: a retry that succeeded must not leave
+  // yesterday's failure on the page.
   const visible = runs.filter(
-    (run) =>
+    (run, index) =>
       !run.dismissed &&
+      (workflowActive(run.status) ||
+        !runs
+          .slice(0, index)
+          .some((newer) => newer.title === run.title && !newer.parentRunId)) &&
       (!run.parentRunId ||
         !runs.some(
           (parent) =>

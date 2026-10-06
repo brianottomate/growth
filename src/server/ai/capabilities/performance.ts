@@ -41,6 +41,7 @@ import { db } from "@/server/db";
 import { brandTable } from "@/server/db/schema";
 
 import { PUSHABLE_AD_PLATFORMS } from "@/lib/ad-platforms";
+import { PERFORMANCE_PLANS } from "@/lib/performance-billing";
 
 import {
   addPerformanceProperty,
@@ -105,7 +106,7 @@ export const getPerformanceAccountAction = growthAction({
   nativeOutputSchema: getPerformanceAccountActionNativeResultSchema,
   outputSchema: getPerformanceAccountActionOutputSchema,
   description:
-    "Read one Performance account completely: contact, plan, the homes on the record, every billing cycle, report list, and the delivery attached to each cycle (campaigns, lifecycle campaigns, amplification targets).",
+    "Read one Performance account completely: contact, plan, the homes on the record, every billing cycle, report list, and the delivery attached to each cycle (campaigns, lifecycle campaigns, amplification targets). Delivery holds only what was attached to a cycle with attachToCycle, so it is usually empty: it never means the brand has no campaigns or ads. Read those with adsRead.listCampaigns.",
   inputSchema: z.object({ accountId: z.string().min(1) }),
   execute: (input, ctx) =>
     getPerformanceAccount(actorFrom(ctx), input.accountId),
@@ -386,7 +387,11 @@ export const promoteToClientAction = growthAction({
     "Record that a brand signed: marks it a client and opens its commercial record with today's date, creating the performance account if the deal closed before they filled the form. Safe to repeat — a re-run keeps the original signing date.",
   inputSchema: z.object({
     brandId: z.string().min(1),
-    plan: z.string().min(1).nullable().optional(),
+    plan: z
+      .enum(PERFORMANCE_PLANS)
+      .nullable()
+      .optional()
+      .describe("Leave out for performance_plus, the standard plan."),
   }),
   outputSchema: z.object({
     accountId: z.string(),

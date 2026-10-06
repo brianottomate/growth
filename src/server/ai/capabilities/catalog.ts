@@ -142,7 +142,7 @@ export const newCatalogCopyAction = growthAction({
 export const newCatalogPhotoAction = growthAction({
   outputSchema: newCatalogPhotoActionOutputSchema,
   description:
-    "Pick a better hero for one home's catalog card from its listing photos and make it the home's hero, so its ads and previews follow. Then rewrite the card copy for the new photo; never picks the current hero again. Refused on an approved card. Fails with the reason when no clean photo is left.",
+    "Pick a better hero for one home's catalog card from its listing photos and make it the home's hero, so its ads and previews follow. Then rewrites the headline (and pills) for the new photo, replacing any edited headline: use it when photo and copy should change together, and adsWrite.setHomeHero to change only the photo. Never picks the current hero again. Refused on an approved card. Fails with the reason when no clean photo is left.",
   inputSchema: homeInput,
   examples: [{ brandId: "brd_01", homeId: "1234567890123" }],
   execute: async (raw, ctx) => {

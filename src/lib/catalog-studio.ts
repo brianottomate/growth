@@ -56,7 +56,9 @@ export const catalogAdCopySchema = z.strictObject({
 });
 export type CatalogAdCopy = z.infer<typeof catalogAdCopySchema>;
 export const defaultCatalogAdCopy = (brandName: string): CatalogAdCopy => ({
-  primaryText: `Find your next ${brandName} escape. Private homes, booked direct.`,
+  // Kept apart from "escape" and "stay": brands are named Oasis Escapes and
+  // Zion Stays, and "your next Oasis Escapes escape" shipped as a default.
+  primaryText: `Find your next stay. Private homes from ${brandName}, booked direct.`,
   headline: "{{hotel.name}}",
   description: "",
 });

@@ -16,9 +16,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { PERFORMANCE_PLANS } from "@/lib/performance-billing";
 import { orpc } from "@/orpc/client";
-
-const PLANS = ["performance_plus", "performance_pro"] as const;
 
 /**
  * Onboarding a customer was chat-only until now. A deal closing is an ops
@@ -32,7 +31,9 @@ export function NewAccountDialog() {
   const [contactName, setContactName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [website, setWebsite] = useState("");
-  const [plan, setPlan] = useState<string>(PLANS[0]);
+  const [plan, setPlan] = useState<(typeof PERFORMANCE_PLANS)[number]>(
+    PERFORMANCE_PLANS[0],
+  );
   const [notes, setNotes] = useState("");
   const [brandId, setBrandId] = useState("");
 
@@ -147,10 +148,14 @@ export function NewAccountDialog() {
               <select
                 id="perf-plan"
                 value={plan}
-                onChange={(event) => setPlan(event.target.value)}
+                onChange={(event) =>
+                  setPlan(
+                    event.target.value as (typeof PERFORMANCE_PLANS)[number],
+                  )
+                }
                 className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
               >
-                {PLANS.map((value) => (
+                {PERFORMANCE_PLANS.map((value) => (
                   <option key={value} value={value}>
                     {value}
                   </option>
