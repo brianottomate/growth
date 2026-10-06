@@ -1,6 +1,6 @@
 # Marketing email DNS onboarding
 
-Growth's brand Email tab can prepare a seven-day, email-only connection link.
+Growth's brand Email tab can prepare a six-month, email-only connection link.
 The operator chooses the DNS zone and marketing subdomain, then clicks
 **Prepare connection link**. Preparation adopts or creates that sending domain
 in Postmark and stores `emailSender.marketingDomain` in the existing brand JSONB.
@@ -58,7 +58,7 @@ References: [Entri configuration and scoped tokens](https://developers.entri.com
 Preparation requires a signed-in member of the brand's current workspace and
 refuses deleted or unowned brands. The public link cannot access ads, intake,
 guest data, or send controls. It is a short random bearer token stored on the brand's email settings,
-retrievable by authorized operators, expiring after seven days. Every request
+retrievable by authorized operators, expiring after 180 days. Every request
 rechecks the live brand, deletion and expiry. The page suppresses referrers and
 caching. Session creation and verification require same-origin JSON POSTs.
 See [client page activity](client-page-activity.md) for link lifecycle and view tracking.
