@@ -11,6 +11,7 @@ export const PLACEHOLDER_FORMATS = {
   portrait: { width: 1080, height: 1350, label: "4:5" },
   story: { width: 1080, height: 1920, label: "9:16" },
   landscape: { width: 1200, height: 628, label: "1.91:1" },
+  wide: { width: 1920, height: 1080, label: "16:9" },
 } as const;
 
 export type PlaceholderFormat = keyof typeof PLACEHOLDER_FORMATS;
@@ -55,10 +56,31 @@ export function placeholderImage(
   };
 }
 
+/** Growth's own placeholder route only: relative, or on the production origin. */
 export function isPlaceholderUrl(url: string) {
   try {
-    return new URL(url, PRODUCTION_ORIGIN).pathname === PLACEHOLDER_PATH;
+    const parsed = new URL(url, PRODUCTION_ORIGIN);
+    return (
+      parsed.origin === PRODUCTION_ORIGIN &&
+      parsed.pathname === PLACEHOLDER_PATH
+    );
   } catch {
     return false;
   }
+}
+
+const FORMAT_FOR_SHAPE: Record<string, PlaceholderFormat> = {
+  square: "square",
+  portrait: "portrait",
+  story: "story",
+  wide: "wide",
+};
+
+/** The same placeholder brief, cut to another ad shape. */
+export function placeholderForShape(url: string, shape: string) {
+  const parsed = new URL(url, PRODUCTION_ORIGIN);
+  parsed.searchParams.set("format", FORMAT_FOR_SHAPE[shape] ?? "square");
+  return url.startsWith("/")
+    ? `${parsed.pathname}${parsed.search}`
+    : parsed.toString();
 }

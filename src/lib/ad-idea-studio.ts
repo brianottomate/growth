@@ -1,4 +1,5 @@
 import { META_PLACEMENTS, metaPlacementSchema } from "./meta-placement-plan";
+import { isPlaceholderUrl, placeholderForShape } from "./placeholder-image";
 import { z } from "zod";
 import type {
   AdContent,
@@ -324,6 +325,9 @@ export function ideaPreviewUrl(
 ) {
   const source = ideaSource(card, shape);
   if (!source) return null;
+  // A placeholder is already the image: recut it rather than composite it.
+  if (isPlaceholderUrl(source.url))
+    return placeholderForShape(source.url, shape);
   const r = ideaRecipe(card, shape);
   const params = new URLSearchParams({
     brandId,

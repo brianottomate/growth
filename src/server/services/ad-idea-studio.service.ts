@@ -1,4 +1,5 @@
 import type { DraftAdResult } from "@/server/ai/capabilities/outputs/ads";
+import { isPlaceholderUrl } from "@/lib/placeholder-image";
 import "server-only";
 import { and, eq, isNull } from "drizzle-orm";
 import type { z } from "zod";
@@ -62,7 +63,10 @@ export async function saveAdIdea(
   }
 
   // Validate source ownership even while the draft has incomplete overlay text.
-  const sources = document.pool ?? [];
+  // Placeholders are briefs served by Growth itself, not photos to vouch for.
+  const sources = (document.pool ?? []).filter(
+    (source) => source.assetId || !isPlaceholderUrl(source.url),
+  );
   for (let start = 0; start < sources.length; start += 8) {
     await Promise.all(
       sources.slice(start, start + 8).map(async (source) => {

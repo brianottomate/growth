@@ -53,6 +53,27 @@ const initiative = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
 });
+const cardMedia = z
+  .object({
+    url: z.string(),
+    width: z.number().nullable(),
+    height: z.number().nullable(),
+  })
+  .nullable();
+const cardItem = z.object({ media: cardMedia, text: z.string().nullable() });
+const initiativeSummary = z.object({
+  brands: z.array(brand.extend({ logo: z.string().nullable() })),
+  sections: z.object({
+    ads: z.object({ count: z.number(), items: z.array(cardItem) }),
+    social: z.object({ count: z.number(), items: z.array(cardItem) }),
+    editorial: z.object({
+      count: z.number(),
+      items: z.array(
+        z.object({ kind: z.enum(["email", "blog"]), title: z.string() }),
+      ),
+    }),
+  }),
+});
 const previewMedia = z.object({
   url: z.string(),
   type: z.enum(["image", "video", "carousel"]),
@@ -147,9 +168,16 @@ const detail = z.object({
 export const listInitiativesAction = growthAction({
   description:
     "List workspace initiatives. Initiatives group organic and paid work without owning it.",
-  inputSchema: z.object({}),
-  outputSchema: z.object({ initiatives: z.array(initiative) }),
-  execute: (_, ctx) => listInitiatives(ctx.orgId),
+  inputSchema: z.object({
+    brandId: z
+      .string()
+      .optional()
+      .describe("Only initiatives this brand leads or has linked work in."),
+  }),
+  outputSchema: z.object({
+    initiatives: z.array(initiative.extend({ summary: initiativeSummary })),
+  }),
+  execute: (input, ctx) => listInitiatives(ctx.orgId, input.brandId),
 });
 export const initiativeOptionsAction = growthAction({
   description:

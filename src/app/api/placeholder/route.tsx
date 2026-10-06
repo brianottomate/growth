@@ -12,11 +12,11 @@ export const runtime = "nodejs";
 export async function GET(request: NextRequest) {
   const spec = readPlaceholderParams(new URL(request.url).searchParams);
   const { width, height, label } = PLACEHOLDER_FORMATS[spec.format];
-  const scale = width / 1080;
+  const scale = Math.min(width, height * 1.72) / 1080;
   const px = (n: number) => `${Math.round(n * scale)}px`;
   // Landscape is short: smaller type and fewer lines so the longest allowed
   // title and description still fit inside the card.
-  const wide = spec.format === "landscape";
+  const wide = spec.format === "landscape" || spec.format === "wide";
 
   return new ImageResponse(
     <div

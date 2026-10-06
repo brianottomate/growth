@@ -22,6 +22,10 @@ import { mediaAssetTable } from "@/server/db/schema";
 import { inArray } from "drizzle-orm";
 import { BrandCadence } from "./BrandStrategyClient";
 import { BrandSurfaceMap } from "./BrandSurfaceMap";
+import { listInitiatives } from "@/server/services/initiative.service";
+import { InitiativeCard } from "../../initiatives/InitiativeCard";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Flag } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -104,6 +108,8 @@ export default async function BrandPage({
     getBrandStrategy(brand.id, { peerBrandIds }),
     backfillStateForBrand(brand.id),
   ]);
+
+  const { initiatives } = await listInitiatives(org.id, brand.id);
 
   const surfaceSummary = await getBrandSurfaceSummary(brand.id, {
     peers: strategy.peerBrandCount,
@@ -232,6 +238,39 @@ export default async function BrandPage({
           null
         }
       />
+
+      <section id="initiatives" className="scroll-mt-6 space-y-3">
+        <div className="flex items-end justify-between">
+          <h2 className="text-base font-semibold">Initiatives</h2>
+          <Link
+            href="/app/initiatives"
+            className="text-sm text-muted-foreground hover:underline"
+          >
+            All initiatives
+          </Link>
+        </div>
+        {initiatives.length ? (
+          <div className="grid grid-cols-1 gap-4 @2xl:grid-cols-2">
+            {initiatives.map((initiative) => (
+              <InitiativeCard key={initiative.id} initiative={initiative} />
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            compact
+            icon={Flag}
+            title={`No initiatives with ${brand.name} yet`}
+            actions={
+              <Link
+                href="/app/initiatives"
+                className="text-sm font-medium hover:underline"
+              >
+                Open initiatives
+              </Link>
+            }
+          />
+        )}
+      </section>
 
       {latestSpots.length > 0 && (
         <section className="space-y-3">

@@ -1,20 +1,9 @@
 "use client";
 import { CampaignSummary } from "@/components/campaigns/campaign-summary";
 import { EmptyState } from "@/components/ui/empty-state";
-import {
-  Megaphone,
-  ImageIcon,
-  ArrowUpRight,
-  CalendarDays,
-  Clock3,
-  Circle,
-  CircleCheck,
-  CirclePause,
-  Archive,
-  type LucideIcon,
-} from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Megaphone, ImageIcon } from "lucide-react";
 import { WorkPreview, previewDate } from "./WorkPreview";
+import { InitiativeCard } from "./InitiativeCard";
 import { StatusBoard, workLane } from "./StatusBoard";
 import { EditorialPreview } from "./EditorialPreview";
 import { AdPreview } from "./AdPreview";
@@ -49,20 +38,6 @@ const empty: InitiativeSave = {
   startAt: null,
   endAt: null,
 };
-const initiativeStatusIcons: Record<string, LucideIcon> = {
-  planned: CalendarDays,
-  active: Megaphone,
-  paused: CirclePause,
-  completed: CircleCheck,
-  archived: Archive,
-};
-const initiativeDate = (value: string) =>
-  new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(value));
 function InitiativeEditor({
   initial,
   close,
@@ -214,69 +189,10 @@ export function InitiativesClient() {
           campaigns.
         </p>
       )}
-      <div className="grid grid-cols-1 gap-4 @3xl:grid-cols-2">
-        {data?.initiatives.map((i) => {
-          const StatusIcon = initiativeStatusIcons[i.status] ?? Circle;
-          const scheduled = Boolean(i.startAt || i.endAt);
-          const dates =
-            i.startAt && i.endAt && i.startAt !== i.endAt
-              ? `${initiativeDate(i.startAt)} – ${initiativeDate(i.endAt)}`
-              : i.startAt
-                ? `Starts ${initiativeDate(i.startAt)}`
-                : i.endAt
-                  ? `Ends ${initiativeDate(i.endAt)}`
-                  : `Updated ${initiativeDate(i.updatedAt)}`;
-          return (
-            <Link
-              key={i.id}
-              href={`/app/initiatives/${i.id}`}
-              className="group flex min-w-0 flex-col rounded-2xl border bg-card p-5 transition-colors hover:border-foreground/25 hover:bg-accent/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
-            >
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <span className="grid size-9 shrink-0 place-items-center rounded-xl border bg-muted/50 text-muted-foreground">
-                  <Megaphone className="size-4" aria-hidden="true" />
-                </span>
-                <Badge
-                  variant={i.status === "active" ? "secondary" : "outline"}
-                  className="capitalize"
-                >
-                  <StatusIcon aria-hidden="true" />
-                  {i.status}
-                </Badge>
-              </div>
-              <h2
-                className="line-clamp-2 text-lg leading-snug font-semibold [overflow-wrap:anywhere]"
-                title={i.name}
-              >
-                {i.name}
-              </h2>
-              <p className="mt-2 mb-5 line-clamp-3 text-sm leading-relaxed [overflow-wrap:anywhere] text-muted-foreground">
-                {i.description ||
-                  "Add a shared brief to bring the content and campaigns together."}
-              </p>
-              <div className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t pt-3 text-xs">
-                <span className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
-                  {scheduled ? (
-                    <CalendarDays
-                      className="size-3.5 shrink-0"
-                      aria-hidden="true"
-                    />
-                  ) : (
-                    <Clock3 className="size-3.5 shrink-0" aria-hidden="true" />
-                  )}
-                  {dates}
-                </span>
-                <span className="inline-flex items-center gap-1 font-medium">
-                  View initiative
-                  <ArrowUpRight
-                    className="size-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 motion-reduce:transition-none"
-                    aria-hidden="true"
-                  />
-                </span>
-              </div>
-            </Link>
-          );
-        })}
+      <div className="grid grid-cols-1 gap-4 @2xl:grid-cols-2 @6xl:grid-cols-3">
+        {data?.initiatives.map((i) => (
+          <InitiativeCard key={i.id} initiative={i} />
+        ))}
       </div>
       <Dialog open={creating} onOpenChange={setCreating}>
         <DialogContent className="@container">
