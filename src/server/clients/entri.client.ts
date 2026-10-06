@@ -88,7 +88,9 @@ export async function createEntriShareLink(input: {
     },
     body: JSON.stringify({
       applicationId,
+      // The share page reads only `config`, which must name the app itself.
       config: {
+        applicationId,
         prefilledDomain: input.rootDomain,
         dnsRecords: input.records,
         userId: `growth-email:${input.brandId}`,
