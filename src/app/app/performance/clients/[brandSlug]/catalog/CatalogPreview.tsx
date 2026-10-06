@@ -1,13 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { toast } from "@/components/ui/toast";
 import {
   catalogCardPreviewUrl,
   defaultCatalogAdCopy,
@@ -17,7 +12,6 @@ import {
   type CatalogHome,
 } from "@/lib/catalog-studio";
 import { previewAtWidth } from "@/lib/compositions";
-import { orpc } from "@/orpc/client";
 
 export type CatalogPreviewCard = {
   key: string;
@@ -55,27 +49,11 @@ export function CatalogPreview({
       home: byId.get(card.homeId),
       name: byId.get(card.homeId)?.name ?? card.homeId,
     }));
-  const client = useQueryClient();
-  const save = useMutation(
-    orpc.catalog.setAdCopy.mutationOptions({
-      onSuccess: async () => {
-        await client.invalidateQueries({
-          queryKey: orpc.catalog.state.queryOptions({ input: { brandId } })
-            .queryKey,
-        });
-        toast.success("Ad copy saved");
-      },
-      onError: (error) => toast.error(error.message),
-    }),
-  );
-
   return (
     <CatalogCollectionPreview
       brandName={brandName}
       cards={cards}
       ad={draft.ad}
-      saving={save.isPending}
-      onSave={(ad) => save.mutate({ brandId, ad })}
     />
   );
 }
@@ -86,102 +64,37 @@ export function CatalogCollectionPreview({
   cards,
   compact = false,
   ad: saved,
-  saving = false,
-  onSave,
 }: {
   brandName: string;
   cards: CatalogPreviewCard[];
   compact?: boolean;
   /** The saved ad copy; the mock falls back to the default. */
   ad?: CatalogAdCopy;
-  saving?: boolean;
-  /** Without it the copy is a scratch field, as in the lab mocks. */
-  onSave?: (ad: CatalogAdCopy) => void;
 }) {
-  const initial = saved ?? defaultCatalogAdCopy(brandName);
-  const [ad, setAd] = useState(initial);
-  useEffect(
-    () => setAd(initial),
-    [initial.primaryText, initial.headline, initial.description],
-  ); // oxlint-disable-line react-hooks/exhaustive-deps
-  const changed =
-    ad.primaryText !== initial.primaryText ||
-    ad.headline !== initial.headline ||
-    ad.description !== initial.description;
+  const ad = saved ?? defaultCatalogAdCopy(brandName);
   const text = ad.primaryText;
 
   return (
-    <div className="space-y-5">
-      <div className="max-w-2xl space-y-2">
-        <label className="block space-y-1.5 text-sm">
-          <span className="text-muted-foreground">Primary text</span>
-          <Textarea
-            value={ad.primaryText}
-            rows={3}
-            maxLength={2200}
-            onChange={(e) => setAd({ ...ad, primaryText: e.target.value })}
-          />
-        </label>
-        <div className="grid grid-cols-1 gap-3 @xl:grid-cols-2">
-          <label className="block space-y-1.5 text-sm">
-            <span className="text-muted-foreground">Headline</span>
-            <Input
-              value={ad.headline}
-              maxLength={255}
-              placeholder="{{hotel.name}}"
-              onChange={(e) => setAd({ ...ad, headline: e.target.value })}
-            />
-          </label>
-          <label className="block space-y-1.5 text-sm">
-            <span className="text-muted-foreground">Description</span>
-            <Input
-              value={ad.description}
-              maxLength={255}
-              placeholder="From the price in the feed"
-              onChange={(e) => setAd({ ...ad, description: e.target.value })}
-            />
-          </label>
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-muted-foreground">{cards.length} cards</p>
-          {onSave && (
-            <Button
-              size="sm"
-              disabled={!changed || saving}
-              loading={saving}
-              onClick={() => onSave(ad)}
-            >
-              Save ad copy
-            </Button>
-          )}
-        </div>
+    <div
+      className={
+        compact
+          ? "flex flex-wrap items-start gap-6"
+          : "grid grid-cols-1 items-start gap-6 @3xl:grid-cols-2 @6xl:grid-cols-3"
+      }
+    >
+      <div className={compact ? "w-80 max-w-full space-y-2" : ""}>
+        {compact && <h4 className="text-sm font-medium">Feed carousel</h4>}
+        <FeedPreview brandName={brandName} text={text} ad={ad} cards={cards} />
       </div>
-      <div
-        className={
-          compact
-            ? "flex flex-wrap items-start gap-6"
-            : "grid grid-cols-1 items-start gap-6 @3xl:grid-cols-2 @6xl:grid-cols-3"
-        }
-      >
-        <div className={compact ? "w-80 max-w-full space-y-2" : ""}>
-          {compact && <h4 className="text-sm font-medium">Feed carousel</h4>}
-          <FeedPreview
-            brandName={brandName}
-            text={text}
-            ad={ad}
-            cards={cards}
-          />
-        </div>
-        <div className={compact ? "w-80 max-w-full space-y-2" : ""}>
-          {compact && <h4 className="text-sm font-medium">Catalog story</h4>}
-          <StoryPreview brandName={brandName} cards={cards} />
-        </div>
-        <div className={compact ? "w-80 max-w-full space-y-2" : ""}>
-          {compact && (
-            <h4 className="text-sm font-medium">More from · whole catalog</h4>
-          )}
-          <MoreFromPreview brandName={brandName} cards={cards} />
-        </div>
+      <div className={compact ? "w-80 max-w-full space-y-2" : ""}>
+        {compact && <h4 className="text-sm font-medium">Catalog story</h4>}
+        <StoryPreview brandName={brandName} cards={cards} />
+      </div>
+      <div className={compact ? "w-80 max-w-full space-y-2" : ""}>
+        {compact && (
+          <h4 className="text-sm font-medium">More from · whole catalog</h4>
+        )}
+        <MoreFromPreview brandName={brandName} cards={cards} />
       </div>
     </div>
   );

@@ -96,6 +96,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { orpc, type RouterInputs } from "@/orpc/client";
 import { reviewInChat } from "../ReviewInChatButton";
+import { CatalogAdCopyCard } from "./CatalogAdCopy";
 import { CatalogPreview } from "./CatalogPreview";
 import { CatalogTemplateCard } from "../CatalogTemplateCard";
 
@@ -502,6 +503,13 @@ export function CatalogCards({
           </Button>
         ))}
       </div>
+      {view === "studio" && draft && (
+        <CatalogAdCopyCard
+          brandId={brandId}
+          brandName={brandName}
+          ad={draft.ad}
+        />
+      )}
       {view !== "exports" && (
         <WorkspaceCard
           title={view === "preview" ? "Catalog preview" : "Catalog cards"}

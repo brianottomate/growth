@@ -370,8 +370,7 @@ export function HomeSuite({
         <p className="text-xs text-muted-foreground">
           {generatedCount} generated cards ·{" "}
           {collection.length - generatedCount} source cards. Failed or
-          ungenerated cards show the fixture’s existing copy. Primary text below
-          is an editable preview caption.
+          ungenerated cards show the fixture’s existing copy.
         </p>
         <CatalogCollectionPreview
           key={`${brand.id}-${home.id}`}
