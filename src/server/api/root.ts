@@ -4,6 +4,7 @@ import { initiativeRouter } from "@/server/api/routers/initiative.router";
 import { homeGroupsRouter } from "@/server/api/routers/homeGroups.router";
 import { userRouter } from "@/server/api/routers/user.router";
 import { adsRouter } from "@/server/api/routers/ads.router";
+import { adPreviewRouter } from "@/server/api/routers/adPreview.router";
 import { affiliateRouter } from "@/server/api/routers/affiliate.router";
 import { amplifierRouter } from "@/server/api/routers/amplifier.router";
 import { personaRouter } from "@/server/api/routers/persona.router";
@@ -55,6 +56,7 @@ export const appRouter = {
   homeGroups: homeGroupsRouter,
   user: userRouter,
   ads: adsRouter,
+  adPreview: adPreviewRouter,
   affiliate: affiliateRouter,
   amplifier: amplifierRouter,
   persona: personaRouter,

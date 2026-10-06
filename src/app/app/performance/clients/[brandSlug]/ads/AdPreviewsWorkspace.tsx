@@ -24,6 +24,7 @@ import {
 import { StudioGeneration } from "./StudioGeneration";
 import { AddAdDialog } from "./AddAdDialog";
 import { StudioIdeas, type StudioIdea } from "./StudioIdeas";
+import { ClientPreviewLink } from "./ClientPreviewLink";
 
 export type WorkspaceHome = HotelFeedHome & {
   imageUrl: string;
@@ -90,6 +91,7 @@ export function AdPreviewsWorkspace({
   const actions = (
     <>
       {addAction}
+      <ClientPreviewLink brandId={brandId} />
       <StudioGeneration
         brandId={brandId}
         brandSlug={brandSlug}
