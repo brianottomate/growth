@@ -1,11 +1,7 @@
 import type { adSectionSchema } from "@/lib/ad-section";
 import { resolveBookingTarget } from "./home-groups.service";
 import type { z } from "zod";
-import {
-  isReplaceableStudioAd,
-  textAdCopySchema,
-  textAdReady,
-} from "@/lib/ad-authoring";
+import { textAdCopySchema, textAdReady } from "@/lib/ad-authoring";
 import { projectIdea, type IdeaShape } from "@/lib/ad-idea-studio";
 import {
   approveImageAd,
@@ -14,10 +10,10 @@ import {
   retireReplacedAd,
 } from "./ad-approval.service";
 import "server-only";
+import { withIdeaStudio } from "@/lib/ad-idea-studio";
 import { waitUntil } from "@vercel/functions";
-import { rewriteAdCreative } from "./ad-creative-copy.service";
-import { listingCopyContext } from "./listing-copy-context.service";
-import { marketOf, type BrandMarkets } from "@/lib/markets";
+
+import { type BrandMarkets } from "@/lib/markets";
 
 import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 
@@ -58,72 +54,26 @@ import {
 } from "@/lib/compositions";
 import {
   adFormatOf,
-  applyCardEdit,
-  buildPerformanceAdPlan,
   homeNameFromFilename,
-  MAX_SET_HOMES,
-  orderHomesForSet,
   parseCreativeFilename,
   performanceAdName,
   performanceFormatFor,
   PERFORMANCE_AD_DEFAULTS,
   type AdFormat,
-  type CardEdit,
 } from "@/lib/performance-ads";
-import {
-  carouselSlideTitles,
-  compositionPreviewUrl,
-  homeCatalogCopy,
-  homeCatalogPreviewUrl,
-} from "@/lib/home-ad-previews";
-import {
-  fetchWanderOsListingDetail,
-  type WanderOsListing,
-} from "@/server/clients/wanderos-site.client";
 
-import { amenitySource } from "@/lib/home-amenities";
-import {
-  deterministicSetCopy,
-  homeFactsDescription,
-  writeAdSetCopy,
-  type CopyHome,
-} from "./ad-set-copy.service";
 import { deleteZernioAd } from "@/server/clients/zernio.client";
 import { extendToCanvas } from "./card-director.service";
 import { freezeComposition } from "./composition.service";
-import { setHomeHero } from "./homes.service";
+
 import { importImageBuffer } from "./media.service";
-import { pickHeroPhoto } from "./hero-pick.service";
-import { brandWebsiteId } from "./wanderos-listings.service";
+
 import { studioListings } from "./studio-homes.service";
-import { homeGroupContext } from "./home-groups.service";
-import type { SavedStudioHome } from "@/lib/studio-homes";
+
 import {
   deliveryMediaFor,
   videoAdCardFor,
 } from "@/server/services/video-delivery.service";
-
-// Building the set a Performance client actually runs.
-//
-// The shape is not invented here: `buildPerformanceAdPlan` has encoded it
-// since the first hand-built campaign — a static and a carousel per home,
-// then a portfolio carousel. The plan also names the catalog ad, which lets
-// Meta rank the same homes per viewer; that one is drawn from the approved
-// catalog the Catalog tab owns, so the set leaves it out.
-//
-// Every ad lands as a row with no campaign. That is the point: the set is
-// reviewed and adjusted against the brand, and attached to the month it runs
-// in only once someone is happy with it.
-//
-// The home is the unit an ad is bound to, not the input someone must pick
-// first. A set can be asked for by naming the homes or by naming a count, and
-// an ad made by hand can be bound to a home afterwards; either way the static,
-// the carousel and the catalog slot for that home follow from the binding.
-
-/** How many photos of one home its own carousel walks through. */
-const HOME_CAROUSEL_CARDS = 6;
-/** Three to ten homes is the product; five is the middle of it. */
-const DEFAULT_SET_SIZE = 5;
 
 export class AdSetError extends Error {
   constructor(
@@ -133,33 +83,6 @@ export class AdSetError extends Error {
     super(message);
   }
 }
-
-export type BuiltAd = {
-  id: string;
-  name: string;
-  kind:
-    | "static"
-    | "carousel"
-    | "catalog_home"
-    | "hero_carousel"
-    | "all_properties_carousel"
-    | "catalog";
-  homeName: string | null;
-  cards: number;
-};
-
-const KIND_FORMAT: Record<BuiltAd["kind"], AdFormat> = {
-  static: "static",
-  carousel: "carousel",
-  // A per-home listing card is one image drawn with the listing composition,
-  // and it pushes as the single static it is.
-  catalog_home: "static",
-  // A carousel of the homes' heroes, the same portfolio shape as the catalog
-  // one but drawn as feature shots.
-  hero_carousel: "portfolio",
-  all_properties_carousel: "portfolio",
-  catalog: "catalog",
-};
 
 type OwnedBrand = {
   id: string;
@@ -546,418 +469,6 @@ function adName(
   });
 }
 
-/**
- * Draw the whole set for a brand, words and all.
- *
- * Asked for by naming the homes (`propertyIds`, in portfolio order) or by
- * naming a count, in which case the homes on the client's record come first
- * and their site's own order fills the rest. One model call writes every
- * caption together so the homes do not repeat each other. Cards are
- * composition URLs rather than frozen files: they redraw when a template
- * improves, and nothing is committed to bytes until the set is approved or
- * pushed.
- */
-export async function buildAdSet(input: {
-  brandId: string;
-  orgId: string;
-  /** WanderOS listing ids, in the order the portfolio carousel should run. */
-  propertyIds?: string[];
-  /** How many homes to choose when none are named. */
-  count?: number;
-  userId?: string | null;
-  /**
-   * "defer" (the first-pass default from the UI) draws the shells with copy
-   * from the facts alone — no model call, fast and re-runnable — and leaves the
-   * words for a later writeSetCopy pass. "ai" writes the captions in one model
-   * pass, which is what the agent action does. Either way the on-card title is
-   * the home's name, so a later copy pass never re-renders a card.
-   */
-  copy?: "ai" | "defer";
-}): Promise<{
-  brandId: string;
-  ads: BuiltAd[];
-  replaced: number;
-  /** The homes the set was drawn from, in order. */
-  homes: { id: string; name: string; url: string }[];
-  /** How the homes were chosen, for the operator to read. */
-  note: string | null;
-}> {
-  const brand = await requireOwnedBrand(input);
-  const listings = await studioListings({
-    id: brand.id,
-    website: brand.website,
-  });
-
-  let chosen: SavedStudioHome[];
-  let note: string | null = null;
-  if (input.propertyIds?.length) {
-    chosen = input.propertyIds.flatMap((id) => {
-      const listing = listings.find((row) => row.id === id);
-      return listing ? [listing] : [];
-    });
-    if (chosen.length !== input.propertyIds.length) {
-      throw new AdSetError(
-        422,
-        "Some selected homes are not in the saved inventory",
-      );
-    }
-  } else {
-    const count = Math.min(
-      Math.max(input.count ?? DEFAULT_SET_SIZE, 1),
-      MAX_SET_HOMES,
-    );
-    const groups = await homeGroupContext(brand.id, input.orgId);
-    const featured = groups.groups.find((group) => group.isPrimary);
-    const onRecord = (featured?.homeIds ?? []).flatMap((id) => {
-      const home = listings.find((home) => home.homeId === id);
-      return home ? [home.url] : [];
-    });
-    chosen = orderHomesForSet(listings, onRecord, count);
-    if (chosen.length === 0) {
-      throw new AdSetError(
-        422,
-        listings.length === 0
-          ? "No saved homes to draw from"
-          : "None of their homes have a photo to draw on",
-      );
-    }
-    const fromRecord = chosen.filter((home) =>
-      onRecord.some(
-        (url) =>
-          url.trim().toLowerCase().replace(/\/+$/, "") ===
-          home.url.trim().toLowerCase().replace(/\/+$/, ""),
-      ),
-    ).length;
-    note =
-      fromRecord > 0
-        ? `${fromRecord} of ${chosen.length} homes are from ${featured?.name ?? "the primary group"}; the rest follow saved inventory order.`
-        : `Chose the first ${chosen.length} homes with a photo in saved inventory order.`;
-  }
-
-  // Explicit generation can enrich imported WanderOS homes with details.
-  // Manual homes use their saved photos and never call the provider.
-  const websiteId = await brandWebsiteId(brand.id);
-  const details = await Promise.all(
-    chosen.map(async (listing) => {
-      const detail =
-        websiteId && listing.source === "wanderos"
-          ? await fetchWanderOsListingDetail({
-              websiteId,
-              propertyId: listing.id,
-            })
-          : {
-              photos: [],
-              description: null,
-              amenities: [],
-              locationDescription: null,
-              petsAllowed: null,
-            };
-      const home = await savedHomeFor(brand.id, listing.id);
-      const photos = detail.photos.length
-        ? detail.photos.map((photo) => photo.url)
-        : (listing.gallery ?? []).map((photo) => photo.url);
-      // A home's own hero wins; otherwise a vision pass picks the best of the
-      // first few photos so the ad does not lead on an entrance sign or a
-      // floor plan. The pick is saved, so a rebuild reuses it and never asks
-      // twice.
-      let hero = home.heroSourceUrl ?? null;
-      if (!hero && photos.length > 0) {
-        const picked = await pickHeroPhoto(photos);
-        hero = picked.url || photos[0] || null;
-        if (hero) {
-          await setHomeHero({
-            homeId: home.id,
-            orgId: input.orgId,
-            sourceUrl: hero,
-          });
-        }
-      }
-      hero = hero ?? listing.imageUrl ?? null;
-      return { listing, home, detail, photos, hero };
-    }),
-  );
-  const usable = details.filter((row) => row.hero);
-  if (usable.length === 0) {
-    throw new AdSetError(422, "None of those homes have a photo to draw on");
-  }
-
-  const copyHomes = usable.map(({ listing, detail, hero }): CopyHome => ({
-    name: listing.name,
-    place: [listing.city, listing.state].filter(Boolean).join(", "),
-    bedrooms: listing.bedrooms ?? null,
-    bathrooms: listing.bathrooms ?? null,
-    guests: listing.guests ?? null,
-    nightlyFrom: listing.nightlyFrom ?? null,
-    amenities: detail.amenities,
-    description: detail.description,
-    heroUrl: hero,
-  }));
-  // A portfolio card is one home: its Meta headline names it and its
-  // description states its facts, so neither goes stale when the set's
-  // copy is rewritten.
-  const homeCardCopy = (home: CopyHome) => ({
-    headline: home.name.slice(0, 60),
-    description: homeFactsDescription(home),
-  });
-  // The first pass defers copy: shells with factual words, no model call. The
-  // words come later, from writeSetCopy, once the compositions and placements
-  // look right.
-  const copy =
-    input.copy === "ai"
-      ? await writeAdSetCopy({
-          brandName: brand.name,
-          brandStory: brand.story,
-          homes: copyHomes,
-        })
-      : deterministicSetCopy(copyHomes, brand.name);
-
-  // The catalog ad is Meta's to draw from the product feed, which the
-  // Catalog tab owns; the studio only holds ideas it can compose and freeze.
-  const plan = buildPerformanceAdPlan({
-    customer: brand.name,
-    properties: usable.map(({ listing }) => ({
-      name: listing.name,
-      url: listing.url,
-    })),
-  }).filter((item) => item.kind !== "catalog");
-
-  /** The card with its story twin riding on it, when the card is a preview. */
-  const withStory = (base: MediaItem): AdCard => {
-    const twin = storyTwinOfPreview(base.url);
-    return twin
-      ? {
-          ...base,
-          story: {
-            url: twin,
-            type: "image",
-            width: STORY.width,
-            height: STORY.height,
-            via: "render",
-          },
-        }
-      : base;
-  };
-
-  /** A card: the composition that draws it, redrawn on read. */
-  // One blueprint per ad kind, so a set reads as one system. The static
-  // leads on the photo with a single bold line (hero-overlay); the carousel
-  // is the rooms themselves, clean (photo-only); the portfolio and catalog
-  // are branded listing cards (catalog-place). A placement's own crop is a
-  // later variation, drawn from the same blueprint.
-  // The pill drawn on the card is a marketing phrase, the way the reference
-  // sets read, not Meta's CTA enum. `SEE_DETAILS` stays the platform button
-  // the push sends (`content.callToAction`); the two are not the same thing.
-  const STAMP_CTA = "Find your next escape";
-  const heroCard = (sourceUrl: string, title: string): MediaItem => ({
-    url: compositionPreviewUrl({
-      brandId: brand.id,
-      templateId: "hero-overlay",
-      formatId: "portrait",
-      source: { url: sourceUrl },
-      title,
-      eyebrow: brand.name,
-      cta: STAMP_CTA,
-    }),
-    type: "image",
-  });
-  // A listing's facts as the preview copy reads them, shared by the catalog
-  // card, the carousel's closing card, and the per-slide headlines.
-  const previewHome = (listing: WanderOsListing) => ({
-    name: listing.name,
-    city: listing.city,
-    state: listing.state,
-    bedrooms: listing.bedrooms,
-    bathrooms: listing.bathrooms,
-    guests: listing.guests,
-    rating: listing.rating,
-    amenities: (() => {
-      const detail = usable.find(
-        (row) => row.listing.id === listing.id,
-      )?.detail;
-      return amenitySource(detail?.amenities, detail?.description);
-    })(),
-  });
-  // Each home's listing card copy, written once in set order so neighbouring
-  // cards lead on different amenities where the homes allow it.
-  const leadsSoFar = new Set<string>();
-  const catalogCopyById = new Map(
-    usable.map(({ listing }) => {
-      const copy = homeCatalogCopy(previewHome(listing), leadsSoFar);
-      if (copy.lead) leadsSoFar.add(copy.lead);
-      return [listing.id, copy] as const;
-    }),
-  );
-  // The branded listing card for one home: the full catalog-place composition
-  // (place, facts, guest-rating pill), drawn on this photo.
-  const listingCard = (
-    sourceUrl: string,
-    listing: WanderOsListing,
-  ): MediaItem => ({
-    url: homeCatalogPreviewUrl({
-      brandId: brand.id,
-      source: { url: sourceUrl },
-      formatId: "portrait",
-      copy:
-        catalogCopyById.get(listing.id) ??
-        homeCatalogCopy(previewHome(listing)),
-    }),
-    type: "image",
-  });
-
-  // A rebuild replaces the last set rather than stacking a second one beside
-  // it. Anything already approved or attached to a campaign is left alone.
-  const stale = await db.query.adTable.findMany({
-    where: and(eq(adTable.brandId, brand.id), isNull(adTable.campaignId)),
-    columns: { id: true, status: true, type: true },
-  });
-  const replaceable = stale.filter(isReplaceableStudioAd);
-  if (replaceable.length > 0) {
-    // `ad` has no soft delete, and a replaced draft is not history worth
-    // keeping: it was never on a platform and nobody approved it.
-    await db.delete(adTable).where(
-      inArray(
-        adTable.id,
-        replaceable.map((ad) => ad.id),
-      ),
-    );
-  }
-
-  const built: BuiltAd[] = [];
-  for (const item of plan) {
-    const index = item.propertyIndex;
-    const home = index != null ? usable[index] : null;
-    const homeCopy = index != null ? copy.homes[index] : null;
-    const format = KIND_FORMAT[item.kind];
-
-    let content: AdCreativeContent;
-    if (item.kind === "static" && home && homeCopy) {
-      content = {
-        format,
-        headline: homeCopy.headline,
-        body: homeCopy.primaryText,
-        description: homeCopy.description,
-        linkUrl: home.listing.url,
-        callToAction: PERFORMANCE_AD_DEFAULTS.callToAction,
-        propertyName: home.listing.name,
-        // The static is the one shape Meta takes a per-placement asset on,
-        // so it is born with its 9:16: the same card on the story canvas.
-        media: [withStory(heroCard(home.hero!, homeCopy.cardTitle))],
-      };
-    } else if (item.kind === "carousel" && home && homeCopy) {
-      // One home's own carousel, branded like the reference sets but past their
-      // baseline: a weak set stamps one template on every slide. This varies
-      // the composition by the card's role — a hero cover and feature cards,
-      // each carrying its own line, closing on the branded listing card.
-      const photos = home.photos.slice(0, HOME_CAROUSEL_CARDS);
-      const slides = photos.length >= 2 ? photos : [home.hero!];
-      const titles = carouselSlideTitles(
-        previewHome(home.listing),
-        slides.length,
-        homeCopy.cardTitle,
-      );
-      content = {
-        format,
-        headline: homeCopy.headline,
-        body: homeCopy.primaryText,
-        description: homeCopy.description,
-        linkUrl: home.listing.url,
-        callToAction: PERFORMANCE_AD_DEFAULTS.callToAction,
-        propertyName: home.listing.name,
-        media: slides.map((photo, index) =>
-          index === slides.length - 1 && slides.length >= 3
-            ? listingCard(photo, home.listing)
-            : heroCard(photo, titles[index]!),
-        ),
-      };
-    } else if (item.kind === "catalog_home" && home && homeCopy) {
-      // The home's hero drawn with the branded listing composition: the same
-      // photo as the static, read as a catalog card. Born with its 9:16 twin
-      // so the story placement has a card to show.
-      content = {
-        format,
-        headline: homeCopy.headline,
-        body: homeCopy.primaryText,
-        description: homeCopy.description,
-        linkUrl: home.listing.url,
-        callToAction: PERFORMANCE_AD_DEFAULTS.callToAction,
-        propertyName: home.listing.name,
-        media: [withStory(listingCard(home.hero!, home.listing))],
-      };
-    } else if (item.kind === "hero_carousel") {
-      // The portfolio as feature shots: each featured home's hero drawn with
-      // the bold hero composition, one card per home, in the set's order. The
-      // catalog carousel below draws the same homes as branded listing cards.
-      content = {
-        format,
-        headline: copy.portfolioHeadline,
-        body: copy.portfolioPrimaryText,
-        description: copy.portfolioDescription,
-        callToAction: PERFORMANCE_AD_DEFAULTS.callToAction,
-        media: usable.map(({ hero }, i) => ({
-          ...heroCard(hero!, copy.homes[i]!.cardTitle),
-          ...homeCardCopy(copyHomes[i]!),
-        })),
-      };
-    } else if (item.kind === "all_properties_carousel") {
-      content = {
-        format,
-        headline: copy.portfolioHeadline,
-        body: copy.portfolioPrimaryText,
-        description: copy.portfolioDescription,
-        callToAction: PERFORMANCE_AD_DEFAULTS.callToAction,
-        media: usable.map(({ hero, listing }, i) => ({
-          ...listingCard(hero!, listing),
-          ...homeCardCopy(copyHomes[i]!),
-        })),
-      };
-    } else {
-      // The catalog ad's cards are Meta's to render from the product set; the
-      // set's own cards stand in so the review shows what it will look like.
-      content = {
-        format,
-        headline: copy.catalogHeadline,
-        body: copy.catalogPrimaryText,
-        description: copy.catalogDescription,
-        callToAction: PERFORMANCE_AD_DEFAULTS.callToAction,
-        media: usable.map(({ hero, listing }) => listingCard(hero!, listing)),
-      };
-    }
-
-    const [row] = await db
-      .insert(adTable)
-      .values({
-        brandId: brand.id,
-        campaignId: null,
-        homeId: home?.home.id ?? null,
-        name: item.name,
-        type: "creative",
-        status: "drawn",
-        content,
-      })
-      .returning({ id: adTable.id });
-
-    built.push({
-      id: row!.id,
-      name: item.name,
-      kind: item.kind,
-      homeName: home?.listing.name ?? null,
-      cards: content.media.length,
-    });
-  }
-
-  return {
-    brandId: brand.id,
-    ads: built,
-    replaced: replaceable.length,
-    homes: usable.map(({ home }) => ({
-      id: home.externalId,
-      name: home.name,
-      url: home.url,
-    })),
-    note,
-  };
-}
-
 /** The full brand collection, including ads assigned to campaigns. */
 export async function listAdSet(input: { brandId: string; orgId: string }) {
   const brand = await requireOwnedBrand(input);
@@ -1011,15 +522,17 @@ export async function addAdShell(input: {
   };
   const [row] = await db
     .insert(adTable)
-    .values({
-      brandId: brand.id,
-      campaignId: campaign?.id ?? null,
-      homeId: bound.home?.id ?? null,
-      name: input.name?.trim() || adName(brand, input.format, bound.name),
-      type: "creative",
-      status: "drawn",
-      content,
-    })
+    .values(
+      withIdeaStudio({
+        brandId: brand.id,
+        campaignId: campaign?.id ?? null,
+        homeId: bound.home?.id ?? null,
+        name: input.name?.trim() || adName(brand, input.format, bound.name),
+        type: "creative" as const,
+        status: "drawn" as const,
+        content,
+      }),
+    )
     .returning({ id: adTable.id, name: adTable.name });
   return { adId: row!.id, name: row!.name, homeName: bound.name };
 }
@@ -1164,15 +677,17 @@ export async function createAdsFromAssets(input: {
     };
     const [row] = await db
       .insert(adTable)
-      .values({
-        brandId: brand.id,
-        campaignId: campaign?.id ?? null,
-        homeId: home?.id ?? null,
-        name: adName(brand, format, label),
-        type: "creative",
-        status: "drawn",
-        content,
-      })
+      .values(
+        withIdeaStudio({
+          brandId: brand.id,
+          campaignId: campaign?.id ?? null,
+          homeId: home?.id ?? null,
+          name: adName(brand, format, label),
+          type: "creative" as const,
+          status: "drawn" as const,
+          content,
+        }),
+      )
       .returning({ id: adTable.id, name: adTable.name });
     created.push({
       adId: row!.id,
@@ -1259,142 +774,6 @@ export async function setAdHome(input: {
       "This ad changed elsewhere. Reload before changing its home.",
     );
   return { adId: ad.id, name, homeName: bound.name };
-}
-
-/**
- * One change to an ad's cards: a library asset into a slot, onto the end,
- * or a card out or moved. Uploads reach here as library assets, so nothing
- * an ad shows is ever outside the library.
- */
-export async function editAdCards(input: {
-  adId: string;
-  orgId: string;
-  /** Who is deriving; a story made by crop, extend or render is filed under them. */
-  userId?: string | null;
-  edit:
-    | { op: "replace"; index: number; mediaAssetId: string }
-    | { op: "append"; mediaAssetId: string }
-    | { op: "remove"; index: number }
-    | { op: "move"; index: number; to: number }
-    | { op: "setStory"; index: number; mediaAssetId: string }
-    | { op: "clearStory"; index: number }
-    | {
-        op: "makeStory";
-        index: number;
-        how?: "auto" | "crop" | "extend" | "render";
-      };
-}) {
-  const ad = await requireOwnedAd(input);
-  const content = creativeContent(ad);
-  const brand = ad.brand;
-  const cardAt = (index: number) => {
-    const card = content.media[index];
-    if (!card) {
-      throw new AdSetError(
-        422,
-        `This ad has ${content.media.length} card${content.media.length === 1 ? "" : "s"}; there is no card ${index + 1}`,
-      );
-    }
-    return card;
-  };
-
-  // The story variants ride on a card and are not cards themselves, so they
-  // are handled here rather than through the card rules.
-  if (
-    input.edit.op === "setStory" ||
-    input.edit.op === "clearStory" ||
-    input.edit.op === "makeStory"
-  ) {
-    const index = input.edit.index;
-    const card = cardAt(index);
-    let story: AdPlacementVariant | undefined;
-    if (input.edit.op === "setStory") {
-      const picked = await cardFromAsset(brand.id, input.edit.mediaAssetId);
-      if ((picked.item.type === "video") !== (card.type === "video")) {
-        throw new AdSetError(
-          422,
-          "Use a video variant for a video ad, or an image variant for an image ad",
-        );
-      }
-      const [item] =
-        card.type === "video"
-          ? await deliveryMediaFor([picked.item], "vertical")
-          : [picked.item];
-      if (
-        card.type === "video" &&
-        (!item?.width ||
-          !item.height ||
-          Math.abs(item.width / item.height - 9 / 16) >= 0.02)
-      ) {
-        throw new AdSetError(422, "Stories and Reels need a 9:16 video cut");
-      }
-      story = { ...item!, via: "upload" };
-    } else if (input.edit.op === "makeStory") {
-      if (!input.userId) {
-        throw new AdSetError(422, "Deriving a story needs a signed-in user");
-      }
-      story = await deriveStory({
-        brand,
-        userId: input.userId,
-        card,
-        how: input.edit.how ?? "auto",
-        home: content.propertyName ?? null,
-      });
-    }
-    const media: AdCard[] = [...content.media];
-    const { story: _dropped, ...base } = card;
-    media[index] = story ? { ...base, story } : base;
-    await db
-      .update(adTable)
-      .set({ content: { ...content, media } })
-      .where(eq(adTable.id, ad.id));
-    return { adId: ad.id, cards: media.length, story: story ?? null };
-  }
-
-  let edit: CardEdit<AdCard>;
-  switch (input.edit.op) {
-    case "replace":
-      edit = {
-        op: "replace",
-        index: input.edit.index,
-        item: (await cardFromAsset(brand.id, input.edit.mediaAssetId)).item,
-      };
-      break;
-    case "append":
-      edit = {
-        op: "append",
-        item: (await cardFromAsset(brand.id, input.edit.mediaAssetId)).item,
-      };
-      break;
-    default:
-      edit = input.edit;
-  }
-  if (
-    (edit.op === "replace" || edit.op === "append") &&
-    edit.item.type === "video"
-  ) {
-    const cut = await videoAdCardFor(edit.item);
-    const previousStory =
-      edit.op === "replace" ? cardAt(edit.index).story : undefined;
-    edit.item = {
-      ...(cut ?? edit.item),
-      ...(previousStory ? { story: previousStory } : {}),
-    };
-  }
-  let media: AdCard[];
-  try {
-    media = applyCardEdit(content, edit);
-  } catch (error) {
-    throw new AdSetError(
-      422,
-      error instanceof Error ? error.message : "That change is not allowed",
-    );
-  }
-  await db
-    .update(adTable)
-    .set({ content: { ...content, media } })
-    .where(eq(adTable.id, ad.id));
-  return { adId: ad.id, cards: media.length, story: null };
 }
 
 /**
@@ -1735,7 +1114,7 @@ export async function setAdCopy(input: {
   const body = input.body ?? content.body;
   const description = input.description ?? content.description;
   // An idea-studio ad sends the projection of its document, so the words go
-  // into the document and are projected again, as writeSetCopy does.
+  // into the document and are projected again.
   const studio = content.ideaStudio;
   if (studio) {
     const document = {
@@ -2032,217 +1411,6 @@ export async function unfreezePlacement(input: {
   const next = withUnfrozen(asPlacements(ad.placements), input.placementKey);
   await savePlacements(ad.id, next);
   return { adId: ad.id, placementKey: input.placementKey };
-}
-
-// ---- The copy pass: AI words onto shells already drawn ---------------------
-//
-// The final pass of the split build. `buildAdSet` with copy:"defer" draws the
-// shells with factual words; this rewrites the persuasive text once the
-// compositions and placements look right. It touches ad-level headline/body
-// only — never the on-card title, so no card re-renders — and it leaves any
-// per-placement copy override alone, since that was a deliberate choice.
-
-export async function writeSetCopy(input: {
-  brandId: string;
-  orgId: string;
-  userId: string;
-  adId?: string;
-  /**
-   * One campaign's ads instead of the brand's catalog set. Asked for by name,
-   * so approved ads are rewritten too: the pass never touches their artwork.
-   */
-  campaignId?: string;
-}): Promise<{ brandId: string; updated: number }> {
-  const brand = await requireOwnedBrand(input);
-  const ads = await db.query.adTable.findMany({
-    where: and(
-      eq(adTable.brandId, brand.id),
-      input.adId ? eq(adTable.id, input.adId) : undefined,
-      input.campaignId
-        ? eq(adTable.campaignId, input.campaignId)
-        : input.adId
-          ? undefined
-          : isNull(adTable.campaignId),
-    ),
-    with: { home: { columns: { externalId: true, name: true, url: true } } },
-  });
-  const candidates = ads.filter(
-    (ad) =>
-      ad.type === "creative" &&
-      (Boolean(input.campaignId) || ad.status !== "approved"),
-  );
-  if (input.adId && !candidates.length)
-    throw new Error("Editable ad not found in this brand or campaign");
-  const editableIds = new Set(
-    candidates
-      .filter(
-        (ad) =>
-          "media" in ad.content &&
-          ad.content.media.every((card) => card.type === "image") &&
-          (!ad.content.format ||
-            ["static", "carousel"].includes(ad.content.format)),
-      )
-      .map((ad) => ad.id),
-  );
-  let updated = 0;
-  for (const ad of candidates) {
-    if (!("media" in ad.content) || !editableIds.has(ad.id)) continue;
-    if (ad.status === "approved" || ad.content.ideaStudio?.approval) {
-      if (input.adId)
-        throw new Error(
-          "Approved ads are final. Edit it to make a draft that replaces it.",
-        );
-      continue;
-    }
-    await rewriteAdCreative({
-      adId: ad.id,
-      orgId: input.orgId,
-      userId: input.userId,
-    });
-    updated++;
-  }
-  const drafts = candidates.filter(
-    (ad) => "media" in ad.content && !editableIds.has(ad.id),
-  );
-  if (drafts.length === 0) return { brandId: brand.id, updated };
-
-  // The homes the per-home ads are bound to, in first-seen order, with the
-  // detail the copy reads from.
-  const externalIds = [
-    ...new Set(
-      drafts.flatMap((ad) => (ad.home?.externalId ? [ad.home.externalId] : [])),
-    ),
-  ];
-  const listings = await studioListings({
-    id: brand.id,
-    website: brand.website,
-  });
-  const websiteId = await brandWebsiteId(brand.id);
-  const existing = await listingCopyContext(brand.id, externalIds);
-  const homeById = new Map<string, CopyHome>();
-  await Promise.all(
-    externalIds.map(async (externalId) => {
-      const listing = listings.find((row) => row.id === externalId);
-      if (!listing) return;
-      const detail =
-        websiteId && listing.source === "wanderos"
-          ? await fetchWanderOsListingDetail({
-              websiteId,
-              propertyId: externalId,
-            })
-          : {
-              photos: [],
-              description: null,
-              amenities: [],
-              locationDescription: null,
-              petsAllowed: null,
-            };
-      homeById.set(externalId, {
-        name: listing.name,
-        place: [listing.city, listing.state].filter(Boolean).join(", "),
-        bedrooms: listing.bedrooms ?? null,
-        bathrooms: listing.bathrooms ?? null,
-        guests: listing.guests ?? null,
-        nightlyFrom: listing.nightlyFrom ?? null,
-        amenities: detail.amenities,
-        description: detail.description,
-        heroUrl: listing.imageUrl ?? null,
-        market: marketOf(brand.markets, listing.city),
-        locationDescription: detail.locationDescription,
-        petsAllowed: detail.petsAllowed,
-        existingCopy: existing.find((item) => item.listingId === externalId),
-      });
-    }),
-  );
-
-  const orderedIds = externalIds.filter((id) => homeById.has(id));
-  const copy = await writeAdSetCopy({
-    brandName: brand.name,
-    brandStory: brand.story,
-    homes: orderedIds.map((id) => homeById.get(id)!),
-    regenerate: true,
-    existingAds: drafts.flatMap((ad) => {
-      if (!("media" in ad.content)) return [];
-      const homeIndex = ad.home?.externalId
-        ? orderedIds.indexOf(ad.home.externalId)
-        : -1;
-      return [
-        {
-          homeIndex: homeIndex >= 0 ? homeIndex : null,
-          format: adFormatOf(ad.content),
-          headline: ad.content.headline,
-          body: ad.content.body,
-          description: ad.content.description,
-          artwork: ad.content.ideaStudio?.document.cards ?? ad.content.media,
-        },
-      ];
-    }),
-  });
-  const copyByHome = new Map(
-    orderedIds.map((id, index) => [id, copy.homes[index]!]),
-  );
-
-  for (const ad of drafts) {
-    const content = ad.content as AdCreativeContent;
-    if (!Array.isArray(content.media)) continue;
-    let headline = content.headline;
-    let body = content.body;
-    let description = content.description;
-    const homeCopy = ad.home?.externalId
-      ? copyByHome.get(ad.home.externalId)
-      : null;
-    if (homeCopy) {
-      headline = homeCopy.headline;
-      body = homeCopy.primaryText;
-      description = homeCopy.description;
-    } else {
-      // The portfolio and catalog ads carry no home; the format says which.
-      const format = adFormatOf(content);
-      if (format === "portfolio") {
-        headline = copy.portfolioHeadline;
-        body = copy.portfolioPrimaryText;
-        description = copy.portfolioDescription;
-      } else if (format === "catalog") {
-        headline = copy.catalogHeadline;
-        body = copy.catalogPrimaryText;
-        description = copy.catalogDescription;
-      } else {
-        continue;
-      }
-    }
-    // An idea-studio ad sends the projection of its document, so the words
-    // go into the document and are projected again; writing only the ad-level
-    // fields left Meta sending copy the editor no longer showed.
-    const studio = content.ideaStudio;
-    const docCopy = studio?.document.copy;
-    if (
-      headline === content.headline &&
-      body === content.body &&
-      description === content.description &&
-      (!docCopy ||
-        (docCopy.headline === headline &&
-          docCopy.body === body &&
-          docCopy.description === description))
-    )
-      continue;
-    const next = studio
-      ? projectIdea(
-          brand.id,
-          content,
-          {
-            ...studio,
-            document: {
-              ...studio.document,
-              copy: { ...studio.document.copy, headline, body, description },
-            },
-          },
-          ad.placements,
-        )
-      : { content: { ...content, headline, body, description } };
-    await db.update(adTable).set(next).where(eq(adTable.id, ad.id));
-    updated += 1;
-  }
-  return { brandId: brand.id, updated };
 }
 
 /** Section saves merge into the latest persisted content and require the reviewed version. */

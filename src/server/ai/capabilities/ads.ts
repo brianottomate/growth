@@ -43,7 +43,6 @@ import {
   deletePlatformCampaignActionOutputSchema,
   createGoogleAdsAccountActionOutputSchema,
   createReportingConversionActionOutputSchema,
-  buildAdSetActionOutputSchema,
   addAdShellActionOutputSchema,
   createAdsFromAssetsActionOutputSchema,
   setAdHomeActionOutputSchema,
@@ -51,7 +50,6 @@ import {
   catalogHomeFactsActionOutputSchema,
   suggestCampaignAudiencesActionOutputSchema,
   editCatalogCardActionOutputSchema,
-  editAdCardsActionOutputSchema,
   attachAdSetActionOutputSchema,
   setAdStatusActionOutputSchema,
   editApprovedAdActionOutputSchema,
@@ -150,41 +148,31 @@ import {
 import {
   requireOwnedCampaign,
   resolveAdAuthoringScope,
-  starterIdeaHomes,
 } from "@/server/services/ads-draft.service";
 import { MediaService } from "@/server/services/media.service";
 import { mediaTypeForUrl } from "@/lib/media-url";
-import { and, eq, isNull } from "drizzle-orm";
 
-import { db } from "@/server/db";
-import { brandTable, type MediaItem } from "@/server/db/schema";
+import { type MediaItem } from "@/server/db/schema";
 import {
   addAdShell,
   attachAdSet,
-  buildAdSet,
   clearPlacement,
   createAdsFromAssets,
   deleteAd,
-  editAdCards,
   freezePlacement,
   setAdCopy,
   setAdHome,
   setAdStatus,
   setPlacementCopy,
   unfreezePlacement,
-  writeSetCopy,
   setAdPlatforms,
 } from "@/server/services/ad-set.service";
 import { editApprovedAd } from "@/server/services/ad-approval.service";
-import {
-  runStarterGeneration,
-  startStarterGeneration,
-  starterGenerationStatus,
-} from "@/server/services/starter-ad-generation.service";
+
 import { AD_PLACEMENT_SPECS } from "@/lib/ad-placements";
 import { channelPlatformEnum } from "@/server/db/channel-schema";
 import { writeGoogleTextAds } from "@/server/services/google-text-ads.service";
-import { HAND_MADE_AD_FORMATS, MAX_SET_HOMES } from "@/lib/performance-ads";
+import { HAND_MADE_AD_FORMATS } from "@/lib/performance-ads";
 
 import { GrowthActionError, growthAction } from "./types";
 
@@ -1425,62 +1413,6 @@ export const deletePlatformCampaignAction = growthAction({
     }),
 });
 
-export const buildAdSetAction = growthAction({
-  outputSchema: buildAdSetActionOutputSchema,
-  description:
-    "Draw a Performance client's whole ad set: per home a static, a carousel and a listing-card static, then a hero carousel and an all-homes carousel. It does not make the catalog ad: that is drawn from the approved catalog, which the Catalog tab owns. Name the homes (propertyIds, WanderOS listing ids in portfolio order) or name a count ('build me five statics and five carousels' is count 5): the homes on the client's Performance record come first and their site's own order fills the rest, and the result says which were chosen. Writes the captions in one pass from each home's own amenities and description, walks each home's carousel through its real room photos, and lands every ad as a draft against the brand with no campaign. Rebuilding replaces the last set and leaves anything already approved alone. Bind or swap a home afterwards with setAdHome. Call it only when the operator asks for ads; to feature a home, use performanceWrite.updateHome.",
-  inputSchema: z
-    .object({
-      brandId: z.string().min(1),
-      propertyIds: z.array(z.string().min(1)).max(MAX_SET_HOMES).optional(),
-      count: z
-        .number()
-        .int()
-        .min(1)
-        .max(MAX_SET_HOMES)
-        .optional()
-        .describe(
-          "How many homes to choose when none are named; 3 to 10 is the product, 5 the default.",
-        ),
-    })
-    .refine((value) => !(value.propertyIds?.length && value.count), {
-      message: "Name the homes or a count, not both.",
-    }),
-  examples: [
-    { brandId: "brand_01", count: 5 },
-    { brandId: "brand_01", propertyIds: ["1234567890123", "1234567890124"] },
-  ],
-  execute: async (input, ctx) => {
-    const result = await buildAdSet({
-      brandId: input.brandId,
-      orgId: ctx.orgId,
-      propertyIds: input.propertyIds,
-      count: input.count,
-      userId: ctx.userId,
-      // A person drawing the set writes the words after the cards look right.
-      copy: ctx.surface === "app" ? "defer" : "ai",
-    });
-    return { ok: true as const, ...result };
-  },
-});
-
-export const writeSetCopyAction = growthAction({
-  description:
-    "Generate a fresh copy set for local ads: caption and Meta headline plus editable image text for static/carousel ideas, preserving selected photos, slide order, templates and crops. Supply adId to rewrite only one ad. Approved ads are final: adsWrite.editApprovedAd makes the draft that replaces one. Legacy artwork keeps its image text. The same as New copy on an ad or Write copy for a set.",
-  inputSchema: z.object({
-    brandId: z.string().min(1),
-    campaignId: z.string().min(1).optional(),
-    adId: z.string().min(1).optional(),
-  }),
-  outputSchema: z.object({ brandId: z.string(), updated: z.number() }),
-  examples: [
-    { brandId: "brand_01" },
-    { brandId: "brand_01", campaignId: "camp_01" },
-  ],
-  execute: (input, ctx) =>
-    writeSetCopy({ ...input, orgId: ctx.orgId, userId: ctx.userId }),
-});
-
 export const writeGoogleTextAdsAction = growthAction({
   description:
     "Write Google Search text ads for a campaign or brand studio from a landing page and optional search terms: each a pool of up to 15 headlines (30 chars) and 4 descriptions (90 chars). Lands as unapproved text ideas; nothing is pushed. The same as Write search ads on the campaign page.",
@@ -1516,92 +1448,10 @@ export const setAdPlatformsAction = growthAction({
   execute: (input, ctx) => setAdPlatforms({ ...input, orgId: ctx.orgId }),
 });
 
-export const generateStarterIdeasAction = growthAction({
-  description:
-    "Generate starter ad ideas for a campaign or standalone brand studio. Home-aware batch creation lives in Ad Studio; selected home IDs snapshot the group membership. Optional bookingTargetId copies this brand's resolved booking destination onto the generated ads. Create ideas from the brand's featured homes (source featured, the default: per home a static and a carousel with photos chosen from its gallery, plus a portfolio hero carousel) or three copy-only brand concepts (source brand). Every idea lands as an unapproved draft for the operator to review and approve; nothing is pushed. Waits for the run to finish and reports what it made.",
-  inputSchema: z
-    .object({
-      ...adAuthoringFields,
-      bookingTargetId: z.string().min(1).optional(),
-      source: z.enum(["featured", "brand"]).default("featured"),
-      homeIds: z
-        .array(z.string().min(1))
-        .max(10)
-        .optional()
-        .describe(
-          "Featured home row ids. Omit for every featured home that has photos, up to ten.",
-        ),
-      stories: z
-        .boolean()
-        .default(true)
-        .describe(
-          "Also plan Facebook and Instagram Stories for featured ideas.",
-        ),
-    })
-    .refine(hasOneAdOwner, { message: "Supply either campaignId or brandId." }),
-  outputSchema: z.object({
-    runId: z.string(),
-    status: z.enum(["queued", "running", "succeeded", "failed", "cancelled"]),
-    created: z.number(),
-    total: z.number(),
-    error: z.string().nullable(),
-  }),
-  examples: [
-    { campaignId: "camp_01" },
-    { campaignId: "camp_01", source: "brand" },
-  ],
-  execute: async (input, ctx) => {
-    const homeIds =
-      input.source === "brand"
-        ? []
-        : (input.homeIds ??
-          (
-            await starterIdeaHomes({
-              campaignId: input.campaignId,
-              brandId: input.brandId,
-              organizationId: ctx.orgId,
-            })
-          )
-            .filter((home) => home.photos.length)
-            .slice(0, 10)
-            .map((home) => home.id));
-    const args = {
-      campaignId: input.campaignId,
-      brandId: input.brandId,
-      source: input.source,
-      bookingTargetId: input.bookingTargetId,
-      homeIds,
-      intendedPlacements: [
-        "facebook-feed" as const,
-        "instagram-feed" as const,
-        ...(input.source === "featured" && input.stories
-          ? (["facebook-story", "instagram-story"] as const)
-          : []),
-      ],
-      organizationId: ctx.orgId,
-      userId: ctx.userId,
-    };
-    const { runId } = await startStarterGeneration(args);
-    await runStarterGeneration(runId, args);
-    const run = await starterGenerationStatus({
-      campaignId: input.campaignId,
-      brandId: input.brandId,
-      organizationId: ctx.orgId,
-    });
-    return {
-      runId,
-      status: run?.status ?? ("failed" as const),
-      created: run?.created ?? 0,
-      total: run?.total ?? 0,
-      error: run?.error ?? null,
-    };
-  },
-});
-
 export const addAdShellAction = growthAction({
   outputSchema: addAdShellActionOutputSchema,
   description:
-    "Add one empty visual ad of a declared format (static, carousel, catalog or video). Supply linkUrl for an arbitrary HTTP or HTTPS destination. Optional propertyId or homeName supports home-aware studio authoring. Lands on the brand's wall, or straight in a campaign when campaignId is given. The creative comes afterwards with editAdCards, by upload into the library or from it. Use this when the operator wants the ads to exist first and fill them in, or wants an ad the build does not make.",
+    "Add one empty visual ad of a declared format (static, carousel or video). The catalog ad is not made here; it comes from the approved catalog. Supply linkUrl for an arbitrary HTTP or HTTPS destination. Optional propertyId or homeName supports home-aware studio authoring. Lands on the brand's wall, or straight in a campaign when campaignId is given. The creative comes afterwards with saveIdea. Use this when the operator wants the ads to exist first and fill them in, or wants an ad the build does not make.",
   inputSchema: z.object({
     brandId: z.string().min(1),
     linkUrl: z
@@ -1846,51 +1696,6 @@ export const setAdHomeAction = growthAction({
   execute: (input, ctx) => setAdHome({ ...input, orgId: ctx.orgId }),
 });
 
-export const editAdCardsAction = growthAction({
-  outputSchema: editAdCardsActionOutputSchema,
-  description:
-    "One change to a legacy drafted ad's cards. Does NOT support mini-studio ads (ideaStudio): for those read adsRead.ideaContext and use adsWrite.saveIdea with the complete document. With a library asset: replace the card at an index, append a card, remove one, move one. Per placement: setStory pins a 9:16 library asset to a card for stories and reels, clearStory drops it, makeStory derives one from the card's baseline (auto picks the best method: re-render when the card came from a composition, extend the photo past its edges via outpaint, else a centred crop; or name crop/extend/render). A static holds one card, a carousel two to ten (one while it is being filled), a video ad one clip. Works on ads in the brand's set and on ads in a campaign that has not been pushed.",
-  inputSchema: z.object({
-    adId: z.string().min(1),
-    edit: z.discriminatedUnion("op", [
-      z.object({
-        op: z.literal("replace"),
-        index: z.number().int().min(0).max(9),
-        mediaAssetId: z.string().min(1),
-      }),
-      z.object({ op: z.literal("append"), mediaAssetId: z.string().min(1) }),
-      z.object({
-        op: z.literal("remove"),
-        index: z.number().int().min(0).max(9),
-      }),
-      z.object({
-        op: z.literal("move"),
-        index: z.number().int().min(0).max(9),
-        to: z.number().int().min(0).max(9),
-      }),
-      z.object({
-        op: z.literal("setStory"),
-        index: z.number().int().min(0).max(9),
-        mediaAssetId: z.string().min(1),
-      }),
-      z.object({
-        op: z.literal("clearStory"),
-        index: z.number().int().min(0).max(9),
-      }),
-      z.object({
-        op: z.literal("makeStory"),
-        index: z.number().int().min(0).max(9),
-        how: z.enum(["auto", "crop", "extend", "render"]).optional(),
-      }),
-    ]),
-  }),
-  examples: [
-    { adId: "ad_01", edit: { op: "append", mediaAssetId: "media_01" } },
-  ],
-  execute: (input, ctx) =>
-    editAdCards({ ...input, orgId: ctx.orgId, userId: ctx.userId }),
-});
-
 export const attachAdSetAction = growthAction({
   outputSchema: attachAdSetActionOutputSchema,
   description:
@@ -1991,7 +1796,7 @@ export const setAdCopyAction = growthAction({
 });
 
 // ---- Placement cells: one platform x placement of one ad ------------------
-// The base creative is edited with setAdCopy/editAdCards; these touch one cell
+// The base creative is edited with saveIdea or setAdCopy; these touch one cell
 // that differs from the base. Singular by design: the model reads the matrix,
 // then fires one call per cell it wants to change, freeze or reset.
 

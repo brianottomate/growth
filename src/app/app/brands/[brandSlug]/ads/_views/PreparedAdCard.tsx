@@ -21,6 +21,7 @@ import { MediaPickerDialog } from "@/app/app/content/[contentId]/MediaPickerDial
 import { safeHomeUrl } from "@/lib/ad-preview-links";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 import { textAdCopySchema, textAdReady } from "@/lib/ad-authoring";
+import type { AdReview } from "@/lib/ad-review";
 import type { AdContent, MediaItem } from "@/server/db/schema";
 import { orpc } from "@/orpc/client";
 
@@ -31,6 +32,7 @@ export type PreparedAd = {
   updatedAt: string;
   content: AdContent;
   bookingTargetId?: string | null;
+  review: AdReview;
 };
 const ctas = [
   ["BOOK_NOW", "Book now"],
@@ -84,7 +86,13 @@ export function PreparedAdCard({
   const [picking, setPicking] = useState<"base" | "story" | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const approved = ad.status === "approved";
+  const ready = ad.status === "ready";
   const locked = approved || Boolean(deliveryState);
+  const { data: members = [] } = useQuery(
+    orpc.content.assignableMembers.queryOptions(),
+  );
+  const member = (id: string | null | undefined) =>
+    (id && members.find((m) => m.id === id)) || null;
   const targets = useQuery({
     ...orpc.homeGroups.targets.queryOptions({ input: { brandId } }),
     enabled: editor === "destination" || Boolean(ad.bookingTargetId),
@@ -116,7 +124,16 @@ export function PreparedAdCard({
   const status = useMutation(
     orpc.ads.setAdStatus.mutationOptions({
       onError,
-      onSuccess: () => router.refresh(),
+      onSuccess: (_result, { status: next }) => {
+        toast.success(
+          next === "approved"
+            ? "Ad approved"
+            : next === "ready"
+              ? "Marked ready for review"
+              : "Back to draft",
+        );
+        router.refresh();
+      },
     }),
   );
   const remove = useMutation(
@@ -324,7 +341,15 @@ export function PreparedAdCard({
           <h3 className="line-clamp-2 font-semibold">{ad.name}</h3>
           <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
             {text ? "Text" : "Video"} ·{" "}
-            {deliveryState ?? (approved ? "Approved" : "Draft ad")}
+            {approved
+              ? `Approved${member(ad.review.approvedBy)?.name ? ` · ${member(ad.review.approvedBy)?.name}` : ""}`
+              : ready
+                ? `Ready for review${member(ad.review.readyBy)?.name ? ` · ${member(ad.review.readyBy)?.name}` : ""}`
+                : "Draft"}
+            {deliveryState ? ` · ${deliveryState}` : ""}
+            {ad.review.replacesAdId && !approved
+              ? " · replaces an approved ad"
+              : ""}
             {metadata && <> · {metadata}</>}
           </p>
         </div>
@@ -684,30 +709,52 @@ export function PreparedAdCard({
         >
           {expanded ? "Close details" : locked ? "View details" : "Edit"}
         </Button>
-        {!expanded && !deliveryState && (
+        {!expanded && !approved && (
+          <Button
+            variant="outline"
+            disabled={busy || status.isPending}
+            onClick={() =>
+              status.mutate({
+                adId: ad.id,
+                status: ready ? "drawn" : "ready",
+                expectedUpdatedAt: ad.updatedAt,
+              })
+            }
+          >
+            {ready ? "Not ready" : "Mark ready"}
+          </Button>
+        )}
+        {!expanded && !approved && (
           <Button
             disabled={
               busy ||
-              (!approved &&
-                (text
-                  ? !textAdReady(text) || !safeHomeUrl(text.linkUrl ?? website)
-                  : !video?.media.length ||
-                    !video.headline.trim() ||
-                    !video.body.trim() ||
-                    !safeHomeUrl(video.linkUrl ?? website)))
+              (text
+                ? !textAdReady(text) || !safeHomeUrl(text.linkUrl ?? website)
+                : !video?.media.length ||
+                  !video.headline.trim() ||
+                  !video.body.trim() ||
+                  !safeHomeUrl(video.linkUrl ?? website))
             }
-            loading={status.isPending || editApproved.isPending}
+            loading={status.isPending}
             onClick={() =>
-              approved
-                ? editApproved.mutate({ adId: ad.id })
-                : status.mutate({
-                    adId: ad.id,
-                    status: "approved",
-                    expectedUpdatedAt: ad.updatedAt,
-                  })
+              status.mutate({
+                adId: ad.id,
+                status: "approved",
+                expectedUpdatedAt: ad.updatedAt,
+              })
             }
           >
-            {approved ? "Edit as new draft" : "Approve"}
+            Approve
+          </Button>
+        )}
+        {!expanded && approved && (
+          <Button
+            variant="outline"
+            disabled={busy || editApproved.isPending}
+            loading={editApproved.isPending}
+            onClick={() => editApproved.mutate({ adId: ad.id })}
+          >
+            Edit as new draft
           </Button>
         )}
       </footer>

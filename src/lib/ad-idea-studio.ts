@@ -1,6 +1,7 @@
 import { META_PLACEMENTS, metaPlacementSchema } from "./meta-placement-plan";
 import { z } from "zod";
 import type {
+  AdContent,
   AdCreativeContent,
   AdPlacements,
   AdCard,
@@ -435,4 +436,34 @@ export function projectIdea(
         })),
   };
   return { content: next, placements: result };
+}
+
+/**
+ * Every static or carousel image ad carries its studio document from birth,
+ * whichever path makes it, so there is one editor and one approval for all
+ * of them. Video, text and catalog ads pass through unchanged.
+ */
+export function withIdeaStudio<
+  T extends {
+    brandId: string;
+    name: string;
+    content: AdContent;
+    placements?: AdPlacements | null;
+  },
+>(values: T): T {
+  const content = values.content;
+  if (!("media" in content) || content.ideaStudio) return values;
+  if (content.media.some((card) => card.type !== "image")) return values;
+  if (content.format && !["static", "carousel"].includes(content.format))
+    return values;
+  const document = ideaDocumentFromAd({ name: values.name, content });
+  return {
+    ...values,
+    ...projectIdea(
+      values.brandId,
+      content,
+      { document },
+      values.placements ?? null,
+    ),
+  };
 }

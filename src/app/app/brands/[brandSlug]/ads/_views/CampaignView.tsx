@@ -3,14 +3,13 @@ import { WorkspaceBreadcrumbs } from "@/components/workspace-breadcrumbs";
 import {
   campaignDisplayName,
   campaignListPath,
-  campaignPath,
   type CampaignWorkspace,
 } from "@/lib/campaign-navigation";
 import { workspaceActor } from "@/server/workspace-actor";
 import { listBrandHomes } from "@/server/services/homes.service";
 import { isImportedMetaCatalog } from "@/lib/meta-import";
 import { notFound, redirect } from "next/navigation";
-import { and, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, inArray, isNotNull } from "drizzle-orm";
 import { Images, Radio, Users, ChartNoAxesCombined } from "lucide-react";
 
 import { db } from "@/server/db";
@@ -21,13 +20,11 @@ import { platformLabel } from "@/components/channel-logos";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/components/ui/lib/utils";
 import { getDraftCampaign } from "@/server/services/ads-draft.service";
-import { brandListings } from "@/server/services/wanderos-listings.service";
-import { toWallAd, type AdState, type WallAd } from "@/lib/ad-wall";
+
+import { type AdState } from "@/lib/ad-wall";
 import { targetedAsset } from "@/lib/audience-asset";
 import { AddAdDialog } from "@/app/app/performance/clients/[brandSlug]/ads/AddAdDialog";
 import { AdIdeasList } from "./AdIdeasList";
-import { AdTile } from "./AdWall";
-import type { PickableHome } from "@/app/app/performance/clients/[brandSlug]/HomePicker";
 
 import { AskAssistantButton } from "./AskAssistantButton";
 import { Audiences } from "./Audiences";
@@ -110,30 +107,6 @@ export async function CampaignView({
       return url ? [[home.id, { name: home.name, url }]] : [];
     }),
   );
-  const listings = await brandListings({
-    id: brand.id,
-    website: brand.website,
-  });
-  const homes: PickableHome[] = listings
-    .filter((home) => home.imageUrl)
-    .map((home) => ({
-      id: home.id,
-      name: home.name,
-      imageUrl: home.imageUrl!,
-      thumbUrl: home.thumbUrl ?? null,
-      bedrooms: home.bedrooms ?? null,
-      guests: home.guests ?? null,
-      nightlyFrom: home.nightlyFrom ?? null,
-    }));
-  // The page reads newest first; the wall reads in the order the ads were
-  // made, so the first home asked for is the first home shown.
-  const wall: WallAd[] = [...ads]
-    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
-    .flatMap((ad) => {
-      const row = toWallAd(ad);
-      return row ? [row] : [];
-    });
-
   const planned = [...platformCampaigns].sort((a, b) =>
     a.platform.localeCompare(b.platform),
   );
@@ -365,22 +338,6 @@ export async function CampaignView({
           states={states}
           plannedPlatforms={plannedPlatforms}
           landingUrl={campaign.landingUrl ?? brand.website}
-          fallback={(id) => (
-            <ul>
-              <AdTile
-                brandId={brand.id}
-                brandSlug={brandSlug}
-                brandName={brandName}
-                brandLogo={brand.logo}
-                landingUrl={campaign.landingUrl}
-                homes={homes}
-                ad={wall.find((ad) => ad.id === id)!}
-                states={states}
-                surface="instagram"
-                allowHomeBinding={false}
-              />
-            </ul>
-          )}
         />
       </section>
       <section>

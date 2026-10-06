@@ -1148,7 +1148,7 @@ export const OPERATION_TOOLS = {
 const listingPhotoShape = z.object({
   /** The home's row: what performanceWrite.updateHome and brandWrite.update take. Null before the brand is ingested. */
   homeId: z.string().nullable(),
-  /** The WanderOS listing id: what adsWrite.buildAdSet takes. */
+  /** The WanderOS listing id. */
   listingId: z.string(),
   name: z.string(),
   url: z.string(),

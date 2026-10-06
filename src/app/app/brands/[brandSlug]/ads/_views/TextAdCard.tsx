@@ -157,5 +157,3 @@ export function TextAdForm({
     </div>
   );
 }
-
-export { PreparedAdCard as TextAdCard } from "./PreparedAdCard";

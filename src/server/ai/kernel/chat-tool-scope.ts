@@ -88,16 +88,6 @@ const common = new Set([
   "playbookRead",
   "sessionRead",
 ]);
-// Chat edits one entity at a time. Keep batch operations available to the app/MCP.
-const batchEdits = new Set([
-  "adsWrite__writeSetCopy",
-  "adsWrite__writeCatalogCards",
-  "adsWrite__buildAdSet",
-  "adsWrite__generateStarterIdeas",
-  "adsWrite__setCatalogDefaultTemplate",
-  "adsWrite__setCatalogAdCopy",
-]);
-
 export function createChatToolScope(input: {
   tools: ToolSet;
   pagePath?: string;
@@ -209,7 +199,6 @@ export function createChatToolScope(input: {
       "adsWrite__setAdStatus",
       "adsWrite__editApprovedAd",
       "adsWrite__setAdCopy",
-      "adsWrite__editAdCards",
       "adsWrite__setAdHome",
     ],
     photos: [
@@ -253,8 +242,7 @@ export function createChatToolScope(input: {
           (name) =>
             pending.has(name) ||
             (input.pitch && pitchOperations.has(name)) ||
-            (!batchEdits.has(name) &&
-              capabilities.has(name.split("__", 1)[0] ?? "") &&
+            (capabilities.has(name.split("__", 1)[0] ?? "") &&
               (!focus ||
                 performanceExpanded ||
                 !performanceCapabilities.has(name.split("__", 1)[0] ?? "") ||

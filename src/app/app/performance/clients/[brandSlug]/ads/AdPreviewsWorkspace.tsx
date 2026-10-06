@@ -39,7 +39,6 @@ export function AdPreviewsWorkspace({
   brandName,
   brandLogo,
   website,
-  homes,
   connected,
   ideas: allIdeas,
   focusHomeId,
@@ -51,7 +50,6 @@ export function AdPreviewsWorkspace({
   /** The resolved brand mark (vector/PNG), used on the feed mocks. */
   brandLogo: string | null;
   website: string | null;
-  homes: WorkspaceHome[];
   homeContext: AdHomeContext[];
   connected: boolean;
   ideas: StudioIdea[];
@@ -208,7 +206,6 @@ export function AdPreviewsWorkspace({
                 brandName={brandName}
                 brandLogo={brandLogo}
                 brandSlug={brandSlug}
-                homes={homes}
                 website={website}
                 connected={connected}
                 focusHomeId={focusHomeId}

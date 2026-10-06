@@ -6,6 +6,7 @@ import {
 } from "./home-groups.service";
 import { resolveMetaSchedule, metaScheduleIssue } from "@/lib/meta-schedule";
 import "server-only";
+import { withIdeaStudio } from "@/lib/ad-idea-studio";
 import { assertAdNotPushed } from "./ad-approval.service";
 
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
@@ -887,7 +888,7 @@ export async function addDraftAd(input: {
 
   const [ad] = await db
     .insert(adTable)
-    .values({ id: createId("ad"), ...values })
+    .values(withIdeaStudio({ id: createId("ad"), ...values }))
     .returning();
 
   return ad!;
@@ -1169,16 +1170,20 @@ async function adoptMirrorIntoPlan(input: {
     if (!adId) {
       const [created] = await db
         .insert(adTable)
-        .values({
-          id: createId("ad"),
-          brandId: input.brandId,
-          campaignId: input.campaignId,
-          name: row.name ?? "Platform ad",
-          type: "media" in content ? "creative" : "text",
-          // It already runs: the people who launched it signed it off.
-          status: "approved",
-          content,
-        })
+        .values(
+          withIdeaStudio({
+            id: createId("ad"),
+            brandId: input.brandId,
+            campaignId: input.campaignId,
+            name: row.name ?? "Platform ad",
+            type:
+              "media" in content ? ("creative" as const) : ("text" as const),
+            // It already runs: the people who launched it signed it off.
+            status: "approved" as const,
+            approvedAt: new Date(),
+            content,
+          }),
+        )
         .returning({ id: adTable.id });
       adId = created!.id;
       ideaBySignature.set(signature, adId);

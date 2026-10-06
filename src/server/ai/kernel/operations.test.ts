@@ -26,8 +26,8 @@ const catalog = {
           id: adId,
         }),
       }),
-      push: growthAction({
-        description: "Push",
+      setDelivery: growthAction({
+        description: "Start delivery",
         inputSchema: z.object({
           campaignId: z.string(),
         }),
@@ -46,8 +46,8 @@ describe("operation discovery", () => {
     let scheduled = false;
     expect(
       startOperationJob(
-        "adsWrite__push",
-        operationTools(catalog, "test").adsWrite__push!,
+        "adsWrite__setDelivery",
+        operationTools(catalog, "test").adsWrite__setDelivery!,
         {
           campaignId: "campaign",
         },

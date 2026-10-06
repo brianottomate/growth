@@ -7,7 +7,7 @@ import {
   META_HEADLINE,
   META_HOME_CAPTION,
 } from "@/server/ai/prompts";
-import { runCopyRequest, type CopyRequest } from "@/server/ai/copy-request";
+import { type CopyRequest } from "@/server/ai/copy-request";
 import { contactSheet } from "./starter-ad-generation.service";
 
 import { z } from "zod";
@@ -348,29 +348,4 @@ export async function adSetCopyRequest(
         : `It has ${output.homes.length} home copies for ${input.homes.length} homes.`,
     attempts: input.regenerate ? 3 : 1,
   };
-}
-
-/**
- * Copy for a whole set in one pass, so the homes read as one campaign and the
- * portfolio caption can refer to what the individual ones already said.
- *
- * Falls back to copy built from the same facts rather than failing the build:
- * a set with plain words is worth more than no set.
- */
-export async function writeAdSetCopy(
-  input: AdSetCopyInput,
-): Promise<AdSetCopy> {
-  const request = await adSetCopyRequest(input);
-  try {
-    const { output } = await runCopyRequest(request);
-    if (!output && input.regenerate)
-      throw new Error(
-        "Could not produce distinct copy. Existing ads were left unchanged.",
-      );
-    return output ?? deterministicSetCopy(input.homes, input.brandName);
-  } catch (error) {
-    if (input.regenerate) throw error;
-    console.error("ad set copy failed", error);
-    return deterministicSetCopy(input.homes, input.brandName);
-  }
 }

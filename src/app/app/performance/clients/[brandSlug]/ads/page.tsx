@@ -89,7 +89,6 @@ export default async function PerformanceBrandAdsPage({
         brandName={brand.name}
         brandLogo={avatarUrl}
         website={brand.website}
-        homes={homes}
         ideas={ideas}
         homeContext={groupContext.homes}
         connected={groupContext.connected}

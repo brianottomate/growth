@@ -10,7 +10,6 @@ that import server services. Outputs live under `~/Downloads/Copy eval/` and
 | `extract.ts <brand-slug> [--list]` | Match artwork to homes and extract copy/photo evidence with the model. `--list` only prints matches. |
 | `regen.ts <brand-slug> [label] [--thorough]` | Generate comparison copy with `save: false`; writes local JSON. |
 | `compare.ts [label]` | Compare generated and finished copy; writes local CSV and a model-generated report. |
-| `_adset.ts <output-file>` | Generate ad-set copy for the selected brands; writes local JSON. |
 | `_check.ts` | Read the Chalets catalog and print inclusion/approval status. |
 | `_cand.ts <home-name>`, `_proof.tsx [heading-font] [body-font] [home-prefix...]`, `_sheet.ts` | Create local visual proofs. |
 | `_pick.ts` | Update selected photo evidence in local extracted JSON. |

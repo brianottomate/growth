@@ -43,8 +43,6 @@ import {
   draftCampaignAction,
   draftAdAction,
   writeGoogleTextAdsAction,
-  buildAdSetAction,
-  writeSetCopyAction,
   addAdShellAction,
   createAdsFromAssetsAction,
   addAudienceAction,
@@ -68,7 +66,6 @@ import {
   deleteCampaignDraftAction,
   deleteCampaignLeavingPlatformAction,
   deleteAudienceAction,
-  editAdCardsAction,
   attachAdSetAction,
   setAdStatusAction,
   editApprovedAdAction,
@@ -167,10 +164,7 @@ export const adsRouter = {
    *  provider call — launching is the separate, approved step. */
   createDraft: actionProcedure(draftCampaignAction),
 
-  buildAdSet: actionProcedure(buildAdSetAction),
-
   /** The copy pass: AI words onto the drafts already drawn. Captions and editable image words together. */
-  writeSetCopy: actionProcedure(writeSetCopyAction),
   draftCreativeCopy: workspaceProcedure
     .input(
       z.object({
@@ -275,7 +269,6 @@ export const adsRouter = {
   setAdHome: actionProcedure(setAdHomeAction),
 
   /** One change to an ad's cards; uploads arrive as library assets. */
-  editAdCards: actionProcedure(editAdCardsAction),
 
   /** Put the approved drafts, or the named ones, into a campaign. */
   attachAdSet: actionProcedure(attachAdSetAction),

@@ -15,10 +15,8 @@ import {
 import { useEffect } from "react";
 import { AdCard } from "@/app/app/brands/[brandSlug]/ads/_views/AdCard";
 import { PreparedAdCard } from "@/app/app/brands/[brandSlug]/ads/_views/PreparedAdCard";
-import { TextAdCard } from "@/app/app/brands/[brandSlug]/ads/_views/TextAdCard";
-import { AdTile } from "@/app/app/brands/[brandSlug]/ads/_views/AdWall";
-import { type AdState, toWallAd } from "@/lib/ad-wall";
-import type { WorkspaceHome } from "./AdPreviewsWorkspace";
+import { type AdState } from "@/lib/ad-wall";
+
 import type { AdContent, AdCreativeContent } from "@/server/db/schema";
 
 export type StudioIdea = {
@@ -59,7 +57,6 @@ export function StudioIdeas({
   brandName,
   brandLogo,
   brandSlug,
-  homes,
   website,
   focusHomeId,
   grouping,
@@ -70,7 +67,6 @@ export function StudioIdeas({
   brandName: string;
   brandLogo: string | null;
   brandSlug: string;
-  homes: WorkspaceHome[];
   website: string | null;
   focusHomeId?: string | null;
   connected: boolean;
@@ -151,7 +147,7 @@ export function StudioIdeas({
               );
               if (!("media" in idea.content))
                 return wrap(
-                  <TextAdCard
+                  <PreparedAdCard
                     key={idea.id}
                     ad={{ ...idea, content: idea.content }}
                     brandId={brandId}
@@ -167,7 +163,6 @@ export function StudioIdeas({
                 return wrap(
                   <AdCard
                     key={idea.id}
-                    studio={!idea.campaignId}
                     metadata={adMetadata}
                     campaignId={idea.campaignId ?? undefined}
                     deliveryState={idea.deliveryState}
@@ -191,34 +186,7 @@ export function StudioIdeas({
                   />,
                   true,
                 );
-              const wall = toWallAd({
-                ...idea,
-                updatedAt: new Date(idea.updatedAt),
-                home: idea.home?.url
-                  ? { ...idea.home, url: idea.home.url }
-                  : null,
-              });
-              return wall
-                ? wrap(
-                    <ul key={idea.id}>
-                      <AdTile
-                        ad={wall}
-                        brandId={brandId}
-                        brandSlug={brandSlug}
-                        brandName={brandName}
-                        brandLogo={brandLogo}
-                        landingUrl={website}
-                        homes={homes}
-                        surface="instagram"
-                        states={
-                          idea.deliveryState
-                            ? { [idea.id]: idea.deliveryState }
-                            : {}
-                        }
-                      />
-                    </ul>,
-                  )
-                : null;
+              return null;
             })}
           </section>
         );

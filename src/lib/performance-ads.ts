@@ -398,107 +398,6 @@ export function performanceAdBusinessKey(input: {
     .join(":");
 }
 
-/**
- * How many homes one set runs on. Meta's carousel holds ten cards, so ten
- * homes is the ceiling for the portfolio ad.
- *
- * This lives here rather than beside the component that draws the picker: a
- * server page importing a value from a `"use client"` module receives a
- * client reference instead of the number, and `slice(0, reference)` silently
- * returns nothing. That bug ate the whole `?homes=` pick.
- */
-export const MAX_SET_HOMES = 10;
-
-export type PerformanceAdPlanItem = {
-  name: string;
-  kind:
-    | "static"
-    | "carousel"
-    | "catalog_home"
-    | "hero_carousel"
-    | "all_properties_carousel"
-    | "catalog";
-  propertyIndex: number | null;
-  linkUrl: string | null;
-};
-
-/**
- * The ad set a Performance+ build ships.
- *
- * Per property: a static, a carousel, and a catalog card — the same hero drawn
- * with the branded listing composition, so each home reads three ways. Then two
- * portfolio ads that are NOT interchangeable — a hand-built carousel of the
- * homes in a chosen order, and an Advantage+ catalog ad where Meta renders and
- * ranks the same homes from the product set. Running both is deliberate: the
- * first controls the story, the second lets Meta pick per viewer.
- */
-export function buildPerformanceAdPlan(input: {
-  customer: string;
-  properties: { name: string; url: string }[];
-}): PerformanceAdPlanItem[] {
-  if (input.properties.length === 0) {
-    throw new Error("A Performance+ plan needs at least one property");
-  }
-  const perProperty = input.properties.flatMap((property, index) => [
-    ...(["Static", "Carousel"] as const).map((format) => ({
-      name: performanceAdName({
-        customer: input.customer,
-        format,
-        propertyName: property.name,
-      }),
-      kind: format === "Static" ? ("static" as const) : ("carousel" as const),
-      propertyIndex: index,
-      linkUrl: property.url,
-    })),
-    {
-      name: performanceAdName({
-        customer: input.customer,
-        format: "Static",
-        propertyName: `${property.name} Catalog`,
-      }),
-      kind: "catalog_home" as const,
-      propertyIndex: index,
-      linkUrl: property.url,
-    },
-  ]);
-  return [
-    ...perProperty,
-    {
-      name: performanceAdName({
-        customer: input.customer,
-        format: "Carousel",
-        propertyName: "Featured heroes",
-      }),
-      // One carousel whose cards are the hero of each featured home, drawn with
-      // the bold hero composition rather than the catalog listing card: the
-      // portfolio read as feature shots instead of catalog tiles.
-      kind: "hero_carousel",
-      propertyIndex: null,
-      linkUrl: null,
-    },
-    {
-      name: performanceAdName({
-        customer: input.customer,
-        format: "Carousel",
-        propertyName: "All properties",
-      }),
-      kind: "all_properties_carousel",
-      propertyIndex: null,
-      linkUrl: null,
-    },
-    {
-      name: performanceAdName({
-        customer: input.customer,
-        format: "Carousel",
-        propertyName: `Catalog ${input.properties.length} properties`,
-      }),
-      kind: "catalog",
-      propertyIndex: null,
-      linkUrl: null,
-    },
-  ];
-}
-
 // ---- THE SET AS A WALL --------------------------------------------------
 //
 // An ad declares what it is. Reading the format off the media worked while
@@ -525,17 +424,10 @@ export const AD_FORMAT_LABEL: Record<AdFormat, string> = {
 };
 
 /**
- * Formats an operator makes by hand. The catalog ad is Meta's to render from
- * the product set once live; as a placeholder it holds one card per home so
- * the wall can show the shape before the feed exists. The portfolio carousel
- * comes from a build alone, since it is the homes in a chosen order.
+ * Formats an ad is made in by hand. The catalog ad is not one of them: Meta
+ * draws it from the approved catalog the Catalog tab exports.
  */
-export const HAND_MADE_AD_FORMATS = [
-  "static",
-  "carousel",
-  "catalog",
-  "video",
-] as const;
+export const HAND_MADE_AD_FORMATS = ["static", "carousel", "video"] as const;
 
 /** How many cards a format holds; Meta's carousel ceiling is ten. */
 export function cardCapacity(format: AdFormat): number {
@@ -675,39 +567,6 @@ export function applyCardEdit<Item extends { type: string }>(
       return media;
     }
   }
-}
-
-/**
- * Which homes a set built by count runs on, in order.
- *
- * The homes the client named on their Performance record come first, in the
- * order they named them, because those are the ones they agreed to pay for.
- * The rest of their site fills the remaining places in the site's own order.
- * Homes with no photo cannot be a card and are skipped.
- */
-export function orderHomesForSet<
-  Home extends { url: string; imageUrl?: string | null },
->(listings: Home[], onRecordUrls: string[], count: number): Home[] {
-  const key = (url: string) => url.trim().toLowerCase().replace(/\/+$/, "");
-  const withPhoto = listings.filter((home) => home.imageUrl);
-  const byUrl = new Map(withPhoto.map((home) => [key(home.url), home]));
-  const picked: Home[] = [];
-  const seen = new Set<string>();
-  for (const url of onRecordUrls) {
-    const home = byUrl.get(key(url));
-    if (home && !seen.has(key(home.url))) {
-      picked.push(home);
-      seen.add(key(home.url));
-    }
-  }
-  for (const home of withPhoto) {
-    if (picked.length >= count) break;
-    if (!seen.has(key(home.url))) {
-      picked.push(home);
-      seen.add(key(home.url));
-    }
-  }
-  return picked.slice(0, count);
 }
 
 /** The placement a file's pixel ratio fits, by Meta's own crops. */

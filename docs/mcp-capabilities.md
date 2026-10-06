@@ -39,18 +39,19 @@ The MCP tools and the in-app Growth assistant are projections of the same
 native AI SDK 7 catalog in `src/server/ai/capabilities`. Executable names use
 `capability__action`, with required fields and policy hints for that operation.
 Hosts should refresh their tool catalog after this naming cutover. MCP exposes connector-safe capabilities and omits open-world `researchRead` and in-app
-`driveRead`. The `adsWrite` domain exposes its local actions, including
-`setAdStatus` (freeze/reopen) and `planPlatform` (local platform draft). Read-only,
-destructive, and idempotency annotations are derived from the same action policy
-used by chat receipts and approvals. Growth runs
-ordinary drafts, plans, and reversible workspace edits immediately once the
-operator's intent is clear. A future tool that publishes or sends externally
-must opt into user approval in policy; MCP clients can additionally honor the
-standard destructive hint.
+`driveRead`. Read-only, destructive, and idempotency annotations are derived
+from the same action policy used by chat receipts and approvals. Growth runs
+drafts, plans, workspace edits and paused provider writes (a push creates
+everything paused) immediately once the operator's intent is clear.
 
-Provider-spend actions within `adsWrite` stay outside the direct MCP projection
-until that route can enforce the same approval continuation. They remain
-available through the in-app approval flow; local actions are available on both surfaces.
+Actions whose policy needs a person's yes (starting spend, irreversible
+deletes, sends and publishes, and the ad and catalog sign-offs) are exposed
+over MCP too. Before running one, the server returns `input_required` with a
+form elicitation (protocol revision 2026-07-28, multi-round-trip, so no server
+session is needed); the client asks the person and calls again with the
+answer. A client set to always allow the tool may answer for its person. A
+client that cannot elicit, including any on the 2025 protocol, gets a refusal
+and nothing runs. `invoke_growth` cannot ask, so it never gets these actions.
 
 The external MCP projection omits Growth's `researchRead` and `driveRead` tools.
 ChatGPT and Claude already provide open-world browsing and their own Drive

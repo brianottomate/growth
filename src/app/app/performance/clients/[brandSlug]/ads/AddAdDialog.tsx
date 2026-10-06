@@ -4,7 +4,6 @@ import { useState } from "react";
 import {
   GalleryHorizontalEnd,
   ImageIcon,
-  Layers,
   Plus,
   Type,
   Video,
@@ -28,7 +27,6 @@ type Format = (typeof HAND_MADE_AD_FORMATS)[number] | "text";
 const FORMAT_ICONS = {
   static: ImageIcon,
   carousel: GalleryHorizontalEnd,
-  catalog: Layers,
   video: Video,
   text: Type,
 } satisfies Record<Format, typeof ImageIcon>;
@@ -104,10 +102,7 @@ export function AddAdDialog({
             name="format"
             label="Format"
             gridCols={3}
-            options={[
-              ...HAND_MADE_AD_FORMATS.filter((value) => value !== "catalog"),
-              "text" as const,
-            ].map((value) => {
+            options={[...HAND_MADE_AD_FORMATS, "text" as const].map((value) => {
               const Icon = FORMAT_ICONS[value];
               return {
                 value,

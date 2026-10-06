@@ -143,10 +143,9 @@ at the foot, each tile a real `ad` row with no campaign yet.
 
 Two ways onto the wall, and they meet in the middle:
 
-- **Build.** From the homes picked, or from a count when none are: the homes on
-  the client's Performance record come first, their site's order fills the
-  rest, and the homes chosen become the pick. `adsWrite.buildAdSet` takes
-  `propertyIds` or `count`.
+- **Generate.** *From home group* on Ad studio makes a static and a carousel
+  per home in the chosen group, plus a hero carousel. It is a button, not an
+  agent tool: agents work one ad at a time.
 - **By hand.** *Add ad* makes an empty ad of a declared format (static,
   carousel, video), bound to a home or not. *Drop finished creatives* puts
   files in the library and asks one question: one static each, or one
@@ -158,9 +157,9 @@ and bound afterwards (*Bind a home* on the tile, `adsWrite.setAdHome`); the
 link, the house name and the tile's place on the wall follow the binding. An
 ad about no home is allowed and says so on its tile.
 
-Cards are edited on the tile: drop a file onto an empty slot, replace or
-remove a card, add one from the library (`adsWrite.editAdCards`). A static
-holds one card, a carousel two to ten and one while it is being filled.
+Cards are edited in the ad's studio editor (`adsWrite.saveIdea`): every static
+and carousel image ad carries a studio document from the moment it is made. A
+static holds one card, a carousel two to ten.
 
 `AdCreativeContent.format` declares what an ad is. Ads drawn before the field
 existed read their shape off `media`, as the push always has (`adFormatOf`).

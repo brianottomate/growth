@@ -20,11 +20,7 @@ import { platformCampaignStatusEnum } from "@/server/db/ads-schema";
 import { brandRelationshipEnum } from "@/server/db/brand-schema";
 import { adStatusEnum } from "@/server/db/ads-schema";
 import { channelPlatformEnum } from "@/server/db/channel-schema";
-import {
-  homesSchema,
-  cardsSchema,
-  metaReportingConversionsSchema,
-} from "./shared";
+import { homesSchema, metaReportingConversionsSchema } from "./shared";
 import { z } from "zod";
 import { jsonValueSchema } from "../../kernel/output";
 
@@ -1154,32 +1150,6 @@ export const deletePlatformCampaignActionOutputSchema = z.strictObject({
   provider: z.record(z.string(), jsonValueSchema).nullable(),
 });
 
-export const buildAdSetActionOutputSchema = z.strictObject({
-  ads: z.array(
-    z.strictObject({
-      cards: z.number(),
-      homeName: z.string().nullable(),
-      id: z.string(),
-      kind: z.enum([
-        "carousel",
-        "static",
-        "catalog",
-        "hero_carousel",
-        "catalog_home",
-        "all_properties_carousel",
-      ]),
-      name: z.string(),
-    }),
-  ),
-  brandId: z.string(),
-  homes: z.array(
-    z.strictObject({ id: z.string(), name: z.string(), url: z.string() }),
-  ),
-  note: z.string().nullable(),
-  ok: z.literal(true),
-  replaced: z.number(),
-});
-
 export const addAdShellActionOutputSchema = z.strictObject({
   adId: z.string(),
   homeName: z.string().nullable(),
@@ -1336,12 +1306,6 @@ export const setAdHomeActionOutputSchema = z.strictObject({
   adId: z.string(),
   homeName: z.string().nullable(),
   name: z.string(),
-});
-
-export const editAdCardsActionOutputSchema = z.strictObject({
-  adId: z.string(),
-  cards: z.number(),
-  story: storySchema.nullable(),
 });
 
 export const attachAdSetActionOutputSchema = z.strictObject({

@@ -315,12 +315,11 @@ async function main() {
       policy.surfaces.includes("overview-chat"),
       `${name} must be available with in-app approval`,
     );
+    // MCP asks for the yes with an elicitation; invoke-growth cannot ask.
     assert(
-      !policy.surfaces.includes("mcp") &&
-        !policy.surfaces.includes("invoke-growth"),
+      !policy.surfaces.includes("invoke-growth"),
       `${name} cannot bypass approval through another transport`,
     );
-    assert(!(name in MCP_TOOLS), `${name} must not be exposed over MCP`);
   }
 
   const composed = composeGrowthContext({

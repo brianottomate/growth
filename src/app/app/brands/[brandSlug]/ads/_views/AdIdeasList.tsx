@@ -1,6 +1,5 @@
 import { PreparedAdCard } from "./PreparedAdCard";
 import { AD_FORMATS, adFormat } from "@/lib/ad-format";
-import { TextAdCard } from "./TextAdCard";
 import { WorkspaceCardHeader } from "@/app/app/performance/WorkspaceCard";
 import { Images } from "lucide-react";
 import type { AdContent } from "@/server/db/schema";
@@ -22,7 +21,6 @@ export function AdIdeasList({
   brandName,
   brandLogo,
   states,
-  fallback,
   actions,
   emptyState,
   plannedPlatforms = [],
@@ -42,7 +40,6 @@ export function AdIdeasList({
   brandName: string;
   brandLogo: string | null;
   states: Record<string, string>;
-  fallback: (id: string) => React.ReactNode;
   ads: {
     id: string;
     name: string;
@@ -107,11 +104,12 @@ export function AdIdeasList({
   );
   const renderIdea = (ad: (typeof ordered)[number]) =>
     !("media" in ad.content) ? (
-      <TextAdCard
+      <PreparedAdCard
         ad={{
           ...ad,
           content: ad.content,
           updatedAt: ad.updatedAt.toISOString(),
+          review: adReviewOf(ad),
         }}
         brandId={brandId}
         brandName={brandName}
@@ -123,7 +121,8 @@ export function AdIdeasList({
       ad.content.media.every((m) => m.type === "image") &&
       (!ad.content.format ||
         ad.content.format === "static" ||
-        ad.content.format === "carousel") ? (
+        ad.content.format === "carousel" ||
+        ad.content.format === "portfolio") ? (
       <AdCard
         campaignId={campaignId}
         brandId={brandId}
@@ -142,16 +141,18 @@ export function AdIdeasList({
       />
     ) : "media" in ad.content && adFormat(ad.content) === "video" ? (
       <PreparedAdCard
-        ad={{ ...ad, updatedAt: ad.updatedAt.toISOString() }}
+        ad={{
+          ...ad,
+          updatedAt: ad.updatedAt.toISOString(),
+          review: adReviewOf(ad),
+        }}
         brandId={brandId}
         brandName={brandName}
         campaignId={campaignId}
         website={landingUrl}
         deliveryState={states[ad.id]}
       />
-    ) : (
-      fallback(ad.id)
-    );
+    ) : null;
   return (
     <section aria-label="Ads" className="space-y-4">
       <WorkspaceCardHeader

@@ -9,7 +9,6 @@ import Image from "next/image";
 import { ideaImagesSaved, ideaSource } from "@/lib/ad-idea-studio";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 import { MessageSquare, Plus, Trash2 } from "lucide-react";
-import { cn } from "@/components/ui/lib/utils";
 import {} from "@/lib/meta-placement-plan";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -77,7 +76,7 @@ export type StudioAd = {
   updatedAt: string;
   homeId?: string | null;
   bookingTargetId?: string | null;
-  review?: AdReview;
+  review: AdReview;
 };
 
 export function AdCard({
@@ -88,15 +87,12 @@ export function AdCard({
   brandLogo,
   deliveryState,
   home,
-  studio = false,
   metadata,
 }: {
   ad: StudioAd;
   metadata?: React.ReactNode;
   /** The campaign it sits in; absent in the studio, where ideas have none. */
   campaignId?: string;
-  /** In the studio, where ideas have no campaign yet. */
-  studio?: boolean;
   brandId: string;
   brandName: string;
   brandLogo: string | null;
@@ -105,10 +101,8 @@ export function AdCard({
 }) {
   const router = useRouter();
   const review = ad.review;
-  const savedApproved = review
-    ? review.status === "approved"
-    : Boolean(ad.content.ideaStudio?.approval);
-  const ready = review?.status === "ready";
+  const savedApproved = review.status === "approved";
+  const ready = review.status === "ready";
   // Approval can show immediately; the server confirms it.
   const [optimistic, setOptimistic] = useState<boolean | null>(null);
   const [stamped, setStamped] = useState(false);
@@ -1039,16 +1033,12 @@ export function AdCard({
             </h3>
             {approved && (
               <ApprovedStamp
-                at={
-                  review?.approvedAt ??
-                  ad.content.ideaStudio?.approval?.approvedAt ??
-                  new Date()
-                }
+                at={review.approvedAt ?? ad.updatedAt}
                 fresh={stamped}
               />
             )}
-            {approved && member(review?.approvedBy) && (
-              <OwnerAvatar member={member(review?.approvedBy)} size="sm" />
+            {approved && member(review.approvedBy) && (
+              <OwnerAvatar member={member(review.approvedBy)} size="sm" />
             )}
           </div>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
@@ -1063,11 +1053,11 @@ export function AdCard({
                   ? "Approved"
                   : "Approved · saving images…"
                 : ready
-                  ? `Ready for review${member(review?.readyBy)?.name ? ` · ${member(review?.readyBy)?.name}` : ""}`
+                  ? `Ready for review${member(review.readyBy)?.name ? ` · ${member(review.readyBy)?.name}` : ""}`
                   : ad.content.metaImport
                     ? "Needs local review"
                     : "Draft"}
-              {review?.replacesAdId && !approved
+              {review.replacesAdId && !approved
                 ? " · replaces an approved ad"
                 : ""}
               {deliveryState ? ` · ${deliveryState}` : ""}

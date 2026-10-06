@@ -40,9 +40,7 @@ Work in this order. Each step reads before it writes, and re-running any step is
 
 ## 6. Ads
 
-`adsWrite.generateStarterIdeas` with the campaignId. It makes a static and a carousel per featured home plus a portfolio carousel, choosing photos from each home's gallery and writing the copy. Every idea lands unapproved. Say in one line how many it made; if it failed, say why.
-
-The in-app chat does not have `generateStarterIdeas`: it keeps batch writes for the app and MCP. There, do not search for it or build the ads one shell at a time. Ask the operator to press From home group on Ad studio, choose Featured homes and Generate ads with AI, then attach the drafts it made to the campaign with `adsWrite.attachAdSet` and their adIds.
+The first set of ads is made in the app, not by a tool: ask the operator to press From home group on Ad studio, choose Featured homes and Generate ads with AI. It makes a static and a carousel per featured home plus a hero carousel, every one unapproved. Do not build the set one shell at a time. When the operator says it is done, attach the drafts to the campaign with `adsWrite.attachAdSet` and their adIds, and say how many there are.
 
 ## 7. Hand back
 

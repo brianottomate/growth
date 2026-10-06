@@ -29,10 +29,10 @@ export interface GrowthActionPolicy {
 
 const ALL = ["overview-chat", "mcp", "invoke-growth", "test"] as const;
 const PRODUCT = ["overview-chat", "test"] as const;
-// Provider-spend writes need the in-app approval card. The direct MCP
-// projection executes tools without that continuation, so it cannot advertise
-// these actions until the MCP route enforces an equivalent approval handshake.
-const APPROVAL_PRODUCT = ["overview-chat", "test"] as const;
+// Actions that need a person's yes: the in-app chat shows its approval card,
+// and MCP asks through the client with an elicitation before running them
+// (to-mcp-server). invoke-growth has no way to ask, so it does not get them.
+const CONFIRMED = ["overview-chat", "mcp", "test"] as const;
 const read = (
   consequence: GrowthToolConsequence = "local-read",
   surfaces: readonly GrowthSurface[] = ALL,
@@ -193,9 +193,9 @@ export const growthActionPolicies = {
     promoteToClient: write({ idempotent: true }),
     // Writes the client's own answers into the records that own each fact.
     // Refuses a second run on the same intake, because re-applying would
-    // reopen a cycle an operator may have since corrected. It sets the
-    // month's media budget, so chat asks with the approval card.
-    applyIntake: write({ approval: "user", surfaces: APPROVAL_PRODUCT }),
+    // reopen a cycle an operator may have since corrected. It records the
+    // month's planned budget; nothing is spent, so it runs without asking.
+    applyIntake: write(),
     // Reads Zernio and stamps our own verification columns. No provider
     // mutation and no spend; re-running just re-checks.
     verifyIntakeAccess: write({ idempotent: true }),
@@ -295,21 +295,21 @@ export const growthActionPolicies = {
       consequence: "background-run",
       idempotent: true,
       reversible: false,
-      surfaces: APPROVAL_PRODUCT,
+      surfaces: CONFIRMED,
     }),
     enrollSequence: write({
       approval: "user",
       consequence: "background-run",
       idempotent: true,
       reversible: false,
-      surfaces: APPROVAL_PRODUCT,
+      surfaces: CONFIRMED,
     }),
     recoverSequence: write({
       approval: "user",
       consequence: "background-run",
       idempotent: true,
       reversible: false,
-      surfaces: APPROVAL_PRODUCT,
+      surfaces: CONFIRMED,
     }),
     cancelSequenceEnrollment: write({ idempotent: true, reversible: false }),
     saveAudience: write(),
@@ -358,14 +358,6 @@ export const growthActionPolicies = {
     // Local DB rows only; no provider call, no spend. Push is separate.
     draftCampaign: write(),
     draftAd: write(),
-    // Writes every ad in the set and one model call for the captions. Local
-    // rows only, no provider call; re-running replaces the last set rather
-    // than stacking a second one, which is why it is idempotent.
-    buildAdSet: write({ idempotent: true, consequence: "model-write" }),
-    // Rewrites captions and editable static/carousel image text; saves local drafts.
-    writeSetCopy: write({ idempotent: true, consequence: "model-write" }),
-    // Several model calls per home; lands unapproved drafts only.
-    generateStarterIdeas: write({ consequence: "model-write" }),
     // One model call; lands unapproved text drafts only.
     writeGoogleTextAds: write({ consequence: "model-write" }),
     // Routing is local: which platforms an unpushed idea compiles to.
@@ -377,7 +369,7 @@ export const growthActionPolicies = {
     setAdStatus: write({
       idempotent: true,
       approval: "user",
-      surfaces: APPROVAL_PRODUCT,
+      surfaces: CONFIRMED,
     }),
     setAdCopy: write({ idempotent: true }),
     saveIdea: write(),
@@ -392,16 +384,11 @@ export const growthActionPolicies = {
     importWanderOs: write({ consequence: "background-run", idempotent: true }),
     newCatalogCopy: write({ consequence: "model-write" }),
     newCatalogPhoto: write({ consequence: "model-write" }),
-    // Open cards only (never approved ones); a running run is returned, not doubled.
-    writeCatalogCards: write({
-      consequence: "background-run",
-      idempotent: true,
-    }),
     // The export ships only approved cards, so approval is the operator's.
     setCatalogApproval: write({
       idempotent: true,
       approval: "user",
-      surfaces: APPROVAL_PRODUCT,
+      surfaces: CONFIRMED,
     }),
     setCatalogIncluded: write({ idempotent: true }),
     setCatalogDefaultTemplate: write({ idempotent: true }),
@@ -410,7 +397,6 @@ export const growthActionPolicies = {
     // Real delete of the run, its library folder and its images. An export is
     // a frozen copy that can be made again, so there is no trash.
     deleteCatalogExport: write({ reversible: false }),
-    editAdCards: write(),
     // Sets one field on local rows; the push is still the provider step.
     attachAdSet: write({ idempotent: true }),
     // Swaps one card slot on a local draft for a library asset.
@@ -436,22 +422,17 @@ export const growthActionPolicies = {
     }),
     linkAudience: write({ idempotent: true }),
     // Creates a custom conversion on the ad account, or reuses the matching
-    // one; spends nothing and changes no campaign. A conversion mutation, so
-    // the operator approves it.
+    // one; spends nothing and changes no campaign.
     createReportingConversion: write({
       consequence: "provider-write",
-      approval: "user",
       idempotent: true,
-      surfaces: APPROVAL_PRODUCT,
     }),
     // Makes a Google Ads account under the manager and a conversion on it.
-    // Currency and time zone are permanent, so the operator approves it.
+    // Currency and time zone are permanent, but nothing is spent.
     createGoogleAdsAccount: write({
       consequence: "provider-write",
-      approval: "user",
       idempotent: true,
       reversible: false,
-      surfaces: APPROVAL_PRODUCT,
     }),
     // Downloads from the platform CDN into R2; dedupes by source url.
     importCreative: write({ idempotent: true, reversible: true }),
@@ -459,11 +440,11 @@ export const growthActionPolicies = {
     // a platform, so they cannot destroy anything a provider knows about.
     deleteCampaignDraft: write({ reversible: false }),
     // The one delete that leaves platform campaigns spending, so the operator
-    // approves it and it stays off MCP.
+    // approves it.
     deleteCampaignLeavingPlatform: write({
       approval: "user",
       reversible: false,
-      surfaces: APPROVAL_PRODUCT,
+      surfaces: CONFIRMED,
     }),
     deleteAudience: write({ reversible: false }),
     // Deletes the ad on the platform too when it is live there.
@@ -471,18 +452,16 @@ export const growthActionPolicies = {
       consequence: "provider-write",
       approval: "user",
       reversible: false,
-      surfaces: APPROVAL_PRODUCT,
+      surfaces: CONFIRMED,
     }),
-    // Creates the campaign tree PAUSED, so approving the push does not start
-    // spend — setDelivery does, separately. Idempotency-Key makes a retry
-    // replay rather than duplicate.
+    // Creates the campaign tree PAUSED, so the push spends nothing and runs
+    // without asking; setDelivery starts spend, and that one asks.
+    // Idempotency-Key makes a retry replay rather than duplicate.
     push: write({
       consequence: "provider-write",
-      approval: "user",
       idempotent: true,
       reversible: true,
       undoWith: "adsWrite.deletePlatformCampaign",
-      surfaces: APPROVAL_PRODUCT,
     }),
     // The one action that starts money moving. Pausing is the same action
     // with the opposite status, which is why it is reversible.
@@ -492,7 +471,7 @@ export const growthActionPolicies = {
       idempotent: true,
       reversible: true,
       undoWith: "adsWrite.setDelivery",
-      surfaces: APPROVAL_PRODUCT,
+      surfaces: CONFIRMED,
     }),
     // Cascades to ad sets and ads on the platform and takes reporting history
     // with it. Pausing is nearly always what was actually wanted.
@@ -501,48 +480,43 @@ export const growthActionPolicies = {
       approval: "user",
       idempotent: false,
       reversible: false,
-      surfaces: APPROVAL_PRODUCT,
+      surfaces: CONFIRMED,
     }),
     // Provider write, no spend. Zernio's create is NOT idempotent — never
     // auto-retry; surface failures to the operator.
     createAudience: write({
       consequence: "provider-write",
-      approval: "user",
       idempotent: false,
       reversible: true,
-      surfaces: APPROVAL_PRODUCT,
     }),
     // Server-side hashed upload into an existing list; resumable batches.
     // Create + upload, and create a lookalike: provider writes, no spend.
     // Both create a Meta audience, which Zernio cannot make idempotent.
     createPersonaLookalike: write({
       consequence: "provider-write",
-      approval: "user",
       idempotent: false,
       reversible: true,
-      surfaces: APPROVAL_PRODUCT,
     }),
     assignPersonaAudience: write({ idempotent: true }),
+    // Forced PAUSED: it cannot spend until setDelivery.
     createSpecializedMetaDraft: write({
       consequence: "provider-write",
-      approval: "user",
       idempotent: true,
       reversible: false,
-      surfaces: APPROVAL_PRODUCT,
     }),
+    // Zernio launches a boost ACTIVE, so it spends at once and asks first.
     boostMetaPost: write({
       consequence: "provider-write",
       approval: "user",
       idempotent: true,
       reversible: false,
-      surfaces: APPROVAL_PRODUCT,
+      surfaces: CONFIRMED,
     }),
+    // Zernio makes the copy PAUSED, so it spends nothing.
     duplicateMetaCampaign: write({
       consequence: "provider-write",
-      approval: "user",
       idempotent: false,
       reversible: false,
-      surfaces: APPROVAL_PRODUCT,
     }),
   },
   publishingRead: {
@@ -588,7 +562,6 @@ export const growthActionPolicies = {
     // the surviving row, but the row itself does not come back.
     applyLivePostMatch: write({
       consequence: "local-write",
-      approval: "user",
       reversible: false,
     }),
   },
