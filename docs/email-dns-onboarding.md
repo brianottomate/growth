@@ -15,7 +15,8 @@ sending domain and explicit root zone. An existing policy is displayed and prese
 Only when neither has a policy does the page offer an unchecked option to add
 `v=DMARC1; p=none` at `_dmarc.<marketing-label>` in that same root zone.
 The server rechecks DNS when starting Entri, adds the suggestion only if still
-missing and explicitly selected, and sets Entri `validateDmarc: true`.
+missing and explicitly selected. It does not set Entri `validateDmarc`: that is a
+paid Entri feature, and our plan answers it with "Entri is misconfigured".
 Lookup failures or malformed/ambiguous records never authorize a DMARC change.
 The same suggested record is copyable for manual setup. This adds no reporting
 mailbox and does not change root-domain policy.

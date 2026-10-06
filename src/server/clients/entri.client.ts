@@ -48,7 +48,6 @@ export async function createEmailEntriConfig(input: {
     wwwRedirect: false,
     secureRootDomain: false,
     checkConflicts: true,
-    validateDmarc: true,
   };
 }
 
@@ -98,7 +97,6 @@ export async function createEntriShareLink(input: {
         wwwRedirect: false,
         secureRootDomain: false,
         checkConflicts: true,
-        validateDmarc: true,
       },
     }),
     signal: AbortSignal.timeout(15_000),

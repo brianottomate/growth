@@ -19,7 +19,11 @@ const host = z
   .max(253)
   .regex(
     /^(?:@|[a-z0-9_](?:[a-z0-9_-]{0,61}[a-z0-9_])?(?:\.[a-z0-9_](?:[a-z0-9_-]{0,61}[a-z0-9_])?)*)$/,
-  );
+  )
+  // Entri's DMARC guard is a paid feature, so DMARC is never written here.
+  .refine((value) => !value.split(".").includes("_dmarc"), {
+    message: "DMARC records are not accepted.",
+  });
 const bodySchema = z.object({
   brandSlug: z.string().min(1),
   /** Records another sender asked the client to add, relative to the root domain. */
