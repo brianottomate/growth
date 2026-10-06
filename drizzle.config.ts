@@ -1,14 +1,19 @@
 import { type Config } from "drizzle-kit";
 
+const databaseUrl =
+  process.env.DATABASE_URL_DIRECT ??
+  process.env.DATABASE_URL_UNPOOLED ??
+  process.env.DATABASE_URL;
+
 export default {
   out: "./drizzle",
   schema: "./src/server/db/schema.ts",
   dialect: "postgresql",
   // Generation/checking must work without app or production credentials.
-  ...((process.env.DATABASE_URL_DIRECT ?? process.env.DATABASE_URL)
+  ...(databaseUrl
     ? {
         dbCredentials: {
-          url: (process.env.DATABASE_URL_DIRECT ?? process.env.DATABASE_URL)!,
+          url: databaseUrl,
         },
       }
     : {}),

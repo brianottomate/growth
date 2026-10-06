@@ -1,8 +1,9 @@
 # Meta lead ads → Growth
 
 Meta Lead Ads submissions for WanderOS now land in Growth directly: a Page
-webhook, with a manual backfill script for anything it misses. Growth qualifies each lead from its form
-answers and sends the qualified-lead event to Meta itself. This replaces the
+webhook, with a manual backfill script for anything it misses. Growth normalizes
+unstructured form answers into structured facts, then qualifies
+each lead and sends the qualified-lead event to Meta itself. This replaces the
 Make.com "Meta→HubSpot v2" scenarios and the HubSpot lifecycle-stage bridge
 that never fired.
 
@@ -16,13 +17,16 @@ wander, wander.com, tracking and sites) is tracked in
 | --- | --- |
 | Webhook (handshake + signed POST) | `src/app/api/webhooks/meta-leadgen/route.ts` |
 | Backfill (manual) | `bun run meta-leadgen:backfill --hours 24` under `doppler run --config prd` (up to 168 h) |
-| Qualification rules, signature, payload parsing | `src/lib/meta-leadgen.ts` (+ tests) |
+| Signature, payload parsing, qualification threshold | `src/lib/meta-leadgen.ts` |
+| Structured result schema | `src/server/services/meta-lead-normalization.service.ts` |
+| AI normalization | `src/server/services/meta-lead-normalization.service.ts` |
 | Graph + Conversions API client | `src/server/clients/meta-leadgen.client.ts` |
 | Orchestration, idempotency | `src/server/services/meta-leadgen.service.ts` |
 | Ledger table | `leads.meta_leadgen_lead`, managed by committed Drizzle migrations |
 
-Flow per lead: store the leadgen id → fetch the lead with a Page token → parse
-the unit count → if 10+ send `Marketing Qualified Lead` to pixel
+Flow per lead: store the leadgen id → fetch the lead with a Page token → normalize
+and persist the answers → apply the deterministic 10-unit threshold → if
+qualified, send `Marketing Qualified Lead` to pixel
 `340252052212435` (CRM event keyed on `lead_id`, `event_id`
 `Marketing Qualified Lead:<leadgen id>`) → if the lead was created at or after
 `META_LEADGEN_ROUTE_FROM`, hand it to `osInboundLeadRouter` (HubSpot upsert,
@@ -40,18 +44,38 @@ of this.
 
 ### Qualification
 
-`parseUnitCount` reads the unit question from every active form:
+Growth uses the existing Anthropic integration (`claude-sonnet-5`) with
+`generateText` + `Output.object` + Zod to interpret the full form submission.
+The result is one small object: audience, conservative managed-property count,
+email, first/last name, phone, PMS, and optional booking-site hostname/pathname.
+Missing facts are null. There are no answer indexes, quotes or evidence objects.
 
-| Form | Question | Shape |
-| --- | --- | --- |
-| Sept 2026 - Conditional form (`1389089572828755`) | How many vacation rental properties… | buckets `0 / 1-10 / 10-199 / 200-750 / 750-2000 / 2000+` |
-| August 2026 - Call Form (Matt/Nick) - No less than 5 | >5 properties? + How many… | Yes/No + free text |
-| August 2026 - Call Form (Matt/Nick) | Do you manage 15+? (enter total) | free text |
-| July 2026 - Long Form (± Audit) | Number of properties | free text |
-| OS update - Long Form … - Spanish | Número de propiedades | free text |
+AI handles question wording, written numbers, languages and URLs in prose.
+Code interpolates the hostname/pathname into an HTTPS URL, constructs tracking
+parameters, and passes the facts to the existing HubSpot/Slack router. Code
+also owns the operator-only conversion rule and the 10-unit threshold.
 
-A range counts by its low end (`1-10` → 1, `10-199` → 10), and an upper bound
-(`<10`, "less than 10", "menos de 10") counts as 0. Yes/No carries no count. Qualified = 10+ (Kristian, 2026-09-22).
+A range counts by its low end (`1-10` → 1, `10-199` → 10); upper bounds
+(`<10`, "less than ten", "menos de diez") count as 0. A Yes/No gate carries no
+count, even when its question mentions a threshold. Conflicting counts are null.
+Guest submissions never reach the HubSpot router or the qualified-lead event.
+
+The generated object lives only in memory while processing a lead. Existing
+email/unit/qualification fields and delivery stamps are updated as before;
+an unfinished lead is normalized again on retry. Only operator emails enter
+the sales retry queue; guest contact details remain in the raw answers.
+
+The preview already applied the earlier nullable `normalization` column to the
+shared database. Its original migration and snapshot remain as applied history;
+a forward migration removes the unused column on the next production release.
+The lead ledger and delivery records remain in place.
+
+Invalid output, an unknown audience or an API failure leaves the lead pending
+for manual backfill, with no regex fallback. The model receives at most 24,000
+characters without truncation and has a 30-second timeout and 1,000-token output
+limit, with two retries handled by the AI SDK. This requires the existing `ANTHROPIC_API_KEY` and adds per-lead AI
+cost/latency after webhook acknowledgement. No AI evaluation or feature-specific
+tests run with the normal checks.
 
 Measured on Meta's raw leads 2026-09-09 → 09-23: **782 leads, 92 qualified
 (11.8%), ~43/week**. That sits inside Meta's CRM-optimization guidance (1–40%

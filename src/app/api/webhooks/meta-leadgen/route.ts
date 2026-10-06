@@ -28,10 +28,14 @@ export function GET(request: NextRequest) {
 /**
  * Page `leadgen` notifications for the Wander Page. Accept-then-process: the
  * lead ids are stored before the 200 so a failure after it only delays the
- * lead until the hourly cron re-reads the forms. Meta retries non-2xx replies.
+ * lead until a manual backfill re-reads the forms. Meta retries non-2xx replies.
  */
 export async function POST(request: NextRequest) {
-  if (!env.META_LEADS_APP_SECRET || !env.META_LEADS_ACCESS_TOKEN) {
+  if (
+    !env.META_LEADS_APP_SECRET ||
+    !env.META_LEADS_ACCESS_TOKEN ||
+    !env.ANTHROPIC_API_KEY
+  ) {
     return NextResponse.json(
       { error: "Meta leadgen webhook is not configured" },
       { status: 503 },

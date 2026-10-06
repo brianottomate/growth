@@ -4,10 +4,7 @@ import { and, eq, gte, isNotNull, isNull, or } from "drizzle-orm";
 
 import { env } from "@/env";
 import {
-  isOperatorLead,
   isQualified,
-  leadContact,
-  parseUnitCount,
   QUALIFIED_LEAD_EVENT,
   type LeadgenNotification,
 } from "@/lib/meta-leadgen";
@@ -23,13 +20,15 @@ import {
 } from "@/server/clients/meta-leadgen.client";
 import { db } from "@/server/db";
 import {
+  type MetaLeadNormalization,
+  normalizeMetaLead,
+} from "@/server/services/meta-lead-normalization.service";
+import {
   metaLeadgenLeadTable,
   type MetaLeadgenLead,
 } from "@/server/db/leads-schema";
 import {
-  extractDomain,
   extractEmailDomain,
-  normalizeSiteUrl,
   osInboundLeadRouter,
 } from "@/server/services/inbound-router.service";
 
@@ -79,11 +78,7 @@ export async function recordLeadNotifications(
 function isDone(row: MetaLeadgenLead): boolean {
   if (row.qualified === null) return false;
   if (row.qualified && !row.capiSentAt) return false;
-  if (
-    row.email &&
-    isOperatorLead(row.fieldData ?? []) &&
-    shouldRoute(row, null)
-  ) {
+  if (row.email && shouldRoute(row, null)) {
     return false;
   }
   return true;
@@ -119,11 +114,13 @@ async function release(rowId: string, step: Step) {
 async function routeLead(
   lead: MetaLead,
   formName: string | null,
-  units: number | null,
+  normalization: MetaLeadNormalization,
 ) {
-  const contact = leadContact(lead.field_data);
+  const contact = normalization;
   if (!contact.email) return false;
-  const siteUrl = contact.siteUrl ? normalizeSiteUrl(contact.siteUrl) : null;
+  const siteUrl = contact.bookingSite
+    ? `https://${contact.bookingSite.hostname}${contact.bookingSite.pathname}`
+    : null;
   const query = new URLSearchParams({
     utm_source: "facebook",
     utm_medium: "paid_social",
@@ -133,11 +130,9 @@ async function routeLead(
   });
   const { contactId } = await osInboundLeadRouter({
     email: contact.email,
-    domain: siteUrl
-      ? extractDomain(siteUrl)
-      : extractEmailDomain(contact.email),
+    domain: contact.bookingSite?.hostname ?? extractEmailDomain(contact.email),
     siteUrl,
-    numberOfProperties: units ?? 0,
+    numberOfProperties: normalization.minimumUnits ?? 0,
     pmsMeta: contact.pms,
     // The router routes Spanish-form leads to the Spanish-speaking AE by source.
     source: `Meta Lead Ad · ${formName ?? lead.form_id ?? "unknown form"}`,
@@ -177,21 +172,32 @@ export async function processLead({
 
   const errors: string[] = [];
   const patch: Partial<typeof metaLeadgenLeadTable.$inferInsert> = {};
+  let stage = "fetch";
   try {
+    // Keep raw answers for inspection even when the AI call fails.
     const lead = prefetched ?? (await fetchLead(leadgenId, pageToken));
-    const units = parseUnitCount(lead.field_data);
-    const qualified = isQualified(units);
     Object.assign(patch, {
       fieldData: lead.field_data,
-      email: leadContact(lead.field_data).email,
-      units,
-      qualified,
       formId: lead.form_id ?? row.formId,
       formName: formName ?? row.formName,
       adId: lead.ad_id ?? row.adId,
       campaignName: lead.campaign_name ?? row.campaignName,
       leadCreatedAt: new Date(lead.created_time),
     });
+    stage = "normalize";
+    const normalization = await normalizeMetaLead({
+      fields: lead.field_data,
+      formName: formName ?? row.formName,
+    });
+    const units =
+      normalization.audience === "operator" ? normalization.minimumUnits : null;
+    const qualified = isQualified(units);
+    Object.assign(patch, {
+      email: normalization.audience === "operator" ? normalization.email : null,
+      units,
+      qualified,
+    });
+    stage = "process";
 
     if (qualified && !row.capiSentAt && (await claim(row.id, "capiSentAt"))) {
       try {
@@ -208,12 +214,12 @@ export async function processLead({
     const createdAt = new Date(lead.created_time);
     if (
       patch.email &&
-      isOperatorLead(lead.field_data) &&
+      normalization.audience === "operator" &&
       shouldRoute(row, createdAt) &&
       (await claim(row.id, "routedAt"))
     ) {
       try {
-        if (!(await routeLead(lead, formName ?? row.formName, units))) {
+        if (!(await routeLead(lead, formName ?? row.formName, normalization))) {
           await release(row.id, "routedAt");
         }
       } catch (err) {
@@ -222,7 +228,9 @@ export async function processLead({
       }
     }
   } catch (err) {
-    errors.push(`fetch: ${String(err)}`);
+    errors.push(
+      `${stage}: failed (${err instanceof Error ? err.name : "unknown error"})`,
+    );
   }
 
   patch.lastError = errors.length ? errors.join(" | ") : null;

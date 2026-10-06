@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "bun run db:check && bun run typecheck && next build && bun run db:migrate",
+    "build": "bun run scripts/database/build.ts",
     "check": "velite build && next typegen && oxlint --type-aware --type-check . .next/types/validator.ts && oxfmt --check && bun run test:quality-toolchain && bun run db:check",
     "clean": "rm -rf node_modules .next .turbo .cache .velite bun.lock",
     "reinstall": "bun run clean && bun install",
@@ -54,7 +54,11 @@
     "prepare": "husky",
     "test:quality-toolchain": "node --test scripts/quality-toolchain.mjs",
     "db:check": "bun scripts/database/check.ts",
-    "db:test": "bun scripts/database/verify.ts"
+    "db:test": "bun scripts/database/verify.ts",
+    "db:experiment": "bun run scripts/database/experiment.ts dev",
+    "db:push:experiment": "bun run scripts/database/experiment.ts push",
+    "preview:experiment": "bun run scripts/database/experiment.ts preview",
+    "db:experiment:delete": "bun run scripts/database/experiment.ts delete"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "4.0.65",
@@ -217,6 +221,7 @@
     "husky": "^9.1.7",
     "i18n-iso-countries": "^7.14.0",
     "lint-staged": "^17.5.1",
+    "neon": "8.0.11",
     "oxfmt": "0.68.0",
     "oxlint": "1.83.0",
     "oxlint-tsgolint": "7.0.2001",

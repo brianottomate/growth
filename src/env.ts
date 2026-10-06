@@ -12,6 +12,7 @@ export const env = createEnv({
         ? z.string()
         : z.string().optional(),
     DATABASE_URL: z.string().url(),
+    DB_EXPERIMENT_BRANCH: z.string().startsWith("experiment/").optional(),
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
@@ -193,6 +194,7 @@ export const env = createEnv({
   runtimeEnv: {
     BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
     DATABASE_URL: process.env.DATABASE_URL,
+    DB_EXPERIMENT_BRANCH: process.env.DB_EXPERIMENT_BRANCH,
     NODE_ENV: process.env.NODE_ENV,
     RESEND_API_KEY: process.env.RESEND_API_KEY,
     QSTASH_TOKEN: process.env.QSTASH_TOKEN,

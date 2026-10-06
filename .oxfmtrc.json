@@ -31,6 +31,7 @@
     ".worktrees/**",
     // drizzle-kit rewrites these on every `db:generate` in its own layout.
     "drizzle/meta/**",
+    "drizzle/history/**",
     "scripts/amplitude-taxonomy/**",
     // Preserved-byte fixtures: real provider responses and immutable run records.
     "fixtures/blog/seo-engine-response.json",

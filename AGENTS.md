@@ -42,10 +42,14 @@ bun run db:check        # Check schema/snapshot agreement
 bun run db:generate     # Generate migration files
 bun run db:migrate      # Apply committed migrations (local and production)
 bun run db:studio       # Drizzle Studio
+bun run db:experiment <name>          # Isolated branch dev server; .env stays on prod
+bun run db:push:experiment <name>     # Push schema only to the experiment
+bun run preview:experiment <name>     # Push schema + Vercel preview on the experiment
+bun run db:experiment:delete <name>   # Delete the disposable branch
 bun run db:seed         # scripts/seed.ts (seeded rows get isSeed=true)
 bun run db:unseed       # Remove seeded rows
 
-bun run build           # velite build + next build
+bun run build           # check + compile; migrations only on Vercel production
 ```
 
 `bun run check`, `bun test`, and `bun run ai:contracts` are the normal gates.
@@ -90,9 +94,11 @@ Since 2026-08-28 this repo follows the org-wide release-drafter flow
   before publishing.
 - PR labels `major`/`minor`/`patch` set the version bump; unlabeled PRs count
   as patch.
-- The `build` script runs committed migrations after `next build` succeeds in
-  every environment. Development, preview and production share the same database.
-  See `docs/database-migrations.md` for the workflow.
+- Local development and automatic previews connect to production by default.
+  Their builds never apply migrations. Vercel production builds apply committed
+  migrations after compilation succeeds. For schema experiments use the explicit
+  Neon branch commands; `preview:experiment` overrides build and runtime URLs for
+  just that deployment. See `docs/database-migrations.md` for setup and workflow.
 - Rollback: never reverse database migrations automatically. Prefer a forward-fix
   release; an app-only instant rollback needs verified schema compatibility.
 - Git history was rewritten on 2026-08-27 to purge `public/lab` media
@@ -400,9 +406,18 @@ vars with the `vercel-env` skill; inspect deploy logs with the `vercel-logs` ski
 ## Important boundaries
 
 - Use Bun. Do not run npm or yarn in this repository.
-- `bun run build` applies pending migrations to the configured database after
-  compiling. Commit Drizzle SQL and snapshots with schema edits. Never
-  use `drizzle-kit push` or one-off schema repair scripts on persistent databases.
+- `bun run dev` stays connected to production by default. For experimental schema
+  changes use `bun run db:experiment <name>` and `bun run db:push:experiment <name>`.
+  Those commands use disposable Neon branches without rewriting local env files.
+  Use DB push while iterating; generate and review SQL/snapshots once the design is
+  settled, before merging. Verify migrations on a fresh experiment branch, not one
+  already changed by DB push. Applied migrations remain immutable.
+- Never use `drizzle-kit push` on production. Only Vercel production builds
+  automatically migrate the database; normal local/preview builds do not.
+  Experimental previews skip the snapshot gate because DB push owns their schema.
+  Reuse the installed Neon CLI and an authorized profile or project-scoped key;
+  use the checked-in Growth project/production branch defaults. Do not switch
+  local `.env` or create a substitute project when access is missing.
 - Preserve the default-deny ad-account allowlist. Aggregator OAuth grants can
   expose unrelated personal or portfolio accounts.
 - Provider sends, publishes, deletes, campaign changes, and conversion-action
