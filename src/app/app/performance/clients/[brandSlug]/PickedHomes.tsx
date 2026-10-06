@@ -122,11 +122,12 @@ export function PickedHomes({
       <Button
         size="sm"
         variant={primary ? "default" : "outline"}
-        disabled={selecting || picked.length >= MAX}
+        loading={selecting}
+        disabled={picked.length >= MAX}
         onClick={() => void select()}
       >
-        <Sparkles className="size-3.5" />
-        {selecting ? "Selecting…" : "Select homes"}
+        {!selecting && <Sparkles className="size-3.5" />}
+        {selecting ? "Selecting homes…" : "Select homes"}
       </Button>
       <ShapeBrandButton
         brandId={brandId}
@@ -184,6 +185,13 @@ export function PickedHomes({
           compact
           icon={House}
           title="Choose the homes that lead"
+          description={
+            selecting ? (
+              <span role="status">
+                Reviewing the homes and selecting the featured set…
+              </span>
+            ) : undefined
+          }
           actions={actions(true)}
         />
       ) : (

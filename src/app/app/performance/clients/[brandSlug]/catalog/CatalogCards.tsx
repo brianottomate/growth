@@ -444,6 +444,36 @@ export function CatalogCards({
   const activeExport = activity.data?.some(
     (run) => run.destination === "Catalog" && running(run.status),
   );
+  const exportActions = draft ? (
+    <>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={fresh}
+          onChange={(e) => setFresh(e.target.checked)}
+        />
+        Redraw every card
+      </label>
+      <Button
+        disabled={
+          busy ||
+          activeExport ||
+          !draft.cards.some((c) => c.included) ||
+          catalogArtworkIssues(draft).length > 0 ||
+          unapproved.length > 0
+        }
+        title={
+          unapproved.length > 0
+            ? `${unapproved.length} included card${unapproved.length === 1 ? "" : "s"} not approved yet`
+            : undefined
+        }
+        loading={busy || activeExport}
+        onClick={() => void exportCatalog()}
+      >
+        {busy || activeExport ? "Creating export…" : "Create export"}
+      </Button>
+    </>
+  ) : undefined;
   return (
     <div className="space-y-4">
       <div
@@ -711,10 +741,12 @@ export function CatalogCards({
                   description="Import the client’s WanderOS homes when you’re ready to build catalog cards. Then choose a template and write their copy."
                   actions={
                     <Button
-                      disabled={importHomes.isPending}
+                      loading={importHomes.isPending}
                       onClick={() => importHomes.mutate({ brandId })}
                     >
-                      {importHomes.isPending ? "Importing…" : "Import homes"}
+                      {importHomes.isPending
+                        ? "Importing homes…"
+                        : "Import homes"}
                     </Button>
                   }
                 />
@@ -1026,37 +1058,7 @@ export function CatalogCards({
           title="Exports"
           icon={Download}
           count={query.data?.exports.length ?? 0}
-          actions={
-            draft ? (
-              <>
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={fresh}
-                    onChange={(e) => setFresh(e.target.checked)}
-                  />
-                  Redraw every card
-                </label>
-                <Button
-                  disabled={
-                    busy ||
-                    activeExport ||
-                    !draft.cards.some((c) => c.included) ||
-                    catalogArtworkIssues(draft).length > 0 ||
-                    unapproved.length > 0
-                  }
-                  title={
-                    unapproved.length > 0
-                      ? `${unapproved.length} included card${unapproved.length === 1 ? "" : "s"} not approved yet`
-                      : undefined
-                  }
-                  onClick={() => void exportCatalog()}
-                >
-                  {busy ? "Working…" : "Create export"}
-                </Button>
-              </>
-            ) : undefined
-          }
+          actions={exportActions}
         >
           <div className="space-y-4">
             {!query.data?.exports.length && (
@@ -1066,13 +1068,17 @@ export function CatalogCards({
                 title="No exports yet"
                 description="Approve the included catalog cards, then create an export. Each export preserves the approved cards and home facts at that moment."
                 actions={
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => void setView("studio")}
-                  >
-                    Review catalog cards
-                  </Button>
+                  <>
+                    {" "}
+                    {exportActions}{" "}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void setView("studio")}
+                    >
+                      Review catalog cards
+                    </Button>{" "}
+                  </>
                 }
               />
             )}

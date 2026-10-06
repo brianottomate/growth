@@ -181,7 +181,11 @@ export function StudioGeneration({
                   });
               }}
             >
-              {ai ? "Generate ads with AI" : "Create starter ads"}
+              {pending
+                ? "Creating ads…"
+                : ai
+                  ? "Generate ads with AI"
+                  : "Create starter ads"}
             </Button>
           }
         >

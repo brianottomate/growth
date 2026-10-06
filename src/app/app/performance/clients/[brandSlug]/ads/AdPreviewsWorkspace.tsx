@@ -87,27 +87,28 @@ export function AdPreviewsWorkspace({
       <AddAdDialog brandId={brandId} website={website} />
     </div>
   );
+  const actions = (
+    <>
+      {addAction}
+      <StudioGeneration
+        brandId={brandId}
+        brandSlug={brandSlug}
+        connected={connected}
+      />
+      <ShapeBrandButton
+        brandId={brandId}
+        brandName={brandName}
+        section="ads and creative review"
+      />
+    </>
+  );
   return (
     <div className="space-y-4">
       <WorkspaceCard
         title="Ads"
         icon={Images}
         count={ideas.length}
-        actions={
-          <>
-            {addAction}
-            <StudioGeneration
-              brandId={brandId}
-              brandSlug={brandSlug}
-              connected={connected}
-            />
-            <ShapeBrandButton
-              brandId={brandId}
-              brandName={brandName}
-              section="ads and creative review"
-            />
-          </>
-        }
+        actions={actions}
       >
         {drafted ? (
           <>
@@ -234,7 +235,12 @@ export function AdPreviewsWorkspace({
             )}
           </>
         ) : (
-          <EmptyState compact icon={Images} title="Create the first ad" />
+          <EmptyState
+            compact
+            icon={Images}
+            title="Create the first ad"
+            actions={actions}
+          />
         )}
       </WorkspaceCard>
     </div>

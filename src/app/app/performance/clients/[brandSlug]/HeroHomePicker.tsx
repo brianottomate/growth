@@ -1,5 +1,6 @@
 "use client";
 
+import { useIsMutating } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { useWorkspaceMutation } from "./useWorkspaceMutation";
 import { Check, Search } from "lucide-react";
@@ -44,12 +45,16 @@ export function HeroHomePicker({
       ? options.filter((option) => option.name.toLowerCase().includes(q))
       : options;
   }, [options, query]);
+  const mutationKey = ["workspace-hero", brandId];
+  const sharedPending = useIsMutating({ mutationKey, exact: true }) > 0;
   const feature = useWorkspaceMutation(
     orpc.brand.setPreviewSource.mutationOptions({
+      mutationKey,
       onSuccess: () => setOpen(false),
       onError: (error) => toast.error(error.message),
     }),
   );
+  const pending = feature.isPending || sharedPending;
   if (options.length === 0) return null;
 
   return (
@@ -57,15 +62,15 @@ export function HeroHomePicker({
       <Button
         size="sm"
         variant={primary ? "default" : "outline"}
-        loading={feature.isPending}
+        loading={pending}
         onClick={() => setOpen(true)}
       >
-        {label}
+        {pending ? "Saving hero home…" : label}
       </Button>
       <Dialog
         open={open}
         onOpenChange={(next) => {
-          if (!feature.isPending) setOpen(next);
+          if (!pending) setOpen(next);
         }}
       >
         <DialogContent size="2xl">
@@ -93,7 +98,7 @@ export function HeroHomePicker({
                 <li key={option.url}>
                   <button
                     type="button"
-                    disabled={feature.isPending}
+                    disabled={pending}
                     onClick={() => {
                       feature.mutate({
                         id: brandId,
@@ -126,7 +131,7 @@ export function HeroHomePicker({
               );
             })}
           </ul>
-          {feature.isPending && (
+          {pending && (
             <p role="status" className="text-sm text-muted-foreground">
               Saving preview image…
             </p>

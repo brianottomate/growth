@@ -66,7 +66,7 @@ export function Audiences({
   metaTargets?: Record<string, { name: string; via: "audience" | "persona" }>;
 }) {
   const router = useRouter();
-  const { busy, run, review } = useSuggestedAudiences(campaignId);
+  const { busy, run, phase, label } = useSuggestedAudiences(campaignId);
   // A chat on this campaign's audiences; Suggest is the one-click add.
   const audienceChat = () =>
     sendAssistantIntent({
@@ -85,16 +85,16 @@ export function Audiences({
     }),
   );
 
-  const actions = () => (
+  const actions = (primary = false) => (
     <>
       <Button
         size="sm"
-        variant="outline"
-        disabled={busy}
+        variant={primary ? "default" : "outline"}
+        loading={busy}
         onClick={() => void run()}
       >
-        <Sparkles className="size-3.5" />
-        {busy ? "Suggesting…" : "Suggest audiences"}
+        {!busy && <Sparkles className="size-3.5" />}
+        {label}
       </Button>
       <Button size="sm" variant="outline" onClick={audienceChat}>
         <MessageSquare className="size-3.5" />
@@ -116,13 +116,30 @@ export function Audiences({
           retain their persona and explain proposed targeting.
         </p>
       )}
-      {review}
+      {busy && audiences.length > 0 && (
+        <p role="status" className="text-xs text-muted-foreground">
+          {phase === "saving"
+            ? "Saving the suggested audiences…"
+            : "Reading personas and market evidence to suggest audiences…"}
+        </p>
+      )}
       {audiences.length === 0 ? (
         <EmptyState
           compact
           icon={Users}
           title="Broad"
-          description="Keep broad targeting, or add audiences from the brand’s evidence to narrow by age or place. Shape lets you explore the targeting before changing it."
+          actions={actions(true)}
+          description={
+            busy ? (
+              <span role="status">
+                {phase === "saving"
+                  ? "Saving the suggested audiences…"
+                  : "Reading personas and market evidence to suggest audiences…"}
+              </span>
+            ) : (
+              "Keep broad targeting, or add audiences from the brand’s evidence to narrow by age or place. Shape lets you explore the targeting before changing it."
+            )
+          }
         />
       ) : (
         <div className="grid grid-cols-1 gap-4 @4xl:grid-cols-2">

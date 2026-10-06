@@ -60,8 +60,8 @@ export function BrandStoryCard({
           loading={write.isPending}
           onClick={() => write.mutate({ brandId })}
         >
-          <Sparkles className="size-3.5" />
-          Write story
+          {!write.isPending && <Sparkles className="size-3.5" />}
+          {write.isPending ? "Writing story…" : "Write story"}
         </Button>
       )}
       <ShapeBrandButton
@@ -101,7 +101,7 @@ export function BrandStoryCard({
               loading={save.isPending}
               onClick={() => save.mutate({ brandId, story: draft })}
             >
-              Save
+              {save.isPending ? "Saving story…" : "Save"}
             </Button>
           </div>
         ) : (

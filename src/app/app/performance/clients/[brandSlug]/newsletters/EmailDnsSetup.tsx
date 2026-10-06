@@ -79,11 +79,9 @@ export function EmailDnsSetup({
       icon={Settings}
       actions={
         <>
-          {(sendingDomain || prepare.data) && (
-            <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
-              Configure domain
-            </Button>
-          )}
+          <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+            Configure domain
+          </Button>
           {styleAction}
         </>
       }
@@ -165,10 +163,13 @@ export function EmailDnsSetup({
               DNS or enable sending.
             </p>
             <Button
+              loading={prepare.isPending}
               onClick={() => void prepareLink()}
               disabled={prepare.isPending || !root || !subdomain}
             >
-              {prepare.isPending ? "Preparing…" : "Get connection link"}
+              {prepare.isPending
+                ? "Preparing connection link…"
+                : "Get connection link"}
             </Button>
             {prepare.error && (
               <p role="alert" className="text-sm text-destructive">
@@ -178,9 +179,12 @@ export function EmailDnsSetup({
             <Button
               variant="outline"
               disabled={prepare.isPending || !root || !subdomain}
+              loading={prepare.isPending}
               onClick={() => void prepareLink(true)}
             >
-              Replace link
+              {prepare.isPending
+                ? "Preparing connection link…"
+                : "Replace link"}
             </Button>
             {url && (
               <div className="space-y-3">

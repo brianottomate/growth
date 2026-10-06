@@ -299,7 +299,7 @@ export function EmailAudiencesClient({
             preview.mutate({ brandId, definition }, { onError: report })
           }
         >
-          Preview audience
+          {preview.isPending ? "Previewing recipients…" : "Preview audience"}
         </Button>
         <Button
           variant="outline"
@@ -327,7 +327,7 @@ export function EmailAudiencesClient({
             )
           }
         >
-          Save audience
+          {save.isPending ? "Saving audience…" : "Save audience"}
         </Button>
         <Button
           variant="outline"
@@ -357,7 +357,9 @@ export function EmailAudiencesClient({
             )
           }
         >
-          Compile saved revision
+          {compile.isPending
+            ? "Compiling recipients…"
+            : "Compile saved revision"}
         </Button>
       </div>
       {preview.error && (
@@ -501,7 +503,7 @@ export function EmailAudiencesClient({
         title="Audiences"
         icon={Users}
         count={audiences.data?.length ?? 0}
-        actions={audiences.data?.length ? audienceActions : undefined}
+        actions={audienceActions}
       >
         {audiences.data?.length || audiences.isPending || audiences.error ? (
           savedAudiences
@@ -510,7 +512,7 @@ export function EmailAudiencesClient({
             compact
             icon={Users}
             title="Choose who receives your emails"
-            description="Define an audience, preview recipients, and save its rules."
+            description="Choose recipient rules, preview who qualifies, then save the audience. Compile recipients when you are ready to use it in an email."
             actions={audienceActions}
           />
         )}

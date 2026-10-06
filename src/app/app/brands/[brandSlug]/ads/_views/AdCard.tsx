@@ -739,6 +739,7 @@ export function AdCard({
                 />
               </label>
             </div>
+            {editorActions}
             <AdIdeaPreview
               brandId={brandId}
               brandName={brandName}
@@ -1011,7 +1012,7 @@ export function AdCard({
           </>
         )}
       </fieldset>
-      {editorActions}
+      {editor !== "copy" && editorActions}
     </div>
   );
   return (

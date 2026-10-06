@@ -224,6 +224,27 @@ export async function CampaignView({
       />
     </div>
   );
+  const platformActions = (
+    <>
+      <PlanPlatformButton
+        brandId={brand.id}
+        brandName={brandName}
+        campaignId={campaign.id}
+        campaignName={campaign.name}
+        planned={plannedPlatforms}
+      />
+      <AskAssistantButton
+        brandId={brand.id}
+        brandName={brandName}
+        campaignId={campaign.id}
+        campaignName={campaign.name}
+        focus="platforms"
+        label="Shape"
+        newThread
+        ask={`Help me shape the platform plan for “${campaign.name}”. Read its current setup and discuss platforms, budget and tracking with me before changing anything.`}
+      />
+    </>
+  );
   return (
     <div className="space-y-4">
       <header className="space-y-3 py-1">
@@ -328,6 +349,7 @@ export async function CampaignView({
               icon={Images}
               title="Add the campaign’s first ads"
               description="Choose existing brand ads or create a new ad."
+              actions={adActions}
             />
           }
           preparingHero={false}
@@ -393,27 +415,7 @@ export async function CampaignView({
                 ? planned.map((row) => platformLabel(row.platform)).join(", ")
                 : undefined
             }
-            actions={
-              <>
-                <PlanPlatformButton
-                  brandId={brand.id}
-                  brandName={brandName}
-                  campaignId={campaign.id}
-                  campaignName={campaign.name}
-                  planned={plannedPlatforms}
-                />
-                <AskAssistantButton
-                  brandId={brand.id}
-                  brandName={brandName}
-                  campaignId={campaign.id}
-                  campaignName={campaign.name}
-                  focus="platforms"
-                  label="Shape"
-                  newThread
-                  ask={`Help me shape the platform plan for “${campaign.name}”. Read its current setup and discuss platforms, budget and tracking with me before changing anything.`}
-                />
-              </>
-            }
+            actions={platformActions}
           >
             {editableAds.length > 0 && (
               <div className="mb-4 space-y-2 rounded-lg border p-3">
@@ -490,6 +492,7 @@ export async function CampaignView({
                 compact
                 icon={Radio}
                 title="Choose where the campaign runs"
+                actions={platformActions}
                 description="Create a Meta draft, or choose another platform. Review its account, tracking and budget before pushing. Shape lets you work through those choices together."
               />
             ) : (

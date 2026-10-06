@@ -1,6 +1,11 @@
 "use client";
 import Link from "next/link";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useIsMutating,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import { orpc } from "@/orpc/client";
@@ -18,9 +23,12 @@ function useImportRun(brandId: string) {
 const active = (status?: string) => status === "queued" || status === "running";
 export function ImportWanderOsButton({ brandId }: { brandId: string }) {
   const client = useQueryClient();
+  const mutationKey = ["workspace-import", brandId];
+  const starting = useIsMutating({ mutationKey, exact: true }) > 0;
   const progress = useImportRun(brandId);
   const start = useMutation(
     orpc.catalog.importWanderOs.mutationOptions({
+      mutationKey,
       onSuccess: (result) => {
         void client.invalidateQueries({ queryKey: orpc.workflow.key() });
         client.setQueryData(
@@ -33,7 +41,8 @@ export function ImportWanderOsButton({ brandId }: { brandId: string }) {
       onError: (error) => toast.error(error.message),
     }),
   );
-  const busy = start.isPending || active(progress.data?.run?.status);
+  const busy =
+    starting || start.isPending || active(progress.data?.run?.status);
   if (progress.data?.missingFoundations.length && !busy)
     return (
       <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -69,18 +78,27 @@ export function WanderOsInventoryActions({
   brandId: string;
   connected: boolean;
 }) {
+  const refreshKey = ["workspace-refresh-homes", brandId];
+  const recheckKey = ["workspace-recheck-wanderos", brandId];
+  const refreshing =
+    useIsMutating({ mutationKey: refreshKey, exact: true }) > 0;
+  const rechecking =
+    useIsMutating({ mutationKey: recheckKey, exact: true }) > 0;
   const progress = useImportRun(brandId);
   const refresh = useWorkspaceMutation(
     orpc.catalog.refreshHomes.mutationOptions({
+      mutationKey: refreshKey,
       onSuccess: () => {
         toast.success("Homes refreshed");
       },
     }),
   );
   const recheck = useWorkspaceMutation(
-    orpc.brand.recheckWebsite.mutationOptions(),
+    orpc.brand.recheckWebsite.mutationOptions({ mutationKey: recheckKey }),
   );
   const busy =
+    refreshing ||
+    rechecking ||
     refresh.isPending ||
     recheck.isPending ||
     active(progress.data?.run?.status);
@@ -89,20 +107,24 @@ export function WanderOsInventoryActions({
       <Button
         variant="outline"
         size="sm"
-        loading={recheck.isPending}
+        loading={recheck.isPending || rechecking}
         disabled={busy}
         onClick={() => recheck.mutate({ brandId })}
       >
-        {recheck.isPending ? "Checking WanderOS…" : "Recheck WanderOS"}
+        {recheck.isPending || rechecking
+          ? "Checking WanderOS…"
+          : "Recheck WanderOS"}
       </Button>
       <Button
         variant="outline"
         size="sm"
-        loading={refresh.isPending}
+        loading={refresh.isPending || refreshing}
         disabled={busy || !connected}
         onClick={() => refresh.mutate({ brandId })}
       >
-        {refresh.isPending ? "Refreshing homes…" : "Refresh homes"}
+        {refresh.isPending || refreshing
+          ? "Refreshing homes…"
+          : "Refresh homes"}
       </Button>
     </>
   );

@@ -6,6 +6,7 @@ import { generateText, Output } from "ai";
 import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
+import { campaignGeography } from "@/lib/campaign-audience-geography";
 import { marketOf, type Market } from "@/lib/markets";
 import { usStateCode, usStateName } from "@/lib/us-states";
 import {
@@ -328,33 +329,24 @@ export async function suggestCampaignAudiences(input: {
     suggestions = output.audiences
       .map((s) => ({
         ...s,
+        hasPlaceTarget: s.states.length > 0 || s.cities.length > 0,
         personaId:
           s.personaId && knownPersonas.has(s.personaId) ? s.personaId : null,
         homeIds: s.homeIds.filter((id) => knownHomes.has(id)),
-        states: s.states
-          .map((state) => usStateCode(state))
-          .filter((state): state is string => Boolean(state)),
+        ...(s.kind === "geo"
+          ? campaignGeography(s, feeders, coveredStates)
+          : { states: [], cities: [] }),
       }))
-      .map((s) =>
-        s.kind === "geo"
-          ? {
-              ...s,
-              states: s.states.filter((state) => !coveredStates.has(state)),
-            }
-          : s,
-      )
       .filter((s) =>
         s.kind === "geo"
           ? Boolean(
               s.states.length ||
-              s.cities.length ||
-              s.countries.length ||
-              s.personaId,
+              (!s.hasPlaceTarget && (s.countries.length || s.personaId)),
             )
           : Boolean(s.platformAudienceId && known.has(s.platformAudienceId)),
       )
       .slice(0, count)
-      .map((s) => {
+      .map(({ hasPlaceTarget: _hasPlaceTarget, ...s }) => {
         const states = s.kind === "geo" ? s.states : [];
         return {
           ...s,

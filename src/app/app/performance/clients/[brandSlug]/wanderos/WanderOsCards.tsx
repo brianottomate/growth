@@ -46,8 +46,18 @@ export function WanderOsConnectionCard({
       Add website
     </ButtonLink>
   );
+  const actions = connected ? (
+    <ImportWanderOsButton brandId={brandId} />
+  ) : (
+    check
+  );
   return (
-    <WorkspaceCard title="WanderOS" icon={Link2} actions={status}>
+    <WorkspaceCard
+      title="WanderOS"
+      icon={Link2}
+      titleAccessory={status}
+      actions={actions}
+    >
       <EmptyState
         icon={Link2}
         title={
@@ -62,7 +72,7 @@ export function WanderOsConnectionCard({
             ? "Import homes, suggest Featured homes, and draft destinations. You can edit these selections afterward. Catalog copy is written using the current hero, with AI notes for anything worth reviewing."
             : "Check the client’s website for WanderOS. Once connected, import its homes here. You can also prepare homes manually below."
         }
-        actions={connected ? <ImportWanderOsButton brandId={brandId} /> : check}
+        actions={actions}
       />
     </WorkspaceCard>
   );
@@ -101,6 +111,9 @@ export function AllHomesCard({
           compact
           icon={House}
           title="Your homes will appear here"
+          actions={
+            <WanderOsInventoryActions brandId={brandId} connected={connected} />
+          }
           description="Import homes from WanderOS above, or add home details manually below."
         />
       )}

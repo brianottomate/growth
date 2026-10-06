@@ -75,8 +75,8 @@ export function DestinationsCard({
           disabled={!towns.length}
           onClick={() => write.mutate({ brandId })}
         >
-          <Sparkles className="size-3.5" />
-          Define destinations
+          {!write.isPending && <Sparkles className="size-3.5" />}
+          {write.isPending ? "Defining destinations…" : "Define destinations"}
         </Button>
       )}
       <ShapeBrandButton
@@ -109,7 +109,7 @@ export function DestinationsCard({
                 loading={save.isPending}
                 onClick={() => save.mutate({ brandId, markets: draft })}
               >
-                Save
+                {save.isPending ? "Saving destinations…" : "Save"}
               </Button>
             </>
           ) : (
@@ -142,9 +142,15 @@ export function DestinationsCard({
           icon={MapPin}
           title="Group homes into guest destinations"
           description={
-            towns.length
-              ? "Define and save destinations from the brand’s homes, or Shape how nearby destinations should be grouped."
-              : "Add homes with their towns first, then define the brand’s destinations."
+            write.isPending ? (
+              <span role="status">
+                Reading the homes and towns to define destinations…
+              </span>
+            ) : towns.length ? (
+              "Define and save destinations from the brand’s homes, or Shape how nearby destinations should be grouped."
+            ) : (
+              "Add homes with their towns first, then define the brand’s destinations."
+            )
           }
           actions={actions(true)}
         />

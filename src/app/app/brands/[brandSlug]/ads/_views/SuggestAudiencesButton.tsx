@@ -4,41 +4,28 @@ import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { SimpleDialog } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 import { orpc } from "@/orpc/client";
-import type { AudienceSuggestion } from "@/server/services/campaign-audience-suggestions.service";
-/** Generation proposes; the operator reviews before local creation. */
+
+/** One click prepares local audiences; platform delivery is a separate action. */
 export function useSuggestedAudiences(campaignId: string) {
   const router = useRouter();
-  const [proposals, setProposals] = useState<AudienceSuggestion[]>([]);
-  const [open, setOpen] = useState(false);
-  const [chosen, setChosen] = useState<Set<number>>(new Set());
+  const [phase, setPhase] = useState<"suggesting" | "saving" | null>(null);
+  const working = phase !== null;
   const suggest = useMutation(
     orpc.ads.suggestCampaignAudiences.mutationOptions(),
   );
   const link = useMutation(orpc.ads.linkAudience.mutationOptions());
   const add = useMutation(orpc.ads.addAudience.mutationOptions());
-  const busy = suggest.isPending || add.isPending || link.isPending;
+  const busy = working || suggest.isPending || add.isPending || link.isPending;
   const run = async () => {
-    try {
-      const result = await suggest.mutateAsync({ campaignId });
-      setProposals(result.suggestions);
-      setChosen(new Set(result.suggestions.map((_, i) => i)));
-      if (result.suggestions.length) setOpen(true);
-      else toast.info("No additional audiences suggested");
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Could not suggest audiences",
-      );
-    }
-  };
-  const save = async () => {
+    if (busy) return;
+    setPhase("suggesting");
     let saved = 0;
     try {
-      for (const [i, s] of proposals.entries()) {
-        if (!chosen.has(i)) continue;
+      const result = await suggest.mutateAsync({ campaignId });
+      setPhase("saving");
+      for (const s of result.suggestions) {
         const audience = await add.mutateAsync({
           campaignId,
           name: s.name,
@@ -52,12 +39,6 @@ export function useSuggestedAudiences(campaignId: string) {
           regions: s.regions,
           cities: s.cities,
         });
-        // Remove successful entries immediately so retry cannot create them twice.
-        setChosen((previous) => {
-          const next = new Set(previous);
-          next.delete(i);
-          return next;
-        });
         saved++;
         if (s.platformAudienceId)
           await link.mutateAsync({
@@ -65,99 +46,47 @@ export function useSuggestedAudiences(campaignId: string) {
             audienceId: audience.id,
           });
       }
-      setOpen(false);
-      toast.success(
-        `Added ${saved} campaign audience${saved === 1 ? "" : "s"}`,
-      );
+      if (saved)
+        toast.success(
+          `Added ${saved} campaign audience${saved === 1 ? "" : "s"}`,
+        );
+      else toast.info("No additional audiences suggested");
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Could not save audience",
+        error instanceof Error ? error.message : "Could not prepare audiences",
       );
+      if (saved)
+        toast.info(
+          `${saved} audience${saved === 1 ? " was" : "s were"} saved before the error. Review them before trying again.`,
+        );
+    } finally {
+      setPhase(null);
+      router.refresh();
     }
-    router.refresh();
   };
-  const review = (
-    <SimpleDialog
-      title="Review proposed campaign audiences"
-      description="Personas and brand evidence inform these proposals. Saving creates local campaign audiences; it does not change Meta or start ads."
-      open={open}
-      onOpenChange={(value) => {
-        if (!busy) setOpen(value);
-      }}
-      footer={
-        <Button disabled={busy || !chosen.size} onClick={() => void save()}>
-          {busy ? "Saving…" : "Add selected audiences"}
-        </Button>
-      }
-    >
-      <div className="space-y-4">
-        {proposals.map((proposal, i) => (
-          <article key={i} className="space-y-2 rounded-lg border p-3">
-            <label className="flex gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={chosen.has(i)}
-                onChange={(e) =>
-                  setChosen((previous) => {
-                    const next = new Set(previous);
-                    if (e.target.checked) next.add(i);
-                    else next.delete(i);
-                    return next;
-                  })
-                }
-              />
-              <span>{proposal.name}</span>
-            </label>
-            <Input
-              aria-label="Audience name"
-              value={proposal.name}
-              onChange={(e) =>
-                setProposals((previous) =>
-                  previous.map((p, j) =>
-                    j === i ? { ...p, name: e.target.value } : p,
-                  ),
-                )
-              }
-            />
-            <p className="text-xs text-muted-foreground">{proposal.why}</p>
-            <p className="text-xs">
-              {[
-                ...proposal.countries,
-                ...proposal.states,
-                ...proposal.cities,
-              ].join(", ") || "No geographic narrowing"}{" "}
-              ·{" "}
-              {proposal.ageMin == null && proposal.ageMax == null
-                ? "No age narrowing"
-                : `Ages ${proposal.ageMin ?? 13}–${proposal.ageMax ?? "65+"}`}
-            </p>
-            {proposal.homeIds.length > 0 && (
-              <p className="text-xs text-muted-foreground">
-                {proposal.homeIds.length} relevant homes selected from brand
-                evidence
-              </p>
-            )}
-          </article>
-        ))}
-      </div>
-    </SimpleDialog>
-  );
-  return { busy, run, review };
+  return {
+    busy,
+    run,
+    phase,
+    label:
+      phase === "saving"
+        ? "Saving audiences…"
+        : busy
+          ? "Suggesting audiences…"
+          : "Suggest audiences",
+  };
 }
 export function SuggestAudiencesButton({ campaignId }: { campaignId: string }) {
-  const { busy, run, review } = useSuggestedAudiences(campaignId);
+  const { busy, run, label } = useSuggestedAudiences(campaignId);
   return (
-    <>
-      <Button
-        size="sm"
-        variant="outline"
-        disabled={busy}
-        onClick={() => void run()}
-      >
-        <Sparkles className="size-3.5" />
-        {busy ? "Suggesting…" : "Suggest audiences"}
-      </Button>
-      {review}
-    </>
+    <Button
+      size="sm"
+      variant="outline"
+      loading={busy}
+      onClick={() => void run()}
+    >
+      {!busy && <Sparkles className="size-3.5" />}
+      {label}
+    </Button>
   );
 }

@@ -62,6 +62,7 @@ export default async function PerformanceBrandCampaignsPage({
             compact
             icon={Megaphone}
             title="Create the first campaign"
+            actions={actions}
           />
         )}
       </WorkspaceCard>

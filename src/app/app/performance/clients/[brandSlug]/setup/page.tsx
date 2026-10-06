@@ -55,8 +55,18 @@ export default async function PerformanceBrandSetupPage({
         Add website
       </ButtonLink>
     );
+    const actions = (
+      <>
+        {action}
+        <ShapeBrandButton
+          brandId={brand.id}
+          brandName={brand.name}
+          section="brand identity"
+        />
+      </>
+    );
     return (
-      <WorkspaceCard title="Brand identity" icon={Palette}>
+      <WorkspaceCard title="Brand identity" icon={Palette} actions={actions}>
         <EmptyState
           compact
           icon={Globe}
@@ -66,16 +76,7 @@ export default async function PerformanceBrandSetupPage({
               : "Add the brand’s website"
           }
           description="Pull the logo, colors, fonts and tagline from the brand’s website."
-          actions={
-            <>
-              {action}
-              <ShapeBrandButton
-                brandId={brand.id}
-                brandName={brand.name}
-                section="brand identity"
-              />
-            </>
-          }
+          actions={actions}
         />
       </WorkspaceCard>
     );

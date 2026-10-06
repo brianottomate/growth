@@ -41,22 +41,58 @@ export function PersonaAudiences({
 }) {
   const hasStory = Boolean(brand.story?.trim());
   const router = useRouter();
+  const [phase, setPhase] = useState<"defining" | "saving" | null>(null);
+  const defining = phase !== null;
   const suggest = useMutation(orpc.persona.suggest.mutationOptions());
   const create = useMutation(orpc.persona.create.mutationOptions());
   const define = async () => {
+    if (defining) return;
+    setPhase("defining");
     try {
       const result = await suggest.mutateAsync({ brandId: brand.id });
+      setPhase("saving");
       for (const proposal of result.suggestions)
         await create.mutateAsync({ brandId: brand.id, ...proposal });
-      router.refresh();
       if (!result.suggestions.length)
         toast.info("No additional personas suggested");
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Could not define personas",
       );
+    } finally {
+      setPhase(null);
+      router.refresh();
     }
   };
+  const actions = (primary = false) => (
+    <>
+      {hasStory ? (
+        <Button
+          size="sm"
+          variant={primary ? "default" : "outline"}
+          loading={defining}
+          disabled={suggest.isPending || create.isPending}
+          onClick={() => void define()}
+        >
+          {!defining && <Sparkles className="size-3.5" />}
+          {phase === "saving"
+            ? "Saving personas…"
+            : defining
+              ? "Defining personas…"
+              : "Define personas"}
+        </Button>
+      ) : (
+        <Button size="sm" variant={primary ? "default" : "outline"} asChild>
+          <Link href="#brand-story">Write story</Link>
+        </Button>
+      )}
+      <ShapeBrandButton
+        brandId={brand.id}
+        brandName={brand.name}
+        section="personas"
+      />
+    </>
+  );
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -64,56 +100,34 @@ export function PersonaAudiences({
           <Users className="size-4" />
           Personas · {personas.length}
         </h2>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!hasStory || suggest.isPending || create.isPending}
-            onClick={() => void define()}
-          >
-            <Sparkles className="size-3.5" />
-            Define personas
-          </Button>
-          <ShapeBrandButton
-            brandId={brand.id}
-            brandName={brand.name}
-            section="personas"
-          />
-        </div>
+        <div className="flex flex-wrap gap-2">{actions()}</div>
       </div>
+      {defining && personas.length > 0 && (
+        <p role="status" className="text-xs text-muted-foreground">
+          {phase === "saving"
+            ? "Saving the new personas…"
+            : "Reading the brand story and homes to define guest personas…"}
+        </p>
+      )}
       {!personas.length && (
         <EmptyState
           compact
           icon={Users}
           title="Define who you’re speaking to"
           description={
-            hasStory
-              ? "Use the brand story to define guest personas."
-              : "Save the brand story before defining personas."
+            defining ? (
+              <span role="status">
+                {phase === "saving"
+                  ? "Saving the new personas…"
+                  : "Reading the brand story and homes to define guest personas…"}
+              </span>
+            ) : hasStory ? (
+              "Use the brand story to define guest personas."
+            ) : (
+              "Save the brand story before defining personas."
+            )
           }
-          actions={
-            <>
-              {hasStory ? (
-                <Button
-                  size="sm"
-                  disabled={suggest.isPending || create.isPending}
-                  onClick={() => void define()}
-                >
-                  <Sparkles className="size-3.5" />
-                  Define personas
-                </Button>
-              ) : (
-                <Button size="sm" asChild>
-                  <Link href="#brand-story">Write story</Link>
-                </Button>
-              )}
-              <ShapeBrandButton
-                brandId={brand.id}
-                brandName={brand.name}
-                section="personas"
-              />
-            </>
-          }
+          actions={actions(true)}
         />
       )}
       <div className="grid grid-cols-1 gap-3 @3xl:grid-cols-2">
@@ -222,7 +236,11 @@ function PersonaEditor({ persona }: { persona: Persona }) {
         </Button>
       }
       footer={
-        <Button disabled={!name.trim() || busy} onClick={() => void save()}>
+        <Button
+          loading={busy}
+          disabled={!name.trim()}
+          onClick={() => void save()}
+        >
           {busy ? "Saving…" : "Save persona"}
         </Button>
       }
@@ -278,7 +296,7 @@ function GeoFields({
           {label}
           <Input
             defaultValue={value[field]?.join(", ") ?? ""}
-            onBlur={(e) =>
+            onChange={(e) =>
               onChange({
                 ...value,
                 [field]: e.target.value
