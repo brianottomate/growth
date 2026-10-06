@@ -159,6 +159,14 @@ export type ReviewEmailIntent = {
   screenshot?: { url: string; fileName: string; mediaType: "image/jpeg" };
 };
 
+export type WorkEmailSequenceIntent = {
+  type: "work_email_sequence";
+  newThread: true;
+  brandId: string;
+  sequenceId?: string;
+  visibleText: string;
+};
+
 export type WorkEmailAudienceIntent = {
   type: "work_email_audience";
   newThread: true;
@@ -198,6 +206,7 @@ export type WorkInitiativeIntent = {
 
 export type AssistantIntent =
   | WorkInitiativeIntent
+  | WorkEmailSequenceIntent
   | WorkEmailAudienceIntent
   | WorkPerformanceClientIntent
   | ReviewEmailIntent

@@ -1,65 +1,33 @@
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
-import { workspaceProcedure } from "@/server/api/orpc";
-import { emailSequenceDraftSchema } from "@/lib/validators/email-sequence";
+import { actionProcedure, workspaceProcedure } from "@/server/api/orpc";
 import {
-  getEmailSequence,
-  listEmailSequences,
-  saveEmailSequence,
-  archiveEmailSequence,
-  listSequenceEmails,
-} from "@/server/services/email-sequence.service";
+  listSequences,
+  getSequence,
+  sequenceEmails,
+  saveSequence,
+  archiveSequence,
+  previewSequence,
+  prepareSequence,
+  cancelSequenceEnrollment,
+} from "@/server/ai/capabilities/email-sequences";
 import { createEmailSlot } from "@/server/services/email-document.service";
+import { lifecycleEnrollmentSchema } from "@/lib/validators/lifecycle-runtime";
 import {
-  lifecycleExecutionSettingsSchema,
-  lifecycleEnrollmentSchema,
-} from "@/lib/validators/lifecycle-runtime";
-import {
-  previewJourney,
-  prepareJourney,
   executionOverview,
   setExecutionEnabled,
   rotateIngestToken,
   enrollRecipient,
   recoverJourney,
-  cancelEnrollment,
 } from "@/server/services/lifecycle-runtime/service";
 
 const sequenceInput = z.object({ sequenceId: z.string().min(1) });
 export const emailSequenceRouter = {
-  list: workspaceProcedure
-    .input(z.object({ brandId: z.string() }))
-    .handler(({ context, input }) =>
-      listEmailSequences(context.workspace.orgId, input.brandId),
-    ),
-  get: workspaceProcedure.input(sequenceInput).handler(({ context, input }) =>
-    getEmailSequence({
-      organizationId: context.workspace.orgId,
-      sequenceId: input.sequenceId,
-    }),
-  ),
-  save: workspaceProcedure
-    .input(
-      z.object({
-        brandId: z.string(),
-        sequenceId: z.string().optional(),
-        expectedVersion: z.number().int().optional(),
-        draft: emailSequenceDraftSchema,
-      }),
-    )
-    .handler(({ context, input }) =>
-      saveEmailSequence({ ...input, organizationId: context.workspace.orgId }),
-    ),
-  archive: workspaceProcedure
-    .input(sequenceInput)
-    .handler(({ context, input }) =>
-      archiveEmailSequence(context.workspace.orgId, input.sequenceId),
-    ),
-  emails: workspaceProcedure
-    .input(z.object({ brandId: z.string() }))
-    .handler(({ context, input }) =>
-      listSequenceEmails(context.workspace.orgId, input.brandId),
-    ),
+  list: actionProcedure(listSequences),
+  get: actionProcedure(getSequence),
+  save: actionProcedure(saveSequence),
+  archive: actionProcedure(archiveSequence),
+  emails: actionProcedure(sequenceEmails),
   createEmail: workspaceProcedure
     .input(
       z.object({
@@ -80,25 +48,8 @@ export const emailSequenceRouter = {
     .handler(({ context, input }) =>
       executionOverview(context.workspace.orgId, input.sequenceId),
     ),
-  previewExecution: workspaceProcedure
-    .input(sequenceInput.extend({ settings: lifecycleExecutionSettingsSchema }))
-    .handler(({ context, input }) =>
-      previewJourney(context.workspace.orgId, input.sequenceId, input.settings),
-    ),
-  prepareExecution: workspaceProcedure
-    .input(
-      sequenceInput.extend({
-        settings: lifecycleExecutionSettingsSchema,
-        reviewedHash: z.string(),
-      }),
-    )
-    .handler(({ context, input }) =>
-      prepareJourney({
-        ...input,
-        organizationId: context.workspace.orgId,
-        userId: context.session.user.id,
-      }),
-    ),
+  previewExecution: actionProcedure(previewSequence),
+  prepareExecution: actionProcedure(prepareSequence),
   setExecutionEnabled: workspaceProcedure
     .input(
       sequenceInput.extend({
@@ -148,13 +99,5 @@ export const emailSequenceRouter = {
     .handler(({ context, input }) =>
       recoverJourney(context.workspace.orgId, input.sequenceId, input.afterId),
     ),
-  cancelEnrollment: workspaceProcedure
-    .input(sequenceInput.extend({ enrollmentId: z.string() }))
-    .handler(({ context, input }) =>
-      cancelEnrollment(
-        context.workspace.orgId,
-        input.sequenceId,
-        input.enrollmentId,
-      ),
-    ),
+  cancelEnrollment: actionProcedure(cancelSequenceEnrollment),
 };

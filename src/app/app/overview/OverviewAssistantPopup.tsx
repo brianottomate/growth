@@ -115,7 +115,13 @@ export function OverviewAssistantPopup({
 
   const nextMode = pathname === "/app/next";
   const pageQuery = useQuery(
-    orpc.creativeWork.pageContext.queryOptions({ input: { path: pathname } }),
+    orpc.creativeWork.pageContext.queryOptions({
+      input: {
+        path: searchParams.size
+          ? `${pathname}?${searchParams.toString()}`
+          : pathname,
+      },
+    }),
   );
   const queryBrandId = searchParams.get("brandId");
   const activeBrand =

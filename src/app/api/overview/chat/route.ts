@@ -1,3 +1,4 @@
+import { getEmailSequence } from "@/server/services/email-sequence.service";
 import {
   campaignFocusForTurn,
   catalogFocusForTurn,
@@ -493,6 +494,23 @@ export async function POST(req: Request): Promise<Response> {
         })
       : null;
 
+    if (assistantIntent?.type === "work_email_sequence") {
+      const sequence = assistantIntent.sequenceId
+        ? await getEmailSequence({
+            organizationId,
+            sequenceId: assistantIntent.sequenceId,
+          }).catch(() => null)
+        : null;
+      if (
+        !brand ||
+        (assistantIntent.sequenceId && sequence?.brandId !== brand.id)
+      )
+        return Response.json(
+          { error: "Sequence not found for this brand in this workspace." },
+          { status: 404 },
+        );
+    }
+
     const surfaceContext =
       surface === "create" || surface === "next"
         ? `\n\n# Current surface\nThe operator is in the unified Next conversation${brand ? ` for ${brand.name} (brandId: ${brand.id})` : ""}${intent ? ` with intent \"${intent}\"` : ""}. The default operating horizon is the next 14 days. Treat questions, pasted images, links, and rough thoughts as one continuous iteration loop. First establish readiness with brandRead action next when a brand is known. Do not pretend this is an editing studio. Prefer the smallest useful action, keep suggestions to at most three and usually one, execute authorized workspace changes without redundant approval cards, then point or navigate the operator to the existing content, schedule, calendar, media, or review surface where the result belongs. When the creative direction is genuinely ready for production, call prepareProductionPacket action prepare. Copying that packet into Claude Design, ChatGPT, a video editor, or an agency workflow is a first-class outcome; Fal is only an optional experiment that consumes the same reviewed packet.`
@@ -933,6 +951,9 @@ export async function POST(req: Request): Promise<Response> {
             pagePath ?? "",
           )),
       ),
+      email:
+        assistantIntent?.type === "work_email_sequence" ||
+        /\/newsletters(?:[/?#]|$)/.test(pagePath ?? ""),
       content: Boolean(activeWorkContext),
       continuation: incoming,
       focus: activeAd

@@ -2,6 +2,7 @@ import "server-only";
 import { and, eq, isNull, or } from "drizzle-orm";
 import { db } from "@/server/db";
 import {
+  emailSequenceTable,
   initiativeTable,
   brandTable,
   campaignTable,
@@ -108,7 +109,19 @@ export async function resolvePageContext(
           columns: { id: true, name: true },
         })
       : undefined;
+  const emailSequence =
+    brand && route.emailSequenceId
+      ? await db.query.emailSequenceTable.findFirst({
+          where: and(
+            eq(emailSequenceTable.id, route.emailSequenceId),
+            eq(emailSequenceTable.brandId, brand.id),
+            isNull(emailSequenceTable.deletedAt),
+          ),
+          columns: { id: true, name: true, version: true },
+        })
+      : null;
   return {
+    emailSequence: emailSequence ?? null,
     initiative: initiative ?? null,
     brand: brand ?? null,
     campaign: campaign ?? null,
@@ -119,6 +132,7 @@ export async function resolvePageContext(
       [
         initiative?.name,
         brand?.name,
+        emailSequence?.name,
         campaign?.name,
         platformCampaign?.name,
         home?.name,

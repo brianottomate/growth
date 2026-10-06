@@ -16,6 +16,10 @@ import {
 import { getSafeInternalPath } from "@/lib/auth-utils";
 
 function guidanceForPath(pathname: string): string | null {
+  if (
+    /^\/app\/performance\/(clients|brands)\/[^/]+\/newsletters/.test(pathname)
+  )
+    return "This is Performance Email: blasts, executable sequences, audiences and settings. Use emailRead.listSequences/getSequence/sequenceStatus and emailWrite.saveSequence for sequence planning; keep lifecycle strategy programs unchanged. Steps link email content, with relative waitMinutes; use existing email tools for content. Read current version before edits and pass expectedVersion. Preview then prepare a frozen revision before activation; activation, enrollment and queue recovery require the in-app approval card and can send real Postmark emails. Never invent recipient consent. Ingest secrets stay in the delivery settings UI.";
   if (pathname === "/app/next")
     return "This is the conversational home. All canonical workspace capabilities remain available; the current location guides the answer but does not limit what the operator can ask Growth to do.";
   if (pathname.startsWith("/app/review"))
@@ -113,9 +117,9 @@ export async function composePageContextSection(options: {
   }
   if (pathname.startsWith("/app/creative/"))
     return `${header}\nUse creativeRead.get for documentId ${pathname.split("/").at(-1)}. Edit with creativeWrite.save, produce with creativeWrite.produce; Dato pull/push are explicit overwrites. Production locks editing.`;
-  const page = await resolvePageContext(pathname, options.organizationId);
+  const page = await resolvePageContext(path, options.organizationId);
   if (page.label)
-    return `${header}\nVerified page context: ${page.label}. ${page.initiative ? `initiativeId: ${page.initiative.id}. Read initiativeRead.get before planning or editing linked work. Link content posts, series and campaigns, never platform posts. Creation and generation are separate; do not fill an initiative automatically.` : ""} ${page.brand ? `brandId: ${page.brand.id}.` : ""} ${page.campaign ? `campaignId: ${page.campaign.id}. Read adsRead.openCampaign before editing.` : ""} ${page.platformCampaign ? `platformCampaignId: ${page.platformCampaign.id}.` : ""} ${page.home ? `homeId: ${page.home.id}.` : ""} ${page.account ? `accountId: ${page.account.id}, status: ${page.account.status}.` : ""}\n${guidanceForPath(pathname) ?? ""}`;
+    return `${header}\nVerified page context: ${page.label}. ${page.initiative ? `initiativeId: ${page.initiative.id}. Read initiativeRead.get before planning or editing linked work. Link content posts, series and campaigns, never platform posts. Creation and generation are separate; do not fill an initiative automatically.` : ""} ${page.brand ? `brandId: ${page.brand.id}.` : ""} ${page.campaign ? `campaignId: ${page.campaign.id}. Read adsRead.openCampaign before editing.` : ""} ${page.platformCampaign ? `platformCampaignId: ${page.platformCampaign.id}.` : ""} ${page.emailSequence ? `sequenceId: ${page.emailSequence.id}, version: ${page.emailSequence.version}. Read emailRead.getSequence before editing.` : ""} ${page.home ? `homeId: ${page.home.id}.` : ""} ${page.account ? `accountId: ${page.account.id}, status: ${page.account.status}.` : ""}\n${guidanceForPath(pathname) ?? ""}`;
 
   const seriesId = /^\/app\/series\/([^/]+)$/.exec(pathname)?.[1];
   if (seriesId) {

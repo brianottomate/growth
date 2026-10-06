@@ -3,7 +3,16 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, Clock3, Mail, Plus, Trash2 } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Clock3,
+  Mail,
+  MessageSquare,
+  Plus,
+  Trash2,
+} from "lucide-react";
+import { sendAssistantIntent } from "@/lib/assistant-events";
 import { orpc } from "@/orpc/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +32,41 @@ import {
   type EmailSequenceDraft,
 } from "@/lib/validators/email-sequence";
 import { ExecutionPanel, ConditionEditor } from "./ExecutionPanel";
+
+function SequenceChatStart({
+  brandId,
+  sequenceId,
+  disabled = false,
+}: {
+  brandId: string;
+  sequenceId?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <Button
+      variant="outline"
+      disabled={disabled}
+      title={
+        disabled
+          ? "Save your draft before working in chat"
+          : "Plan or manage this sequence in chat"
+      }
+      onClick={() =>
+        sendAssistantIntent({
+          type: "work_email_sequence",
+          newThread: true,
+          brandId,
+          sequenceId,
+          visibleText: sequenceId
+            ? "Help me shape this email sequence. Read its saved plan and delivery status, then talk through what we should change."
+            : "Help me plan an email sequence. Let's work out the entry event, emails, waits and exit rule before saving a draft.",
+        })
+      }
+    >
+      <MessageSquare className="size-4" /> Shape
+    </Button>
+  );
+}
 
 function duration(minutes: number) {
   if (!minutes) return "Immediately";
@@ -118,12 +162,15 @@ export function EmailSequences({
             Plan a series of emails around a moment in your customer’s journey.
           </p>
         </div>
-        <Button asChild>
-          <Link href={`${basePath}?tab=sequences&sequence=new`}>
-            <Plus className="size-4" />
-            New sequence
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <SequenceChatStart brandId={brandId} />
+          <Button asChild>
+            <Link href={`${basePath}?tab=sequences&sequence=new`}>
+              <Plus className="size-4" />
+              New sequence
+            </Link>
+          </Button>
+        </div>
       </div>
       {query.isPending && (
         <p className="text-sm text-muted-foreground">Loading sequences…</p>
@@ -252,6 +299,24 @@ function SequenceEditor({
     orpc.emailSequence.emails.queryOptions({ input: { brandId } }),
   );
   const dirty = JSON.stringify(draft) !== saved || !sequenceId;
+  const hasNewerVersion =
+    initialVersion !== undefined &&
+    version !== undefined &&
+    initialVersion > version;
+  const loadLatest = () => {
+    const next = emailSequenceDraftSchema.parse(initial);
+    setDraft(next);
+    setSaved(JSON.stringify(next));
+    setVersion(initialVersion);
+  };
+  // Reconcile agent/MCP writes only when there is no unsaved operator work.
+  useEffect(() => {
+    if (!hasNewerVersion || dirty) return;
+    const next = emailSequenceDraftSchema.parse(initial);
+    setDraft(next);
+    setSaved(JSON.stringify(next));
+    setVersion(initialVersion);
+  }, [hasNewerVersion, dirty, initial, initialVersion]);
   useEffect(() => {
     if (!dirty) return;
     const warn = (event: BeforeUnloadEvent) => {
@@ -303,7 +368,7 @@ function SequenceEditor({
             `${basePath}?tab=sequences&sequence=${result.id}`,
           );
         void client.invalidateQueries({
-          queryKey: orpc.emailSequence.list.key(),
+          queryKey: orpc.emailSequence.key(),
         });
         toast.success("Sequence draft saved");
       },
@@ -343,16 +408,46 @@ function SequenceEditor({
   const sender = emails.data?.sender;
   return (
     <div className="space-y-6">
+      {hasNewerVersion && dirty && (
+        <div role="alert" className="rounded-lg border p-3 text-sm">
+          This sequence was updated elsewhere. Your unsaved draft is preserved.
+          Load the latest version before continuing.
+          <Button
+            variant="outline"
+            className="ml-3"
+            onClick={() => {
+              if (
+                window.confirm(
+                  "Discard your unsaved edits and load the latest saved sequence?",
+                )
+              )
+                loadLatest();
+            }}
+          >
+            Load latest version
+          </Button>
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button variant="ghost" asChild>
           <Link href={`${basePath}?tab=sequences`}>← All sequences</Link>
         </Button>
         <div className="flex items-center gap-3">
+          <SequenceChatStart
+            brandId={brandId}
+            sequenceId={sequenceId}
+            disabled={dirty || save.isPending}
+          />
           <span className="text-xs text-muted-foreground">
             {dirty ? "Unsaved draft" : "Draft saved"}
           </span>
           <Button
-            disabled={save.isPending || createEmail.isPending || !dirty}
+            disabled={
+              save.isPending ||
+              createEmail.isPending ||
+              !dirty ||
+              hasNewerVersion
+            }
             onClick={() => {
               const parsed = emailSequenceDraftSchema.safeParse(draft);
               if (!parsed.success)

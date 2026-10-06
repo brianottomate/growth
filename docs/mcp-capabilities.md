@@ -190,3 +190,14 @@ standalone content posts and paid campaigns. `initiativeRead` exposes `list`,
 `get` and eligible membership `options`; `initiativeWrite` exposes `save`, `link`
 and `unlink`. These are local operations shared with `/app/initiatives`, with
 workspace checks and one typed FK membership table. See [Initiatives](initiatives.md).
+
+## Performance Email sequences
+
+`emailRead` exposes listSequences, getSequence, sequenceEmails, previewSequence and
+sequenceStatus. `emailWrite` exposes saveSequence, prepareSequence, pauseSequence,
+cancelSequenceEnrollment and archiveSequence. These use the same scoped services
+as the Performance Email forms. Edits require the current expectedVersion.
+
+activateSequence, enrollSequence and recoverSequence require in-app approval and
+are omitted from MCP and invoke-growth. Ingest credentials remain UI-only.
+See [delivery semantics](lifecycle-execution.md).

@@ -301,6 +301,28 @@ async function main() {
     "Strategy updates lost action-level idempotency",
   );
 
+  // These actions can send real email. A generic catalog check alone would
+  // not catch an accidental policy change that exposed them without approval.
+  for (const action of [
+    "activateSequence",
+    "enrollSequence",
+    "recoverSequence",
+  ]) {
+    const name = `emailWrite__${action}`;
+    const policy = policyForGrowthTool(name);
+    assert(policy.approval === "user", `${name} must require send approval`);
+    assert(
+      policy.surfaces.includes("overview-chat"),
+      `${name} must be available with in-app approval`,
+    );
+    assert(
+      !policy.surfaces.includes("mcp") &&
+        !policy.surfaces.includes("invoke-growth"),
+      `${name} cannot bypass approval through another transport`,
+    );
+    assert(!(name in MCP_TOOLS), `${name} must not be exposed over MCP`);
+  }
+
   const composed = composeGrowthContext({
     surface: "test",
     maximumCharacters: 100,

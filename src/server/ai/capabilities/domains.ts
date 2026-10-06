@@ -1,4 +1,19 @@
 import {
+  listSequences,
+  getSequence,
+  sequenceEmails,
+  sequenceStatus,
+  previewSequence,
+  saveSequence,
+  archiveSequence,
+  prepareSequence,
+  activateSequence,
+  pauseSequence,
+  enrollSequence,
+  recoverSequence,
+  cancelSequenceEnrollment,
+} from "./email-sequences";
+import {
   listCreativeDocuments,
   readCreativeDocument,
   createCreativeDocumentAction,
@@ -505,8 +520,14 @@ export const contentMediaWrite = growthDomainTool({
 });
 
 export const emailRead = growthDomainTool({
-  description: "Read email drafts and preview warehouse recipient audiences.",
+  description:
+    "Read email drafts, executable sequences and delivery status, and preview warehouse recipient audiences.",
   actions: {
+    listSequences,
+    getSequence,
+    sequenceEmails,
+    sequenceStatus,
+    previewSequence,
     get: EMAIL_TOOLS.getEmailDraft,
     audiences: listEmailAudiencesAction,
     previewAudience: previewEmailAudienceAction,
@@ -516,8 +537,16 @@ export const emailRead = growthDomainTool({
 
 export const emailWrite = growthDomainTool({
   description:
-    "Create, revise, deliberately generate, or permanently delete an email draft; save and compile warehouse recipient audiences without sending.",
+    "Plan and edit email content, audiences and sequences; manage sequence delivery with explicit approval for actions that can send.",
   actions: {
+    saveSequence,
+    archiveSequence,
+    prepareSequence,
+    activateSequence,
+    pauseSequence,
+    enrollSequence,
+    recoverSequence,
+    cancelSequenceEnrollment,
     saveAudience: saveEmailAudienceAction,
     compileAudience: compileEmailAudienceAction,
     createSlot: EMAIL_TOOLS.createEmailSlot,

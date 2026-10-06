@@ -221,9 +221,16 @@ suppress native lifecycle records. Soft bounces update receipts without permanen
 suppressing the recipient. Profile withdrawal and the token-based local preference
 endpoint remain native-lifecycle-only controls; they do not update other providers.
 
-New execution writes are exposed in the authenticated form router, not through
-AI/MCP. Existing AI planning actions remain planning-only; future connector
-exposure must go through the canonical capability policy and approval runtime.
+The canonical `emailRead` and `emailWrite` actions support sequence planning,
+content linking, previews, frozen revisions, status, pausing, cancellation and
+archiving in chat and MCP. Activation, single-recipient enrollment and queue
+recovery can send real emails: they require the in-app approval card and are
+excluded from MCP/invoke-growth until those transports have an approval handshake.
+Ingest-token rotation remains form-only so secrets never enter chat receipts.
+Recent enrollment status omits recipient email addresses; it is not a lifetime
+aggregate. Shape opens a brand-scoped discussion and never itself authorizes sending.
+The editor reconciles saved agent changes while preserving unsaved local drafts.
+Existing lifecycle strategy pages are unchanged.
 
 ## Provider boundaries
 

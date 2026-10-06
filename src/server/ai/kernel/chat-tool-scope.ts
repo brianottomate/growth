@@ -104,6 +104,7 @@ export function createChatToolScope(input: {
   performance?: boolean;
   pitch?: boolean;
   content?: boolean;
+  email?: boolean;
   continuation: UIMessage;
   focus?:
     | "catalog"
@@ -118,6 +119,7 @@ export function createChatToolScope(input: {
   const selected = new Set<Domain>();
   let performanceExpanded = false;
   if (input.pitch) selected.add("research");
+  if (input.email) selected.add("email");
   if (/\/initiatives(\/|$)/.test(input.pagePath ?? "")) {
     selected.add("performance");
     selected.add("content");

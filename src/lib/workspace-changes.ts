@@ -27,7 +27,7 @@ export function workspaceDomains(toolName: string): string[] {
       "website",
     ];
   if (name.startsWith("email") || name === "newsletterAgent")
-    return ["newsletter", "content"];
+    return ["newsletter", "emailSequence", "content"];
   if (name === "blogAgent") return ["blog", "content"];
   if (name.startsWith("lifecycle")) return ["lifecycle"];
   if (name.startsWith("leads")) return ["leads"];

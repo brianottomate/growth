@@ -51,10 +51,7 @@ export type LifecycleExecutionSettings = z.infer<
 export const lifecycleEnrollmentSchema = z.object({
   eventId: z.string().trim().min(1).max(200),
   eventName: z.string().trim().min(1).max(100),
-  email: z
-    .email()
-    .max(254)
-    .transform((v) => v.toLowerCase()),
+  email: z.email().max(254).toLowerCase(),
   attributes: lifecycleAttributesSchema.default({}),
   consent: z.object({
     granted: z.literal(true),
@@ -65,10 +62,7 @@ export const lifecycleEnrollmentSchema = z.object({
 export type LifecycleEnrollment = z.infer<typeof lifecycleEnrollmentSchema>;
 
 export const lifecycleProfileSchema = z.object({
-  email: z
-    .email()
-    .max(254)
-    .transform((v) => v.toLowerCase()),
+  email: z.email().max(254).toLowerCase(),
   attributes: lifecycleAttributesSchema,
   observedAt: z.iso.datetime({ offset: true }),
   // A profile update can withdraw consent, never silently restore it.

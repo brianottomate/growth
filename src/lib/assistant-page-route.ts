@@ -18,7 +18,14 @@ export function assistantPageRoute(path: string) {
       pathname,
     );
   const account = /^\/app\/performance\/(perf_[^/]+)$/.exec(pathname);
+  const sequence =
+    /^\/app\/performance\/(?:clients|brands)\/[^/]+\/newsletters$/.test(
+      pathname,
+    )
+      ? new URLSearchParams(path.split("?")[1]?.split("#")[0]).get("sequence")
+      : null;
   return {
+    emailSequenceId: sequence && sequence !== "new" ? sequence : undefined,
     initiativeId: /^\/app\/initiatives\/([^/]+)$/.exec(pathname)?.[1],
     brandSlug: brand?.[1],
     campaignId: campaign?.[1],

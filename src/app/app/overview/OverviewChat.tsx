@@ -21,7 +21,7 @@ import { useAssistantVoice } from "./useAssistantVoice";
 import { useAssistantDictation } from "./useAssistantDictation";
 import { ChatQueue } from "./ChatQueue";
 import { ChatNextOptions } from "./ChatNextOptions";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useChat } from "@ai-sdk/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -263,6 +263,7 @@ export function OverviewChat({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const pageSearchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [input, setInput] = useState(seedPrompt ?? "");
   // Seed once per deep link. Without the ref, editing the prefill and then
@@ -291,7 +292,9 @@ export function OverviewChat({
     workContext,
     campaignContext,
     catalogContext,
-    pagePath: pathname,
+    pagePath: pageSearchParams.size
+      ? `${pathname}?${pageSearchParams.toString()}`
+      : pathname,
     contextMode,
   };
 
@@ -1760,6 +1763,15 @@ function ApprovalCard({
 }) {
   const inp = input as
     | {
+        sequenceId?: string;
+        expectedRevisionId?: string;
+        afterId?: string;
+        enrollment?: {
+          email?: string;
+          eventName?: string;
+          eventId?: string;
+          consent?: { source?: string; recordedAt?: string };
+        };
         title?: string;
         hook?: string;
         platforms?: string[];
@@ -1778,6 +1790,28 @@ function ApprovalCard({
         posts?: Array<{ text?: string }>;
       }
     | undefined;
+  const sequenceApproval = (
+    {
+      "emailWrite.activateSequence": {
+        heading: "Activate this email sequence?",
+        label: "Activate delivery",
+        detail:
+          "Existing queued work and new events can send real emails through Postmark.",
+      },
+      "emailWrite.enrollSequence": {
+        heading: "Enroll this recipient and allow emails?",
+        label: "Enroll and allow sending",
+        detail:
+          "This can send the first email immediately. Confirm the recipient and consent evidence below.",
+      },
+      "emailWrite.recoverSequence": {
+        heading: "Recover queued email delivery?",
+        label: "Recover and allow sending",
+        detail:
+          "Requeues up to 50 active enrollments and can send real emails. Uncertain provider attempts remain held for review.",
+      },
+    } as Record<string, { heading: string; label: string; detail: string }>
+  )[toolName];
   const isAudienceWrite =
     toolName === "audienceWrite.createTarget" ||
     toolName === "audienceWrite.updateTarget";
@@ -1878,8 +1912,30 @@ function ApprovalCard({
     <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3">
       <div className="flex items-center gap-1.5 text-xs font-medium text-amber-500">
         <ShieldQuestion className="h-3.5 w-3.5" />
-        {heading}
+        {sequenceApproval?.heading ?? heading}
       </div>
+      {sequenceApproval && (
+        <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+          <p>{sequenceApproval.detail}</p>
+          <p>Sequence: {inp?.sequenceId}</p>
+          {inp?.expectedRevisionId && (
+            <p>Reviewed revision: {inp.expectedRevisionId}</p>
+          )}
+          {inp?.afterId && <p>Continue after enrollment: {inp.afterId}</p>}
+          {inp?.enrollment && (
+            <>
+              <p>Recipient: {inp.enrollment.email}</p>
+              <p>
+                Event: {inp.enrollment.eventName} · {inp.enrollment.eventId}
+              </p>
+              <p>
+                Consent: {inp.enrollment.consent?.source} ·{" "}
+                {inp.enrollment.consent?.recordedAt}
+              </p>
+            </>
+          )}
+        </div>
+      )}
       {(inp?.title || inp?.name) && (
         <p className="mt-1.5 text-sm font-medium">{inp.title ?? inp.name}</p>
       )}
@@ -1934,7 +1990,7 @@ function ApprovalCard({
         <div className="mt-2 flex gap-2">
           <Button size="sm" onClick={() => onApprove(true)}>
             <Check className="h-3.5 w-3.5" />
-            {primaryLabel}
+            {sequenceApproval?.label ?? primaryLabel}
           </Button>
           <Button size="sm" variant="outline" onClick={() => onApprove(false)}>
             <X className="h-3.5 w-3.5" />
