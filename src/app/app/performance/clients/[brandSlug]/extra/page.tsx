@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import { ClientPageActivity } from "../ClientPageActivity";
 import { loadPerformanceBrand } from "../_data";
+import { OnboardingEmailCard } from "./OnboardingEmailCard";
 
 export const metadata: Metadata = { title: "Extra · Wander Performance" };
 export const dynamic = "force-dynamic";
@@ -23,6 +25,9 @@ export default async function PerformanceBrandExtraPage({
       <div className="space-y-1">
         <h2 className="text-lg font-semibold">Extra</h2>
       </div>
+      <Suspense fallback={null}>
+        <OnboardingEmailCard brandId={brand.id} orgId={org.id} />
+      </Suspense>
       <ClientPageActivity brandId={brand.id} orgId={org.id} />
     </div>
   );
