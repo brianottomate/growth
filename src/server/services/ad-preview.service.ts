@@ -18,12 +18,14 @@ import {
 } from "@/lib/ad-preview";
 import type { CatalogDraft, CatalogHome } from "@/lib/catalog-studio";
 import { freezeApprovedAd } from "./ad-approval.service";
+import { ensureBrandConnect } from "./brand-connect.service";
 
 /**
  * The link is self-contained: brand, one campaign, one catalog export and an
- * expiry, signed with a key derived from the auth secret. Nothing is stored,
- * so there is no table and no migration, and also no revoking a single link
- * before it expires.
+ * expiry, signed with a key derived from the auth secret and the brand's
+ * connect token. Nothing is stored, so there is no table and no migration.
+ * Regenerating the brand's connect link revokes every preview link it has,
+ * the same way it revokes the connect link itself.
  */
 type PreviewClaims = {
   b: string;
@@ -35,38 +37,48 @@ type PreviewClaims = {
 function signingKey() {
   const secret = env.BETTER_AUTH_SECRET;
   if (!secret) throw new Error("BETTER_AUTH_SECRET is not configured");
-  return createHmac("sha256", secret).update("growth:ad-preview:v2").digest();
+  return createHmac("sha256", secret).update("growth:ad-preview:v3").digest();
 }
-function signature(payload: string) {
-  return createHmac("sha256", signingKey()).update(payload).digest();
+function signature(payload: string, brandToken: string) {
+  return createHmac("sha256", signingKey())
+    .update(`${payload}.${brandToken}`)
+    .digest();
 }
-function signToken(claims: PreviewClaims) {
+function signToken(claims: PreviewClaims, brandToken: string) {
   const payload = Buffer.from(JSON.stringify(claims)).toString("base64url");
-  return `${payload}.${signature(payload).toString("base64url")}`;
+  return `${payload}.${signature(payload, brandToken).toString("base64url")}`;
 }
 /** The claims of a genuine, unexpired link, or null. */
-function readToken(token: string): PreviewClaims | null {
+async function readToken(token: string): Promise<PreviewClaims | null> {
   const [payload, sig, extra] = token.split(".");
   if (!payload || !sig || extra !== undefined || token.length > 1000)
     return null;
-  const given = Buffer.from(sig, "base64url");
-  const expected = signature(payload);
-  if (given.length !== expected.length || !timingSafeEqual(given, expected))
-    return null;
+  let claims: PreviewClaims;
   try {
-    const claims = JSON.parse(
+    claims = JSON.parse(
       Buffer.from(payload, "base64url").toString("utf8"),
     ) as PreviewClaims;
-    if (
-      typeof claims.b !== "string" ||
-      typeof claims.e !== "number" ||
-      claims.e < Date.now()
-    )
-      return null;
-    return claims;
   } catch {
     return null;
   }
+  if (
+    typeof claims.b !== "string" ||
+    typeof claims.e !== "number" ||
+    claims.e < Date.now()
+  )
+    return null;
+  // The claims are untrusted until the signature checks out against the
+  // brand's current connect token; a missing brand or token fails it.
+  const brand = await db.query.brandTable.findFirst({
+    where: and(eq(brandTable.id, claims.b), isNull(brandTable.deletedAt)),
+    columns: { connectToken: true },
+  });
+  if (!brand?.connectToken) return null;
+  const given = Buffer.from(sig, "base64url");
+  const expected = signature(payload, brand.connectToken);
+  if (given.length !== expected.length || !timingSafeEqual(given, expected))
+    return null;
+  return claims;
 }
 
 /** The mark the feed mocks wear, resolved the way the studio resolves it. */
@@ -185,12 +197,16 @@ export async function createAdPreviewLink(
     if (!exported) throw new Error("Catalog export not found for this brand");
   }
   const expiresAt = Date.now() + input.expiresInDays * 86_400_000;
-  const token = signToken({
-    b: brand.id,
-    c: input.campaignId,
-    x: input.catalogExportId,
-    e: expiresAt,
-  });
+  const { token: brandToken } = await ensureBrandConnect(brand.id);
+  const token = signToken(
+    {
+      b: brand.id,
+      c: input.campaignId,
+      x: input.catalogExportId,
+      e: expiresAt,
+    },
+    brandToken,
+  );
   return {
     url: `${env.NEXT_PUBLIC_BASE_URL}/ad-preview/${token}`,
     expiresAt: new Date(expiresAt).toISOString(),
@@ -241,7 +257,7 @@ async function frozenCatalog(brandId: string, exportId: string) {
  * the catalog is the export, which never changes.
  */
 export async function loadAdPreviewPage(token: string) {
-  const claims = readToken(token);
+  const claims = await readToken(token);
   if (!claims) return null;
   const brand = await db.query.brandTable.findFirst({
     where: and(eq(brandTable.id, claims.b), isNull(brandTable.deletedAt)),

@@ -68,10 +68,10 @@ export function ClientConnectCard({ brandId }: { brandId: string }) {
           before anything is signed, the intake form the client fills in, the
           Leadsie grant that hands us their ad accounts, and the connect page
           they authorise accounts on here. The token is the credential for the
-          intake and connect links, so regenerating it revokes those you have
-          already sent. The pitch reads off the slug and shows only what is
-          already public on the client&rsquo;s own site. The grant is one
-          Wander-wide link, which the token does not govern at all.
+          intake, connect and ad preview links, so regenerating it revokes those
+          you have already sent. The pitch reads off the slug and shows only
+          what is already public on the client&rsquo;s own site. The grant is
+          one Wander-wide link, which the token does not govern at all.
         </p>
       </div>
 
@@ -206,7 +206,7 @@ export function ClientConnectCard({ brandId }: { brandId: string }) {
               onClick={() => {
                 if (
                   window.confirm(
-                    "Regenerate the link? The one you already sent stops working.",
+                    "Regenerate the link? The one you already sent stops working, and so do this brand's ad preview links.",
                   )
                 ) {
                   regenerate.mutate({ brandId });
