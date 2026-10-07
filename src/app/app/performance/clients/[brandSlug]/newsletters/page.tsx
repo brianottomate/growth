@@ -5,6 +5,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { EmailAudiencesClient } from "@/app/app/newsletters/audiences/EmailAudiencesClient";
 import { BrandEmailStyle } from "@/app/app/newsletters/BrandEmailStyle";
+import { NewsletterCapture } from "@/app/app/newsletters/NewsletterCapture";
 import { NewslettersView } from "@/app/app/newsletters/NewslettersView";
 
 import { loadPerformanceBrand } from "../_data";
@@ -68,19 +69,22 @@ export default async function PerformanceBrandNewslettersPage({
     />
   );
   const settings = (
-    <EmailDnsSetup
-      brandId={brand.id}
-      rootDomain={setup?.rootDomain ?? suggestedEmailRoot(brand.website)}
-      sendingDomain={setup?.sendingDomain}
-      styleAction={
-        <BrandEmailStyle
-          brandId={brand.id}
-          brandName={brand.name}
-          theme={sender?.emailSender?.theme}
-          copyGuide={sender?.emailSender?.copyGuide}
-        />
-      }
-    />
+    <div className="space-y-6">
+      <EmailDnsSetup
+        brandId={brand.id}
+        rootDomain={setup?.rootDomain ?? suggestedEmailRoot(brand.website)}
+        sendingDomain={setup?.sendingDomain}
+        styleAction={
+          <BrandEmailStyle
+            brandId={brand.id}
+            brandName={brand.name}
+            theme={sender?.emailSender?.theme}
+            copyGuide={sender?.emailSender?.copyGuide}
+          />
+        }
+      />
+      <NewsletterCapture brands={[brand]} brand={brand} />
+    </div>
   );
   return (
     <div className="space-y-6">
@@ -118,6 +122,7 @@ export default async function PerformanceBrandNewslettersPage({
         settings
       ) : (
         <NewslettersView
+          showCapture={false}
           brands={[{ id: brand.id, name: brand.name, slug: brand.slug }]}
           brand={{ id: brand.id, name: brand.name, slug: brand.slug }}
           basePath={basePath}
