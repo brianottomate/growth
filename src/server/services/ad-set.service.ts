@@ -15,7 +15,7 @@ import { waitUntil } from "@vercel/functions";
 
 import { type BrandMarkets } from "@/lib/markets";
 
-import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, ne } from "drizzle-orm";
 
 import {
   adTable,
@@ -144,7 +144,6 @@ async function requireOwnedAd(
       422,
       "Approved ads are final. Edit it to make a draft that replaces it.",
     );
-  if (!allowStudio) await assertAdNotPushed(ad.id);
   if (!allowStudio && "media" in ad.content && ad.content.ideaStudio) {
     throw new AdSetError(
       422,
@@ -946,9 +945,6 @@ export async function setAdStatus(input: {
       "Approved ads are final. Edit it to make a draft that replaces it.",
     );
   }
-  if (!input.expectedUpdatedAt)
-    throw new Error("Review the current ad before changing its status.");
-  const version = new Date(input.expectedUpdatedAt);
   if (input.status !== "approved") {
     const saved = await db
       .update(adTable)
@@ -957,12 +953,22 @@ export async function setAdStatus(input: {
           ? { status: "ready", readyAt: new Date(), readyBy: input.userId }
           : { status: "drawn", readyAt: null, readyBy: null },
       )
-      .where(and(eq(adTable.id, ad.id), eq(adTable.updatedAt, version)))
+      .where(
+        and(
+          eq(adTable.id, ad.id),
+          ne(adTable.status, "approved"),
+          input.expectedUpdatedAt
+            ? eq(adTable.updatedAt, new Date(input.expectedUpdatedAt))
+            : undefined,
+        ),
+      )
       .returning({ id: adTable.id });
     if (!saved.length)
       throw new Error("This ad changed. Refresh before changing its status.");
     return { adId: ad.id, status: input.status };
   }
+  if (!input.expectedUpdatedAt)
+    throw new Error("Review the current ad before approving it.");
   if (!input.userId) throw new Error("Approval needs a signed-in person.");
   const userId = input.userId;
   if (
@@ -1004,7 +1010,12 @@ export async function setAdStatus(input: {
     const saved = await db
       .update(adTable)
       .set({ status: "approved", approvedAt: new Date(), approvedBy: userId })
-      .where(and(eq(adTable.id, ad.id), eq(adTable.updatedAt, version)))
+      .where(
+        and(
+          eq(adTable.id, ad.id),
+          eq(adTable.updatedAt, new Date(input.expectedUpdatedAt)),
+        ),
+      )
       .returning({ id: adTable.id });
     if (!saved.length)
       throw new Error("This ad changed. Refresh before approving.");
@@ -1427,6 +1438,7 @@ export async function saveAdSection(
   let bookingTargetId = ad.bookingTargetId;
   const section = input.section;
   if (section.kind === "destination") {
+    let linkUrl = section.linkUrl;
     if (
       section.bookingTargetId &&
       section.bookingTargetId !== ad.bookingTargetId
@@ -1437,15 +1449,12 @@ export async function saveAdSection(
       );
       if (resolved.target.brandId !== ad.brandId)
         throw new Error("Booking target belongs to another brand.");
-      if (resolved.url !== section.linkUrl)
-        throw new Error(
-          "This booking target changed. Choose it again before saving.",
-        );
+      linkUrl = resolved.url;
     }
     bookingTargetId = section.bookingTargetId;
     content = {
       ...content,
-      linkUrl: section.linkUrl || undefined,
+      linkUrl: linkUrl || undefined,
       ...("media" in content
         ? { callToAction: section.callToAction || undefined }
         : {}),

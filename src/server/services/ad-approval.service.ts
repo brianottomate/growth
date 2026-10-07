@@ -17,6 +17,7 @@ import {
   ideaAwaitingArtwork,
   ideaImagesSaved,
   ideaPreviewUrl,
+  ideaSource,
   projectIdea,
   type IdeaStudio,
 } from "@/lib/ad-idea-studio";
@@ -239,6 +240,27 @@ export async function approveImageAd(input: {
   document.exportShapes = [...document.shapes];
   if (!document.cards.length || ideaAwaitingArtwork(document))
     throw new Error("Add artwork for every included size before approving.");
+  // The one place sources are vouched for: approval is what lets them render.
+  const sources = new Map(
+    document.cards.flatMap((card) =>
+      document.shapes.flatMap((shape) => {
+        const source = ideaSource(card, shape);
+        return source ? [[source.assetId ?? source.url, source] as const] : [];
+      }),
+    ),
+  );
+  for (const source of sources.values())
+    await resolveCompositionContext(
+      input.userId,
+      compositionPreviewSchema.parse({
+        brandId: brand.id,
+        templateId: "photo-only",
+        formatId: "portrait",
+        title: "",
+        sourceMediaAssetId: source.assetId,
+      }),
+      { sourceUrl: source.assetId ? null : source.url },
+    );
   if (
     !document.copy.headline.trim() ||
     !document.copy.body.trim() ||

@@ -54,7 +54,6 @@ import {
   chatModelOutput,
 } from "@/server/ai/kernel/chat-context";
 import { isChatUtilityTool } from "@/lib/chat-utility-tools";
-import { createChatWriteGate } from "@/server/ai/kernel/chat-write-gate";
 import { createChatToolScope } from "@/server/ai/kernel/chat-tool-scope";
 import { chatCreativePreview } from "@/server/ai/kernel/chat-creative-preview";
 import { creativeEditingSection } from "@/server/ai/prompts/creative-editing";
@@ -919,7 +918,6 @@ export async function POST(req: Request): Promise<Response> {
       model: MODEL,
       contextManifest: context.manifest,
     });
-    const writeGate = createChatWriteGate();
     const runtimeTools: import("@/server/ai/kernel/operations").GrowthCatalog =
       {
         ...NATIVE_TOOLS,
@@ -934,9 +932,8 @@ export async function POST(req: Request): Promise<Response> {
       },
       runId,
       surface: "overview-chat",
-      beforeExecute: async (name, value) => {
+      beforeExecute: async () => {
         await assertChatTurn(claimedThreadId, turnId);
-        writeGate.beforeExecute(name, value);
       },
     });
 
@@ -1019,7 +1016,6 @@ export async function POST(req: Request): Promise<Response> {
           maxOutputTokens: GROWTH_MAX_OUTPUT_TOKENS,
           prepareStep: async ({ messages, stepNumber }) => {
             await assertChatTurn(claimedThreadId, turnId);
-            writeGate.nextStep();
             const corrections = await readChatSteering(claimedThreadId, turnId);
             steeringInputIds.push(...corrections.map((message) => message.id));
             return {

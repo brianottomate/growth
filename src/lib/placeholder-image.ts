@@ -24,7 +24,6 @@ export type PlaceholderSpec = {
 };
 
 export const PLACEHOLDER_PATH = "/api/placeholder";
-const PRODUCTION_ORIGIN = "https://growth-red.vercel.app";
 
 export function readPlaceholderParams(params: URLSearchParams) {
   const format = params.get("format");
@@ -38,36 +37,17 @@ export function readPlaceholderParams(params: URLSearchParams) {
   };
 }
 
-/** Absolute so server-side readers (push, copy calls) can fetch it too. */
-export function placeholderImage(
-  spec: PlaceholderSpec,
-  origin = PRODUCTION_ORIGIN,
-): MediaItem {
+export function placeholderImage(spec: PlaceholderSpec): MediaItem {
   const format = spec.format ?? "square";
   const params = new URLSearchParams({ title: spec.title, format });
   if (spec.description) params.set("description", spec.description);
   if (spec.prompt) params.set("prompt", spec.prompt);
   const { width, height } = PLACEHOLDER_FORMATS[format];
-  return {
-    url: `${origin}${PLACEHOLDER_PATH}?${params.toString()}`,
-    type: "image",
-    width,
-    height,
-  };
+  return { url: `${PLACEHOLDER_PATH}?${params}`, type: "image", width, height };
 }
 
-/** Growth's own placeholder route only: relative, or on the production origin. */
-export function isPlaceholderUrl(url: string) {
-  try {
-    const parsed = new URL(url, PRODUCTION_ORIGIN);
-    return (
-      parsed.origin === PRODUCTION_ORIGIN &&
-      parsed.pathname === PLACEHOLDER_PATH
-    );
-  } catch {
-    return false;
-  }
-}
+export const isPlaceholderUrl = (url: string) =>
+  url.startsWith(`${PLACEHOLDER_PATH}?`);
 
 const FORMAT_FOR_SHAPE: Record<string, PlaceholderFormat> = {
   square: "square",
@@ -78,9 +58,7 @@ const FORMAT_FOR_SHAPE: Record<string, PlaceholderFormat> = {
 
 /** The same placeholder brief, cut to another ad shape. */
 export function placeholderForShape(url: string, shape: string) {
-  const parsed = new URL(url, PRODUCTION_ORIGIN);
-  parsed.searchParams.set("format", FORMAT_FOR_SHAPE[shape] ?? "square");
-  return url.startsWith("/")
-    ? `${parsed.pathname}${parsed.search}`
-    : parsed.toString();
+  const params = new URLSearchParams(url.slice(url.indexOf("?") + 1));
+  params.set("format", FORMAT_FOR_SHAPE[shape] ?? "square");
+  return `${PLACEHOLDER_PATH}?${params}`;
 }

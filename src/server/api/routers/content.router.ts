@@ -753,19 +753,17 @@ export const contentRouter = {
     .input(
       z.object({
         contentPostId: z.string(),
-        media: z
-          .array(
-            z.object({
-              url: z.string().max(2000),
-              type: z.enum(["image", "video", "carousel"]),
-              width: z.number().int().positive().optional(),
-              height: z.number().int().positive().optional(),
-              thumbnail: z.string().max(2000).optional(),
-              assetId: z.string().optional(),
-              derivedFrom: z.string().optional(),
-            }),
-          )
-          .max(50),
+        media: z.array(
+          z.object({
+            url: z.string().max(2000),
+            type: z.enum(["image", "video", "carousel"]),
+            width: z.number().int().positive().optional(),
+            height: z.number().int().positive().optional(),
+            thumbnail: z.string().max(2000).optional(),
+            assetId: z.string().optional(),
+            derivedFrom: z.string().optional(),
+          }),
+        ),
       }),
     )
     .handler(async ({ context: ctx, input }) => {

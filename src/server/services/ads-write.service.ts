@@ -1797,7 +1797,7 @@ export async function previewDraftAd(
   if (!ad) throw new Error("Ad not found");
   const brand = await db.query.brandTable.findFirst({
     where: eq(brandTable.id, ad.brandId),
-    columns: { slug: true, organizationId: true },
+    columns: { slug: true, organizationId: true, website: true },
   });
   if (brand?.organizationId !== context.organizationId || !brand.slug) {
     throw new Error("No access to this ad");
@@ -1816,14 +1816,10 @@ export async function previewDraftAd(
       "Video preview needs an uploaded video id, which a pre-push draft does not have — push paused and preview from Ads Manager",
     );
   }
-  const link = content.linkUrl ?? ad.campaign?.landingUrl;
-  if (!link) {
-    // Same rule as the push: a preview of a link the push would refuse is a
-    // preview of an ad that cannot exist.
-    throw new Error(
-      "Set a landing URL on the campaign, or a link URL on the ad",
-    );
-  }
+  // The push insists on a real link; a preview can stand on the brand's site.
+  const link = content.linkUrl ?? ad.campaign?.landingUrl ?? brand.website;
+  if (!link)
+    throw new Error("Add a website to the brand, or a link URL on the ad");
   const destination = await requireAdDestination({
     organizationId: context.organizationId,
     brandSlug: brand.slug,

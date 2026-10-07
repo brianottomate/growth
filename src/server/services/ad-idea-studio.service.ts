@@ -1,5 +1,4 @@
 import type { DraftAdResult } from "@/server/ai/capabilities/outputs/ads";
-import { isPlaceholderUrl } from "@/lib/placeholder-image";
 import "server-only";
 import { and, eq, isNull } from "drizzle-orm";
 import type { z } from "zod";
@@ -8,10 +7,8 @@ import {
   projectIdea,
   withIdeaPool,
 } from "@/lib/ad-idea-studio";
-import { compositionPreviewSchema } from "@/lib/compositions";
 import { db } from "@/server/db";
 import { adTable, brandTable } from "@/server/db/schema";
-import { resolveCompositionContext } from "./composition.service";
 import { assertAdNotPushed } from "./ad-approval.service";
 import { resolveBookingTarget } from "./home-groups.service";
 
@@ -56,33 +53,11 @@ export async function saveAdIdea(
     const resolved = await resolveBookingTarget(bookingTargetId, context.orgId);
     if (resolved.target.brandId !== brand.id)
       throw new Error("Booking target belongs to another brand.");
-    if (resolved.url !== document.copy.linkUrl)
-      throw new Error(
-        "This booking target changed. Choose it again before saving.",
-      );
+    document.copy.linkUrl = resolved.url;
+    for (const copy of Object.values(document.copyOverrides))
+      if (copy?.linkUrl) copy.linkUrl = resolved.url;
   }
 
-  // Validate source ownership even while the draft has incomplete overlay text.
-  // Placeholders are briefs served by Growth itself, not photos to vouch for.
-  const sources = (document.pool ?? []).filter(
-    (source) => source.assetId || !isPlaceholderUrl(source.url),
-  );
-  for (let start = 0; start < sources.length; start += 8) {
-    await Promise.all(
-      sources.slice(start, start + 8).map(async (source) => {
-        const spec = compositionPreviewSchema.parse({
-          brandId: brand.id,
-          templateId: "photo-only",
-          formatId: "portrait",
-          title: "",
-          sourceMediaAssetId: source.assetId,
-        });
-        await resolveCompositionContext(context.userId, spec, {
-          sourceUrl: source.assetId ? null : source.url,
-        });
-      }),
-    );
-  }
   if (ad.content.ideaStudio?.approval)
     throw new Error(
       "Approved ads are final. Edit it to make a draft that replaces it.",

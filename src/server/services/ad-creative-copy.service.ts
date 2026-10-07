@@ -243,11 +243,6 @@ export async function draftAdCreativeCopy(input: {
     throw new Error(
       "Approved ads are final. Edit it to make a draft that replaces it.",
     );
-  if (
-    new Date(context.ad.updatedAt).getTime() !==
-    new Date(input.expectedUpdatedAt).getTime()
-  )
-    throw new Error("This ad changed elsewhere. Reload before rewriting copy.");
   const { output, problems } = await runCopyRequest(
     await adCreativeCopyRequest(context, input.scope),
   );

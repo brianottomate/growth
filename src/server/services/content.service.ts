@@ -6,10 +6,7 @@ import {
   getPlatformFormat,
   platformFormatsFor,
 } from "../content/formats";
-import {
-  platformTextLength,
-  threadFormatForPlatform,
-} from "@/lib/platform-thread";
+import { threadFormatForPlatform } from "@/lib/platform-thread";
 import { isStoryFormat, sequenceScheduledAt } from "@/lib/platform-sequence";
 import { firstCommentDraftPatch, firstCommentLimit } from "@/lib/first-comment";
 import {
@@ -420,19 +417,6 @@ async function saveSpotThread(
       throw new Error("Every Story frame needs exactly one image or video.");
     }
 
-    const characterLimit =
-      root.platform === "x" ? 280 : root.platform === "threads" ? 500 : null;
-    if (
-      characterLimit &&
-      input.items.some(
-        (item) =>
-          platformTextLength(item.text ?? "", root.platform) > characterLimit,
-      )
-    ) {
-      throw new Error(
-        `${root.platform === "x" ? "X" : "Threads"} posts must be ${characterLimit} characters or fewer.`,
-      );
-    }
     for (const item of input.items) {
       if (
         item.textDocument &&

@@ -11,10 +11,8 @@ Other formats reuse their existing editors in this workspace.
 An ad moves draft → ready → approved, and approved is final.
 
 - **Draft** (`status = drawn`): editable from the campaign or the Ad studio.
-- **Ready** (`ready_at`, `ready_by`): its author marked it done for review. Any
-  edit to its content, placements, name, home, booking target or platforms sends
-  it back to draft. A database trigger (`growth_ad_ready_clears_on_edit`) does
-  this, so every write path obeys it.
+- **Ready** (`ready_at`, `ready_by`): its author marked it done for review.
+  Saving the ad from the studio or a set sends it back to draft.
 - **Approved** (`approved_at`, `approved_by`): the sign-off. The ad never changes
   again. For image ads the images every included size needs are rendered and saved
   in the background (`freezeApprovedAd`); the push and previews call it too, so

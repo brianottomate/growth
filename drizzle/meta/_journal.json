@@ -85,6 +85,13 @@
       "when": 1791330697335,
       "tag": "0010_catalog_card_ad_copy",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791333640400,
+      "tag": "0011_drop_redundant_triggers",
+      "breakpoints": true
     }
   ]
 }

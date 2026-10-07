@@ -1010,11 +1010,6 @@ export const prepareContentMediaUploads = growthAction({
   }),
   execute: async ({ contentPostId, files }, ctx) => {
     const content = await requireContentWorkItem(contentPostId, ctx);
-    if ((content.media?.length ?? 0) + files.length > 50) {
-      throw new Error(
-        "This upload would exceed the 50-item content media pool.",
-      );
-    }
     const uploads = [];
     for (const file of files) {
       const prepared = await MediaService.createR2Upload({
@@ -1058,15 +1053,6 @@ export const finishContentMediaUploads = growthAction({
   }),
   execute: async ({ contentPostId, uploads }, ctx) => {
     const content = await requireContentWorkItem(contentPostId, ctx);
-    if (
-      (content.media?.length ?? 0) +
-        new Set(uploads.map((upload) => upload.mediaId)).size >
-      50
-    ) {
-      throw new Error(
-        "This upload would exceed the 50-item content media pool.",
-      );
-    }
     const items = [];
     for (const upload of uploads) {
       const asset = await MediaService.verifyR2Upload(upload.mediaId);
@@ -1131,11 +1117,6 @@ export const importRemoteImagesToContent = growthAction({
   }),
   execute: async ({ contentPostId, images }, ctx) => {
     const content = await requireContentWorkItem(contentPostId, ctx);
-    if ((content.media?.length ?? 0) + images.length > 50) {
-      throw new Error(
-        "This import would exceed the 50-item content media pool.",
-      );
-    }
     const items = [];
     for (const image of images) {
       const asset = await MediaService.importRemoteImage({

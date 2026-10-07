@@ -163,11 +163,6 @@ export const importDriveFilesToContent = growthAction({
   }),
   execute: async ({ contentPostId, fileIds }, ctx) => {
     const content = await requireContentWorkItem(contentPostId, ctx);
-    if ((content.media?.length ?? 0) + fileIds.length > 50) {
-      throw new Error(
-        "This import would exceed the 50-item content media pool.",
-      );
-    }
 
     const { imported, failures } = await GoogleDriveService.importFiles({
       userId: ctx.userId,

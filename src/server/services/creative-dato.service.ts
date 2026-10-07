@@ -132,8 +132,6 @@ export async function transferDatoDocument(input: {
           ),
         };
       }
-      if (!itemId && !image)
-        throw new Error("A new Dato draft needs a hero image.");
       const attributes = {
         title: content.title,
         url: content.slug,

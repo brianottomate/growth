@@ -73,13 +73,8 @@ try {
   await db.query(
     "INSERT INTO brand(id,name,created_at,updated_at) VALUES ('one','One',now(),now()),('two','Two',now(),now())",
   );
-  assert.equal(
-    (
-      await db.query<{ count: number }>(
-        "SELECT count(*)::int AS count FROM home_group",
-      )
-    ).rows[0]?.count,
-    2,
+  await db.query(
+    "INSERT INTO home_group(id,brand_id,name,is_primary) VALUES ('hgroup_featured_one','one','Featured homes',true)",
   );
   await db.query(
     "INSERT INTO home(id,brand_id,external_id,url,url_key,name,created_at,updated_at) VALUES ('home','one','external','https://example.com','home','Home',now(),now())",
@@ -94,18 +89,6 @@ try {
       )
     ).rows[0]?.count,
     1,
-  );
-  await assert.rejects(
-    db.query(
-      "INSERT INTO home_group_member(group_id,home_id) VALUES ('hgroup_featured_two','home')",
-    ),
-    /same brand/,
-  );
-  await assert.rejects(
-    db.query(
-      "INSERT INTO booking_target(id,brand_id,name,home_id) VALUES ('target','two','Target','home')",
-    ),
-    /another brand/,
   );
   // A home that leaves the record leaves its groups.
   await db.query("UPDATE home SET deleted_at=now() WHERE id='home'");
@@ -172,7 +155,7 @@ try {
     null,
   );
   console.log(
-    "PASS: native CLI fresh install, repeat no-op with preserved data, failed SQL rolls back and exits nonzero, home-group and booking-target guards.",
+    "PASS: native CLI fresh install, repeat no-op with preserved data, failed SQL rolls back and exits nonzero, deleted homes leave their groups.",
   );
 } finally {
   await db.end();

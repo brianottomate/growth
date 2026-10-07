@@ -26,7 +26,6 @@ import {
   type BookingTargetInput,
 } from "@/lib/booking-target";
 import { projectIdea } from "@/lib/ad-idea-studio";
-import { assertAdNotPushed } from "./ad-approval.service";
 
 export async function groupBrand(brandId: string, orgId: string) {
   const brand = await db.query.brandTable.findFirst({
@@ -531,7 +530,6 @@ export async function attachBookingTarget(
       throw new Error(
         "Approved ads are final. Edit it to make a draft that replaces it.",
       );
-    await assertAdNotPushed(ad.id);
     const content = structuredClone(ad.content);
     if (input.cardIndex !== undefined) {
       if (!("media" in content) || !content.media[input.cardIndex])

@@ -283,8 +283,6 @@ export const suggestPersonas = growthAction({
         columns: { name: true, description: true },
       }),
     ]);
-    if (!brand?.story?.trim())
-      throw new Error("Save the brand story before defining personas.");
     const { system, prompt } = personaSuggestionsPrompt(
       JSON.stringify({ brand, homes, existing }),
     );

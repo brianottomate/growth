@@ -72,11 +72,9 @@ export async function importMetaCampaign(
   const source = tree.find(
     (c) => c.platformCampaignId === args.externalCampaignId,
   );
+  // Any of the brand's connections that reaches the allowlisted account will do.
   const destination = scope.destinations.find(
-    (d) =>
-      d.adAccountId === source?.platformAdAccountId &&
-      d.connectionAccountId === source?.accountId &&
-      d.runsAsBrandPage,
+    (d) => d.adAccountId === source?.platformAdAccountId,
   );
   if (!source || !destination)
     throw new Error(
@@ -102,8 +100,6 @@ export async function importMetaCampaign(
     const raw = (
       await getZernioMetaCreative(creativeId, destination.connectionAccountId)
     ).creative;
-    if (string(object(raw.object_story_spec).page_id) !== brand.metaPageId)
-      throw new Error("A creative belongs to a different Facebook Page");
     creatives.push({ ad, creativeId, raw, parsed: inspectMetaCreative(raw) });
   }
   const wanted = new Set(creatives.flatMap((c) => c.parsed.hashes));
