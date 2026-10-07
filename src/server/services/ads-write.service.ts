@@ -2094,7 +2094,18 @@ async function compileAudienceTargeting(input: {
           countryCode,
           limit: 5,
         });
-        const match = matchAudienceLocation(name, geoType, results);
+        let match = matchAudienceLocation(name, geoType, results);
+        if (!match && geoType === "city" && name.includes(",")) {
+          const fallback = await searchZernioTargeting({
+            accountId: input.connectionAccountId,
+            q: name.split(",")[0]!.trim(),
+            dimension: "geo",
+            geoType,
+            countryCode,
+            limit: 5,
+          });
+          match = matchAudienceLocation(name, geoType, fallback.results);
+        }
         if (!match)
           throw new Error(
             `"${name}" did not resolve unambiguously to a ${geoType}`,
