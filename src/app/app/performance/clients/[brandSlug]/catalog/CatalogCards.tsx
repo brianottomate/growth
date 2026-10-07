@@ -891,6 +891,9 @@ export function CatalogCards({
                         ) : (
                           <div className="space-y-3">
                             <div className="space-y-1.5">
+                              <h5 className="text-xs font-medium text-muted-foreground">
+                                Text on image
+                              </h5>
                               <p className="text-lg leading-snug font-medium break-words">
                                 {card.title || "No headline yet"}
                               </p>
@@ -906,14 +909,21 @@ export function CatalogCards({
                             />
                           </div>
                         )}
-                        <div className="space-y-0.5 text-sm">
-                          <p className="font-medium">{card.adHeadline}</p>
-                          {card.adDescription && (
-                            <p className="text-muted-foreground">
-                              {card.adDescription}
-                            </p>
-                          )}
-                        </div>
+                        {!editing && (
+                          <div className="space-y-1.5 border-t pt-3 text-sm">
+                            <h5 className="text-xs font-medium text-muted-foreground">
+                              Ad copy
+                            </h5>
+                            <div className="space-y-0.5">
+                              <p className="font-medium">{card.adHeadline}</p>
+                              {card.adDescription && (
+                                <p className="text-muted-foreground">
+                                  {card.adDescription}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )}
                         {card.aiReview?.fingerprint ===
                           catalogCardReviewKey(card) &&
                           card.aiReview.findings.length > 0 && (
@@ -1644,7 +1654,8 @@ export function CardEditor({
           </p>
         </div>
       ) : (
-        <>
+        <div className="space-y-2 border-t pt-3">
+          <h5 className="text-sm font-medium">Text on image</h5>
           <label className="block space-y-1 text-sm">
             Headline
             <Input
@@ -1661,10 +1672,10 @@ export function CardEditor({
               onChange={(e) => onChange({ ...card, subtitle: e.target.value })}
             />
           </label>
-        </>
+        </div>
       )}
       <div className="space-y-2 border-t pt-3">
-        <h5 className="text-sm font-medium">Ad</h5>
+        <h5 className="text-sm font-medium">Ad copy</h5>
         <label className="block space-y-1 text-sm">
           Ad headline
           <Input
