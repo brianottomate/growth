@@ -16,6 +16,7 @@ import { toast } from "@/components/ui/toast";
 // The team-facing pipeline (a deliberate subset of the 9-value enum).
 export const STATUS_OPTIONS = [
   { value: "draft", label: "Draft" },
+  { value: "pending_review", label: "Ready" },
   { value: "approved", label: "Approved" },
   { value: "scheduled", label: "Scheduled" },
   { value: "published", label: "Published" },

@@ -30,8 +30,7 @@ export const metadata: Metadata = {
  * 2. Client decisions. Approve / request changes per ad, signed with a name
  *    the client types once (kept in localStorage). Record the decision
  *    against a snapshot of what the page drew (stored per ad when the link is
- *    made), not the live ad, and lapse it when the ad changes, the same way
- *    `catalogCardFingerprint` lapses a catalog approval.
+ *    made), so the decision describes what the client reviewed.
  * 3. Comments. A table with `authorName` text and no user FK, per ad or for
  *    the whole set, capped per link. Do NOT reach for Better Auth anonymous
  *    sessions here: sign-up is gated to @wander.com, `user.create.after`

@@ -35,6 +35,27 @@ import {
  * the caller is already authorized.
  */
 
+/** Approved social copy and media can be revised after reopening. */
+export function assertPostOpen(status: string) {
+  if (status === "approved")
+    throw new Error("Reopen this post before editing its copy or media.");
+}
+
+async function requireOpenPost(id: string) {
+  const post = await db.query.platformPostTable.findFirst({
+    where: eq(platformPostTable.id, id),
+  });
+  if (!post) throw new Error("Platform post not found");
+  assertPostOpen(post.status);
+  if (post.parentPlatformPostId) {
+    const root = await db.query.platformPostTable.findFirst({
+      where: eq(platformPostTable.id, post.parentPlatformPostId),
+    });
+    if (root) assertPostOpen(root.status);
+  }
+  return post;
+}
+
 type ChannelPlatform = (typeof channelPlatformEnum.enumValues)[number];
 
 export type CreatePlatformPostInput = {
@@ -370,6 +391,7 @@ async function saveSpotThread(
     if (!root || root.parentPlatformPostId) {
       throw new Error("Thread editing must start from the root platform post.");
     }
+    assertPostOpen(root.status);
     const firstComment =
       input.firstComment === undefined
         ? undefined
@@ -772,6 +794,7 @@ async function setSpotMedia(input: {
   platformPostId: string;
   media: MediaItem[];
 }): Promise<{ id: string }> {
+  await requireOpenPost(input.platformPostId);
   const seen = new Set<string>();
   const deduped = input.media.filter((item) => {
     const key = item.assetId ?? item.url;
@@ -791,6 +814,7 @@ async function setSpotCarousel(input: {
   format: string;
   media: MediaItem[];
 }): Promise<{ id: string }> {
+  await requireOpenPost(input.platformPostId);
   const seen = new Set<string>();
   const deduped = input.media.filter((item) => {
     const key = item.assetId ?? item.url;
@@ -820,7 +844,7 @@ async function updatePlatformDraft(input: {
 }): Promise<{ id: string }> {
   const current = await db.query.platformPostTable.findFirst({
     where: eq(platformPostTable.id, input.platformPostId),
-    columns: { id: true, parentPlatformPostId: true },
+    columns: { id: true, parentPlatformPostId: true, status: true },
   });
   if (!current) throw new Error("Platform post not found");
   const patch: Record<string, unknown> = {};
@@ -832,6 +856,7 @@ async function updatePlatformDraft(input: {
     patch.archetype = input.format ? archetypeForFormat(input.format) : null;
   }
   if (Object.keys(patch).length) {
+    await requireOpenPost(current.id);
     await db
       .update(platformPostTable)
       .set(patch)
@@ -943,6 +968,7 @@ async function purgeIdea(input: { contentPostId: string }) {
 }
 
 export const ContentService = {
+  assertPostOpen,
   createIdea,
   createPlatformPost,
   promotePlatformPost,

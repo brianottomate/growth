@@ -120,6 +120,13 @@
       "when": 1791337013024,
       "tag": "0015_ad_review_version_precision",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1791348235128,
+      "tag": "0016_manual_catalog_review",
+      "breakpoints": true
     }
   ]
 }

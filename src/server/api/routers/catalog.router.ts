@@ -1,3 +1,6 @@
+import { z } from "zod";
+import { setCatalogReady } from "@/server/services/catalog-studio.service";
+import { protectedProcedure } from "@/server/api/orpc";
 import { actionProcedure } from "@/server/api/orpc";
 import {
   editCatalogCardAction,
@@ -32,6 +35,17 @@ export const catalogRouter = {
   newCopy: actionProcedure(newCatalogCopyAction),
   newPhoto: actionProcedure(newCatalogPhotoAction),
   setApproval: actionProcedure(setCatalogApprovalAction),
+  setReady: protectedProcedure
+    .input(
+      z.object({
+        brandId: z.string().min(1),
+        homeIds: z.array(z.string().min(1)).min(1),
+        ready: z.boolean(),
+      }),
+    )
+    .handler(({ input, context }) =>
+      setCatalogReady({ ...input, userId: context.session.user.id }),
+    ),
   setIncluded: actionProcedure(setCatalogIncludedAction),
   setDefaultTemplate: actionProcedure(setCatalogDefaultTemplateAction),
   setAdCopy: actionProcedure(setCatalogAdCopyAction),

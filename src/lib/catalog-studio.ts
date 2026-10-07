@@ -43,6 +43,7 @@ export const catalogCardSchema = z.object({
   adDescription: z.string().trim().min(1).max(255),
   /** Signed off as it stands now; derived on read, never saved from a client. */
   approved: z.boolean().optional(),
+  ready: z.boolean().optional(),
 });
 export type CatalogCard = z.infer<typeof catalogCardSchema>;
 /** The canvas a catalog runs in. Meta shows catalog tiles square, so 4:5 is retired. */
@@ -298,8 +299,8 @@ export function defaultCatalogPills(home: CatalogHome) {
   return picked;
 }
 
-/** What a card shows, as one string: approval holds while this is unchanged. */
-export function catalogCardFingerprint(card: CatalogCard) {
+/** What an AI review examined, used only to hide stale AI notes. */
+export function catalogCardReviewKey(card: CatalogCard) {
   // Supplied artwork is the whole card; the fields it does not draw can
   // change without touching what was approved.
   if (card.mode === "finished")
@@ -333,7 +334,10 @@ export const catalogUnapproved = (draft: CatalogDraft) =>
 export function catalogDraft(
   homes: CatalogHome[],
   overrides: ReadonlyMap<string, CatalogOverrides> = new Map(),
-  approvals: ReadonlyMap<string, string> = new Map(),
+  approvals: ReadonlyMap<
+    string,
+    { approved: boolean; ready: boolean }
+  > = new Map(),
   /** The brand's default card, for every home without its own. */
   defaultTemplate: CatalogTemplateId = DEFAULT_CATALOG_TEMPLATE,
   /** The brand's markets: a card's location is its market's label. */
@@ -383,7 +387,8 @@ export function catalogDraft(
         };
         return {
           ...card,
-          approved: approvals.get(home.id) === catalogCardFingerprint(card),
+          approved: approvals.get(home.id)?.approved ?? false,
+          ready: approvals.get(home.id)?.ready ?? false,
         };
       }),
   };

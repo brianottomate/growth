@@ -151,6 +151,7 @@ export function SpotCard({
 }) {
   const router = useRouter();
   const owned = spot.source === "owned";
+  const approved = spot.status === "approved";
   const story = isStoryFormat(spot.format);
   const providerPublishingPlatform =
     spot.platform === "instagram" ||
@@ -261,7 +262,15 @@ export function SpotCard({
                 {sequenceNoun(spot.format, threadItems.length)}
               </span>
             )}
-            {owned ? (
+            {owned && approved ? (
+              <button
+                type="button"
+                onClick={() => updateSpot({ status: "draft" })}
+                className="rounded-md border px-2 py-1 text-xs"
+              >
+                Approved · Reopen
+              </button>
+            ) : owned ? (
               <SimpleSelect
                 value={
                   STATUS_OPTIONS.some((option) => option.value === spot.status)
@@ -403,7 +412,7 @@ export function SpotCard({
         </div>
 
         <div className="col-span-2 flex min-w-0 flex-wrap items-center gap-1.5 @xl:ml-auto @xl:shrink-0 @xl:justify-end">
-          {owned && !isEmail && (
+          {owned && !isEmail && !approved && (
             <>
               <button
                 type="button"

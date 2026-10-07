@@ -857,9 +857,6 @@ export async function addDraftAd(input: {
       .update(adTable)
       .set({
         ...values,
-        status: "drawn",
-        readyAt: null,
-        readyBy: null,
         updatedAt: new Date(),
       })
       .where(
@@ -1580,9 +1577,6 @@ export async function replaceDraftAdMedia(input: {
     .update(adTable)
     .set({
       content: { ...content, media },
-      status: "drawn",
-      readyAt: null,
-      readyBy: null,
     })
     .where(and(eq(adTable.id, ad.id), eq(adTable.updatedAt, ad.updatedAt)))
     .returning();

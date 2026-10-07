@@ -14,7 +14,6 @@ import { join } from "node:path";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import sharp from "sharp";
 
-import { catalogCardFingerprint } from "@/lib/catalog-studio";
 import { db } from "@/server/db";
 import {
   brandTable,
@@ -215,7 +214,6 @@ if (args.includes("--approve")) {
     approved: true,
     cards: mine.map((c) => ({
       homeId: c.homeId,
-      fingerprint: catalogCardFingerprint(c),
     })),
   });
   console.log("approved", mine.length);

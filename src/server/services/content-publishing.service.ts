@@ -943,6 +943,8 @@ export async function saveSocialFirstComment(input: {
     where: eq(platformPostTable.id, input.platformPostId),
   });
   if (!spot) throw new Error("Platform post not found");
+  if (spot.status === "approved")
+    throw new Error("Reopen this post before editing its first comment.");
   if (spot.parentPlatformPostId) {
     throw new Error("Prepare the first comment on the root post");
   }

@@ -19,7 +19,7 @@ import { z } from "zod";
 import {
   CATALOG_WRITE_PASSES,
   catalogHeadlineIssue,
-  catalogCardFingerprint,
+  catalogCardReviewKey,
   type CatalogWritePass,
   DEFAULT_CATALOG_TEMPLATE,
   catalogAdHeadline,
@@ -990,7 +990,7 @@ export async function prepareInitialCatalog(input: {
           );
           if (!ctx.card) return;
           if (ctx.card.approved) return;
-          const fingerprint = catalogCardFingerprint(ctx.card);
+          const fingerprint = catalogCardReviewKey(ctx.card);
           const photo = await photoForModel(ctx.card.imageUrl).catch(
             () => null,
           );
@@ -1044,7 +1044,7 @@ export async function prepareInitialCatalog(input: {
           if (!latest.card) return;
           if (
             latest.card.approved ||
-            catalogCardFingerprint(latest.card) !== fingerprint
+            catalogCardReviewKey(latest.card) !== fingerprint
           )
             return;
           await db

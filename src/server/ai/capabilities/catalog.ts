@@ -62,7 +62,7 @@ const homeInput = brandInput.extend({
     .boolean()
     .optional()
     .describe(
-      "Local development only: change an approved card anyway. Ignored when deployed.",
+      "Reserved for local export tooling. Approved card edits require reopening.",
     ),
 });
 
@@ -207,17 +207,13 @@ export const writeCatalogCardsAction = growthAction({
 export const setCatalogApprovalAction = growthAction({
   outputSchema: setCatalogApprovalActionOutputSchema,
   description:
-    "Sign catalog cards off as the operator saw them, or reopen them (approved false). Approving needs each card's fingerprint as shown on the page, so a card that changed since is refused rather than approved unseen; from chat, reopen only, and ask the operator to approve on the page. Approved cards are locked and are what the export ships.",
+    "Sign catalog cards off as the operator saw them, or reopen them (approved false). Human approval locks edits until the card is reopened. Approved cards are locked and are what the export ships.",
   inputSchema: brandInput.extend({
     approved: z.boolean(),
     cards: z
       .array(
         z.object({
           homeId: z.string().min(1),
-          fingerprint: z
-            .string()
-            .optional()
-            .describe("The card's fingerprint as shown; required to approve."),
         }),
       )
       .min(1),

@@ -406,6 +406,14 @@ export const updateContentWorkItem = growthAction({
         .filter((post) => post.source === "owned")
         .map((post) => [post.id, post]),
     );
+    if (
+      ctx.surface !== "app" &&
+      (input.contentStatus === "pending_review" ||
+        input.platformDrafts?.some(
+          (draft) => draft.status === "pending_review",
+        ))
+    )
+      throw new Error("Ready is set by a person on the page.");
     for (const draft of input.platformDrafts ?? []) {
       const owned = ownedById.get(draft.platformPostId);
       if (!owned) {
@@ -415,6 +423,21 @@ export const updateContentWorkItem = growthAction({
           eligibleLabel: "owned drafts",
           hint: ADD_A_SPOT_HINT,
         });
+      }
+      if (
+        ctx.surface !== "app" &&
+        owned.status === "pending_review" &&
+        draft.status === "draft"
+      )
+        throw new Error(
+          "Ready is cleared by a person on the page. Edit the copy without changing its review state.",
+        );
+      if (draft.text !== undefined || draft.format !== undefined) {
+        ContentService.assertPostOpen(owned.status);
+        const root = owned.parentPlatformPostId
+          ? ownedById.get(owned.parentPlatformPostId)
+          : undefined;
+        if (root) ContentService.assertPostOpen(root.status);
       }
       // A format change must stay on the same platform, and must be a real
       // product for it — otherwise a spot can be re-pointed at nonsense.

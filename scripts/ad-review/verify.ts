@@ -142,8 +142,12 @@ try {
     expectedUpdatedAt: firstReady.updatedAt.toISOString(),
   });
   const edited = await ad();
-  assert.equal(edited.status, "drawn");
-  assert.equal(edited.readyAt, null);
+  assert.equal(edited.status, "ready");
+  assert.equal(
+    edited.readyAt?.toISOString(),
+    firstReady.readyAt?.toISOString(),
+  );
+  assert.equal(edited.readyBy, firstReady.readyBy);
   await setAdStatus({
     adId,
     orgId: ctx.orgId,
@@ -175,6 +179,14 @@ try {
   draftAdActionOutputSchema.parse(JSON.parse(JSON.stringify(approved)));
   assert(approved.approvedSnapshot);
   assert.equal(approved.status, "approved");
+  await assert.rejects(() =>
+    setAdCopy({
+      adId,
+      orgId: ctx.orgId,
+      text: firstReady.content as import("@/server/db/ads-schema").AdTextContent,
+      expectedUpdatedAt: approved.updatedAt.toISOString(),
+    }),
+  );
   await attachAdSet({
     orgId: ctx.orgId,
     brandId: brand.id,

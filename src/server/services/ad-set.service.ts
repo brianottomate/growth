@@ -161,12 +161,7 @@ async function saveDraftChange(
 ) {
   const saved = await db
     .update(adTable)
-    .set({
-      ...patch,
-      status: "drawn",
-      readyAt: null,
-      readyBy: null,
-    })
+    .set(patch)
     .where(
       and(
         eq(adTable.id, ad.id),
@@ -789,9 +784,6 @@ export async function setAdHome(input: {
       homeId: home?.id ?? null,
       name,
       ...projected,
-      status: "drawn",
-      readyAt: null,
-      readyBy: null,
       updatedAt: new Date(),
     })
     .where(and(eq(adTable.id, ad.id), eq(adTable.updatedAt, ad.updatedAt)))
@@ -1126,7 +1118,7 @@ export async function setAdCopy(input: {
     const content = textAdCopySchema.parse(input.text);
     const saved = await db
       .update(adTable)
-      .set({ content, status: "drawn", readyAt: null, readyBy: null })
+      .set({ content })
       .where(
         and(
           eq(adTable.id, ad.id),
@@ -1521,9 +1513,6 @@ export async function saveAdSection(
     .set({
       content,
       bookingTargetId,
-      status: "drawn",
-      readyAt: null,
-      readyBy: null,
     })
     .where(
       and(

@@ -146,13 +146,15 @@ export const homeTable = pgTable(
     catalogAdHeadline: t.text(),
     catalogAdDescription: t.text(),
     /**
-     * Who signed the card off, and the card as it was then. Any later change
-     * to what the card shows (an edit, a new hero, a changed default) no
-     * longer matches the fingerprint, so the card is back to unreviewed.
+     * Human review state. Ready survives edits; approval locks card edits.
      */
+    catalogReadyAt: t.timestamp(),
+    catalogReadyBy: t
+      .text()
+      .references(() => userTable.id, { onDelete: "set null" }),
     catalogApproval: t
       .jsonb()
-      .$type<{ approvedAt: string; approvedBy: string; fingerprint: string }>(),
+      .$type<{ approvedAt: string; approvedBy: string }>(),
 
     /**
      * The home's photos: the listing's full gallery, with room labels, from

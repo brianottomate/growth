@@ -33,7 +33,6 @@ import {
   catalogArtworkIssues,
   catalogLocation,
   catalogCardCopy,
-  catalogCardFingerprint,
   artworkFormat,
   catalogDraft,
   catalogHeadlineIssue,
@@ -131,17 +130,16 @@ type CatalogBrand = Awaited<ReturnType<typeof catalogBrand>>;
 
 /**
  * An approved card is signed off as it stands, and the export ships only
- * signed-off cards. `force` lets a local dev server change or export anyway,
- * to try versions; deployed, it is ignored.
+ * signed-off cards. Local export tooling may bypass the export check.
  */
 export const catalogLockBypass = (force?: boolean) =>
   Boolean(force) && process.env.NODE_ENV === "development";
 
 export function assertCardOpen(
   card: Pick<CatalogCard, "approved"> | null | undefined,
-  force?: boolean,
+  _force?: boolean,
 ) {
-  if (card?.approved && !catalogLockBypass(force))
+  if (card?.approved)
     throw new Error("This card is approved. Reopen it before changing it.");
 }
 
@@ -177,6 +175,7 @@ async function catalogRows(brandId: string) {
       catalogFinishedAssetId: true,
       catalogExcluded: true,
       catalogApproval: true,
+      catalogReadyAt: true,
       catalogPills: true,
       catalogAdHeadline: true,
       catalogAdDescription: true,
@@ -297,10 +296,15 @@ async function catalogHomes(brand: CatalogBrand, refresh = false) {
     ]),
   );
   const approvals = new Map(
-    [...rows.values()].flatMap((row) =>
-      row.catalogApproval
-        ? [[row.externalId, row.catalogApproval.fingerprint] as const]
-        : [],
+    [...rows.values()].map(
+      (row) =>
+        [
+          row.externalId,
+          {
+            approved: Boolean(row.catalogApproval),
+            ready: Boolean(row.catalogReadyAt),
+          },
+        ] as const,
     ),
   );
   const draft = catalogDraft(
@@ -615,9 +619,8 @@ export async function editCatalogCard(input: {
 }): Promise<EditCatalogCardResult> {
   const brand = await catalogBrand(input.userId, input.brandId);
   const { patch } = input;
-  // Taking a card in or out of the export, or its ad copy under the image,
-  // is not a change to what the approved image shows.
-  const unlocked = new Set(["included", "adHeadline", "adDescription"]);
+  // Inclusion remains an export choice. Creative edits require reopening.
+  const unlocked = new Set(["included"]);
   if (Object.keys(patch).some((key) => !unlocked.has(key))) {
     const { draft } = await catalogHomes(brand);
     assertCardOpen(
@@ -711,11 +714,13 @@ export async function editCatalogCard(input: {
     await db
       .update(homeTable)
       .set({
+        ...(!input.approved
+          ? { catalogReadyAt: null, catalogReadyBy: null }
+          : {}),
         catalogApproval: input.approved
           ? {
               approvedAt: new Date().toISOString(),
               approvedBy: input.userId,
-              fingerprint: catalogCardFingerprint(card),
             }
           : null,
       })
@@ -740,27 +745,18 @@ export async function editCatalogCard(input: {
   };
 }
 
-/**
- * Sign cards off exactly as the operator saw them, or take the sign-off back.
- * Each approval carries the fingerprint of the card on screen; a card the
- * chat changed since is refused rather than approved unseen. A card that
- * changes later is unreviewed again on its own.
- */
+/** Human approval locks a card until it is reopened. */
 export async function setCatalogApproval(input: {
   userId: string;
   brandId: string;
   approved: boolean;
-  cards: readonly { homeId: string; fingerprint?: string }[];
+  cards: readonly { homeId: string }[];
 }) {
   const brand = await catalogBrand(input.userId, input.brandId);
-  const { homes, draft } = await catalogHomes(brand);
+  const { draft } = await catalogHomes(brand);
   const cards = input.cards.flatMap((seen) => {
     const card = draft.cards.find((c) => c.homeId === seen.homeId);
     if (!card) return [];
-    if (input.approved && seen.fingerprint !== catalogCardFingerprint(card))
-      throw new Error(
-        `${homes.find((h) => h.id === card.homeId)?.name ?? "A card"} changed since you looked at it. Review it again.`,
-      );
     return [card];
   });
   const approvedAt = new Date().toISOString();
@@ -768,11 +764,13 @@ export async function setCatalogApproval(input: {
     await db
       .update(homeTable)
       .set({
+        ...(!input.approved
+          ? { catalogReadyAt: null, catalogReadyBy: null }
+          : {}),
         catalogApproval: input.approved
           ? {
               approvedAt,
               approvedBy: input.userId,
-              fingerprint: catalogCardFingerprint(card),
             }
           : null,
       })
@@ -786,6 +784,34 @@ export async function setCatalogApproval(input: {
   return { updated: cards.length };
 }
 
+/** Human Ready mark, independent of the card content. */
+export async function setCatalogReady(input: {
+  userId: string;
+  brandId: string;
+  homeIds: string[];
+  ready: boolean;
+}) {
+  const brand = await catalogBrand(input.userId, input.brandId);
+  const { draft } = await catalogHomes(brand);
+  for (const id of input.homeIds)
+    assertCardOpen(draft.cards.find((c) => c.homeId === id));
+  const rows = await db
+    .update(homeTable)
+    .set({
+      catalogReadyAt: input.ready ? new Date() : null,
+      catalogReadyBy: input.ready ? input.userId : null,
+    })
+    .where(
+      and(
+        eq(homeTable.brandId, brand.id),
+        inArray(homeTable.externalId, input.homeIds),
+        isNull(homeTable.deletedAt),
+      ),
+    )
+    .returning({ id: homeTable.id });
+  return { updated: rows.length };
+}
+
 /** The catalog card every home uses unless it has its own. */
 export async function setCatalogDefaultTemplate(input: {
   userId: string;
@@ -793,6 +819,11 @@ export async function setCatalogDefaultTemplate(input: {
   templateId: CatalogTemplateId;
 }) {
   const brand = await catalogBrand(input.userId, input.brandId);
+  const { draft } = await catalogHomes(brand);
+  if (draft.cards.some((card) => card.approved))
+    throw new Error(
+      "Reopen approved cards before changing the catalog template.",
+    );
   await db
     .update(brandTable)
     .set({
@@ -1201,7 +1232,7 @@ const adCopyOutput = z.object({
 /**
  * Write the ad headline (and, unless headlineOnly, the description) Meta
  * prints under each catalog card, in batches the model reads at once. Ad
- * copy is not part of what an approval signs off, so approved cards take it.
+ * Approved cards are skipped until reopened.
  */
 export async function writeCatalogAdCopy(input: {
   userId: string;
@@ -1213,8 +1244,9 @@ export async function writeCatalogAdCopy(input: {
   const brand = await catalogBrand(input.userId, input.brandId);
   const { homes, draft } = await catalogHomes(brand);
   const wanted = input.homeIds && new Set(input.homeIds);
-  const cards = draft.cards.filter((card) =>
-    wanted ? wanted.has(card.homeId) : card.included,
+  const cards = draft.cards.filter(
+    (card) =>
+      !card.approved && (wanted ? wanted.has(card.homeId) : card.included),
   );
   const ask = async (batch: CatalogCard[]) => {
     const listings = batch.map((card) => {

@@ -72,7 +72,7 @@ import {
 } from "@/lib/compositions";
 import {
   catalogArtworkIssues,
-  catalogCardFingerprint,
+  catalogCardReviewKey,
   catalogCardPreviewUrl,
   catalogUnapproved,
   type CatalogCard,
@@ -112,13 +112,13 @@ function errorMessage(error: unknown, fallback: string) {
 const running = (status?: string) =>
   status === "queued" || status === "running";
 /**
- * A local dev server may change approved cards. Exporting unapproved ones is
+ * Local export tooling may export unapproved cards with
  * `scripts/export-catalog-unapproved.ts`.
  */
 const DEV = process.env.NODE_ENV === "development";
 const FORCE = DEV ? { force: true } : {};
 /** Approved cards are signed off; they change only after Reopen. */
-const locked = (card: CatalogCard) => Boolean(card.approved) && !DEV;
+const locked = (card: CatalogCard) => Boolean(card.approved);
 const LOCKED_TITLE = "Approved. Reopen it to change it.";
 const preview = catalogCardPreviewUrl;
 export function CatalogCards({
@@ -325,7 +325,13 @@ export function CatalogCards({
             draft: {
               ...data.draft,
               cards: data.draft.cards.map((card) =>
-                ids.has(card.homeId) ? { ...card, approved } : card,
+                ids.has(card.homeId)
+                  ? {
+                      ...card,
+                      approved,
+                      ...(!approved ? { ready: false } : {}),
+                    }
+                  : card,
               ),
             },
           }
@@ -339,7 +345,6 @@ export function CatalogCards({
           approved,
           cards: cards.map((card) => ({
             homeId: card.homeId,
-            fingerprint: catalogCardFingerprint(card),
           })),
         }),
       "Unable to update approval",
@@ -384,14 +389,19 @@ export function CatalogCards({
       (inclusion === "included" ? card.included : !card.included),
   );
   const statusOf = (card: CatalogCard) =>
-    previewStatus(homeOf(card)?.name ?? card.title);
+    reviewPreview
+      ? previewStatus(homeOf(card)?.name ?? card.title)
+      : card.approved
+        ? "approved"
+        : card.ready
+          ? "ready"
+          : "draft";
   const draftCount = inclusionCards.filter(
     (card) => statusOf(card) === "draft",
   ).length;
   const readyCount = inclusionCards.filter(
     (card) => statusOf(card) === "ready",
   ).length;
-  const reviewCount = inclusionCards.filter((card) => !card.approved).length;
   const approvalCount = inclusionCards.filter((card) =>
     reviewPreview ? statusOf(card) === "approved" : card.approved,
   ).length;
@@ -403,8 +413,8 @@ export function CatalogCards({
           ? statusOf(card) !== "approved"
           : statusOf(card) === filter
         : filter === "review" || filter === "draft"
-          ? !card.approved
-          : filter === "approved" && card.approved),
+          ? !card.approved && (filter === "review" || !card.ready)
+          : statusOf(card) === filter),
   );
   const visible = filtered.filter((card) =>
     `${homeOf(card)?.name ?? ""} ${card.title}`
@@ -706,7 +716,7 @@ export function CatalogCards({
                   >
                     {(reviewPreview
                       ? (["all", "draft", "ready", "approved"] as const)
-                      : (["all", "review", "approved"] as const)
+                      : (["all", "draft", "ready", "approved"] as const)
                     ).map((key) => (
                       <Button
                         key={key}
@@ -725,11 +735,9 @@ export function CatalogCards({
                           ? `Draft ${draftCount}`
                           : key === "ready"
                             ? `Ready ${readyCount}`
-                            : key === "review"
-                              ? `Needs review ${reviewCount}`
-                              : key === "approved"
-                                ? `Approved ${approvalCount}`
-                                : `All ${inclusionCards.length}`}
+                            : key === "approved"
+                              ? `Approved ${approvalCount}`
+                              : `All ${inclusionCards.length}`}
                       </Button>
                     ))}
                   </div>
@@ -907,7 +915,7 @@ export function CatalogCards({
                           )}
                         </div>
                         {card.aiReview?.fingerprint ===
-                          catalogCardFingerprint(card) &&
+                          catalogCardReviewKey(card) &&
                           card.aiReview.findings.length > 0 && (
                             <details className="space-y-1 rounded-lg bg-muted/40 p-3 text-sm">
                               <summary className="cursor-pointer font-medium">
@@ -998,6 +1006,28 @@ export function CatalogCards({
                                 >
                                   Edit
                                 </Button>
+                                {!card.approved && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={saving}
+                                    onClick={() =>
+                                      void act(
+                                        () =>
+                                          orpc.catalog.setReady.call({
+                                            brandId,
+                                            homeIds: [card.homeId],
+                                            ready: !card.ready,
+                                          }),
+                                        "Unable to update Ready",
+                                      )
+                                    }
+                                  >
+                                    {card.ready
+                                      ? "Back to draft"
+                                      : "Mark ready"}
+                                  </Button>
+                                )}
                                 <ApproveButton
                                   card={card}
                                   showStatus={false}

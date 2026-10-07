@@ -12,7 +12,7 @@ import { adTable, brandTable } from "@/server/db/schema";
 import { assertAdNotPushed } from "./ad-approval.service";
 import { resolveBookingTarget } from "./home-groups.service";
 
-/** One shared edit path for humans and assistants. Saving keeps this a draft. */
+/** One shared edit path for humans and assistants. Saving preserves the human Ready mark. */
 export async function saveAdIdea(
   input: z.infer<typeof ideaSaveSchema>,
   context: { orgId: string; userId: string },
@@ -32,6 +32,8 @@ export async function saveAdIdea(
       ),
     }));
   if (!ad || !brand) throw new Error("Ad not found");
+  if (ad.status === "approved")
+    throw new Error("Reopen this ad before editing it.");
   await assertAdNotPushed(ad.id);
   if (!("media" in ad.content))
     throw new Error(
@@ -82,9 +84,6 @@ export async function saveAdIdea(
       ...next,
       ...(bookingTargetId !== undefined ? { bookingTargetId } : {}),
       name: args.name,
-      status: "drawn",
-      readyAt: null,
-      readyBy: null,
       updatedAt: new Date(),
     })
     .where(and(eq(adTable.id, ad.id), eq(adTable.updatedAt, ad.updatedAt)))

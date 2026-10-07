@@ -560,9 +560,6 @@ export async function attachBookingTarget(
       .update(adTable)
       .set({
         ...projected,
-        status: "drawn",
-        readyAt: null,
-        readyBy: null,
         ...(input.cardIndex === undefined
           ? { bookingTargetId: target.id }
           : {}),

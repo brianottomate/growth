@@ -1549,7 +1549,7 @@ export const setHomeHeroAction = growthAction({
       .boolean()
       .optional()
       .describe(
-        "Local development only: change an approved card anyway. Ignored when deployed.",
+        "Reserved for local export tooling. Approved card edits require reopening.",
       ),
   }),
   examples: [
@@ -1674,7 +1674,7 @@ export const editCatalogCardAction = growthAction({
       .boolean()
       .optional()
       .describe(
-        "Local development only: change an approved card anyway. Ignored when deployed.",
+        "Reserved for local export tooling. Approved card edits require reopening.",
       ),
   }),
   examples: [
@@ -1731,22 +1731,25 @@ export const attachAdSetAction = growthAction({
 export const setAdStatusAction = growthAction({
   outputSchema: setAdStatusActionOutputSchema,
   description:
-    "Move an ad along draft → ready → approved. ready marks it done for review (any later edit sends it back to drawn); drawn takes a ready mark back. approved is the person's final sign-off: its approved output is captured and its images are saved in the background. To revise an approved ad use returnToStudio; its platform ads remain unchanged. Supply expectedUpdatedAt from the latest read. This never publishes to a platform.",
+    "Move an ad along draft → ready → approved. ready is a human mark for review that survives edits; drawn takes a ready mark back. approved is the person's final sign-off: its approved output is captured and its images are saved in the background. To revise an approved ad use returnToStudio; its platform ads remain unchanged. Supply expectedUpdatedAt from the latest read. This never publishes to a platform.",
   inputSchema: z.object({
     adId: z.string().min(1),
     status: z.enum(["drawn", "ready", "approved"]),
     expectedUpdatedAt: z.string().datetime().optional(),
     exportShapes: ideaExportShapesSchema.optional(),
   }),
-  execute: (input, ctx) =>
-    setAdStatus({
+  execute: (input, ctx) => {
+    if (ctx.surface !== "app" && input.status !== "approved")
+      throw new Error("Ready is set by a person on the page.");
+    return setAdStatus({
       adId: input.adId,
       orgId: ctx.orgId,
       status: input.status,
       expectedUpdatedAt: input.expectedUpdatedAt,
       exportShapes: input.exportShapes,
       userId: ctx.userId,
-    }),
+    });
+  },
 });
 
 export const returnAdToStudioAction = growthAction({
