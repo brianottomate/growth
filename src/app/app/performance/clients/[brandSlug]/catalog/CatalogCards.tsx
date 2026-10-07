@@ -1,6 +1,6 @@
 "use client";
 
-import { ReviewDiscussion } from "@/components/review/ReviewDiscussion";
+import { ReviewFooter } from "@/components/review/ReviewFooter";
 import { CopyButton } from "@/components/copy-button";
 import { toast } from "@/components/ui/toast";
 import { ImagePickerDialog } from "@/components/image-picker-dialog";
@@ -10,7 +10,6 @@ import {
   useReviewPreview,
   usePreviewReviewStatus,
 } from "@/components/review/ReviewPreview";
-import { ApprovedStamp } from "@/components/approved-stamp";
 import { catalogAddressIssues } from "@/lib/catalog-addresses";
 import {
   Select,
@@ -192,7 +191,6 @@ export function CatalogCards({
   const [picker, setPicker] = useState(false);
   const [error, setError] = useState("");
   /** Cards approved this session, so their stamp lands rather than sits. */
-  const [stamped, setStamped] = useState<Set<string>>(new Set());
   const draft = query.data?.draft;
   const leaveEditor = (action: () => void) => {
     if (saving) return;
@@ -337,7 +335,6 @@ export function CatalogCards({
           }
         : data,
     );
-    setStamped(approved ? ids : new Set());
     void act(
       () =>
         orpc.catalog.setApproval.call({
@@ -351,7 +348,6 @@ export function CatalogCards({
     ).then((result) => {
       if (result === null) {
         client.setQueryData(state.queryKey, previous);
-        setStamped(new Set());
       }
     });
   };
@@ -808,8 +804,6 @@ export function CatalogCards({
                         !card.included && !editing && inclusion !== "excluded"
                       }
                       highlighted={focusHome === card.homeId}
-                      approved={card.approved && !reviewPreview}
-                      fresh={stamped.has(card.homeId)}
                       review={
                         reviewPreview ? (
                           <ReviewPreview
@@ -818,13 +812,72 @@ export function CatalogCards({
                             initialStatus={statusOf(card)}
                           />
                         ) : (
-                          <ReviewDiscussion
+                          <ReviewFooter
+                            status={statusOf(card)}
                             target={{
                               type: "catalog",
                               id: card.homeId,
                               brandId,
                             }}
-                          />
+                          >
+                            {!editing && (
+                              <>
+                                <IncludeButton
+                                  card={card}
+                                  onInclude={(included) =>
+                                    update({ ...card, included })
+                                  }
+                                />
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  disabled={
+                                    locked(card) ||
+                                    Boolean(fixing[card.homeId]) ||
+                                    saving
+                                  }
+                                  title={
+                                    locked(card) ? LOCKED_TITLE : undefined
+                                  }
+                                  onClick={() => openEditor(card)}
+                                >
+                                  Edit
+                                </Button>
+                                {!card.approved && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={saving}
+                                    onClick={() =>
+                                      void act(
+                                        () =>
+                                          orpc.catalog.setReady.call({
+                                            brandId,
+                                            homeIds: [card.homeId],
+                                            ready: !card.ready,
+                                          }),
+                                        "Unable to update Ready",
+                                      )
+                                    }
+                                  >
+                                    {card.ready
+                                      ? "Back to draft"
+                                      : "Mark ready"}
+                                  </Button>
+                                )}
+                                <ApproveButton
+                                  card={card}
+                                  showStatus={false}
+                                  disabled={
+                                    Boolean(fixing[card.homeId]) || saving
+                                  }
+                                  onApprove={(approved) =>
+                                    approve([card], approved)
+                                  }
+                                />
+                              </>
+                            )}
+                          </ReviewFooter>
                         )
                       }
                       artwork={
@@ -989,67 +1042,6 @@ export function CatalogCards({
                                 </Button>
                               ))}
                             </div>
-                            {!reviewPreview && (
-                              <div
-                                role="group"
-                                aria-label="Card actions"
-                                className="flex flex-wrap items-center justify-end gap-2"
-                              >
-                                <IncludeButton
-                                  card={card}
-                                  onInclude={(included) =>
-                                    update({ ...card, included })
-                                  }
-                                />
-                                <Button
-                                  size="sm"
-                                  variant="secondary"
-                                  disabled={
-                                    locked(card) ||
-                                    Boolean(fixing[card.homeId]) ||
-                                    saving
-                                  }
-                                  title={
-                                    locked(card) ? LOCKED_TITLE : undefined
-                                  }
-                                  onClick={() => openEditor(card)}
-                                >
-                                  Edit
-                                </Button>
-                                {!card.approved && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    disabled={saving}
-                                    onClick={() =>
-                                      void act(
-                                        () =>
-                                          orpc.catalog.setReady.call({
-                                            brandId,
-                                            homeIds: [card.homeId],
-                                            ready: !card.ready,
-                                          }),
-                                        "Unable to update Ready",
-                                      )
-                                    }
-                                  >
-                                    {card.ready
-                                      ? "Back to draft"
-                                      : "Mark ready"}
-                                  </Button>
-                                )}
-                                <ApproveButton
-                                  card={card}
-                                  showStatus={false}
-                                  disabled={
-                                    Boolean(fixing[card.homeId]) || saving
-                                  }
-                                  onApprove={(approved) =>
-                                    approve([card], approved)
-                                  }
-                                />
-                              </div>
-                            )}
                           </div>
                         )}
                       </div>
@@ -1822,8 +1814,6 @@ export function CatalogCardLayout({
   name,
   dimmed = false,
   highlighted = false,
-  approved,
-  fresh = false,
   artwork,
   review,
   children,
@@ -1832,8 +1822,6 @@ export function CatalogCardLayout({
   name?: string;
   dimmed?: boolean;
   highlighted?: boolean;
-  approved?: boolean;
-  fresh?: boolean;
   artwork: ReactNode;
   review?: ReactNode;
   children: ReactNode;
@@ -1847,17 +1835,10 @@ export function CatalogCardLayout({
       <div className="grid grid-cols-1 items-stretch gap-5 @3xl:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
         <div className="group/artwork relative mx-auto w-full max-w-sm overflow-hidden rounded-lg">
           {artwork}
-          {approved && (
-            <ApprovedStamp
-              size="lg"
-              fresh={fresh}
-              className="pointer-events-none absolute top-3 right-3 z-10 bg-card/85 text-[var(--color-success)] backdrop-blur-sm transition-opacity group-focus-within/artwork:opacity-0 group-hover/artwork:opacity-0 pointer-coarse:opacity-90"
-            />
-          )}
         </div>
         {children}
       </div>
-      {review && <div className="mt-4 border-t pt-4">{review}</div>}
+      {review && <div className="mt-4">{review}</div>}
     </section>
   );
 }

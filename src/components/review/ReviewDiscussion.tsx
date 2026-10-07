@@ -1,5 +1,5 @@
 "use client";
-import { useId, useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { authClient } from "@/server/better-auth/client";
 import { ChevronDown, MessageSquare } from "lucide-react";
@@ -11,9 +11,13 @@ import type { ReviewTarget } from "@/lib/review-target";
 export function ReviewDiscussion({
   target,
   defaultOpen = false,
+  summary,
+  actions,
 }: {
   target: ReviewTarget;
   defaultOpen?: boolean;
+  summary?: ReactNode;
+  actions?: ReactNode;
 }) {
   const { data: session } = authClient.useSession();
   const [open, setOpen] = useState(defaultOpen);
@@ -42,22 +46,32 @@ export function ReviewDiscussion({
   };
   return (
     <div className="w-full space-y-3">
-      <Button
-        size="sm"
-        variant={open ? "secondary" : "ghost"}
-        aria-expanded={open}
-        aria-controls={discussionId}
-        aria-label={open ? "Hide review comments" : "Show review comments"}
-        onClick={() => setOpen(!open)}
-      >
-        <MessageSquare className="size-3.5" />
-        {open ? "Hide comments" : "Comments"}
-        {query.data?.length ? ` · ${query.data.length}` : ""}
-        <ChevronDown
-          aria-hidden="true"
-          className={`size-3.5 transition-transform ${open ? "rotate-180" : ""}`}
-        />
-      </Button>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {summary}
+          <Button
+            size="sm"
+            variant={open ? "secondary" : "ghost"}
+            aria-expanded={open}
+            aria-controls={discussionId}
+            aria-label={open ? "Hide review comments" : "Show review comments"}
+            onClick={() => setOpen(!open)}
+          >
+            <MessageSquare className="size-3.5" />
+            {open ? "Hide comments" : "Comments"}
+            {query.data?.length ? ` · ${query.data.length}` : ""}
+            <ChevronDown
+              aria-hidden="true"
+              className={`size-3.5 transition-transform ${open ? "rotate-180" : ""}`}
+            />
+          </Button>
+        </div>
+        {actions && (
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+            {actions}
+          </div>
+        )}
+      </div>
       {open && (
         <section
           id={discussionId}

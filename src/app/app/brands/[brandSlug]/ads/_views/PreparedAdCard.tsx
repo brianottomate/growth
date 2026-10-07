@@ -1,7 +1,7 @@
 "use client";
 
 import { ReturnToStudioButton } from "@/components/review/ReturnToStudioButton";
-import { ReviewDiscussion } from "@/components/review/ReviewDiscussion";
+import { ReviewFooter } from "@/components/review/ReviewFooter";
 
 import { useState, type ReactNode } from "react";
 import {
@@ -29,7 +29,6 @@ import { MediaPickerDialog } from "@/app/app/content/[contentId]/MediaPickerDial
 import { safeHomeUrl } from "@/lib/ad-preview-links";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 import { textAdCopySchema, textAdReady } from "@/lib/ad-authoring";
-import { ReviewStatusBadge } from "@/components/review/ReviewStatusBadge";
 import type { AdReview } from "@/lib/ad-review";
 import type { AdContent, MediaItem } from "@/server/db/schema";
 import { orpc } from "@/orpc/client";
@@ -344,19 +343,7 @@ export function PreparedAdCard({
         <div className="min-w-0">
           <h3 className="line-clamp-2 font-semibold">{ad.name}</h3>
           <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-            {text ? "Text" : "Video"} ·{" "}
-            <ReviewStatusBadge
-              status={approved ? "approved" : ready ? "ready" : "draft"}
-            />
-            {
-              member(
-                approved
-                  ? ad.review.approvedBy
-                  : ready
-                    ? ad.review.readyBy
-                    : null,
-              )?.name
-            }
+            {text ? "Text" : "Video"}
             {deliveryState ? ` · ${deliveryState}` : ""}
             {metadata && <> · {metadata}</>}
           </p>
@@ -706,7 +693,13 @@ export function PreparedAdCard({
           />
         </div>
       ) : (
-        <footer className="flex flex-wrap justify-end gap-2 border-t pt-4">
+        <ReviewFooter
+          status={approved ? "approved" : ready ? "ready" : "draft"}
+          target={{ type: "ad", id: ad.id }}
+          reviewer={member(
+            approved ? ad.review.approvedBy : ready ? ad.review.readyBy : null,
+          )}
+        >
           {!deliveryState && (
             <Button
               variant="ghost"
@@ -737,7 +730,7 @@ export function PreparedAdCard({
                 })
               }
             >
-              {ready ? "Not ready" : "Mark ready"}
+              {ready ? "Back to draft" : "Mark ready"}
             </Button>
           )}
           {!expanded && !approved && (
@@ -770,10 +763,7 @@ export function PreparedAdCard({
               pushed={Boolean(deliveryState)}
             />
           )}
-        </footer>
-      )}
-      {!reviewPreview && (
-        <ReviewDiscussion target={{ type: "ad", id: ad.id }} />
+        </ReviewFooter>
       )}
       <DeleteAlert
         open={deleteOpen}

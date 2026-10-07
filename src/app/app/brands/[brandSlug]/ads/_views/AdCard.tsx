@@ -1,7 +1,7 @@
 "use client";
 
 import { ReturnToStudioButton } from "@/components/review/ReturnToStudioButton";
-import { ReviewDiscussion } from "@/components/review/ReviewDiscussion";
+import { ReviewFooter } from "@/components/review/ReviewFooter";
 
 import {
   ImagePickerDialog,
@@ -65,9 +65,6 @@ import {
   useReviewPreview,
   previewReviewStatus,
 } from "@/components/review/ReviewPreview";
-import { ReviewStatusBadge } from "@/components/review/ReviewStatusBadge";
-import { ApprovedStamp } from "@/components/approved-stamp";
-import { OwnerAvatar } from "@/components/assignment/assignee";
 import type { AdReview } from "@/lib/ad-review";
 
 const CALL_TO_ACTION_OPTIONS = [
@@ -115,7 +112,6 @@ export function AdCard({
   const ready = review.status === "ready";
   // Approval can show immediately; the server confirms it.
   const [optimistic, setOptimistic] = useState<boolean | null>(null);
-  const [stamped, setStamped] = useState(false);
   useEffect(() => setOptimistic(null), [savedApproved]);
   const approved = optimistic ?? savedApproved;
   // Editing an approved output requires returning the ad to Studio.
@@ -148,7 +144,6 @@ export function AdCard({
       onMutate: ({ status }) => {
         if (status === "approved") {
           setOptimistic(true);
-          setStamped(true);
           setView("overview");
         }
       },
@@ -164,7 +159,6 @@ export function AdCard({
       },
       onError: (error) => {
         setOptimistic(null);
-        setStamped(false);
         toast.error(error.message);
         router.refresh();
       },
@@ -1035,21 +1029,7 @@ export function AdCard({
               {isStatic ? "Static" : "Carousel"} ·{" "}
               {savedState.document.cards.length} {isStatic ? "image" : "slides"}
             </span>
-            {!reviewPreview && (
-              <>
-                <span aria-hidden="true">·</span>
-                <span>
-                  {approved
-                    ? "Approved"
-                    : ready
-                      ? `Ready for review${member(review.readyBy)?.name ? ` · ${member(review.readyBy)?.name}` : ""}`
-                      : ad.content.metaImport
-                        ? "Needs local review"
-                        : "Draft"}
-                  {deliveryState ? ` · ${deliveryState}` : ""}
-                </span>
-              </>
-            )}
+            {deliveryState && <span>· {deliveryState}</span>}
             {metadata && (
               <>
                 <span aria-hidden="true">·</span>
@@ -1418,94 +1398,77 @@ export function AdCard({
           />
         </div>
       ) : (
-        <footer className="flex flex-wrap items-center justify-between gap-3 border-t pt-3">
-          {
-            <div className="flex items-center gap-3 py-1">
-              {approved ? (
-                <ApprovedStamp
-                  at={review.approvedAt ?? ad.updatedAt}
-                  fresh={stamped}
-                />
-              ) : (
-                <ReviewStatusBadge status={ready ? "ready" : "draft"} />
-              )}
-              {member(approved ? review.approvedBy : review.readyBy) && (
-                <OwnerAvatar
-                  member={member(approved ? review.approvedBy : review.readyBy)}
-                  size="sm"
-                />
-              )}
-            </div>
-          }
-          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              aria-label={`Delete ${savedState.name}`}
-              disabled={busy}
-              onClick={() => setDeleteOpen(true)}
-            >
-              <Trash2 className="size-4" />
-            </Button>
+        <ReviewFooter
+          status={approved ? "approved" : ready ? "ready" : "draft"}
+          target={{ type: "ad", id: ad.id }}
+          reviewer={member(
+            approved ? review.approvedBy : ready ? review.readyBy : null,
+          )}
+        >
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            aria-label={`Delete ${savedState.name}`}
+            disabled={busy}
+            onClick={() => setDeleteOpen(true)}
+          >
+            <Trash2 className="size-4" />
+          </Button>
 
+          <Button
+            size="sm"
+            variant="outline"
+            aria-expanded={!collapsed}
+            disabled={busy || editor !== null}
+            onClick={() => setView(collapsed ? "details" : "overview")}
+          >
+            {collapsed ? (locked ? "View details" : "Edit") : "Close details"}
+          </Button>
+
+          {collapsed && !approved && (
             <Button
               size="sm"
               variant="outline"
-              aria-expanded={!collapsed}
-              disabled={busy || editor !== null}
-              onClick={() => setView(collapsed ? "details" : "overview")}
+              disabled={busy || approval.isPending || editor !== null}
+              onClick={() =>
+                approval.mutate({
+                  adId: ad.id,
+                  status: ready ? "drawn" : "ready",
+                  expectedUpdatedAt: savedState.version,
+                })
+              }
             >
-              {collapsed ? (locked ? "View details" : "Edit") : "Close details"}
+              {ready ? "Back to draft" : "Mark ready"}
             </Button>
-
-            {collapsed && !approved && (
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={busy || approval.isPending || editor !== null}
-                onClick={() =>
-                  approval.mutate({
-                    adId: ad.id,
-                    status: ready ? "drawn" : "ready",
-                    expectedUpdatedAt: savedState.version,
-                  })
-                }
-              >
-                {ready ? "Not ready" : "Mark ready"}
-              </Button>
-            )}
-            {collapsed && !approved && (
-              <Button
-                size="sm"
-                disabled={busy || approval.isPending || editor !== null}
-                loading={approval.isPending}
-                onClick={() =>
-                  approval.mutate({
-                    adId: ad.id,
-                    status: "approved",
-                    expectedUpdatedAt: savedState.version,
-                    exportShapes: [
-                      ...(savedState.document.exportShapes ??
-                        savedState.document.shapes),
-                    ],
-                  })
-                }
-              >
-                Approve
-              </Button>
-            )}
-            {collapsed && approved && (
-              <ReturnToStudioButton
-                adId={ad.id}
-                updatedAt={ad.updatedAt}
-                pushed={Boolean(deliveryState)}
-              />
-            )}
-          </div>
-        </footer>
-      )}
-      {!reviewPreview && (
-        <ReviewDiscussion target={{ type: "ad", id: ad.id }} />
+          )}
+          {collapsed && !approved && (
+            <Button
+              size="sm"
+              disabled={busy || approval.isPending || editor !== null}
+              loading={approval.isPending}
+              onClick={() =>
+                approval.mutate({
+                  adId: ad.id,
+                  status: "approved",
+                  expectedUpdatedAt: savedState.version,
+                  exportShapes: [
+                    ...(savedState.document.exportShapes ??
+                      savedState.document.shapes),
+                  ],
+                })
+              }
+            >
+              Approve
+            </Button>
+          )}
+          {collapsed && approved && (
+            <ReturnToStudioButton
+              adId={ad.id}
+              updatedAt={ad.updatedAt}
+              pushed={Boolean(deliveryState)}
+            />
+          )}
+        </ReviewFooter>
       )}
       <DeleteAlert
         open={deleteOpen}

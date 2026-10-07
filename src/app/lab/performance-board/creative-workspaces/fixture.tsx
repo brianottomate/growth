@@ -1,4 +1,5 @@
 "use client";
+import { ReviewStatusBadge } from "@/components/review/ReviewStatusBadge";
 
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
@@ -16,7 +17,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ApprovedStamp } from "@/components/approved-stamp";
 import { Badge } from "@/components/ui/badge";
 import { SimpleDialog } from "@/components/ui/dialog";
 import { WorkspaceCard } from "@/app/app/performance/WorkspaceCard";
@@ -702,7 +702,11 @@ function CatalogFixtureCard({
     <>
       <CatalogCardLayout
         name={home.name}
-        approved={card.approved}
+        review={
+          <ReviewStatusBadge
+            status={card.approved ? "approved" : card.ready ? "ready" : "draft"}
+          />
+        }
         dimmed={!card.included}
         artwork={
           <Image
@@ -915,11 +919,7 @@ function AdFixtureCard({
           />
         )}
         <h4 className="min-w-0 flex-1 text-sm font-medium">{ad.name}</h4>
-        {ad.approved ? (
-          <ApprovedStamp />
-        ) : (
-          <Badge variant="secondary">Draft</Badge>
-        )}
+        <ReviewStatusBadge status={ad.approved ? "approved" : "draft"} />
       </div>
       {ad.assigned && studio && (
         <p className="text-xs text-muted-foreground">{campaignName}</p>
