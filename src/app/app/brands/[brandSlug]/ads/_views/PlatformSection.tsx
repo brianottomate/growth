@@ -9,9 +9,15 @@ import Link from "next/link";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { adRoutesTo, isPushableAdPlatform } from "@/lib/ad-platforms";
 import { db } from "@/server/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { adPlatformSpec } from "@/lib/ad-platforms";
-import { platformAdTable, type PlatformCampaign } from "@/server/db/schema";
+import {
+  adAccountTable,
+  brandTable,
+  platformAdTable,
+  type PlatformCampaign,
+} from "@/server/db/schema";
+import { metaTrackingDefaults } from "@/server/services/meta-tracking-defaults";
 
 import { fmtDate, money, statusStyle } from "./format";
 import { DeletePlatformCampaign } from "./DeletePlatformCampaign";
@@ -77,8 +83,35 @@ export async function PlatformSection({
 
   // ---- draft: the pre-push contract ------------------------------------
   if (isDraft && platform === "meta_ads" && draftAds && audiences) {
+    const brand = await db.query.brandTable.findFirst({
+      where: eq(brandTable.id, platformCampaign.brandId),
+    });
+    const pinned = brand?.performanceSettings?.metaAdsDestination;
+    const account =
+      pinned &&
+      (await db.query.adAccountTable.findFirst({
+        where: and(
+          eq(adAccountTable.brandId, platformCampaign.brandId),
+          eq(adAccountTable.externalId, pinned.adAccountId),
+          eq(adAccountTable.platform, "facebook"),
+          eq(adAccountTable.isAllowed, true),
+        ),
+      }));
+    const destination =
+      pinned?.connectionAccountId && account && brand?.metaPageId
+        ? {
+            ...pinned,
+            adAccountName: account.name,
+            pageId: brand.metaPageId,
+            trackingDefaults: await metaTrackingDefaults(
+              brand.id,
+              account.externalId,
+            ),
+          }
+        : undefined;
     return (
       <MetaPlatformCard
+        destination={destination}
         campaignId={campaignId}
         campaignStartAt={campaignStartAt}
         campaignEndAt={campaignEndAt}

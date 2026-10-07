@@ -482,9 +482,52 @@ async function metaWrite<T>(path: string, body: Record<string, unknown>) {
   });
 }
 
-async function metaRead<T>(path: string, fields: string) {
-  const params = new URLSearchParams({ access_token: adsToken(), fields });
+async function metaRead<T>(
+  path: string,
+  fields: string,
+  query: Record<string, string> = {},
+) {
+  const params = new URLSearchParams({
+    ...query,
+    access_token: adsToken(),
+    fields,
+  });
   return metaFetch<T>(`${ADS_WRITE_URL}/${path}?${params}`);
+}
+
+/** Verify the provider's paused-create promise before recording the campaign. */
+export async function ensureMetaAdsPaused(
+  adIds: string[],
+  client = {
+    statuses: (ids: string[]) =>
+      metaRead<Record<string, { id: string; status: string }>>(
+        "",
+        "id,status",
+        { ids: ids.join(",") },
+      ),
+    pause: (id: string) =>
+      metaWrite<{ success: boolean }>(id, { status: "PAUSED" }),
+    status: (id: string) => metaRead<{ status: string }>(id, "status"),
+  },
+) {
+  for (let offset = 0; offset < adIds.length; offset += 20) {
+    const ids = adIds.slice(offset, offset + 20);
+    const rows = await client.statuses(ids);
+    await Promise.all(
+      ids.map(async (id) => {
+        if (!rows[id])
+          throw new Error(
+            `Meta did not return ad ${id} for pause verification`,
+          );
+        if (rows[id].status === "PAUSED") return;
+        const result = await client.pause(id);
+        if (!result.success) throw new Error(`Meta could not pause ad ${id}`);
+        const verified = await client.status(id);
+        if (verified.status !== "PAUSED")
+          throw new Error(`Meta ad ${id} is still ${verified.status}`);
+      }),
+    );
+  }
 }
 
 /**

@@ -14,6 +14,12 @@ const names: Record<
   string,
   { title: string; destination: string; path: string; unit: string }
 > = {
+  "platform-push": {
+    title: "Pushing campaign",
+    destination: "Campaign",
+    path: "campaigns",
+    unit: "ads",
+  },
   "starter-ads": {
     title: "Generating ads",
     destination: "Ad studio",
@@ -62,7 +68,7 @@ export async function workflowActivity(userId: string, brandId: string) {
       destination: kind.destination,
       href: run.packetId
         ? `/app/creative/${run.packetId}`
-        : `/app/performance/clients/${brand.slug ?? brand.id}/${kind.path}`,
+        : `/app/performance/clients/${brand.slug ?? brand.id}/${kind.path}${run.workflowType === "platform-push" && run.campaignId ? `/${run.campaignId}#campaign-platforms` : ""}`,
       status: run.status,
       message:
         typeof p.message === "string"

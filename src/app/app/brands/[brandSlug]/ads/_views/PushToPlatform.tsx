@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { UploadCloud } from "lucide-react";
+import { Loader2, UploadCloud } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -69,7 +69,7 @@ export function PushToPlatform({
   const destinations = useQuery(
     orpc.ads.destinations.queryOptions({
       input: { brandSlug, platform: zernioAdPlatformKey(platform) },
-      enabled: open,
+      enabled: open && !configuration,
     }),
   );
   // A Meta destination names the Page it runs as, because that is the
@@ -105,6 +105,17 @@ export function PushToPlatform({
     }),
   );
 
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!push.isPending) return;
+    const startedAt = Date.now();
+    setElapsed(0);
+    const timer = setInterval(
+      () => setElapsed(Math.floor((Date.now() - startedAt) / 1000)),
+      1000,
+    );
+    return () => clearInterval(timer);
+  }, [push.isPending]);
   const canPush = Boolean(chosen) && budget != null && !push.isPending;
   const setSummary =
     audienceCount === 0
@@ -133,24 +144,41 @@ export function PushToPlatform({
               {push.isPending
                 ? "Pushing…"
                 : platform === "meta_ads"
-                  ? "Push paused"
+                  ? "Push to Meta"
                   : `Push to ${platformName}`}
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Push to {platformName}?</DialogTitle>
+              <DialogTitle>
+                {push.isPending
+                  ? `Pushing to ${platformName}`
+                  : `Push to ${platformName}?`}
+              </DialogTitle>
               <DialogDescription>
-                {setSummary} × {draftAdCount} ad
-                {draftAdCount === 1 ? "" : "s"} at {budgetSummary} on{" "}
-                {configuration.label}, all paused. Launch starts delivery after
-                you review the result. Returning a creative to Studio keeps its
-                existing platform ads running with their pushed artwork.
+                {push.isPending
+                  ? "Uploading approved artwork and creating your paused campaign. This can take several minutes. Follow progress in Background work."
+                  : `Create ${setSummary} and ${draftAdCount} ad${draftAdCount === 1 ? "" : "s"} on ${configuration.label} with a ${budgetSummary} ${budgetType === "lifetime" ? "" : "campaign "}budget. Everything will be paused. Review in ${platformName} before launching.`}
               </DialogDescription>
             </DialogHeader>
+            {push.isPending && (
+              <p
+                role="status"
+                className="flex items-center gap-2 text-sm text-muted-foreground"
+              >
+                <Loader2 className="size-4 animate-spin" />
+                {Math.floor(elapsed / 60)}:
+                {String(elapsed % 60).padStart(2, "0")} elapsed
+              </p>
+            )}
+            {push.error && (
+              <p role="alert" className="text-sm text-destructive">
+                {push.error.message}
+              </p>
+            )}
             <DialogFooter>
               <Button variant="outline" onClick={() => setOpen(false)}>
-                Cancel
+                {push.isPending ? "Close" : "Cancel"}
               </Button>
               <Button
                 loading={push.isPending}
@@ -165,7 +193,7 @@ export function PushToPlatform({
                   })
                 }
               >
-                Push
+                {push.isPending ? "Pushing…" : `Push to ${platformName}`}
               </Button>
             </DialogFooter>
           </DialogContent>

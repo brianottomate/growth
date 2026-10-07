@@ -1,3 +1,9 @@
+import {
+  startWorkflowRun,
+  claimWorkflowRun,
+  updateWorkflowRun,
+  failWorkflowRun,
+} from "./workflow-run.service";
 import type { DraftAdPreviewResult } from "@/server/contracts/ad-tool-output";
 import { applyMetaTrackingDefaults } from "@/lib/meta-tracking";
 import { metaTrackingDefaults } from "./meta-tracking-defaults";
@@ -17,6 +23,7 @@ import { searchTerms, type SearchTerm } from "@/lib/search-terms";
 import { META_URL_TAGS } from "@/lib/ad-utm";
 import {
   createMetaPlacementCreative,
+  ensureMetaAdsPaused,
   metaCreativeTemplate,
   type MetaCreativeTemplate,
 } from "@/server/clients/meta.client";
@@ -132,7 +139,15 @@ import {
 } from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
 
-type AdsWriteContext = { organizationId: string; runId: string };
+type AdsWriteContext = {
+  organizationId: string;
+  runId: string;
+  reportProgress?: (
+    message: string,
+    completed?: number,
+    total?: number,
+  ) => Promise<void>;
+};
 
 type AdDestination = {
   brand: Pick<Brand, "id" | "slug" | "name" | "zernioProfileId" | "metaPageId">;
@@ -2317,7 +2332,69 @@ export function googleDisplayImages(
  * takes no numbers of its own. Meta creates paused. Google creates then
  * pauses; a failed pause returns the live status and an explicit warning.
  */
+/** The shared activity rail owns progress and serializes provider writes. */
 export async function pushDraftToPlatform(
+  input: Parameters<typeof performPlatformPush>[0],
+  context: AdsWriteContext,
+) {
+  if (input.validateOnly || input.platform !== "meta_ads")
+    return performPlatformPush(input, context);
+  const campaign = await db.query.campaignTable.findFirst({
+    where: eq(campaignTable.id, input.campaignId),
+  });
+  if (!campaign) throw new Error("Campaign not found");
+  const started = await startWorkflowRun({
+    organizationId: context.organizationId,
+    brandId: campaign.brandId,
+    campaignId: campaign.id,
+    workflowType: "platform-push",
+    lockKey: `platform-push:${campaign.id}:${input.platform}`,
+    input: { campaignId: campaign.id, platform: input.platform },
+    progress: { message: "Checking platform access" },
+  });
+  if (!started.started)
+    throw new Error(
+      "A push is already in progress. Follow it in Background work.",
+    );
+  const run = await claimWorkflowRun(started.run.id, "platform-push");
+  if (!run) throw new Error("Could not start platform push");
+  let progress: Record<string, unknown> = {
+    message: "Checking platform access",
+  };
+  try {
+    const result = await performPlatformPush(input, {
+      ...context,
+      reportProgress: async (message, completed, total) => {
+        progress = {
+          ...progress,
+          message,
+          ...(completed != null ? { completed } : {}),
+          ...(total != null ? { total } : {}),
+        };
+        // Activity reporting must never undo a successful provider write.
+        await updateWorkflowRun(run, { progress }).catch((error) =>
+          console.error("Platform push progress unavailable", error),
+        );
+      },
+    });
+    await updateWorkflowRun(run, {
+      status: "succeeded",
+      progress: {
+        ...progress,
+        message:
+          "Campaign created paused. Review in the platform before launching.",
+      },
+    }).catch((error) =>
+      console.error("Platform push completion activity unavailable", error),
+    );
+    return result;
+  } catch (error) {
+    await failWorkflowRun(run, error);
+    throw error;
+  }
+}
+
+async function performPlatformPush(
   input: {
     campaignId: string;
     /**
@@ -2401,6 +2478,7 @@ export async function pushDraftToPlatform(
     throw new Error(
       "Configure the platform connection in brand settings before pushing.",
     );
+  await context.reportProgress?.("Checking platform account and Page access");
   const destination = await requireAdDestination({
     organizationId: context.organizationId,
     brandSlug: brand.slug,
@@ -2444,6 +2522,7 @@ export async function pushDraftToPlatform(
     );
   // Approval is a sign-off; the images it signed off are rendered and saved
   // here, the first time something needs their real URLs.
+  await context.reportProgress?.("Checking approved artwork");
   let froze = false;
   for (let i = 0; i < ads.length; i += 4) {
     const batch = await Promise.all(
@@ -2508,6 +2587,7 @@ export async function pushDraftToPlatform(
 
   // Compile every audience's targeting up front, so a resolution failure
   // surfaces before anything is created.
+  await context.reportProgress?.("Preparing audience targeting");
   const compiled = [];
   for (const audience of audiences) {
     const { spec, warnings: audienceWarnings } = await compileAudienceTargeting(
@@ -3387,6 +3467,9 @@ async function pushToMeta(args: PushArgs) {
     attached: Array<{ planAd: Ad; result: ZernioAdWriteResponse }>;
   };
 
+  let completedAds = 0;
+  const totalAds = usable.length * Math.max(1, compiled.length);
+
   /** An ad set opened with the first ad, then every other ad attached. */
   const createAdSet = async (setArgs: {
     audience: PlanAudience | null;
@@ -3395,6 +3478,11 @@ async function pushToMeta(args: PushArgs) {
     validateOnly: boolean;
   }): Promise<CreatedSet> => {
     const [lead, ...rest] = usable;
+    await context.reportProgress?.(
+      `Creating ad set and uploading ${lead!.ad.name}`,
+      completedAds,
+      totalAds,
+    );
     const audienceKey = setArgs.audience?.id ?? "broad";
     const payload: CreateZernioStandaloneAdInput = {
       accountId: input.connectionAccountId,
@@ -3433,6 +3521,7 @@ async function pushToMeta(args: PushArgs) {
     if (setArgs.validateOnly || result.validateOnly) {
       return { result, attached: [] };
     }
+    await context.reportProgress?.("Ad set created", ++completedAds, totalAds);
     const adSetId = writtenAdSetId(result);
     if (!adSetId && rest.length > 0) {
       throw new Error(
@@ -3441,6 +3530,11 @@ async function pushToMeta(args: PushArgs) {
     }
     const attached: CreatedSet["attached"] = [];
     for (const { ad, content } of rest) {
+      await context.reportProgress?.(
+        `Uploading and creating ${ad.name}`,
+        completedAds,
+        totalAds,
+      );
       const attach: CreateZernioStandaloneAdInput = {
         accountId: input.connectionAccountId,
         adAccountId: destination.adAccount.id,
@@ -3463,6 +3557,7 @@ async function pushToMeta(args: PushArgs) {
           adAccount: destination.adAccount,
         }),
       });
+      await context.reportProgress?.("Ad created", ++completedAds, totalAds);
     }
     return { result, attached };
   };
@@ -3518,6 +3613,7 @@ async function pushToMeta(args: PushArgs) {
     };
   }
 
+  await context.reportProgress?.("Creating paused Meta campaign", 0, totalAds);
   const shell = await createZernioAdCampaign(
     {
       accountId: input.connectionAccountId,
@@ -3562,6 +3658,17 @@ async function pushToMeta(args: PushArgs) {
       });
       perSet.push({ audience, spec, set });
     }
+    await context.reportProgress?.(
+      "Verifying every Meta ad is paused",
+      completedAds,
+      totalAds,
+    );
+    const adIds = perSet.flatMap(({ set }) =>
+      setAdsFor(set).map((ad) => ad.externalId),
+    );
+    if (adIds.some((id) => !id))
+      throw new Error("Meta returned an ad without an ID");
+    await ensureMetaAdsPaused(adIds as string[]);
   } catch (error) {
     const cleanedUp = await deleteZernioCampaign({
       campaignId: shellId,
@@ -3579,19 +3686,6 @@ async function pushToMeta(args: PushArgs) {
           ? "the campaign was removed from Meta so nothing is half-built"
           : `removing campaign ${shellId} from Meta also failed, delete it in Ads Manager`
       }. ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-
-  // Zernio has been seen leaving the opening ad ACTIVE despite PAUSED.
-  const active = perSet.flatMap(({ set }) =>
-    [set.result, ...set.attached.map(({ result }) => result)].filter(
-      (result) =>
-        (result.ad ?? result.ads?.[0])?.status?.toUpperCase() === "ACTIVE",
-    ),
-  );
-  if (active.length > 0) {
-    warnings.push(
-      `${active.length} ad(s) came back ACTIVE; pause them in Ads Manager before the campaign is switched on`,
     );
   }
 

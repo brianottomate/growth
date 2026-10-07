@@ -19,7 +19,7 @@ import {
   type MetaPlacement,
 } from "@/lib/meta-placement-plan";
 import { useRouter } from "next/navigation";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { ChannelLogo } from "@/components/channel-logos";
 import { Button } from "@/components/ui/button";
 import {
@@ -64,6 +64,7 @@ type Audience = {
 const DEFAULT_PROJECTION_EXPANSION: Record<string, boolean> = {};
 
 export function MetaPlatformCard({
+  destination,
   campaignId,
   campaignName,
   brandSlug,
@@ -75,6 +76,13 @@ export function MetaPlatformCard({
   ads,
   audiences,
 }: {
+  destination?: {
+    connectionAccountId: string;
+    adAccountId: string;
+    adAccountName: string | null;
+    pageId: string;
+    trackingDefaults?: Parameters<typeof applyMetaTrackingDefaults>[1];
+  };
   campaignId: string;
   campaignName: string;
   campaignStartAt?: Date | null;
@@ -97,19 +105,14 @@ export function MetaPlatformCard({
   const saved = pc.settings?.meta;
   const [goal, setGoal] = useState<AdPushGoal>(saved?.goal ?? "conversions");
   const sectionId = useId();
-  const destinations = useQuery(
-    orpc.ads.destinations.queryOptions({
-      input: { brandSlug, platform: "meta" },
-    }),
-  );
-  const choices = destinations.data?.destinations ?? [];
-  const chosen = choices[0];
+  const chosen = destination;
+  const choices = chosen ? [chosen] : [];
   const configuration = chosen
     ? {
         connectionAccountId: chosen.connectionAccountId,
         adAccountId: chosen.adAccountId,
         goal,
-        label: `${chosen.adAccountName ?? chosen.adAccountId} · Page ${chosen.pageId ?? "not resolved"}`,
+        label: chosen.adAccountName ?? chosen.adAccountId,
       }
     : undefined;
   const routedAds = ads.filter((ad) => adRoutesTo(ad.platforms, "meta_ads"));
@@ -176,9 +179,6 @@ export function MetaPlatformCard({
   const blockers = [
     scheduleError,
     !configuration && "Configure Meta access in brand settings.",
-    configuration &&
-      !chosen?.runsAsBrandPage &&
-      "The connection does not have access to this brand’s Facebook Page.",
     !placementPlan.length && "Choose delivery placements in Settings.",
     missingTracking &&
       "Set a pixel and conversion event, or a custom conversion, in Settings.",
@@ -212,7 +212,7 @@ export function MetaPlatformCard({
           />
           {!ready && (
             <Button size="sm" disabled>
-              Push paused
+              Push to Meta
             </Button>
           )}
           {ready && (
@@ -240,7 +240,7 @@ export function MetaPlatformCard({
           />
         </div>
       </div>
-      {!ready && !destinations.isPending && (
+      {!ready && (
         <div
           className="space-y-1 text-sm text-muted-foreground"
           aria-label="Required before pushing"
@@ -316,31 +316,16 @@ export function MetaPlatformCard({
             <SetupFact
               label="Ad account"
               value={
-                chosen?.adAccountName ??
-                chosen?.adAccountId ??
-                (destinations.isPending ? "Loading…" : "Not selected")
+                chosen?.adAccountName ?? chosen?.adAccountId ?? "Not configured"
               }
               detail={chosen?.pageId ? `Page ${chosen.pageId}` : "No Page"}
             />
           </dl>
-          {destinations.error && (
-            <p role="alert" className="text-sm">
-              {destinations.error.message}
+          {!choices.length && (
+            <p className="text-sm text-muted-foreground">
+              Configure Meta access in brand settings before pushing.
             </p>
           )}
-          {chosen && !chosen.runsAsBrandPage && (
-            <p role="alert" className="text-sm">
-              This destination does not match the brand’s Facebook Page. Choose
-              a matching connection before pushing.
-            </p>
-          )}
-          {!destinations.isPending &&
-            !destinations.error &&
-            !choices.length && (
-              <p className="text-sm text-muted-foreground">
-                No allowlisted Meta destination is connected to this brand.
-              </p>
-            )}
           <details className="group text-xs text-muted-foreground">
             <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 [&::-webkit-details-marker]:hidden">
               <ChevronRight className="size-3 transition-transform group-open:rotate-90" />
