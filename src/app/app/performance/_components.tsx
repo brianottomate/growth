@@ -1,3 +1,4 @@
+import { ClientPreviewLink } from "./clients/[brandSlug]/ads/ClientPreviewLink";
 import {
   CampaignPlatforms,
   CampaignSummary,
@@ -229,6 +230,10 @@ export function CampaignRow({
       <span className="hidden w-36 shrink-0 text-right @lg:block">
         <SpendCell campaign={campaign} />
       </span>
+      <ClientPreviewLink
+        brandId={brand.id}
+        campaign={{ id: campaign.id, name: campaign.name }}
+      />
       {deletable ? (
         <span className="justify-self-end @lg:w-8 @lg:shrink-0">
           <DeleteCampaignButton

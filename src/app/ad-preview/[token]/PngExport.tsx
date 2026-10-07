@@ -156,16 +156,19 @@ export function PngExport({
           ...root.querySelectorAll<HTMLElement>("[data-export-ad]"),
         ];
         for (const [index, section] of sections.entries()) {
-          const png = await toPng(section, { ...options, pixelRatio: 2 });
+          const png = await toPng(section, {
+            ...options,
+            pixelRatio: Math.min(2, 16_000 / section.scrollHeight),
+          });
           zip.file(
-            `${filename}-ad-${String(index + 1).padStart(2, "0")}.png`,
+            `${filename}-${section.getAttribute("data-export-name") ?? `ad-${String(index + 1).padStart(2, "0")}`}.png`,
             png.split(",")[1]!,
             { base64: true },
           );
         }
         const blob = await zip.generateAsync({ type: "blob" });
         const url = URL.createObjectURL(blob);
-        download(url, `${filename}-ads.zip`);
+        download(url, `${filename}.zip`);
         setTimeout(() => URL.revokeObjectURL(url), 10_000);
       }
     } catch (error) {
@@ -189,7 +192,7 @@ export function PngExport({
           Full page (one image)
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => void run("ads")}>
-          Each ad (zip)
+          Each ad / catalog (zip)
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <a href={`/ad-preview/${token}/sheet?download=1`}>

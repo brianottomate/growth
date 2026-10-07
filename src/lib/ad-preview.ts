@@ -139,6 +139,12 @@ export const createAdPreviewLinkInput = z
     brandId: z.string().min(1),
     campaignId: z.string().min(1).nullable(),
     catalogExportId: z.string().min(1).nullable(),
+    catalogCardIndexes: z
+      .array(z.number().int().min(0).max(9999))
+      .min(1)
+      .max(500)
+      .nullable()
+      .default(null),
     expiresInDays: z.number().int().min(1).max(90).default(30),
   })
   .refine((input) => input.campaignId || input.catalogExportId, {

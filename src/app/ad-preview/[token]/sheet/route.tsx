@@ -207,7 +207,7 @@ export async function GET(
   const cards = preview.catalog?.cards ?? [];
   const perRow = Math.floor((WIDTH - PAD * 2 + 24) / (TILE + 24));
   const catalogHeight = cards.length
-    ? 120 + Math.ceil(cards.length / perRow) * (TILE + 72)
+    ? 220 + Math.ceil(cards.length / perRow) * (TILE + 130)
     : 0;
   const height = PAD * 2 + 140 + ads.length * (ROW + 32) + catalogHeight + 60;
   const fonts = await loadGoogleFont("Instrument Sans", [400, 600]);
@@ -235,14 +235,19 @@ export async function GET(
         </div>
       </div>
       {ads.length > 0 && (
-        <Label>{`CAMPAIGN · ${ads.length} ${ads.length === 1 ? "AD" : "ADS"}`}</Label>
+        <Label>{`CAMPAIGN · ${ads.length} ${ads.length === 1 ? "AD" : "ADS"}${preview.campaign?.unavailableAds ? ` · ${preview.campaign.unavailableAds} APPROVED ADS AWAITING PREVIEW ARTWORK` : ""}`}</Label>
       )}
       {ads.map((ad, index) => (
         <AdRow key={ad.id} ad={ad} index={index} />
       ))}
       {cards.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          <Label>{`CATALOG · ${cards.length} HOMES`}</Label>
+          <Label>{`CATALOG · ${cards.length} OF ${preview.catalog?.totalCards} HOMES`}</Label>
+          <div
+            style={{ fontSize: 19, color: "#3d3d3d", whiteSpace: "pre-wrap" }}
+          >
+            {clip(preview.catalog?.ad?.primaryText, 400)}
+          </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 24 }}>
             {cards.map((card) => (
               <div
@@ -259,10 +264,13 @@ export async function GET(
                   src={card.image}
                   width={TILE}
                   height={TILE}
-                  style={{ objectFit: "cover", borderRadius: 14 }}
+                  style={{ objectFit: "contain", borderRadius: 14 }}
                 />
                 <div style={{ fontSize: 17, fontWeight: 600 }}>
-                  {clip(card.headline, 28)}
+                  {clip(card.headline, 60)}
+                </div>
+                <div style={{ fontSize: 16, color: "#6b6b6b" }}>
+                  {clip(card.description, 100)}
                 </div>
               </div>
             ))}
@@ -277,7 +285,8 @@ export async function GET(
           color: "#8a8a8a",
         }}
       >
-        Prepared by Wander Performance
+        Prepared by Wander Performance · Composed overview; long copy and
+        carousels are shortened.
       </div>
     </div>
   );

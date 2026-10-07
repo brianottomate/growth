@@ -20,32 +20,11 @@ export const metadata: Metadata = {
  * theme, because the mocks imitate light feeds and the page is saved to PDF
  * from the browser as often as it is opened.
  *
- * Suggested next steps, in order:
- *
- * 1. Revocable links. The token is stateless (brand, ads, expiry, HMAC), so a
- *    link cannot be killed before it expires short of rotating
- *    BETTER_AUTH_SECRET. An `ad_preview_link` row holding a sha256 of the
- *    token, `expiresAt` and `revokedAt` fixes that and lists sent links
- *    in the studio. It is also the parent the next two items need.
- * 2. Client decisions. Approve / request changes per ad, signed with a name
- *    the client types once (kept in localStorage). Record the decision
- *    against a snapshot of what the page drew (stored per ad when the link is
- *    made), so the decision describes what the client reviewed.
- * 3. Comments. A table with `authorName` text and no user FK, per ad or for
- *    the whole set, capped per link. Do NOT reach for Better Auth anonymous
- *    sessions here: sign-up is gated to @wander.com, `user.create.after`
- *    auto-joins every new user to the Wander org, and `protectedProcedure`
- *    (~280 procedures), /lab and several API routes treat any session as a
- *    teammate. The token stays the only credential.
- * 4. One-click PDF/PNG. Today the operator or client uses the browser's
- *    "Save as PDF". wander.com's pitch export (`src/features/pitchExport`)
- *    shows the server path: playwright-core + @sparticuz/chromium. Here it is
- *    simpler, because this page is server-rendered from the token, so the
- *    headless browser can load `/ad-preview/<token>` directly and print it,
- *    with no DOM capture or asset inlining.
- * 5. Catalog and Google display. Catalog cards can reuse
- *    `CatalogCollectionPreview` once its card URLs are frozen to R2; catalog
- *    ad copy is not covered by the card fingerprint, so gate it first.
+ * Links read the campaign's current approved ads and a frozen catalog export,
+ * optionally limited to selected homes. Returning an ad to Studio removes it
+ * from this page. Rotating the brand connect token revokes its preview links.
+ * Browser PNG/PDF exports include the selected catalog's full home list;
+ * the Satori sheet is a compact overview with shortened copy and carousels.
  */
 export default async function AdPreviewPage({
   params,

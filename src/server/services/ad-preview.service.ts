@@ -16,7 +16,7 @@ import {
   type AdPreviewCatalogCard,
   type createAdPreviewLinkInput,
 } from "@/lib/ad-preview";
-import type { CatalogDraft } from "@/lib/catalog-studio";
+import { defaultCatalogAdCopy, type CatalogDraft } from "@/lib/catalog-studio";
 import { freezeApprovedAd } from "./ad-approval.service";
 import { ensureBrandConnect } from "./brand-connect.service";
 
@@ -32,6 +32,7 @@ type PreviewClaims = {
   c: string | null;
   x: string | null;
   e: number;
+  h?: number[] | null;
 };
 
 function signingKey() {
@@ -51,7 +52,7 @@ function signToken(claims: PreviewClaims, brandToken: string) {
 /** The claims of a genuine, unexpired link, or null. */
 async function readToken(token: string): Promise<PreviewClaims | null> {
   const [payload, sig, extra] = token.split(".");
-  if (!payload || !sig || extra !== undefined || token.length > 1000)
+  if (!payload || !sig || extra !== undefined || token.length > 8000)
     return null;
   let claims: PreviewClaims;
   try {
@@ -121,7 +122,7 @@ export async function adPreviewOptions(orgId: string, brandId: string) {
     }),
     db.query.catalogExportTable.findMany({
       where: eq(catalogExportTable.brandId, brandId),
-      columns: { id: true, createdAt: true, output: true },
+      columns: { id: true, createdAt: true, input: true, output: true },
       orderBy: desc(catalogExportTable.createdAt),
       limit: 10,
     }),
@@ -136,7 +137,10 @@ export async function adPreviewOptions(orgId: string, brandId: string) {
     catalogExports: exports.map((row) => ({
       id: row.id,
       createdAt: row.createdAt.toISOString(),
-      cards: (row.output as { completed?: number }).completed ?? 0,
+      cards: catalogFromExport(row).cards.map((card, index) => ({
+        index,
+        headline: card.headline,
+      })),
     })),
   };
 }
@@ -172,14 +176,18 @@ export async function createAdPreviewLink(
     for (const ad of approved) await freezeApprovedAd(ad.id);
   }
   if (input.catalogExportId) {
-    const exported = await db.query.catalogExportTable.findFirst({
-      where: and(
-        eq(catalogExportTable.id, input.catalogExportId),
-        eq(catalogExportTable.brandId, brand.id),
-      ),
-      columns: { id: true },
-    });
-    if (!exported) throw new Error("Catalog export not found for this brand");
+    const catalog = await frozenCatalog(brand.id, input.catalogExportId);
+    if (!catalog?.cards.length)
+      throw new Error("This catalog export has no preview cards.");
+    if (
+      input.catalogCardIndexes &&
+      (new Set(input.catalogCardIndexes).size !==
+        input.catalogCardIndexes.length ||
+        input.catalogCardIndexes.some((index) => index >= catalog.cards.length))
+    )
+      throw new Error("Choose homes from this catalog export.");
+  } else if (input.catalogCardIndexes) {
+    throw new Error("Choose a catalog export before selecting homes.");
   }
   const expiresAt = Date.now() + input.expiresInDays * 86_400_000;
   const { token: brandToken } = await ensureBrandConnect(brand.id);
@@ -189,6 +197,7 @@ export async function createAdPreviewLink(
       c: input.campaignId,
       x: input.catalogExportId,
       e: expiresAt,
+      h: input.catalogCardIndexes,
     },
     brandToken,
   );
@@ -207,6 +216,15 @@ async function frozenCatalog(brandId: string, exportId: string) {
     ),
   });
   if (!row) return null;
+  return catalogFromExport(row);
+}
+
+function catalogFromExport(
+  row: Pick<
+    typeof catalogExportTable.$inferSelect,
+    "input" | "output" | "createdAt"
+  >,
+) {
   const { draft } = row.input as { draft: CatalogDraft };
   const output = row.output as {
     assets?: { homeId: string; name: string; url: string; format: string }[];
@@ -270,13 +288,25 @@ export async function loadAdPreviewPage(token: string) {
     const ad = adPreviewAd({ ...row, homeName: row.home?.name });
     return ad ? [{ id: row.id, ...ad }] : [];
   });
-  if (!ads.length && !catalog?.cards.length) return null;
+  const selectedCatalog = catalog
+    ? {
+        ...catalog,
+        ad: catalog.ad ?? defaultCatalogAdCopy(brand.name),
+        cards: claims.h
+          ? catalog.cards.filter((_, index) => claims.h!.includes(index))
+          : catalog.cards,
+        totalCards: catalog.cards.length,
+      }
+    : null;
+  if (!ads.length && !selectedCatalog?.cards.length) return null;
   return {
     brandName: brand.name,
     brandLogo,
     expiresAt: new Date(claims.e).toISOString(),
-    campaign: campaign ? { name: campaign.name, ads } : null,
-    catalog: catalog?.cards.length ? catalog : null,
+    campaign: campaign
+      ? { name: campaign.name, ads, unavailableAds: rows.length - ads.length }
+      : null,
+    catalog: selectedCatalog?.cards.length ? selectedCatalog : null,
   };
 }
 export type AdPreviewPage = NonNullable<

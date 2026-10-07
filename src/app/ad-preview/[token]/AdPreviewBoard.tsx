@@ -60,6 +60,15 @@ export function AdPreviewBoard({
               <p className="text-sm text-muted-foreground">
                 Campaign · {ads.length} {ads.length === 1 ? "ad" : "ads"}
               </p>
+              {preview.campaign.unavailableAds > 0 && (
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {preview.campaign.unavailableAds} approved{" "}
+                  {preview.campaign.unavailableAds === 1
+                    ? "ad has"
+                    : "ads have"}{" "}
+                  no shareable preview artwork yet.
+                </p>
+              )}
             </div>
             {ads.map((ad, index) => (
               <section
@@ -93,22 +102,49 @@ export function AdPreviewBoard({
           <section
             aria-label="Catalog"
             data-export-ad
-            className="space-y-5 rounded-2xl border border-border bg-surface-primary p-4 sm:p-6 print:break-inside-avoid"
+            data-export-name="catalog"
+            className="space-y-5 rounded-2xl border border-border bg-surface-primary p-4 sm:p-6"
           >
             <div>
               <p className="text-xs text-muted-foreground">
-                Catalog · {preview.catalog.cards.length} homes
+                Catalog · {preview.catalog.cards.length} of{" "}
+                {preview.catalog.totalCards} homes
               </p>
               <h2 className="text-lg font-semibold">
                 {preview.brandName} catalog ads
               </h2>
             </div>
+            <p className="text-sm whitespace-pre-wrap">
+              {preview.catalog.ad?.primaryText}
+            </p>
             <div className="@container">
               <CatalogCollectionPreview
                 brandName={preview.brandName}
                 ad={preview.catalog.ad ?? undefined}
                 cards={preview.catalog.cards}
               />
+            </div>
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold">Included homes</h3>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 print:grid-cols-3">
+                {preview.catalog.cards.map((card) => (
+                  <article
+                    key={card.key}
+                    className="space-y-2 print:break-inside-avoid"
+                  >
+                    {/* oxlint-disable-next-line nextjs/no-img-element */}
+                    <img
+                      src={card.image}
+                      alt={card.headline}
+                      className="aspect-square w-full rounded-lg bg-muted object-contain"
+                    />
+                    <p className="text-sm font-semibold">{card.headline}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {card.description}
+                    </p>
+                  </article>
+                ))}
+              </div>
             </div>
           </section>
         )}
