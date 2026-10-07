@@ -101,7 +101,8 @@ export function useChatQueue({
           document.hidden
             ? 60_000
             : pollState.current?.activeTurnId ||
-                pollState.current?.inputs.length
+                pollState.current?.inputs.length ||
+                ["submitted", "streaming"].includes(current.current.status)
               ? 2000
               : 30_000,
         );
@@ -116,7 +117,7 @@ export function useChatQueue({
       disposed = true;
       clearTimeout(timer);
     };
-  }, [active, refresh]);
+  }, [active, refresh, status]);
   useEffect(() => {
     if (
       !active ||
@@ -146,19 +147,22 @@ export function useChatQueue({
   const enqueue = useCallback(
     async (payload: QueuedPayload, steer = false) => {
       if (accepting.current) return false;
-      if (steer && !state?.activeTurnId) {
+      const steeringContext = state?.steering?.context;
+      if (steer && (!state?.activeTurnId || !steeringContext)) {
         toast.error(
-          "Wait for the current response to start before steering it.",
+          state?.steering?.reason ??
+            "Wait for the current response to start before steering it.",
         );
         return false;
       }
+      const context = steer ? steeringContext! : payload.context;
       accepting.current = true;
       setSaving(true);
       try {
         const key = JSON.stringify({
           threadId,
           parts: payload.message.parts,
-          context: payload.context,
+          context,
           steer,
         });
         const id =
@@ -168,7 +172,11 @@ export function useChatQueue({
         unacknowledged.current = { key, id };
         const receipt = await command({
           action: "enqueue",
-          payload: { ...payload, message: { ...payload.message, id } },
+          payload: {
+            ...payload,
+            context,
+            message: { ...payload.message, id },
+          },
           ...(steer && state?.activeTurnId
             ? { targetTurnId: state.activeTurnId }
             : {}),
@@ -191,7 +199,7 @@ export function useChatQueue({
         setSaving(false);
       }
     },
-    [command, state?.activeTurnId, threadId],
+    [command, state, threadId],
   );
   const control = useCallback(
     async (action: string, id?: string, text?: string) => {

@@ -3,7 +3,6 @@
 import { isChatUtilityTool } from "@/lib/chat-utility-tools";
 import {
   assistantFocusLabel,
-  sameTurnFocus,
   type AssistantFocus,
 } from "@/lib/assistant-focus";
 import { appliedEvidenceSchema } from "@/lib/applied-evidence";
@@ -868,8 +867,27 @@ export function OverviewChat({
     (input.trim().length > 0 || readyAttachments.length > 0);
 
   // The composer sends text and every ready attachment as one durable turn.
-  const submitComposer = async (steer = false) => {
-    if (!canSend) return;
+  const steeringReason = busy
+    ? readyAttachments.length > 0 || attachmentsUploading
+      ? "Attachments need a new turn. Use Queue."
+      : (queue.state?.steering?.reason ??
+        (!queue.state?.steering?.context
+          ? "Waiting for current work to start. You can queue a follow-up."
+          : null))
+    : null;
+  const steeringContext = queue.state?.steering?.context;
+  const steeringLabel = steeringContext
+    ? (assistantFocusLabel({
+        catalogHomeContext:
+          steeringContext.catalogContext as AssistantFocus["catalogHomeContext"],
+        adWorkContext:
+          steeringContext.campaignContext as AssistantFocus["adWorkContext"],
+        workContext:
+          steeringContext.workContext as AssistantFocus["workContext"],
+      }) ?? "current work")
+    : "current work";
+  const submitComposer = async (steer = busy) => {
+    if (!canSend || (steer && steeringReason)) return;
     const chatAttachments = readyAttachments.map((attachment) => ({
       url: attachment.hostedUrl,
       mediaType: attachment.mediaType,
@@ -1276,6 +1294,12 @@ export function OverviewChat({
               />
             </div>
             <ChatQueue state={queue.state} control={queue.control} />
+            {busy && (
+              <p className="mb-2 text-xs text-muted-foreground" role="status">
+                {steeringReason ??
+                  `Enter steers ${steeringLabel}. Queue starts a follow-up.`}
+              </p>
+            )}
             <AssistantVoiceControls
               voice={voice}
               dictation={dictation}
@@ -1331,27 +1355,20 @@ export function OverviewChat({
               </Button>
               <div className="flex items-center gap-2">
                 <AssistantVoiceButtons voice={voice} dictation={dictation} />
-                {busy &&
-                  queue.state?.activeTurnId &&
-                  canSend &&
-                  queue.state.inputs.some(
-                    (item) =>
-                      item.status === "running" &&
-                      sameTurnFocus(
-                        item.payload.context,
-                        requestBodyRef.current,
-                      ),
-                  ) &&
-                  readyAttachments.length === 0 && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => void submitComposer(true)}
-                    >
-                      Steer
-                    </Button>
-                  )}
+                {busy && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!canSend}
+                    onClick={() => void submitComposer(false)}
+                    className="h-11 lg:h-9"
+                    aria-label="Queue message"
+                    title="Run this message after current work finishes"
+                  >
+                    Queue
+                  </Button>
+                )}
                 {busy && (
                   <Button
                     type="button"
@@ -1366,12 +1383,17 @@ export function OverviewChat({
                 )}
                 <Button
                   type="submit"
-                  size={busy ? "sm" : "icon"}
-                  disabled={!canSend}
-                  className={busy ? "h-11 lg:h-8" : "size-11 lg:size-9"}
-                  aria-label={busy ? "Queue message" : "Send"}
+                  size="icon"
+                  disabled={!canSend || (busy && Boolean(steeringReason))}
+                  className="size-11 lg:size-9"
+                  aria-label={busy ? "Steer current work" : "Send"}
+                  title={
+                    busy
+                      ? (steeringReason ?? `Steer ${steeringLabel} (Enter)`)
+                      : "Send (Enter)"
+                  }
                 >
-                  {busy ? "Queue" : <ArrowUp className="h-4 w-4" />}
+                  <ArrowUp className="h-4 w-4" />
                 </Button>
               </div>
             </div>

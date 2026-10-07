@@ -116,7 +116,19 @@ export async function getChatTurnState(actor: ChatActor, threadId: string) {
         ),
       )
       .orderBy(asc(inputs.sequence));
+    const running = pending.find((input) => input.status === "running");
     return {
+      steering: {
+        context:
+          thread.activeTurnId && !thread.stopRequested && running
+            ? running.payload.context
+            : null,
+        reason: thread.stopRequested
+          ? "Current work is stopping. Queue a follow-up."
+          : thread.activeTurnId && !running
+            ? "Steering is unavailable during this continuation. Queue a follow-up."
+            : null,
+      },
       activeTurnId: thread.activeTurnId,
       paused: thread.queuePaused,
       stopRequested: thread.stopRequested,

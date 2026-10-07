@@ -65,3 +65,15 @@ entries. Its concurrency checks use real PostgreSQL row locks.
 Browser checks cover queue editing after reload, resuming a paused queue,
 steering during a model loop, editable next-step suggestions, and a narrow
 viewport. Run model checks with read-only prompts and no provider mutations.
+
+## Composer actions
+
+Send uses the up arrow and Enter when idle. During a response, the up arrow
+and Enter steer current work; Queue remains a separate secondary button.
+Steering uses the running input's saved context, including after page navigation.
+Queue captures the current page context. The server snapshot supplies steering
+availability. The composer keeps the primary action visible and explains waits,
+attachments, stopping, and continuations that have no running input.
+
+Accepted steering applies before the next model step. A tool in progress finishes
+first. A correction submitted after the turn finishes becomes a queued follow-up.

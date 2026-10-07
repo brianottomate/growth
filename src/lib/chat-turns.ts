@@ -41,6 +41,7 @@ export type ChatTurnSnapshot = {
   activeTurnId: string | null;
   paused: boolean;
   stopRequested: boolean;
+  steering?: { context: Record<string, unknown> | null; reason: string | null };
   inputs: PendingChatInput[];
   messages: UIMessage[];
 };

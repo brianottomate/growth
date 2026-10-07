@@ -67,6 +67,11 @@ try {
   const winner = contenders.find((r) => r.status === "fulfilled")!;
   assert.equal(winner.status, "fulfilled");
   const turn = winner.value.turnId;
+  assert.deepEqual(
+    (await getChatTurnState(actor, threadId)).steering.context,
+    a.context,
+  );
+  pass("steering reports the running target for a composer on another page");
   pass("two tabs cannot claim the same turn");
   const b = payload(`b-${suffix}`, "Also draft a second option");
   await enqueueChatInput(actor, threadId, b);
@@ -127,6 +132,7 @@ try {
   let state = await getChatTurnState(actor, threadId);
   assert.equal(state.paused, true);
   assert.equal(state.inputs[0]!.status, "failed");
+  assert.equal(state.steering.context, null);
   pass("stop fences tools and retains failed input for review");
   await changeChatQueue(actor, threadId, "cancel", b.message.id);
   await changeChatQueue(actor, threadId, "resume");
