@@ -3,7 +3,14 @@
 import { ReturnToStudioButton } from "@/components/review/ReturnToStudioButton";
 
 import { useState } from "react";
-import { ChevronDown, Images, Play, Type } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Images,
+  Play,
+  Type,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AD_FORMATS, adFormat } from "@/lib/ad-format";
 import type { AdReview } from "@/lib/ad-review";
@@ -45,16 +52,23 @@ export function CampaignAdCard({
   studioHref: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [slide, setSlide] = useState(0);
   const format = adFormat(ad.content);
   const creative = "media" in ad.content ? ad.content : null;
   const document = creative
     ? ideaDocumentFromAd({ name: ad.name, content: creative })
     : null;
   const studio = creative?.ideaStudio;
-  const firstCard = document?.cards[0];
-  const first = creative?.media[0];
+  const slideCount = Math.max(
+    document?.cards.length ?? 0,
+    creative?.media.length ?? 0,
+    1,
+  );
+  const currentSlide = Math.min(slide, slideCount - 1);
+  const firstCard = document?.cards[currentSlide];
+  const first = creative?.media[currentSlide];
   const thumbnail =
-    studio?.approval?.renders.square?.[0]?.url ??
+    studio?.approval?.renders.square?.[currentSlide]?.url ??
     (first?.type === "image" ? first.url : first?.thumbnail) ??
     (firstCard
       ? firstCard.mode === "supplied"
@@ -70,8 +84,8 @@ export function CampaignAdCard({
       id={`ad-${ad.id}`}
       className="overflow-hidden rounded-xl border bg-background"
     >
-      <div className="flex items-start gap-3 p-4">
-        <div className="relative flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
+      <div className="flex flex-wrap items-start gap-4 p-4">
+        <div className="relative flex size-36 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
           {thumbnail ? (
             <img
               src={thumbnail}
@@ -82,13 +96,33 @@ export function CampaignAdCard({
           ) : (
             <Icon className="size-5 text-muted-foreground" />
           )}
-          {format === "carousel" && (
-            <span className="absolute right-1 bottom-1 rounded bg-black/70 px-1 text-[10px] text-white">
-              {document?.cards.length ?? creative?.media.length} slides
-            </span>
+          {format === "carousel" && slideCount > 1 && (
+            <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-black/70 px-1 py-1 text-xs text-white">
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                aria-label={`Previous slide for ${ad.name}`}
+                onClick={() =>
+                  setSlide((currentSlide + slideCount - 1) % slideCount)
+                }
+              >
+                <ChevronLeft className="size-4" />
+              </Button>
+              <span aria-live="polite">
+                {currentSlide + 1} / {slideCount}
+              </span>
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                aria-label={`Next slide for ${ad.name}`}
+                onClick={() => setSlide((currentSlide + 1) % slideCount)}
+              >
+                <ChevronRight className="size-4" />
+              </Button>
+            </div>
           )}
         </div>
-        <div className="min-w-0 flex-1 space-y-1.5">
+        <div className="min-w-40 flex-1 space-y-1.5">
           <h3 className="text-sm font-semibold">{ad.name}</h3>
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <span>{AD_FORMATS.find((item) => item.id === format)?.label}</span>

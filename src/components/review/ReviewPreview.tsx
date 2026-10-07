@@ -52,7 +52,7 @@ export function useReviewPreview() {
   );
 }
 
-type Note = { person: string; text: string; version: number; event?: boolean };
+type Note = { person: string; text: string };
 const initials = (name: string) =>
   name
     .split(" ")
@@ -88,79 +88,19 @@ export function ReviewPreview({
   const [status, setStatus] = useState(
     () => (reviewKey && previewStatuses.get(reviewKey)) || initialStatus,
   );
-  const [version, setVersion] = useState(2);
   const [changed, setChanged] = useState(false);
   const [open, setOpen] = useState(false);
-  const [history, setHistory] = useState(false);
   const [text, setText] = useState("");
-  const [notes, setNotes] = useState<Note[]>([
-    {
-      person: "Kristian Boe",
-      text: "Could we lead with the rooftop instead of the location?",
-      version: 1,
-    },
-    {
-      person: "Silvina Jaume",
-      text: "Updated the opening and selected a brighter photo.",
-      version: 2,
-    },
-    ...(initialStatus !== "draft"
-      ? [
-          {
-            person: "Silvina Jaume",
-            text: "Marked ready for review · Oct 5, 3:20 PM",
-            version: 2,
-            event: true,
-          },
-        ]
-      : []),
-    ...(initialStatus === "approved"
-      ? [
-          {
-            person: "Kristian Boe",
-            text: "Approved this version · Oct 6, 9:15 AM",
-            version: 2,
-            event: true,
-          },
-        ]
-      : []),
-  ]);
+  const [notes, setNotes] = useState<Note[]>([]);
   const note = (entry: Note) => setNotes((current) => [...current, entry]);
-  const transition = (next: ReviewStatus, reviewer = false) => {
+  const transition = (next: ReviewStatus) => {
     setStatus(next);
     updatePreviewStatus(reviewKey, next);
     setChanged(true);
-    note({
-      person:
-        next === "approved" || reviewer ? "Kristian Boe" : "Silvina Jaume",
-      text: reviewer
-        ? "Requested changes · just now"
-        : next === "ready"
-          ? "Marked ready for review · just now"
-          : next === "approved"
-            ? "Approved this version · just now"
-            : "Returned to draft · just now",
-      version,
-      event: true,
-    });
   };
-  const revise = () => {
-    setVersion((current) => current + 1);
-    setChanged(true);
-    setStatus("draft");
-    updatePreviewStatus(reviewKey, "draft");
-    note({
-      person: "Silvina Jaume",
-      text:
-        variant === "replacement"
-          ? `Created replacement draft from approved v${version}`
-          : `Reopened for revision from approved v${version}`,
-      version: version + 1,
-      event: true,
-    });
-  };
-  const comments = notes.filter((item) => !item.event);
-  const shown = notes.filter((item) => history || item.version === version);
+  const revise = () => transition("draft");
+  const comments = notes;
+  const shown = notes;
   const person = status === "approved" ? "Kristian Boe" : "Silvina Jaume";
   return (
     <div className="w-full space-y-3">
@@ -171,12 +111,6 @@ export function ReviewPreview({
         >
           <ReviewStatusBadge status={status} />
           <Person name={person} />
-          {version > 2 && (
-            <span className="text-muted-foreground">
-              {variant === "replacement" ? "Replacement draft" : "Revision"} · v
-              {version}
-            </span>
-          )}
           {!compact && (
             <span className="text-muted-foreground">
               {status === "approved"
@@ -247,14 +181,9 @@ export function ReviewPreview({
         >
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h4 className="text-sm font-semibold">
-                Review & comments{" "}
-                <span className="font-normal text-muted-foreground">
-                  · v{version}
-                </span>
-              </h4>
+              <h4 className="text-sm font-semibold">Review & comments</h4>
               <p className="mt-1 text-xs text-muted-foreground">
-                Feedback and sign-off for this version.
+                Comments for this item.
               </p>
             </div>
             <Button
@@ -266,33 +195,13 @@ export function ReviewPreview({
               <X className="size-4" />
             </Button>
           </div>
-          <button
-            type="button"
-            onClick={() => setHistory((value) => !value)}
-            className="mb-4 text-xs text-muted-foreground underline underline-offset-4"
-          >
-            {history ? "Show current version only" : "Show earlier versions"}
-          </button>
           <div className="space-y-4">
             {shown.map((item, index) => (
               <div key={index} className="flex items-start gap-2.5">
                 <Person name={item.person} />
                 <div className="min-w-0 text-xs">
-                  <p className="mb-1 font-medium">
-                    {item.person}
-                    <span className="ml-2 font-normal text-muted-foreground">
-                      {item.version !== version
-                        ? `Earlier version · v${item.version}`
-                        : `v${item.version}`}
-                    </span>
-                  </p>
-                  <p
-                    className={
-                      item.event ? "text-muted-foreground" : "leading-relaxed"
-                    }
-                  >
-                    {item.text}
-                  </p>
+                  <p className="mb-1 font-medium">{item.person}</p>
+                  <p className="leading-relaxed">{item.text}</p>
                 </div>
               </div>
             ))}
@@ -302,13 +211,13 @@ export function ReviewPreview({
             onSubmit={(event) => {
               event.preventDefault();
               if (!text.trim()) return;
-              note({ person: "Kristian Boe", text: text.trim(), version });
+              note({ person: "Kristian Boe", text: text.trim() });
               setText("");
             }}
           >
             <textarea
               aria-label="Review comment"
-              placeholder="Leave feedback on this version…"
+              placeholder="Leave feedback…"
               value={text}
               onChange={(event) => setText(event.target.value)}
               rows={2}
@@ -325,10 +234,9 @@ export function ReviewPreview({
                     note({
                       person: "Kristian Boe",
                       text: text.trim(),
-                      version,
                     });
                     setText("");
-                    transition("draft", true);
+                    transition("draft");
                   }}
                 >
                   Request changes

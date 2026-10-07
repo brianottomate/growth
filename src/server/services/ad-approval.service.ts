@@ -443,12 +443,13 @@ export async function returnAdToStudio(
           ),
         );
     }
-    await tx.insert(contentCommentTable).values({
-      ...reviewSubjectFields({ type: "ad", id: ad.id }),
-      ...reviewActor(ctx, input.as),
-      event: "return_to_studio",
-      body: `Returned to Studio.${input.comment?.trim() ? `\n\n${input.comment.trim()}` : ""}${pushed.length ? "\n\nExisting platform ads were left unchanged and may still be running." : ""}`,
-    });
+    if (input.comment?.trim()) {
+      await tx.insert(contentCommentTable).values({
+        ...reviewSubjectFields({ type: "ad", id: ad.id }),
+        ...reviewActor(ctx, input.as),
+        body: input.comment.trim(),
+      });
+    }
   });
   // Keep approval assets: an in-flight platform push may still reference them.
   return {

@@ -86,11 +86,11 @@ export function LiveWorkspaces() {
   const brand = BRANDS.find((item) => item.slug === brandSlug)!;
   const base = `/app/performance/clients/${brand.slug}`;
   const workspaces = [
-    { title: "Catalog", path: `${base}/catalog?reviewPreview=1` },
-    { title: "Ad Studio", path: `${base}/ads?reviewPreview=1` },
+    { title: "Catalog", path: `${base}/catalog` },
+    { title: "Ad Studio", path: `${base}/ads` },
     {
       title: "Campaign",
-      path: `${base}/campaigns/${brand.campaign}?reviewPreview=1`,
+      path: `${base}/campaigns/${brand.campaign}`,
     },
     { title: "SoMe", path: `/app/brands/${brand.slug}/content/review-preview` },
   ];
@@ -110,8 +110,8 @@ export function LiveWorkspaces() {
           </Link>
           <h1 className="font-semibold">Creative workspaces</h1>
           <p className="text-xs text-muted-foreground">
-            {brand.name} · Review prototype · Comments and review actions stay
-            local
+            {brand.name} · Live catalog, ads and campaign · Social post is a
+            sample
           </p>
         </div>
         <select
