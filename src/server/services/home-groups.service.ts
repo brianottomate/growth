@@ -560,6 +560,9 @@ export async function attachBookingTarget(
       .update(adTable)
       .set({
         ...projected,
+        status: "drawn",
+        readyAt: null,
+        readyBy: null,
         ...(input.cardIndex === undefined
           ? { bookingTargetId: target.id }
           : {}),
@@ -594,7 +597,7 @@ export async function attachBookingTarget(
     });
     if (approved.some((ad) => !ad.content.linkUrl))
       throw new Error(
-        "An approved ad uses this campaign's fallback URL. Edit it into a replacement draft or give it an explicit reviewed URL before changing the default.",
+        "An approved ad uses this campaign's fallback URL. Return it to Studio and review an explicit URL before changing the default.",
       );
     // Existing ads can already have their own URLs; don't silently replace them.
     await db

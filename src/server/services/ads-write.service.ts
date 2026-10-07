@@ -2346,8 +2346,7 @@ export async function pushDraftToPlatform(
       `No ads are set to run on ${platformName} — add it to an ad's platforms`,
     );
   }
-  // Only approved ads go out. Drafts, including one that will replace an
-  // approved ad, stay in the campaign and wait for their own approval.
+  // Campaign membership consumes approved ads; keep the publishing guard too.
   ads = ads.filter((ad) => ad.status === "approved");
   if (ads.length === 0)
     throw new Error(`Approve at least one ad for ${platformName} to push`);
@@ -2378,7 +2377,17 @@ export async function pushDraftToPlatform(
     await db.query.adTable.findMany({
       where: eq(adTable.campaignId, campaign.id),
     }),
-  ).filter((ad) => ad.status === "approved");
+  )
+    .filter((ad) => ad.status === "approved")
+    .map((ad) => {
+      if (!ad.approvedSnapshot)
+        throw new Error(`Approve ${ad.name} again before publishing.`);
+      return {
+        ...ad,
+        content: ad.approvedSnapshot.content,
+        placements: ad.approvedSnapshot.placements,
+      };
+    });
   // A shell is an ad someone meant to fill and did not. Sending the rest
   // around it would ship a set with a hole nobody chose.
   const shells = ads.filter(
@@ -4065,6 +4074,14 @@ async function recordCompiledCampaign(input: {
         channelId: input.draft.channelId,
         platform: input.draft.platform,
         adId: ad.planAd.id,
+        pushedCreative: {
+          name: ad.planAd.name,
+          headline: ad.headline ?? null,
+          body: ad.body ?? null,
+          linkUrl: ad.linkUrl ?? null,
+          media: ad.media ?? null,
+          copy: ad.copy ?? null,
+        },
         name: ad.planAd.name,
         headline: ad.headline,
         body: ad.body,

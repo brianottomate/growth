@@ -71,6 +71,8 @@ const pitchOperations = new Set([
 ]);
 
 const common = new Set([
+  "reviewRead",
+  "reviewWrite",
   "initiativeRead",
   "initiativeWrite",
   "creativeRead",
@@ -184,7 +186,7 @@ export function createChatToolScope(input: {
       "adsRead__openCampaign",
       "adsWrite__saveIdea",
       "adsWrite__setAdStatus",
-      "adsWrite__editApprovedAd",
+      "adsWrite__returnToStudio",
       "adsWrite__setAdCopy",
       "adsWrite__setPlacementCopy",
       "adsWrite__clearPlacement",
@@ -197,7 +199,7 @@ export function createChatToolScope(input: {
       "adsWrite__draftAd",
       "adsWrite__saveIdea",
       "adsWrite__setAdStatus",
-      "adsWrite__editApprovedAd",
+      "adsWrite__returnToStudio",
       "adsWrite__setAdCopy",
       "adsWrite__setAdHome",
     ],

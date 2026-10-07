@@ -68,7 +68,7 @@ import {
   deleteAudienceAction,
   attachAdSetAction,
   setAdStatusAction,
-  editApprovedAdAction,
+  returnAdToStudioAction,
   setAdCopyAction,
   setAdHomeAction,
   clearPlacementAction,
@@ -278,7 +278,7 @@ export const adsRouter = {
 
   /** Production state on one drafted ad. Touches no platform. */
   setAdStatus: actionProcedure(setAdStatusAction),
-  editApprovedAd: actionProcedure(editApprovedAdAction),
+  returnToStudio: actionProcedure(returnAdToStudioAction),
 
   /** The words on one drafted ad; its cards are left alone. */
   setAdCopy: actionProcedure(setAdCopyAction),

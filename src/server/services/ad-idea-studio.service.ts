@@ -60,7 +60,7 @@ export async function saveAdIdea(
 
   if (ad.content.ideaStudio?.approval)
     throw new Error(
-      "Approved ads are final. Edit it to make a draft that replaces it.",
+      "Return this ad to Studio before editing its approved output.",
     );
   if (
     args.reviewImportedCreative &&

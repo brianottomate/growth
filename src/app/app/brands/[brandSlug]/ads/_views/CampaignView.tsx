@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { WorkspaceCardHeader } from "@/app/app/performance/WorkspaceCard";
 import { WorkspaceBreadcrumbs } from "@/components/workspace-breadcrumbs";
 import {
@@ -23,7 +25,6 @@ import { getDraftCampaign } from "@/server/services/ads-draft.service";
 
 import { type AdState } from "@/lib/ad-wall";
 import { targetedAsset } from "@/lib/audience-asset";
-import { AddAdDialog } from "@/app/app/performance/clients/[brandSlug]/ads/AddAdDialog";
 import { AdIdeasList } from "./AdIdeasList";
 
 import { AskAssistantButton } from "./AskAssistantButton";
@@ -180,11 +181,13 @@ export async function CampaignView({
       {!anyPushed && (
         <>
           <AddExistingAdsDialog brandId={brand.id} campaignId={campaign.id} />
-          <AddAdDialog
-            brandId={brand.id}
-            website={campaign.landingUrl ?? brand.website}
-            campaignId={campaign.id}
-          />
+          <Button size="sm" variant="outline" asChild>
+            <Link
+              href={`/app/performance/clients/${brand.slug ?? brand.id}/ads`}
+            >
+              Create in Studio
+            </Link>
+          </Button>
         </>
       )}
       <AskAssistantButton
@@ -330,14 +333,13 @@ export async function CampaignView({
           preparingHero={false}
           homeOrder={orderedHomes.map((home) => home.id)}
           homeLinks={homeLinks}
-          campaignId={campaign.id}
+          studioHref={`/app/performance/clients/${brandSlug}/ads`}
           ads={ads}
           brandId={brand.id}
           brandName={brandName}
           brandLogo={brand.logo}
           states={states}
           plannedPlatforms={plannedPlatforms}
-          landingUrl={campaign.landingUrl ?? brand.website}
         />
       </section>
       <section>

@@ -377,7 +377,7 @@ export async function runStarterGeneration(runId: string, input: Input) {
         if (input.exportShapes) document.shapes = [...input.exportShapes];
         await db.insert(adTable).values({
           brandId: brand.id,
-          campaignId: campaign?.id ?? null,
+          campaignId: null,
           name: idea.name,
           type: "creative",
           status: "drawn",
@@ -429,7 +429,7 @@ export async function runStarterGeneration(runId: string, input: Input) {
       if (booking) document.copy.linkUrl = booking.url;
       await db.insert(adTable).values({
         brandId: brand.id,
-        campaignId: campaign?.id ?? null,
+        campaignId: null,
         name,
         type: "creative",
         status: "drawn",

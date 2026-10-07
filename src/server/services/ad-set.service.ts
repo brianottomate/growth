@@ -1,3 +1,4 @@
+import { approvedOutput } from "@/lib/ad-approved-output";
 import type { adSectionSchema } from "@/lib/ad-section";
 import { resolveBookingTarget } from "./home-groups.service";
 import type { z } from "zod";
@@ -7,7 +8,6 @@ import {
   approveImageAd,
   assertAdNotPushed,
   freezeApprovedAd,
-  retireReplacedAd,
 } from "./ad-approval.service";
 import "server-only";
 import { withIdeaStudio } from "@/lib/ad-idea-studio";
@@ -144,7 +144,7 @@ async function requireOwnedAd(
   if (!allowStudio && ad.status === "approved")
     throw new AdSetError(
       422,
-      "Approved ads are final. Edit it to make a draft that replaces it.",
+      "Return this ad to Studio before editing or changing its review state.",
     );
   if (!allowStudio && "media" in ad.content && ad.content.ideaStudio) {
     throw new AdSetError(
@@ -153,6 +153,29 @@ async function requireOwnedAd(
     );
   }
   return ad;
+}
+
+async function saveDraftChange(
+  ad: Pick<typeof adTable.$inferSelect, "id" | "updatedAt">,
+  patch: Partial<typeof adTable.$inferInsert>,
+) {
+  const saved = await db
+    .update(adTable)
+    .set({
+      ...patch,
+      status: "drawn",
+      readyAt: null,
+      readyBy: null,
+    })
+    .where(
+      and(
+        eq(adTable.id, ad.id),
+        eq(adTable.updatedAt, ad.updatedAt),
+        ne(adTable.status, "approved"),
+      ),
+    )
+    .returning({ id: adTable.id });
+  if (!saved.length) throw new Error("This ad changed. Refresh before saving.");
 }
 
 function creativeContent(ad: { content: unknown }): AdCreativeContent {
@@ -526,7 +549,7 @@ export async function addAdShell(input: {
     .values(
       withIdeaStudio({
         brandId: brand.id,
-        campaignId: campaign?.id ?? null,
+        campaignId: null,
         homeId: bound.home?.id ?? null,
         name: input.name?.trim() || adName(brand, input.format, bound.name),
         type: "creative" as const,
@@ -681,7 +704,7 @@ export async function createAdsFromAssets(input: {
       .values(
         withIdeaStudio({
           brandId: brand.id,
-          campaignId: campaign?.id ?? null,
+          campaignId: null,
           homeId: home?.id ?? null,
           name: adName(brand, format, label),
           type: "creative" as const,
@@ -720,7 +743,7 @@ export async function setAdHome(input: {
   const content = creativeContent(ad);
   if (ad.status === "approved" || content.ideaStudio?.approval)
     throw new Error(
-      "Approved ads are final. Edit it to make a draft that replaces it.",
+      "Return this ad to Studio before editing or changing its review state.",
     );
   const brand = ad.brand;
   const bound = await homeBinding(brand, input);
@@ -766,6 +789,9 @@ export async function setAdHome(input: {
       homeId: home?.id ?? null,
       name,
       ...projected,
+      status: "drawn",
+      readyAt: null,
+      readyBy: null,
       updatedAt: new Date(),
     })
     .where(and(eq(adTable.id, ad.id), eq(adTable.updatedAt, ad.updatedAt)))
@@ -797,7 +823,9 @@ export async function attachAdSet(input: {
     });
   const pick = (rows: Awaited<ReturnType<typeof draftsQuery>>) =>
     input.adIds?.length
-      ? rows.filter((ad) => input.adIds!.includes(ad.id))
+      ? rows.filter(
+          (ad) => ad.status === "approved" && input.adIds!.includes(ad.id),
+        )
       : rows.filter((ad) => ad.status === "approved");
   // An idea approved before the studio froze on approval has no images yet;
   // save them now so it arrives with its media.
@@ -822,7 +850,7 @@ export async function attachAdSet(input: {
   if (input.adIds && wanted.length !== input.adIds.length) {
     throw new AdSetError(
       422,
-      "An ad was assigned elsewhere. Reload before trying again.",
+      "Only approved, unassigned ads can enter a campaign. Refresh and approve the selected ads first.",
     );
   }
   if (wanted.length === 0) {
@@ -858,6 +886,7 @@ export async function attachAdSet(input: {
       .where(
         and(
           eq(adTable.brandId, brand.id),
+          eq(adTable.status, "approved"),
           isNull(adTable.campaignId),
           inArray(
             adTable.id,
@@ -869,7 +898,7 @@ export async function attachAdSet(input: {
     if (assigned.length !== wanted.length) {
       throw new AdSetError(
         422,
-        "An ad was assigned elsewhere. Reload before trying again.",
+        "Only approved, unassigned ads can enter a campaign. Refresh and approve the selected ads first.",
       );
     }
   });
@@ -916,13 +945,8 @@ export async function deleteAd(input: { adId: string; orgId: string }) {
   return { deleted: true, deletedOnPlatform: ran.length };
 }
 
-/**
- * Move an ad along draft → ready → approved. Ready is its author saying it is
- * done; any edit sends it back to draft (a database trigger). Approved is
- * final: the images are saved in the background and the ad never changes
- * again. To change an approved ad, `editApprovedAd` makes the draft that
- * replaces it, and approving that draft retires the original.
- */
+/** Draft → Ready → Approved. Approval freezes output; Return to Studio reopens
+ * the same ad and preserves platform records and comments. */
 export async function setAdStatus(input: {
   adId: string;
   orgId: string;
@@ -934,17 +958,11 @@ export async function setAdStatus(input: {
   const ad = await requireOwnedAd(input, true);
   if (ad.status === "approved") {
     if (input.status === "approved") {
-      // A retry finishes a retirement an earlier approval did not.
-      const retired = await retireReplacedAd(ad.id);
-      return {
-        adId: ad.id,
-        status: "approved" as const,
-        ...(retired.retired ? { replaced: retired.retired } : {}),
-      };
+      return { adId: ad.id, status: "approved" as const };
     }
     throw new AdSetError(
       422,
-      "Approved ads are final. Edit it to make a draft that replaces it.",
+      "Return this ad to Studio before editing or changing its review state.",
     );
   }
   if (input.status !== "approved") {
@@ -1011,7 +1029,17 @@ export async function setAdStatus(input: {
     }
     const saved = await db
       .update(adTable)
-      .set({ status: "approved", approvedAt: new Date(), approvedBy: userId })
+      .set({
+        status: "approved",
+        approvedAt: new Date(),
+        approvedBy: userId,
+        approvedSnapshot: {
+          content: approvedOutput(ad.content),
+          placements: ad.placements,
+          approvedAt: new Date().toISOString(),
+          approvedBy: userId,
+        },
+      })
       .where(
         and(
           eq(adTable.id, ad.id),
@@ -1022,12 +1050,7 @@ export async function setAdStatus(input: {
     if (!saved.length)
       throw new Error("This ad changed. Refresh before approving.");
   }
-  const retired = await retireReplacedAd(ad.id);
-  return {
-    adId: ad.id,
-    status: "approved" as const,
-    ...(retired.retired ? { replaced: retired.retired } : {}),
-  };
+  return { adId: ad.id, status: "approved" as const };
 }
 
 /**
@@ -1042,10 +1065,9 @@ export async function setAdPhotoOnly(input: {
 }) {
   const ad = await requireOwnedAd(input);
   const content = creativeContent(ad);
-  await db
-    .update(adTable)
-    .set({ content: { ...content, photoOnly: input.photoOnly } })
-    .where(eq(adTable.id, ad.id));
+  await saveDraftChange(ad, {
+    content: { ...content, photoOnly: input.photoOnly },
+  });
   return { adId: ad.id, photoOnly: input.photoOnly };
 }
 
@@ -1079,10 +1101,7 @@ export async function setCardCopy(input: {
   }
   const media = [...content.media];
   media[input.index] = next;
-  await db
-    .update(adTable)
-    .set({ content: { ...content, media } })
-    .where(eq(adTable.id, ad.id));
+  await saveDraftChange(ad, { content: { ...content, media } });
   return { adId: ad.id, index: input.index };
 }
 
@@ -1107,7 +1126,7 @@ export async function setAdCopy(input: {
     const content = textAdCopySchema.parse(input.text);
     const saved = await db
       .update(adTable)
-      .set({ content })
+      .set({ content, status: "drawn", readyAt: null, readyBy: null })
       .where(
         and(
           eq(adTable.id, ad.id),
@@ -1138,17 +1157,10 @@ export async function setAdCopy(input: {
         return next ? { ...card, copy: { ...card.copy, ...next } } : card;
       }),
     };
-    await db
-      .update(adTable)
-      .set(
-        projectIdea(
-          ad.brandId,
-          content,
-          { ...studio, document },
-          ad.placements,
-        ),
-      )
-      .where(eq(adTable.id, ad.id));
+    await saveDraftChange(
+      ad,
+      projectIdea(ad.brandId, content, { ...studio, document }, ad.placements),
+    );
     return { adId: ad.id };
   }
   const media = content.media.map((card, i) => {
@@ -1161,18 +1173,15 @@ export async function setAdCopy(input: {
       description: merged.description?.trim() || undefined,
     };
   });
-  await db
-    .update(adTable)
-    .set({
-      content: {
-        ...content,
-        headline,
-        body,
-        description: description?.trim() || undefined,
-        media,
-      },
-    })
-    .where(eq(adTable.id, ad.id));
+  await saveDraftChange(ad, {
+    content: {
+      ...content,
+      headline,
+      body,
+      description: description?.trim() || undefined,
+      media,
+    },
+  });
   return { adId: ad.id };
 }
 
@@ -1196,10 +1205,7 @@ export async function setAdTextOnly(input: {
       descriptions: c.body ? [c.body] : [],
       linkUrl: c.linkUrl,
     };
-    await db
-      .update(adTable)
-      .set({ type: "text", content: next })
-      .where(eq(adTable.id, ad.id));
+    await saveDraftChange(ad, { type: "text", content: next });
   } else {
     if (ad.type === "creative") return { adId: ad.id, textOnly: false };
     const t = ad.content as AdTextContent;
@@ -1210,10 +1216,7 @@ export async function setAdTextOnly(input: {
       linkUrl: t.linkUrl,
       media: [],
     };
-    await db
-      .update(adTable)
-      .set({ type: "creative", content: next })
-      .where(eq(adTable.id, ad.id));
+    await saveDraftChange(ad, { type: "creative", content: next });
   }
   return { adId: ad.id, textOnly: input.textOnly };
 }
@@ -1251,8 +1254,11 @@ function requirePlacementSpec(key: string) {
   return spec;
 }
 
-async function savePlacements(adId: string, placements: AdPlacements) {
-  await db.update(adTable).set({ placements }).where(eq(adTable.id, adId));
+async function savePlacements(
+  ad: Pick<typeof adTable.$inferSelect, "id" | "updatedAt">,
+  placements: AdPlacements,
+) {
+  await saveDraftChange(ad, { placements });
 }
 
 /** Copy for one cell that differs from the base. A `null` field clears it. */
@@ -1272,7 +1278,7 @@ export async function setPlacementCopy(input: {
     input.patch,
     { via: input.via ?? "manual" },
   );
-  await savePlacements(ad.id, next);
+  await savePlacements(ad, next);
   return { adId: ad.id, placementKey: input.placementKey };
 }
 
@@ -1329,7 +1335,7 @@ export async function setPlacementCard(input: {
     content.media.length,
     { via: input.via ?? "manual" },
   );
-  await savePlacements(ad.id, next);
+  await savePlacements(ad, next);
   return { adId: ad.id, placementKey: input.placementKey, via: variant.via };
 }
 
@@ -1341,7 +1347,7 @@ export async function clearPlacement(input: {
 }) {
   const ad = await requireOwnedAd(input);
   const next = withoutKey(asPlacements(ad.placements), input.placementKey);
-  await savePlacements(ad.id, next);
+  await savePlacements(ad, next);
   return { adId: ad.id, placementKey: input.placementKey };
 }
 
@@ -1406,7 +1412,7 @@ export async function freezePlacement(input: {
       ...(resolved.copy.linkUrl ? { linkUrl: resolved.copy.linkUrl } : {}),
     },
   });
-  await savePlacements(ad.id, next);
+  await savePlacements(ad, next);
   return {
     adId: ad.id,
     placementKey: input.placementKey,
@@ -1422,7 +1428,7 @@ export async function unfreezePlacement(input: {
 }) {
   const ad = await requireOwnedAd(input);
   const next = withUnfrozen(asPlacements(ad.placements), input.placementKey);
-  await savePlacements(ad.id, next);
+  await savePlacements(ad, next);
   return { adId: ad.id, placementKey: input.placementKey };
 }
 
@@ -1512,7 +1518,13 @@ export async function saveAdSection(
   }
   const saved = await db
     .update(adTable)
-    .set({ content, bookingTargetId })
+    .set({
+      content,
+      bookingTargetId,
+      status: "drawn",
+      readyAt: null,
+      readyBy: null,
+    })
     .where(
       and(
         eq(adTable.id, ad.id),

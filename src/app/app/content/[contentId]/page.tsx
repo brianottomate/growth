@@ -1,3 +1,4 @@
+import { ReviewStatusBadge } from "@/components/review/ReviewStatusBadge";
 import { AmplificationPanel } from "../../campaigns/[campaignId]/MomentAmplifiers";
 import { CreativeDocuments } from "./CreativeDocuments";
 import Link from "next/link";
@@ -63,6 +64,16 @@ const editorUrlOf = (metadata: unknown): string | null => {
 };
 
 function StatusBadge({ status }: { status: string }) {
+  if (
+    status === "draft" ||
+    status === "pending_review" ||
+    status === "approved"
+  )
+    return (
+      <ReviewStatusBadge
+        status={status === "pending_review" ? "ready" : status}
+      />
+    );
   return (
     <span
       className={`rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${
@@ -483,6 +494,20 @@ export default async function ContentDetailPage({
         }))}
       />
 
+      {/* Team discussion on this idea (audience comment counts live in stats). */}
+      <h2 className="mt-8 mb-1 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+        Discussion
+      </h2>
+      {totals.comments > 0 && (
+        <p className="mb-1 text-xs text-muted-foreground">
+          {fmt(totals.comments)} audience comments across platforms.
+        </p>
+      )}
+      <CommentThread
+        contentPostId={content.id}
+        currentUserId={session.user.id}
+      />
+
       {/* platform renderings */}
       <h2 className="mt-8 mb-3 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
         Platform posts · {postGroups.length}
@@ -602,19 +627,6 @@ export default async function ContentDetailPage({
         </>
       )}
 
-      {/* Team discussion on this idea (audience comment counts live in stats). */}
-      <h2 className="mt-8 mb-1 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-        Discussion
-      </h2>
-      {totals.comments > 0 && (
-        <p className="mb-1 text-xs text-muted-foreground">
-          {fmt(totals.comments)} audience comments across platforms.
-        </p>
-      )}
-      <CommentThread
-        contentPostId={content.id}
-        currentUserId={session.user.id}
-      />
       <div className="mt-8">
         <AmplificationPanel scope={{ contentPostId: content.id }} />
       </div>

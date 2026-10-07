@@ -1,6 +1,7 @@
 import { relations, sql } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import {
+  check,
   index,
   pgEnum,
   pgTable,
@@ -8,6 +9,8 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
+import { adTable } from "./ads-schema";
+import { homeTable } from "./home-schema";
 import { userTable } from "./auth-schema";
 import { brandTable } from "./brand-schema";
 import {
@@ -401,6 +404,16 @@ export const contentCommentTable = pgTable(
       .references((): AnyPgColumn => platformPostTable.id, {
         onDelete: "cascade",
       }),
+    adId: t.text().references(() => adTable.id, { onDelete: "cascade" }),
+    homeId: t.text().references(() => homeTable.id, { onDelete: "cascade" }),
+    actorKind: t.text().$type<"user" | "agent">().default("user").notNull(),
+    viaAgent: t.boolean().default(false).notNull(),
+    agentRunId: t.text(),
+    event: t
+      .text()
+      .$type<"comment" | "return_to_studio">()
+      .default("comment")
+      .notNull(),
     authorId: t
       .text()
       .references(() => userTable.id)
@@ -418,6 +431,16 @@ export const contentCommentTable = pgTable(
     deletedAt: t.timestamp(),
   }),
   (table) => [
+    check(
+      "content_comment_subject_check",
+      sql`num_nonnulls(${table.contentPostId}, ${table.platformPostId}, ${table.adId}, ${table.homeId}) = 1`,
+    ),
+    check(
+      "content_comment_actor_check",
+      sql`${table.actorKind} in ('user', 'agent')`,
+    ),
+    index("content_comment_ad_idx").on(table.adId),
+    index("content_comment_home_idx").on(table.homeId),
     index("content_comment_content_idx").on(table.contentPostId),
     index("content_comment_platform_idx").on(table.platformPostId),
   ],

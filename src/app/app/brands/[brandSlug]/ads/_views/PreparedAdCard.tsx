@@ -1,6 +1,14 @@
 "use client";
 
+import { ReturnToStudioButton } from "@/components/review/ReturnToStudioButton";
+import { ReviewDiscussion } from "@/components/review/ReviewDiscussion";
+
 import { useState, type ReactNode } from "react";
+import {
+  ReviewPreview,
+  useReviewPreview,
+  previewReviewStatus,
+} from "@/components/review/ReviewPreview";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { MessageSquare, Trash2 } from "lucide-react";
@@ -21,6 +29,7 @@ import { MediaPickerDialog } from "@/app/app/content/[contentId]/MediaPickerDial
 import { safeHomeUrl } from "@/lib/ad-preview-links";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 import { textAdCopySchema, textAdReady } from "@/lib/ad-authoring";
+import { ReviewStatusBadge } from "@/components/review/ReviewStatusBadge";
 import type { AdReview } from "@/lib/ad-review";
 import type { AdContent, MediaItem } from "@/server/db/schema";
 import { orpc } from "@/orpc/client";
@@ -86,8 +95,9 @@ export function PreparedAdCard({
   const [picking, setPicking] = useState<"base" | "story" | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const approved = ad.status === "approved";
+  const reviewPreview = useReviewPreview();
   const ready = ad.status === "ready";
-  const locked = approved || Boolean(deliveryState);
+  const locked = approved;
   const { data: members = [] } = useQuery(
     orpc.content.assignableMembers.queryOptions(),
   );
@@ -108,19 +118,7 @@ export function PreparedAdCard({
       },
     }),
   );
-  const editApproved = useMutation(
-    orpc.ads.editApprovedAd.mutationOptions({
-      onSuccess: (result) => {
-        toast.success(
-          result.created
-            ? "Draft made. It replaces this ad once approved."
-            : "A replacement draft is already open.",
-        );
-        router.refresh();
-      },
-      onError: (error) => toast.error(error.message),
-    }),
-  );
+
   const status = useMutation(
     orpc.ads.setAdStatus.mutationOptions({
       onError,
@@ -341,15 +339,19 @@ export function PreparedAdCard({
           <h3 className="line-clamp-2 font-semibold">{ad.name}</h3>
           <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
             {text ? "Text" : "Video"} ·{" "}
-            {approved
-              ? `Approved${member(ad.review.approvedBy)?.name ? ` · ${member(ad.review.approvedBy)?.name}` : ""}`
-              : ready
-                ? `Ready for review${member(ad.review.readyBy)?.name ? ` · ${member(ad.review.readyBy)?.name}` : ""}`
-                : "Draft"}
+            <ReviewStatusBadge
+              status={approved ? "approved" : ready ? "ready" : "draft"}
+            />
+            {
+              member(
+                approved
+                  ? ad.review.approvedBy
+                  : ready
+                    ? ad.review.readyBy
+                    : null,
+              )?.name
+            }
             {deliveryState ? ` · ${deliveryState}` : ""}
-            {ad.review.replacesAdId && !approved
-              ? " · replaces an approved ad"
-              : ""}
             {metadata && <> · {metadata}</>}
           </p>
         </div>
@@ -690,74 +692,83 @@ export function PreparedAdCard({
           )}
         </>
       )}
-      <footer className="flex flex-wrap justify-end gap-2 border-t pt-4">
-        {!deliveryState && (
+      {reviewPreview ? (
+        <div className="border-t pt-4">
+          <ReviewPreview
+            reviewKey={ad.name}
+            initialStatus={previewReviewStatus(ad.name)}
+          />
+        </div>
+      ) : (
+        <footer className="flex flex-wrap justify-end gap-2 border-t pt-4">
+          {!deliveryState && (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Delete ad"
+              disabled={busy || editor !== null}
+              onClick={() => setDeleteOpen(true)}
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          )}
           <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Delete ad"
+            variant="outline"
             disabled={busy || editor !== null}
-            onClick={() => setDeleteOpen(true)}
+            onClick={() => setExpanded(!expanded)}
           >
-            <Trash2 className="size-4" />
+            {expanded ? "Close details" : locked ? "View details" : "Edit"}
           </Button>
-        )}
-        <Button
-          variant="outline"
-          disabled={busy || editor !== null}
-          onClick={() => setExpanded(!expanded)}
-        >
-          {expanded ? "Close details" : locked ? "View details" : "Edit"}
-        </Button>
-        {!expanded && !approved && (
-          <Button
-            variant="outline"
-            disabled={busy || status.isPending}
-            onClick={() =>
-              status.mutate({
-                adId: ad.id,
-                status: ready ? "drawn" : "ready",
-                expectedUpdatedAt: ad.updatedAt,
-              })
-            }
-          >
-            {ready ? "Not ready" : "Mark ready"}
-          </Button>
-        )}
-        {!expanded && !approved && (
-          <Button
-            disabled={
-              busy ||
-              (text
-                ? !textAdReady(text) || !safeHomeUrl(text.linkUrl ?? website)
-                : !video?.media.length ||
-                  !video.headline.trim() ||
-                  !video.body.trim() ||
-                  !safeHomeUrl(video.linkUrl ?? website))
-            }
-            loading={status.isPending}
-            onClick={() =>
-              status.mutate({
-                adId: ad.id,
-                status: "approved",
-                expectedUpdatedAt: ad.updatedAt,
-              })
-            }
-          >
-            Approve
-          </Button>
-        )}
-        {!expanded && approved && (
-          <Button
-            variant="outline"
-            disabled={busy || editApproved.isPending}
-            loading={editApproved.isPending}
-            onClick={() => editApproved.mutate({ adId: ad.id })}
-          >
-            Edit as new draft
-          </Button>
-        )}
-      </footer>
+          {!expanded && !approved && (
+            <Button
+              variant="outline"
+              disabled={busy || status.isPending}
+              onClick={() =>
+                status.mutate({
+                  adId: ad.id,
+                  status: ready ? "drawn" : "ready",
+                  expectedUpdatedAt: ad.updatedAt,
+                })
+              }
+            >
+              {ready ? "Not ready" : "Mark ready"}
+            </Button>
+          )}
+          {!expanded && !approved && (
+            <Button
+              disabled={
+                busy ||
+                (text
+                  ? !textAdReady(text) || !safeHomeUrl(text.linkUrl ?? website)
+                  : !video?.media.length ||
+                    !video.headline.trim() ||
+                    !video.body.trim() ||
+                    !safeHomeUrl(video.linkUrl ?? website))
+              }
+              loading={status.isPending}
+              onClick={() =>
+                status.mutate({
+                  adId: ad.id,
+                  status: "approved",
+                  expectedUpdatedAt: ad.updatedAt,
+                })
+              }
+            >
+              Approve
+            </Button>
+          )}
+          {!expanded && approved && (
+            <ReturnToStudioButton
+              adId={ad.id}
+              updatedAt={ad.updatedAt}
+              pushed={Boolean(deliveryState)}
+            />
+          )}
+        </footer>
+      )}
+      {!reviewPreview && (
+        <ReviewDiscussion target={{ type: "ad", id: ad.id }} />
+      )}
       <DeleteAlert
         open={deleteOpen}
         onOpenChange={setDeleteOpen}

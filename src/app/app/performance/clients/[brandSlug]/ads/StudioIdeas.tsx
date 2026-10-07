@@ -1,5 +1,9 @@
 "use client";
 
+import {
+  usePreviewReviewStatus,
+  useReviewPreview,
+} from "@/components/review/ReviewPreview";
 import type { AdReview } from "@/lib/ad-review";
 import { adFormat } from "@/lib/ad-format";
 
@@ -47,9 +51,7 @@ function editable(content: AdCreativeContent) {
 }
 
 /**
- * Every idea on the brand's studio, filed under the home it is about. Each
- * one opens in the idea editor; Freeze saves its sizes and makes it ready
- * for a campaign.
+ * Every idea on the brand's studio, filed under the home it is about. Drafts remain editable; Ready requests review, and approval freezes the creative.
  */
 export function StudioIdeas({
   ideas,
@@ -78,13 +80,22 @@ export function StudioIdeas({
       document
         .getElementById(`home-${focusHomeId}`)
         ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const adAnchor = window.location.hash.slice(1);
+    if (adAnchor.startsWith("ad-"))
+      document
+        .getElementById(adAnchor)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [focusHomeId, grouping, ideas]);
+  const reviewPreview = useReviewPreview();
+  const previewStatus = usePreviewReviewStatus();
   const groups = groupCollectionAds(ideas, grouping, homeContext);
   return (
     <div className="divide-y">
       {groups.map((group) => {
         const frozen = group.ads.filter(
-          (idea) => idea.status === "approved",
+          (idea) =>
+            (reviewPreview ? previewStatus(idea.name) : idea.status) ===
+            "approved",
         ).length;
         return (
           <section
@@ -124,7 +135,15 @@ export function StudioIdeas({
               );
               const adMetadata = assignment;
               const wrap = (node: React.ReactNode, metadataInside = false) => (
-                <div key={idea.id} className="space-y-2">
+                <div
+                  key={idea.id}
+                  id={
+                    !("media" in idea.content) || !editable(idea.content)
+                      ? `ad-${idea.id}`
+                      : undefined
+                  }
+                  className="scroll-mt-4 space-y-2"
+                >
                   {idea.home?.url ? (
                     <a
                       href={idea.home.url}

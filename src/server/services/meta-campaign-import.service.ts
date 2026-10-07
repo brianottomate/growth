@@ -260,7 +260,7 @@ export async function importMetaCampaign(
       await db.insert(adTable).values({
         id: createId("ad"),
         brandId: brand.id,
-        campaignId: created.campaign.id,
+        campaignId: null,
         name: c.ad.name ?? "Imported Meta ad",
         type: "creative",
         status: "drawn",

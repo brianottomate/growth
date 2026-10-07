@@ -989,6 +989,12 @@ export const contentRouter = {
   comments: protectedProcedure
     .input(z.object({ contentPostId: z.string() }))
     .handler(async ({ context: ctx, input }) => {
+      const content = await ctx.db.query.contentPostTable.findFirst({
+        where: eq(contentPostTable.id, input.contentPostId),
+        with: { brand: { columns: { organizationId: true } } },
+      });
+      if (!content) throw new ORPCError("NOT_FOUND");
+      await assertOrgMember(ctx, content.brand?.organizationId);
       const rows = await ctx.db.query.contentCommentTable.findMany({
         where: and(
           eq(contentCommentTable.contentPostId, input.contentPostId),

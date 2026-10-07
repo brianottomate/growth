@@ -4,36 +4,42 @@ import { parseAsStringLiteral, useQueryStates } from "nuqs";
 import { Button } from "@/components/ui/button";
 import { AdFormatFilter } from "@/components/ad-format-filter";
 import { AD_FORMATS, type AdFormat } from "@/lib/ad-format";
-import { ApprovedStamp } from "@/components/approved-stamp";
+import {
+  adReviewStatus,
+  usePreviewReviewStatus,
+  useReviewPreview,
+} from "@/components/review/ReviewPreview";
 
 const AD_TYPES = AD_FORMATS.map((format) => format.id);
 
 type Group = {
   id: AdFormat;
   label: string;
-  ads: { id: string; approved: boolean; node: React.ReactNode }[];
+  ads: { id: string; name: string; status: string; node: React.ReactNode }[];
 };
 
 /** Independent status and type filters over one stable list of ads. */
 export function AdIdeaGroups({ groups }: { groups: Group[] }) {
+  const reviewPreview = useReviewPreview();
+  const previewStatus = usePreviewReviewStatus();
+  const statusOf = (ad: Group["ads"][number]) =>
+    reviewPreview ? previewStatus(ad.name) : adReviewStatus(ad.status);
   const [{ filter, adType }, setFilters] = useQueryStates({
-    filter: parseAsStringLiteral(["all", "review", "approved"]).withDefault(
+    filter: parseAsStringLiteral([
       "all",
-    ),
+      "draft",
+      "ready",
+      "approved",
+    ]).withDefault("all"),
     adType: parseAsStringLiteral(AD_TYPES),
   });
   const all = groups.flatMap((group) => group.ads);
-  const approved = all.filter((ad) => ad.approved).length;
+  const approved = all.filter((ad) => statusOf(ad) === "approved").length;
   const filteredGroups = groups.map((group) => ({
     ...group,
-    ads: group.ads.filter((ad) =>
-      filter === "all" ? true : ad.approved === (filter === "approved"),
-    ),
+    ads: group.ads.filter((ad) => filter === "all" || statusOf(ad) === filter),
   }));
-  const statusCount = filteredGroups.reduce(
-    (count, group) => count + group.ads.length,
-    0,
-  );
+
   const shown = filteredGroups
     .filter((group) => adType === null || group.id === adType)
     .flatMap((group) => group.ads);
@@ -44,7 +50,7 @@ export function AdIdeaGroups({ groups }: { groups: Group[] }) {
         aria-label="Ad review status"
         className="flex w-fit max-w-full flex-wrap rounded-lg border p-0.5 text-sm"
       >
-        {(["all", "review", "approved"] as const).map((key) => (
+        {(["all", "draft", "ready", "approved"] as const).map((key) => (
           <Button
             key={key}
             variant={filter === key ? "secondary" : "ghost"}
@@ -52,11 +58,13 @@ export function AdIdeaGroups({ groups }: { groups: Group[] }) {
             aria-pressed={filter === key}
             onClick={() => setFilters({ filter: key })}
           >
-            {key === "review"
-              ? `Needs review ${all.length - approved}`
-              : key === "approved"
-                ? `Approved ${approved}`
-                : `All ${all.length}`}
+            {key === "draft"
+              ? `Draft ${all.filter((ad) => statusOf(ad) === "draft").length}`
+              : key === "ready"
+                ? `Ready ${all.filter((ad) => statusOf(ad) === "ready").length}`
+                : key === "approved"
+                  ? `Approved ${approved}`
+                  : `All ${all.length}`}
           </Button>
         ))}
       </div>
@@ -71,14 +79,7 @@ export function AdIdeaGroups({ groups }: { groups: Group[] }) {
       />
       {shown.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed py-10 text-sm text-muted-foreground">
-          {filter === "review" && statusCount === 0 ? (
-            <>
-              <ApprovedStamp className="scale-150" />
-              <p className="pt-2">All {all.length} approved</p>
-            </>
-          ) : (
-            <p>No ads match these filters.</p>
-          )}
+          <p>No ads match these filters.</p>
           <Button
             size="sm"
             variant="outline"

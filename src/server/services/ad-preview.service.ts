@@ -93,17 +93,6 @@ async function brandAvatar(brand: typeof brandTable.$inferSelect) {
   return asset?.url ?? brand.logo;
 }
 
-/**
- * Approved ads that are still current: one an approved replacement superseded
- * stays `approved` for its stats when it ran, but is not what the client sees.
- */
-function currentApproved<T extends { id: string; replacesAdId: string | null }>(
-  ads: T[],
-) {
-  const replaced = new Set(ads.flatMap((ad) => ad.replacesAdId ?? []));
-  return ads.filter((ad) => !replaced.has(ad.id));
-}
-
 async function ownedBrand(orgId: string, brandId: string) {
   const brand = await db.query.brandTable.findFirst({
     where: and(
@@ -141,9 +130,7 @@ export async function adPreviewOptions(orgId: string, brandId: string) {
     campaigns: campaigns
       .map((campaign) => ({
         ...campaign,
-        approved: currentApproved(ads).filter(
-          (ad) => ad.campaignId === campaign.id,
-        ).length,
+        approved: ads.filter((ad) => ad.campaignId === campaign.id).length,
       }))
       .filter((campaign) => campaign.approved > 0),
     catalogExports: exports.map((row) => ({
@@ -173,15 +160,13 @@ export async function createAdPreviewLink(
       columns: { id: true },
     });
     if (!campaign) throw new Error("Campaign not found for this brand");
-    const approved = currentApproved(
-      await db.query.adTable.findMany({
-        where: and(
-          eq(adTable.campaignId, campaign.id),
-          eq(adTable.status, "approved"),
-        ),
-        columns: { id: true, replacesAdId: true },
-      }),
-    );
+    const approved = await db.query.adTable.findMany({
+      where: and(
+        eq(adTable.campaignId, campaign.id),
+        eq(adTable.status, "approved"),
+      ),
+      columns: { id: true },
+    });
     if (!approved.length)
       throw new Error("This campaign has no approved ads yet.");
     for (const ad of approved) await freezeApprovedAd(ad.id);
@@ -281,7 +266,7 @@ export async function loadAdPreviewPage(token: string) {
         orderBy: (ad, { asc }) => [asc(ad.createdAt)],
       })
     : [];
-  const ads = currentApproved(rows).flatMap((row) => {
+  const ads = rows.flatMap((row) => {
     const ad = adPreviewAd({ ...row, homeName: row.home?.name });
     return ad ? [{ id: row.id, ...ad }] : [];
   });

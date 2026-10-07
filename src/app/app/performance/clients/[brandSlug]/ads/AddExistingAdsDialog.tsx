@@ -37,7 +37,9 @@ export function AddExistingAdsDialog({
     ...orpc.ads.brandAds.queryOptions({ input: { brandId } }),
     enabled: open,
   });
-  const available = (ads.data ?? []).filter((ad) => !ad.campaignId);
+  const available = (ads.data ?? []).filter(
+    (ad) => !ad.campaignId && ad.status === "approved",
+  );
   const selected = picked.filter((id) => available.some((ad) => ad.id === id));
   const visible = available.filter((ad) =>
     `${ad.name} ${adHomeContext(ad, homes.data?.homes).label} ${adTypeLabel(ad)}`
@@ -45,7 +47,7 @@ export function AddExistingAdsDialog({
       .includes(search.trim().toLowerCase()),
   );
   const groups = groupCollectionAds(visible, grouping, homes.data?.homes);
-  const assigned = (ads.data ?? []).length - available.length;
+  const assigned = (ads.data ?? []).filter((ad) => ad.campaignId).length;
   const attach = useWorkspaceMutation(
     orpc.ads.attachAdSet.mutationOptions({
       onSuccess: (result) => {
@@ -69,13 +71,13 @@ export function AddExistingAdsDialog({
           }
         }
       }}
-      title="Add existing ads"
+      title="Add approved ads"
       size="lg"
       scrollable
       className="flex max-h-[90dvh] flex-col"
       trigger={
         <Button size="sm" variant="outline">
-          Add existing ads
+          Add approved ads
         </Button>
       }
       footer={

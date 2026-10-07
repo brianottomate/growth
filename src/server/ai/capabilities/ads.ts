@@ -53,7 +53,6 @@ import {
   editCatalogCardActionOutputSchema,
   attachAdSetActionOutputSchema,
   setAdStatusActionOutputSchema,
-  editApprovedAdActionOutputSchema,
   setAdCopyActionOutputSchema,
   setPlacementCopyActionOutputSchema,
   clearPlacementActionOutputSchema,
@@ -168,7 +167,7 @@ import {
   unfreezePlacement,
   setAdPlatforms,
 } from "@/server/services/ad-set.service";
-import { editApprovedAd } from "@/server/services/ad-approval.service";
+import { returnAdToStudio } from "@/server/services/ad-approval.service";
 
 import { AD_PLACEMENT_SPECS } from "@/lib/ad-placements";
 import { channelPlatformEnum } from "@/server/db/channel-schema";
@@ -583,7 +582,7 @@ export const draftAdAction = growthAction({
   nativeOutputSchema: draftAdResultSchema,
   outputSchema: draftAdActionOutputSchema,
   description:
-    "Add a drafted ad to a LOCAL campaign or to the brand ad studio — a suggestion the push transforms per platform. Local only. Type creative (default) carries copy plus media: one image, several images (a carousel, in order), or a video — for Meta. Media the operator attached this turn can be passed by its chat url directly; it is saved into the brand's library and its video poster resolved for you. Type text is a pool of headlines and descriptions, for Google/OpenAI.",
+    "Add an unassigned draft to Ad Studio, using a brand or campaign as authoring context. Approval is required before the existing ad is consumed by a campaign. Local only. Type creative (default) carries copy plus media: one image, several images (a carousel, in order), or a video — for Meta. Media the operator attached this turn can be passed by its chat url directly; it is saved into the brand's library and its video poster resolved for you. Type text is a pool of headlines and descriptions, for Google/OpenAI.",
   inputSchema: z
     .object({
       ...adAuthoringFields,
@@ -1719,7 +1718,7 @@ export const setAdHomeAction = growthAction({
 export const attachAdSetAction = growthAction({
   outputSchema: attachAdSetActionOutputSchema,
   description:
-    "Assign the brand's approved unassigned ads, or explicitly selected unassigned drafts, to a draft campaign. Named drafts may still need creative and copy; delivery requires completed, approved ads. Keeps the ads in the brand collection. Refuses cross-brand or previously assigned selections and pushed campaigns. Local only; nothing reaches a platform until adsWrite.push.",
+    "Assign the brand's approved unassigned ads, to a draft campaign. Only approved ads can be assigned; Studio shows the unassigned pool by default. Refuses cross-brand or previously assigned selections and pushed campaigns. Local only; nothing reaches a platform until adsWrite.push.",
   inputSchema: z.object({
     brandId: z.string().min(1),
     campaignId: z.string().min(1),
@@ -1732,7 +1731,7 @@ export const attachAdSetAction = growthAction({
 export const setAdStatusAction = growthAction({
   outputSchema: setAdStatusActionOutputSchema,
   description:
-    "Move an ad along draft → ready → approved. ready marks it done for review (any later edit sends it back to drawn); drawn takes a ready mark back. approved is the person's final sign-off: the ad never changes again and its images are saved in the background. Approving a draft made by editApprovedAd retires the ad it replaces. An approved ad cannot go back to draft; use editApprovedAd. Supply expectedUpdatedAt from the latest read. This never publishes to a platform.",
+    "Move an ad along draft → ready → approved. ready marks it done for review (any later edit sends it back to drawn); drawn takes a ready mark back. approved is the person's final sign-off: its approved output is captured and its images are saved in the background. To revise an approved ad use returnToStudio; its platform ads remain unchanged. Supply expectedUpdatedAt from the latest read. This never publishes to a platform.",
   inputSchema: z.object({
     adId: z.string().min(1),
     status: z.enum(["drawn", "ready", "approved"]),
@@ -1750,14 +1749,21 @@ export const setAdStatusAction = growthAction({
     }),
 });
 
-export const editApprovedAdAction = growthAction({
-  outputSchema: editApprovedAdActionOutputSchema,
+export const returnAdToStudioAction = growthAction({
+  outputSchema: z.object({
+    adId: z.string(),
+    status: z.literal("drawn"),
+    platformAdsUnchanged: z.number(),
+  }),
   description:
-    "Change an approved ad: makes the draft that replaces it, with the same name, home, campaign, routing and creative, and returns its adId to edit. The approved ad keeps running until the draft is approved, which retires it (deleted if it never ran, kept for its stats if it did). Calling again returns the open draft.",
-  inputSchema: z.object({ adId: z.string().min(1) }),
-  examples: [{ adId: "ad_01" }],
-  execute: (input, ctx) =>
-    editApprovedAd({ adId: input.adId, orgId: ctx.orgId }),
+    "Return the same approved or campaign ad to Studio as an unassigned draft. Clears approval and Ready attribution, keeps its composition and comments, and records the optional comment with the return event. Existing platform ads and their creative remain unchanged and may still run; this does not pause delivery. Read the current updatedAt before calling. Use as=user only for words the user explicitly asks you to post on their behalf; otherwise as=agent.",
+  inputSchema: z.object({
+    adId: z.string().min(1),
+    expectedUpdatedAt: z.string().datetime(),
+    comment: z.string().trim().max(8000).optional(),
+    as: z.enum(["user", "agent"]).default("agent"),
+  }),
+  execute: returnAdToStudio,
 });
 
 export const setAdCopyAction = growthAction({

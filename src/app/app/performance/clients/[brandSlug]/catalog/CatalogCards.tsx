@@ -1,8 +1,15 @@
 "use client";
+
+import { ReviewDiscussion } from "@/components/review/ReviewDiscussion";
 import { CopyButton } from "@/components/copy-button";
 import { toast } from "@/components/ui/toast";
 import { ImagePickerDialog } from "@/components/image-picker-dialog";
 import { CompositionSelector } from "@/components/composition-picker";
+import {
+  ReviewPreview,
+  useReviewPreview,
+  usePreviewReviewStatus,
+} from "@/components/review/ReviewPreview";
 import { ApprovedStamp } from "@/components/approved-stamp";
 import { catalogAddressIssues } from "@/lib/catalog-addresses";
 import {
@@ -129,6 +136,8 @@ export function CatalogCards({
   brandName?: string;
   /** The brand's hero home, drawn in the card picker. */
 }) {
+  const reviewPreview = useReviewPreview();
+  const previewStatus = usePreviewReviewStatus();
   const client = useQueryClient();
   const state = orpc.catalog.state.queryOptions({ input: { brandId } });
   const query = useQuery({
@@ -176,7 +185,13 @@ export function CatalogCards({
   const [limit, setLimit] = useState(10);
   const [filter, setFilter] = useQueryState(
     "filter",
-    parseAsStringLiteral(["all", "review", "approved"]).withDefault("all"),
+    parseAsStringLiteral([
+      "all",
+      "review",
+      "draft",
+      "ready",
+      "approved",
+    ]).withDefault("all"),
   );
   /** Cards with a New copy or New photo call in flight. */
   const [fixing, setFixing] = useState<Record<string, "copy" | "photo">>({});
@@ -376,12 +391,28 @@ export function CatalogCards({
       inclusion === "all" ||
       (inclusion === "included" ? card.included : !card.included),
   );
+  const statusOf = (card: CatalogCard) =>
+    previewStatus(homeOf(card)?.name ?? card.title);
+  const draftCount = inclusionCards.filter(
+    (card) => statusOf(card) === "draft",
+  ).length;
+  const readyCount = inclusionCards.filter(
+    (card) => statusOf(card) === "ready",
+  ).length;
   const reviewCount = inclusionCards.filter((card) => !card.approved).length;
-  const approvalCount = inclusionCards.filter((card) => card.approved).length;
+  const approvalCount = inclusionCards.filter((card) =>
+    reviewPreview ? statusOf(card) === "approved" : card.approved,
+  ).length;
   const filtered = inclusionCards.filter(
     (card) =>
       filter === "all" ||
-      (filter === "review" ? !card.approved : card.approved),
+      (reviewPreview
+        ? filter === "review"
+          ? statusOf(card) !== "approved"
+          : statusOf(card) === filter
+        : filter === "review" || filter === "draft"
+          ? !card.approved
+          : filter === "approved" && card.approved),
   );
   const visible = filtered.filter((card) =>
     `${homeOf(card)?.name ?? ""} ${card.title}`
@@ -541,7 +572,15 @@ export function CatalogCards({
                 <span>
                   {draft.cards.filter((c) => c.included).length} of{" "}
                   {draft.cards.length} homes included ·{" "}
-                  {draft.cards.filter((c) => c.included && c.approved).length}{" "}
+                  {
+                    draft.cards.filter(
+                      (c) =>
+                        c.included &&
+                        (reviewPreview
+                          ? statusOf(c) === "approved"
+                          : c.approved),
+                    ).length
+                  }{" "}
                   approved
                 </span>
                 <div className="flex flex-wrap gap-2">
@@ -673,7 +712,10 @@ export function CatalogCards({
                     aria-label="Review status"
                     className="flex flex-wrap rounded-lg border p-0.5"
                   >
-                    {(["all", "review", "approved"] as const).map((key) => (
+                    {(reviewPreview
+                      ? (["all", "draft", "ready", "approved"] as const)
+                      : (["all", "review", "approved"] as const)
+                    ).map((key) => (
                       <Button
                         key={key}
                         variant={filter === key ? "secondary" : "ghost"}
@@ -687,11 +729,15 @@ export function CatalogCards({
                           });
                         }}
                       >
-                        {key === "review"
-                          ? `Needs review ${reviewCount}`
-                          : key === "approved"
-                            ? `Approved ${approvalCount}`
-                            : "Any status"}
+                        {key === "draft"
+                          ? `Draft ${draftCount}`
+                          : key === "ready"
+                            ? `Ready ${readyCount}`
+                            : key === "review"
+                              ? `Needs review ${reviewCount}`
+                              : key === "approved"
+                                ? `Approved ${approvalCount}`
+                                : `All ${inclusionCards.length}`}
                       </Button>
                     ))}
                   </div>
@@ -791,7 +837,7 @@ export function CatalogCards({
                       className={`relative flex scroll-mt-20 flex-col overflow-hidden rounded-xl border bg-card ${card.included || inclusion === "excluded" ? "" : "opacity-50"} ${focusHome === card.homeId ? "ring-2 ring-ring" : ""}`}
                     >
                       <div className="group/artwork relative">
-                        {card.approved && (
+                        {card.approved && !reviewPreview && (
                           <ApprovedStamp
                             size="lg"
                             fresh={stamped.has(card.homeId)}
@@ -831,19 +877,29 @@ export function CatalogCards({
                         </button>
                         <HomeLink url={homeOf(card)?.url} />
                       </div>
-                      <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t p-3">
-                        <IncludeButton
-                          card={card}
-                          onInclude={(included) =>
-                            update({ ...card, included })
-                          }
-                        />
-                        <ApproveButton
-                          card={card}
-                          disabled={Boolean(fixing[card.homeId]) || saving}
-                          onApprove={(approved) => approve([card], approved)}
-                        />
-                      </div>
+                      {reviewPreview ? (
+                        <div className="mt-auto border-t p-3">
+                          <ReviewPreview
+                            reviewKey={homeOf(card)?.name ?? card.title}
+                            variant="reopen"
+                            initialStatus={statusOf(card)}
+                          />
+                        </div>
+                      ) : (
+                        <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t p-3">
+                          <IncludeButton
+                            card={card}
+                            onInclude={(included) =>
+                              update({ ...card, included })
+                            }
+                          />
+                          <ApproveButton
+                            card={card}
+                            disabled={Boolean(fixing[card.homeId]) || saving}
+                            onApprove={(approved) => approve([card], approved)}
+                          />
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -861,8 +917,25 @@ export function CatalogCards({
                           !card.included && !editing && inclusion !== "excluded"
                         }
                         highlighted={focusHome === card.homeId}
-                        approved={card.approved}
+                        approved={card.approved && !reviewPreview}
                         fresh={stamped.has(card.homeId)}
+                        review={
+                          reviewPreview ? (
+                            <ReviewPreview
+                              reviewKey={homeOf(card)?.name ?? card.title}
+                              variant="reopen"
+                              initialStatus={statusOf(card)}
+                            />
+                          ) : (
+                            <ReviewDiscussion
+                              target={{
+                                type: "catalog",
+                                id: card.homeId,
+                                brandId,
+                              }}
+                            />
+                          )
+                        }
                         artwork={
                           <CardPreview
                             brandId={brandId}
@@ -1018,43 +1091,45 @@ export function CatalogCards({
                                   </Button>
                                 ))}
                               </div>
-                              <div
-                                role="group"
-                                aria-label="Card actions"
-                                className="flex flex-wrap items-center justify-end gap-2"
-                              >
-                                <IncludeButton
-                                  card={card}
-                                  onInclude={(included) =>
-                                    update({ ...card, included })
-                                  }
-                                />
-                                <Button
-                                  size="sm"
-                                  variant="secondary"
-                                  disabled={
-                                    locked(card) ||
-                                    Boolean(fixing[card.homeId]) ||
-                                    saving
-                                  }
-                                  title={
-                                    locked(card) ? LOCKED_TITLE : undefined
-                                  }
-                                  onClick={() => openEditor(card)}
+                              {!reviewPreview && (
+                                <div
+                                  role="group"
+                                  aria-label="Card actions"
+                                  className="flex flex-wrap items-center justify-end gap-2"
                                 >
-                                  Edit
-                                </Button>
-                                <ApproveButton
-                                  card={card}
-                                  showStatus={false}
-                                  disabled={
-                                    Boolean(fixing[card.homeId]) || saving
-                                  }
-                                  onApprove={(approved) =>
-                                    approve([card], approved)
-                                  }
-                                />
-                              </div>
+                                  <IncludeButton
+                                    card={card}
+                                    onInclude={(included) =>
+                                      update({ ...card, included })
+                                    }
+                                  />
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    disabled={
+                                      locked(card) ||
+                                      Boolean(fixing[card.homeId]) ||
+                                      saving
+                                    }
+                                    title={
+                                      locked(card) ? LOCKED_TITLE : undefined
+                                    }
+                                    onClick={() => openEditor(card)}
+                                  >
+                                    Edit
+                                  </Button>
+                                  <ApproveButton
+                                    card={card}
+                                    showStatus={false}
+                                    disabled={
+                                      Boolean(fixing[card.homeId]) || saving
+                                    }
+                                    onApprove={(approved) =>
+                                      approve([card], approved)
+                                    }
+                                  />
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
@@ -1865,6 +1940,7 @@ export function CatalogCardLayout({
   approved,
   fresh = false,
   artwork,
+  review,
   children,
 }: {
   id?: string;
@@ -1874,6 +1950,7 @@ export function CatalogCardLayout({
   approved?: boolean;
   fresh?: boolean;
   artwork: ReactNode;
+  review?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -1895,6 +1972,7 @@ export function CatalogCardLayout({
         </div>
         {children}
       </div>
+      {review && <div className="mt-4 border-t pt-4">{review}</div>}
     </section>
   );
 }

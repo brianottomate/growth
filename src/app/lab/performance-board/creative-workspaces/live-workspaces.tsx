@@ -5,13 +5,16 @@ import Link from "next/link";
 import { ExternalLink, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-const BASE = "/app/performance/clients/porchlit-properties";
-const WORKSPACES = [
-  { title: "Catalog", path: `${BASE}/catalog` },
-  { title: "Ad Studio", path: `${BASE}/ads` },
+const BRANDS = [
   {
-    title: "Campaign Ad Studio",
-    path: `${BASE}/campaigns/camp_fGW4KbhjFgmH83W7`,
+    slug: "30a-beach-stays",
+    name: "30A Beach Stays",
+    campaign: "camp_hvekjNbs9nyAq3WM",
+  },
+  {
+    slug: "hollyhock-suites",
+    name: "Hollyhock Suites",
+    campaign: "camp_FC7EhEnSWCEgvrVM",
   },
 ];
 
@@ -45,7 +48,7 @@ function LiveFrame({
   const scale = Math.min(1, size.width / frameWidth);
   return (
     <section
-      className="flex min-h-0 min-w-[440px] flex-1 flex-col border-r last:border-r-0"
+      className="flex min-h-0 min-w-[300px] flex-1 flex-col border-r last:border-r-0"
       aria-label={title}
     >
       <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b px-4">
@@ -79,9 +82,22 @@ function LiveFrame({
 }
 
 export function LiveWorkspaces() {
+  const [brandSlug, setBrandSlug] = useState("30a-beach-stays");
+  const brand = BRANDS.find((item) => item.slug === brandSlug)!;
+  const base = `/app/performance/clients/${brand.slug}`;
+  const workspaces = [
+    { title: "Ad Studio", path: `${base}/ads?reviewPreview=1` },
+    { title: "Catalog", path: `${base}/catalog?reviewPreview=1` },
+    {
+      title: "Campaign",
+      path: `${base}/campaigns/${brand.campaign}?reviewPreview=1`,
+    },
+    { title: "SoMe", path: `/app/brands/${brand.slug}/content/review-preview` },
+  ];
   const [width, setWidth] = useState(0);
   const [revision, setRevision] = useState(0);
-  const [showCatalog, setShowCatalog] = useState(false);
+  const [showCatalog, setShowCatalog] = useState(true);
+  const [showSome, setShowSome] = useState(true);
   return (
     <main className="flex h-svh flex-col overflow-hidden bg-background">
       <header className="flex shrink-0 flex-wrap items-center gap-4 border-b px-4 py-3">
@@ -94,9 +110,22 @@ export function LiveWorkspaces() {
           </Link>
           <h1 className="font-semibold">Creative workspaces</h1>
           <p className="text-xs text-muted-foreground">
-            Porchlit Properties · Live pages and data
+            {brand.name} · Review prototype · Comments and review actions stay
+            local
           </p>
         </div>
+        <select
+          aria-label="Comparison brand"
+          className="rounded-md border bg-background px-3 py-2 text-sm"
+          value={brandSlug}
+          onChange={(event) => setBrandSlug(event.target.value)}
+        >
+          {BRANDS.map((item) => (
+            <option key={item.slug} value={item.slug}>
+              {item.name}
+            </option>
+          ))}
+        </select>
         <Button
           variant="outline"
           size="sm"
@@ -104,6 +133,14 @@ export function LiveWorkspaces() {
           onClick={() => setShowCatalog((value) => !value)}
         >
           {showCatalog ? "Hide catalog" : "Show catalog"}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          aria-pressed={showSome}
+          onClick={() => setShowSome((value) => !value)}
+        >
+          {showSome ? "Hide SoMe" : "Show SoMe"}
         </Button>
         <label className="flex items-center gap-2 text-sm">
           Page width
@@ -129,16 +166,20 @@ export function LiveWorkspaces() {
         </Button>
       </header>
       <div className="flex min-h-0 flex-1 overflow-x-auto">
-        {WORKSPACES.filter(
-          (workspace) => showCatalog || workspace.title !== "Catalog",
-        ).map((workspace) => (
-          <LiveFrame
-            key={workspace.path}
-            {...workspace}
-            width={width}
-            revision={revision}
-          />
-        ))}
+        {workspaces
+          .filter(
+            (workspace) =>
+              (showCatalog || workspace.title !== "Catalog") &&
+              (showSome || workspace.title !== "SoMe"),
+          )
+          .map((workspace) => (
+            <LiveFrame
+              key={workspace.path}
+              {...workspace}
+              width={width}
+              revision={revision}
+            />
+          ))}
       </div>
     </main>
   );

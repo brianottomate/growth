@@ -1,4 +1,9 @@
 import {
+  addReviewCommentAction,
+  deleteReviewCommentAction,
+  listReviewCommentsAction,
+} from "./review";
+import {
   listSequences,
   getSequence,
   sequenceEmails,
@@ -99,7 +104,7 @@ import {
   writeGoogleTextAdsAction,
   setAdPlatformsAction,
   setAdStatusAction,
-  editApprovedAdAction,
+  returnAdToStudioAction,
   setAdCopyAction,
   saveIdeaAction,
   addAdShellAction,
@@ -615,7 +620,7 @@ export const adsWrite = growthDomainTool({
     writeGoogleTextAds: writeGoogleTextAdsAction,
     setAdPlatforms: setAdPlatformsAction,
     setAdStatus: setAdStatusAction,
-    editApprovedAd: editApprovedAdAction,
+    returnToStudio: returnAdToStudioAction,
     setAdCopy: setAdCopyAction,
     saveIdea: saveIdeaAction,
     addAdShell: addAdShellAction,
@@ -830,7 +835,23 @@ export const listeningWrite = growthDomainTool({
   actions: { importBrowserRun: importBrowserEvidence },
 });
 
+export const reviewRead = growthDomainTool({
+  description:
+    "Internal review discussions on ads, catalog cards and content posts.",
+  actions: { listComments: listReviewCommentsAction },
+});
+export const reviewWrite = growthDomainTool({
+  description:
+    "Internal review comments with explicit user or agent attribution.",
+  actions: {
+    addComment: addReviewCommentAction,
+    deleteComment: deleteReviewCommentAction,
+  },
+});
+
 export const DOMAIN_CAPABILITY_TOOLS = {
+  reviewRead,
+  reviewWrite,
   creativeRead,
   creativeWrite,
   initiativeRead,

@@ -431,6 +431,46 @@ const placementsValueSchema = z.strictObject({
 
 const placementsSchema = z.record(z.string(), placementsValueSchema);
 
+const snapshotContentSchema = z.union([
+  contentSchema,
+  z.strictObject({
+    headlines: z.array(z.string()),
+    descriptions: z.array(z.string()),
+    linkUrl: z.string().optional(),
+  }),
+]);
+const approvedSnapshotSchema = z.strictObject({
+  content: snapshotContentSchema,
+  placements: placementsSchema.nullable(),
+  approvedAt: z.string(),
+  approvedBy: z.string(),
+});
+const nativeApprovedSnapshotSchema = approvedSnapshotSchema.extend({
+  content: z.union([
+    contentSchema.extend({
+      metaImport: metaImportSchema
+        .extend({
+          rawCreative: z.record(z.string(), z.unknown()),
+        })
+        .optional(),
+    }),
+    snapshotContentSchema.options[1],
+  ]),
+});
+const pushedCreativeSchema = z.strictObject({
+  name: z.string(),
+  headline: z.string().nullable(),
+  body: z.string().nullable(),
+  linkUrl: z.string().nullable(),
+  media: z.array(mediaItemSchema).nullable(),
+  copy: z
+    .strictObject({
+      headlines: z.array(z.string()),
+      descriptions: z.array(z.string()),
+    })
+    .nullable(),
+});
+
 export const draftAdResultSchema = z.strictObject({
   bookingTargetId: z.string().nullable(),
   brandId: z.string(),
@@ -462,12 +502,14 @@ export const draftAdResultSchema = z.strictObject({
   readyBy: z.string().nullable(),
   approvedAt: z.date().nullable(),
   approvedBy: z.string().nullable(),
+  approvedSnapshot: nativeApprovedSnapshotSchema.nullable(),
   replacesAdId: z.string().nullable(),
   type: z.enum(["text", "creative"]),
   updatedAt: z.date(),
 });
 
 const draftAdSchema = draftAdResultSchema.extend({
+  approvedSnapshot: approvedSnapshotSchema.nullable(),
   content: z.union([
     contentSchema,
     z.strictObject({
@@ -835,6 +877,7 @@ export const openCampaignActionOutputSchema = z.strictObject({
       readyBy: z.string().nullable(),
       approvedAt: z.iso.datetime().nullable(),
       approvedBy: z.string().nullable(),
+      approvedSnapshot: approvedSnapshotSchema.nullable(),
       replacesAdId: z.string().nullable(),
       type: z.enum(["text", "creative"]),
       updatedAt: z.iso.datetime(),
@@ -942,6 +985,7 @@ export const openCampaignActionOutputSchema = z.strictObject({
           platformAdSetId: z.string().nullable(),
           platformCampaignId: z.string(),
           platformObjective: z.string().nullable(),
+          pushedCreative: pushedCreativeSchema.nullable(),
           stats: statsSchema.nullable(),
           status: z.string().nullable(),
           thumbnailUrl: z.string().nullable(),
@@ -1319,15 +1363,6 @@ export const attachAdSetActionOutputSchema = z.strictObject({
 export const setAdStatusActionOutputSchema = z.strictObject({
   adId: z.string(),
   status: z.enum(["approved", "ready", "drawn"]),
-  /** The approved ad this one replaced, now retired. */
-  replaced: z.string().optional(),
-});
-
-export const editApprovedAdActionOutputSchema = z.strictObject({
-  adId: z.string(),
-  replacesAdId: z.string(),
-  /** False when a replacement draft was already open. */
-  created: z.boolean(),
 });
 
 export const setAdCopyActionOutputSchema = z.strictObject({ adId: z.string() });
@@ -1574,6 +1609,7 @@ export const openCampaignActionNativeResultSchema =
   openCampaignActionOutputSchema.extend({
     ads: z.array(
       openCampaignActionOutputSchema.shape.ads.element.extend({
+        approvedSnapshot: nativeApprovedSnapshotSchema.nullable(),
         content: z.union([
           openCampaignActionOutputSchema.shape.ads.element.shape.content.options[0].extend(
             {

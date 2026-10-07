@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  adReviewStatus,
+  usePreviewReviewStatus,
+  useReviewPreview,
+} from "@/components/review/ReviewPreview";
 import { useState } from "react";
 import { Images, Search } from "lucide-react";
 
@@ -24,7 +29,6 @@ import {
 import { StudioGeneration } from "./StudioGeneration";
 import { AddAdDialog } from "./AddAdDialog";
 import { StudioIdeas, type StudioIdea } from "./StudioIdeas";
-import { ClientPreviewLink } from "./ClientPreviewLink";
 
 export type WorkspaceHome = HotelFeedHome & {
   imageUrl: string;
@@ -56,30 +60,43 @@ export function AdPreviewsWorkspace({
   /** A single home a per-home link opened on: open and scroll to it. */
   focusHomeId?: string | null;
 }) {
+  const reviewPreview = useReviewPreview();
+  const previewStatus = usePreviewReviewStatus();
+  const statusOf = (ad: StudioIdea) =>
+    reviewPreview ? previewStatus(ad.name) : adReviewStatus(ad.status);
   const ideas = allIdeas.filter((idea) => adFormat(idea.content) !== "catalog");
-  const [filter, setFilter] = useState<"all" | "review" | "approved">("all");
+  const [filter, setFilter] = useState<"all" | "draft" | "ready" | "approved">(
+    "all",
+  );
   const [kind, setKind] = useState<AdFormat | null>(null);
   const [assignment, setAssignment] = useState<
     "all" | "unassigned" | "assigned"
-  >("all");
+  >("unassigned");
   const [grouping, setGrouping] = useState<AdGrouping>("type");
   const [search, setSearch] = useState("");
-  const approved = ideas.filter((ad) => ad.status === "approved").length;
-  const drafted = ideas.length > 0;
-  const unapproved = ideas.filter((ad) => ad.status !== "approved").length;
-
-  const visible = ideas.filter(
+  const scoped = ideas.filter(
     (idea) =>
-      (kind === null || adFormat(idea.content) === kind) &&
       (assignment === "all" ||
         (assignment === "assigned") === Boolean(idea.campaignId)) &&
-      (filter === "all" ||
-        (filter === "approved"
-          ? idea.status === "approved"
-          : idea.status !== "approved")) &&
       `${idea.name} ${adHomeContext(idea, homeContext).label} ${idea.campaignName ?? ""}`
         .toLowerCase()
         .includes(search.trim().toLowerCase()),
+  );
+  const statusScope = scoped.filter(
+    (idea) => kind === null || adFormat(idea.content) === kind,
+  );
+  const approved = statusScope.filter(
+    (ad) => statusOf(ad) === "approved",
+  ).length;
+  const drafted = ideas.length > 0;
+  const draftCount = statusScope.filter(
+    (ad) => statusOf(ad) === "draft",
+  ).length;
+  const readyCount = statusScope.filter(
+    (ad) => statusOf(ad) === "ready",
+  ).length;
+  const visible = statusScope.filter(
+    (idea) => filter === "all" || statusOf(idea) === filter,
   );
   const addAction = (
     <div className="flex flex-wrap gap-2">
@@ -89,7 +106,6 @@ export function AdPreviewsWorkspace({
   const actions = (
     <>
       {addAction}
-      <ClientPreviewLink brandId={brandId} />
       <StudioGeneration
         brandId={brandId}
         brandSlug={brandSlug}
@@ -107,7 +123,7 @@ export function AdPreviewsWorkspace({
       <WorkspaceCard
         title="Ads"
         icon={Images}
-        count={ideas.length}
+        count={scoped.length}
         actions={actions}
       >
         {drafted ? (
@@ -159,7 +175,7 @@ export function AdPreviewsWorkspace({
               aria-label="Ad review status"
               className="flex w-fit max-w-full flex-wrap gap-1 rounded-lg border p-0.5"
             >
-              {(["all", "review", "approved"] as const).map((key) => (
+              {(["all", "draft", "ready", "approved"] as const).map((key) => (
                 <Button
                   key={key}
                   size="sm"
@@ -168,10 +184,12 @@ export function AdPreviewsWorkspace({
                   onClick={() => setFilter(key)}
                 >
                   {key === "all"
-                    ? `All ${ideas.length}`
-                    : key === "review"
-                      ? `Needs review ${unapproved}`
-                      : `Approved ${approved}`}
+                    ? `All ${statusScope.length}`
+                    : key === "draft"
+                      ? `Draft ${draftCount}`
+                      : key === "ready"
+                        ? `Ready ${readyCount}`
+                        : `Approved ${approved}`}
                 </Button>
               ))}
             </div>
@@ -188,9 +206,7 @@ export function AdPreviewsWorkspace({
                     (assignment === "all" ||
                       (assignment === "assigned") ===
                         Boolean(idea.campaignId)) &&
-                    (filter === "all" ||
-                      (filter === "approved") ===
-                        (idea.status === "approved")) &&
+                    (filter === "all" || statusOf(idea) === filter) &&
                     `${idea.name} ${adHomeContext(idea, homeContext).label} ${idea.campaignName ?? ""}`
                       .toLowerCase()
                       .includes(search.trim().toLowerCase()),

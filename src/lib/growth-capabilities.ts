@@ -5,6 +5,8 @@
  * handling all key off this one public ID/action map.
  */
 export const GROWTH_CAPABILITY_ACTIONS = {
+  reviewRead: ["listComments"],
+  reviewWrite: ["addComment", "deleteComment"],
   creativeRead: ["list", "get"],
   creativeWrite: [
     "create",
@@ -204,7 +206,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "writeGoogleTextAds",
     "setAdPlatforms",
     "setAdStatus",
-    "editApprovedAd",
+    "returnToStudio",
     "setAdCopy",
     "saveIdea",
     "addAdShell",
@@ -352,6 +354,8 @@ export const GROWTH_CAPABILITY_LABELS = {
   emailWrite: "Updating email",
   contentStrategyRead: "Reading content strategy",
   contentStrategyWrite: "Updating content strategy",
+  reviewRead: "Reading review comments",
+  reviewWrite: "Updating review comments",
   adsRead: "Reading ads",
   adsWrite: "Updating ads",
   publishingRead: "Reading publishing state",

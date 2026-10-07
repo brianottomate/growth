@@ -360,6 +360,11 @@ export const growthActionPolicies = {
     diagnoseAlignment: read("model-read"),
     inspectConversions: read(),
   },
+  reviewRead: { listComments: read() },
+  reviewWrite: {
+    addComment: write(),
+    deleteComment: write({ idempotent: true }),
+  },
   adsWrite: {
     // Local DB rows only; no provider call, no spend. Push is separate.
     draftCampaign: write(),
@@ -369,7 +374,7 @@ export const growthActionPolicies = {
     // Routing is local: which platforms an unpushed idea compiles to.
     setAdPlatforms: write({ idempotent: true }),
     // Local copy of an approved ad as a draft; the original is untouched.
-    editApprovedAd: write(),
+    returnToStudio: write(),
     // Approval is the person's sign-off that gates the push, so chat asks
     // for it with the approval card rather than deciding on its own.
     setAdStatus: write({

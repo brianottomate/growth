@@ -1,14 +1,11 @@
-import { PreparedAdCard } from "./PreparedAdCard";
-import { AD_FORMATS, adFormat } from "@/lib/ad-format";
+import { CampaignAdCard } from "./CampaignAdCard";
+import { adFormat } from "@/lib/ad-format";
 import { WorkspaceCardHeader } from "@/app/app/performance/WorkspaceCard";
 import { Images } from "lucide-react";
 import type { AdContent } from "@/server/db/schema";
 import { ideaDocumentFromAd } from "@/lib/ad-idea-studio";
 import { isImportedMetaCatalog } from "@/lib/meta-import";
 import { adReviewOf } from "@/lib/ad-review";
-import { AdCard } from "./AdCard";
-import { AdIdeaGroups } from "./AdIdeaGroups";
-import { AdPlatformRouting } from "./AdPlatformRouting";
 import type { ChannelPlatform } from "@/server/db/schema";
 
 export function AdIdeasList({
@@ -16,7 +13,6 @@ export function AdIdeasList({
   homeOrder,
   homeLinks,
   preparingHero,
-  campaignId,
   brandId,
   brandName,
   brandLogo,
@@ -24,18 +20,17 @@ export function AdIdeasList({
   actions,
   emptyState,
   plannedPlatforms = [],
-  landingUrl = null,
+  studioHref,
 }: {
   /** The campaign's planned platforms; an idea can be narrowed to some. */
   plannedPlatforms?: ChannelPlatform[];
-  landingUrl?: string | null;
+  studioHref: string;
   /** Add starter ideas, Add ad, Assets: they act on the list below them. */
   actions?: React.ReactNode;
   emptyState?: React.ReactNode;
   homeOrder: string[];
   homeLinks: Record<string, { name: string; url: string }>;
   preparingHero: boolean;
-  campaignId: string;
   brandId: string;
   brandName: string;
   brandLogo: string | null;
@@ -87,72 +82,18 @@ export function AdIdeasList({
           Number("format" in b.content && b.content.format === "carousel")
         : 0),
   );
-  const groups = AD_FORMATS.map((group) => ({
-    ...group,
-    ads: ordered.filter((ad) => adFormat(ad.content) === group.id),
-  })).filter((group) => group.ads.length > 0);
   const renderAd = (ad: (typeof ordered)[number]) => (
-    <div key={ad.id}>
-      <AdPlatformRouting
-        adId={ad.id}
-        platforms={ad.platforms ?? null}
-        planned={plannedPlatforms}
-        locked={Boolean(states[ad.id])}
-      />
-      {renderIdea(ad)}
-    </div>
+    <CampaignAdCard
+      ad={{ ...ad, review: adReviewOf(ad) }}
+      brandId={brandId}
+      brandName={brandName}
+      brandLogo={brandLogo}
+      deliveryState={states[ad.id]}
+      home={ad.homeId ? homeLinks[ad.homeId] : undefined}
+      plannedPlatforms={plannedPlatforms}
+      studioHref={studioHref}
+    />
   );
-  const renderIdea = (ad: (typeof ordered)[number]) =>
-    !("media" in ad.content) ? (
-      <PreparedAdCard
-        ad={{
-          ...ad,
-          content: ad.content,
-          updatedAt: ad.updatedAt.toISOString(),
-          review: adReviewOf(ad),
-        }}
-        brandId={brandId}
-        brandName={brandName}
-        campaignId={campaignId}
-        website={landingUrl}
-        deliveryState={states[ad.id]}
-      />
-    ) : "media" in ad.content &&
-      ad.content.media.every((m) => m.type === "image") &&
-      (!ad.content.format ||
-        ad.content.format === "static" ||
-        ad.content.format === "carousel" ||
-        ad.content.format === "portfolio") ? (
-      <AdCard
-        campaignId={campaignId}
-        brandId={brandId}
-        brandName={brandName}
-        brandLogo={brandLogo}
-        deliveryState={states[ad.id]}
-        home={ad.homeId ? homeLinks[ad.homeId] : undefined}
-        ad={{
-          id: ad.id,
-          name: ad.name,
-          content: ad.content,
-          updatedAt: ad.updatedAt.toISOString(),
-          homeId: ad.homeId,
-          review: adReviewOf(ad),
-        }}
-      />
-    ) : "media" in ad.content && adFormat(ad.content) === "video" ? (
-      <PreparedAdCard
-        ad={{
-          ...ad,
-          updatedAt: ad.updatedAt.toISOString(),
-          review: adReviewOf(ad),
-        }}
-        brandId={brandId}
-        brandName={brandName}
-        campaignId={campaignId}
-        website={landingUrl}
-        deliveryState={states[ad.id]}
-      />
-    ) : null;
   return (
     <section aria-label="Ads" className="space-y-4">
       <WorkspaceCardHeader
@@ -175,20 +116,11 @@ export function AdIdeasList({
           <p className="text-sm text-muted-foreground">No ads yet.</p>
         ))
       ) : (
-        <AdIdeaGroups
-          groups={groups.map((group) => ({
-            id: group.id,
-            label: group.label,
-            ads: group.ads.map((ad) => ({
-              id: ad.id,
-              approved:
-                "media" in ad.content && ad.content.ideaStudio
-                  ? Boolean(ad.content.ideaStudio.approval)
-                  : ad.status === "approved",
-              node: renderAd(ad),
-            })),
-          }))}
-        />
+        <div className="space-y-3">
+          {ordered.map((ad) => (
+            <div key={ad.id}>{renderAd(ad)}</div>
+          ))}
+        </div>
       )}
       {catalogs.length > 0 && (
         <section

@@ -78,8 +78,7 @@ export type AudienceSource = (typeof audienceSourceEnum.enumValues)[number];
  */
 /**
  * drawn is a draft; ready means its author marked it for review; approved is
- * final. An approved ad never changes: editing one makes a new draft that
- * replaces it (`replacesAdId`). `kept` is the retired rebuild marker.
+ * frozen until Return to Studio reopens the same record. `kept` is legacy.
  */
 export const adStatusEnum = pgEnum("ad_status", [
   "drawn",
@@ -555,6 +554,13 @@ export const adTable = pgTable(
     type: adTypeEnum().default("creative").notNull(),
     status: adStatusEnum().default("drawn").notNull(),
     content: t.jsonb().$type<AdContent>().notNull(),
+    /** Signed-off output. Composition recipes remain in content for reference. */
+    approvedSnapshot: t.jsonb().$type<{
+      content: AdContent;
+      placements: AdPlacements | null;
+      approvedAt: string;
+      approvedBy: string;
+    }>(),
     /**
      * Per platform × placement cells that differ from `content`: copy
      * overrides, a placement's own files, and whether the cell is frozen.
@@ -582,7 +588,7 @@ export const adTable = pgTable(
      */
     businessKey: t.text(),
 
-    /** Marked ready for review, and by whom. Any edit clears it (trigger). */
+    /** Marked ready for review, and by whom. Service edits clear it. */
     readyAt: t.timestamp(),
     readyBy: t.text().references(() => userTable.id, { onDelete: "set null" }),
     /** Signed off, and by whom. Set once; an approved ad is final. */
@@ -591,8 +597,7 @@ export const adTable = pgTable(
       .text()
       .references(() => userTable.id, { onDelete: "set null" }),
     /**
-     * The approved ad this draft was made from. Approving it retires that
-     * one: deleted when it never ran, left for its stats when it did.
+     * Legacy replacement link, retained for compatibility; new flows do not write it.
      */
     replacesAdId: t.text().references((): AnyPgColumn => adTable.id, {
       onDelete: "set null",
@@ -814,6 +819,15 @@ export const platformAdTable = pgTable(
     media: t.jsonb().$type<MediaItem[]>(),
     /** The full text pools sent, where the platform takes pools (Google RSA). */
     copy: t.jsonb().$type<{ headlines: string[]; descriptions: string[] }>(),
+    /** What Growth pushed; sync updates observed fields without overwriting this. */
+    pushedCreative: t.jsonb().$type<{
+      name: string;
+      headline: string | null;
+      body: string | null;
+      linkUrl: string | null;
+      media: MediaItem[] | null;
+      copy: { headlines: string[]; descriptions: string[] } | null;
+    }>(),
     thumbnailUrl: t.text(),
 
     status: t.text(), // raw platform status (active/paused/rejected/…)

@@ -1,3 +1,7 @@
+import { approvedOutput } from "@/lib/ad-approved-output";
+import { withTransaction } from "@/server/db";
+import { reviewActor, reviewSubjectFields } from "./review-comments.service";
+import type { GrowthActionContext } from "@/server/ai/kernel/tool";
 import "server-only";
 import { reusableApprovalAsset } from "@/lib/ad-approval-assets";
 import { isImportedMetaCatalog } from "@/lib/meta-import";
@@ -7,8 +11,8 @@ import {
   adTable,
   campaignTable,
   brandTable,
-  mediaAssetTable,
   platformAdTable,
+  contentCommentTable,
 } from "@/server/db/schema";
 import {
   ideaDocumentFromAd,
@@ -111,7 +115,7 @@ async function renderApprovalExports(input: {
 /** Whether every approved size of the ad has its saved images. */
 export async function approvedAdFrozen(adId: string): Promise<boolean> {
   const ad = await db.query.adTable.findFirst({ where: eq(adTable.id, adId) });
-  if (!ad || !("media" in ad.content)) return false;
+  if (ad?.status !== "approved" || !("media" in ad.content)) return false;
   const studio = ad.content.ideaStudio;
   return Boolean(studio?.approval && ideaImagesSaved(studio));
 }
@@ -123,7 +127,32 @@ export async function approvedAdFrozen(adId: string): Promise<boolean> {
  */
 export async function freezeApprovedAd(adId: string): Promise<boolean> {
   const ad = await db.query.adTable.findFirst({ where: eq(adTable.id, adId) });
-  if (!ad || !("media" in ad.content)) return false;
+  if (ad?.status !== "approved") return false;
+  if (!("media" in ad.content) || !ad.content.ideaStudio) {
+    if (ad.approvedSnapshot) return false;
+    if (!ad.approvedBy)
+      throw new Error(
+        "Return this ad to Studio and approve it again before publishing.",
+      );
+    await db
+      .update(adTable)
+      .set({
+        approvedSnapshot: {
+          content: approvedOutput(ad.content),
+          placements: ad.placements,
+          approvedAt: (ad.approvedAt ?? ad.updatedAt).toISOString(),
+          approvedBy: ad.approvedBy,
+        },
+      })
+      .where(
+        and(
+          eq(adTable.id, ad.id),
+          eq(adTable.updatedAt, ad.updatedAt),
+          eq(adTable.status, "approved"),
+        ),
+      );
+    return true;
+  }
   const studio = ad.content.ideaStudio;
   const approval = studio?.approval;
   if (!studio || !approval) return false;
@@ -131,7 +160,27 @@ export async function freezeApprovedAd(adId: string): Promise<boolean> {
   const missing = document.shapes.filter(
     (shape) => approval.renders[shape]?.length !== document.cards.length,
   );
-  if (!missing.length) return false;
+  if (!missing.length && ad.approvedSnapshot) return false;
+  if (!missing.length) {
+    await db
+      .update(adTable)
+      .set({
+        approvedSnapshot: {
+          content: approvedOutput(ad.content),
+          placements: ad.placements,
+          approvedAt: approval.approvedAt,
+          approvedBy: approval.approvedBy,
+        },
+      })
+      .where(
+        and(
+          eq(adTable.id, ad.id),
+          eq(adTable.updatedAt, ad.updatedAt),
+          eq(adTable.status, "approved"),
+        ),
+      );
+    return true;
+  }
   const brand = await db.query.brandTable.findFirst({
     where: and(eq(brandTable.id, ad.brandId), isNull(brandTable.deletedAt)),
   });
@@ -158,7 +207,16 @@ export async function freezeApprovedAd(adId: string): Promise<boolean> {
     );
     const [saved] = await db
       .update(adTable)
-      .set({ ...next, updatedAt: new Date() })
+      .set({
+        ...next,
+        approvedSnapshot: {
+          content: approvedOutput(next.content),
+          placements: next.placements,
+          approvedAt: approval.approvedAt,
+          approvedBy: approval.approvedBy,
+        },
+        updatedAt: new Date(),
+      })
       .where(and(eq(adTable.id, ad.id), eq(adTable.updatedAt, ad.updatedAt)))
       .returning({ id: adTable.id });
     if (!saved) {
@@ -183,19 +241,23 @@ export async function freezeApprovedAd(adId: string): Promise<boolean> {
  * one, edit it into the draft that replaces it.
  */
 export async function assertAdNotPushed(adId: string) {
+  const source = await db.query.adTable.findFirst({
+    where: eq(adTable.id, adId),
+    columns: { status: true, campaignId: true },
+  });
+  if (source && source.status !== "approved" && !source.campaignId) return;
   const pushed = await db.query.platformAdTable.findFirst({
     where: eq(platformAdTable.adId, adId),
     columns: { id: true },
   });
   if (pushed)
     throw new Error(
-      "This ad is pushed and read-only. Edit it to make a draft that replaces it.",
+      "Return this ad to Studio before editing. Its platform ads stay unchanged.",
     );
 }
 
 /**
- * Approve an image ad. Approval is final: the ad never changes again, and the
- * way to change it is `editApprovedAd`, which makes a draft that replaces it.
+ * Approve an image ad. Output stays frozen until the same ad returns to Studio.
  * The images every included size needs are rendered and saved right after,
  * in the background, so approving stays instant.
  */
@@ -298,39 +360,16 @@ export async function approveImageAd(input: {
   return { adId: ad.id, status: "approved" as const };
 }
 
-/**
- * The approved ad a newly approved draft was made from is done. One that never
- * ran is deleted with the images its approval saved; one that ran stays for its
- * stats and keeps running until someone pauses it on the platform.
- */
-export async function retireReplacedAd(adId: string) {
-  const ad = await db.query.adTable.findFirst({
-    where: eq(adTable.id, adId),
-    columns: { replacesAdId: true },
-  });
-  if (!ad?.replacesAdId) return { retired: null };
-  const old = await db.query.adTable.findFirst({
-    where: eq(adTable.id, ad.replacesAdId),
-  });
-  if (!old) return { retired: null };
-  const pushed = await db.query.platformAdTable.findFirst({
-    where: eq(platformAdTable.adId, old.id),
-    columns: { id: true },
-  });
-  if (pushed) return { retired: old.id, deleted: false };
-  await db.delete(adTable).where(eq(adTable.id, old.id));
-  await deleteApprovalRenders(old).catch((error: unknown) =>
-    console.error("replaced ad image cleanup failed", old.id, error),
-  );
-  return { retired: old.id, deleted: true };
-}
-
-/**
- * Change an approved ad by making the draft that will replace it: same name,
- * home, campaign, routing and creative, without the approval. Calling it again
- * returns the draft already open, so there is only ever one.
- */
-export async function editApprovedAd(input: { adId: string; orgId: string }) {
+/** Reopen the same ad. Campaign membership and sign-off are cleared atomically. */
+export async function returnAdToStudio(
+  input: {
+    adId: string;
+    expectedUpdatedAt: string;
+    comment?: string;
+    as?: "user" | "agent";
+  },
+  ctx: GrowthActionContext,
+) {
   const ad = await db.query.adTable.findFirst({
     where: eq(adTable.id, input.adId),
   });
@@ -339,78 +378,82 @@ export async function editApprovedAd(input: { adId: string; orgId: string }) {
     (await db.query.brandTable.findFirst({
       where: and(
         eq(brandTable.id, ad.brandId),
-        eq(brandTable.organizationId, input.orgId),
+        eq(brandTable.organizationId, ctx.orgId),
         isNull(brandTable.deletedAt),
       ),
       columns: { id: true },
     }));
   if (!ad || !brand) throw new Error("Ad not found");
-  if (ad.status !== "approved")
-    throw new Error(
-      "Only an approved ad needs a copy; edit this one directly.",
-    );
-  const open = await db.query.adTable.findFirst({
-    where: and(
-      eq(adTable.replacesAdId, ad.id),
-      sql`${adTable.status} <> 'approved'`,
-    ),
-    columns: { id: true },
+  if (ad.updatedAt.toISOString() !== input.expectedUpdatedAt)
+    throw new Error("This ad changed. Refresh before returning it to Studio.");
+  if (ad.status !== "approved" && !ad.campaignId)
+    throw new Error("This ad is already a Studio draft.");
+  const pushed = await db.query.platformAdTable.findMany({
+    where: eq(platformAdTable.adId, ad.id),
   });
-  if (open) return { adId: open.id, replacesAdId: ad.id, created: false };
   let content = ad.content;
+  let placements = ad.placements;
   if ("media" in content && content.ideaStudio) {
-    const { approval: _approval, ...draft } = content.ideaStudio;
-    content = projectIdea(brand.id, content, draft, ad.placements).content;
+    const { approval: _approval, ...studio } = content.ideaStudio;
+    const next = projectIdea(brand.id, content, studio, placements);
+    content = next.content;
+    placements = next.placements;
   }
-  const [copy] = await db
-    .insert(adTable)
-    .values({
-      brandId: ad.brandId,
-      campaignId: ad.campaignId,
-      homeId: ad.homeId,
-      bookingTargetId: ad.bookingTargetId,
-      name: ad.name,
-      type: ad.type,
-      status: "drawn",
-      content,
-      placements: ad.placements,
-      platforms: ad.platforms,
-      replacesAdId: ad.id,
-    })
-    .returning({ id: adTable.id });
-  return { adId: copy!.id, replacesAdId: ad.id, created: true };
-}
-
-/**
- * Delete the images an approval saved for this ad, unless something else
- * still points at them. Reused library originals are never this ad's to
- * delete.
- */
-async function deleteApprovalRenders(ad: typeof adTable.$inferSelect) {
-  if (!("media" in ad.content)) return;
-  const approval = ad.content.ideaStudio?.approval;
-  if (!approval) return;
-  for (const asset of Object.values(approval.renders).flat()) {
-    if (asset.reused) continue;
-    const otherUse = await db.execute(sql`
-      select 1 from (
-        select to_jsonb(p)::text as payload from ad p
-        union all select to_jsonb(p)::text from content_post p
-        union all select to_jsonb(p)::text from platform_post p
-        union all select to_jsonb(p)::text from platform_ad p
-        union all select to_jsonb(p)::text from campaign p
-        union all select to_jsonb(p)::text from media_asset p where p.id <> ${asset.assetId}
-      ) refs where position(${asset.assetId} in payload) > 0 or position(${asset.url} in payload) > 0 limit 1
-    `);
-    if (otherUse.rows.length) continue;
-    const own = await db.query.mediaAssetTable.findFirst({
-      where: and(
-        eq(mediaAssetTable.id, asset.assetId),
-        eq(mediaAssetTable.brandId, ad.brandId),
-        sql`${mediaAssetTable.metadata}->'adApproval'->>'adId' = ${ad.id}`,
-      ),
-      columns: { id: true },
+  await withTransaction(async (tx) => {
+    const saved = await tx
+      .update(adTable)
+      .set({
+        campaignId: null,
+        status: "drawn",
+        readyAt: null,
+        readyBy: null,
+        approvedAt: null,
+        approvedBy: null,
+        approvedSnapshot: null,
+        replacesAdId: null,
+        content,
+        placements,
+        businessKey: null,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(adTable.id, ad.id), eq(adTable.updatedAt, ad.updatedAt)))
+      .returning({ id: adTable.id });
+    if (!saved.length)
+      throw new Error(
+        "This ad changed. Refresh before returning it to Studio.",
+      );
+    for (const platform of pushed) {
+      if (platform.pushedCreative) continue;
+      await tx
+        .update(platformAdTable)
+        .set({
+          pushedCreative: {
+            name: platform.name ?? ad.name,
+            headline: platform.headline,
+            body: platform.body,
+            linkUrl: platform.linkUrl,
+            media: platform.media,
+            copy: platform.copy,
+          },
+        })
+        .where(
+          and(
+            eq(platformAdTable.id, platform.id),
+            isNull(platformAdTable.pushedCreative),
+          ),
+        );
+    }
+    await tx.insert(contentCommentTable).values({
+      ...reviewSubjectFields({ type: "ad", id: ad.id }),
+      ...reviewActor(ctx, input.as),
+      event: "return_to_studio",
+      body: `Returned to Studio.${input.comment?.trim() ? `\n\n${input.comment.trim()}` : ""}${pushed.length ? "\n\nExisting platform ads were left unchanged and may still be running." : ""}`,
     });
-    if (own) await deleteMedia(own.id);
-  }
+  });
+  // Keep approval assets: an in-flight platform push may still reference them.
+  return {
+    adId: ad.id,
+    status: "drawn" as const,
+    platformAdsUnchanged: pushed.length,
+  };
 }

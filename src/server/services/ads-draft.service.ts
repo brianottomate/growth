@@ -682,10 +682,10 @@ export async function adIdeaHomePhotos(input: {
   const ad = await db.query.adTable.findFirst({
     where: eq(adTable.id, input.adId),
   });
-  if (!ad?.campaignId) throw new Error("Campaign ad not found");
+  if (!ad) throw new Error("Ad not found");
   const homes = await starterIdeaHomes({
     organizationId: input.organizationId,
-    campaignId: ad.campaignId,
+    brandId: ad.brandId,
     allHomes: true,
   });
   return homes.find((home) => home.id === ad.homeId) ?? null;
@@ -776,7 +776,7 @@ export async function addStarterAdIdeas(input: {
       .insert(adTable)
       .values({
         brandId: brand.id,
-        campaignId: campaign?.id ?? null,
+        campaignId: null,
         name: idea.name,
         type: "creative",
         status: "drawn",
@@ -821,13 +821,13 @@ export async function addDraftAd(input: {
       campaignId: true,
       content: true,
       status: true,
+      updatedAt: true,
     },
   });
 
   if (
     existing &&
-    (existing.campaignId !== (campaign?.id ?? null) ||
-      existing.brandId !== brand.id)
+    (existing.campaignId !== null || existing.brandId !== brand.id)
   ) {
     // Keys are globally unique, so silently updating would edit an ad on a
     // DIFFERENT campaign. Refuse and say which.
@@ -837,7 +837,7 @@ export async function addDraftAd(input: {
   }
 
   const values = {
-    campaignId: campaign?.id ?? null,
+    campaignId: null,
     brandId: brand.id,
     name: input.name.trim(),
     type: input.type ?? "creative",
@@ -846,9 +846,7 @@ export async function addDraftAd(input: {
   };
 
   if (existing?.status === "approved")
-    throw new Error(
-      "Approved ads are final. Edit it to make a draft that replaces it.",
-    );
+    throw new Error("Return this ad to Studio before editing.");
   if (existing && "media" in existing.content && existing.content.ideaStudio) {
     throw new Error(
       "This ad uses the mini studio. Edit it in Ad ideas or use saveIdea.",
@@ -857,11 +855,24 @@ export async function addDraftAd(input: {
   if (existing) {
     const [updated] = await db
       .update(adTable)
-      .set({ ...values, updatedAt: new Date() })
-      .where(eq(adTable.id, existing.id))
+      .set({
+        ...values,
+        status: "drawn",
+        readyAt: null,
+        readyBy: null,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(adTable.id, existing.id),
+          eq(adTable.updatedAt, existing.updatedAt),
+        ),
+      )
       .returning();
 
-    return updated!;
+    if (!updated)
+      throw new Error("This ad changed. Refresh before drafting again.");
+    return updated;
   }
 
   const [ad] = await db
@@ -1515,9 +1526,7 @@ export async function replaceDraftAdMedia(input: {
         brandId: ad.brandId,
       });
   if (ad.status === "approved")
-    throw new Error(
-      "Approved ads are final. Edit it to make a draft that replaces it.",
-    );
+    throw new Error("Return this ad to Studio before editing.");
   const content = ad.content;
   if (!("media" in content) || !Array.isArray(content.media)) {
     throw new Error("This ad has no cards to replace");
@@ -1569,8 +1578,15 @@ export async function replaceDraftAdMedia(input: {
   };
   const [updated] = await db
     .update(adTable)
-    .set({ content: { ...content, media } })
-    .where(eq(adTable.id, ad.id))
+    .set({
+      content: { ...content, media },
+      status: "drawn",
+      readyAt: null,
+      readyBy: null,
+    })
+    .where(and(eq(adTable.id, ad.id), eq(adTable.updatedAt, ad.updatedAt)))
     .returning();
-  return { ad: updated!, replaced: previous };
+  if (!updated)
+    throw new Error("This ad changed. Refresh before replacing its media.");
+  return { ad: updated, replaced: previous };
 }

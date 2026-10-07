@@ -1,5 +1,8 @@
 "use client";
 
+import { ReturnToStudioButton } from "@/components/review/ReturnToStudioButton";
+import { ReviewDiscussion } from "@/components/review/ReviewDiscussion";
+
 import {
   ImagePickerDialog,
   type PickerImage,
@@ -57,6 +60,12 @@ import type {
   IdeaSource,
 } from "@/lib/ad-idea-studio";
 import type { AdCreativeContent, MediaItem } from "@/server/db/schema";
+import {
+  ReviewPreview,
+  useReviewPreview,
+  previewReviewStatus,
+} from "@/components/review/ReviewPreview";
+import { ReviewStatusBadge } from "@/components/review/ReviewStatusBadge";
 import { ApprovedStamp } from "@/components/approved-stamp";
 import { OwnerAvatar } from "@/components/assignment/assignee";
 import type { AdReview } from "@/lib/ad-review";
@@ -102,15 +111,15 @@ export function AdCard({
   const router = useRouter();
   const review = ad.review;
   const savedApproved = review.status === "approved";
+  const reviewPreview = useReviewPreview();
   const ready = review.status === "ready";
   // Approval can show immediately; the server confirms it.
   const [optimistic, setOptimistic] = useState<boolean | null>(null);
   const [stamped, setStamped] = useState(false);
   useEffect(() => setOptimistic(null), [savedApproved]);
   const approved = optimistic ?? savedApproved;
-  // Approved is final and pushed is read-only: both change by a replacement.
-  const pushed = Boolean(deliveryState);
-  const locked = approved || pushed;
+  // Editing an approved output requires returning the ad to Studio.
+  const locked = approved;
   const imagesSaved = Boolean(
     ad.content.ideaStudio && ideaImagesSaved(ad.content.ideaStudio),
   );
@@ -164,19 +173,7 @@ export function AdCard({
       },
     }),
   );
-  const editApproved = useMutation(
-    orpc.ads.editApprovedAd.mutationOptions({
-      onSuccess: (result) => {
-        toast.success(
-          result.created
-            ? "Draft made. It replaces this ad once approved."
-            : "A replacement draft is already open.",
-        );
-        router.refresh();
-      },
-      onError: (error) => toast.error(error.message),
-    }),
-  );
+
   const [document, setDocument] = useState(() => ideaDocumentFromAd(ad));
   const [name, setName] = useState(ad.name);
   const [version, setVersion] = useState(ad.updatedAt);
@@ -1031,37 +1028,29 @@ export function AdCard({
             >
               {savedState.name}
             </h3>
-            {approved && (
-              <ApprovedStamp
-                at={review.approvedAt ?? ad.updatedAt}
-                fresh={stamped}
-              />
-            )}
-            {approved && member(review.approvedBy) && (
-              <OwnerAvatar member={member(review.approvedBy)} size="sm" />
-            )}
           </div>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
             <span>
               {isStatic ? "Static" : "Carousel"} ·{" "}
               {savedState.document.cards.length} {isStatic ? "image" : "slides"}
             </span>
-            <span aria-hidden="true">·</span>
-            <span>
-              {approved
-                ? imagesSaved
-                  ? "Approved"
-                  : "Approved · saving images…"
-                : ready
-                  ? `Ready for review${member(review.readyBy)?.name ? ` · ${member(review.readyBy)?.name}` : ""}`
-                  : ad.content.metaImport
-                    ? "Needs local review"
-                    : "Draft"}
-              {review.replacesAdId && !approved
-                ? " · replaces an approved ad"
-                : ""}
-              {deliveryState ? ` · ${deliveryState}` : ""}
-            </span>
+            {!reviewPreview && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span>
+                  {approved
+                    ? imagesSaved
+                      ? "Approved"
+                      : "Approved · saving images…"
+                    : ready
+                      ? `Ready for review${member(review.readyBy)?.name ? ` · ${member(review.readyBy)?.name}` : ""}`
+                      : ad.content.metaImport
+                        ? "Needs local review"
+                        : "Draft"}
+                  {deliveryState ? ` · ${deliveryState}` : ""}
+                </span>
+              </>
+            )}
             {metadata && (
               <>
                 <span aria-hidden="true">·</span>
@@ -1269,9 +1258,8 @@ export function AdCard({
           </div>
           {locked && view === "details" && (
             <p className="text-sm text-muted-foreground">
-              Approved ads are final. Edit makes a draft that replaces this ad
-              once it is approved
-              {pushed ? "; this one keeps running until then" : ""}.
+              Return this ad to Studio to edit and review it again. Existing
+              platform ads stay unchanged.
             </p>
           )}
           {view === "details" && (
@@ -1423,75 +1411,103 @@ export function AdCard({
           )}
         </>
       )}
-      <footer className="flex flex-wrap items-center justify-end gap-2 border-t pt-3">
-        <Button
-          size="icon-sm"
-          variant="ghost"
-          aria-label={`Delete ${savedState.name}`}
-          disabled={busy}
-          onClick={() => setDeleteOpen(true)}
-        >
-          <Trash2 className="size-4" />
-        </Button>
+      {reviewPreview ? (
+        <div className="border-t pt-4">
+          <ReviewPreview
+            reviewKey={ad.name}
+            initialStatus={previewReviewStatus(ad.name)}
+          />
+        </div>
+      ) : (
+        <footer className="flex flex-wrap items-center justify-between gap-3 border-t pt-3">
+          {
+            <div className="flex items-center gap-3 py-1">
+              {approved ? (
+                <ApprovedStamp
+                  at={review.approvedAt ?? ad.updatedAt}
+                  fresh={stamped}
+                />
+              ) : (
+                <ReviewStatusBadge status={ready ? "ready" : "draft"} />
+              )}
+              {member(approved ? review.approvedBy : review.readyBy) && (
+                <OwnerAvatar
+                  member={member(approved ? review.approvedBy : review.readyBy)}
+                  size="sm"
+                />
+              )}
+            </div>
+          }
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              aria-label={`Delete ${savedState.name}`}
+              disabled={busy}
+              onClick={() => setDeleteOpen(true)}
+            >
+              <Trash2 className="size-4" />
+            </Button>
 
-        <Button
-          size="sm"
-          variant="outline"
-          aria-expanded={!collapsed}
-          disabled={busy || editor !== null}
-          onClick={() => setView(collapsed ? "details" : "overview")}
-        >
-          {collapsed ? (locked ? "View details" : "Edit") : "Close details"}
-        </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              aria-expanded={!collapsed}
+              disabled={busy || editor !== null}
+              onClick={() => setView(collapsed ? "details" : "overview")}
+            >
+              {collapsed ? (locked ? "View details" : "Edit") : "Close details"}
+            </Button>
 
-        {collapsed && !approved && (
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={busy || approval.isPending || editor !== null}
-            onClick={() =>
-              approval.mutate({
-                adId: ad.id,
-                status: ready ? "drawn" : "ready",
-                expectedUpdatedAt: savedState.version,
-              })
-            }
-          >
-            {ready ? "Not ready" : "Mark ready"}
-          </Button>
-        )}
-        {collapsed && !approved && (
-          <Button
-            size="sm"
-            disabled={busy || approval.isPending || editor !== null}
-            loading={approval.isPending}
-            onClick={() =>
-              approval.mutate({
-                adId: ad.id,
-                status: "approved",
-                expectedUpdatedAt: savedState.version,
-                exportShapes: [
-                  ...(savedState.document.exportShapes ??
-                    savedState.document.shapes),
-                ],
-              })
-            }
-          >
-            Approve
-          </Button>
-        )}
-        {collapsed && approved && (
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={busy || editApproved.isPending}
-            loading={editApproved.isPending}
-            onClick={() => editApproved.mutate({ adId: ad.id })}
-          >
-            Edit as new draft
-          </Button>
-        )}
-      </footer>
+            {collapsed && !approved && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busy || approval.isPending || editor !== null}
+                onClick={() =>
+                  approval.mutate({
+                    adId: ad.id,
+                    status: ready ? "drawn" : "ready",
+                    expectedUpdatedAt: savedState.version,
+                  })
+                }
+              >
+                {ready ? "Not ready" : "Mark ready"}
+              </Button>
+            )}
+            {collapsed && !approved && (
+              <Button
+                size="sm"
+                disabled={busy || approval.isPending || editor !== null}
+                loading={approval.isPending}
+                onClick={() =>
+                  approval.mutate({
+                    adId: ad.id,
+                    status: "approved",
+                    expectedUpdatedAt: savedState.version,
+                    exportShapes: [
+                      ...(savedState.document.exportShapes ??
+                        savedState.document.shapes),
+                    ],
+                  })
+                }
+              >
+                Approve
+              </Button>
+            )}
+            {collapsed && approved && (
+              <ReturnToStudioButton
+                adId={ad.id}
+                updatedAt={ad.updatedAt}
+                pushed={Boolean(deliveryState)}
+              />
+            )}
+          </div>
+        </footer>
+      )}
+      {!reviewPreview && (
+        <ReviewDiscussion target={{ type: "ad", id: ad.id }} />
+      )}
       <DeleteAlert
         open={deleteOpen}
         onOpenChange={setDeleteOpen}

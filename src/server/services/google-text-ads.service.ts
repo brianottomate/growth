@@ -148,7 +148,7 @@ export async function writeGoogleTextAds(input: {
       drafts.map((draft) => ({
         id: createId("ad"),
         brandId: brand.id,
-        campaignId: campaign?.id ?? null,
+        campaignId: null,
         name: `Search · ${draft.angle}`,
         type: "text" as const,
         status: "drawn" as const,
