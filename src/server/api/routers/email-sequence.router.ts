@@ -14,6 +14,8 @@ import {
 import { createEmailSlot } from "@/server/services/email-document.service";
 import { lifecycleEnrollmentSchema } from "@/lib/validators/lifecycle-runtime";
 import {
+  previewTestJourney,
+  startTestJourney,
   executionOverview,
   setExecutionEnabled,
   rotateIngestToken,
@@ -21,8 +23,45 @@ import {
   recoverJourney,
 } from "@/server/services/lifecycle-runtime/service";
 
+import { createFlexTestSequence } from "@/server/services/lifecycle-runtime/flex";
+
 const sequenceInput = z.object({ sequenceId: z.string().min(1) });
 export const emailSequenceRouter = {
+  createFlexTest: workspaceProcedure
+    .input(z.object({ brandId: z.string().min(1) }))
+    .handler(({ context, input }) =>
+      createFlexTestSequence({
+        ...input,
+        organizationId: context.workspace.orgId,
+        userId: context.session.user.id,
+      }),
+    ),
+  previewTest: workspaceProcedure
+    .input(sequenceInput.extend({ fast: z.boolean() }))
+    .handler(({ context, input }) =>
+      previewTestJourney(
+        context.workspace.orgId,
+        input.sequenceId,
+        context.session.user.id,
+        input.fast,
+      ),
+    ),
+  startTest: workspaceProcedure
+    .input(
+      sequenceInput.extend({
+        fast: z.boolean(),
+        reviewedHash: z.string().min(1),
+        requestId: z.uuid(),
+        confirmSends: z.literal(true),
+      }),
+    )
+    .handler(({ context, input }) =>
+      startTestJourney({
+        ...input,
+        organizationId: context.workspace.orgId,
+        userId: context.session.user.id,
+      }),
+    ),
   list: actionProcedure(listSequences),
   get: actionProcedure(getSequence),
   save: actionProcedure(saveSequence),

@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -148,6 +149,14 @@ export function EmailSequences({
   basePath: string;
   sequenceId?: string;
 }) {
+  const router = useRouter();
+  const createFlex = useMutation(
+    orpc.emailSequence.createFlexTest.mutationOptions({
+      onSuccess: ({ id }) =>
+        router.push(`${basePath}?tab=sequences&sequence=${id}`),
+      onError: (error) => toast.error(error.message),
+    }),
+  );
   const query = useQuery(
     orpc.emailSequence.list.queryOptions({ input: { brandId } }),
   );
@@ -172,6 +181,13 @@ export function EmailSequences({
         </div>
         <div className="flex items-center gap-2">
           <SequenceChatStart brandId={brandId} />
+          <Button
+            variant="outline"
+            disabled={createFlex.isPending}
+            onClick={() => createFlex.mutate({ brandId })}
+          >
+            Flex test sequence
+          </Button>
           <Button asChild>
             <Link href={`${basePath}?tab=sequences&sequence=new`}>
               <Plus className="size-4" />
@@ -220,11 +236,13 @@ export function EmailSequences({
                 <Badge variant={sequence.enabled ? "default" : "secondary"}>
                   {sequence.enabled
                     ? "Active"
-                    : !isWelcomeSequence(sequence.triggerEvent)
-                      ? "Coming later"
-                      : sequence.revisionId
-                        ? "Paused"
-                        : "Draft"}
+                    : sequence.triggerEvent === "test.manual"
+                      ? "Test"
+                      : !isWelcomeSequence(sequence.triggerEvent)
+                        ? "Coming later"
+                        : sequence.revisionId
+                          ? "Paused"
+                          : "Draft"}
                 </Badge>
               </div>
               <p className="mt-2 text-sm text-muted-foreground">
@@ -305,6 +323,12 @@ function SequenceEditor({
   initialVersion?: number;
 }) {
   const client = useQueryClient();
+  const testEmail = useMutation(
+    orpc.newsletter.sendTest.mutationOptions({
+      onSuccess: ({ to }) => toast.success(`Test email sent to ${to}`),
+      onError: (error) => toast.error(error.message),
+    }),
+  );
   const [draft, setDraft] = useState<EmailSequenceDraft>(() =>
     emailSequenceDraftSchema.parse(initial),
   );
@@ -615,6 +639,19 @@ function SequenceEditor({
                         ))}
                       </SelectContent>
                     </Select>
+                    {step.platformPostId && (
+                      <Button
+                        variant="outline"
+                        disabled={testEmail.isPending}
+                        onClick={() =>
+                          testEmail.mutate({
+                            platformPostId: step.platformPostId!,
+                          })
+                        }
+                      >
+                        Send test to me
+                      </Button>
+                    )}
                     {step.platformPostId ? (
                       <Button variant="outline" asChild>
                         <Link

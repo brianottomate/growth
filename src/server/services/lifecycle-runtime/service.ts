@@ -17,6 +17,7 @@ import type {
 import { db, withTransaction } from "@/server/db";
 import {
   brandTable,
+  userTable,
   emailSequenceTable,
   lifecycleExecutionTable as executions,
   lifecycleRevisionTable as revisions,
@@ -25,6 +26,7 @@ import {
   lifecycleDeliveryTable as deliveries,
 } from "@/server/db/schema";
 import { getEmailSequence } from "@/server/services/email-sequence.service";
+import { canRunJourney } from "./test-policy";
 import { assertJourneyBrand, compileJourney, contentHash } from "./compiler";
 import {
   lifecycleReadiness,
@@ -237,7 +239,13 @@ export async function executionOverview(
     hasIngestToken: Boolean(execution?.ingestTokenHash),
     readiness,
     brandDelivery: brand?.emailDelivery ?? null,
-    runs,
+    runs: runs.map((run) => ({
+      ...run,
+      isTest: Boolean(
+        runRevisions.find((revision) => revision.id === run.revisionId)
+          ?.snapshot.test,
+      ),
+    })),
     deliveries: recentDeliveries.map((delivery) => ({
       ...delivery,
       stepName:
@@ -487,7 +495,18 @@ export async function dispatchEnrollment(enrollmentId: string) {
   const execution = await db.query.lifecycleExecutionTable.findFirst({
     where: eq(executions.sequenceId, run.sequenceId),
   });
-  if (!execution?.enabled || execution.runtimeId !== run.runtimeId) return;
+  const revision = await db.query.lifecycleRevisionTable.findFirst({
+    where: eq(revisions.id, run.revisionId),
+  });
+  const recipient = await db.query.lifecycleRecipientTable.findFirst({
+    where: eq(recipients.id, run.recipientId),
+  });
+  if (
+    !revision ||
+    !recipient ||
+    !canRunJourney(revision.snapshot, recipient.email, execution, run.runtimeId)
+  )
+    return;
   const [delivery] = await db
     .select()
     .from(deliveries)
@@ -655,4 +674,162 @@ export async function unsubscribeRecipient(token: string) {
         isNull(recipients.suppressedAt),
       ),
     );
+}
+
+export async function previewTestJourney(
+  organizationId: string,
+  sequenceId: string,
+  userId: string,
+  fast: boolean,
+) {
+  const program = await getEmailSequence({ organizationId, sequenceId });
+  const [brand, user] = await Promise.all([
+    db.query.brandTable.findFirst({
+      where: eq(brandTable.id, program.brandId),
+    }),
+    db.query.userTable.findFirst({ where: eq(userTable.id, userId) }),
+  ]);
+  if (!user?.email || !brand) throw new ORPCError("NOT_FOUND");
+  const sender = brand.emailSender;
+  const preview = await previewJourney(organizationId, sequenceId, {
+    from: sender?.fromEmail
+      ? `${sender.fromName || brand.name} <${sender.fromEmail}>`
+      : "",
+    replyTo: sender?.replyTo || undefined,
+    triggerEvent: program.triggerEvent,
+    conditions: {},
+  });
+  preview.snapshot.test = {
+    email: user.email.toLowerCase(),
+    attributes: {
+      first_name: user.name?.split(" ")[0] || "Guest",
+      last_home: "Example home",
+    },
+  };
+  if (fast)
+    preview.snapshot.steps = preview.snapshot.steps.map((step, index) => ({
+      ...step,
+      delayMinutes: index,
+    }));
+  preview.contentHash = contentHash(preview.snapshot);
+  return preview;
+}
+
+export async function startTestJourney(input: {
+  organizationId: string;
+  sequenceId: string;
+  userId: string;
+  fast: boolean;
+  reviewedHash: string;
+  requestId: string;
+}) {
+  requireLifecycleRuntime();
+  const preview = await previewTestJourney(
+    input.organizationId,
+    input.sequenceId,
+    input.userId,
+    input.fast,
+  );
+  if (preview.errors.length)
+    throw new ORPCError("BAD_REQUEST", { message: preview.errors.join("\n") });
+  if (preview.contentHash !== input.reviewedHash)
+    throw new ORPCError("CONFLICT", {
+      message: "The sequence changed. Review the test again.",
+    });
+  const program = await getEmailSequence({
+    organizationId: input.organizationId,
+    sequenceId: input.sequenceId,
+  });
+  const test = preview.snapshot.test!;
+  const eventId = `test:${input.requestId}`;
+  const enrollmentId = await withTransaction(async (tx) => {
+    await tx
+      .insert(executions)
+      .values({ sequenceId: input.sequenceId })
+      .onConflictDoNothing();
+    await tx
+      .select()
+      .from(executions)
+      .where(eq(executions.sequenceId, input.sequenceId))
+      .for("update");
+    const [existing] = await tx
+      .select()
+      .from(enrollments)
+      .where(
+        and(
+          eq(enrollments.sequenceId, input.sequenceId),
+          eq(enrollments.eventId, eventId),
+        ),
+      );
+    if (existing) {
+      if (existing.inputHash !== preview.contentHash)
+        throw new ORPCError("CONFLICT", {
+          message: "This test request was already used for different content.",
+        });
+      return existing.id;
+    }
+    const now = new Date();
+    await tx
+      .insert(recipients)
+      .values({
+        brandId: program.brandId,
+        email: test.email,
+        attributes: {},
+        observedAt: now,
+        consentSource: "Operator requested a test to their own account",
+        consentAt: now,
+        unsubscribeToken: randomBytes(32).toString("base64url"),
+      })
+      .onConflictDoNothing();
+    const [recipient] = await tx
+      .select()
+      .from(recipients)
+      .where(
+        and(
+          eq(recipients.brandId, program.brandId),
+          eq(recipients.email, test.email),
+        ),
+      )
+      .for("update");
+    if (!recipient || recipient.suppressedAt)
+      throw new ORPCError("CONFLICT", {
+        message: "Your email is unsubscribed or suppressed for this brand.",
+      });
+    const [revision] = await tx
+      .insert(revisions)
+      .values({
+        sequenceId: input.sequenceId,
+        snapshot: preview.snapshot,
+        contentHash: preview.contentHash,
+        createdBy: input.userId,
+      })
+      .returning();
+    const [run] = await tx
+      .insert(enrollments)
+      .values({
+        sequenceId: input.sequenceId,
+        revisionId: revision!.id,
+        recipientId: recipient.id,
+        eventId,
+        inputHash: preview.contentHash,
+        runtimeId: env.LIFECYCLE_RUNTIME_ID!,
+        createdAt: now,
+      })
+      .returning();
+    await tx.insert(deliveries).values(
+      preview.snapshot.steps.map((step, position) => ({
+        enrollmentId: run!.id,
+        stepId: step.id,
+        position,
+        dueAt: new Date(now.getTime() + step.delayMinutes * 60_000),
+      })),
+    );
+    return run!.id;
+  });
+  try {
+    await dispatchEnrollment(enrollmentId);
+    return { enrollmentId, queued: true };
+  } catch {
+    return { enrollmentId, queued: false };
+  }
 }

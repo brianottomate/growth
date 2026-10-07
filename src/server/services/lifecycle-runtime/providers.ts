@@ -89,6 +89,7 @@ export async function verifyLifecycleJob(
 export async function sendLifecycleEmail(
   payload: LifecycleEmailPayload,
   deliveryId: string,
+  test = false,
 ) {
   requireLifecycleRuntime();
   const token = await postmarkServerToken(payload.delivery.serverId);
@@ -101,10 +102,13 @@ export async function sendLifecycleEmail(
       HtmlBody: payload.html,
       TextBody: payload.text,
       MessageStream: payload.delivery.messageStream,
-      Tag: "growth-lifecycle",
+      Tag: test ? "growth-test" : "growth-lifecycle",
       TrackOpens: false,
       TrackLinks: "None",
-      Metadata: { lifecycle_delivery_id: deliveryId },
+      Metadata: {
+        lifecycle_delivery_id: deliveryId,
+        ...(test ? { test: "true" } : {}),
+      },
     },
   ]);
   if (result?.ErrorCode !== 0 || !result.MessageID)

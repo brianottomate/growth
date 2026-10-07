@@ -19,6 +19,7 @@ import {
   renderLifecycleEmail,
 } from "./compiler";
 import { requireLifecycleRuntime, sendLifecycleEmail } from "./providers";
+import { canRunJourney, isTestJourney } from "./test-policy";
 import { dispatchEnrollment } from "./service";
 
 // Postmark has no send idempotency contract here. Once a provider attempt
@@ -56,14 +57,11 @@ export async function executeLifecycleDelivery(
       )
       .innerJoin(brandTable, eq(brandTable.id, emailSequenceTable.brandId))
       .innerJoin(recipients, eq(recipients.id, enrollments.recipientId))
-      .innerJoin(executions, eq(executions.sequenceId, enrollments.sequenceId))
       .where(
         and(
           eq(enrollments.id, initial.enrollmentId),
           eq(enrollments.status, "active"),
           eq(enrollments.runtimeId, runtimeId),
-          eq(executions.runtimeId, runtimeId),
-          eq(executions.enabled, true),
         ),
       );
     if (scope?.websiteId)
@@ -83,8 +81,6 @@ export async function executeLifecycleDelivery(
       .select()
       .from(executions)
       .where(eq(executions.sequenceId, run.sequenceId));
-    if (!execution?.enabled || execution.runtimeId !== runtimeId)
-      return { status: "paused" } as const;
     const [program] = await tx
       .select({
         deletedAt: emailSequenceTable.deletedAt,
@@ -120,11 +116,16 @@ export async function executeLifecycleDelivery(
         .where(eq(enrollments.id, run.id));
       return { status: "cancelled" } as const;
     }
-    const exitCondition = revision.snapshot.settings.exitCondition;
     if (
-      exitCondition &&
-      matchesCondition(exitCondition, recipient.attributes)
-    ) {
+      !canRunJourney(revision.snapshot, recipient.email, execution, runtimeId)
+    )
+      return { status: "paused" } as const;
+    const test = isTestJourney(revision.snapshot, recipient.email);
+    const attributes = test
+      ? revision.snapshot.test!.attributes
+      : recipient.attributes;
+    const exitCondition = revision.snapshot.settings.exitCondition;
+    if (exitCondition && matchesCondition(exitCondition, attributes)) {
       await tx
         .update(enrollments)
         .set({ status: "cancelled", reason: "Exit condition met" })
@@ -217,8 +218,7 @@ export async function executeLifecycleDelivery(
     }
     if (
       !parentSent ||
-      (step.condition &&
-        !matchesCondition(step.condition, recipient.attributes))
+      (step.condition && !matchesCondition(step.condition, attributes))
     ) {
       await tx
         .update(deliveries)
@@ -237,7 +237,7 @@ export async function executeLifecycleDelivery(
         payload = renderLifecycleEmail({
           snapshot: revision.snapshot,
           step,
-          attributes: recipient.attributes,
+          attributes,
           email: recipient.email,
           deliveryId: delivery.id,
         });
@@ -247,6 +247,8 @@ export async function executeLifecycleDelivery(
         );
       }
     }
+    if (test && !delivery.payload)
+      payload = { ...payload, subject: `[Test] ${payload.subject}` };
     const leaseToken = randomUUID();
     await tx
       .update(deliveries)
@@ -262,6 +264,7 @@ export async function executeLifecycleDelivery(
     return {
       status: "send",
       payload,
+      test,
       leaseToken,
       enrollmentId: run.id,
     } as const;
@@ -272,7 +275,11 @@ export async function executeLifecycleDelivery(
   }
   if (claim.status !== "send") return claim;
   try {
-    const providerEmailId = await sendLifecycleEmail(claim.payload, deliveryId);
+    const providerEmailId = await sendLifecycleEmail(
+      claim.payload,
+      deliveryId,
+      claim.test,
+    );
     await db
       .update(deliveries)
       .set({

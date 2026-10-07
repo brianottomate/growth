@@ -246,3 +246,15 @@ References: [QStash publishing](https://upstash.com/docs/qstash/api-reference/me
 [QStash plan limits](https://upstash.com/pricing/qstash),
 [Postmark sending](https://postmarkapp.com/developer/api/email-api),
 [Postmark delivery events](https://postmarkapp.com/developer/webhooks/delivery-webhook).
+
+## Test sends and Flex
+
+**Send test to me** sends one saved email to the signed-in operator, from the email editor or its sequence step. It uses the existing brand Postmark server and stream.
+
+**Flex test sequence** creates (or opens) a brand's editable three-email preset: the first email immediately, then one-minute waits. Creation sends nothing.
+
+Under **Review & delivery → Test sequence to me**, review the destination and timeline, then confirm the test. Choose one-minute waits or the saved sequence's waits. The server chooses the signed-in user's email; a caller cannot supply another recipient. Each test freezes the current saved content in a separate revision, without activating live execution or changing its reviewed version. A retry uses the same request ID; scheduling failures can be recovered through the existing queue controls.
+
+Test runs use the same QStash scheduler, worker, suppression checks and delivery ledger. Their immutable revision marks the run as a test and binds it to the operator's address. Subjects use `[Test]`, Postmark uses `growth-test` and `test=true` metadata, and recent enrollments show **Test**. Tests create no blast send or published content record. Cancel remaining emails from the test run's receipt list. Postmark unsubscribe links retain their real brand-stream suppression behavior.
+
+Tests require the configured delivery runtime, even while the live sequence is paused. They do not exercise the Amplitude entry integration.

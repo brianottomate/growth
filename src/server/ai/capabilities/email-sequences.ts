@@ -174,6 +174,7 @@ export const sequenceStatus = growthAction({
         reason: z.string().nullable(),
         createdAt: z.string(),
         revisionId: z.string(),
+        isTest: z.boolean(),
       }),
     ),
     deliveries: z.array(
@@ -204,13 +205,16 @@ export const sequenceStatus = growthAction({
             snapshot: data.revision.snapshot,
           }
         : null,
-      runs: data.runs.map(({ id, status, reason, createdAt, revisionId }) => ({
-        id,
-        status,
-        reason,
-        createdAt: createdAt.toISOString(),
-        revisionId,
-      })),
+      runs: data.runs.map(
+        ({ id, status, reason, createdAt, revisionId, isTest }) => ({
+          id,
+          status,
+          reason,
+          createdAt: createdAt.toISOString(),
+          revisionId,
+          isTest,
+        }),
+      ),
       deliveries: data.deliveries.map((d) => ({
         ...d,
         dueAt: d.dueAt.toISOString(),

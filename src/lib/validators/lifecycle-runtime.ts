@@ -70,6 +70,7 @@ export const lifecycleProfileSchema = z.object({
 });
 
 export interface LifecycleExecutionSnapshot {
+  test?: { email: string; attributes: LifecycleAttributes };
   settings: LifecycleExecutionSettings;
   delivery: {
     provider: "postmark";
