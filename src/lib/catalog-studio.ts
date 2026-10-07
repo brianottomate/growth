@@ -69,7 +69,9 @@ export const defaultCatalogAdCopy = (brandName: string): CatalogAdCopy => ({
  * "|" or the first sentence, no emoji, and not shouted. "DerbyCity Plush Loft.
  * Gather in Style by Hollyhock" becomes "DerbyCity Plush Loft".
  */
-export function catalogAdHeadline(name: string) {
+export function catalogAdHeadline(name: string, brandName?: string) {
+  if (/^\d+$/.test(name.trim()) && brandName)
+    return `${brandName} · ${name.trim()}`;
   let head = name.split(" | ")[0]!.split(/(?<=[a-z0-9]{3})\. |: /i)[0]!;
   head = head
     .replace(/\p{Extended_Pictographic}/gu, "")
@@ -348,6 +350,7 @@ export function catalogDraft(
   showLogo = true,
   /** The ad the catalog runs in. */
   ad?: CatalogAdCopy,
+  brandName?: string,
 ): CatalogDraft {
   return {
     formats: [format],
@@ -382,7 +385,7 @@ export function catalogDraft(
           rating: ratingOutOfFive(home.rating),
           pills: o.pills ?? defaultCatalogPills(home),
           location: catalogLocation(home, markets) || undefined,
-          adHeadline: o.adHeadline ?? catalogAdHeadline(home.name),
+          adHeadline: o.adHeadline ?? catalogAdHeadline(home.name, brandName),
           adDescription: o.adDescription ?? catalogAdDescription(home),
         };
         return {

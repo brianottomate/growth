@@ -49,7 +49,7 @@ export function catalogCopyRules(input: {
     const card = CATALOG_COPY_INTENTS[id];
     const label = COMPOSITION_TEMPLATES.find((t) => t.id === id)?.label ?? id;
     const length = card.placeSuffix
-      ? `The lead before " in" should aim for ${card.headlineChars} characters so it stays on two lines (the card cannot draw more than 37); the place is where a guest would search, the destination region the listing or brand names (e.g. "Hocking Hills, Ohio") over a small town's postal name${input.place ? ` (current: ${input.place})` : ""}, one place for every card in the catalog.`
+      ? `The lead before " in" should aim for ${card.headlineChars} characters so it stays on two lines (the card cannot draw more than 37); the place is where a guest would search, the destination region the listing or brand names (e.g. "Hocking Hills, Ohio") over a small town's postal name${input.place ? ` (current: ${input.place})` : ""}; use this home’s assigned destination, which can differ between homes.`
       : `The headline is at most about ${card.headlineChars} characters so it stays on two lines.`;
     return `"${label}" card: ${card.intent} ${length}`;
   };

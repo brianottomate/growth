@@ -316,6 +316,7 @@ async function catalogHomes(brand: CatalogBrand, refresh = false) {
     DEFAULT_CATALOG_FORMAT,
     brand.settings?.logoOnCreatives !== false,
     brand.settings?.catalogAd ?? defaultCatalogAdCopy(brand.name),
+    brand.name,
   );
   for (const card of draft.cards) {
     const review = rows.get(card.homeId)?.aiNotes?.catalog;
@@ -1254,7 +1255,7 @@ export async function writeCatalogAdCopy(input: {
       return {
         homeId: card.homeId,
         listingTitle: home.name,
-        suggestedHeadline: catalogAdHeadline(home.name),
+        suggestedHeadline: catalogAdHeadline(home.name, brand.name),
         city: home.city ?? null,
         state: home.state ?? null,
         bedrooms: home.bedrooms ?? null,
@@ -1291,7 +1292,11 @@ export async function writeCatalogAdCopy(input: {
       db
         .update(homeTable)
         .set({
-          catalogAdHeadline: copy.adHeadline.trim().slice(0, 255) || null,
+          catalogAdHeadline:
+            catalogAdHeadline(
+              copy.adHeadline.trim().slice(0, 255),
+              brand.name,
+            ) || null,
           ...(input.headlineOnly
             ? {}
             : {
