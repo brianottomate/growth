@@ -14,7 +14,8 @@ import {
   brandStorySection,
   campaignAudiencesPickPrompt,
 } from "@/server/ai/prompts";
-import { executeQuery } from "@/server/clients/bigquery.client";
+import { bookingDemandContext } from "@/lib/booking-demand";
+import { readBrandBookingDemand } from "./booking-demand.service";
 import { db } from "@/server/db";
 import {
   audienceTable,
@@ -32,11 +33,7 @@ import { requireOwnedCampaign } from "./ads-draft.service";
 // phrases, the count stays small. Nothing is written and nothing reaches a
 // platform; each suggestion is one addAudience call away.
 //
-// Guest origin is the evidence that would settle this, and the warehouse
-// does not have it for WanderOS sites: the Segment tables carry wander.com
-// only (checked 2026-09-28). So the shortlist is the brand's
-// market (its feeder cities), what the brand's direct bookings say about
-// the booking window, and the audiences already synced in its ad account.
+// Booking evidence is shared with destination generation and stays aggregate.
 
 const MODEL = "claude-sonnet-5";
 
@@ -45,45 +42,6 @@ export type BookingWindow = {
   medianNights: number | null;
   medianLeadDays: number | null;
 };
-
-type BookingRow = {
-  bookings: number | null;
-  median_nights: number | null;
-  median_lead_days: number | null;
-};
-
-/** Direct-site bookings of the brand's homes, last 12 months. */
-async function bookingWindow(
-  listingIds: string[],
-): Promise<BookingWindow | null> {
-  if (!listingIds.length) return null;
-  try {
-    const [row] = await executeQuery<BookingRow>(
-      `
-      SELECT COUNT(*) AS bookings,
-        APPROX_QUANTILES(TIMESTAMP_DIFF(ts_checkout, ts_checkin, DAY), 2)[OFFSET(1)] AS median_nights,
-        APPROX_QUANTILES(TIMESTAMP_DIFF(ts_checkin, ts_confirmed, DAY), 2)[OFFSET(1)] AS median_lead_days
-      FROM \`wander-9fc9c.analytics.bookings\`
-      WHERE id_unit IN UNNEST(@ids)
-        AND channel = 'direct_website' AND is_wander_saas
-        AND status = 'confirmed' AND NOT is_manual_booking
-        AND ts_confirmed IS NOT NULL AND ts_canceled IS NULL
-        AND ts_confirmed >= TIMESTAMP(DATE_SUB(CURRENT_DATE(), INTERVAL 12 MONTH))
-      `,
-      { ids: listingIds },
-      { ids: ["STRING"] },
-    );
-    if (!row?.bookings) return null;
-    return {
-      bookings: row.bookings,
-      medianNights: row.median_nights,
-      medianLeadDays: row.median_lead_days,
-    };
-  } catch (error) {
-    console.warn("booking window unavailable", error);
-    return null;
-  }
-}
 
 /** "Atlanta, GA" → { city, state }. A bare name is a city with no state. */
 function splitPlace(place: string) {
@@ -203,11 +161,15 @@ export async function suggestCampaignAudiences(input: {
     if (market) markets.set(market.id, market);
   }
 
-  const window = await bookingWindow(
-    homes
-      .filter((home) => home.source === "wanderos")
-      .map((home) => home.externalId),
-  );
+  const demand = await readBrandBookingDemand(brand.id);
+  const total = demand.summaries.find((row) => row.town === null);
+  const window: BookingWindow | null = total
+    ? {
+        bookings: total.bookings,
+        medianNights: total.medianNights,
+        medianLeadDays: total.medianLeadDays,
+      }
+    : null;
 
   // Platform assets remain reusable across campaigns through explicit links.
   const assets = await db.query.platformAudienceTable.findMany({
@@ -243,12 +205,28 @@ export async function suggestCampaignAudiences(input: {
       (!asset.seedMetadata || asset.seedMetadata.status === "ready"),
   );
 
-  const feeders = [...markets.values()].flatMap((market) =>
+  const marketFeeders = [...markets.values()].flatMap((market) =>
     (market.feederCities ?? []).map((place) => ({
       ...splitPlace(place),
       market: market.label,
     })),
   );
+  const observedFeeders = (total?.cities ?? [])
+    .filter(
+      (origin) => origin.city && (!origin.country || origin.country === "US"),
+    )
+    .map((origin) => ({
+      city: origin.city!,
+      state: usStateCode(origin.state),
+      market: "Observed bookings",
+    }));
+  const feeders = [...observedFeeders, ...marketFeeders];
+  const observedStates = (total?.states ?? [])
+    .filter((origin) => !origin.country || origin.country === "US")
+    .flatMap((origin) => {
+      const state = usStateCode(origin.state);
+      return state ? [state] : [];
+    });
   const shortlist = {
     campaign: {
       name: campaign.name,
@@ -265,12 +243,15 @@ export async function suggestCampaignAudiences(input: {
     feederMarkets: feeders,
     // Geo audiences are whole states; a feeder city only says which state.
     feederStates: [
-      ...new Set(feeders.flatMap((f) => (f.state ? [f.state] : []))),
+      ...new Set([
+        ...observedStates,
+        ...feeders.flatMap((f) => (f.state ? [f.state] : [])),
+      ]),
     ].map((state) => ({
       state: `${state} (${usStateName(state) ?? state})`,
       feederCities: feeders.filter((f) => f.state === state).map((f) => f.city),
     })),
-    bookingWindow: window,
+    bookingDemand: JSON.parse(bookingDemandContext(demand)) as unknown,
     personas: personas.map(
       ({ id, name, description, demandGeography, destinationGeography }) => ({
         id,
@@ -304,16 +285,17 @@ export async function suggestCampaignAudiences(input: {
       type: asset.type,
       size: asset.sizeLabel,
     })),
-    note: [
-      window
-        ? "Guest origin by session is not available for this site; feeder cities come from the market."
-        : "No direct bookings in the last 12 months and no guest-origin data; feeder cities come from the market.",
-    ]
-      .filter(Boolean)
-      .join(" "),
+    note:
+      demand.status === "available"
+        ? "Observed origins use current guest profile locations for direct-site bookings confirmed in the past 12 months. Coverage may be incomplete; market feeder cities remain planning suggestions."
+        : "Booking evidence is unavailable for this brand. Market feeder cities remain planning suggestions.",
   };
 
-  const empty = !feeders.length && !offerable.length && !personas.length;
+  const empty =
+    !feeders.length &&
+    !observedStates.length &&
+    !offerable.length &&
+    !personas.length;
   const fallback = (): AudienceSuggestion[] => [];
 
   let suggestions: AudienceSuggestion[];

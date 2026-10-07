@@ -20,6 +20,9 @@ import { fetchWanderOsListingDetail } from "@/server/clients/wanderos-site.clien
 import { db } from "@/server/db";
 import { brandTable, homeTable } from "@/server/db/schema";
 
+import { bookingDemandContext } from "@/lib/booking-demand";
+import { readBrandBookingDemand } from "./booking-demand.service";
+
 import { brandWebsiteId } from "./wanderos-listings.service";
 
 const MODEL = "claude-sonnet-5";
@@ -107,6 +110,7 @@ export async function draftBrandMarkets(input: {
       };
     }),
   );
+  const bookingDemand = await readBrandBookingDemand(brand.id);
   const { system, prompt } = brandMarketsDraftPrompt({
     brandName: brand.name,
     website: brand.website,
@@ -116,6 +120,7 @@ export async function draftBrandMarkets(input: {
       creativeDirection: brand.creativeDirection,
     }),
     towns: JSON.stringify(described),
+    bookingDemand: bookingDemandContext(bookingDemand),
   });
   const { output } = await generateText({
     model: anthropic(MODEL),

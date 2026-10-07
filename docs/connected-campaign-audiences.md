@@ -6,13 +6,38 @@ to go. Neither description is automatically a platform targeting instruction.
 Setup edits both and uses the existing US/world geography map when populated.
 
 Campaign audience suggestions read personas, brand story, markets, booking
-window evidence, brand-owned homes and reusable platform assets. The operator
+demand evidence, brand-owned homes and reusable platform assets. The operator
 reviews proposals before saving. Each audience retains its persona, explanation
 and optional relevant home IDs. These links can also be edited in the campaign.
 Creative generation uses the selected personas and brand pillars; featured-home
 suggestions retain their aggregate booking/review ranking and use motivations,
 destinations, home facts, open-night context and photos to assess fit. Persona
 fit is a planning hypothesis, never an assertion about individual customers.
+
+## Booking evidence in AI inputs
+
+Destination generation and campaign audience suggestions share a bounded
+BigQuery summary. The cohort contains confirmed, non-manual, uncanceled
+direct-site bookings confirmed in the past 12 months, scoped to both the
+brand's linked WanderOS website and its imported active homes. Distinct booking
+IDs and one current profile per user prevent duplicate joins from inflating counts.
+
+The summary includes portfolio totals and up to six busiest home towns, median
+stay length from local check-in/check-out dates, median booking lead time and
+check-in month counts. Seasonal counts describe this confirmation cohort, not
+occupancy or a forecast. Top five cities and states carry booking counts and
+shares of all qualifying bookings; locations with fewer than three bookings
+are omitted. Guest locations come from current `analytics.customer_profiles`
+fields and can differ from residence at booking time. Profile, city and state
+coverage counts travel with the evidence.
+
+The aggregate payload is capped at 8,000 characters across the brand. Least
+busy town summaries are dropped if needed while portfolio totals remain.
+No guest identifiers, contact details or individual booking rows reach the AI.
+An unavailable warehouse query stays unknown evidence; a successful empty
+result means zero qualifying bookings. The model must distinguish observed
+aggregates from suggested markets and exploration hypotheses. Each read has
+a 2 GB scan ceiling and a 15-second warehouse job limit.
 
 ## Platform assets
 

@@ -73,6 +73,7 @@ test("missing About alone is allowed and destinations remain grounded in home to
     website: null,
     story: "",
     towns: "Birmingham",
+    bookingDemand: "{}",
   });
   expect(markets.system).toContain(
     "imported home towns are the required source of truth",
