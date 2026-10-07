@@ -9,7 +9,7 @@ import { z } from "zod";
 import {
   brandMarketsSchema,
   marketId,
-  marketSchema,
+  generatedMarketSchema,
   type BrandMarkets,
 } from "@/lib/markets";
 import {
@@ -56,7 +56,7 @@ async function brandTowns(brandId: string) {
 
 const draftSchema = z.object({
   markets: z
-    .array(marketSchema.omit({ id: true }))
+    .array(generatedMarketSchema.omit({ id: true }))
     .min(1)
     .max(12),
 });
@@ -122,7 +122,7 @@ export async function draftBrandMarkets(input: {
     system,
     prompt:
       prompt +
-      `\nExisting destinations (preserve IDs and membership unless steering requires a regroup): ${JSON.stringify(brand.markets)}` +
+      `\nExisting destinations (preserve IDs and membership unless steering requires a regroup; condense context to the compact limits): ${JSON.stringify(brand.markets)}` +
       operatorSteeringSection(input.steer),
     output: Output.object({ schema: draftSchema }),
     providerOptions: { anthropic: { effort: "medium" } },

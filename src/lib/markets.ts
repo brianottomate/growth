@@ -27,12 +27,30 @@ export const marketSchema = z.object({
     )
     .max(8)
     .optional(),
-  /** Where guests travel in from. */
+  /** Suggested origin cities, qualified with state or country. */
   feederCities: z.array(z.string().trim().min(1).max(60)).max(10).optional(),
   gettingThere: z.string().trim().max(200).optional(),
   notes: z.string().trim().max(600).optional(),
 });
 export type Market = z.infer<typeof marketSchema>;
+
+/** Compact generation limits; stored context keeps its existing read contract. */
+export const generatedMarketSchema = marketSchema.extend({
+  draws: z.array(z.string().trim().min(1).max(50)).max(3).optional(),
+  seasons: z
+    .array(
+      z.object({
+        name: z.string().trim().min(1).max(40),
+        when: z.string().trim().min(1).max(40),
+        note: z.string().trim().max(100).optional(),
+      }),
+    )
+    .max(2)
+    .optional(),
+  feederCities: z.array(z.string().trim().min(1).max(60)).max(3).optional(),
+  notes: z.string().trim().max(160).optional(),
+  evidenceNote: z.string().trim().max(160).optional(),
+});
 
 export const brandMarketsSchema = z.object({
   markets: z.array(marketSchema).max(12),
