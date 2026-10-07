@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useId, useState, useSyncExternalStore } from "react";
 import { useSearchParams } from "next/navigation";
-import { MessageSquare, Check, Send, X } from "lucide-react";
+import { MessageSquare, Check, Send, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ReviewStatusBadge } from "./ReviewStatusBadge";
 
@@ -90,6 +90,7 @@ export function ReviewPreview({
   );
   const [changed, setChanged] = useState(false);
   const [open, setOpen] = useState(false);
+  const discussionId = useId();
   const [text, setText] = useState("");
   const [notes, setNotes] = useState<Note[]>([]);
   const note = (entry: Note) => setNotes((current) => [...current, entry]);
@@ -131,11 +132,17 @@ export function ReviewPreview({
             variant={open ? "secondary" : "ghost"}
             size="sm"
             aria-expanded={open}
+            aria-controls={discussionId}
             onClick={() => setOpen((value) => !value)}
             aria-label={`${open ? "Hide" : "Show"} review comments`}
           >
             <MessageSquare className="size-3.5" />
-            {comments.length}
+            {open ? "Hide comments" : "Comments"}
+            {comments.length ? ` · ${comments.length}` : ""}
+            <ChevronDown
+              aria-hidden="true"
+              className={`size-3.5 transition-transform ${open ? "rotate-180" : ""}`}
+            />
           </Button>
         </div>
         {actions && (
@@ -176,25 +183,10 @@ export function ReviewPreview({
       </div>
       {open && (
         <section
+          id={discussionId}
           aria-label="Review discussion"
-          className="rounded-xl border bg-muted/20 p-4"
+          className="space-y-4 border-t pt-4"
         >
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h4 className="text-sm font-semibold">Review & comments</h4>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Comments for this item.
-              </p>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Close review discussion"
-              onClick={() => setOpen(false)}
-            >
-              <X className="size-4" />
-            </Button>
-          </div>
           <div className="space-y-4">
             {shown.map((item, index) => (
               <div key={index} className="flex items-start gap-2.5">
@@ -207,7 +199,7 @@ export function ReviewPreview({
             ))}
           </div>
           <form
-            className="mt-5 space-y-2 border-t pt-4"
+            className="space-y-2"
             onSubmit={(event) => {
               event.preventDefault();
               if (!text.trim()) return;

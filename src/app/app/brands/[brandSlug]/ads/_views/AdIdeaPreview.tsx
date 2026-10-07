@@ -1,5 +1,5 @@
 "use client";
-import { AdSlideCopy } from "./AdSlideCopy";
+import { AdPreviewSlide } from "./AdPreviewSlide";
 import { useEffect, useId, useRef, useState } from "react";
 import { ChevronRight, ExternalLink } from "lucide-react";
 import {
@@ -9,7 +9,6 @@ import {
 } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import Image from "next/image";
 import type { AdCreativeContent } from "@/server/db/ads-schema";
 import { metaPreviewMedia } from "@/lib/meta-preview";
 import { CompactAdMock } from "@/components/ad-mock";
@@ -251,24 +250,13 @@ export function AdIdeaPreview({
               const description =
                 item.description || copy.description?.trim() || "";
               return (
-                <div key={index} className="w-52 shrink-0">
-                  <a
-                    href={item.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label={`Open slide ${index + 1} at full size`}
-                  >
-                    <Image
-                      src={item.url}
-                      alt={`Slide ${index + 1}`}
-                      width={300}
-                      height={375}
-                      unoptimized
-                      className="h-auto w-full rounded-t-lg"
-                    />
-                  </a>
-                  <AdSlideCopy headline={headline} description={description} />
-                </div>
+                <AdPreviewSlide
+                  key={index}
+                  url={item.url}
+                  index={index}
+                  headline={headline}
+                  description={description}
+                />
               );
             })}
           </div>

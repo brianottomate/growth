@@ -1,8 +1,8 @@
 "use client";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { authClient } from "@/server/better-auth/client";
-import { MessageSquare } from "lucide-react";
+import { ChevronDown, MessageSquare } from "lucide-react";
 import { orpc } from "@/orpc/client";
 import { Button } from "@/components/ui/button";
 import { OwnerAvatar } from "@/components/assignment/assignee";
@@ -17,6 +17,7 @@ export function ReviewDiscussion({
 }) {
   const { data: session } = authClient.useSession();
   const [open, setOpen] = useState(defaultOpen);
+  const discussionId = useId();
   const [body, setBody] = useState("");
   const qc = useQueryClient();
   const opts = orpc.review.comments.queryOptions({ input: { target } });
@@ -45,18 +46,24 @@ export function ReviewDiscussion({
         size="sm"
         variant={open ? "secondary" : "ghost"}
         aria-expanded={open}
+        aria-controls={discussionId}
         aria-label={open ? "Hide review comments" : "Show review comments"}
         onClick={() => setOpen(!open)}
       >
         <MessageSquare className="size-3.5" />
-        Comments{query.data?.length ? ` · ${query.data.length}` : ""}
+        {open ? "Hide comments" : "Comments"}
+        {query.data?.length ? ` · ${query.data.length}` : ""}
+        <ChevronDown
+          aria-hidden="true"
+          className={`size-3.5 transition-transform ${open ? "rotate-180" : ""}`}
+        />
       </Button>
       {open && (
         <section
+          id={discussionId}
           aria-label="Review discussion"
-          className="space-y-4 rounded-lg border bg-background p-4"
+          className="space-y-4 border-t pt-4"
         >
-          <h4 className="text-sm font-medium">Review & comments</h4>
           {query.isLoading && (
             <p className="text-sm text-muted-foreground">Loading comments…</p>
           )}

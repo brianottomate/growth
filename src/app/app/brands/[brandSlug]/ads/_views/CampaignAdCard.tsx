@@ -12,6 +12,8 @@ import {
   Type,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { AdPreviewSlide } from "./AdPreviewSlide";
 import { AD_FORMATS, adFormat } from "@/lib/ad-format";
 import type { AdReview } from "@/lib/ad-review";
 import {
@@ -85,55 +87,82 @@ export function CampaignAdCard({
       className="overflow-hidden rounded-xl border bg-background"
     >
       <div className="flex flex-wrap items-start gap-4 p-4">
-        <div className="relative flex size-36 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
-          {thumbnail ? (
-            <img
-              src={thumbnail}
-              alt=""
-              loading="lazy"
-              className="size-full object-cover"
-            />
-          ) : (
-            <Icon className="size-5 text-muted-foreground" />
-          )}
-          {format === "carousel" && slideCount > 1 && (
-            <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-black/70 px-1 py-1 text-xs text-white">
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                aria-label={`Previous slide for ${ad.name}`}
-                onClick={() =>
-                  setSlide((currentSlide + slideCount - 1) % slideCount)
-                }
-              >
-                <ChevronLeft className="size-4" />
-              </Button>
-              <span aria-live="polite">
-                {currentSlide + 1} / {slideCount}
-              </span>
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                aria-label={`Next slide for ${ad.name}`}
-                onClick={() => setSlide((currentSlide + 1) % slideCount)}
-              >
-                <ChevronRight className="size-4" />
-              </Button>
-            </div>
-          )}
-        </div>
+        {thumbnail && format !== "video" ? (
+          <AdPreviewSlide
+            url={thumbnail}
+            index={currentSlide}
+            headline={
+              firstCard?.copy?.headline?.trim() || creative?.headline || ""
+            }
+            description={
+              firstCard?.copy?.description?.trim() ||
+              creative?.description ||
+              ""
+            }
+            controls={
+              format === "carousel" && slideCount > 1 ? (
+                <>
+                  <Button
+                    size="icon-sm"
+                    variant="outline"
+                    className="absolute top-1/2 left-2 -translate-y-1/2"
+                    aria-label={`Previous slide for ${ad.name}`}
+                    onClick={() =>
+                      setSlide((currentSlide + slideCount - 1) % slideCount)
+                    }
+                  >
+                    <ChevronLeft className="size-4" />
+                  </Button>
+                  <Button
+                    size="icon-sm"
+                    variant="outline"
+                    className="absolute top-1/2 right-2 -translate-y-1/2"
+                    aria-label={`Next slide for ${ad.name}`}
+                    onClick={() => setSlide((currentSlide + 1) % slideCount)}
+                  >
+                    <ChevronRight className="size-4" />
+                  </Button>
+                </>
+              ) : null
+            }
+          />
+        ) : (
+          <div className="flex size-36 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
+            {thumbnail ? (
+              <img
+                src={thumbnail}
+                alt=""
+                loading="lazy"
+                className="size-full object-cover"
+              />
+            ) : (
+              <Icon className="size-5 text-muted-foreground" />
+            )}
+          </div>
+        )}
         <div className="min-w-40 flex-1 space-y-1.5">
-          <h3 className="text-sm font-semibold">{ad.name}</h3>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <span>{AD_FORMATS.find((item) => item.id === format)?.label}</span>
-            <span>
+          <div className="flex items-start gap-2">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+              <h3 className="text-sm font-semibold">{ad.name}</h3>
+              <Badge variant="secondary">
+                {AD_FORMATS.find((item) => item.id === format)?.label}
+              </Badge>
+            </div>
+            <ReturnToStudioButton
+              menu
+              adId={ad.id}
+              updatedAt={ad.updatedAt.toISOString()}
+              studioHref={studioHref}
+              pushed={Boolean(deliveryState)}
+            />
+          </div>
+          {deliveryState && (
+            <p className="text-xs text-muted-foreground">
               {deliveryState === "live"
                 ? "Linked to live campaign"
-                : deliveryState
-                  ? "Pushed to platform"
-                  : "Not pushed"}
-            </span>
-          </div>
+                : "Pushed to platform"}
+            </p>
+          )}
           {copy && (
             <p className="line-clamp-2 text-xs text-muted-foreground">{copy}</p>
           )}
@@ -150,7 +179,7 @@ export function CampaignAdCard({
           <div className="flex flex-wrap items-center gap-2 pt-1">
             <Button
               size="sm"
-              variant="ghost"
+              variant={open ? "secondary" : "ghost"}
               aria-expanded={open}
               aria-controls={`preview-${ad.id}`}
               onClick={() => setOpen((value) => !value)}
@@ -160,12 +189,14 @@ export function CampaignAdCard({
                 className={`size-3.5 transition-transform ${open ? "rotate-180" : ""}`}
               />
             </Button>
-            <ReturnToStudioButton
-              adId={ad.id}
-              updatedAt={ad.updatedAt.toISOString()}
-              studioHref={studioHref}
-              pushed={Boolean(deliveryState)}
-            />
+            {format === "carousel" && slideCount > 1 && (
+              <span
+                aria-live="polite"
+                className="text-xs text-muted-foreground tabular-nums"
+              >
+                {currentSlide + 1} / {slideCount}
+              </span>
+            )}
           </div>
         </div>
       </div>

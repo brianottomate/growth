@@ -5,6 +5,13 @@ import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { orpc } from "@/orpc/client";
 import { Button } from "@/components/ui/button";
+import { MoreHorizontal, Undo2 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -19,11 +26,13 @@ export function ReturnToStudioButton({
   updatedAt,
   studioHref,
   pushed = false,
+  menu = false,
 }: {
   adId: string;
   updatedAt: string;
   studioHref?: string;
   pushed?: boolean;
+  menu?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [comment, setComment] = useState("");
@@ -50,9 +59,25 @@ export function ReturnToStudioButton({
   );
   return (
     <>
-      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
-        Return to Studio
-      </Button>
+      {menu ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="icon-sm" variant="ghost" aria-label="Ad actions">
+              <MoreHorizontal className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={() => setOpen(true)}>
+              <Undo2 className="size-4" />
+              Return to Studio
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : (
+        <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+          Return to Studio
+        </Button>
+      )}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
