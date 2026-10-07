@@ -86,8 +86,8 @@ export function LiveWorkspaces() {
   const brand = BRANDS.find((item) => item.slug === brandSlug)!;
   const base = `/app/performance/clients/${brand.slug}`;
   const workspaces = [
-    { title: "Ad Studio", path: `${base}/ads?reviewPreview=1` },
     { title: "Catalog", path: `${base}/catalog?reviewPreview=1` },
+    { title: "Ad Studio", path: `${base}/ads?reviewPreview=1` },
     {
       title: "Campaign",
       path: `${base}/campaigns/${brand.campaign}?reviewPreview=1`,
