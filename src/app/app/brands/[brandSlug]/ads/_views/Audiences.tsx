@@ -1,10 +1,4 @@
 "use client";
-import { ContextHomes } from "@/components/brand/ContextHomes";
-import { CampaignAudienceContext } from "./CampaignAudienceContext";
-import {
-  CampaignAudienceAssets,
-  type CampaignAsset,
-} from "./CampaignAudienceAssets";
 import { WorkspaceCardHeader } from "@/app/app/performance/WorkspaceCard";
 
 import { useRouter } from "next/navigation";
@@ -52,8 +46,6 @@ export function Audiences({
   audiences,
   metaTargets = {},
   personas = [],
-  platformAssets = [],
-  homes = [],
 }: {
   campaignId: string;
   campaignName: string;
@@ -61,8 +53,6 @@ export function Audiences({
   brandName: string;
   audiences: AudienceRow[];
   personas?: { id: string; name: string }[];
-  platformAssets?: CampaignAsset[];
-  homes?: { id: string; name: string }[];
   /** The Meta audience each ad set will target, by campaign audience id. */
   metaTargets?: Record<string, { name: string; via: "audience" | "persona" }>;
 }) {
@@ -207,14 +197,6 @@ export function Audiences({
                     {row.description}
                   </p>
                 )}
-                {row.homeIds?.length ? (
-                  <ContextHomes
-                    homes={homes.filter((home) =>
-                      row.homeIds?.includes(home.id),
-                    )}
-                    label="Relevant homes"
-                  />
-                ) : null}
                 <div className="space-y-2 border-t pt-3">
                   <h4 className="text-xs font-medium text-muted-foreground">
                     Platform targeting
@@ -249,16 +231,6 @@ export function Audiences({
                       : "No age narrowing"}
                   </p>
                 </div>
-                <CampaignAudienceContext
-                  audience={row}
-                  personas={personas}
-                  homes={homes}
-                />
-                <CampaignAudienceAssets
-                  audienceId={row.id}
-                  assets={platformAssets}
-                  countries={row.geography?.countries}
-                />
               </div>
             ))}
           </section>

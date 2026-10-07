@@ -361,11 +361,6 @@ export async function CampaignView({
               audiences={audiences}
               metaTargets={metaTargets}
               personas={draft.personas}
-              platformAssets={reusableAssets}
-              homes={orderedHomes.map((home) => ({
-                id: home.id,
-                name: home.name,
-              }))}
             />
           </Step>
 
