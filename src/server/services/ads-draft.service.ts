@@ -757,6 +757,12 @@ export async function addStarterAdIdeas(input: {
     if (ideas[0]!.content.ideaStudio)
       ideas[0]!.content.ideaStudio.document.copy.linkUrl = brand.website;
   }
+  // One home already has its own carousel; the shared one needs two.
+  if (source !== "blank" && homes.length < 2)
+    ideas.splice(
+      ideas.findIndex((idea) => idea.key === "hero-carousel"),
+      1,
+    );
   const targetId = input.bookingTargetId ?? campaign?.bookingTargetId;
   const booking = targetId
     ? await studioBookingDestination(brand.id, targetId, input.organizationId)

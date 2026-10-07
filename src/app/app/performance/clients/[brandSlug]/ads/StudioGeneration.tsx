@@ -10,6 +10,7 @@ import { toast } from "@/components/ui/toast";
 import { orpc } from "@/orpc/client";
 import Link from "next/link";
 import {
+  ExternalLink,
   House,
   Info,
   Loader2,
@@ -25,6 +26,7 @@ import {
 } from "@/components/ui/accordion";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { IDEA_SHAPE_LABELS, type IdeaShape } from "@/lib/ad-idea-studio";
+import { starterAdCount } from "@/lib/starter-ad-ideas";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useWorkspaceMutation } from "../useWorkspaceMutation";
 
@@ -38,7 +40,10 @@ function useStudioGenerationRun(brandId: string) {
   });
 }
 
-/** Batch creation snapshots group membership into the saved ads/run. */
+const ALL_HOMES = "__all__";
+const MAX_HOMES = 10;
+
+/** Batch creation snapshots the ticked homes into the saved ads/run. */
 export function StudioGeneration({
   brandId,
   brandSlug,
@@ -66,21 +71,49 @@ export function StudioGeneration({
     ...orpc.homeGroups.context.queryOptions({ input: { brandId } }),
     enabled: open && connected,
   });
-  const selectedGroupId = groupId || groups.data?.groups[0]?.id || "";
-  const selected = groups.data?.groups.find(
-    (group) => group.id === selectedGroupId,
-  );
+  // "All homes" sits above the groups, so any home can be picked one by one.
+  const choices = groups.data
+    ? [
+        {
+          id: ALL_HOMES,
+          name: "All homes",
+          homeIds: groups.data.homes.map((home) => home.id),
+        },
+        ...groups.data.groups,
+      ]
+    : [];
+  const selectedGroupId =
+    groupId ||
+    groups.data?.groups.find((group) => group.homeIds.length)?.id ||
+    ALL_HOMES;
+  const selected = choices.find((group) => group.id === selectedGroupId);
+  // null = the default: a group's homes all ticked, All homes none ticked.
+  const [ticked, setTicked] = useState<string[] | null>(null);
   const [exportShapes, setExportShapes] = useState<IdeaShape[]>([
     "square",
     "story",
   ]);
   const homes = useQuery({
     ...orpc.ads.starterIdeaHomes.queryOptions({
-      input: { brandId, groupId: selectedGroupId },
+      input:
+        selectedGroupId === ALL_HOMES
+          ? { brandId, allHomes: true }
+          : { brandId, groupId: selectedGroupId },
     }),
     enabled: open && connected && Boolean(selected),
   });
   const available = homes.data ?? [];
+  const picked = available.filter((home) =>
+    ticked
+      ? ticked.includes(home.id)
+      : selectedGroupId !== ALL_HOMES && available.length <= MAX_HOMES,
+  );
+  const toggle = (homeId: string) =>
+    setTicked(
+      picked.some((home) => home.id === homeId)
+        ? picked.filter((home) => home.id !== homeId).map((home) => home.id)
+        : [...picked.map((home) => home.id), homeId],
+    );
   const progress = useStudioGenerationRun(brandId);
   const running = ["queued", "running"].includes(progress.data?.status ?? "");
   const generate = useMutation(
@@ -107,13 +140,11 @@ export function StudioGeneration({
     exportShapes.length > 0 &&
     connected &&
     groups.data?.connected &&
-    selected &&
-    selected.homeIds.length > 0 &&
-    selected.homeIds.length <= 10 &&
     !homes.isPending &&
     !homes.isError &&
-    available.length === selected.homeIds.length &&
-    available.every((home) => home.photos.length > 0);
+    picked.length > 0 &&
+    picked.length <= MAX_HOMES &&
+    picked.every((home) => home.photos.length > 0);
   const manage = (
     <Link
       href={`/app/performance/clients/${brandSlug}/wanderos`}
@@ -133,18 +164,19 @@ export function StudioGeneration({
                 setBatchId(crypto.randomUUID());
                 setGroupFilter("");
                 setGroupId("");
+                setTicked(null);
               }
               setOpen(next);
             }
           }}
-          title="Create ads from a home group"
+          title="Create ads from homes"
           size="lg"
           scrollable
           className="flex max-h-[90dvh] flex-col"
           trigger={
             <Button size="sm" variant="outline" disabled={running}>
               <House aria-hidden="true" className="size-3.5" />
-              From home group
+              From homes
             </Button>
           }
           footer={
@@ -153,7 +185,7 @@ export function StudioGeneration({
               disabled={!ready || running}
               loading={pending}
               onClick={() => {
-                const homeIds = available.map((home) => home.id);
+                const homeIds = picked.map((home) => home.id);
                 if (ai)
                   generate.mutate({
                     brandId,
@@ -201,21 +233,18 @@ export function StudioGeneration({
               </p>
             ) : !groups.data.connected ? (
               <p>Connect WanderOS before creating a home-group batch.</p>
-            ) : !groups.data.groups.some(
-                (group) =>
-                  group.homeIds.length > 0 && group.homeIds.length <= 10,
-              ) ? (
+            ) : !groups.data.homes.length ? (
               <EmptyState
                 compact
                 icon={House}
-                title="Prepare a home group"
-                description="Create a group with 1–10 homes and source photos in WanderOS."
+                title="Import homes"
+                description="Import homes and source photos in WanderOS."
                 actions={manage}
               />
             ) : (
               <>
                 <fieldset className="min-w-0 space-y-3" disabled={pending}>
-                  <legend className="text-sm font-medium">Home group</legend>
+                  <legend className="text-sm font-medium">Homes</legend>
                   <Input
                     aria-label="Filter home groups"
                     placeholder="Filter home groups…"
@@ -223,15 +252,14 @@ export function StudioGeneration({
                     onChange={(event) => setGroupFilter(event.target.value)}
                   />
                   <div className="space-y-2">
-                    {groups.data.groups
+                    {choices
                       .filter((group) =>
                         group.name
                           .toLowerCase()
                           .includes(groupFilter.trim().toLowerCase()),
                       )
                       .map((group) => {
-                        const disabled =
-                          !group.homeIds.length || group.homeIds.length > 10;
+                        const disabled = !group.homeIds.length;
                         const active = group.id === selectedGroupId;
                         const preview = group.homeIds
                           .map(
@@ -263,11 +291,7 @@ export function StudioGeneration({
                                   {group.homeIds.length === 1
                                     ? "home"
                                     : "homes"}
-                                  {disabled
-                                    ? group.homeIds.length
-                                      ? " · Maximum 10"
-                                      : " · Add homes in WanderOS"
-                                    : ""}
+                                  {disabled ? " · Add homes in WanderOS" : ""}
                                 </p>
                               </div>
                               <input
@@ -276,7 +300,10 @@ export function StudioGeneration({
                                 value={group.id}
                                 checked={active}
                                 disabled={disabled}
-                                onChange={() => setGroupId(group.id)}
+                                onChange={() => {
+                                  setGroupId(group.id);
+                                  setTicked(null);
+                                }}
                                 aria-label={group.name}
                                 className="size-4 accent-primary"
                               />
@@ -300,43 +327,63 @@ export function StudioGeneration({
                                 ) : (
                                   <>
                                     <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                                      {available.map((home) => (
-                                        <li
-                                          key={home.id}
-                                          className="min-w-0 space-y-1"
-                                        >
-                                          <a
-                                            href={home.url}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            title={`Open listing: ${home.name}`}
-                                            className="block space-y-1 rounded-md focus-visible:outline-2 focus-visible:outline-ring"
+                                      {available.map((home) => {
+                                        const on = picked.some(
+                                          (p) => p.id === home.id,
+                                        );
+                                        return (
+                                          <li
+                                            key={home.id}
+                                            className="min-w-0 space-y-1"
                                           >
-                                            <div className="flex h-20 overflow-hidden rounded-md bg-muted">
-                                              <GroupPreviewPhoto
-                                                url={
-                                                  home.photos[0]?.url ?? null
-                                                }
-                                              />
-                                            </div>
-                                            <span className="block truncate text-xs font-medium">
-                                              {home.name}
-                                            </span>
-                                          </a>
-                                          <p className="text-xs text-muted-foreground">
-                                            {home.photos.length
-                                              ? `${home.photos.length} photos`
-                                              : "Needs photos"}
-                                          </p>
-                                        </li>
-                                      ))}
+                                            <label
+                                              className={`block cursor-pointer space-y-1 rounded-md ${on ? "" : "opacity-50"}`}
+                                            >
+                                              <div className="relative flex h-20 overflow-hidden rounded-md bg-muted">
+                                                <GroupPreviewPhoto
+                                                  url={
+                                                    home.photos[0]?.url ?? null
+                                                  }
+                                                />
+                                                <input
+                                                  type="checkbox"
+                                                  checked={on}
+                                                  onChange={() =>
+                                                    toggle(home.id)
+                                                  }
+                                                  aria-label={home.name}
+                                                  className="absolute top-1.5 left-1.5 size-4 accent-primary"
+                                                />
+                                              </div>
+                                              <span className="block truncate text-xs font-medium">
+                                                {home.name}
+                                              </span>
+                                            </label>
+                                            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                              {home.photos.length
+                                                ? `${home.photos.length} photos`
+                                                : "Needs photos"}
+                                              <a
+                                                href={home.url}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                title={`Open listing: ${home.name}`}
+                                                aria-label={`Open listing: ${home.name}`}
+                                                className="hover:text-foreground"
+                                              >
+                                                <ExternalLink className="size-3" />
+                                              </a>
+                                            </p>
+                                          </li>
+                                        );
+                                      })}
                                     </ul>
-                                    {available.some(
+                                    {picked.some(
                                       (home) => !home.photos.length,
                                     ) && (
                                       <p role="alert" className="text-sm">
-                                        Every home needs a source photo before
-                                        generating.
+                                        Every ticked home needs a source photo
+                                        before generating.
                                       </p>
                                     )}
                                   </>
@@ -347,7 +394,7 @@ export function StudioGeneration({
                         );
                       })}
                   </div>
-                  {!groups.data.groups.some((group) =>
+                  {!choices.some((group) =>
                     group.name
                       .toLowerCase()
                       .includes(groupFilter.trim().toLowerCase()),
@@ -381,13 +428,21 @@ export function StudioGeneration({
                     role="status"
                   >
                     <p className="font-medium">
-                      {selected.homeIds.length * 2 + 1} draft ads
+                      {picked.length > MAX_HOMES
+                        ? `Pick up to ${MAX_HOMES} homes`
+                        : picked.length
+                          ? `${starterAdCount(picked.length)} draft ads`
+                          : "Tick the homes to make ads for"}
                     </p>
-                    <p className="text-muted-foreground">
-                      {selected.homeIds.length} static ·{" "}
-                      {selected.homeIds.length} home carousels · 1 group
-                      carousel
-                    </p>
+                    {picked.length > 0 && picked.length <= MAX_HOMES && (
+                      <p className="text-muted-foreground">
+                        {picked.length} static · {picked.length}{" "}
+                        {picked.length === 1
+                          ? "home carousel"
+                          : "home carousels"}
+                        {picked.length > 1 ? " · 1 group carousel" : ""}
+                      </p>
+                    )}
                   </div>
                 )}
                 <fieldset className="space-y-2" disabled={pending}>

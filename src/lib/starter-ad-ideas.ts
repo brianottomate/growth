@@ -178,3 +178,8 @@ export function shellStarterAdIdeas(homes: StarterHome[]) {
   }
   return ideas;
 }
+
+/** A static and a carousel per home, plus the shared hero carousel from two homes. */
+export function starterAdCount(homes: number) {
+  return homes * 2 + (homes > 1 ? 1 : 0);
+}
