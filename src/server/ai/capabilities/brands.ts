@@ -513,7 +513,14 @@ export const setBrandMarkAction = growthAction({
       white: z.string(),
       dark: z.string(),
     }),
-    note: z.string().nullable(),
+    imageTreatment: z.object({ lightBackgroundRemoved: z.boolean() }),
+    visualInspection: z.literal("required"),
+    note: z
+      .string()
+      .nullable()
+      .describe(
+        "Optical critique before saving; confirm its claims against inspectCreative's saved images.",
+      ),
     path: z.string(),
   }),
   examples: [
@@ -566,6 +573,8 @@ export const setBrandMarkAction = growthAction({
       brandId: brand.id,
       source: mark.source,
       variants: mark.variants,
+      imageTreatment: mark.imageTreatment,
+      visualInspection: "required" as const,
       note: tuning?.note ?? null,
       path: `/app/brands/${brand.slug ?? brand.id}`,
     };

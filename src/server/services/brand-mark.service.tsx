@@ -232,7 +232,13 @@ function pngInsideIco(body: Buffer): Buffer | null {
   return image.subarray(0, 4).equals(png) ? image : null;
 }
 
-async function fetchPng(url: string, favicon = false): Promise<Buffer> {
+export type MarkImageTreatment = { lightBackgroundRemoved: boolean };
+
+async function fetchPng(
+  url: string,
+  favicon = false,
+  report?: (treatment: MarkImageTreatment) => void,
+): Promise<Buffer> {
   const response = await fetch(unwrapImageProxy(url), {
     signal: AbortSignal.timeout(10_000),
     // Some brand CDNs refuse a bare fetch; this is the same request a page
@@ -266,7 +272,9 @@ async function fetchPng(url: string, favicon = false): Promise<Buffer> {
     .toBuffer();
   // Tight bounds, so every later measurement is of the mark and not its
   // padding: the icon's size against the text, and the traced viewBox.
-  return trimTransparent(favicon ? await removeLightIconBackground(png) : png);
+  const cleaned = favicon ? await removeLightIconBackground(png) : png;
+  report?.({ lightBackgroundRemoved: !cleaned.equals(png) });
+  return trimTransparent(cleaned);
 }
 
 /**
@@ -538,12 +546,14 @@ export async function renderBrandMark(
   brand: MarkBrand,
   tone: MarkTone,
   tuning: MarkTuning = NO_TUNING,
+  report?: (treatment: MarkImageTreatment) => void,
 ): Promise<Buffer> {
   const iconUrl = await resolveMarkIconUrl(recipe, brand);
   let iconPng = iconUrl
     ? await fetchPng(
         iconUrl,
         recipe.source === "favicon" || recipe.iconFrom === "favicon",
+        report,
       )
     : null;
   if (iconPng && recipe.iconFrom === "logo-icon")
@@ -698,7 +708,8 @@ export async function setBrandMark(input: {
   /** Why this mark, when it was suggested rather than picked by hand. */
   reason?: string | null;
   previewCopy?: BrandPreviewCopy | null;
-}): Promise<BrandMark> {
+}): Promise<BrandMark & { imageTreatment: MarkImageTreatment }> {
+  let imageTreatment: MarkImageTreatment = { lightBackgroundRemoved: false };
   const brand = await loadMarkBrand(input.brandId);
   const tuning =
     input.recipe.source === "lockup" ? (input.tuning ?? null) : null;
@@ -711,6 +722,11 @@ export async function setBrandMark(input: {
       brand,
       tone,
       tuning ?? NO_TUNING,
+      tone === "color"
+        ? (treatment) => {
+            imageTreatment = treatment;
+          }
+        : undefined,
     );
     // An icon-only mark may come from a small file; a lockup is rendered
     // large already. Trace the mono icons so cards draw them at any size.
@@ -771,7 +787,7 @@ export async function setBrandMark(input: {
     .set({ brandMark: mark })
     .where(eq(brandTable.id, brand.id));
 
-  return mark;
+  return { ...mark, imageTreatment };
 }
 
 export async function clearBrandMark(brandId: string): Promise<void> {
