@@ -14,8 +14,9 @@ import { env } from "@/env";
  *
  * Contract: POST JSON `{ email }` → JSON `{ "salesRepEmail": "<rep>" }`. No
  * match is `{}` or a null/empty `salesRepEmail`. Anything else (a non-2xx, a
- * body that isn't that JSON, a rep that isn't an email) throws, so a broken
- * scenario shows up as a lookup error instead of passing for "no meeting".
+ * body that isn't that JSON, any other key, a rep that isn't an email)
+ * throws, so a broken scenario shows up as a lookup error instead of passing
+ * for "no meeting".
  * The URL is the secret.
  */
 
@@ -25,7 +26,9 @@ export const isRevenueHeroLookupConfigured = Boolean(
   env.REVENUEHERO_LOOKUP_WEBHOOK_URL,
 );
 
-const meetingRepResponseSchema = z.object({
+// Strict: an object carrying anything else (`{ "error": "failed" }`) is a
+// broken scenario, not a no-match.
+const meetingRepResponseSchema = z.strictObject({
   salesRepEmail: z
     .string()
     .trim()

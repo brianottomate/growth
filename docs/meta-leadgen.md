@@ -108,7 +108,8 @@ Make.com webhook at `REVENUEHERO_LOOKUP_WEBHOOK_URL` (POST `{ email }` →
 | env var unset | any | routed by round robin (warning logged once) |
 
 "None" is only an explicit no-match (`{}`, or a null or empty `salesRepEmail`).
-A non-2xx, a timeout, a body that isn't that JSON, or a rep that isn't an email
+A non-2xx, a timeout, a body that isn't that JSON, an object with any other key
+(`{"error": "failed"}`), or a rep that isn't an email
 is a lookup error, recorded in `last_error`, so a broken Make scenario shows up
 instead of passing for "nobody booked".
 
