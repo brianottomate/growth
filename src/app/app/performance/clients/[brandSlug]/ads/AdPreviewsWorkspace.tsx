@@ -28,6 +28,7 @@ import {
   type AdGrouping,
   type AdHomeContext,
 } from "@/lib/ad-collection-groups";
+import { SendToCampaign } from "./SendToCampaign";
 import { StudioGeneration } from "./StudioGeneration";
 import { AddAdDialog } from "./AddAdDialog";
 import { StudioIdeas, type StudioIdea } from "./StudioIdeas";
@@ -131,6 +132,9 @@ export function AdPreviewsWorkspace({
         brandSlug={brandSlug}
         connected={connected}
       />
+      {!reviewPreview && (
+        <SendToCampaign brandId={brandId} brandSlug={brandSlug} />
+      )}
       <ShapeBrandButton
         brandId={brandId}
         brandName={brandName}

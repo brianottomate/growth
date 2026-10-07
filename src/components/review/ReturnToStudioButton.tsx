@@ -27,13 +27,21 @@ export function ReturnToStudioButton({
   studioHref,
   pushed = false,
   menu = false,
+  inStudio = false,
+  assigned = true,
 }: {
   adId: string;
   updatedAt: string;
   studioHref?: string;
   pushed?: boolean;
   menu?: boolean;
+  inStudio?: boolean;
+  assigned?: boolean;
 }) {
+  const label = inStudio ? "Reopen" : "Return to Studio";
+  const completed = inStudio
+    ? "Reopened as a draft."
+    : "Returned to Studio as a draft.";
   const [open, setOpen] = useState(false);
   const [comment, setComment] = useState("");
   const router = useRouter();
@@ -44,12 +52,12 @@ export function ReturnToStudioButton({
         setComment("");
         toast.success(
           result.platformAdsUnchanged
-            ? "Returned to Studio. Existing platform ads are unchanged."
-            : "Returned to Studio as a draft.",
+            ? `${completed} Existing platform ads are unchanged.`
+            : completed,
         );
         if (result.mediaCleanup.errors.length)
           toast.warning(
-            "Returned to Studio. Some exported files could not be removed.",
+            `${completed} Some exported files could not be removed.`,
           );
         if (studioHref) router.push(`${studioHref}#ad-${adId}`);
         router.refresh();
@@ -69,22 +77,24 @@ export function ReturnToStudioButton({
           <DropdownMenuContent align="end">
             <DropdownMenuItem onSelect={() => setOpen(true)}>
               <Undo2 className="size-4" />
-              Return to Studio
+              {label}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       ) : (
         <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
-          Return to Studio
+          {label}
         </Button>
       )}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Return to Studio</DialogTitle>
+            <DialogTitle>{label}</DialogTitle>
             <DialogDescription>
-              This ad leaves its campaign and becomes an editable draft. Its
-              comments stay with it, and it will need approval again. Unused
+              {assigned
+                ? "This ad leaves its campaign and becomes an editable draft. "
+                : "This ad becomes an editable draft. "}
+              Its comments stay with it, and it will need approval again. Unused
               exports are removed; source artwork stays.
               {pushed &&
                 " Existing platform ads will stay unchanged and may still be running. Pause them separately if needed."}
@@ -93,7 +103,7 @@ export function ReturnToStudioButton({
           <label className="space-y-2 text-sm">
             Comment (optional)
             <textarea
-              aria-label="Reason for returning to Studio"
+              aria-label="Reopening comment"
               className="min-h-24 w-full rounded-md border bg-background p-3"
               maxLength={8000}
               value={comment}
@@ -116,7 +126,7 @@ export function ReturnToStudioButton({
                 })
               }
             >
-              Return to Studio
+              {label}
             </Button>
           </DialogFooter>
           {mutation.error && (

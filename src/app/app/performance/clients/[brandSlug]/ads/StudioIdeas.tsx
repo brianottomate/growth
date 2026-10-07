@@ -16,9 +16,7 @@ import {
   type AdGrouping,
   type AdHomeContext,
 } from "@/lib/ad-collection-groups";
-import { Button } from "@/components/ui/button";
-import { SendToCampaign } from "./SendToCampaign";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { AdCard } from "@/app/app/brands/[brandSlug]/ads/_views/AdCard";
 import { PreparedAdCard } from "@/app/app/brands/[brandSlug]/ads/_views/PreparedAdCard";
 import { type AdState } from "@/lib/ad-wall";
@@ -88,45 +86,11 @@ export function StudioIdeas({
         .getElementById(adAnchor)
         ?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [focusHomeId, grouping, ideas]);
-  const [picked, setPicked] = useState<string[]>([]);
-  const available = ideas.filter(
-    (ad) => ad.status === "approved" && !ad.campaignId,
-  );
-  const selected = picked.filter((id) => available.some((ad) => ad.id === id));
   const reviewPreview = useReviewPreview();
   const previewStatus = usePreviewReviewStatus();
   const groups = groupCollectionAds(ideas, grouping, homeContext);
   return (
     <div className="divide-y">
-      {!reviewPreview && available.length > 0 && (
-        <div className="sticky top-0 z-10 mb-4 flex flex-wrap items-center gap-2 bg-background py-3">
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={selected.length === available.length}
-              onChange={(event) =>
-                setPicked(
-                  event.target.checked ? available.map((ad) => ad.id) : [],
-                )
-              }
-            />
-            {selected.length
-              ? `${selected.length} selected`
-              : "Select approved ads"}
-          </label>
-          <SendToCampaign
-            brandId={brandId}
-            brandSlug={brandSlug}
-            adIds={selected}
-            onSent={() => setPicked([])}
-          />
-          {selected.length > 0 && (
-            <Button size="sm" variant="ghost" onClick={() => setPicked([])}>
-              Clear
-            </Button>
-          )}
-        </div>
-      )}
       {groups.map((group) => {
         const frozen = group.ads.filter(
           (idea) =>
@@ -169,30 +133,7 @@ export function StudioIdeas({
                   Unassigned
                 </span>
               );
-              const adMetadata = (
-                <div className="flex items-center gap-3">
-                  {!reviewPreview &&
-                    idea.status === "approved" &&
-                    !idea.campaignId && (
-                      <label className="flex items-center gap-2 text-xs">
-                        <input
-                          type="checkbox"
-                          aria-label={`Select ${idea.name}`}
-                          checked={selected.includes(idea.id)}
-                          onChange={(event) =>
-                            setPicked((current) =>
-                              event.target.checked
-                                ? [...current, idea.id]
-                                : current.filter((id) => id !== idea.id),
-                            )
-                          }
-                        />
-                        Select
-                      </label>
-                    )}
-                  {assignment}
-                </div>
-              );
+              const adMetadata = assignment;
               const wrap = (node: React.ReactNode, metadataInside = false) => (
                 <div
                   key={idea.id}

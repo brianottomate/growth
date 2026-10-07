@@ -758,6 +758,8 @@ export function PreparedAdCard({
           )}
           {!expanded && approved && (
             <ReturnToStudioButton
+              inStudio
+              assigned={Boolean(campaignId)}
               adId={ad.id}
               updatedAt={ad.updatedAt}
               pushed={Boolean(deliveryState)}
