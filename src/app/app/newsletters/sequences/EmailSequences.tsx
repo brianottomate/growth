@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -33,6 +32,7 @@ import {
   type EmailSequenceDraft,
 } from "@/lib/validators/email-sequence";
 import { ExecutionPanel, ConditionEditor } from "./ExecutionPanel";
+import { SequenceTestAction } from "./SequenceTestPanel";
 
 function SequenceChatStart({
   brandId,
@@ -149,14 +149,6 @@ export function EmailSequences({
   basePath: string;
   sequenceId?: string;
 }) {
-  const router = useRouter();
-  const createFlex = useMutation(
-    orpc.emailSequence.createFlexTest.mutationOptions({
-      onSuccess: ({ id }) =>
-        router.push(`${basePath}?tab=sequences&sequence=${id}`),
-      onError: (error) => toast.error(error.message),
-    }),
-  );
   const query = useQuery(
     orpc.emailSequence.list.queryOptions({ input: { brandId } }),
   );
@@ -175,23 +167,16 @@ export function EmailSequences({
         <div>
           <h2 className="text-xl font-semibold">Email sequences</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Start with a welcome series for new subscribers. Other lifecycle
-            journeys are coming later.
+            Plan emails around a moment in your customer’s journey. Welcome is
+            the first journey we’ll connect to Amplitude.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <SequenceChatStart brandId={brandId} />
-          <Button
-            variant="outline"
-            disabled={createFlex.isPending}
-            onClick={() => createFlex.mutate({ brandId })}
-          >
-            Flex test sequence
-          </Button>
           <Button asChild>
             <Link href={`${basePath}?tab=sequences&sequence=new`}>
               <Plus className="size-4" />
-              New welcome sequence
+              New sequence
             </Link>
           </Button>
         </div>
@@ -482,6 +467,12 @@ function SequenceEditor({
             sequenceId={sequenceId}
             disabled={dirty || save.isPending}
           />
+          {sequenceId && (
+            <SequenceTestAction
+              sequenceId={sequenceId}
+              disabled={dirty || save.isPending}
+            />
+          )}
           <span className="text-xs text-muted-foreground">
             {dirty ? "Unsaved draft" : "Draft saved"}
           </span>

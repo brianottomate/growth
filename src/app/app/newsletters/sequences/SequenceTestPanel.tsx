@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { orpc } from "@/orpc/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,71 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "@/components/ui/toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+
+export function SequenceTestAction({
+  sequenceId,
+  disabled,
+}: {
+  sequenceId: string;
+  disabled: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const client = useQueryClient();
+  const overview = useQuery(
+    orpc.emailSequence.executionOverview.queryOptions({
+      input: { sequenceId },
+      enabled: open,
+    }),
+  );
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button
+          variant="outline"
+          disabled={disabled}
+          title={disabled ? "Save the draft before testing" : undefined}
+        >
+          Test sequence
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Test sequence</DialogTitle>
+        </DialogHeader>
+        {overview.isPending ? (
+          <p>Checking delivery setup…</p>
+        ) : overview.error ? (
+          <p role="alert">{overview.error.message}</p>
+        ) : (
+          <>
+            {!overview.data.readiness.ready && (
+              <p role="alert">
+                Setup remaining: {overview.data.readiness.missing.join(", ")}
+              </p>
+            )}
+            <SequenceTestPanel
+              sequenceId={sequenceId}
+              ready={overview.data.readiness.ready}
+              onStarted={() => {
+                setOpen(false);
+                return client.invalidateQueries({
+                  queryKey: orpc.emailSequence.executionOverview.key(),
+                });
+              }}
+            />
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export function SequenceTestPanel({
   sequenceId,
@@ -62,7 +127,6 @@ export function SequenceTestPanel({
   const review = preview.data;
   return (
     <section className="mb-5 space-y-3 rounded-xl border p-4">
-      <h3 className="font-medium">Test sequence</h3>
       <p className="text-sm text-muted-foreground">
         Run the saved emails to one or several recipients. Live delivery can
         stay paused. Test individual emails with Send test to me in the email

@@ -1,6 +1,5 @@
 "use client";
 
-import { SequenceTestPanel } from "./SequenceTestPanel";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -283,11 +282,6 @@ export function ExecutionPanel({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <SequenceTestPanel
-          sequenceId={sequenceId}
-          ready={data.readiness.ready}
-          onStarted={refresh}
-        />
         <p className="text-sm text-muted-foreground">
           Delivery uses this brand’s Postmark server and message stream:{" "}
           {data.brandDelivery
