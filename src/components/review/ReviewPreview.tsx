@@ -128,7 +128,7 @@ export function ReviewPreview({
             </span>
           )}
           <Button
-            variant="ghost"
+            variant={open ? "secondary" : "ghost"}
             size="sm"
             aria-expanded={open}
             onClick={() => setOpen((value) => !value)}

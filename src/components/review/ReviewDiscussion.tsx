@@ -43,7 +43,7 @@ export function ReviewDiscussion({
     <div className="w-full space-y-3">
       <Button
         size="sm"
-        variant="ghost"
+        variant={open ? "secondary" : "ghost"}
         aria-expanded={open}
         aria-label={open ? "Hide review comments" : "Show review comments"}
         onClick={() => setOpen(!open)}

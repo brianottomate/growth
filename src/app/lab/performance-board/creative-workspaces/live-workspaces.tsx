@@ -82,15 +82,17 @@ function LiveFrame({
 }
 
 export function LiveWorkspaces() {
+  const [reviewPrototype, setReviewPrototype] = useState(false);
   const [brandSlug, setBrandSlug] = useState("30a-beach-stays");
   const brand = BRANDS.find((item) => item.slug === brandSlug)!;
   const base = `/app/performance/clients/${brand.slug}`;
+  const reviewQuery = reviewPrototype ? "?reviewPreview=1" : "";
   const workspaces = [
-    { title: "Catalog", path: `${base}/catalog` },
-    { title: "Ad Studio", path: `${base}/ads` },
+    { title: "Catalog", path: `${base}/catalog${reviewQuery}` },
+    { title: "Ad Studio", path: `${base}/ads${reviewQuery}` },
     {
       title: "Campaign",
-      path: `${base}/campaigns/${brand.campaign}`,
+      path: `${base}/campaigns/${brand.campaign}${reviewQuery}`,
     },
     { title: "SoMe", path: `/app/brands/${brand.slug}/content/review-preview` },
   ];
@@ -110,8 +112,11 @@ export function LiveWorkspaces() {
           </Link>
           <h1 className="font-semibold">Creative workspaces</h1>
           <p className="text-xs text-muted-foreground">
-            {brand.name} · Live catalog, ads and campaign · Social post is a
-            sample
+            {brand.name} ·{" "}
+            {reviewPrototype
+              ? "Review prototype: Draft, Ready, Approved. Review changes stay local."
+              : "Live catalog, ads and campaign"}{" "}
+            · Social post is a sample
           </p>
         </div>
         <select
@@ -126,6 +131,16 @@ export function LiveWorkspaces() {
             </option>
           ))}
         </select>
+        {process.env.NODE_ENV === "development" && (
+          <Button
+            variant={reviewPrototype ? "secondary" : "outline"}
+            size="sm"
+            aria-pressed={reviewPrototype}
+            onClick={() => setReviewPrototype((value) => !value)}
+          >
+            Review prototype
+          </Button>
+        )}
         <Button
           variant="outline"
           size="sm"
