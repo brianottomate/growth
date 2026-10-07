@@ -86,8 +86,8 @@ export function adPreviewAd(ad: {
       descriptions: content.descriptions.filter(Boolean),
       linkUrl: content.linkUrl ?? null,
     };
-  const shape = content.ideaStudio?.document.shapes.includes("portrait")
-    ? "portrait"
+  const shape = content.ideaStudio?.document.shapes.includes("square")
+    ? "square"
     : content.ideaStudio?.document.shapes[0];
   const placements: AdPreviewPlacement[] = [];
   for (const id of AD_PREVIEW_PLACEMENTS) {

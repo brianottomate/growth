@@ -35,6 +35,8 @@ export type SocialMockMedia = {
   thumbnail?: string | null;
   width?: number | null;
   height?: number | null;
+  /** Keep composed artwork intact when its frame has a different aspect ratio. */
+  fit?: "cover" | "contain";
 };
 
 export type SocialMockAvatar = {
@@ -175,7 +177,10 @@ export function Avatar({
 function Frame({ item, play }: { item: SocialMockMedia; play: boolean }) {
   // Absolutely positioned inside a fill wrapper: the image's intrinsic size
   // then never drives a grid track, so a layout's aspect box is the truth.
-  const fill = "absolute inset-0 size-full object-cover";
+  const fill = cn(
+    "absolute inset-0 size-full",
+    item.fit === "contain" ? "object-contain" : "object-cover",
+  );
   let inner: React.ReactNode;
   if (isVideo(item)) {
     const poster =
