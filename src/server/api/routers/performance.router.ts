@@ -4,6 +4,7 @@ import {
   draftPitchAction,
 } from "@/server/ai/capabilities/pitch";
 import { z } from "zod";
+import { generateBillingCycles } from "@/server/services/billing-cycles.service";
 import { PIPELINE_COLUMNS } from "@/lib/performance-pipeline";
 import { setPerformanceSettings } from "@/server/services/performance-settings.service";
 import { setBrandStages } from "@/server/services/brand-relationship.service";
@@ -95,6 +96,14 @@ export const performanceRouter = {
 
   updateProperty: actionProcedure(updatePerformancePropertyAction),
 
+  generateCycles: workspaceProcedure
+    .input(z.object({ accountId: z.string().min(1) }))
+    .handler(({ context, input }) =>
+      generateBillingCycles({
+        orgId: context.workspace.orgId,
+        accountId: input.accountId,
+      }),
+    ),
   openCycle: actionProcedure(openPerformanceCycleAction),
 
   updateCycle: actionProcedure(updatePerformanceCycleAction),

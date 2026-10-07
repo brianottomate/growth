@@ -4,8 +4,9 @@ import { ClientConnectCard } from "@/app/app/brands/[brandSlug]/ClientConnectCar
 import { SharedAdsConnections } from "@/app/app/brands/[brandSlug]/SharedAdsConnections";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
+import { currentPeriod } from "@/lib/performance-billing";
 import { db } from "@/server/db";
 import { platformCampaignTable } from "@/server/db/schema";
 import type { SettingsDerived } from "@/lib/performance-settings";
@@ -41,11 +42,16 @@ export default async function PerformanceBrandSettingsPage({
   const [cycle, platformRows, readiness] = await Promise.all([
     deskBrand?.account
       ? db.query.performanceCycleTable.findFirst({
-          where: (t, { eq }) => eq(t.accountId, deskBrand.account!.id),
+          where: (t) =>
+            and(
+              eq(t.accountId, deskBrand.account!.id),
+              eq(t.period, currentPeriod()),
+            ),
           orderBy: (t, { desc }) => desc(t.period),
           columns: {
             billedAmount: true,
             mediaBudget: true,
+            clientMediaContribution: true,
             feePaidAt: true,
             mediaPaidAt: true,
           },
@@ -68,6 +74,7 @@ export default async function PerformanceBrandSettingsPage({
       cycle?.billedAmount ?? brand.performanceSettings?.monthlyFee ?? null,
     feePaidAt: cycle?.feePaidAt ?? null,
     mediaPaidAt: cycle?.mediaPaidAt ?? null,
+    clientMediaContribution: cycle?.clientMediaContribution ?? null,
     // The intake's figure stands in until a cycle is opened, as on the checklist.
     mediaBudget: cycle?.mediaBudget ?? intake?.budget ?? null,
     actualSpend: Math.round(
@@ -112,7 +119,7 @@ export default async function PerformanceBrandSettingsPage({
       <SharedAdsConnections brandId={brand.id} />
       <SettingsCard
         derived={derived}
-        settings={brand.performanceSettings ?? null}
+        settings={deskBrand?.settings ?? brand.performanceSettings ?? null}
       />
     </div>
   );

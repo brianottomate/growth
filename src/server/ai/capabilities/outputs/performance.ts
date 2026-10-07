@@ -29,6 +29,7 @@ const cycleItemSchema = z.strictObject({
   feePaidAt: z.iso.datetime().nullable(),
   id: z.string(),
   mediaBudget: z.number().nullable(),
+  clientMediaContribution: z.number().nullable(),
   mediaPaidAt: z.iso.datetime().nullable(),
   notes: z.string().nullable(),
   period: z.string(),
@@ -85,8 +86,17 @@ const answersSchema = z
   })
   .catchall(jsonValueSchema);
 
+const commercialOutput = {
+  monthlyFee: z.number().nullable(),
+  agreedAdSpend: z.number().nullable(),
+  clientMediaContribution: z.number().nullable(),
+  effectiveDate: z.string().nullable(),
+  terms: z.string().nullable(),
+  endDate: z.string().nullable(),
+};
 const accountSchema = z.strictObject({
   brandId: z.string().nullable(),
+  ...commercialOutput,
   contactEmail: z.string().nullable(),
   contactName: z.string().nullable(),
   createdAt: z.iso.datetime(),
@@ -116,6 +126,7 @@ export const listPerformanceAccountsActionOutputSchema = z.strictObject({
   accounts: z.array(
     z.strictObject({
       brandId: z.string().nullable(),
+      ...commercialOutput,
       contactEmail: z.string().nullable(),
       contactName: z.string().nullable(),
       createdAt: z.iso.datetime(),
@@ -132,6 +143,7 @@ export const listPerformanceAccountsActionOutputSchema = z.strictObject({
           hasReport: z.boolean(),
           id: z.string(),
           mediaBudget: z.number().nullable(),
+          clientMediaContribution: z.number().nullable(),
           period: z.string(),
           status: z.enum(performanceCycleStatusEnum.enumValues),
         })
@@ -143,6 +155,7 @@ export const listPerformanceAccountsActionOutputSchema = z.strictObject({
           billedAmount: z.number().nullable(),
           id: z.string(),
           mediaBudget: z.number().nullable(),
+          clientMediaContribution: z.number().nullable(),
           period: z.string(),
           status: z.enum(performanceCycleStatusEnum.enumValues),
         }),
@@ -188,6 +201,7 @@ export const getPerformanceAccountActionOutputSchema = z.strictObject({
       })
       .nullable(),
     brandId: z.string().nullable(),
+    ...commercialOutput,
     contactEmail: z.string().nullable(),
     contactName: z.string().nullable(),
     createdAt: z.iso.datetime(),

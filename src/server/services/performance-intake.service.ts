@@ -714,8 +714,19 @@ export async function applyPerformanceIntake(
     record("account", intake.accountId, accountPatch);
     written.push("Account marked active");
 
-    // 2. Money onto the cycle, which is what reconciliation reads.
+    // 2. Explicit intake budget sets defaults for future months too.
     const budget = input.mediaBudgetDollars ?? intake.mediaBudgetDollars;
+    if (budget != null) {
+      await tx
+        .update(performanceAccountTable)
+        .set({
+          agreedAdSpend: budget,
+          ...(currentAccount?.clientMediaContribution == null
+            ? { clientMediaContribution: budget }
+            : {}),
+        })
+        .where(eq(performanceAccountTable.id, intake.accountId));
+    }
     const currentCycle = await tx.query.performanceCycleTable.findFirst({
       where: and(
         eq(performanceCycleTable.accountId, intake.accountId),
@@ -738,6 +749,9 @@ export async function applyPerformanceIntake(
             accountId: intake.accountId,
             period: preview.period,
             mediaBudget: budget,
+            billedAmount: currentAccount?.monthlyFee ?? null,
+            clientMediaContribution:
+              currentAccount?.clientMediaContribution ?? budget,
             status: "planned",
           })
           .returning();
@@ -745,6 +759,9 @@ export async function applyPerformanceIntake(
           record("cycle", createdCycle.id, {
             period: preview.period,
             mediaBudget: budget,
+            billedAmount: currentAccount?.monthlyFee ?? null,
+            clientMediaContribution:
+              currentAccount?.clientMediaContribution ?? budget,
             status: "planned",
           });
         written.push(`Opened cycle ${preview.period} at $${budget}`);

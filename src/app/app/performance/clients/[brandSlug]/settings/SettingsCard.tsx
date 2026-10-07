@@ -66,7 +66,13 @@ export function SettingsCard({
             ? `${money(derived.actualSpend)} spent`
             : null;
         return {
-          text: [planned, planned ? paidOn(derived.mediaPaidAt) : null, spent]
+          text: [
+            planned,
+            derived.clientMediaContribution != null
+              ? `${money(derived.clientMediaContribution)} client charge · ${paidOn(derived.mediaPaidAt)}`
+              : null,
+            spent,
+          ]
             .filter(Boolean)
             .join(" · "),
           tone: planned && !derived.mediaPaidAt ? "warn" : "ok",

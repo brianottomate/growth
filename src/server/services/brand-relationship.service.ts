@@ -1,4 +1,5 @@
 import "server-only";
+import { generateBillingCycles } from "./billing-cycles.service";
 
 import { and, eq, isNull } from "drizzle-orm";
 
@@ -239,6 +240,7 @@ export async function promoteBrandToClient(
         ...(input.plan ? { plan: input.plan } : {}),
       })
       .where(eq(performanceAccountTable.id, existing.id));
+    await generateBillingCycles({ orgId: actor.orgId, accountId: existing.id });
     return { accountId: existing.id, created: false };
   }
 
@@ -252,7 +254,16 @@ export async function promoteBrandToClient(
       plan: input.plan ?? "performance_plus",
       status: "active",
       signedAt,
+      monthlyFee: brand.performanceSettings?.monthlyFee ?? null,
+      agreedAdSpend: brand.performanceSettings?.agreedAdSpend ?? null,
+      clientMediaContribution: brand.performanceSettings?.agreedAdSpend ?? null,
+      effectiveDate:
+        brand.performanceSettings?.effectiveDate ||
+        signedAt.toISOString().slice(0, 10),
+      terms: brand.performanceSettings?.terms ?? null,
+      endDate: brand.performanceSettings?.endDate || null,
     })
     .returning({ id: performanceAccountTable.id });
+  await generateBillingCycles({ orgId: actor.orgId, accountId: account!.id });
   return { accountId: account!.id, created: true };
 }

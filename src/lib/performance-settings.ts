@@ -145,6 +145,7 @@ export type SettingsDerived = {
   mediaPaidAt: Date | null;
   /** Whole dollars of media a month, from the newest cycle or the intake. */
   mediaBudget: number | null;
+  clientMediaContribution?: number | null;
   /** What Meta reports spent across the brand's campaigns, in dollars. */
   actualSpend: number;
   onboardingLink: string | null;

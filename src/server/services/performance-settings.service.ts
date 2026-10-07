@@ -1,4 +1,5 @@
 import "server-only";
+import { syncAccountTermsFromSettings } from "./billing-cycles.service";
 
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -153,6 +154,16 @@ export async function setPerformanceSettings(input: {
       422,
       "Client settings changed while saving. Refresh and try again.",
     );
+  await syncAccountTermsFromSettings({
+    orgId: input.orgId,
+    brandId: input.brandId,
+    client,
+    patch: Object.fromEntries(
+      ["monthlyFee", "agreedAdSpend", "effectiveDate", "terms", "endDate"]
+        .filter((key) => changed.includes(key))
+        .map((key) => [key, (next as Record<string, unknown>)[key]]),
+    ),
+  });
   // Paid lives on the month's billing cycle, which is what moves the brand to
   // Paid on the Clients list. The card's payment fields write through to it.
   for (const [key, line] of [

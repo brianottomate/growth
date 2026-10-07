@@ -2,13 +2,11 @@ import "server-only";
 
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 
-import {
-  PERFORMANCE_FEE_DOLLARS,
-  currentPeriod,
-} from "@/lib/performance-billing";
+import { currentPeriod } from "@/lib/performance-billing";
 import { db } from "@/server/db";
 import {
   brandTable,
+  performanceAccountTable,
   performanceCycleTable,
   performanceIntakeTable,
   type PerformanceCycle,
@@ -45,6 +43,9 @@ export async function ensureCurrentCycle(
     brandId,
     signedAt: brand.businessStageAt,
   });
+  const account = await db.query.performanceAccountTable.findFirst({
+    where: eq(performanceAccountTable.id, accountId),
+  });
   const period = currentPeriod();
 
   const existing = await db.query.performanceCycleTable.findFirst({
@@ -65,12 +66,22 @@ export async function ensureCurrentCycle(
     .values({
       accountId,
       period,
-      billedAmount: PERFORMANCE_FEE_DOLLARS,
-      mediaBudget: intake?.mediaBudgetDollars ?? null,
+      billedAmount: account?.monthlyFee ?? null,
+      mediaBudget: account?.agreedAdSpend ?? intake?.mediaBudgetDollars ?? null,
+      clientMediaContribution: account?.clientMediaContribution ?? null,
       status: "live",
     })
+    .onConflictDoNothing({
+      target: [performanceCycleTable.accountId, performanceCycleTable.period],
+    })
     .returning();
-  return cycle!;
+  if (cycle) return cycle;
+  return (await db.query.performanceCycleTable.findFirst({
+    where: and(
+      eq(performanceCycleTable.accountId, accountId),
+      eq(performanceCycleTable.period, period),
+    ),
+  }))!;
 }
 
 /**

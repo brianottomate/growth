@@ -9,7 +9,7 @@ import {
   type BusinessStage,
   type DeliveryStage,
 } from "@/lib/performance-stage";
-import { type BillingSummary } from "@/lib/performance-billing";
+import { currentPeriod, type BillingSummary } from "@/lib/performance-billing";
 import type { PerformanceSettings } from "@/server/db/brand-schema";
 import { db } from "@/server/db";
 import {
@@ -79,8 +79,14 @@ export type DeskBrand = {
   /** The pitch page on wander.com a rep sends before anything is signed. Slug only. */
   pitchUrl: string | null;
   account: { id: string; status: string; plan: string | null } | null;
-  /** This month's fee and media lines, from the newest cycle. Null before the first payment. */
+  /** This calendar month's fee and client media charge. */
   billing: BillingSummary | null;
+  billingCycles?: {
+    period: string;
+    billedAmount: number | null;
+    mediaBudget: number | null;
+    clientMediaContribution: number | null;
+  }[];
   campaigns: DeskCampaign[];
   /** Up to five featured homes, so a row is recognizable by its listings. */
   featuredHomes: { id: string; name: string; photo: string | null }[];
@@ -213,7 +219,17 @@ export async function loadPerformanceDesk(
         inArray(performanceAccountTable.brandId, brandIds),
         isNull(performanceAccountTable.deletedAt),
       ),
-      columns: { id: true, brandId: true, status: true, plan: true },
+      columns: {
+        id: true,
+        brandId: true,
+        status: true,
+        plan: true,
+        monthlyFee: true,
+        agreedAdSpend: true,
+        effectiveDate: true,
+        endDate: true,
+        terms: true,
+      },
     }),
     db.query.homeTable.findMany({
       where: and(
@@ -275,6 +291,7 @@ export async function loadPerformanceDesk(
           period: true,
           billedAmount: true,
           mediaBudget: true,
+          clientMediaContribution: true,
           feePaidAt: true,
           mediaPaidAt: true,
           actualSpendCents: true,
@@ -284,7 +301,10 @@ export async function loadPerformanceDesk(
   // Newest first, so the first row seen per account is the current cycle.
   const cycleByAccount = new Map<string, (typeof cycleRows)[number]>();
   for (const cycle of cycleRows) {
-    if (!cycleByAccount.has(cycle.accountId))
+    if (
+      cycle.period === currentPeriod() &&
+      !cycleByAccount.has(cycle.accountId)
+    )
       cycleByAccount.set(cycle.accountId, cycle);
   }
 
@@ -345,7 +365,10 @@ export async function loadPerformanceDesk(
         ? {
             period: cycle.period,
             fee: { amount: cycle.billedAmount, paidAt: cycle.feePaidAt },
-            media: { amount: cycle.mediaBudget, paidAt: cycle.mediaPaidAt },
+            media: {
+              amount: cycle.clientMediaContribution,
+              paidAt: cycle.mediaPaidAt,
+            },
             spend:
               cycle.actualSpendCents != null
                 ? Math.round(cycle.actualSpendCents / 100)
@@ -360,7 +383,16 @@ export async function loadPerformanceDesk(
         businessAt: brand.businessStageAt,
         delivery: brand.deliveryStage ?? "not_started",
         pipelineStage: brand.performanceSettings?.pipelineStage,
-        settings: brand.performanceSettings,
+        settings: account
+          ? {
+              ...brand.performanceSettings,
+              monthlyFee: account.monthlyFee,
+              agreedAdSpend: account.agreedAdSpend,
+              effectiveDate: account.effectiveDate,
+              endDate: account.endDate,
+              terms: account.terms,
+            }
+          : brand.performanceSettings,
         deliveryAt: brand.deliveryStageAt,
         id: brand.id,
         name: brand.name,
@@ -382,6 +414,9 @@ export async function loadPerformanceDesk(
         campaigns: own,
         featuredHomes: homesByBrand.get(brand.id) ?? [],
         billing,
+        billingCycles: account
+          ? cycleRows.filter((row) => row.accountId === account.id)
+          : [],
         best: own.reduce<DeskCampaignState | null>(
           (acc, campaign) =>
             acc === null || RANK[campaign.state] < RANK[acc]

@@ -65,6 +65,16 @@ export const performanceAccountTable = pgTable(
     plan: t.text(),
     status: performanceAccountStatusEnum().default("prospect").notNull(),
 
+    monthlyFee: t.numeric({ precision: 14, scale: 2, mode: "number" }),
+    agreedAdSpend: t.numeric({ precision: 14, scale: 2, mode: "number" }),
+    clientMediaContribution: t.numeric({
+      precision: 14,
+      scale: 2,
+      mode: "number",
+    }),
+    effectiveDate: t.date(),
+    terms: t.text(),
+    endDate: t.date(),
     notes: t.text(),
 
     // When the customer signed. `status` alone loses the date, and the date is
@@ -196,10 +206,10 @@ export type PerformanceCycleStatus =
  * campaigns, lifecycle campaigns, amplification targets — FKs to the cycle,
  * so the report is one query over its attachments.
  *
- * `billedAmount` and `mediaBudget` are BOTH stored (whole dollars, matching
- * campaign.budget): $500/mo billed with $400/mo of media is a take rate the
- * old spreadsheet had no column for, and reports must be honest about which
- * number spend is measured against.
+ * Account defaults are copied when a cycle is created. A month can be edited
+ * ahead of time without changing the account or another month. billedAmount
+ * is the management fee; clientMediaContribution is the client's media charge.
+ * mediaBudget includes Wander funding and is the limit used for spend checks.
  */
 export const performanceCycleTable = pgTable(
   "performance_cycle",
@@ -217,8 +227,14 @@ export const performanceCycleTable = pgTable(
     startAt: t.timestamp({ withTimezone: true }),
     endAt: t.timestamp({ withTimezone: true }),
 
-    billedAmount: t.integer(), // whole dollars the customer pays
-    mediaBudget: t.integer(), // whole dollars that reach ad platforms
+    // USD amounts; paid dates are manual receipts until Stripe is connected.
+    billedAmount: t.numeric({ precision: 14, scale: 2, mode: "number" }), // management fee
+    mediaBudget: t.numeric({ precision: 14, scale: 2, mode: "number" }), // full ad budget
+    clientMediaContribution: t.numeric({
+      precision: 14,
+      scale: 2,
+      mode: "number",
+    }),
 
     /**
      * Observed spend across every campaign attached to this cycle, in CENTS.
@@ -238,7 +254,7 @@ export const performanceCycleTable = pgTable(
     /**
      * The two things a client pays for a month, settled separately: Wander's
      * fee (`billedAmount`) and the media that reaches the platforms
-     * (`mediaBudget`). Null means the invoice is still open.
+     * (`clientMediaContribution`). Null means no payment has been recorded.
      */
     feePaidAt: t.timestamp({ withTimezone: true }),
     mediaPaidAt: t.timestamp({ withTimezone: true }),

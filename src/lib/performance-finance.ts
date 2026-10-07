@@ -20,6 +20,7 @@ export type FinanceAccount = {
   end: MonthKey | null;
   paying: boolean;
   billing: DeskBrand["billing"];
+  billingCycles?: DeskBrand["billingCycles"];
 };
 
 export type FinanceMonth = {
@@ -83,12 +84,23 @@ export function financeAccounts(brands: DeskBrand[]): FinanceAccount[] {
       // Paid as a stage, or this month's fee settled: either is money in.
       paying: brand.business === "paid" || Boolean(brand.billing?.fee.paidAt),
       billing: brand.billing,
+      billingCycles: brand.billingCycles,
     }))
     .sort(
       (a, b) => (b.fee ?? 0) - (a.fee ?? 0) || a.name.localeCompare(b.name),
     );
 }
 
+function amountForMonth(
+  account: FinanceAccount,
+  month: string,
+  field: "billedAmount" | "mediaBudget",
+) {
+  const cycle = account.billingCycles?.find((item) => item.period === month);
+  return cycle
+    ? (cycle[field] ?? 0)
+    : ((field === "billedAmount" ? account.fee : account.adBudget) ?? 0);
+}
 function covers(account: FinanceAccount, month: MonthKey) {
   if (account.business === "paused") return false;
   if (account.start && account.start > month) return false;
@@ -112,13 +124,17 @@ export function financeSeries(
       month,
       actualFees: active
         .filter((account) => account.paying)
-        .reduce((sum, account) => sum + (account.fee ?? 0), 0),
+        .reduce(
+          (sum, account) =>
+            sum + amountForMonth(account, month, "billedAmount"),
+          0,
+        ),
       committedFees: active.reduce(
-        (sum, account) => sum + (account.fee ?? 0),
+        (sum, account) => sum + amountForMonth(account, month, "billedAmount"),
         0,
       ),
       committedMedia: active.reduce(
-        (sum, account) => sum + (account.adBudget ?? 0),
+        (sum, account) => sum + amountForMonth(account, month, "mediaBudget"),
         0,
       ),
       future: month > current,
@@ -156,8 +172,14 @@ export function financeTotals(accounts: FinanceAccount[]): FinanceTotals {
   return {
     actualMrr: active
       .filter((account) => account.paying)
-      .reduce((sum, account) => sum + (account.fee ?? 0), 0),
-    committedMrr: active.reduce((sum, account) => sum + (account.fee ?? 0), 0),
+      .reduce(
+        (sum, account) => sum + amountForMonth(account, month, "billedAmount"),
+        0,
+      ),
+    committedMrr: active.reduce(
+      (sum, account) => sum + amountForMonth(account, month, "billedAmount"),
+      0,
+    ),
     committedMedia: active.reduce(
       (sum, account) => sum + (account.adBudget ?? 0),
       0,

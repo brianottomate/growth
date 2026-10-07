@@ -1,11 +1,15 @@
 import "server-only";
+import { generateBillingCycles } from "./billing-cycles.service";
 
 import { and, desc, eq, gte, ilike, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 
+import { performanceAmountSchema } from "@/lib/performance-card-state";
+import { currentPeriod } from "@/lib/performance-billing";
 import { PERFORMANCE_PLANS } from "@/lib/performance-billing";
 import { db } from "@/server/db";
 import {
+  brandTable,
   platformAdTable,
   amplificationTargetTable,
   platformCampaignTable,
@@ -36,7 +40,26 @@ export class PerformanceError extends Error {
 
 const PERIOD_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
+const commercialFields = {
+  monthlyFee: performanceAmountSchema
+    .max(999999999999.99)
+    .nullable()
+    .optional(),
+  agreedAdSpend: performanceAmountSchema
+    .max(999999999999.99)
+    .nullable()
+    .optional(),
+  clientMediaContribution: performanceAmountSchema
+    .max(999999999999.99)
+    .nullable()
+    .optional(),
+  effectiveDate: z.iso.date().nullable().optional(),
+  terms: z.string().trim().max(500).nullable().optional(),
+  endDate: z.iso.date().nullable().optional(),
+};
+
 export const createPerformanceAccountSchema = z.object({
+  ...commercialFields,
   name: z.string().trim().min(1).max(160),
   contactName: z.string().trim().min(1).max(160).nullable().default(null),
   contactEmail: z.string().trim().email().nullable().default(null),
@@ -50,7 +73,9 @@ export const createPerformanceAccountSchema = z.object({
 });
 
 export const updatePerformanceAccountSchema = z.object({
+  ...commercialFields,
   accountId: z.string().min(1),
+  expectedUpdatedAt: z.iso.datetime().optional(),
   name: z.string().trim().min(1).max(160).optional(),
   contactName: z.string().trim().min(1).max(160).nullable().optional(),
   contactEmail: z.string().trim().email().nullable().optional(),
@@ -90,20 +115,18 @@ export const openPerformanceCycleSchema = z.object({
     .string()
     .regex(PERIOD_RE, "period must be YYYY-MM")
     .describe('Billing period like "2026-08"; unique per account.'),
-  billedAmount: z
-    .number()
-    .int()
-    .positive()
+  billedAmount: performanceAmountSchema
     .nullable()
-    .default(null)
-    .describe("Whole dollars the customer pays."),
-  mediaBudget: z
-    .number()
-    .int()
-    .positive()
+    .optional()
+    .describe("Management fee in USD."),
+  mediaBudget: performanceAmountSchema
     .nullable()
-    .default(null)
-    .describe("Whole dollars that reach ad platforms."),
+    .optional()
+    .describe("Full media budget in USD."),
+  clientMediaContribution: performanceAmountSchema
+    .nullable()
+    .optional()
+    .describe("Client media charge in USD."),
   startAt: z.string().datetime().nullable().default(null),
   endAt: z.string().datetime().nullable().default(null),
   notes: z.string().trim().max(4_000).nullable().default(null),
@@ -111,9 +134,22 @@ export const openPerformanceCycleSchema = z.object({
 
 export const updatePerformanceCycleSchema = z.object({
   cycleId: z.string().min(1),
+  expectedUpdatedAt: z.iso.datetime().optional(),
   status: z.enum(["planned", "live", "reporting", "closed"]).optional(),
-  billedAmount: z.number().int().positive().nullable().optional(),
-  mediaBudget: z.number().int().positive().nullable().optional(),
+  billedAmount: performanceAmountSchema
+    .max(999999999999.99)
+    .nullable()
+    .optional(),
+  mediaBudget: performanceAmountSchema
+    .max(999999999999.99)
+    .nullable()
+    .optional(),
+  clientMediaContribution: performanceAmountSchema
+    .max(999999999999.99)
+    .nullable()
+    .optional(),
+  feePaid: z.boolean().optional(),
+  mediaPaid: z.boolean().optional(),
   startAt: z.string().datetime().nullable().optional(),
   endAt: z.string().datetime().nullable().optional(),
   notes: z.string().trim().max(4_000).nullable().optional(),
@@ -221,6 +257,7 @@ export async function listPerformanceAccounts(actor: PerformanceActor) {
           status: true,
           billedAmount: true,
           mediaBudget: true,
+          clientMediaContribution: true,
           actualSpendCents: true,
           actualSpendAt: true,
         },
@@ -264,7 +301,9 @@ export async function listPerformanceAccounts(actor: PerformanceActor) {
 
   return {
     accounts: accounts.map((account) => {
-      const current = account.cycles[0] ?? null;
+      const current =
+        account.cycles.find((cycle) => cycle.period === currentPeriod()) ??
+        null;
       return {
         ...account,
         currentCycle: current
@@ -281,7 +320,12 @@ export async function listPerformanceAccounts(actor: PerformanceActor) {
             }
           : null,
         lifetimeBilled: account.cycles.reduce(
-          (total, cycle) => total + (cycle.billedAmount ?? 0),
+          (total, cycle) =>
+            cycle.period <= currentPeriod()
+              ? total +
+                (cycle.billedAmount ?? 0) +
+                (cycle.clientMediaContribution ?? 0)
+              : total,
           0,
         ),
       };
@@ -410,14 +454,63 @@ export async function getPerformanceAccount(
   };
 }
 
+function validateAmounts(input: {
+  monthlyFee?: number | null;
+  agreedAdSpend?: number | null;
+  clientMediaContribution?: number | null;
+  effectiveDate?: string | null;
+  endDate?: string | null;
+}) {
+  if (
+    input.agreedAdSpend != null &&
+    input.clientMediaContribution != null &&
+    input.clientMediaContribution > input.agreedAdSpend
+  )
+    throw new PerformanceError(
+      "BAD_REQUEST",
+      "Client media charge cannot exceed the full ad budget.",
+    );
+  if (
+    input.effectiveDate &&
+    input.endDate &&
+    input.endDate <= input.effectiveDate
+  )
+    throw new PerformanceError(
+      "BAD_REQUEST",
+      "End date must follow the effective date.",
+    );
+}
+async function requireOwnedBrand(
+  actor: PerformanceActor,
+  brandId: string | null | undefined,
+) {
+  if (!brandId) return;
+  const brand = await db.query.brandTable.findFirst({
+    where: and(
+      eq(brandTable.id, brandId),
+      eq(brandTable.organizationId, actor.orgId),
+      isNull(brandTable.deletedAt),
+    ),
+    columns: { id: true },
+  });
+  if (!brand)
+    throw new PerformanceError(
+      "NOT_FOUND",
+      "Brand not found in this workspace",
+    );
+}
+
 export async function createPerformanceAccount(
   actor: PerformanceActor,
   input: z.infer<typeof createPerformanceAccountSchema>,
 ) {
+  validateAmounts(input);
+  await requireOwnedBrand(actor, input.brandId);
   const [account] = await db
     .insert(performanceAccountTable)
     .values({ ...input, organizationId: actor.orgId })
     .returning();
+  await generateBillingCycles({ orgId: actor.orgId, accountId: account!.id });
   return { account: account! };
 }
 
@@ -425,14 +518,29 @@ export async function updatePerformanceAccount(
   actor: PerformanceActor,
   input: z.infer<typeof updatePerformanceAccountSchema>,
 ) {
-  await requireAccount(actor, input.accountId);
-  const { accountId, ...changes } = input;
+  const current = await requireAccount(actor, input.accountId);
+  validateAmounts({ ...current, ...input });
+  await requireOwnedBrand(actor, input.brandId);
+  const { accountId, expectedUpdatedAt, ...changes } = input;
   const [account] = await db
     .update(performanceAccountTable)
     .set(changes)
-    .where(eq(performanceAccountTable.id, accountId))
+    .where(
+      and(
+        eq(performanceAccountTable.id, accountId),
+        expectedUpdatedAt
+          ? eq(performanceAccountTable.updatedAt, new Date(expectedUpdatedAt))
+          : undefined,
+      ),
+    )
     .returning();
-  return { account: account! };
+  if (!account)
+    throw new PerformanceError(
+      "BAD_REQUEST",
+      "Account terms changed while saving. Refresh and try again.",
+    );
+  await generateBillingCycles({ orgId: actor.orgId, accountId: account.id });
+  return { account };
 }
 
 export async function addPerformanceProperty(
@@ -480,10 +588,32 @@ export async function openPerformanceCycle(
   input: z.infer<typeof openPerformanceCycleSchema>,
 ) {
   const account = await requireAccount(actor, input.accountId);
+  validateAmounts({
+    agreedAdSpend:
+      input.mediaBudget === undefined
+        ? account.agreedAdSpend
+        : input.mediaBudget,
+    clientMediaContribution:
+      input.clientMediaContribution === undefined
+        ? account.clientMediaContribution
+        : input.clientMediaContribution,
+  });
   const [cycle] = await db
     .insert(performanceCycleTable)
     .values({
       ...input,
+      billedAmount:
+        input.billedAmount === undefined
+          ? account.monthlyFee
+          : input.billedAmount,
+      mediaBudget:
+        input.mediaBudget === undefined
+          ? account.agreedAdSpend
+          : input.mediaBudget,
+      clientMediaContribution:
+        input.clientMediaContribution === undefined
+          ? account.clientMediaContribution
+          : input.clientMediaContribution,
       startAt: input.startAt ? new Date(input.startAt) : null,
       endAt: input.endAt ? new Date(input.endAt) : null,
     })
@@ -497,19 +627,59 @@ export async function updatePerformanceCycle(
 ) {
   const currentCycle = await requireCycle(actor, input.cycleId);
   const account = await requireAccount(actor, currentCycle.accountId);
-  const { cycleId, startAt, endAt, ...changes } = input;
+  validateAmounts({
+    agreedAdSpend:
+      input.mediaBudget === undefined
+        ? currentCycle.mediaBudget
+        : input.mediaBudget,
+    clientMediaContribution:
+      input.clientMediaContribution === undefined
+        ? currentCycle.clientMediaContribution
+        : input.clientMediaContribution,
+  });
+  const {
+    cycleId,
+    startAt,
+    endAt,
+    feePaid,
+    mediaPaid,
+    expectedUpdatedAt,
+    ...changes
+  } = input;
   const [cycle] = await db
     .update(performanceCycleTable)
     .set({
       ...changes,
+      ...(feePaid !== undefined
+        ? { feePaidAt: feePaid ? (currentCycle.feePaidAt ?? new Date()) : null }
+        : {}),
+      ...(mediaPaid !== undefined
+        ? {
+            mediaPaidAt: mediaPaid
+              ? (currentCycle.mediaPaidAt ?? new Date())
+              : null,
+          }
+        : {}),
       ...(startAt !== undefined
         ? { startAt: startAt ? new Date(startAt) : null }
         : {}),
       ...(endAt !== undefined ? { endAt: endAt ? new Date(endAt) : null } : {}),
     })
-    .where(eq(performanceCycleTable.id, cycleId))
+    .where(
+      and(
+        eq(performanceCycleTable.id, cycleId),
+        expectedUpdatedAt
+          ? eq(performanceCycleTable.updatedAt, new Date(expectedUpdatedAt))
+          : undefined,
+      ),
+    )
     .returning();
-  return { cycle: cycle! };
+  if (!cycle)
+    throw new PerformanceError(
+      "BAD_REQUEST",
+      "Billing month changed while saving. Refresh and try again.",
+    );
+  return { cycle };
 }
 
 /**

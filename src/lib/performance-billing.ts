@@ -1,7 +1,6 @@
 /**
  * What a Performance client pays each month, as two lines: the fee Wander
- * charges for running the account, and the media that reaches the ad
- * platforms. They are invoiced and paid separately, so each line carries its
+ * charges for running the account, and the client’s contribution to media. They are invoiced and paid separately, so each line carries its
  * own paid date. Lives on the cycle, not the brand: the brand's business
  * stage says the client is paying at all, the cycle says for which month.
  */
@@ -16,7 +15,7 @@ export const PERFORMANCE_PLANS = [
 ] as const;
 
 export type BillingLine = {
-  /** Whole dollars, or null when nobody has set the amount yet. */
+  /** USD, or null when nobody has set the amount yet. */
   amount: number | null;
   paidAt: Date | null;
 };

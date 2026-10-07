@@ -1,6 +1,7 @@
 import "server-only";
+import { currentPeriod } from "@/lib/performance-billing";
 
-import { desc, inArray } from "drizzle-orm";
+import { and, eq, desc, inArray } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import {
@@ -64,7 +65,10 @@ export async function loadPerformanceTracker(
     }),
     accountIds.length
       ? db.query.performanceCycleTable.findMany({
-          where: inArray(performanceCycleTable.accountId, accountIds),
+          where: and(
+            inArray(performanceCycleTable.accountId, accountIds),
+            eq(performanceCycleTable.period, currentPeriod()),
+          ),
           orderBy: desc(performanceCycleTable.period),
           columns: { accountId: true, billedAmount: true, mediaBudget: true },
         })
@@ -96,7 +100,7 @@ export async function loadPerformanceTracker(
   }
 
   return desk.brands.map((brand): TrackerRow => {
-    const settings = settingsOf.get(brand.id) ?? null;
+    const settings = brand.settings ?? settingsOf.get(brand.id) ?? null;
     const cycle = brand.account ? cycleOf.get(brand.account.id) : undefined;
     const intake = readiness.get(brand.id)?.intake ?? null;
     const spent = brand.campaigns.reduce((sum, c) => sum + c.spend, 0);
