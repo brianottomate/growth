@@ -109,6 +109,7 @@ async function requireOwnedBrand(input: {
       website: true,
       relationship: true,
       story: true,
+      creativeDirection: true,
       markets: true,
     },
   });
@@ -132,6 +133,7 @@ async function requireOwnedAd(
           relationship: true,
           organizationId: true,
           story: true,
+          creativeDirection: true,
         },
       },
     },

@@ -1,4 +1,9 @@
 import {
+  personaProfileSchema,
+  creativeDirectionText,
+} from "@/lib/brand-direction";
+import { steerSchema, operatorSteeringSection } from "@/lib/generation-steer";
+import {
   updatePersonaNativeResultSchema,
   createPersonaNativeResultSchema,
   listPersonasNativeResultSchema,
@@ -55,7 +60,7 @@ async function requireOwnedBrand(brandId: string, orgId: string) {
 
 async function requirePersona(personaId: string, orgId: string) {
   const persona = await db.query.personaTable.findFirst({
-    where: eq(personaTable.id, personaId),
+    where: and(eq(personaTable.id, personaId), isNull(personaTable.deletedAt)),
   });
   if (!persona) throw new Error("Persona not found");
   await requireOwnedBrand(persona.brandId, orgId);
@@ -86,6 +91,7 @@ const personaFields = {
       "Optional destinations of interest. Never use these as where customers live.",
     ),
   notes: z.string().trim().max(4000).nullish(),
+  profile: personaProfileSchema.nullish(),
 };
 
 export const listPersonas = growthAction({
@@ -117,6 +123,7 @@ export const createPersona = growthAction({
   }),
   execute: async (input, ctx) => {
     const brand = await requireOwnedBrand(input.brandId, ctx.orgId);
+    await validateProfileHomes(brand.id, input.profile);
     const [persona] = await db
       .insert(personaTable)
       .values({
@@ -129,6 +136,7 @@ export const createPersona = growthAction({
         demandGeography: input.demandGeography ?? null,
         destinationGeography: input.destinationGeography ?? null,
         notes: input.notes ?? null,
+        profile: input.profile ?? null,
       })
       .returning();
     return persona!;
@@ -149,9 +157,11 @@ export const updatePersona = growthAction({
     demandGeography: personaFields.demandGeography,
     destinationGeography: personaFields.destinationGeography,
     notes: personaFields.notes,
+    profile: personaFields.profile,
   }),
   execute: async (input, ctx) => {
     const persona = await requirePersona(input.personaId, ctx.orgId);
+    await validateProfileHomes(persona.brandId, input.profile);
     const { personaId: _id, ...patch } = input;
     const [updated] = await db
       .update(personaTable)
@@ -245,20 +255,36 @@ export const assignPersonaAudienceAction = growthAction({
 const suggestionSchema = z.object({
   name: z.string().trim().min(1).max(200),
   description: z.string().trim().min(1).max(2000),
+  profile: personaProfileSchema,
 });
 
 /** Read and reason separately from creation, so Shape can discuss the same proposals. */
 export const suggestPersonas = growthAction({
   description:
-    "Requires a saved brand story. Suggest up to three missing brand-level guest personas from the brand story and homes, preserving the existing set. Read-only; return planning hypotheses, not measured booking facts. The UI can create them immediately when the operator clicks Define personas; chat can discuss before personaWrite.create.",
-  inputSchema: z.object({ brandId: z.string().trim().min(1) }),
+    "Suggest up to three missing brand-level customer personas from the brand story and homes, preserving the existing set. Pass personaId to revise an existing persona and apply the result with update; omit it to propose missing personas. Pass steer for the requested changes. Read-only; return planning hypotheses, not measured booking facts. The UI can create them immediately when the operator clicks Define personas; chat can discuss before personaWrite.create.",
+  inputSchema: z.object({
+    brandId: z.string().trim().min(1),
+    steer: steerSchema,
+    personaId: z
+      .string()
+      .min(1)
+      .optional()
+      .describe(
+        "Regenerate this existing persona as a proposal, preserving its identity. Apply with personaWrite.update; do not create a duplicate.",
+      ),
+  }),
   outputSchema: z.object({ suggestions: z.array(suggestionSchema).max(3) }),
   execute: async (input, ctx) => {
     await requireOwnedBrand(input.brandId, ctx.orgId);
     const [brand, homes, existing] = await Promise.all([
       db.query.brandTable.findFirst({
         where: eq(brandTable.id, input.brandId),
-        columns: { name: true, description: true, story: true },
+        columns: {
+          name: true,
+          description: true,
+          story: true,
+          creativeDirection: true,
+        },
       }),
       db.query.homeTable.findMany({
         where: and(
@@ -266,6 +292,7 @@ export const suggestPersonas = growthAction({
           isNull(homeTable.deletedAt),
         ),
         columns: {
+          id: true,
           name: true,
           city: true,
           state: true,
@@ -273,23 +300,34 @@ export const suggestPersonas = growthAction({
           guests: true,
           amenities: true,
         },
-        limit: 25,
+        limit: 100,
       }),
       db.query.personaTable.findMany({
         where: and(
           eq(personaTable.brandId, input.brandId),
           isNull(personaTable.deletedAt),
         ),
-        columns: { name: true, description: true },
+        columns: { id: true, name: true, description: true, profile: true },
       }),
     ]);
+    const target = input.personaId
+      ? existing.find((p) => p.id === input.personaId)
+      : null;
+    if (input.personaId && !target)
+      throw new Error("That persona is not active on this brand.");
     const { system, prompt } = personaSuggestionsPrompt(
-      JSON.stringify({ brand, homes, existing }),
+      JSON.stringify({ brand, homes, existing, target }),
     );
     const { output } = await generateText({
       model: anthropic("claude-sonnet-5"),
-      system,
-      prompt,
+      system:
+        system +
+        " Return a structured profile with motivation, needs, objections, decisionCriteria, icon, relevant homeIds and fitReason. Write needs, objections, decision criteria and must-haves as concise 2–6 word phrases, with at most five entries each. Keep motivation under 45 words. Home IDs must come from the supplied inventory. These are suggested fits, not measured customer segments. Use travel null for non-travel brands. Unknown travel attributes must be null. evidenceNote must distinguish inferred preferences from observed evidence. When target is supplied, return exactly one updated proposal for that persona, preserving its motivation unless directed otherwise; the instruction to avoid existing personas does not apply to this target.",
+      prompt:
+        prompt +
+        "\n" +
+        creativeDirectionText(brand?.creativeDirection) +
+        operatorSteeringSection(input.steer),
       output: Output.object({
         schema: z.object({
           suggestions: z.array(suggestionSchema).max(3),
@@ -303,11 +341,37 @@ export const suggestPersonas = growthAction({
         "No persona suggestions were returned. Try again or Shape them in conversation.",
       );
     requirePersonaEvidence(output, existing.length);
+    for (const suggestion of output.suggestions)
+      await validateProfileHomes(input.brandId, suggestion.profile);
     return {
-      suggestions: newPersonaSuggestions(
-        output.suggestions,
-        existing.map((row) => row.name),
-      ),
+      suggestions: target
+        ? output.suggestions.slice(0, 1)
+        : newPersonaSuggestions(
+            output.suggestions,
+            existing.map((row) => row.name),
+          ),
     };
   },
 });
+
+async function validateProfileHomes(
+  brandId: string,
+  profile: z.infer<typeof personaProfileSchema> | null | undefined,
+) {
+  if (!profile) return;
+  if (
+    profile.travel?.partyMin &&
+    profile.travel.partyMax &&
+    profile.travel.partyMin > profile.travel.partyMax
+  )
+    throw new Error("Party size minimum exceeds maximum.");
+  const homes = await db.query.homeTable.findMany({
+    where: and(eq(homeTable.brandId, brandId), isNull(homeTable.deletedAt)),
+    columns: { id: true },
+  });
+  const ids = new Set(homes.map((h) => h.id));
+  if (profile.homeIds.some((id) => !ids.has(id)))
+    throw new Error(
+      "Suggested homes must belong to this brand's active inventory.",
+    );
+}

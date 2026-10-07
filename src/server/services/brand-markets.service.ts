@@ -1,4 +1,5 @@
 import "server-only";
+import { operatorSteeringSection } from "@/lib/generation-steer";
 
 import { anthropic } from "@ai-sdk/anthropic";
 import { generateText, Output } from "ai";
@@ -61,10 +62,21 @@ const draftSchema = z.object({
 });
 
 /** Draft the brand's markets from its homes' towns and listings; used at once. */
-export async function draftBrandMarkets(input: { brandId: string }) {
+export async function draftBrandMarkets(input: {
+  brandId: string;
+  steer?: string;
+}) {
   const brand = await db.query.brandTable.findFirst({
     where: eq(brandTable.id, input.brandId),
-    columns: { id: true, name: true, website: true, story: true },
+    columns: {
+      id: true,
+      name: true,
+      website: true,
+      story: true,
+      creativeDirection: true,
+      markets: true,
+      updatedAt: true,
+    },
   });
   if (!brand) throw new Error("Brand not found");
   const towns = await brandTowns(brand.id);
@@ -98,13 +110,20 @@ export async function draftBrandMarkets(input: { brandId: string }) {
   const { system, prompt } = brandMarketsDraftPrompt({
     brandName: brand.name,
     website: brand.website,
-    story: brandStorySection({ brandName: brand.name, story: brand.story }),
+    story: brandStorySection({
+      brandName: brand.name,
+      story: brand.story,
+      creativeDirection: brand.creativeDirection,
+    }),
     towns: JSON.stringify(described),
   });
   const { output } = await generateText({
     model: anthropic(MODEL),
     system,
-    prompt,
+    prompt:
+      prompt +
+      `\nExisting destinations (preserve IDs and membership unless steering requires a regroup): ${JSON.stringify(brand.markets)}` +
+      operatorSteeringSection(input.steer),
     output: Output.object({ schema: draftSchema }),
     providerOptions: { anthropic: { effort: "medium" } },
   });
@@ -119,9 +138,29 @@ export async function draftBrandMarkets(input: { brandId: string }) {
       label: [t.town, t.state].filter(Boolean).join(", ").slice(0, 40),
       towns: [t.town],
     })),
-  ].map((market) => ({ ...market, id: marketId(market.label) }));
+  ].map((market) => ({
+    ...market,
+    id:
+      brand.markets?.markets.find(
+        (old) =>
+          old.towns.length === market.towns.length &&
+          old.towns.every((town) =>
+            market.towns.some((t) => t.toLowerCase() === town.toLowerCase()),
+          ),
+      )?.id ?? marketId(market.label),
+  }));
+  const assigned = markets.flatMap((m) => m.towns.map((t) => t.toLowerCase()));
+  if (
+    new Set(markets.map((market) => market.id)).size !== markets.length ||
+    new Set(assigned).size !== assigned.length ||
+    assigned.some((town) => !towns.some((t) => t.town.toLowerCase() === town))
+  )
+    throw new Error(
+      "Destination generation returned overlapping or unknown towns. Existing destinations were preserved.",
+    );
   return saveBrandMarkets({
     brandId: brand.id,
+    expectedUpdatedAt: brand.updatedAt,
     value: { markets, draftedAt: new Date().toISOString(), confirmedAt: null },
   });
 }
@@ -153,11 +192,24 @@ export async function setBrandMarkets(input: {
 async function saveBrandMarkets(input: {
   brandId: string;
   value: BrandMarkets;
+  expectedUpdatedAt?: Date;
 }) {
   const markets = brandMarketsSchema.parse(input.value);
-  await db
+  const saved = await db
     .update(brandTable)
     .set({ markets })
-    .where(eq(brandTable.id, input.brandId));
+    .where(
+      and(
+        eq(brandTable.id, input.brandId),
+        input.expectedUpdatedAt
+          ? eq(brandTable.updatedAt, input.expectedUpdatedAt)
+          : undefined,
+      ),
+    )
+    .returning({ id: brandTable.id });
+  if (!saved.length)
+    throw new Error(
+      "The brand changed during generation. Read it again and retry.",
+    );
   return { markets };
 }

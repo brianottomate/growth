@@ -1,3 +1,5 @@
+import { operatorSteeringSection } from "@/lib/generation-steer";
+import type { CreativeDirection } from "@/lib/brand-direction";
 import {
   startWorkflowRun,
   claimWorkflowRun,
@@ -191,6 +193,8 @@ export async function contactSheet(home: StarterHome, firstLabel = 1) {
 export function homeCompositionRequest(input: {
   brandName: string;
   brandStory: string | null;
+  creativeDirection?: CreativeDirection | null;
+  steer?: string;
   voice: unknown;
   campaign: string;
   home: {
@@ -225,7 +229,9 @@ export function homeCompositionRequest(input: {
       brandStorySection({
         brandName: input.brandName,
         story: input.brandStory,
-      }),
+        creativeDirection: input.creativeDirection,
+      }) +
+      operatorSteeringSection(input.steer),
     content: [
       {
         type: "text",
@@ -249,6 +255,8 @@ export function brandConceptsRequest(input: {
   brandName: string;
   website: string | null;
   story: string | null;
+  creativeDirection?: CreativeDirection | null;
+  steer?: string;
   brandContext: unknown;
   campaign: string;
 }): CopyRequest<z.infer<typeof brandStarterCopySchema>> {
@@ -263,7 +271,12 @@ export function brandConceptsRequest(input: {
       "\n\n" +
       META_DESCRIPTION +
       "\n\n Include a mix of static and carousel formats. These drafts have no selected photos or homes yet: do not invent properties, amenities, offers, availability, prices, or testimonials. Use concept names, not fictional home names." +
-      brandStorySection({ brandName: input.brandName, story: input.story }),
+      brandStorySection({
+        brandName: input.brandName,
+        story: input.story,
+        creativeDirection: input.creativeDirection,
+      }) +
+      operatorSteeringSection(input.steer),
     content: [
       {
         type: "text",
@@ -333,6 +346,8 @@ export async function runStarterGeneration(runId: string, input: Input) {
       const { output } = await runCopyRequest(
         brandConceptsRequest({
           brandName: brand.name,
+          creativeDirection: fullBrand?.creativeDirection,
+          steer: input.steer,
           website: brand.website,
           story: fullBrand?.story ?? null,
           brandContext: { fingerprint: fullBrand?.brandFingerprint, strategy },
@@ -451,6 +466,8 @@ export async function runStarterGeneration(runId: string, input: Input) {
       const { output: generated } = await runCopyRequest(
         homeCompositionRequest({
           brandName: brand.name,
+          creativeDirection: fullBrand?.creativeDirection,
+          steer: input.steer,
           brandStory: `${fullBrand?.story ?? ""}\nBrand strategy reference: ${strategy}`,
           voice: fullBrand?.brandFingerprint,
           campaign: campaign?.name ?? `${brand.name} ad studio`,
@@ -527,7 +544,9 @@ export async function runStarterGeneration(runId: string, input: Input) {
         brandStorySection({
           brandName: brand.name,
           story: fullBrand?.story ?? null,
-        }),
+          creativeDirection: fullBrand?.creativeDirection,
+        }) +
+        operatorSteeringSection(input.steer),
       prompt: JSON.stringify({
         brand: brand.name,
         homes: homeCopies,

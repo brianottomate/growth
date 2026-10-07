@@ -160,6 +160,11 @@ import {
   updateBrandAction,
   draftBrandStoryAction,
 } from "./brands";
+import {
+  readBrandContext,
+  draftBrandMarketsAction,
+  setBrandMarketsAction,
+} from "./brand-context";
 import { listPlaybooksAction, readPlaybookAction } from "./playbooks";
 import { CONTENT_STRATEGY_TOOLS } from "./content-strategy";
 import { inspectConversionReality } from "./conversions";
@@ -329,6 +334,7 @@ export const brandRead = growthDomainTool({
     getMap: getBrandMap,
     next: nextForBrand,
     identity: readBrandIdentityAction,
+    context: readBrandContext,
     recommendMark: recommendBrandMarkAction,
   },
 });
@@ -347,6 +353,8 @@ export const brandWrite = growthDomainTool({
     setPerformanceSettings: setPerformanceSettingsAction,
     update: updateBrandAction,
     draftStory: draftBrandStoryAction,
+    draftMarkets: draftBrandMarketsAction,
+    setMarkets: setBrandMarketsAction,
   },
 });
 

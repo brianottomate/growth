@@ -100,6 +100,7 @@ export async function catalogBrand(userId: string, brandId: string) {
       id: brandTable.id,
       name: brandTable.name,
       story: brandTable.story,
+      creativeDirection: brandTable.creativeDirection,
       brandIdentity: brandTable.brandIdentity,
       brandMark: brandTable.brandMark,
       voice: brandTable.brandFingerprint,
@@ -492,6 +493,7 @@ export async function catalogHomeFacts(
             story: brandStorySection({
               brandName: brand.name,
               story: brand.story,
+              creativeDirection: brand?.creativeDirection,
             }),
             place: catalogLocation(home, brand.markets),
             brandWide: brandWideAmenities(includedHomes(homes, draft)),

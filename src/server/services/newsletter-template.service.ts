@@ -1,3 +1,4 @@
+import { brandStorySection } from "@/server/ai/prompts/brand-story";
 import {
   beginDocumentRun,
   claimDocumentRun,
@@ -286,10 +287,14 @@ async function draftNewsletterFromTemplateUnlocked(
 
   const system = [
     `You write one marketing email for ${brand.name}, a vacation rental brand, to its past guests.`,
-    brand.brandFingerprint?.fingerprintText?.trim()
+    !brand.creativeDirection && brand.brandFingerprint?.fingerprintText?.trim()
       ? `Brand voice:\n${brand.brandFingerprint.fingerprintText.trim()}`
       : null,
-    brand.story?.trim() ? `Brand story:\n${brand.story.trim()}` : null,
+    brandStorySection({
+      brandName: brand.name,
+      story: brand.story,
+      creativeDirection: brand.creativeDirection,
+    }),
     emailCopyGuidance(brand),
     input.template === "season-ahead"
       ? `Template "Season ahead": a getaway for one season or occasion. Pick ${count} homes; the first is featured large, the rest follow as a list. Write groupTitles for 2 groups (the featured home, then the rest).`

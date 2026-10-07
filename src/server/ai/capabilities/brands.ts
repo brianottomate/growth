@@ -1,3 +1,5 @@
+import { steerSchema } from "@/lib/generation-steer";
+import { creativeDirectionSchema } from "@/lib/brand-direction";
 import type { BrandListResult, GetBrandOutput } from "./outputs/brands";
 import {
   listBrandsOutputSchema,
@@ -115,6 +117,7 @@ export const getBrand = growthAction({
         logo: true,
         description: true,
         story: true,
+        creativeDirection: true,
         websiteMeta: true,
         brandIdentity: true,
         performanceSettings: true,
@@ -214,12 +217,14 @@ export const updateBrandAction = growthAction({
       heroHomeId: z.string().min(1).nullable().optional(),
       heroImageUrl: z.string().url().nullable().optional(),
       story: z.string().max(4000).nullable().optional(),
+      creativeDirection: creativeDirectionSchema.nullable().optional(),
     })
     .refine(
       (value) =>
         value.heroHomeId !== undefined ||
         value.heroImageUrl !== undefined ||
-        value.story !== undefined,
+        value.story !== undefined ||
+        value.creativeDirection !== undefined,
       { message: "Send at least one field to change." },
     ),
   outputSchema: z.object({
@@ -246,6 +251,7 @@ export const updateBrandAction = growthAction({
         featuredListingUrl: true,
         previewSourceUrl: true,
         story: true,
+        creativeDirection: true,
       },
     });
     if (!brand)
@@ -278,8 +284,14 @@ export const updateBrandAction = growthAction({
     if (input.heroHomeId !== undefined || input.heroImageUrl !== undefined)
       await setBrandPreviewSource({ brandId: brand.id, listingUrl, sourceUrl });
     const story =
-      input.story !== undefined
-        ? (await setBrandStory({ brandId: brand.id, story: input.story })).story
+      input.story !== undefined || input.creativeDirection !== undefined
+        ? (
+            await setBrandStory({
+              brandId: brand.id,
+              story: input.story,
+              creativeDirection: input.creativeDirection,
+            })
+          ).story
         : brand.story;
     return {
       brandId: brand.id,
@@ -292,9 +304,12 @@ export const updateBrandAction = growthAction({
 
 export const draftBrandStoryAction = growthAction({
   description:
-    "Draft the brand story from what the brand already shows (its site identity, its homes, and a few things guests said) and save it. Use it once at setup, or when the operator asks to start the story over; to add to an existing story, use brandWrite.update with story instead.",
-  inputSchema: z.object({ brandId: z.string().min(1) }),
-  outputSchema: z.object({ story: z.string().nullable() }),
+    "Draft the brand story from what the brand already shows (its site identity, its homes, and a few things guests said) and save it. Generates story and structured creative direction together. Read brandRead.context first and pass steer for the requested changes; current accepted direction is preserved unless changed. For precise edits use brandWrite.update.",
+  inputSchema: z.object({ brandId: z.string().min(1), steer: steerSchema }),
+  outputSchema: z.object({
+    story: z.string().nullable(),
+    creativeDirection: creativeDirectionSchema,
+  }),
   examples: [{ brandId: "brand_winterpark" }],
   execute: async (input, ctx) => {
     const brand = await db.query.brandTable.findFirst({
@@ -309,7 +324,7 @@ export const draftBrandStoryAction = growthAction({
       throw new Error(
         "That brand is not available in the active organization.",
       );
-    return draftBrandStory({ brandId: brand.id });
+    return draftBrandStory({ brandId: brand.id, steer: input.steer });
   },
 });
 
@@ -638,7 +653,13 @@ export const recommendBrandMarkAction = growthAction({
     "Explore a creative mark without saving it. Renders candidates and recommends one, optionally following the operator's direction. Returns its recipe, optical tuning and alternatives. Discuss these first; only call brandWrite.setMark with the accepted recipe and tuning when asked to apply. For in-app previews, use /api/brands/mark-preview with brandId, source, tone and recipe query fields; this requires the signed-in browser session.",
   inputSchema: z.object({
     brandId: z.string().trim().min(1),
-    direction: z.string().trim().max(2000).optional(),
+    direction: z
+      .string()
+      .trim()
+      .max(2000)
+      .optional()
+      .describe("Legacy alias for steer; use steer for new calls."),
+    steer: steerSchema,
   }),
   outputSchema: z.object({
     brandId: z.string(),
@@ -650,7 +671,10 @@ export const recommendBrandMarkAction = growthAction({
   }),
   execute: async (input, ctx) => {
     await assertOwnedBrand(input.brandId, ctx.orgId);
-    const recommendation = await recommendBrandMark(input);
+    const recommendation = await recommendBrandMark({
+      ...input,
+      direction: input.steer ?? input.direction,
+    });
     if (!recommendation)
       throw new Error("No logo, favicon or name to build a mark from.");
     return { brandId: input.brandId, ...recommendation };

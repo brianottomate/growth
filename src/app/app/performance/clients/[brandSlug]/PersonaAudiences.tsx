@@ -1,5 +1,12 @@
 "use client";
 import Link from "next/link";
+import {
+  ContextHomes,
+  type ContextHome,
+} from "@/components/brand/ContextHomes";
+import type { PersonaProfile } from "@/lib/brand-direction";
+import { DirectionPhrases } from "./CreativeDirection";
+import { Heart, Briefcase, Compass, Home } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -20,6 +27,7 @@ type Persona = {
   id: string;
   name: string;
   description: string | null;
+  profile?: PersonaProfile | null;
   demandGeography: PersonaDemandGeography | null;
   destinationGeography: PersonaDemandGeography | null;
 };
@@ -34,9 +42,11 @@ function located(geo: PersonaDemandGeography | null) {
 export function PersonaAudiences({
   brand,
   personas,
+  homes = [],
 }: {
   brand: { id: string; slug: string; name: string; story: string | null };
   personas: Persona[];
+  homes?: ContextHome[];
   unassigned?: unknown[];
 }) {
   const hasStory = Boolean(brand.story?.trim());
@@ -136,15 +146,43 @@ export function PersonaAudiences({
             key={persona.id}
             className="space-y-3 rounded-xl border bg-muted/40 p-4"
           >
-            <div className="flex items-start justify-between gap-2">
-              <div>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
                 <h3 className="font-semibold">{persona.name}</h3>
-                <p className="text-sm text-muted-foreground">
-                  {persona.description}
-                </p>
+                {!persona.profile && (
+                  <p className="text-sm text-muted-foreground">
+                    {persona.description}
+                  </p>
+                )}
               </div>
-              <PersonaEditor persona={persona} />
+              <div className="flex shrink-0 gap-1">
+                <PersonaEditor persona={persona} />
+                <ShapeBrandButton
+                  brandId={brand.id}
+                  brandName={brand.name}
+                  section="persona"
+                  resource={{ id: persona.id, name: persona.name }}
+                />
+              </div>
             </div>
+            {persona.profile && (
+              <>
+                <PersonaProfileDetails
+                  profile={persona.profile}
+                  homes={homes}
+                />
+                {persona.description && (
+                  <details className="text-sm">
+                    <summary className="cursor-pointer text-muted-foreground">
+                      Persona story
+                    </summary>
+                    <p className="mt-2 text-muted-foreground">
+                      {persona.description}
+                    </p>
+                  </details>
+                )}
+              </>
+            )}
             {located(persona.demandGeography) && (
               <PersonaLocation
                 persona={persona}
@@ -181,10 +219,20 @@ function PersonaLocation({
       <GeographyChips label="States" values={geography.states} />
       <GeographyChips label="Regions" values={geography.regions} />
       <GeographyChips label="Cities" values={geography.cities} />
-      <AudienceMap
-        audiences={[{ id: persona.id, name: persona.name, geography }]}
-        context="persona"
-      />
+      {geography.source && (
+        <p className="text-xs text-muted-foreground">{geography.source}</p>
+      )}
+      <details>
+        <summary className="cursor-pointer text-xs font-medium">
+          View geography map
+        </summary>
+        <div className="mt-2">
+          <AudienceMap
+            audiences={[{ id: persona.id, name: persona.name, geography }]}
+            context="persona"
+          />
+        </div>
+      </details>
     </section>
   );
 }
@@ -313,5 +361,82 @@ function GeoFields({
         </Label>
       ))}
     </fieldset>
+  );
+}
+
+function PersonaProfileDetails({
+  profile,
+  homes,
+}: {
+  profile: PersonaProfile;
+  homes: ContextHome[];
+}) {
+  const Icon = {
+    users: Users,
+    heart: Heart,
+    briefcase: Briefcase,
+    compass: Compass,
+    home: Home,
+    sparkles: Sparkles,
+  }[profile.icon];
+  const travel = profile.travel;
+  const rows = travel
+    ? [
+        ["Trip purpose", travel.purpose],
+        [
+          "Party size",
+          travel.partyMin && travel.partyMax
+            ? `${travel.partyMin}–${travel.partyMax} guests`
+            : null,
+        ],
+        ["Booking window", travel.bookingWindow],
+        ["Stay length", travel.stayLength],
+        ["Price sensitivity", travel.priceSensitivity],
+      ]
+    : [];
+  return (
+    <div className="space-y-4">
+      <p className="flex gap-2 text-sm">
+        <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+        {profile.motivation}
+      </p>
+      {rows.some(([, value]) => value) && (
+        <dl className="divide-y rounded-xl border px-3">
+          {rows
+            .filter(([, value]) => value)
+            .map(([label, value]) => (
+              <div
+                key={label}
+                className="flex justify-between gap-4 py-2 text-sm"
+              >
+                <dt className="text-muted-foreground">{label}</dt>
+                <dd className="text-right">{value}</dd>
+              </div>
+            ))}
+        </dl>
+      )}
+      <div className="grid grid-cols-1 gap-4 @2xl:grid-cols-2">
+        <DirectionPhrases title="Needs" values={profile.needs} />
+        <DirectionPhrases
+          title="Decision criteria"
+          values={profile.decisionCriteria}
+        />
+      </div>
+      <details className="space-y-3">
+        <summary className="cursor-pointer text-sm text-muted-foreground">
+          Objections & supporting evidence
+        </summary>
+        <DirectionPhrases title="Objections" values={profile.objections} />
+        {travel && (
+          <DirectionPhrases title="Must-haves" values={travel.mustHaves} />
+        )}
+        <p className="text-xs text-muted-foreground">{profile.evidenceNote}</p>
+      </details>
+      <ContextHomes
+        homes={homes.filter((home) => profile.homeIds.includes(home.id))}
+        label="Suggested homes"
+        reason={profile.fitReason}
+      />
+    </div>
   );
 }

@@ -1,3 +1,4 @@
+import { steerSchema } from "@/lib/generation-steer";
 import {
   listSponsoredAbandonmentActionNativeResultSchema,
   searchAttachableCampaignsActionNativeResultSchema,
@@ -159,6 +160,7 @@ export const suggestFeaturedHomesAction = growthAction({
     "Suggest which homes a Performance brand should feature: its hallmark homes, ranked on direct-site bookings over 12 months, then how the home sells across all channels over 90 days, then reviews, with one look at the shortlist's hero photos to break ties. Returns the picks and the scored shortlist. Read-only itself: show the picks with the numbers and feature them with performanceWrite.updateHome once the operator agrees (a playbook the operator started counts as agreeing). Open nights are context, never a reason to drop a home: a booked-out hallmark home still earns the click.",
   inputSchema: z.object({
     brandId: brandIdInput,
+    steer: steerSchema,
     count: z
       .number()
       .int()
@@ -194,6 +196,8 @@ export const suggestFeaturedHomesAction = growthAction({
       brandName: brand.name,
       brandStory: brand.story,
       count: input.count,
+      steer: input.steer,
+      creativeDirection: brand.creativeDirection,
     });
   },
 });
@@ -204,6 +208,7 @@ export const reviewPortfolioAction = growthAction({
   inputSchema: z.object({
     brandId: brandIdInput,
     surface: z.enum(["catalog", "ads"]),
+    steer: steerSchema,
     campaignId: z
       .string()
       .optional()
@@ -236,6 +241,8 @@ export const reviewPortfolioAction = growthAction({
       brandId: brand.id,
       brandName: brand.name,
       brandStory: brand.story,
+      creativeDirection: brand.creativeDirection,
+      steer: input.steer,
       surface: input.surface,
       campaignId: input.campaignId,
     });

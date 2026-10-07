@@ -2,6 +2,7 @@ import "server-only";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/server/db";
 import {
+  brandTable,
   audienceTable,
   contentPillarTable,
   personaTable,
@@ -11,7 +12,11 @@ export async function brandStrategyContext(
   brandId: string,
   campaignId?: string,
 ) {
-  const [personas, pillars, audiences] = await Promise.all([
+  const [brand, personas, pillars, audiences] = await Promise.all([
+    db.query.brandTable.findFirst({
+      where: eq(brandTable.id, brandId),
+      columns: { creativeDirection: true },
+    }),
     db.query.personaTable.findMany({
       where: and(
         eq(personaTable.brandId, brandId),
@@ -34,15 +39,24 @@ export async function brandStrategyContext(
     audiences.flatMap((a) => (a.personaId ? [a.personaId] : [])),
   );
   return JSON.stringify({
+    creativeDirection: brand?.creativeDirection ?? null,
     personas: personas
       .filter((p) => !selected.size || selected.has(p.id))
       .map(
-        ({ id, name, description, demandGeography, destinationGeography }) => ({
+        ({
           id,
           name,
           description,
           demandGeography,
           destinationGeography,
+          profile,
+        }) => ({
+          id,
+          name,
+          description,
+          demandGeography,
+          destinationGeography,
+          profile,
         }),
       ),
     pillars: pillars.map(({ name, description }) => ({ name, description })),

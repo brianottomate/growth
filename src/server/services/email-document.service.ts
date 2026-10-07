@@ -1,3 +1,4 @@
+import { brandStorySection } from "@/server/ai/prompts/brand-story";
 import { emailCopyGuidance } from "@/lib/brand-email-style";
 import "server-only";
 
@@ -548,7 +549,13 @@ export async function runEmailGenerationJob(jobId: string) {
     if (!document || !spot?.brand || !isEmailFormat(spot.format)) {
       throw new Error("The email slot no longer exists.");
     }
-    const brandVoice = spot.brand.brandFingerprint?.fingerprintText?.trim();
+    const brandVoice = spot.brand.creativeDirection
+      ? brandStorySection({
+          brandName: spot.brand.name,
+          story: spot.brand.story,
+          creativeDirection: spot.brand.creativeDirection,
+        })
+      : spot.brand.brandFingerprint?.fingerprintText?.trim();
     const channelVoice =
       spot.channel?.channelFingerprint?.fingerprintText?.trim();
     const content = spot.contentPost;
@@ -569,9 +576,11 @@ export async function runEmailGenerationJob(jobId: string) {
           : "This is an issue in a recurring editorial newsletter. It should feel like one installment in an ongoing reader relationship.",
         brandVoice ? `Brand voice:\n${brandVoice}` : null,
         emailCopyGuidance(spot.brand),
-        spot.brand.story?.trim()
-          ? `Brand story:\n${spot.brand.story.trim()}`
-          : null,
+        brandStorySection({
+          brandName: spot.brand.name,
+          story: spot.brand.story,
+          creativeDirection: spot.brand.creativeDirection,
+        }),
         channelVoice ? `Newsletter voice:\n${channelVoice}` : null,
         "Return an honest, useful draft in Markdown. Do not invent product facts, customer quotes, metrics, dates, or links. Preserve provided URLs exactly. Do not add unsubscribe language; the product sending runtime owns the compliance footer. Use one clear CTA at most.",
         `The draft may contain markers like ${HOMES_MARKER} or <!-- homes 2 -->, each where a group of home cards appears. Keep every marker exactly once, in a sensible place, and do not list those homes in the text.`,
@@ -664,7 +673,13 @@ export async function rewriteEmailBlock(input: {
     input.platformPostId,
     input.organizationId,
   );
-  const brandVoice = spot.brand.brandFingerprint?.fingerprintText?.trim();
+  const brandVoice = spot.brand.creativeDirection
+    ? brandStorySection({
+        brandName: spot.brand.name,
+        story: spot.brand.story,
+        creativeDirection: spot.brand.creativeDirection,
+      })
+    : spot.brand.brandFingerprint?.fingerprintText?.trim();
   const { output } = await generateText({
     model: anthropic(EMAIL_GENERATION_MODEL),
     output: Output.object({

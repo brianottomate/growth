@@ -95,6 +95,7 @@ export const growthActionPolicies = {
     getMap: read("local-read", ALL),
     next: read("local-read", ALL),
     identity: read("local-read", ALL),
+    context: read("local-read", ALL),
     recommendMark: read("model-read", ALL),
   },
   brandWrite: {
@@ -120,6 +121,11 @@ export const growthActionPolicies = {
     // Plain brand fields; writing the old values back is the undo.
     update: write({ idempotent: true, undoWith: "brandWrite.update" }),
     // Writes the story from one model call; undo by writing the old text back.
+    draftMarkets: write({
+      consequence: "model-write",
+      undoWith: "brandWrite.setMarkets",
+    }),
+    setMarkets: write({ idempotent: true }),
     draftStory: write({
       consequence: "model-write",
       undoWith: "brandWrite.update",

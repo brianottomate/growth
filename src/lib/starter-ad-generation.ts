@@ -1,3 +1,4 @@
+import { steerSchema } from "@/lib/generation-steer";
 import { z } from "zod";
 import { adAuthoringFields, hasOneAdOwner } from "./ad-authoring";
 import { compositionImagePositionSchema } from "./compositions";
@@ -13,6 +14,7 @@ import type { StarterHome } from "./starter-ad-ideas";
 export const starterGenerationSchema = z
   .object({
     ...adAuthoringFields,
+    steer: steerSchema,
     exportShapes: z.array(ideaShapeSchema).min(1).max(4).optional(),
     bookingTargetId: z.string().min(1).optional(),
     source: z.enum(["featured", "brand"]).default("featured"),

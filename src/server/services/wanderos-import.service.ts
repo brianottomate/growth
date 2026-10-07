@@ -167,6 +167,7 @@ export async function runWanderOsImport(
             brandId: brand.id,
             brandName: brand.name,
             brandStory: brand.story,
+            creativeDirection: brand.creativeDirection,
             count: 5,
           });
           if (!result.picks.length)

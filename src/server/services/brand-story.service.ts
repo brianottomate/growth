@@ -1,5 +1,10 @@
 import "server-only";
 import {
+  creativeDirectionSchema,
+  type CreativeDirection,
+} from "@/lib/brand-direction";
+import { operatorSteeringSection } from "@/lib/generation-steer";
+import {
   brandStoryResultSchema,
   requireBrandStory,
 } from "@/lib/brand-evidence";
@@ -26,14 +31,25 @@ const MODEL = "claude-sonnet-5";
 
 export async function setBrandStory(input: {
   brandId: string;
-  story: string | null;
+  story?: string | null;
+  creativeDirection?: CreativeDirection | null;
 }) {
   const story = input.story?.trim() || null;
-  await db
+  const [saved] = await db
     .update(brandTable)
-    .set({ story })
-    .where(eq(brandTable.id, input.brandId));
-  return { story };
+    .set({
+      ...(input.story !== undefined ? { story } : {}),
+      ...(input.creativeDirection !== undefined
+        ? { creativeDirection: input.creativeDirection }
+        : {}),
+    })
+    .where(eq(brandTable.id, input.brandId))
+    .returning({
+      story: brandTable.story,
+      creativeDirection: brandTable.creativeDirection,
+    });
+  if (!saved) throw new Error("Brand not found");
+  return saved;
 }
 
 /**
@@ -66,7 +82,10 @@ async function guestQuotes(listingIds: string[]) {
 }
 
 /** Draft a story from the brand's site identity, homes and guests, and save it. */
-export async function draftBrandStory(input: { brandId: string }) {
+export async function draftBrandStory(input: {
+  brandId: string;
+  steer?: string;
+}) {
   const brand = await db.query.brandTable.findFirst({
     where: eq(brandTable.id, input.brandId),
     columns: {
@@ -77,6 +96,9 @@ export async function draftBrandStory(input: { brandId: string }) {
       description: true,
       brandIdentity: true,
       websiteMeta: true,
+      story: true,
+      creativeDirection: true,
+      updatedAt: true,
     },
   });
   if (!brand) throw new Error("Brand not found");
@@ -100,14 +122,6 @@ export async function draftBrandStory(input: { brandId: string }) {
   const snapshots = Object.fromEntries(
     Object.entries(pages).filter(([, page]) => Boolean(page)),
   );
-  if (Object.keys(snapshots).length) {
-    await db
-      .update(brandTable)
-      .set({
-        websiteMeta: sql`coalesce(${brandTable.websiteMeta}, '{}'::jsonb) || ${JSON.stringify(snapshots)}::jsonb`,
-      })
-      .where(eq(brandTable.id, brand.id));
-  }
   const { system, prompt } = brandStoryDraftPrompt({
     websiteContent: [pages.homepage, pages.about]
       .filter(Boolean)
@@ -141,12 +155,46 @@ export async function draftBrandStory(input: { brandId: string }) {
   const { output } = await generateText({
     model: anthropic(MODEL),
     system,
-    prompt,
-    output: Output.object({ schema: brandStoryResultSchema }),
+    prompt:
+      prompt +
+      `\n\nCurrent saved brief and direction (preserve accepted choices unless steered otherwise):\n${JSON.stringify({ story: brand.story, creativeDirection: brand.creativeDirection })}` +
+      operatorSteeringSection(input.steer),
+    output: Output.object({
+      schema: brandStoryResultSchema.extend({
+        creativeDirection: creativeDirectionSchema.nullable(),
+      }),
+    }),
   });
   if (!output)
     throw new Error(
       "No story was returned. Check the website or import homes before trying again.",
     );
-  return setBrandStory({ brandId: brand.id, story: requireBrandStory(output) });
+  const story = requireBrandStory(output);
+  if (!output.creativeDirection)
+    throw new Error(
+      "No creative direction returned; existing content was preserved.",
+    );
+  const saved = await db
+    .update(brandTable)
+    .set({
+      story,
+      creativeDirection: output.creativeDirection,
+      ...(Object.keys(snapshots).length
+        ? {
+            websiteMeta: sql`coalesce(${brandTable.websiteMeta}, '{}'::jsonb) || ${JSON.stringify(snapshots)}::jsonb`,
+          }
+        : {}),
+    })
+    .where(
+      and(
+        eq(brandTable.id, brand.id),
+        eq(brandTable.updatedAt, brand.updatedAt),
+      ),
+    )
+    .returning({ id: brandTable.id });
+  if (!saved.length)
+    throw new Error(
+      "The brand changed while writing. Read it again and retry; your edits were preserved.",
+    );
+  return { story, creativeDirection: output.creativeDirection };
 }

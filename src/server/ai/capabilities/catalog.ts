@@ -1,3 +1,4 @@
+import { steerSchema } from "@/lib/generation-steer";
 import "server-only";
 
 import { after } from "next/server";
@@ -131,7 +132,7 @@ export const newCatalogCopyAction = growthAction({
   outputSchema: newCatalogCopyActionOutputSchema,
   description:
     "Write a new headline (and amenity pills, on the amenities cards) for one home's catalog card with the card's photo in view, and save it. One model call. Refused on an approved card (reopen it first) and on a finished card, whose headline is part of the supplied artwork.",
-  inputSchema: homeInput,
+  inputSchema: homeInput.extend({ steer: steerSchema }),
   examples: [{ brandId: "brd_01", homeId: "1234567890123" }],
   execute: async (input, ctx) =>
     newCatalogCopy({
@@ -145,7 +146,7 @@ export const newCatalogPhotoAction = growthAction({
   outputSchema: newCatalogPhotoActionOutputSchema,
   description:
     "Pick a better hero for one home's catalog card from its listing photos and make it the home's hero, so its ads and previews follow. Then rewrites the headline (and pills) for the new photo, replacing any edited headline: use it when photo and copy should change together, and adsWrite.setHomeHero to change only the photo. Never picks the current hero again. Refused on an approved card. Fails with the reason when no clean photo is left.",
-  inputSchema: homeInput,
+  inputSchema: homeInput.extend({ steer: steerSchema }),
   examples: [{ brandId: "brd_01", homeId: "1234567890123" }],
   execute: async (raw, ctx) => {
     const input = {

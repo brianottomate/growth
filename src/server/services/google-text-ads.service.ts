@@ -1,3 +1,4 @@
+import { operatorSteeringSection } from "@/lib/generation-steer";
 import "server-only";
 
 import { anthropic } from "@ai-sdk/anthropic";
@@ -45,6 +46,7 @@ export async function writeGoogleTextAds(input: {
   landingUrl?: string;
   keywords?: string[];
   count?: number;
+  steer?: string;
 }) {
   const { campaign, brand } = await resolveAdAuthoringScope(input);
   const landingUrl = input.landingUrl ?? campaign?.landingUrl ?? brand.website;
@@ -55,7 +57,7 @@ export async function writeGoogleTextAds(input: {
   const [story, page, audiences, ideas] = await Promise.all([
     db.query.brandTable.findFirst({
       where: eq(brandTable.id, brand.id),
-      columns: { story: true },
+      columns: { story: true, creativeDirection: true },
     }),
     scrapeBasicContent({ url: landingUrl }),
     campaign
@@ -99,9 +101,14 @@ export async function writeGoogleTextAds(input: {
       "Where the searcher's terms are given, put the strongest of them in a few headlines word for word.",
       "No exclamation marks, no all-caps words, no emoji, no hashtags.",
       `Write ${count} ad(s), each from a different angle.`,
-      brandStorySection({ brandName: brand.name, story: story?.story ?? null }),
+      brandStorySection({
+        brandName: brand.name,
+        story: story?.story ?? null,
+        creativeDirection: story?.creativeDirection,
+      }),
     ].join("\n"),
     prompt: [
+      operatorSteeringSection(input.steer),
       `Landing page: ${landingUrl}`,
       page.title ? `Title: ${page.title}` : "",
       "",

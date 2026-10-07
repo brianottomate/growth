@@ -503,6 +503,9 @@ export const brandTable = pgTable(
      * prompt for the brand. Null until drafted.
      */
     story: t.text(),
+    creativeDirection: t
+      .jsonb()
+      .$type<import("@/lib/brand-direction").CreativeDirection>(),
     /**
      * Where the brand's homes are, as guests think of it: a label per market,
      * its towns, and what draws people there. See src/lib/markets.ts. Applied
@@ -754,6 +757,7 @@ export const personaTable = pgTable(
     /** Places they want to visit or buy in; never residence targeting. */
     destinationGeography: t.jsonb().$type<PersonaDemandGeography>(),
     notes: t.text(),
+    profile: t.jsonb().$type<import("@/lib/brand-direction").PersonaProfile>(),
 
     createdAt: t
       .timestamp()

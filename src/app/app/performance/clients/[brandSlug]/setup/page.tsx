@@ -142,6 +142,7 @@ export default async function PerformanceBrandSetupPage({
         brandId={brand.id}
         brandName={brand.name}
         story={brand.story}
+        creativeDirection={brand.creativeDirection}
       />
       <section className="rounded-xl border p-4">
         <PersonaAudiences
@@ -150,9 +151,20 @@ export default async function PerformanceBrandSetupPage({
             id: persona.id,
             name: persona.name,
             description: persona.description,
+            profile: persona.profile,
             demandGeography: persona.demandGeography,
             destinationGeography: persona.destinationGeography,
             targets,
+          }))}
+          homes={rows.map((home) => ({
+            id: home.id,
+            name: home.name,
+            city: home.city,
+            imageUrl:
+              home.galleryCache?.find(
+                (photo) => photo.url === home.heroSourceUrl,
+              )?.thumbUrl ?? home.heroSourceUrl,
+            href: `/app/performance/clients/${slug}/homes/${home.externalId}`,
           }))}
           unassigned={audiences.unassigned}
         />

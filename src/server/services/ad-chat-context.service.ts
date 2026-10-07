@@ -137,6 +137,7 @@ export async function adChatContext(input: {
       brandStorySection({
         brandName: brand.name,
         story: fullBrand?.story ?? null,
+        creativeDirection: fullBrand?.creativeDirection,
       }),
     ].join("\n\n"),
   };

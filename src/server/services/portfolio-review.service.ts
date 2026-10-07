@@ -1,3 +1,5 @@
+import type { CreativeDirection } from "@/lib/brand-direction";
+import { operatorSteeringSection } from "@/lib/generation-steer";
 import "server-only";
 
 import { anthropic } from "@ai-sdk/anthropic";
@@ -121,6 +123,8 @@ export async function reviewPortfolio(input: {
   brandId: string;
   brandName: string;
   brandStory: string | null;
+  creativeDirection?: CreativeDirection | null;
+  steer?: string;
   surface: "catalog" | "ads";
   /** For ads: the campaign to review; omitted, the brand's draft set with no campaign. */
   campaignId?: string;
@@ -180,6 +184,7 @@ export async function reviewPortfolio(input: {
     brandStory: brandStorySection({
       brandName: input.brandName,
       story: input.brandStory,
+      creativeDirection: input.creativeDirection,
     }),
     items: items.map((item, index) => ({
       number: index + 1,
@@ -210,7 +215,7 @@ export async function reviewPortfolio(input: {
       {
         role: "user",
         content: [
-          { type: "text", text: prompt },
+          { type: "text", text: prompt + operatorSteeringSection(input.steer) },
           ...sheets.map((sheet) => ({
             type: "file" as const,
             data: sheet,

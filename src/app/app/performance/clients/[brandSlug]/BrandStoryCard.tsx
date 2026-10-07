@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useWorkspaceMutation } from "./useWorkspaceMutation";
+import { CreativeDirection } from "./CreativeDirection";
+import type { CreativeDirection as Direction } from "@/lib/brand-direction";
 import { FileText, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -20,10 +22,12 @@ export function BrandStoryCard({
   brandId,
   brandName,
   story,
+  creativeDirection,
 }: {
   brandId: string;
   brandName: string;
   story: string | null;
+  creativeDirection?: Direction | null;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
   const editing = draft !== null;
@@ -118,7 +122,12 @@ export function BrandStoryCard({
           className="w-full rounded-lg border bg-muted/30 p-3 text-sm outline-none focus:ring-2 focus:ring-ring"
         />
       ) : story ? (
-        <BrandStoryContent story={story} />
+        <div className="space-y-5">
+          {creativeDirection && <CreativeDirection value={creativeDirection} />}
+          <div className={creativeDirection ? "border-t pt-5" : ""}>
+            <BrandStoryContent story={story} />
+          </div>
+        </div>
       ) : (
         <EmptyState
           compact

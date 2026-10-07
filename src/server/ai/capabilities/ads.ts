@@ -1,3 +1,4 @@
+import { steerSchema } from "@/lib/generation-steer";
 import {
   deletePlatformCampaignActionNativeResultSchema,
   setDeliveryActionNativeResultSchema,
@@ -1419,6 +1420,7 @@ export const writeGoogleTextAdsAction = growthAction({
   inputSchema: z
     .object({
       ...adAuthoringFields,
+      steer: steerSchema,
       landingUrl: z.string().url().optional(),
       keywords: z.array(z.string().trim().min(1)).max(40).optional(),
       count: z.number().int().min(1).max(3).default(2),
@@ -1580,6 +1582,7 @@ export const suggestCampaignAudiencesAction = growthAction({
     "Propose the next audience for a Performance client's campaign (one by default, up to 5 with count), skipping what the campaign already targets, from brand personas, story, home fit, and the evidence: the brand's market (feeder cities), what its direct bookings say about the booking window, and the audiences already synced in its ad account. Each suggestion says why; add the ones the operator wants with addAudience (geo: cities, states, countries, ages; lookalike or retargeting: the platformAudienceId names the asset). Nothing is saved or pushed. Guest-origin data is not available for WanderOS sites, so geo suggestions rest on the market on Setup.",
   inputSchema: z.object({
     campaignId: z.string().min(1),
+    steer: steerSchema,
     count: z.number().int().min(1).max(5).optional(),
   }),
   examples: [{ campaignId: "camp_01" }],

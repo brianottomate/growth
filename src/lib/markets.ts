@@ -13,6 +13,7 @@ export const marketSchema = z.object({
   label: z.string().trim().min(1).max(40),
   /** The towns this market's homes sit in, as the listings name them. */
   towns: z.array(z.string().trim().min(1).max(60)).min(1).max(40),
+  evidenceNote: z.string().trim().max(600).optional(),
   region: z.string().trim().max(60).optional(),
   /** Landmarks and attractions guests come for. */
   draws: z.array(z.string().trim().min(1).max(80)).max(12).optional(),

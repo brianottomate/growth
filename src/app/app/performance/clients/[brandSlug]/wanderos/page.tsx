@@ -121,6 +121,13 @@ export default async function PerformanceWanderOsPage({
                 brandId={brand.id}
                 brandName={brand.name}
                 markets={brand.markets ?? null}
+                homes={rows.map((home) => ({
+                  id: home.id,
+                  name: home.name,
+                  city: home.city,
+                  imageUrl: heroThumb(home),
+                  href: `/app/performance/clients/${slug}/homes/${home.externalId}`,
+                }))}
                 towns={[
                   ...inventoryHomes.reduce((counts, home) => {
                     if (home.city)

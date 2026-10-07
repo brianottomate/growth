@@ -1,3 +1,4 @@
+import { creativeDirectionSchema } from "@/lib/brand-direction";
 import { performanceSettingsSchema } from "./brands";
 import { brandPageSnapshotSchema } from "@/lib/brand-website-content";
 import {
@@ -478,6 +479,7 @@ export const previewIntakeApplyActionOutputSchema = z.strictObject({
         description: z.string().nullable(),
         featuredListingUrl: z.string().nullable(),
         story: z.string().nullable(),
+        creativeDirection: creativeDirectionSchema.nullable(),
         markets: brandMarketsSchema.nullable(),
         followerCount: z.number().nullable(),
         id: z.string(),

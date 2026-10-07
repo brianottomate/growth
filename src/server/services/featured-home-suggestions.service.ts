@@ -1,3 +1,4 @@
+import { operatorSteeringSection } from "@/lib/generation-steer";
 import { brandStrategyContext } from "./brand-strategy-context.service";
 import "server-only";
 
@@ -129,6 +130,8 @@ export async function suggestFeaturedHomes(input: {
   /** The brand's story, which the pick weighs on creative. */
   brandStory: string | null;
   count: number;
+  steer?: string;
+  creativeDirection?: import("@/lib/brand-direction").CreativeDirection | null;
 }) {
   const strategy = await brandStrategyContext(input.brandId);
   const rows = await db.query.homeTable.findMany({
@@ -213,29 +216,31 @@ export async function suggestFeaturedHomes(input: {
         content: [
           {
             type: "text",
-            text: featuredHomesPickPrompt({
-              brandName: input.brandName,
-              count,
-              brandStory: brandStorySection({
+            text:
+              featuredHomesPickPrompt({
                 brandName: input.brandName,
-                story: `${input.brandStory ?? ""}\nBrand strategy reference: ${strategy}`,
-              }),
-              candidates: shortlist.map((home, index) => ({
-                photo: index + 1,
-                name: home.name,
-                city: home.city,
-                state: home.state,
-                bedrooms: home.bedrooms,
-                guests: home.guests,
-                amenities: home.amenities,
-                open60: home.open60,
-                directBookings12m: home.directBookings,
-                directValue12m: home.directValue,
-                sold90: home.sold90,
-                reviews: home.reviews,
-                reviewScore: home.reviewScore,
-              })),
-            }),
+                count,
+                brandStory: brandStorySection({
+                  creativeDirection: input.creativeDirection,
+                  brandName: input.brandName,
+                  story: `${input.brandStory ?? ""}\nBrand strategy reference: ${strategy}`,
+                }),
+                candidates: shortlist.map((home, index) => ({
+                  photo: index + 1,
+                  name: home.name,
+                  city: home.city,
+                  state: home.state,
+                  bedrooms: home.bedrooms,
+                  guests: home.guests,
+                  amenities: home.amenities,
+                  open60: home.open60,
+                  directBookings12m: home.directBookings,
+                  directValue12m: home.directValue,
+                  sold90: home.sold90,
+                  reviews: home.reviews,
+                  reviewScore: home.reviewScore,
+                })),
+              }) + operatorSteeringSection(input.steer),
           },
           { type: "file", data: sheet.image, mediaType: "image/jpeg" },
         ],

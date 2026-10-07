@@ -1,6 +1,7 @@
 "use client";
 import { useState, type ReactNode, type ComponentProps } from "react";
 import Link from "next/link";
+import { ContextHomes } from "@/components/brand/ContextHomes";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -325,16 +326,56 @@ export function HomeGroupsWorkspace({
                 </span>
               )}
             </div>
-            {target.url && (
-              <a
-                className="inline-flex items-center gap-1.5 text-sm underline underline-offset-4"
-                href={target.url}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Preview booking search <ExternalLink className="size-3.5" />
-              </a>
-            )}
+            <ContextHomes
+              label="Included homes"
+              homes={data.homes
+                .filter((home) =>
+                  target.homeId
+                    ? home.id === target.homeId
+                    : target.homeGroupId
+                      ? data.groups
+                          .find((group) => group.id === target.homeGroupId)
+                          ?.homeIds.includes(home.id)
+                      : true,
+                )
+                .map((home) => ({
+                  id: home.id,
+                  name: home.name,
+                  imageUrl: home.heroSourceUrl,
+                }))}
+            />
+            <div className="flex flex-wrap items-center gap-3">
+              <ShapeBrandButton
+                brandId={brandId}
+                brandName={brandName}
+                section="booking target"
+                resource={{ id: target.id, name: target.name }}
+              />
+              {target.url && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() =>
+                    void navigator.clipboard
+                      .writeText(target.url!)
+                      .then(() => toast.success("Booking link copied"))
+                      .catch(() => toast.error("Could not copy link"))
+                  }
+                >
+                  Copy link
+                </Button>
+              )}
+              {target.url && (
+                <a
+                  className="inline-flex items-center gap-1.5 text-sm underline underline-offset-4"
+                  href={target.url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Open booking page <ExternalLink className="size-3.5" />
+                </a>
+              )}
+            </div>
             {target.issue && (
               <p role="alert" className="text-sm">
                 {target.issue}

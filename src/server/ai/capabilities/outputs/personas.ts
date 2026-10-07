@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { personaProfileSchema } from "@/lib/brand-direction";
 
 /** Wire results for this capability. Dates are ISO strings after JSON normalization. */
 const demandGeographySchema = z.strictObject({
@@ -21,6 +22,7 @@ const listPersonaItemSchema = z.strictObject({
   id: z.string(),
   name: z.string(),
   notes: z.string().nullable(),
+  profile: personaProfileSchema.nullable(),
   updatedAt: z.iso.datetime(),
 });
 

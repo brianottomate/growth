@@ -3,11 +3,10 @@ import { getClientPageActivity } from "@/server/services/client-page-activity.se
 import { brandEmailThemeSchema } from "@/lib/brand-email-style";
 import type { BrandingProfile } from "@mendable/firecrawl-js";
 import { z } from "zod";
-import { brandMarketsSchema } from "@/lib/markets";
 import {
-  draftBrandMarkets,
-  setBrandMarkets,
-} from "@/server/services/brand-markets.service";
+  draftBrandMarketsAction,
+  setBrandMarketsAction,
+} from "@/server/ai/capabilities/brand-context";
 import { waitUntil } from "@vercel/functions";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { ORPCError } from "@orpc/server";
@@ -19,6 +18,7 @@ import {
 
 import { actionProcedure, protectedProcedure } from "@/server/api/orpc";
 import {
+  draftBrandStoryAction,
   addBrandAdPreviewAction,
   enrichBrandAction,
   listBrands,
@@ -51,10 +51,7 @@ import {
   setHomeMedia,
 } from "@/server/services/homes.service";
 import { inspirationAddress } from "@/lib/inbound-email";
-import {
-  draftBrandStory,
-  setBrandStory,
-} from "@/server/services/brand-story.service";
+import { setBrandStory } from "@/server/services/brand-story.service";
 import { enrichBrandFromWebsite } from "@/server/services/brand-enrichment.service";
 import {
   removeBrandAdPreview,
@@ -684,37 +681,9 @@ export const brandRouter = {
     }),
 
   /** Setup: draft the brand story from the site, the homes and the guests. */
-  draftStory: protectedProcedure
-    .input(z.object({ brandId: z.string().min(1) }))
-    .handler(async ({ context: ctx, input }) => {
-      const brand = await assertBrandManageable(ctx, input.brandId);
-      return draftBrandStory({ brandId: brand.id });
-    }),
-
-  /** Setup: draft the brand's markets from its homes' towns and listings. */
-  draftMarkets: protectedProcedure
-    .input(z.object({ brandId: z.string().min(1) }))
-    .handler(async ({ context: ctx, input }) => {
-      const brand = await assertBrandManageable(ctx, input.brandId);
-      return draftBrandMarkets({ brandId: brand.id });
-    }),
-
-  /** Setup: save the markets as the operator edited or confirmed them. */
-  setMarkets: protectedProcedure
-    .input(
-      z.object({
-        brandId: z.string().min(1),
-        markets: brandMarketsSchema.shape.markets,
-      }),
-    )
-    .handler(async ({ context: ctx, input }) => {
-      const brand = await assertBrandManageable(ctx, input.brandId);
-      return setBrandMarkets({
-        brandId: brand.id,
-        userId: ctx.session.user.id,
-        markets: input.markets,
-      });
-    }),
+  draftStory: actionProcedure(draftBrandStoryAction),
+  draftMarkets: actionProcedure(draftBrandMarketsAction),
+  setMarkets: actionProcedure(setBrandMarketsAction),
 
   /** Setup: tick a home into the featured set, or out of it. */
   homesSetFeatured: protectedProcedure

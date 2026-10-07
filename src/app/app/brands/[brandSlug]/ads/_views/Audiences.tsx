@@ -1,4 +1,5 @@
 "use client";
+import { ContextHomes } from "@/components/brand/ContextHomes";
 import { CampaignAudienceContext } from "./CampaignAudienceContext";
 import {
   CampaignAudienceAssets,
@@ -207,15 +208,17 @@ export function Audiences({
                   </p>
                 )}
                 {row.homeIds?.length ? (
-                  <p className="text-xs text-muted-foreground">
-                    Relevant homes:{" "}
-                    {homes
-                      .filter((h) => row.homeIds?.includes(h.id))
-                      .map((h) => h.name)
-                      .join(", ")}
-                  </p>
+                  <ContextHomes
+                    homes={homes.filter((home) =>
+                      row.homeIds?.includes(home.id),
+                    )}
+                    label="Relevant homes"
+                  />
                 ) : null}
-                <div className="space-y-2">
+                <div className="space-y-2 border-t pt-3">
+                  <h4 className="text-xs font-medium text-muted-foreground">
+                    Platform targeting
+                  </h4>
                   <GeographyChips
                     label="Countries"
                     values={row.geography?.countries}

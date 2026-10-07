@@ -1,3 +1,4 @@
+import { creativeDirectionSchema } from "@/lib/brand-direction";
 import { catalogAdCopySchema } from "@/lib/catalog-studio";
 import { homesSchema, metaReportingConversionsSchema } from "./shared";
 import { z } from "zod";
@@ -123,6 +124,7 @@ export const getBrandOutputSchema = z.strictObject({
     logo: z.string().nullable(),
     description: z.string().nullable(),
     story: z.string().nullable(),
+    creativeDirection: creativeDirectionSchema.nullable(),
     enrichment: z.strictObject({
       scrapedAt: z.string().nullable(),
       hasBrandIdentity: z.boolean(),
