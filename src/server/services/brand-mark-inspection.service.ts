@@ -80,11 +80,7 @@ export async function inspectSavedBrandMark(input: {
   );
   const panels: Buffer[] = [];
   const warnings: string[] = [];
-  const panel = async (
-    mark: Buffer,
-    label: string,
-    background: string | Buffer,
-  ) => {
+  const panel = async (mark: Buffer, background: string | Buffer) => {
     const base =
       typeof background === "string"
         ? sharp({
@@ -96,16 +92,12 @@ export async function inspectSavedBrandMark(input: {
       .png()
       .toBuffer();
     const size = await sharp(icon).metadata();
-    const text = Buffer.from(
-      `<svg width="900" height="140"><text x="24" y="25" fill="${background === "#222222" ? "#ffffff" : "#111111"}" font-family="sans-serif" font-size="16">${label}</text></svg>`,
-    );
     return base
       .composite([
-        { input: text, left: 0, top: 0 },
         {
           input: icon,
           left: 40,
-          top: 45 + Math.floor((72 - (size.height ?? 72)) / 2),
+          top: 34 + Math.floor((72 - (size.height ?? 72)) / 2),
         },
       ])
       .png()
@@ -113,11 +105,7 @@ export async function inspectSavedBrandMark(input: {
   };
   for (let i = 0; i < tones.length; i++)
     panels.push(
-      await panel(
-        buffers[i]!,
-        `${tones[i]} · saved asset`,
-        tones[i] === "white" ? "#222222" : "#ffffff",
-      ),
+      await panel(buffers[i]!, tones[i] === "white" ? "#222222" : "#ffffff"),
     );
   const featuredHome =
     !brand.previewSourceUrl && brand.featuredListingUrl
@@ -144,11 +132,7 @@ export async function inspectSavedBrandMark(input: {
       if (!response.ok)
         throw new Error(`Photo download failed (${response.status}).`);
       panels.push(
-        await panel(
-          buffers[1]!,
-          "White · selected preview photo",
-          Buffer.from(await response.arrayBuffer()),
-        ),
+        await panel(buffers[1]!, Buffer.from(await response.arrayBuffer())),
       );
       onPhoto = true;
     } catch {
