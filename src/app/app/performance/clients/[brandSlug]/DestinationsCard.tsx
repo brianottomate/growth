@@ -94,11 +94,6 @@ export function DestinationsCard({
                   title="Suggested origin cities"
                   values={(market.feederCities ?? []).slice(0, 3)}
                 />
-                {!!market.feederCities?.length && (
-                  <p className="text-xs text-muted-foreground">
-                    Suggested origins for planning.
-                  </p>
-                )}
               </article>
             );
           })}
