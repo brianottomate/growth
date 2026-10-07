@@ -19,11 +19,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
 import {
@@ -35,8 +30,6 @@ import {
   Layers,
   Download,
   Search,
-  List,
-  LayoutGrid,
   Eye,
   EyeOff,
 } from "lucide-react";
@@ -168,7 +161,6 @@ export function CatalogCards({
       "included",
     ),
   );
-  const [layout, setLayout] = useState<"grid" | "list">("list");
   const [details, setDetails] = useState<CatalogCard | null>(null);
   const [pendingEditorAction, setPendingEditorAction] = useState<
     (() => void) | null
@@ -767,39 +759,6 @@ export function CatalogCards({
                     </SelectContent>
                   </Select>
                 </div>
-                <div
-                  role="group"
-                  aria-label="Card layout"
-                  className="flex items-center gap-0.5 rounded-md border p-0.5"
-                >
-                  {(["list", "grid"] as const).map((value) => (
-                    <Tooltip key={value}>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant={layout === value ? "secondary" : "ghost"}
-                          size="icon-sm"
-                          aria-label={value === "list" ? "List" : "Compact"}
-                          aria-pressed={layout === value}
-                          onClick={() => {
-                            leaveEditor(() => {
-                              setLayout(value);
-                              setDetails(null);
-                            });
-                          }}
-                        >
-                          {value === "list" ? (
-                            <List className="size-4" />
-                          ) : (
-                            <LayoutGrid className="size-4" />
-                          )}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {value === "list" ? "List" : "Compact"}
-                      </TooltipContent>
-                    </Tooltip>
-                  ))}
-                </div>
               </div>
               {visible.length === 0 && draft.cards.length > 0 && (
                 <p className="py-6 text-center text-sm text-muted-foreground">
@@ -828,316 +787,236 @@ export function CatalogCards({
                   }
                 />
               )}
-              {layout === "grid" ? (
-                <div className="grid grid-cols-1 gap-3 @xl:grid-cols-2 @2xl:gap-4 @4xl:grid-cols-3 @6xl:grid-cols-4">
-                  {visible.slice(0, limit).map((card) => (
-                    <div
+              <div className="space-y-3">
+                {visible.slice(0, limit).map((card) => {
+                  const editing = details?.homeId === card.homeId;
+                  const shown = editing ? details : card;
+                  return (
+                    <CatalogCardLayout
                       key={card.homeId}
                       id={`home-${card.homeId}`}
-                      className={`relative flex scroll-mt-20 flex-col overflow-hidden rounded-xl border bg-card ${card.included || inclusion === "excluded" ? "" : "opacity-50"} ${focusHome === card.homeId ? "ring-2 ring-ring" : ""}`}
-                    >
-                      <div className="group/artwork relative">
-                        {card.approved && !reviewPreview && (
-                          <ApprovedStamp
-                            size="lg"
-                            fresh={stamped.has(card.homeId)}
-                            className="pointer-events-none absolute top-3 right-3 z-10 bg-card/85 text-[var(--color-success)] backdrop-blur-sm transition-opacity group-focus-within/artwork:opacity-0 group-hover/artwork:opacity-0 pointer-coarse:opacity-90"
-                          />
-                        )}
-                        <button
-                          className="block w-full"
-                          disabled={locked(card)}
-                          title={locked(card) ? LOCKED_TITLE : undefined}
-                          onClick={() => openEditor(card)}
-                          aria-label={`Edit ${homeOf(card)?.name}`}
-                        >
-                          <CardPreview
-                            brandId={brandId}
-                            card={card}
-                            format={format}
-                          />
-                        </button>
-                      </div>
-                      {card.mode === "finished" && (
-                        <p className="px-3 pt-2 text-xs text-muted-foreground">
-                          Artwork
-                          {card.finishedArtwork ? "" : " · Choose image"}
-                        </p>
-                      )}
-                      <div className="flex min-w-0 items-start gap-2 p-3">
-                        <button
-                          className="line-clamp-2 min-h-10 min-w-0 flex-1 text-left text-sm leading-5 font-medium break-words"
-                          title={
-                            locked(card) ? LOCKED_TITLE : homeOf(card)?.name
-                          }
-                          disabled={locked(card)}
-                          onClick={() => openEditor(card)}
-                        >
-                          {homeOf(card)?.name}
-                        </button>
-                        <HomeLink url={homeOf(card)?.url} />
-                      </div>
-                      {reviewPreview ? (
-                        <div className="mt-auto border-t p-3">
+                      name={homeOf(card)?.name}
+                      dimmed={
+                        !card.included && !editing && inclusion !== "excluded"
+                      }
+                      highlighted={focusHome === card.homeId}
+                      approved={card.approved && !reviewPreview}
+                      fresh={stamped.has(card.homeId)}
+                      review={
+                        reviewPreview ? (
                           <ReviewPreview
                             reviewKey={homeOf(card)?.name ?? card.title}
                             variant="reopen"
                             initialStatus={statusOf(card)}
                           />
-                        </div>
-                      ) : (
-                        <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t p-3">
-                          <IncludeButton
-                            card={card}
-                            onInclude={(included) =>
-                              update({ ...card, included })
-                            }
+                        ) : (
+                          <ReviewDiscussion
+                            target={{
+                              type: "catalog",
+                              id: card.homeId,
+                              brandId,
+                            }}
                           />
-                          <ApproveButton
-                            card={card}
-                            disabled={Boolean(fixing[card.homeId]) || saving}
-                            onApprove={(approved) => approve([card], approved)}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {visible.slice(0, limit).map((card) => {
-                    const editing = details?.homeId === card.homeId;
-                    const shown = editing ? details : card;
-                    return (
-                      <CatalogCardLayout
-                        key={card.homeId}
-                        id={`home-${card.homeId}`}
-                        name={homeOf(card)?.name}
-                        dimmed={
-                          !card.included && !editing && inclusion !== "excluded"
-                        }
-                        highlighted={focusHome === card.homeId}
-                        approved={card.approved && !reviewPreview}
-                        fresh={stamped.has(card.homeId)}
-                        review={
-                          reviewPreview ? (
-                            <ReviewPreview
-                              reviewKey={homeOf(card)?.name ?? card.title}
-                              variant="reopen"
-                              initialStatus={statusOf(card)}
-                            />
-                          ) : (
-                            <ReviewDiscussion
-                              target={{
-                                type: "catalog",
-                                id: card.homeId,
-                                brandId,
-                              }}
-                            />
-                          )
-                        }
-                        artwork={
-                          <CardPreview
-                            brandId={brandId}
-                            card={shown}
-                            format={format}
-                          />
-                        }
-                      >
-                        <div className="flex min-w-0 flex-col gap-4">
-                          <div className="flex min-w-0 items-center gap-2">
-                            {!card.included && (
-                              <Badge variant="outline">Excluded</Badge>
-                            )}
-                            <p className="flex min-w-0 flex-1 items-center gap-1.5 text-sm font-medium">
-                              <span
-                                className="truncate"
-                                title={homeOf(card)?.name}
+                        )
+                      }
+                      artwork={
+                        <CardPreview
+                          brandId={brandId}
+                          card={shown}
+                          format={format}
+                        />
+                      }
+                    >
+                      <div className="flex min-w-0 flex-col gap-4">
+                        <div className="flex min-w-0 items-center gap-2">
+                          {!card.included && (
+                            <Badge variant="outline">Excluded</Badge>
+                          )}
+                          <p className="flex min-w-0 flex-1 items-center gap-1.5 text-sm font-medium">
+                            <span
+                              className="truncate"
+                              title={homeOf(card)?.name}
+                            >
+                              {homeOf(card)?.name}
+                            </span>
+                            <HomeLink url={homeOf(card)?.url} />
+                          </p>
+                          {!editing && (
+                            <div className="ml-auto flex shrink-0 flex-wrap gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => workInChat(card)}
                               >
-                                {homeOf(card)?.name}
-                              </span>
-                              <HomeLink url={homeOf(card)?.url} />
-                            </p>
-                            {!editing && (
-                              <div className="ml-auto flex shrink-0 flex-wrap gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => workInChat(card)}
-                                >
-                                  <MessageSquare className="size-3.5" />
-                                  Shape
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                          {editing ? (
-                            <CardEditor
-                              brandId={brandId}
-                              card={details}
-                              home={homeOf(card)}
-                              onChange={setDetails}
-                              onHero={(photoUrl) =>
-                                void setHero(details, photoUrl)
-                              }
-                              onLibrary={() => setLibrary(true)}
-                              onApply={async () => {
-                                setSaving(true);
-                                const saved = await update({
-                                  ...details,
-                                  included: card.included,
-                                });
-                                setSaving(false);
-                                if (saved) setDetails(null);
-                              }}
-                              saving={saving}
-                              onCancel={() =>
-                                leaveEditor(() => setDetails(null))
-                              }
-                            />
-                          ) : card.mode === "finished" ? (
-                            <p className="text-sm text-muted-foreground">
-                              Artwork used as-is, with no added text or logo.
-                            </p>
-                          ) : (
-                            <div className="space-y-3">
-                              <div className="space-y-1.5">
-                                <p className="text-lg leading-snug font-medium break-words">
-                                  {card.title || "No headline yet"}
-                                </p>
-                                {card.subtitle && (
-                                  <p className="text-sm text-muted-foreground">
-                                    {card.subtitle}
-                                  </p>
-                                )}
-                              </div>
-                              <Amenities
-                                list={homeOf(card)?.amenities ?? []}
-                                headline={card.title}
-                              />
+                                <MessageSquare className="size-3.5" />
+                                Shape
+                              </Button>
                             </div>
                           )}
-                          <div className="space-y-0.5 text-sm">
-                            <p className="font-medium">{card.adHeadline}</p>
-                            {card.adDescription && (
-                              <p className="text-muted-foreground">
-                                {card.adDescription}
+                        </div>
+                        {editing ? (
+                          <CardEditor
+                            brandId={brandId}
+                            card={details}
+                            home={homeOf(card)}
+                            onChange={setDetails}
+                            onHero={(photoUrl) =>
+                              void setHero(details, photoUrl)
+                            }
+                            onLibrary={() => setLibrary(true)}
+                            onApply={async () => {
+                              setSaving(true);
+                              const saved = await update({
+                                ...details,
+                                included: card.included,
+                              });
+                              setSaving(false);
+                              if (saved) setDetails(null);
+                            }}
+                            saving={saving}
+                            onCancel={() => leaveEditor(() => setDetails(null))}
+                          />
+                        ) : card.mode === "finished" ? (
+                          <p className="text-sm text-muted-foreground">
+                            Artwork used as-is, with no added text or logo.
+                          </p>
+                        ) : (
+                          <div className="space-y-3">
+                            <div className="space-y-1.5">
+                              <p className="text-lg leading-snug font-medium break-words">
+                                {card.title || "No headline yet"}
                               </p>
-                            )}
-                          </div>
-                          {card.aiReview?.fingerprint ===
-                            catalogCardFingerprint(card) &&
-                            card.aiReview.findings.length > 0 && (
-                              <details className="space-y-1 rounded-lg bg-muted/40 p-3 text-sm">
-                                <summary className="cursor-pointer font-medium">
-                                  Review notes · {card.aiReview.findings.length}
-                                </summary>
-                                {card.aiReview.findings.map((finding, i) => (
-                                  <p key={i} className="text-muted-foreground">
-                                    <span className="font-medium">
-                                      {finding.action === "check_image"
-                                        ? "Check image"
-                                        : finding.action ===
-                                            "consider_excluding"
-                                          ? "Consider excluding"
-                                          : "Check details"}
-                                      :
-                                    </span>{" "}
-                                    {finding.reason}
-                                  </p>
-                                ))}
-                              </details>
-                            )}
-                          {!editing && (
-                            <div className="mt-auto space-y-3 border-t pt-3">
-                              <div
-                                role="group"
-                                aria-label="Quick actions"
-                                className="flex flex-wrap items-center justify-start gap-1"
-                              >
-                                {(
-                                  [
-                                    ["Choose photo", () => choosePhoto(card)],
-                                    [
-                                      fixing[card.homeId] === "photo"
-                                        ? "Updating photo + copy…"
-                                        : "New photo + copy",
-                                      () => void quickFix(card, "photo"),
-                                    ],
-                                    [
-                                      fixing[card.homeId] === "copy"
-                                        ? "Writing copy…"
-                                        : "New copy",
-                                      () => void quickFix(card, "copy"),
-                                    ],
-                                  ] as const
-                                ).map(([label, onClick]) => (
-                                  <Button
-                                    key={label}
-                                    size="xs"
-                                    variant="ghost"
-                                    disabled={
-                                      Boolean(fixing[card.homeId]) ||
-                                      locked(card) ||
-                                      (card.mode === "finished" &&
-                                        label !== "Choose photo")
-                                    }
-                                    title={
-                                      locked(card) ? LOCKED_TITLE : undefined
-                                    }
-                                    onClick={onClick}
-                                  >
-                                    {label}
-                                  </Button>
-                                ))}
-                              </div>
-                              {!reviewPreview && (
-                                <div
-                                  role="group"
-                                  aria-label="Card actions"
-                                  className="flex flex-wrap items-center justify-end gap-2"
-                                >
-                                  <IncludeButton
-                                    card={card}
-                                    onInclude={(included) =>
-                                      update({ ...card, included })
-                                    }
-                                  />
-                                  <Button
-                                    size="sm"
-                                    variant="secondary"
-                                    disabled={
-                                      locked(card) ||
-                                      Boolean(fixing[card.homeId]) ||
-                                      saving
-                                    }
-                                    title={
-                                      locked(card) ? LOCKED_TITLE : undefined
-                                    }
-                                    onClick={() => openEditor(card)}
-                                  >
-                                    Edit
-                                  </Button>
-                                  <ApproveButton
-                                    card={card}
-                                    showStatus={false}
-                                    disabled={
-                                      Boolean(fixing[card.homeId]) || saving
-                                    }
-                                    onApprove={(approved) =>
-                                      approve([card], approved)
-                                    }
-                                  />
-                                </div>
+                              {card.subtitle && (
+                                <p className="text-sm text-muted-foreground">
+                                  {card.subtitle}
+                                </p>
                               )}
                             </div>
+                            <Amenities
+                              list={homeOf(card)?.amenities ?? []}
+                              headline={card.title}
+                            />
+                          </div>
+                        )}
+                        <div className="space-y-0.5 text-sm">
+                          <p className="font-medium">{card.adHeadline}</p>
+                          {card.adDescription && (
+                            <p className="text-muted-foreground">
+                              {card.adDescription}
+                            </p>
                           )}
                         </div>
-                      </CatalogCardLayout>
-                    );
-                  })}
-                </div>
-              )}
+                        {card.aiReview?.fingerprint ===
+                          catalogCardFingerprint(card) &&
+                          card.aiReview.findings.length > 0 && (
+                            <details className="space-y-1 rounded-lg bg-muted/40 p-3 text-sm">
+                              <summary className="cursor-pointer font-medium">
+                                Review notes · {card.aiReview.findings.length}
+                              </summary>
+                              {card.aiReview.findings.map((finding, i) => (
+                                <p key={i} className="text-muted-foreground">
+                                  <span className="font-medium">
+                                    {finding.action === "check_image"
+                                      ? "Check image"
+                                      : finding.action === "consider_excluding"
+                                        ? "Consider excluding"
+                                        : "Check details"}
+                                    :
+                                  </span>{" "}
+                                  {finding.reason}
+                                </p>
+                              ))}
+                            </details>
+                          )}
+                        {!editing && (
+                          <div className="mt-auto space-y-3 border-t pt-3">
+                            <div
+                              role="group"
+                              aria-label="Quick actions"
+                              className="flex flex-wrap items-center justify-start gap-1"
+                            >
+                              {(
+                                [
+                                  ["Choose photo", () => choosePhoto(card)],
+                                  [
+                                    fixing[card.homeId] === "photo"
+                                      ? "Updating photo + copy…"
+                                      : "New photo + copy",
+                                    () => void quickFix(card, "photo"),
+                                  ],
+                                  [
+                                    fixing[card.homeId] === "copy"
+                                      ? "Writing copy…"
+                                      : "New copy",
+                                    () => void quickFix(card, "copy"),
+                                  ],
+                                ] as const
+                              ).map(([label, onClick]) => (
+                                <Button
+                                  key={label}
+                                  size="xs"
+                                  variant="ghost"
+                                  disabled={
+                                    Boolean(fixing[card.homeId]) ||
+                                    locked(card) ||
+                                    (card.mode === "finished" &&
+                                      label !== "Choose photo")
+                                  }
+                                  title={
+                                    locked(card) ? LOCKED_TITLE : undefined
+                                  }
+                                  onClick={onClick}
+                                >
+                                  {label}
+                                </Button>
+                              ))}
+                            </div>
+                            {!reviewPreview && (
+                              <div
+                                role="group"
+                                aria-label="Card actions"
+                                className="flex flex-wrap items-center justify-end gap-2"
+                              >
+                                <IncludeButton
+                                  card={card}
+                                  onInclude={(included) =>
+                                    update({ ...card, included })
+                                  }
+                                />
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  disabled={
+                                    locked(card) ||
+                                    Boolean(fixing[card.homeId]) ||
+                                    saving
+                                  }
+                                  title={
+                                    locked(card) ? LOCKED_TITLE : undefined
+                                  }
+                                  onClick={() => openEditor(card)}
+                                >
+                                  Edit
+                                </Button>
+                                <ApproveButton
+                                  card={card}
+                                  showStatus={false}
+                                  disabled={
+                                    Boolean(fixing[card.homeId]) || saving
+                                  }
+                                  onApprove={(approved) =>
+                                    approve([card], approved)
+                                  }
+                                />
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </CatalogCardLayout>
+                  );
+                })}
+              </div>
               {limit < visible.length && (
                 <div className="flex flex-wrap gap-2">
                   <Button
@@ -1385,41 +1264,6 @@ export function CatalogCards({
             </DialogDescription>
           </DialogHeader>
           <CatalogTemplateCard brandId={brandId} />
-        </DialogContent>
-      </Dialog>
-      <Dialog
-        open={layout === "grid" && !!details}
-        onOpenChange={(open) => {
-          if (!open) leaveEditor(() => setDetails(null));
-        }}
-      >
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>{details && homeOf(details)?.name}</DialogTitle>
-            <DialogDescription>
-              Edit the catalog artwork. Listing facts stay unchanged.
-            </DialogDescription>
-          </DialogHeader>
-          {details && (
-            <div className="grid gap-6 md:grid-cols-2">
-              <CardPreview brandId={brandId} card={details} format={format} />
-              <CardEditor
-                brandId={brandId}
-                card={details}
-                home={homeOf(details)}
-                onChange={setDetails}
-                onHero={(photoUrl) => void setHero(details, photoUrl)}
-                onLibrary={() => setLibrary(true)}
-                saving={saving}
-                onApply={async () => {
-                  setSaving(true);
-                  const saved = await update(details);
-                  setSaving(false);
-                  if (saved) setDetails(null);
-                }}
-              />
-            </div>
-          )}
         </DialogContent>
       </Dialog>
       <Dialog
