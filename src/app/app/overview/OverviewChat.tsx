@@ -19,6 +19,7 @@ import {
 import { useAssistantVoice } from "./useAssistantVoice";
 import { useAssistantDictation } from "./useAssistantDictation";
 import { ChatQueue } from "./ChatQueue";
+import { CopySuggestionsCard } from "./CopySuggestionsCard";
 import { ChatNextOptions } from "./ChatNextOptions";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useChat } from "@ai-sdk/react";
@@ -1715,6 +1716,15 @@ export function renderToolPart(
         <ProductionPacketCard
           key={key}
           output={output as ProductionPacketOutput}
+        />
+      );
+    case "presentCopyOptions.present":
+      return (
+        <CopySuggestionsCard
+          key={key}
+          output={output}
+          onPrompt={onPrompt}
+          busy={isRunning}
         />
       );
     case "presentNextOptions.present":

@@ -31,6 +31,7 @@ import {
 import { fetchWanderOsListingDetail } from "@/server/clients/wanderos-site.client";
 import {
   catalogArtworkIssues,
+  catalogCopyPatchSchema,
   catalogLocation,
   catalogCardCopy,
   artworkFormat,
@@ -631,17 +632,7 @@ export async function editCatalogCard(input: {
   }
   for (const id of [patch.imageAssetId, patch.finishedAssetId])
     if (id) await finishedCatalogAsset(brand.id, id);
-  const title = patch.title?.trim();
-  if (title !== undefined && (!title || title.length > 120))
-    throw new Error("A headline is 1–120 characters");
-  if (patch.subtitle && patch.subtitle.length > 220)
-    throw new Error("The facts line is at most 220 characters");
-  if (
-    patch.pills &&
-    (patch.pills.length > 4 ||
-      patch.pills.some((p) => !p.trim() || p.length > 24))
-  )
-    throw new Error("Up to four amenity pills, each at most 24 characters");
+  const { title } = catalogCopyPatchSchema.parse(patch);
   if (title) {
     const row = await db.query.homeTable.findFirst({
       where: and(

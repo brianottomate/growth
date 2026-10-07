@@ -12,6 +12,15 @@ import { rankAmenities } from "./home-amenities";
 import { marketOf, type BrandMarkets } from "./markets";
 import { hotelFeedRows, type HotelFeedHome } from "./meta-hotel-feed";
 
+/** Copy fields accepted by the catalog editor and selectable copy suggestions. */
+export const catalogCopyPatchSchema = z.object({
+  title: z.string().trim().min(1).max(120).optional(),
+  subtitle: z.string().max(220).optional(),
+  pills: z.array(z.string().trim().min(1).max(24)).max(4).optional(),
+  adHeadline: z.string().trim().min(1).max(255).optional(),
+  adDescription: z.string().trim().max(255).optional(),
+});
+
 export const catalogCardSchema = z.object({
   homeId: z.string().min(1),
   aiReview: catalogAiReviewSchema.optional(),

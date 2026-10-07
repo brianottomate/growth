@@ -12,6 +12,73 @@ export type Specimen = {
 };
 export const specimens: Specimen[] = [
   {
+    id: "copy-suggestions",
+    title: "Selectable ad copy sets",
+    note: "Caption and image text stay together; Apply hands the exact card and Story edit to chat. This gallery only shows the handoff message.",
+    category: "Ads",
+    capability: "presentCopyOptions",
+    action: "present",
+    data: {
+      target: { surface: "ad", brandId: "fixture-coast", adId: "fixture-ad" },
+      options: [
+        {
+          label: "A weekend together",
+          rationale: "Lead with the group moment, then show the space.",
+          edits: [
+            {
+              kind: "ad",
+              shape: null,
+              body: "Bring your favorite people. Spend the weekend together by the coast.",
+              headline: "Room for your whole crew",
+            },
+            {
+              kind: "composition",
+              cardId: "fixture-slide-2",
+              shape: "story",
+              title: "A place to gather",
+            },
+          ],
+        },
+        {
+          label: "A slower morning",
+          rationale: "Use a different moment without inventing an amenity.",
+          edits: [
+            {
+              kind: "ad",
+              shape: null,
+              body: "Coffee, good company, and a slower start. Make the coast your weekend plan.",
+              headline: "Take your time",
+            },
+            {
+              kind: "composition",
+              cardId: "fixture-slide-2",
+              shape: "story",
+              title: "Stay a little slower",
+            },
+          ],
+        },
+        {
+          label: "Make it your base",
+          rationale: "Connect the destination with the reason to stay.",
+          edits: [
+            {
+              kind: "ad",
+              shape: null,
+              body: "Explore the coast, then come home to each other.",
+              headline: "Your coastal weekend base",
+            },
+            {
+              kind: "composition",
+              cardId: "fixture-slide-2",
+              shape: "story",
+              title: "Out exploring. Back together.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     id: "workspace",
     title: "Workspace snapshot",
     note: "Counts, attention signals, and the work waiting across a workspace.",

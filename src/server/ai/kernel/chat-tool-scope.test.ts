@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createChatToolScope } from "./chat-tool-scope";
 
 const tools = {
+  presentCopyOptions: tool({ inputSchema: z.object({}) }),
   performanceWrite__saveHomeGroup: tool({ inputSchema: z.object({}) }),
   performanceWrite__changeHomeGroupHomes: tool({ inputSchema: z.object({}) }),
   adsWrite__saveIdea: tool({ inputSchema: z.object({}) }),
@@ -36,6 +37,7 @@ test("a follow-up retains an explicitly enabled domain, including a focused chat
       history: [enabled],
       focus,
     });
+    expect(scope.activeTools()).toContain("presentCopyOptions");
     expect(scope.activeTools()).toContain("performanceWrite__saveHomeGroup");
     expect(scope.activeTools()).toContain(
       "performanceWrite__changeHomeGroupHomes",

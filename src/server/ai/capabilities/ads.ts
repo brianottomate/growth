@@ -1,3 +1,4 @@
+import { catalogCopyPatchSchema } from "@/lib/catalog-studio";
 import { steerSchema } from "@/lib/generation-steer";
 import {
   deletePlatformCampaignActionNativeResultSchema,
@@ -1651,36 +1652,20 @@ export const editCatalogCardAction = growthAction({
   inputSchema: z.object({
     brandId: z.string().min(1),
     homeId: z.string().min(1).describe("The WanderOS listing id."),
-    title: z.string().trim().min(1).max(120).optional(),
-    subtitle: z.string().max(220).optional(),
-    adHeadline: z
-      .string()
-      .trim()
-      .min(1)
-      .max(255)
-      .optional()
-      .describe(
-        "The ad headline Meta prints under the card: the home's name, cleaned up.",
-      ),
-    adDescription: z
-      .string()
-      .trim()
-      .max(255)
-      .optional()
-      .describe(
-        "The line under the ad headline, e.g. 'Gatlinburg, TN · Sleeps 8 · Hot tub'.",
-      ),
+    ...catalogCopyPatchSchema.shape,
+    adHeadline: catalogCopyPatchSchema.shape.adHeadline.describe(
+      "The ad headline Meta prints under the card: the home's name, cleaned up.",
+    ),
+    adDescription: catalogCopyPatchSchema.shape.adDescription.describe(
+      "The line under the ad headline, e.g. 'Gatlinburg, TN · Sleeps 8 · Hot tub'.",
+    ),
     templateId: compositionTemplateIdSchema.optional(),
     imagePosition: compositionImagePositionSchema.optional(),
     showLogo: z.boolean().optional(),
     included: z.boolean().optional(),
-    pills: z
-      .array(z.string().trim().min(1).max(24))
-      .max(4)
-      .optional()
-      .describe(
-        "Amenity pills on the amenities cards: two to four short labels of amenities this listing has.",
-      ),
+    pills: catalogCopyPatchSchema.shape.pills.describe(
+      "Amenity pills on the amenities cards: two to four short labels of amenities this listing has.",
+    ),
     mode: z
       .enum(["compose", "finished"])
       .nullable()

@@ -10,6 +10,7 @@ import { z } from "zod";
 import { capabilityErrorSchema } from "../kernel/output";
 import { operationTools } from "../kernel/operations";
 
+import { presentCopyOptions } from "./copy-suggestions";
 import { presentNextOptions } from "./next-options";
 import { blogAgent } from "./blog";
 import { DOMAIN_CAPABILITY_TOOLS } from "./domains";
@@ -29,6 +30,7 @@ export type { GrowthTool as Capability, CapabilityContext } from "./types";
  * product surface is just a typed map assembled with object spreads.
  */
 export const OVERVIEW_TOOLS = {
+  presentCopyOptions,
   presentNextOptions,
   workspaceOverview,
   navigateWorkspace,

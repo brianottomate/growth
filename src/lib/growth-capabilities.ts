@@ -25,6 +25,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
   prepareProductionPacket: ["prepare"],
   renderSocialPosts: ["render"],
   presentNextOptions: ["present"],
+  presentCopyOptions: ["present"],
   blogAgent: ["run"],
   newsletterAgent: ["run"],
   brandRead: [
@@ -329,6 +330,7 @@ export const GROWTH_CAPABILITY_LABELS = {
   prepareProductionPacket: "Preparing production packet",
   renderSocialPosts: "Rendering social posts",
   presentNextOptions: "Offering next steps",
+  presentCopyOptions: "Offering copy sets",
   blogAgent: "Working on the blog",
   newsletterAgent: "Working on the newsletter",
   brandRead: "Reading brands",

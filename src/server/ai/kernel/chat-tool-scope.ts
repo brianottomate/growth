@@ -78,6 +78,7 @@ const common = new Set([
   "creativeRead",
   "creativeWrite",
   "presentNextOptions",
+  "presentCopyOptions",
   "workspaceOverview",
   "navigateWorkspace",
   "operationRead",

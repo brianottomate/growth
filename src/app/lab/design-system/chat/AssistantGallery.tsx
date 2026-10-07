@@ -238,7 +238,7 @@ export function AssistantGallery({ catalog }: { catalog: CatalogEntry[] }) {
       }}
     >
       <header className="space-y-6 pb-8">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <Link
             href="/lab"
             className="flex items-center gap-2 text-sm text-muted-foreground"

@@ -4,6 +4,7 @@ import type { ToolSet } from "ai";
 
 const eager = new Set([
   "presentNextOptions",
+  "presentCopyOptions",
   "workspaceOverview",
   "brandRead__list",
   "operationRead__status",
