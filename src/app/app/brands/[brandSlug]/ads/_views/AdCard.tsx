@@ -9,7 +9,7 @@ import {
 } from "@/components/image-picker-dialog";
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { ideaImagesSaved, ideaSource } from "@/lib/ad-idea-studio";
+import { ideaSource } from "@/lib/ad-idea-studio";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 import { MessageSquare, Plus, Trash2 } from "lucide-react";
 import {} from "@/lib/meta-placement-plan";
@@ -120,9 +120,6 @@ export function AdCard({
   const approved = optimistic ?? savedApproved;
   // Editing an approved output requires returning the ad to Studio.
   const locked = approved;
-  const imagesSaved = Boolean(
-    ad.content.ideaStudio && ideaImagesSaved(ad.content.ideaStudio),
-  );
   const { data: members = [] } = useQuery(
     orpc.content.assignableMembers.queryOptions(),
   );
@@ -235,8 +232,12 @@ export function AdCard({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const remove = useMutation(
     orpc.ads.deleteAd.mutationOptions({
-      onSuccess: () => {
+      onSuccess: (result) => {
         setDeleteOpen(false);
+        if (result.mediaCleanup.errors.length)
+          toast.warning(
+            "Ad deleted. Some exported files could not be removed.",
+          );
         toast.success("Ad idea deleted");
         router.refresh();
       },
@@ -1039,9 +1040,7 @@ export function AdCard({
                 <span aria-hidden="true">·</span>
                 <span>
                   {approved
-                    ? imagesSaved
-                      ? "Approved"
-                      : "Approved · saving images…"
+                    ? "Approved"
                     : ready
                       ? `Ready for review${member(review.readyBy)?.name ? ` · ${member(review.readyBy)?.name}` : ""}`
                       : ad.content.metaImport

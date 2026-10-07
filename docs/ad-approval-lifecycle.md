@@ -8,13 +8,21 @@ There is no copy, replacement, lineage, or versioning workflow.
 ## Review and approved output
 
 - Draft (`drawn`) is editable. Ready records who marked it ready and when.
-- Editing Ready returns it to Draft. Approval supersedes the Ready state; its
+- Ready is a manual human mark that survives edits. Approval supersedes Ready; its
   provenance remains available until Return to Studio clears both review marks.
-- Approved captures `ad.approved_snapshot`: output content and placements plus
-  approver/time. The editable composition stays on `ad.content` for reference.
-- Image approval renders its included sizes in the background. Until rendering
-  completes the card reports saving images. Attachment and publishing await those
-  renders. Publishers consume the captured output, never a live composition.
+- Image approval captures the recipe, copy, included sizes and drawing brand settings
+  in `ad.content.ideaStudio`. It locks editing immediately without rendering.
+- Send to campaign in Studio and Add approved ads in a campaign both call
+  `adsWrite.attachAdSet`. Consumption renders compositions and captures
+  `ad.approved_snapshot` before assigning the selected ad IDs. Supplied artwork
+  at the required dimensions passes through with its existing asset. Other sizes
+  use the normal artwork fitting. The editable recipe remains for reopening.
+- Studio supports single and multiple selection, sending to an existing campaign,
+  and creating a campaign from the selection. Chat/MCP use the same action with
+  `campaignId` or `newCampaignName` plus `adIds`. The new campaign and assignment
+  commit together after export succeeds. No previous campaign relationship is saved.
+- Publishers consume captured output. Legacy campaign previews/pushes finish
+  missing exports from older approvals using the same renderer.
 - Text/video approval captures the output immediately.
 
 Campaign cards show previews and delivery. Review controls and internal discussion
@@ -31,7 +39,10 @@ silently overwriting them.
 Platform ads keep their independent `pushed_creative` snapshot, observed fields,
 and delivery state. Returning/reapproving an ad never pauses, rewrites, or updates
 an existing platform ad. The dialog and event explain that it may still run.
-Render assets remain available, including for in-flight pushes. Existing platform
+Reopen and delete purge generated exports after clearing their owner references.
+Source artwork and files referenced by retained platform records or other content
+stay available. Chat history does not retain export files. There is no protection
+for in-flight pushes. Cleanup errors are reported alongside the completed action. Existing platform
 rows are backfilled from the last known observed creative, not a claim to recover
 an exact historical push. Imported platform ads may lack a human approver and
 must return to Studio and receive local approval before another push.
@@ -60,7 +71,7 @@ by size in slide order, with the existing individual asset actions. Source photo
 remain ordinary library items. Search, folder, and tag filters apply before
 grouping, so a filtered bundle shows only matching exports. New exports record
 ad and campaign names in their approval provenance; older exports still group
-using their existing ad ID and source version. Returning an ad preserves its prior render assets for platform history.
+using their existing ad ID and source version. Returning an ad retains exports that platform history or other content still references and purges the rest.
 
 ## Meta delivery workspace
 

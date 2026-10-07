@@ -103,7 +103,9 @@ export function AddExistingAdsDialog({
               attach.mutate({ brandId, campaignId, adIds: selected })
             }
           >
-            Add {selected.length || "selected"} ads
+            {attach.isPending
+              ? "Preparing ads…"
+              : `Add ${selected.length || "selected"} ads`}
           </Button>
         </div>
       }
@@ -215,7 +217,8 @@ export function AddExistingAdsDialog({
                                     : "Draft"}{" "}
                                   · Unassigned
                                   {"media" in ad.content &&
-                                  !ad.content.media.length
+                                  !ad.content.media.length &&
+                                  !ad.content.ideaStudio?.document.cards.length
                                     ? " · Needs creative"
                                     : ""}
                                 </span>

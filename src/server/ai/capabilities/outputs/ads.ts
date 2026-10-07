@@ -217,6 +217,7 @@ const approvalSchema = z.strictObject({
   approvedBy: z.string(),
   renders: rendersSchema,
   sourceVersion: z.string(),
+  brand: z.record(z.string(), jsonValueSchema).optional(),
 });
 
 const portraitSchema = z.strictObject({
@@ -1128,6 +1129,11 @@ export const deleteAdDraftActionOutputSchema = z.strictObject({
   deleted: z.boolean(),
   /** How many platform ads it was deleted from first. */
   deletedOnPlatform: z.number().optional(),
+  mediaCleanup: z.strictObject({
+    deleted: z.number(),
+    kept: z.number(),
+    errors: z.array(z.string()),
+  }),
 });
 
 export const pushDraftActionOutputSchema = z.union([

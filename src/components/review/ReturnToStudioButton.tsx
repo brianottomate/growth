@@ -38,6 +38,10 @@ export function ReturnToStudioButton({
             ? "Returned to Studio. Existing platform ads are unchanged."
             : "Returned to Studio as a draft.",
         );
+        if (result.mediaCleanup.errors.length)
+          toast.warning(
+            "Returned to Studio. Some exported files could not be removed.",
+          );
         if (studioHref) router.push(`${studioHref}#ad-${adId}`);
         router.refresh();
       },
@@ -55,7 +59,8 @@ export function ReturnToStudioButton({
             <DialogTitle>Return to Studio</DialogTitle>
             <DialogDescription>
               This ad leaves its campaign and becomes an editable draft. Its
-              comments stay with it, and it will need approval again.
+              comments stay with it, and it will need approval again. Unused
+              exports are removed; source artwork stays.
               {pushed &&
                 " Existing platform ads will stay unchanged and may still be running. Pause them separately if needed."}
             </DialogDescription>

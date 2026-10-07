@@ -137,7 +137,13 @@ export function PreparedAdCard({
   const remove = useMutation(
     orpc.ads.deleteAd.mutationOptions({
       onError,
-      onSuccess: () => router.refresh(),
+      onSuccess: (result) => {
+        if (result.mediaCleanup.errors.length)
+          toast.warning(
+            "Ad deleted. Some exported files could not be removed.",
+          );
+        router.refresh();
+      },
     }),
   );
   const busy = save.isPending || status.isPending || remove.isPending;

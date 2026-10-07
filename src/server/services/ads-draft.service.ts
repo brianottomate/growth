@@ -18,7 +18,7 @@ import {
 import { db, withTransaction } from "@/server/db";
 import {
   campaignExportCandidates,
-  cleanupCampaignExports,
+  cleanupUnusedExports,
 } from "./campaign-media-cleanup.service";
 import {
   adTable,
@@ -1236,6 +1236,7 @@ export function planAdSignature(content: AdContent) {
 export async function listBrandCampaigns(input: {
   organizationId: string;
   brandId: string;
+  availableForAds?: boolean;
 }): Promise<CampaignListResult> {
   const brand = await db.query.brandTable.findFirst({
     where: eq(brandTable.id, input.brandId),
@@ -1244,11 +1245,23 @@ export async function listBrandCampaigns(input: {
   if (brand?.organizationId !== input.organizationId) {
     throw new Error("No access to this brand");
   }
-  return db.query.campaignTable.findMany({
-    where: eq(campaignTable.brandId, input.brandId),
-    orderBy: [desc(campaignTable.createdAt)],
-    columns: { id: true, name: true, status: true },
-  });
+  return db
+    .select({
+      id: campaignTable.id,
+      name: campaignTable.name,
+      status: campaignTable.status,
+    })
+    .from(campaignTable)
+    .where(
+      and(
+        eq(campaignTable.brandId, input.brandId),
+        isNull(campaignTable.deletedAt),
+        input.availableForAds
+          ? sql`not exists (select 1 from ${platformCampaignTable} where ${platformCampaignTable.campaignId} = ${campaignTable.id} and ${platformCampaignTable.externalId} is not null)`
+          : undefined,
+      ),
+    )
+    .orderBy(desc(campaignTable.createdAt));
 }
 
 /**
@@ -1475,7 +1488,7 @@ export async function deleteDraftCampaign(input: {
         .where(eq(platformCampaignTable.id, row.id));
     await tx.delete(campaignTable).where(eq(campaignTable.id, campaign.id));
   });
-  const mediaCleanup = await cleanupCampaignExports(exports);
+  const mediaCleanup = await cleanupUnusedExports(exports);
   return { deleted: true, mediaCleanup };
 }
 

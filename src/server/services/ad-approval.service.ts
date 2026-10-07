@@ -5,7 +5,7 @@ import type { GrowthActionContext } from "@/server/ai/kernel/tool";
 import "server-only";
 import { reusableApprovalAsset } from "@/lib/ad-approval-assets";
 import { isImportedMetaCatalog } from "@/lib/meta-import";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/server/db";
 import {
   adTable,
@@ -34,6 +34,7 @@ import {
   renderComposition,
   resolveCompositionContext,
 } from "./composition.service";
+import { purgeAdExports } from "./campaign-media-cleanup.service";
 import { deleteMedia, importImageBuffer } from "./media.service";
 
 type Brand = typeof brandTable.$inferSelect;
@@ -51,14 +52,18 @@ async function renderApprovalExports(input: {
   userId: string;
   sourceVersion: string;
   generated: string[];
+  renderBrand?: NonNullable<IdeaStudio["approval"]>["brand"];
+  campaign?: { id: string; name: string };
 }) {
   const { ad, brand, document } = input;
-  const campaign = ad.campaignId
-    ? await db.query.campaignTable.findFirst({
-        where: eq(campaignTable.id, ad.campaignId),
-        columns: { name: true },
-      })
-    : null;
+  const campaign =
+    input.campaign ??
+    (ad.campaignId
+      ? await db.query.campaignTable.findFirst({
+          where: eq(campaignTable.id, ad.campaignId),
+          columns: { name: true },
+        })
+      : null);
   const byShape: NonNullable<IdeaStudio["approval"]>["renders"] = {};
   for (const shape of input.shapes) {
     const renders: { assetId: string; url: string; reused?: true }[] = [];
@@ -78,7 +83,10 @@ async function renderApprovalExports(input: {
         renders.push(reusable);
         continue;
       }
-      const context = await loadCompositionSource(resolved);
+      const context = await loadCompositionSource({
+        ...resolved,
+        brand: { ...resolved.brand, ...input.renderBrand },
+      });
       const bytes = Buffer.from(
         await renderComposition(spec, context).arrayBuffer(),
       );
@@ -96,7 +104,7 @@ async function renderApprovalExports(input: {
           adApproval: {
             adId: ad.id,
             adName: ad.name,
-            campaignId: ad.campaignId,
+            campaignId: input.campaign?.id ?? ad.campaignId,
             campaignName: campaign?.name,
             sourceVersion: input.sourceVersion,
             shape,
@@ -122,10 +130,13 @@ export async function approvedAdFrozen(adId: string): Promise<boolean> {
 
 /**
  * Render and save the images an approved ad has not saved yet, as the
- * approver. Approval starts it in the background; the push and the previews
- * call it too, so they never send live renders. Returns whether it saved any.
+ * approver when a campaign consumes it. Legacy campaign preview/push paths
+ * also finish missing exports. Returns whether it saved any.
  */
-export async function freezeApprovedAd(adId: string): Promise<boolean> {
+export async function freezeApprovedAd(
+  adId: string,
+  campaign?: { id: string; name: string },
+): Promise<boolean> {
   const ad = await db.query.adTable.findFirst({ where: eq(adTable.id, adId) });
   if (ad?.status !== "approved") return false;
   if (!("media" in ad.content) || !ad.content.ideaStudio) {
@@ -155,7 +166,10 @@ export async function freezeApprovedAd(adId: string): Promise<boolean> {
   }
   const studio = ad.content.ideaStudio;
   const approval = studio?.approval;
-  if (!studio || !approval) return false;
+  if (!studio || !approval)
+    throw new Error(
+      "Return this ad to Studio and approve it again before exporting.",
+    );
   const document = studio.document;
   const missing = document.shapes.filter(
     (shape) => approval.renders[shape]?.length !== document.cards.length,
@@ -195,6 +209,8 @@ export async function freezeApprovedAd(adId: string): Promise<boolean> {
       userId: approval.approvedBy,
       sourceVersion: approval.sourceVersion,
       generated,
+      renderBrand: approval.brand,
+      campaign,
     });
     const next = projectIdea(
       brand.id,
@@ -222,8 +238,7 @@ export async function freezeApprovedAd(adId: string): Promise<boolean> {
     if (!saved) {
       for (const id of generated) await deleteMedia(id);
       generated.length = 0;
-      // The background save after Approve and a push can race; whichever
-      // lands second finds the images already saved and has nothing to do.
+      // Two consumers can render concurrently; only one version is saved.
       if (await approvedAdFrozen(ad.id)) return false;
       throw new Error(
         `${ad.name} changed while its images were saved. Try again.`,
@@ -257,9 +272,8 @@ export async function assertAdNotPushed(adId: string) {
 }
 
 /**
- * Approve an image ad. Output stays frozen until the same ad returns to Studio.
- * The images every included size needs are rendered and saved right after,
- * in the background, so approving stays instant.
+ * Capture the approved recipe and branding. Campaign consumption renders its
+ * included sizes; approval performs no image rendering.
  */
 export async function approveImageAd(input: {
   adId: string;
@@ -339,6 +353,19 @@ export async function approveImageAd(input: {
       approvedBy: input.userId,
       sourceVersion: input.expectedUpdatedAt,
       renders: {},
+      brand: {
+        name: brand.name,
+        logo: brand.logo,
+        brandMark: brand.brandMark,
+        brandIdentity: brand.brandIdentity
+          ? {
+              colors: brand.brandIdentity.colors,
+              colorScheme: brand.brandIdentity.colorScheme,
+              fonts: brand.brandIdentity.fonts,
+              fontsChosen: brand.brandIdentity.fontsChosen,
+            }
+          : null,
+      },
     },
   };
   const next = projectIdea(brand.id, ad.content, studio, ad.placements);
@@ -347,6 +374,7 @@ export async function approveImageAd(input: {
     .set({
       ...next,
       status: "approved",
+      approvedSnapshot: null,
       approvedAt,
       approvedBy: input.userId,
       updatedAt: new Date(),
@@ -451,10 +479,11 @@ export async function returnAdToStudio(
       });
     }
   });
-  // Keep approval assets: an in-flight platform push may still reference them.
+  const mediaCleanup = await purgeAdExports({ adId: ad.id, brandId: brand.id });
   return {
     adId: ad.id,
     status: "drawn" as const,
     platformAdsUnchanged: pushed.length,
+    mediaCleanup,
   };
 }

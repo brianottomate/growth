@@ -410,7 +410,7 @@ export const growthActionPolicies = {
     // a frozen copy that can be made again, so there is no trash.
     deleteCatalogExport: write({ reversible: false }),
     // Sets one field on local rows; the push is still the provider step.
-    attachAdSet: write({ idempotent: true }),
+    attachAdSet: write(),
     // Swaps one card slot on a local draft for a library asset.
     replaceAdCard: write({ idempotent: true }),
     // One cell of one ad: local rows only, no provider call. Freezing marks a

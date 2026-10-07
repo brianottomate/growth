@@ -104,12 +104,23 @@ export const ideaDocumentSchema = z
   });
 export type IdeaDocument = z.infer<typeof ideaDocumentSchema>;
 export type IdeaImage = IdeaDocument["cards"][number];
+import type { BrandIdentity, BrandMark } from "@/server/db/brand-schema";
+export type ApprovedRenderBrand = Pick<
+  BrandIdentity,
+  "colors" | "colorScheme" | "fonts" | "fontsChosen"
+>;
 export type IdeaStudio = {
   document: IdeaDocument;
   approval?: {
     approvedAt: string;
     approvedBy: string;
     sourceVersion: string;
+    brand?: {
+      name: string;
+      logo: string | null;
+      brandMark: BrandMark | null;
+      brandIdentity: ApprovedRenderBrand | null;
+    };
     renders: Partial<
       Record<IdeaShape, { assetId: string; url: string; reused?: true }[]>
     >;

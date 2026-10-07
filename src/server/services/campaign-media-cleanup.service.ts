@@ -38,7 +38,18 @@ export async function campaignExportCandidates(
   );
 }
 
-export async function cleanupCampaignExports(
+/** The ad owns generated exports; supplied artwork has no matching provenance. */
+export async function purgeAdExports(input: { adId: string; brandId: string }) {
+  const assets = await db.query.mediaAssetTable.findMany({
+    where: and(
+      eq(mediaAssetTable.brandId, input.brandId),
+      sql`${mediaAssetTable.metadata}->'adApproval'->>'adId' = ${input.adId}`,
+    ),
+  });
+  return cleanupUnusedExports(assets);
+}
+
+export async function cleanupUnusedExports(
   assets: Awaited<ReturnType<typeof campaignExportCandidates>>,
 ) {
   let deleted = 0;
@@ -46,7 +57,7 @@ export async function cleanupCampaignExports(
   const errors: string[] = [];
   for (const asset of assets) {
     try {
-      // Check after the campaign cascades: retained platform rows and other campaigns still count.
+      // Check after the owner clears its references. Retained platform media and source assets still count.
       // Text scanning also covers embedded JSON documents and direct URL reuse across brands.
       const references = await db.execute(sql`
         select 1 from (
@@ -60,8 +71,6 @@ export async function cleanupCampaignExports(
           union all select to_jsonb(p)::text from home p
           union all select to_jsonb(p)::text from home_media p
           union all select to_jsonb(p)::text from brand p
-          union all select to_jsonb(p)::text from assistant_message p
-          union all select to_jsonb(p)::text from assistant_input p
           union all select to_jsonb(p)::text from media_asset p where p.id <> ${asset.id}
         ) refs where position(${asset.id} in payload) > 0 or position(${asset.url} in payload) > 0
           or (${asset.r2Key ?? ""} <> '' and position(${asset.r2Key ?? ""} in payload) > 0) limit 1
@@ -77,7 +86,7 @@ export async function cleanupCampaignExports(
       errors.push(
         `Could not clean up ${asset.id}: ${error instanceof Error ? error.message : "unknown error"}`,
       );
-      console.error("Campaign media cleanup failed", asset.id, error);
+      console.error("Export cleanup failed", asset.id, error);
     }
   }
   return { deleted, kept, errors };

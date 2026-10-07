@@ -11,11 +11,12 @@ import {
 } from "./ad-approval.service";
 import "server-only";
 import { withIdeaStudio } from "@/lib/ad-idea-studio";
-import { waitUntil } from "@vercel/functions";
+import { purgeAdExports } from "./campaign-media-cleanup.service";
+import { createId } from "@/server/db/utils";
 
 import { type BrandMarkets } from "@/lib/markets";
 
-import { and, eq, inArray, isNotNull, isNull, ne } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, ne, or } from "drizzle-orm";
 
 import {
   adTable,
@@ -803,96 +804,105 @@ export async function setAdHome(input: {
 export async function attachAdSet(input: {
   brandId: string;
   orgId: string;
-  campaignId: string;
+  campaignId?: string;
+  newCampaignName?: string;
   adIds?: string[];
 }) {
   const brand = await requireOwnedBrand(input);
-  const campaign = await campaignFor(brand.id, input.campaignId);
+  if (Boolean(input.campaignId) === Boolean(input.newCampaignName?.trim()))
+    throw new AdSetError(
+      422,
+      "Choose a campaign or give the new campaign a name.",
+    );
+  if (input.newCampaignName && !input.adIds?.length)
+    throw new AdSetError(422, "Select the ads to create a campaign from.");
+  const campaign = input.campaignId
+    ? await campaignFor(brand.id, input.campaignId)
+    : { id: createId("camp"), name: input.newCampaignName!.trim() };
   const draftsQuery = () =>
     db.query.adTable.findMany({
       where: and(eq(adTable.brandId, brand.id), isNull(adTable.campaignId)),
-      columns: { id: true, status: true, content: true, name: true },
+      columns: {
+        id: true,
+        status: true,
+        content: true,
+        name: true,
+        updatedAt: true,
+      },
     });
-  const pick = (rows: Awaited<ReturnType<typeof draftsQuery>>) =>
-    input.adIds?.length
-      ? rows.filter(
-          (ad) => ad.status === "approved" && input.adIds!.includes(ad.id),
-        )
-      : rows.filter((ad) => ad.status === "approved");
-  // An idea approved before the studio froze on approval has no images yet;
-  // save them now so it arrives with its media.
-  let drafts = await draftsQuery();
-  if (
-    input.adIds &&
-    (input.adIds.length === 0 ||
-      new Set(input.adIds).size !== input.adIds.length ||
-      input.adIds.some((id) => !drafts.some((ad) => ad.id === id)))
-  ) {
-    throw new AdSetError(
-      422,
-      "Choose unassigned ads from this brand. Reload if their assignment changed.",
+  const select = (rows: Awaited<ReturnType<typeof draftsQuery>>) => {
+    const wanted = rows.filter(
+      (ad) =>
+        ad.status === "approved" &&
+        (!input.adIds || input.adIds.includes(ad.id)),
     );
-  }
-  let frozeAny = false;
-  for (const ad of pick(drafts)) {
-    if (await freezeApprovedAd(ad.id)) frozeAny = true;
-  }
-  if (frozeAny) drafts = await draftsQuery();
-  const wanted = pick(drafts);
-  if (input.adIds && wanted.length !== input.adIds.length) {
-    throw new AdSetError(
-      422,
-      "Only approved, unassigned ads can enter a campaign. Refresh and approve the selected ads first.",
+    if (
+      !wanted.length ||
+      (input.adIds &&
+        (new Set(input.adIds).size !== input.adIds.length ||
+          wanted.length !== input.adIds.length))
+    )
+      throw new AdSetError(
+        422,
+        "Choose approved, unassigned ads from this brand. Refresh if their review or assignment changed.",
+      );
+    return wanted;
+  };
+  // Validate the entire selection before rendering or creating a campaign.
+  const selected = select(await draftsQuery());
+  for (let offset = 0; offset < selected.length; offset += 4) {
+    const results = await Promise.allSettled(
+      selected
+        .slice(offset, offset + 4)
+        .map((ad) => freezeApprovedAd(ad.id, campaign)),
     );
+    const failed = results.find((result) => result.status === "rejected");
+    if (failed?.status === "rejected") throw failed.reason;
   }
-  if (wanted.length === 0) {
-    throw new AdSetError(
-      422,
-      input.adIds?.length
-        ? "None of those ads are drafts on this brand"
-        : "No approved drafts to attach. Approve the ads that should run first.",
-    );
-  }
-  const empty = wanted.filter(
-    (ad) =>
-      "media" in (ad.content as object) &&
-      (ad.content as AdCreativeContent).media.length === 0,
+  const rows = await draftsQuery();
+  // Never absorb ads approved while the selected ads were rendering.
+  const wanted = select(rows).filter((ad) =>
+    selected.some((item) => item.id === ad.id),
   );
-  if (
-    empty.length > 0 &&
-    (!input.adIds?.length || empty.some((ad) => ad.status === "approved"))
-  ) {
+  if (wanted.length !== selected.length)
     throw new AdSetError(
       422,
-      `${empty.length} ad${empty.length === 1 ? " has" : "s have"} no creative yet: ${empty
-        .map((ad) => ad.name)
-        .join(", ")}`,
+      "The selection changed while preparing images. Refresh and try again.",
     );
-  }
-  // A concurrent attachment must fail as a whole rather than move ads out
-  // of another campaign or leave a partially assigned selection.
+  if (wanted.some((ad) => "media" in ad.content && !ad.content.media.length))
+    throw new AdSetError(
+      422,
+      "Every selected ad needs exported media before entering a campaign.",
+    );
   await withTransaction(async (tx) => {
+    if (!input.campaignId)
+      await tx.insert(campaignTable).values({
+        id: campaign.id,
+        brandId: brand.id,
+        name: campaign.name,
+        status: "planned",
+      });
     const assigned = await tx
       .update(adTable)
-      .set({ campaignId: campaign.id })
+      .set({ campaignId: campaign.id, updatedAt: new Date() })
       .where(
         and(
           eq(adTable.brandId, brand.id),
           eq(adTable.status, "approved"),
           isNull(adTable.campaignId),
-          inArray(
-            adTable.id,
-            wanted.map((ad) => ad.id),
+          or(
+            ...wanted.map((ad) =>
+              and(eq(adTable.id, ad.id), eq(adTable.updatedAt, ad.updatedAt)),
+            ),
           ),
         ),
       )
       .returning({ id: adTable.id });
-    if (assigned.length !== wanted.length) {
+    if (assigned.length !== wanted.length)
       throw new AdSetError(
         422,
-        "Only approved, unassigned ads can enter a campaign. Refresh and approve the selected ads first.",
+        "The selection changed. Refresh and try again.",
       );
-    }
   });
   return {
     campaignId: campaign.id,
@@ -934,7 +944,11 @@ export async function deleteAd(input: { adId: string; orgId: string }) {
       .where(eq(platformAdTable.id, row.id));
   }
   await db.delete(adTable).where(eq(adTable.id, ad.id));
-  return { deleted: true, deletedOnPlatform: ran.length };
+  const mediaCleanup = await purgeAdExports({
+    adId: ad.id,
+    brandId: ad.brandId,
+  });
+  return { deleted: true, deletedOnPlatform: ran.length, mediaCleanup };
 }
 
 /** Draft → Ready → Approved. Approval freezes output; Return to Studio reopens
@@ -993,13 +1007,6 @@ export async function setAdStatus(input: {
       userId,
       expectedUpdatedAt: input.expectedUpdatedAt,
     });
-    // Saving every size's images takes seconds per card; the push and the
-    // previews wait on them if they are still being saved.
-    waitUntil(
-      freezeApprovedAd(ad.id).catch((error: unknown) =>
-        console.error("saving approved images failed", ad.id, error),
-      ),
-    );
   } else {
     if (ad.type === "text" && !textAdReady(ad.content as AdTextContent))
       throw new Error(

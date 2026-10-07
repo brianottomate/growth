@@ -910,12 +910,13 @@ export const createGoogleAdsAccountAction = growthAction({
 export const listCampaignsAction = growthAction({
   outputSchema: listCampaignsActionOutputSchema,
   description:
-    "List a brand's per-platform campaigns, including ones sync pulled that are not attached to any first-party campaign. Use it to find a campaign id, or to see what is waiting to be attached.",
+    "List the brand's first-party campaigns. Set availableForAds to find campaigns that can consume approved Studio ads.",
   inputSchema: z.object({
     brandId: z.string().trim().min(1),
+    availableForAds: z.boolean().optional(),
   }),
   execute: async (input, ctx) =>
-    listBrandCampaigns({ brandId: input.brandId, organizationId: ctx.orgId }),
+    listBrandCampaigns({ ...input, organizationId: ctx.orgId }),
 });
 
 export const replaceAdCardAction = growthAction({
@@ -1718,20 +1719,36 @@ export const setAdHomeAction = growthAction({
 export const attachAdSetAction = growthAction({
   outputSchema: attachAdSetActionOutputSchema,
   description:
-    "Assign the brand's approved unassigned ads, to a draft campaign. Only approved ads can be assigned; Studio shows the unassigned pool by default. Refuses cross-brand or previously assigned selections and pushed campaigns. Local only; nothing reaches a platform until adsWrite.push.",
-  inputSchema: z.object({
-    brandId: z.string().min(1),
-    campaignId: z.string().min(1),
-    adIds: z.array(z.string().min(1)).max(100).optional(),
-  }),
-  examples: [{ brandId: "brand_01", campaignId: "camp_01" }],
+    "Send selected approved Studio ads to a campaign (export), or add them from the campaign (import). Both render the approved recipes into fixed media and assign the existing ad IDs. Supply exactly one of campaignId or newCampaignName; a new campaign requires explicit adIds. Refuses cross-brand, unapproved, assigned selections and pushed campaigns. Nothing reaches a platform until adsWrite.push.",
+  inputSchema: z
+    .object({
+      brandId: z.string().min(1),
+      campaignId: z.string().min(1).optional(),
+      newCampaignName: z.string().trim().min(1).max(200).optional(),
+      adIds: z.array(z.string().min(1)).max(100).optional(),
+    })
+    .refine(
+      (input) => Boolean(input.campaignId) !== Boolean(input.newCampaignName),
+      { message: "Choose an existing campaign or a new campaign name." },
+    )
+    .refine((input) => !input.newCampaignName || Boolean(input.adIds?.length), {
+      message: "Select ads to create a campaign from.",
+    }),
+  examples: [
+    { brandId: "brand_01", campaignId: "camp_01" },
+    {
+      brandId: "brand_01",
+      newCampaignName: "Fall stays",
+      adIds: ["ad_01", "ad_02"],
+    },
+  ],
   execute: (input, ctx) => attachAdSet({ ...input, orgId: ctx.orgId }),
 });
 
 export const setAdStatusAction = growthAction({
   outputSchema: setAdStatusActionOutputSchema,
   description:
-    "Move an ad along draft → ready → approved. ready is a human mark for review that survives edits; drawn takes a ready mark back. approved is the person's final sign-off: its approved output is captured and its images are saved in the background. To revise an approved ad use returnToStudio; its platform ads remain unchanged. Supply expectedUpdatedAt from the latest read. This never publishes to a platform.",
+    "Move an ad along draft → ready → approved. ready is a human mark for review that survives edits; drawn takes a ready mark back. approved is the person's final sign-off: its recipe, copy and branding are captured immediately. Images render when attachAdSet sends it to a campaign. To revise an approved ad use returnToStudio; its platform ads remain unchanged. Supply expectedUpdatedAt from the latest read. This never publishes to a platform.",
   inputSchema: z.object({
     adId: z.string().min(1),
     status: z.enum(["drawn", "ready", "approved"]),
@@ -1757,9 +1774,14 @@ export const returnAdToStudioAction = growthAction({
     adId: z.string(),
     status: z.literal("drawn"),
     platformAdsUnchanged: z.number(),
+    mediaCleanup: z.object({
+      deleted: z.number(),
+      kept: z.number(),
+      errors: z.array(z.string()),
+    }),
   }),
   description:
-    "Return the same approved or campaign ad to Studio as an unassigned draft. Clears approval and Ready attribution, keeps its composition and comments, and records the optional comment with the return event. Existing platform ads and their creative remain unchanged and may still run; this does not pause delivery. Read the current updatedAt before calling. Use as=user only for words the user explicitly asks you to post on their behalf; otherwise as=agent.",
+    "Return the same approved or campaign ad to Studio as an unassigned draft. Clears approval and Ready attribution, keeps its source artwork, composition and comments, purges unused generated exports, and records the optional comment with the return event. Existing platform ads and their creative remain unchanged and may still run; this does not pause delivery. Read the current updatedAt before calling. Use as=user only for words the user explicitly asks you to post on their behalf; otherwise as=agent.",
   inputSchema: z.object({
     adId: z.string().min(1),
     expectedUpdatedAt: z.string().datetime(),

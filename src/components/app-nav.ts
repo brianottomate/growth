@@ -57,7 +57,7 @@ export const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
     label: "Wander Performance",
     items: [
       {
-        label: "Dashboard",
+        label: "Client Dashboard",
         href: "/app/performance",
         icon: Crosshair,
         exact: true,
