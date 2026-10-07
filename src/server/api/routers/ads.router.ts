@@ -1,3 +1,4 @@
+import { STARTER_AD_TYPES } from "@/lib/starter-ad-ideas";
 import { adSectionSchema } from "@/lib/ad-section";
 import { saveAdSection } from "@/server/services/ad-set.service";
 import { and, eq } from "drizzle-orm";
@@ -239,6 +240,7 @@ export const adsRouter = {
           campaignId: z.string().min(1).optional(),
           brandId: z.string().min(1).optional(),
           batchId: z.string().uuid().optional(),
+          adTypes: z.array(z.enum(STARTER_AD_TYPES)).min(1).max(3).optional(),
           exportShapes: z.array(ideaShapeSchema).min(1).max(4).optional(),
           bookingTargetId: z.string().min(1).optional(),
           source: z.enum(["blank", "featured", "shells"]).default("blank"),

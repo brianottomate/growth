@@ -50,6 +50,7 @@ import {
 } from "@/lib/ad-platforms";
 import {
   featuredStarterAdIdeas,
+  type StarterAdType,
   shellStarterAdIdeas,
   starterAdIdeas,
 } from "@/lib/starter-ad-ideas";
@@ -705,6 +706,7 @@ export async function addStarterAdIdeas(input: {
   organizationId: string;
   campaignId?: string;
   brandId?: string;
+  adTypes?: StarterAdType[];
   /** Stable request identity for a new brand batch and its retries. */
   batchId?: string;
   exportShapes?: IdeaShape[];
@@ -748,17 +750,20 @@ export async function addStarterAdIdeas(input: {
     );
   const ideas =
     source === "featured"
-      ? featuredStarterAdIdeas(homes)
+      ? featuredStarterAdIdeas(homes, input.adTypes)
       : source === "shells"
         ? shellStarterAdIdeas(homes)
         : starterAdIdeas();
-  if (byHome && brand.website) {
-    ideas[0]!.content.linkUrl = brand.website;
-    if (ideas[0]!.content.ideaStudio)
-      ideas[0]!.content.ideaStudio.document.copy.linkUrl = brand.website;
+  const hero = ideas.find((idea) => idea.key === "hero-carousel");
+  if (byHome && brand.website && hero) {
+    hero.content.linkUrl = brand.website;
+    if (hero.content.ideaStudio)
+      hero.content.ideaStudio.document.copy.linkUrl = brand.website;
   }
+  if (!ideas.length)
+    throw new Error("Choose an ad type available for these homes.");
   // One home already has its own carousel; the shared one needs two.
-  if (source !== "blank" && homes.length < 2)
+  if (source !== "blank" && homes.length < 2 && hero)
     ideas.splice(
       ideas.findIndex((idea) => idea.key === "hero-carousel"),
       1,

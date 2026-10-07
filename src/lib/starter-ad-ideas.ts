@@ -6,6 +6,9 @@ import {
 } from "./ad-idea-studio";
 import type { AdCreativeContent } from "@/server/db/ads-schema";
 
+export const STARTER_AD_TYPES = ["static", "carousel", "hero"] as const;
+export type StarterAdType = (typeof STARTER_AD_TYPES)[number];
+
 /** Editable placeholders only; the home labels do not claim real inventory. */
 export function starterAdIdeas() {
   const ideas: { key: string; name: string; content: AdCreativeContent }[] = [
@@ -46,7 +49,10 @@ export type StarterHome = {
   photos: { url: string; assetId?: string; label?: string; homeId?: string }[];
 };
 /** Known inventory fills the same draft model, without rendering files or inventing copy. */
-export function featuredStarterAdIdeas(homes: StarterHome[]) {
+export function featuredStarterAdIdeas(
+  homes: StarterHome[],
+  adTypes: readonly StarterAdType[] = STARTER_AD_TYPES,
+) {
   const ideas: {
     key: string;
     name: string;
@@ -88,7 +94,12 @@ export function featuredStarterAdIdeas(homes: StarterHome[]) {
         },
       });
     }
-  for (const idea of ideas) {
+  const selected = ideas.filter((idea) =>
+    idea.key === "hero-carousel"
+      ? homes.length > 1 && adTypes.includes("hero")
+      : adTypes.includes(idea.content.format as "static" | "carousel"),
+  );
+  for (const idea of selected) {
     const sources = idea.homeId
       ? homes
           .find((home) => home.id === idea.homeId)!
@@ -98,12 +109,12 @@ export function featuredStarterAdIdeas(homes: StarterHome[]) {
       document: withIdeaPool(ideaDocumentFromAd(idea), sources),
     };
   }
-  for (const idea of ideas) {
+  for (const idea of selected) {
     const document = ideaDocumentFromAd(idea);
     document.exportShapes = [...IDEA_SHAPES];
     idea.content.ideaStudio = { document };
   }
-  return ideas;
+  return selected;
 }
 
 /**
@@ -180,6 +191,13 @@ export function shellStarterAdIdeas(homes: StarterHome[]) {
 }
 
 /** A static and a carousel per home, plus the shared hero carousel from two homes. */
-export function starterAdCount(homes: number) {
-  return homes * 2 + (homes > 1 ? 1 : 0);
+export function starterAdCount(
+  homes: number,
+  adTypes: readonly StarterAdType[] = STARTER_AD_TYPES,
+) {
+  return (
+    homes * Number(adTypes.includes("static")) +
+    homes * Number(adTypes.includes("carousel")) +
+    Number(homes > 1 && adTypes.includes("hero"))
+  );
 }

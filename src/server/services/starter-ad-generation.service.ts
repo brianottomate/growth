@@ -36,7 +36,11 @@ import {
   projectIdea,
   type IdeaDocument,
 } from "@/lib/ad-idea-studio";
-import { starterAdCount, type StarterHome } from "@/lib/starter-ad-ideas";
+import {
+  starterAdCount,
+  STARTER_AD_TYPES,
+  type StarterHome,
+} from "@/lib/starter-ad-ideas";
 import { db } from "@/server/db";
 import { adTable, brandTable, workflowRunTable } from "@/server/db/schema";
 import { fetchWanderOsListingDetail } from "@/server/clients/wanderos-site.client";
@@ -65,6 +69,11 @@ export async function startStarterGeneration(input: Input) {
     input.homeIds.some((id) => !homes.some((h) => h.id === id))
   )
     throw new Error("Choose this brand's homes");
+  if (
+    input.source !== "brand" &&
+    !starterAdCount(input.homeIds.length, input.adTypes)
+  )
+    throw new Error("Choose an ad type available for these homes.");
   const targetId = input.bookingTargetId ?? campaign?.bookingTargetId;
   const bookingDestination = targetId
     ? await studioBookingDestination(brand.id, targetId, input.organizationId)
@@ -84,7 +93,9 @@ export async function startStarterGeneration(input: Input) {
         input.source === "brand" ? "Preparing brand ideas" : "Preparing homes",
       created: 0,
       total:
-        input.source === "brand" ? 3 : starterAdCount(input.homeIds.length),
+        input.source === "brand"
+          ? 3
+          : starterAdCount(input.homeIds.length, input.adTypes),
     },
   });
   return { runId: run.id };
@@ -301,7 +312,9 @@ export async function runStarterGeneration(runId: string, input: Input) {
   };
   let created = 0;
   const total =
-    input.source === "brand" ? 3 : starterAdCount(input.homeIds.length);
+    input.source === "brand"
+      ? 3
+      : starterAdCount(input.homeIds.length, input.adTypes);
   const progress = async (message: string) => {
     await updateWorkflowRun(claimed, {
       status: "running",
@@ -506,18 +519,20 @@ export async function runStarterGeneration(runId: string, input: Input) {
         "carousel",
         logoDefault,
       );
-      await save(
-        `${home.name} · Static`,
-        generatedDocument(
-          grid.home,
-          output,
-          input.intendedPlacements,
-          "static",
-          logoDefault,
-        ),
-        home.id,
-      );
-      await save(`${home.name} · Carousel`, document, home.id);
+      if ((input.adTypes ?? STARTER_AD_TYPES).includes("static"))
+        await save(
+          `${home.name} · Static`,
+          generatedDocument(
+            grid.home,
+            output,
+            input.intendedPlacements,
+            "static",
+            logoDefault,
+          ),
+          home.id,
+        );
+      if ((input.adTypes ?? STARTER_AD_TYPES).includes("carousel"))
+        await save(`${home.name} · Carousel`, document, home.id);
       // In the portfolio carousel each card is a different home, so it
       // carries that home's name and facts, as the ad-set builder's cards do.
       heroCards.push({
@@ -533,7 +548,10 @@ export async function runStarterGeneration(runId: string, input: Input) {
       await progress(`Created ads for ${home.name}`);
     }
     // One home already has its own carousel; the shared one needs two.
-    if (heroCards.length > 1) {
+    if (
+      heroCards.length > 1 &&
+      (input.adTypes ?? STARTER_AD_TYPES).includes("hero")
+    ) {
       await progress("Writing the shared hero carousel");
       const { output: copy } = await generateText({
         model: anthropic(MODEL),

@@ -9,13 +9,14 @@ import {
   type IdeaDocument,
 } from "./ad-idea-studio";
 import { META_PLACEMENTS, metaPlacementSchema } from "./meta-placement-plan";
-import type { StarterHome } from "./starter-ad-ideas";
+import { STARTER_AD_TYPES, type StarterHome } from "./starter-ad-ideas";
 
 export const starterGenerationSchema = z
   .object({
     ...adAuthoringFields,
     steer: steerSchema,
     exportShapes: z.array(ideaShapeSchema).min(1).max(4).optional(),
+    adTypes: z.array(z.enum(STARTER_AD_TYPES)).min(1).max(3).optional(),
     bookingTargetId: z.string().min(1).optional(),
     source: z.enum(["featured", "brand"]).default("featured"),
     homeIds: z.array(z.string().min(1)).max(10),

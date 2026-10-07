@@ -26,7 +26,12 @@ import {
 } from "@/components/ui/accordion";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { IDEA_SHAPE_LABELS, type IdeaShape } from "@/lib/ad-idea-studio";
-import { starterAdCount } from "@/lib/starter-ad-ideas";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  STARTER_AD_TYPES,
+  type StarterAdType,
+  starterAdCount,
+} from "@/lib/starter-ad-ideas";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useWorkspaceMutation } from "../useWorkspaceMutation";
 
@@ -40,7 +45,6 @@ function useStudioGenerationRun(brandId: string) {
   });
 }
 
-const ALL_HOMES = "__all__";
 const MAX_HOMES = 10;
 
 /** Batch creation snapshots the ticked homes into the saved ads/run. */
@@ -71,24 +75,20 @@ export function StudioGeneration({
     ...orpc.homeGroups.context.queryOptions({ input: { brandId } }),
     enabled: open && connected,
   });
-  // "All homes" sits above the groups, so any home can be picked one by one.
-  const choices = groups.data
-    ? [
-        {
-          id: ALL_HOMES,
-          name: "All homes",
-          homeIds: groups.data.homes.map((home) => home.id),
-        },
-        ...groups.data.groups,
-      ]
-    : [];
+  const [selectionMode, setSelectionMode] = useState("group");
+  const [homeFilter, setHomeFilter] = useState("");
+  const choices = groups.data?.groups ?? [];
   const selectedGroupId =
     groupId ||
-    groups.data?.groups.find((group) => group.homeIds.length)?.id ||
-    ALL_HOMES;
+    choices.find(
+      (group) => group.homeIds.length > 0 && group.homeIds.length <= MAX_HOMES,
+    )?.id ||
+    "";
   const selected = choices.find((group) => group.id === selectedGroupId);
-  // null = the default: a group's homes all ticked, All homes none ticked.
-  const [ticked, setTicked] = useState<string[] | null>(null);
+  const [ticked, setTicked] = useState<string[]>([]);
+  const [adTypes, setAdTypes] = useState<StarterAdType[]>([
+    ...STARTER_AD_TYPES,
+  ]);
   const [exportShapes, setExportShapes] = useState<IdeaShape[]>([
     "square",
     "story",
@@ -96,23 +96,28 @@ export function StudioGeneration({
   const homes = useQuery({
     ...orpc.ads.starterIdeaHomes.queryOptions({
       input:
-        selectedGroupId === ALL_HOMES
+        selectionMode === "individual"
           ? { brandId, allHomes: true }
           : { brandId, groupId: selectedGroupId },
     }),
-    enabled: open && connected && Boolean(selected),
+    enabled:
+      open &&
+      connected &&
+      (selectionMode === "individual" || Boolean(selected)),
   });
   const available = homes.data ?? [];
-  const picked = available.filter((home) =>
-    ticked
-      ? ticked.includes(home.id)
-      : selectedGroupId !== ALL_HOMES && available.length <= MAX_HOMES,
+  const picked =
+    selectionMode === "group"
+      ? available
+      : available.filter((home) => ticked.includes(home.id));
+  const effectiveAdTypes = adTypes.filter(
+    (type) => type !== "hero" || picked.length > 1,
   );
   const toggle = (homeId: string) =>
-    setTicked(
-      picked.some((home) => home.id === homeId)
-        ? picked.filter((home) => home.id !== homeId).map((home) => home.id)
-        : [...picked.map((home) => home.id), homeId],
+    setTicked((current) =>
+      current.includes(homeId)
+        ? current.filter((id) => id !== homeId)
+        : [...current, homeId],
     );
   const progress = useStudioGenerationRun(brandId);
   const running = ["queued", "running"].includes(progress.data?.status ?? "");
@@ -138,6 +143,9 @@ export function StudioGeneration({
   const ready =
     (!bookingTargetId || Boolean(chosenTarget?.url)) &&
     exportShapes.length > 0 &&
+    effectiveAdTypes.length > 0 &&
+    (selectionMode === "individual" ||
+      available.length === selected?.homeIds.length) &&
     connected &&
     groups.data?.connected &&
     !homes.isPending &&
@@ -164,7 +172,10 @@ export function StudioGeneration({
                 setBatchId(crypto.randomUUID());
                 setGroupFilter("");
                 setGroupId("");
-                setTicked(null);
+                setSelectionMode("group");
+                setHomeFilter("");
+                setAdTypes([...STARTER_AD_TYPES]);
+                setTicked([]);
               }
               setOpen(next);
             }
@@ -191,6 +202,7 @@ export function StudioGeneration({
                     brandId,
                     source: "featured",
                     homeIds,
+                    adTypes: effectiveAdTypes,
                     bookingTargetId: bookingTargetId || undefined,
                     exportShapes,
                     intendedPlacements: [
@@ -209,6 +221,7 @@ export function StudioGeneration({
                     exportShapes,
                     source: "featured",
                     homeIds,
+                    adTypes: effectiveAdTypes,
                     bookingTargetId: bookingTargetId || undefined,
                   });
               }}
@@ -243,38 +256,46 @@ export function StudioGeneration({
               />
             ) : (
               <>
-                <fieldset className="min-w-0 space-y-3" disabled={pending}>
-                  <legend className="text-sm font-medium">Homes</legend>
-                  <Input
-                    aria-label="Filter home groups"
-                    placeholder="Filter home groups…"
-                    value={groupFilter}
-                    onChange={(event) => setGroupFilter(event.target.value)}
-                  />
-                  <div className="space-y-2">
-                    {choices
-                      .filter((group) =>
-                        group.name
-                          .toLowerCase()
-                          .includes(groupFilter.trim().toLowerCase()),
-                      )
-                      .map((group) => {
-                        const disabled = !group.homeIds.length;
-                        const active = group.id === selectedGroupId;
-                        const preview = group.homeIds
-                          .map(
-                            (id) =>
-                              groups.data.homes.find((home) => home.id === id)
-                                ?.heroSourceUrl,
-                          )
-                          .find(Boolean);
-                        return (
-                          <div
-                            key={group.id}
-                            className={`overflow-hidden rounded-lg border ${active ? "border-primary bg-muted/30" : "border-border"}`}
-                          >
+                <Tabs value={selectionMode} onValueChange={setSelectionMode}>
+                  <TabsList aria-label="Home selection">
+                    <TabsTrigger value="group" disabled={pending}>
+                      Home group
+                    </TabsTrigger>
+                    <TabsTrigger value="individual" disabled={pending}>
+                      Individual
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="group" className="space-y-3">
+                    <Input
+                      aria-label="Filter home groups"
+                      placeholder="Filter home groups…"
+                      value={groupFilter}
+                      disabled={pending}
+                      onChange={(event) => setGroupFilter(event.target.value)}
+                    />
+                    <fieldset className="space-y-2" disabled={pending}>
+                      <legend className="sr-only">Home group</legend>
+                      {choices
+                        .filter((group) =>
+                          group.name
+                            .toLowerCase()
+                            .includes(groupFilter.trim().toLowerCase()),
+                        )
+                        .map((group) => {
+                          const disabled =
+                            !group.homeIds.length ||
+                            group.homeIds.length > MAX_HOMES;
+                          const preview = group.homeIds
+                            .map(
+                              (id) =>
+                                groups.data.homes.find((home) => home.id === id)
+                                  ?.heroSourceUrl,
+                            )
+                            .find(Boolean);
+                          return (
                             <label
-                              className={`flex items-center gap-3 p-3 ${disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
+                              key={group.id}
+                              className={`flex items-center gap-3 rounded-lg border p-3 ${group.id === selectedGroupId ? "border-primary bg-muted/30" : "border-border"} ${disabled ? "opacity-50" : "cursor-pointer"}`}
                             >
                               <div
                                 className="flex h-12 w-16 shrink-0 overflow-hidden rounded-md bg-muted"
@@ -282,169 +303,197 @@ export function StudioGeneration({
                               >
                                 <GroupPreviewPhoto url={preview ?? null} />
                               </div>
-                              <div className="min-w-0 flex-1">
+                              <span className="min-w-0 flex-1">
                                 <span className="text-sm font-medium">
                                   {group.name}
                                 </span>
-                                <p className="text-xs text-muted-foreground">
+                                <span className="block text-xs text-muted-foreground">
                                   {group.homeIds.length}{" "}
                                   {group.homeIds.length === 1
                                     ? "home"
                                     : "homes"}
-                                  {disabled ? " · Add homes in WanderOS" : ""}
-                                </p>
-                              </div>
+                                  {group.homeIds.length > MAX_HOMES
+                                    ? " · Maximum 10"
+                                    : ""}
+                                </span>
+                              </span>
                               <input
                                 type="radio"
                                 name="studio-home-group"
-                                value={group.id}
-                                checked={active}
+                                checked={group.id === selectedGroupId}
                                 disabled={disabled}
-                                onChange={() => {
-                                  setGroupId(group.id);
-                                  setTicked(null);
-                                }}
+                                onChange={() => setGroupId(group.id)}
                                 aria-label={group.name}
                                 className="size-4 accent-primary"
                               />
                             </label>
-                            {active && (
-                              <div className="space-y-3 px-3 pb-3">
-                                {homes.isPending ? (
-                                  <p role="status" className="text-sm">
-                                    Loading home photos…
-                                  </p>
-                                ) : homes.isError ? (
-                                  <p role="alert" className="text-sm">
-                                    Could not load home photos.{" "}
-                                    <Button
-                                      variant="link"
-                                      onClick={() => void homes.refetch()}
-                                    >
-                                      Try again
-                                    </Button>
-                                  </p>
-                                ) : (
-                                  <>
-                                    <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                                      {available.map((home) => {
-                                        const on = picked.some(
-                                          (p) => p.id === home.id,
-                                        );
-                                        return (
-                                          <li
-                                            key={home.id}
-                                            className="min-w-0 space-y-1"
-                                          >
-                                            <label
-                                              className={`block cursor-pointer space-y-1 rounded-md ${on ? "" : "opacity-50"}`}
-                                            >
-                                              <div className="relative flex h-20 overflow-hidden rounded-md bg-muted">
-                                                <GroupPreviewPhoto
-                                                  url={
-                                                    home.photos[0]?.url ?? null
-                                                  }
-                                                />
-                                                <input
-                                                  type="checkbox"
-                                                  checked={on}
-                                                  onChange={() =>
-                                                    toggle(home.id)
-                                                  }
-                                                  aria-label={home.name}
-                                                  className="absolute top-1.5 left-1.5 size-4 accent-primary"
-                                                />
-                                              </div>
-                                              <span className="block truncate text-xs font-medium">
-                                                {home.name}
-                                              </span>
-                                            </label>
-                                            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                              {home.photos.length
-                                                ? `${home.photos.length} photos`
-                                                : "Needs photos"}
-                                              <a
-                                                href={home.url}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                title={`Open listing: ${home.name}`}
-                                                aria-label={`Open listing: ${home.name}`}
-                                                className="hover:text-foreground"
-                                              >
-                                                <ExternalLink className="size-3" />
-                                              </a>
-                                            </p>
-                                          </li>
-                                        );
-                                      })}
-                                    </ul>
-                                    {picked.some(
-                                      (home) => !home.photos.length,
-                                    ) && (
-                                      <p role="alert" className="text-sm">
-                                        Every ticked home needs a source photo
-                                        before generating.
-                                      </p>
-                                    )}
-                                  </>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                  </div>
-                  {!choices.some((group) =>
-                    group.name
-                      .toLowerCase()
-                      .includes(groupFilter.trim().toLowerCase()),
-                  ) && (
-                    <p
-                      role="status"
-                      className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground"
-                    >
-                      No home groups match “{groupFilter.trim()}”.{" "}
-                      <Button
-                        size="sm"
-                        variant="link"
-                        onClick={() => setGroupFilter("")}
-                      >
-                        Clear filter
-                      </Button>
-                      <ButtonLink
-                        size="sm"
-                        variant="link"
-                        href={`/app/performance/clients/${brandSlug}/wanderos#home-groups`}
-                        onClick={() => setOpen(false)}
-                      >
-                        Manage home groups
-                      </ButtonLink>
-                    </p>
-                  )}
-                </fieldset>
-                {selected && (
-                  <div
-                    className="rounded-lg border bg-muted/30 p-3 text-sm"
-                    role="status"
-                  >
-                    <p className="font-medium">
-                      {picked.length > MAX_HOMES
-                        ? `Pick up to ${MAX_HOMES} homes`
-                        : picked.length
-                          ? `${starterAdCount(picked.length)} draft ads`
-                          : "Tick the homes to make ads for"}
-                    </p>
-                    {picked.length > 0 && picked.length <= MAX_HOMES && (
-                      <p className="text-muted-foreground">
-                        {picked.length} static · {picked.length}{" "}
-                        {picked.length === 1
-                          ? "home carousel"
-                          : "home carousels"}
-                        {picked.length > 1 ? " · 1 group carousel" : ""}
+                          );
+                        })}
+                    </fieldset>
+                    {!choices.some((group) =>
+                      group.name
+                        .toLowerCase()
+                        .includes(groupFilter.trim().toLowerCase()),
+                    ) && (
+                      <p className="text-sm text-muted-foreground">
+                        No matching home groups. {manage}
                       </p>
                     )}
-                  </div>
+                    {selected && (
+                      <p className="text-sm text-muted-foreground">
+                        All {selected.homeIds.length} homes in this group will
+                        be used.
+                      </p>
+                    )}
+                  </TabsContent>
+                  <TabsContent value="individual" className="space-y-3">
+                    <Input
+                      aria-label="Filter homes"
+                      placeholder="Filter homes…"
+                      value={homeFilter}
+                      disabled={pending}
+                      onChange={(event) => setHomeFilter(event.target.value)}
+                    />
+                    <fieldset disabled={pending}>
+                      <legend className="sr-only">Individual homes</legend>
+                      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                        {available
+                          .filter((home) =>
+                            home.name
+                              .toLowerCase()
+                              .includes(homeFilter.trim().toLowerCase()),
+                          )
+                          .map((home) => {
+                            const on = ticked.includes(home.id);
+                            return (
+                              <li key={home.id} className="min-w-0 space-y-1">
+                                <label
+                                  className={`block cursor-pointer space-y-1 rounded-md ${on ? "" : "opacity-60"}`}
+                                >
+                                  <div className="relative flex h-20 overflow-hidden rounded-md bg-muted">
+                                    <GroupPreviewPhoto
+                                      url={home.photos[0]?.url ?? null}
+                                    />
+                                    <input
+                                      type="checkbox"
+                                      checked={on}
+                                      disabled={
+                                        !on && ticked.length >= MAX_HOMES
+                                      }
+                                      onChange={() => toggle(home.id)}
+                                      aria-label={home.name}
+                                      className="absolute top-1.5 left-1.5 size-4 accent-primary"
+                                    />
+                                  </div>
+                                  <span className="block truncate text-xs font-medium">
+                                    {home.name}
+                                  </span>
+                                </label>
+                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <span>
+                                    {home.photos.length
+                                      ? `${home.photos.length} photos`
+                                      : "Needs photos"}
+                                  </span>
+                                  <a
+                                    href={home.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    aria-label={`Open listing: ${home.name}`}
+                                  >
+                                    <ExternalLink className="size-3" />
+                                  </a>
+                                </div>
+                              </li>
+                            );
+                          })}
+                      </ul>
+                    </fieldset>
+                    {!homes.isPending &&
+                      !available.some((home) =>
+                        home.name
+                          .toLowerCase()
+                          .includes(homeFilter.trim().toLowerCase()),
+                      ) && (
+                        <p className="text-sm text-muted-foreground">
+                          No matching homes.
+                        </p>
+                      )}
+                  </TabsContent>
+                </Tabs>
+                {homes.isPending && (
+                  <p role="status" className="text-sm">
+                    Loading home photos…
+                  </p>
                 )}
+                {homes.isError && (
+                  <p role="alert" className="text-sm">
+                    Could not load home photos.{" "}
+                    <Button variant="link" onClick={() => void homes.refetch()}>
+                      Try again
+                    </Button>
+                  </p>
+                )}
+                {picked.some((home) => !home.photos.length) && (
+                  <p role="alert" className="text-sm">
+                    Every selected home needs a source photo before generating.
+                  </p>
+                )}
+                <fieldset className="space-y-2" disabled={pending}>
+                  <legend className="mb-2 text-sm font-medium">
+                    Ads to draft
+                  </legend>
+                  <div className="flex flex-wrap gap-2">
+                    {STARTER_AD_TYPES.map((type) => {
+                      const disabled = type === "hero" && picked.length < 2;
+                      const checked = effectiveAdTypes.includes(type);
+                      return (
+                        <label
+                          key={type}
+                          className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${checked ? "border-primary bg-muted/30" : "border-border"} ${disabled ? "opacity-50" : "cursor-pointer"}`}
+                        >
+                          <input
+                            type="checkbox"
+                            aria-label={
+                              type === "hero"
+                                ? "Hero"
+                                : type === "static"
+                                  ? "Static"
+                                  : "Carousel"
+                            }
+                            checked={checked}
+                            disabled={disabled}
+                            onChange={(event) =>
+                              setAdTypes((current) =>
+                                event.target.checked
+                                  ? [...current, type]
+                                  : current.filter((value) => value !== type),
+                              )
+                            }
+                            className="size-4 accent-primary"
+                          />
+                          {type === "static"
+                            ? "Static"
+                            : type === "carousel"
+                              ? "Carousel"
+                              : "Hero"}
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Static and carousel create one ad per home. Hero creates one
+                    carousel across the selected homes and needs at least two.
+                  </p>
+                </fieldset>
+                <div
+                  className="rounded-lg border bg-muted/30 p-3 text-sm"
+                  role="status"
+                >
+                  {picked.length
+                    ? `${picked.length} ${picked.length === 1 ? "home" : "homes"} · ${starterAdCount(picked.length, effectiveAdTypes)} draft ads`
+                    : "Select homes to make ads for"}
+                </div>
                 <fieldset className="space-y-2" disabled={pending}>
                   <legend className="mb-2 text-sm font-medium">
                     Creative sizes
