@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { metaPlacementMedia } from "./meta-placement-plan";
 import {
   defaultIdeaRecipe,
   ideaDocumentFromAd,
@@ -272,4 +273,48 @@ test("card booking links survive saving, approval and every placement projection
       }).cards[0]!.copy,
     ).toEqual(document.cards[0]!.copy);
   }
+});
+
+test("Meta validates the canonical square export when portrait is also approved", () => {
+  const document = {
+    ...draft(),
+    shapes: ["portrait", "square", "story"] as IdeaDocument["shapes"],
+  };
+  const image = (shape: string) => [
+    { assetId: shape, url: `https://media.example/${shape}.png` },
+  ];
+  const projected = projectIdea(
+    "brand",
+    content,
+    {
+      document,
+      approval: {
+        approvedAt: "2026-10-07T00:00:00.000Z",
+        approvedBy: "user",
+        sourceVersion: "v1",
+        renders: {
+          portrait: image("portrait"),
+          square: image("square"),
+          story: image("story"),
+        },
+      },
+    },
+    null,
+  ).content;
+  expect(metaPlacementMedia(projected, "facebook-feed").issue).toBeNull();
+  expect(metaPlacementMedia(projected, "instagram-story").issue).toBeNull();
+  expect(
+    metaPlacementMedia(
+      {
+        ...projected,
+        media: [
+          {
+            ...projected.media[0]!,
+            url: "https://media.example/unapproved.png",
+          },
+        ],
+      },
+      "facebook-feed",
+    ).issue,
+  ).toContain("does not match");
 });

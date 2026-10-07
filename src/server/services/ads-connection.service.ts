@@ -136,7 +136,7 @@ export async function saveSharedAdsConnection(
     .update(brandTable)
     .set({
       metaPageId: input.pageId,
-      performanceSettings: sql`jsonb_set(coalesce(${brandTable.performanceSettings}, '{}'::jsonb), '{adsConnectionBrandId}', ${JSON.stringify(ownerId)}::jsonb)`,
+      performanceSettings: sql`coalesce(${brandTable.performanceSettings}, '{}'::jsonb) || ${JSON.stringify({ adsConnectionBrandId: ownerId, metaAdsDestination: { connectionAccountId: input.connectionId, adAccountId: input.accountId } })}::jsonb`,
     })
     .where(eq(brandTable.id, client.id));
   await setBrandAdAccountAllowed({
@@ -187,7 +187,7 @@ export async function saveTrackingDefaults(
   await db
     .update(brandTable)
     .set({
-      performanceSettings: sql`jsonb_set(coalesce(${brandTable.performanceSettings}, '{}'::jsonb), '{metaTrackingDefaults}', coalesce(${brandTable.performanceSettings}->'metaTrackingDefaults', '{}'::jsonb) || ${JSON.stringify({ [input.accountId]: { pixelId: input.pixelId, customEventType: input.customEventType } })}::jsonb)`,
+      performanceSettings: sql`jsonb_set(coalesce(${brandTable.performanceSettings}, '{}'::jsonb), '{metaTrackingDefaults}', coalesce(${brandTable.performanceSettings}->'metaTrackingDefaults', '{}'::jsonb) || ${JSON.stringify({ [input.accountId]: { pixelId: input.pixelId, customEventType: input.customEventType } })}::jsonb) || ${JSON.stringify({ metaAdsDestination: { connectionAccountId: input.connectionId, adAccountId: input.accountId } })}::jsonb`,
     })
     .where(eq(brandTable.id, ownerId));
   return { saved: true };

@@ -728,6 +728,12 @@ export const duplicateMetaCampaignActionOutputSchema = z.strictObject({
       .strictObject({
         adCopiesUrl: z.string().nullable().optional(),
         adsConnectionBrandId: z.string().optional(),
+        metaAdsDestination: z
+          .strictObject({
+            connectionAccountId: z.string(),
+            adAccountId: z.string(),
+          })
+          .optional(),
         bookings: z.number().nullable().optional(),
         carouselCreativeUrl: z.string().nullable().optional(),
         catalogCreativeUrl: z.string().nullable().optional(),

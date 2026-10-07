@@ -255,16 +255,44 @@ function matchingConnections(
  */
 function brandConnections(
   accounts: ZernioAccount[],
-  brand: { zernioProfileId: string | null },
+  brand: {
+    zernioProfileId: string | null;
+    performanceSettings?: Brand["performanceSettings"];
+  },
   ownZernioProfileId: string | null,
   platform: ZernioAdPlatform,
 ) {
   const own = ownZernioProfileId
     ? matchingConnections(accounts, ownZernioProfileId, platform)
     : [];
+  if (platform === "meta" && brand.performanceSettings?.metaAdsDestination) {
+    const configured =
+      brand.performanceSettings.metaAdsDestination.connectionAccountId;
+    return [
+      ...own,
+      ...matchingConnections(accounts, brand.zernioProfileId!, platform),
+    ].filter(
+      (connection, index, all) =>
+        zernioAccountId(connection) === configured &&
+        index ===
+          all.findIndex(
+            (candidate) => zernioAccountId(candidate) === configured,
+          ),
+    );
+  }
   return own.length
     ? own
     : matchingConnections(accounts, brand.zernioProfileId!, platform);
+}
+
+/** Credentials are chosen once in brand settings, never during a push. */
+export function configuredMetaDestination(
+  settings: Brand["performanceSettings"],
+) {
+  const destination = settings?.metaAdsDestination;
+  if (!destination?.connectionAccountId || !destination.adAccountId)
+    throw new Error("Configure Meta access in brand settings before pushing.");
+  return destination;
 }
 
 export async function listAdsWriteDestinations(input: {
@@ -280,12 +308,20 @@ export async function listAdsWriteDestinations(input: {
     listZernioAccounts(),
     allowedAccountsForBrand(brand.id, input.platform),
   ]);
-  const connections = brandConnections(
+  const candidates = brandConnections(
     accounts,
     brand,
     ownZernioProfileId,
     input.platform,
   );
+  const pinned = brand.performanceSettings?.metaAdsDestination;
+  const connections =
+    input.platform === "meta"
+      ? candidates.filter(
+          (connection) =>
+            zernioAccountId(connection) === pinned?.connectionAccountId,
+        )
+      : candidates;
 
   const destinationResults = await Promise.allSettled(
     connections.map(async (connection) => {
@@ -328,7 +364,13 @@ export async function listAdsWriteDestinations(input: {
         const allowedRow = allowed.find((row) =>
           sameAdAccountId(input.platform, row.externalId, adAccount.id),
         );
-        if (!allowedRow || adAccount.selectable === false) return [];
+        if (
+          !allowedRow ||
+          adAccount.selectable === false ||
+          (input.platform === "meta" &&
+            !sameAdAccountId("meta", pinned!.adAccountId, adAccount.id))
+        )
+          return [];
         const pageId =
           input.platform === "meta"
             ? (brand.metaPageId ??
@@ -401,6 +443,17 @@ async function requireAdDestination(input: {
     input.organizationId,
     input.brandSlug,
   );
+  if (input.platform === "meta") {
+    const pinned = configuredMetaDestination(brand.performanceSettings);
+    if (
+      input.connectionAccountId !== pinned.connectionAccountId ||
+      !sameAdAccountId("meta", input.adAccountId, pinned.adAccountId)
+    )
+      throw new Error(
+        "Meta access is fixed in brand settings. Use the configured destination.",
+      );
+  }
+
   const [accounts, allowed] = await Promise.all([
     listZernioAccounts(),
     allowedAccountsForBrand(brand.id, input.platform),
@@ -2275,9 +2328,9 @@ export async function pushDraftToPlatform(
      * created a second Meta campaign while the operator watched for LinkedIn.
      */
     platform: PushableAdPlatform;
-    connectionAccountId: string;
-    adAccountId: string;
-    goal: AdPushGoal;
+    connectionAccountId?: string;
+    adAccountId?: string;
+    goal?: AdPushGoal;
     validateOnly?: boolean;
   },
   context: AdsWriteContext,
@@ -2285,11 +2338,6 @@ export async function pushDraftToPlatform(
   const platform = input.platform;
   const platformSpec = requireAdPlatformSpec(platform);
   const platformName = platformSpec.shortLabel;
-  if (!platformSpec.features.goals.includes(input.goal)) {
-    throw new Error(
-      `${platformName} does not offer the ${input.goal} goal through Zernio — pick one of ${platformSpec.features.goals.join(", ")}`,
-    );
-  }
   const campaign = await db.query.campaignTable.findFirst({
     where: eq(campaignTable.id, input.campaignId),
   });
@@ -2329,12 +2377,36 @@ export async function pushDraftToPlatform(
   const budgetType = (draft.budgetType ?? "daily") as "daily" | "lifetime";
   const settings = draft.settings ?? {};
 
+  const goal =
+    platform === "meta_ads"
+      ? (input.goal ?? draft.settings?.meta?.goal ?? "conversions")
+      : input.goal;
+  if (!goal) throw new Error(`Choose a ${platformName} goal before pushing.`);
+  if (!platformSpec.features.goals.includes(goal)) {
+    throw new Error(
+      `${platformName} does not offer the ${goal} goal through Zernio — pick one of ${platformSpec.features.goals.join(", ")}`,
+    );
+  }
+  const pinned =
+    platform === "meta_ads"
+      ? configuredMetaDestination(brand.performanceSettings)
+      : undefined;
+  const connectionAccountId =
+    platform === "meta_ads"
+      ? pinned?.connectionAccountId
+      : input.connectionAccountId;
+  const adAccountId =
+    platform === "meta_ads" ? pinned?.adAccountId : input.adAccountId;
+  if (!connectionAccountId || !adAccountId)
+    throw new Error(
+      "Configure the platform connection in brand settings before pushing.",
+    );
   const destination = await requireAdDestination({
     organizationId: context.organizationId,
     brandSlug: brand.slug,
     platform: zernioAdPlatformKey(platform),
-    connectionAccountId: input.connectionAccountId,
-    adAccountId: input.adAccountId,
+    connectionAccountId,
+    adAccountId,
   });
 
   const [audiences, loadedAds] = await Promise.all([
@@ -2441,7 +2513,7 @@ export async function pushDraftToPlatform(
     const { spec, warnings: audienceWarnings } = await compileAudienceTargeting(
       {
         audience,
-        connectionAccountId: input.connectionAccountId,
+        connectionAccountId,
         brandId: brand.id,
         platform,
       },
@@ -2451,7 +2523,7 @@ export async function pushDraftToPlatform(
   }
 
   const pushArgs: PushArgs = {
-    input,
+    input: { ...input, connectionAccountId, adAccountId, goal },
     context,
     campaign,
     brand,

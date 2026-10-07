@@ -280,6 +280,8 @@ export type PerformanceSettings = {
 
   /** Brand whose Zernio connection is explicitly shared for paid ads only. */
   adsConnectionBrandId?: string;
+  /** Exact Meta credentials chosen in brand settings. Chat cannot change them. */
+  metaAdsDestination?: { connectionAccountId: string; adAccountId: string };
   homeInventory?: import("@/server/services/home-inventory.service").HomeInventory;
   /** Who receives the monthly report; free text, commas between addresses. */
   reportEmails?: string | null;

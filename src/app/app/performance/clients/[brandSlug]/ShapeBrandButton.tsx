@@ -25,7 +25,7 @@ export function ShapeBrandButton({
           newThread: true,
           brandId,
           brandName,
-          visibleText: `Help me shape the ${section} for ${brandName} (brand ID: ${brandId}).${resource ? ` Resource: ${resource.name} (ID: ${resource.id}).` : ""} Read the current resource and relevant brand evidence. Help me make the changes I ask for; pass my direction as steer when using a generation tool. Preserve unrelated content.`,
+          visibleText: `Help me shape the ${section} for ${brandName} (brand ID: ${brandId}).${resource ? ` Resource: ${resource.name} (ID: ${resource.id}).` : ""} Read the current resource and relevant brand evidence, then suggest what to create or improve. Wait for my confirmation before applying changes. Once I confirm, pass my direction as steer when using a generation tool. Preserve unrelated content.`,
         })
       }
     >

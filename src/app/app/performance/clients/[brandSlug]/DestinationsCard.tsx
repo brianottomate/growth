@@ -1,9 +1,12 @@
 "use client";
-import { MapPin } from "lucide-react";
+import { MapPin, Sparkles } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { BrandMarkets } from "@/lib/markets";
 import { ShapeBrandButton } from "./ShapeBrandButton";
 import { DirectionPhrases } from "./CreativeDirection";
+import { Button } from "@/components/ui/button";
+import { orpc } from "@/orpc/client";
+import { useWorkspaceMutation } from "./useWorkspaceMutation";
 
 export function DestinationsCard({
   brandId,
@@ -17,6 +20,19 @@ export function DestinationsCard({
   towns: { town: string; homes: number }[];
 }) {
   const list = markets?.markets ?? [];
+  const write = useWorkspaceMutation(orpc.brand.draftMarkets.mutationOptions());
+  const define = (primary = false) => (
+    <Button
+      size="sm"
+      variant={primary ? "default" : "outline"}
+      loading={write.isPending}
+      disabled={!towns.length}
+      onClick={() => write.mutate({ brandId })}
+    >
+      {!write.isPending && <Sparkles className="size-3.5" />}
+      {write.isPending ? "Defining destinations…" : "Define destinations"}
+    </Button>
+  );
   return (
     <section className="space-y-4 rounded-xl border p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -24,7 +40,8 @@ export function DestinationsCard({
           <MapPin className="size-4 text-muted-foreground" />
           Destinations
         </h2>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          {!list.length && define()}
           <ShapeBrandButton
             brandId={brandId}
             brandName={brandName}
@@ -37,7 +54,14 @@ export function DestinationsCard({
           compact
           icon={MapPin}
           title="Where people come to stay"
-          description="Shape guest destinations from your imported homes in chat."
+          description={
+            write.isPending
+              ? "Reading the imported homes and towns…"
+              : towns.length
+                ? "Define guest destinations from your imported homes."
+                : "Import homes to define their destinations."
+          }
+          actions={define(true)}
         />
       ) : (
         <div className="grid grid-cols-1 gap-4 @4xl:grid-cols-2">

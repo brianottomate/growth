@@ -1246,15 +1246,6 @@ export const setPlatformDraftAction = growthAction({
       .optional(),
     meta: z
       .object({
-        destination: z
-          .object({
-            connectionAccountId: z.string().trim().min(1),
-            adAccountId: z.string().trim().min(1),
-          })
-          .optional()
-          .describe(
-            "The ad account the push uses, from listDestinations. Saved so every later push and preview reuses it.",
-          ),
         goal: z.enum(AD_PUSH_GOALS).optional(),
         startWhenLaunched: z
           .boolean()
@@ -1404,7 +1395,7 @@ export const pushDraftAction = growthAction({
   nativeOutputSchema: pushDraftActionNativeResultSchema,
   outputSchema: pushDraftActionOutputSchema,
   description:
-    "COMPILE a LOCAL campaign onto one platform: each audience becomes an ad set / ad group, every creative ad runs under each, and region names resolve to real platform geo keys. Budget, dates and settings come from the platform DRAFT row (set them with setPlatformDraft first), so this takes no numbers of its own. Everything is created PAUSED; adsWrite.setDelivery starts spend separately. Set validateOnly for a dry run — Meta only, single audience only. LinkedIn: campaign group → campaign (the ad set) → creative. ONE push sends every creative ad, same as Meta — the first opens the campaign and the rest are attached to it, one provider call each. Do not split a campaign across several pushes or ask the operator to pick a subset. LinkedIn targets at country level only, and its goals are engagement / traffic / awareness / video_views. Call adsRead.listDestinations first for the account ids; never guess them.",
+    "COMPILE a LOCAL campaign onto one platform: each audience becomes an ad set / ad group, every creative ad runs under each, and region names resolve to real platform geo keys. Budget, dates and settings come from the platform DRAFT row (set them with setPlatformDraft first), so this takes no numbers of its own. Everything is created PAUSED; adsWrite.setDelivery starts spend separately. Set validateOnly for a dry run — Meta only, single audience only. LinkedIn: campaign group → campaign (the ad set) → creative. ONE push sends every creative ad, same as Meta — the first opens the campaign and the rest are attached to it, one provider call each. Do not split a campaign across several pushes or ask the operator to pick a subset. LinkedIn targets at country level only, and its goals are engagement / traffic / awareness / video_views. Meta uses the exact connection already pinned in brand settings; omit credential ids and use the saved goal (default conversions). Do not ask the operator to choose credentials. For other platforms call adsRead.listDestinations for the account ids; never guess them.",
   inputSchema: z.object({
     campaignId: z.string().trim().min(1),
     platform: z
@@ -1412,9 +1403,9 @@ export const pushDraftAction = growthAction({
       .describe(
         "Required. Always name the platform the operator asked for — this is not inferred, and getting it wrong creates a campaign on the wrong ad account.",
       ),
-    connectionAccountId: destinationSchema.connectionAccountId,
-    adAccountId: destinationSchema.adAccountId,
-    goal: z.enum(AD_PUSH_GOALS),
+    connectionAccountId: destinationSchema.connectionAccountId.optional(),
+    adAccountId: destinationSchema.adAccountId.optional(),
+    goal: z.enum(AD_PUSH_GOALS).optional(),
     validateOnly: z.boolean().optional(),
   }),
   execute: async (input, ctx) =>

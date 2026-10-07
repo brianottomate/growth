@@ -247,8 +247,10 @@ export async function approveImageAd(input: {
       ),
     }));
   if (!ad || !brand) throw new Error("Ad not found");
-  if (ad.status === "approved")
+  if (ad.status === "approved") {
+    if (ad.campaignId) await freezeApprovedAd(ad.id);
     return { adId: ad.id, status: "approved" as const };
+  }
   if (ad.updatedAt.toISOString() !== input.expectedUpdatedAt)
     throw new Error(
       "This ad changed elsewhere. Reload and review the latest version.",
@@ -336,6 +338,7 @@ export async function approveImageAd(input: {
     throw new Error(
       "This ad changed during approval. Review it and approve again.",
     );
+  if (ad.campaignId) await freezeApprovedAd(ad.id);
   return { adId: ad.id, status: "approved" as const };
 }
 

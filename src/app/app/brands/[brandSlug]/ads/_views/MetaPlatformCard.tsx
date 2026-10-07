@@ -63,18 +63,6 @@ type Audience = {
 };
 const DEFAULT_PROJECTION_EXPANSION: Record<string, boolean> = {};
 
-/** "connection:adAccount", the select's key, as the draft's saved destination. */
-function destinationOf(key: string) {
-  const at = key.indexOf(":");
-  if (at <= 0) return {};
-  return {
-    destination: {
-      connectionAccountId: key.slice(0, at),
-      adAccountId: key.slice(at + 1),
-    },
-  };
-}
-
 export function MetaPlatformCard({
   campaignId,
   campaignName,
@@ -107,11 +95,6 @@ export function MetaPlatformCard({
   });
 
   const saved = pc.settings?.meta;
-  const [destinationKey, setDestinationKey] = useState(
-    saved?.destination
-      ? `${saved.destination.connectionAccountId}:${saved.destination.adAccountId}`
-      : "",
-  );
   const [goal, setGoal] = useState<AdPushGoal>(saved?.goal ?? "conversions");
   const sectionId = useId();
   const destinations = useQuery(
@@ -119,21 +102,8 @@ export function MetaPlatformCard({
       input: { brandSlug, platform: "meta" },
     }),
   );
-  // Facebook and Meta Ads connections can expose the same paying account/Page.
-  const choices = (destinations.data?.destinations ?? []).filter(
-    (choice, index, all) =>
-      index ===
-      all.findIndex(
-        (other) =>
-          other.adAccountId === choice.adAccountId &&
-          other.pageId === choice.pageId &&
-          other.runsAsBrandPage === choice.runsAsBrandPage,
-      ),
-  );
-  const chosen =
-    choices.find(
-      (d) => `${d.connectionAccountId}:${d.adAccountId}` === destinationKey,
-    ) ?? (choices.length === 1 ? choices[0] : undefined);
+  const choices = destinations.data?.destinations ?? [];
+  const chosen = choices[0];
   const configuration = chosen
     ? {
         connectionAccountId: chosen.connectionAccountId,
@@ -205,7 +175,7 @@ export function MetaPlatformCard({
     !(meta?.pixelId && meta?.customEventType);
   const blockers = [
     scheduleError,
-    !configuration && "Choose an ad account in Settings.",
+    !configuration && "Configure Meta access in brand settings.",
     configuration &&
       !chosen?.runsAsBrandPage &&
       "The connection does not have access to this brand’s Facebook Page.",
@@ -296,16 +266,8 @@ export function MetaPlatformCard({
               campaignStartAt={campaignStartAt}
               campaignEndAt={campaignEndAt}
               choices={choices}
-              destinationKey={
-                chosen
-                  ? `${chosen.connectionAccountId}:${chosen.adAccountId}`
-                  : ""
-              }
               goal={goal}
-              onApply={(key, nextGoal) => {
-                setDestinationKey(key);
-                setGoal(nextGoal);
-              }}
+              onApply={setGoal}
             />
           </div>
           <dl className="grid grid-cols-1 gap-4 @sm:grid-cols-2 @2xl:grid-cols-4">
@@ -596,7 +558,6 @@ function MetaSettings({
   campaignStartAt,
   campaignEndAt,
   choices,
-  destinationKey,
   goal,
   onApply,
 }: {
@@ -609,11 +570,9 @@ function MetaSettings({
     adAccountName?: string | null;
     pageId?: string | null;
   }[];
-  destinationKey: string;
   goal: AdPushGoal;
-  onApply: (key: string, goal: AdPushGoal) => void;
+  onApply: (goal: AdPushGoal) => void;
 }) {
-  const [draftDestination, setDraftDestination] = useState(destinationKey);
   const [draftGoal, setDraftGoal] = useState(goal);
   const [amount, setAmount] = useState(pc.budget?.toString() ?? "");
   const [budgetType, setBudgetType] = useState<"daily" | "lifetime">(
@@ -661,7 +620,7 @@ function MetaSettings({
   const save = useMutation(
     orpc.ads.setPlatformDraft.mutationOptions({
       onSuccess: () => {
-        onApply(draftDestination, draftGoal);
+        onApply(draftGoal);
         setOpen(false);
         router.refresh();
       },
@@ -686,7 +645,6 @@ function MetaSettings({
         size="sm"
         variant="outline"
         onClick={() => {
-          setDraftDestination(destinationKey);
           setDraftGoal(goal);
           setAmount(pc.budget?.toString() ?? "");
           setBudgetType(pc.budgetType === "lifetime" ? "lifetime" : "daily");
@@ -713,27 +671,14 @@ function MetaSettings({
         <DialogHeader>
           <DialogTitle>Meta delivery settings</DialogTitle>
         </DialogHeader>
-        <label className="space-y-1 text-sm">
-          Ad account · Facebook Page
-          <select
-            className="w-full rounded border bg-background p-2"
-            value={draftDestination}
-            onChange={(e) => setDraftDestination(e.target.value)}
-          >
-            <option value="" disabled>
-              Choose an allowlisted account
-            </option>
-            {choices.map((d) => (
-              <option
-                key={`${d.connectionAccountId}:${d.adAccountId}`}
-                value={`${d.connectionAccountId}:${d.adAccountId}`}
-              >
-                {d.adAccountName ?? d.adAccountId} · Page{" "}
-                {d.pageId ?? "not resolved"}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="space-y-1 text-sm">
+          <p>Ad account · Facebook Page</p>
+          <p className="text-muted-foreground">
+            {choices[0]
+              ? `${choices[0].adAccountName ?? choices[0].adAccountId} · Page ${choices[0].pageId ?? "not resolved"}`
+              : "Configure Meta access in brand settings."}
+          </p>
+        </div>
         <label className="space-y-1 text-sm">
           Goal
           <select
@@ -916,7 +861,6 @@ function MetaSettings({
                 budget: amount ? Number(amount) : null,
                 budgetType,
                 meta: {
-                  ...destinationOf(draftDestination),
                   goal: draftGoal,
                   startWhenLaunched: !scheduledStart,
                   runUntilPaused: !scheduledEnd,

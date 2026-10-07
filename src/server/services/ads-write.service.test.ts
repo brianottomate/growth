@@ -4,6 +4,7 @@ import { describe, expect, it } from "bun:test";
 import {
   assertMetaAdPayload,
   connectionRunsAsBrandPage,
+  configuredMetaDestination,
   googlePauseOutcome,
   metaPromotedObjectFor,
 } from "@/server/services/ads-write.service";
@@ -250,5 +251,26 @@ describe("Meta campaign label compilation", () => {
         name: "Sales · October 2026 · Tangy Cactus",
       }),
     ).toBe(name);
+  });
+});
+
+describe("configured Meta destination", () => {
+  it("requires a pinned connection even when a managing brand exists", () => {
+    expect(() =>
+      configuredMetaDestination({ adsConnectionBrandId: "brand_manager" }),
+    ).toThrow(/brand settings/);
+    expect(() => configuredMetaDestination(null)).toThrow(/brand settings/);
+  });
+  it("uses the exact saved credentials", () => {
+    const destination = {
+      connectionAccountId: "configured_connection",
+      adAccountId: "act_configured",
+    };
+    expect(
+      configuredMetaDestination({
+        adsConnectionBrandId: "brand_manager",
+        metaAdsDestination: destination,
+      }),
+    ).toEqual(destination);
   });
 });

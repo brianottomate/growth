@@ -199,8 +199,8 @@ export function metaPlacementMedia(
   if (studio?.approval && !Object.keys(studio.approval.renders).length)
     return { media: [], issue: null, pending: true as const };
   if (studio?.approval) {
-    const shape = studio.document.shapes.includes("portrait")
-      ? "portrait"
+    const shape = studio.document.shapes.includes("square")
+      ? "square"
       : studio.document.shapes[0]!;
     const frozen = studio.approval.renders[shape];
     if (

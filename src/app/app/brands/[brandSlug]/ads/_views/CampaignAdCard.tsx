@@ -2,7 +2,7 @@
 
 import { ReturnToStudioButton } from "@/components/review/ReturnToStudioButton";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ChevronDown,
   ChevronLeft,
@@ -17,11 +17,7 @@ import { AdPreviewSlide } from "./AdPreviewSlide";
 import { destinationLabel, safeHomeUrl } from "@/lib/ad-preview-links";
 import { AD_FORMATS, adFormat } from "@/lib/ad-format";
 import type { AdReview } from "@/lib/ad-review";
-import {
-  ideaDocumentFromAd,
-  ideaEditorPreviewUrl,
-  ideaSource,
-} from "@/lib/ad-idea-studio";
+import { ideaDocumentFromAd } from "@/lib/ad-idea-studio";
 import type { AdContent, ChannelPlatform } from "@/server/db/schema";
 
 import { AdIdeaPreview } from "./AdIdeaPreview";
@@ -69,15 +65,28 @@ export function CampaignAdCard({
   );
   const currentSlide = Math.min(slide, slideCount - 1);
   const firstCard = document?.cards[currentSlide];
-  const first = creative?.media[currentSlide];
-  const thumbnail =
-    studio?.approval?.renders.square?.[currentSlide]?.url ??
-    (first?.type === "image" ? first.url : first?.thumbnail) ??
-    (firstCard
-      ? firstCard.mode === "supplied"
-        ? ideaSource(firstCard, "square")?.url
-        : ideaEditorPreviewUrl(brandId, firstCard, "square")
-      : undefined);
+  const images = useMemo(
+    () =>
+      creative?.media.map((media, index) => {
+        const render = studio?.approval?.renders.square?.[index];
+        return {
+          url: render?.url ?? media.url,
+        };
+      }) ?? [],
+    [creative?.media, studio?.approval?.renders.square],
+  );
+  const image = images[currentSlide];
+  const thumbnail = image?.url;
+  useEffect(() => {
+    if (format !== "carousel" || images.length < 2) return;
+    for (const index of [
+      (currentSlide + 1) % images.length,
+      (currentSlide + images.length - 1) % images.length,
+    ]) {
+      const preload = new window.Image();
+      preload.src = images[index]!.url;
+    }
+  }, [currentSlide, format, images]);
   const Icon = format === "video" ? Play : format === "text" ? Type : Images;
   const copy =
     creative?.body ||

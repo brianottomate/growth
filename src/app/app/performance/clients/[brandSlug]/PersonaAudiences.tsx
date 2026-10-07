@@ -2,11 +2,17 @@
 import type { PersonaProfile } from "@/lib/brand-direction";
 import { DirectionPhrases } from "./CreativeDirection";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Users } from "lucide-react";
+import { Sparkles, Users } from "lucide-react";
 import { AudienceMap } from "@/components/audience-map";
 import { GeographyChips } from "@/components/geography-chips";
 import { ShapeBrandButton } from "./ShapeBrandButton";
 import type { PersonaDemandGeography } from "@/server/db/brand-schema";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { useMutation } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/toast";
+import { orpc } from "@/orpc/client";
 
 type Persona = {
   id: string;
@@ -31,6 +37,46 @@ export function PersonaAudiences({
   brand: { id: string; slug: string; name: string; story: string | null };
   personas: Persona[];
 }) {
+  const router = useRouter();
+  const [phase, setPhase] = useState<"defining" | "saving" | null>(null);
+  const [refreshing, startTransition] = useTransition();
+  const suggest = useMutation(orpc.persona.suggest.mutationOptions());
+  const create = useMutation(orpc.persona.create.mutationOptions());
+  const busy = phase !== null || refreshing;
+  const define = async () => {
+    if (busy || personas.length) return;
+    setPhase("defining");
+    try {
+      const result = await suggest.mutateAsync({ brandId: brand.id });
+      setPhase("saving");
+      for (const proposal of result.suggestions)
+        await create.mutateAsync({ brandId: brand.id, ...proposal });
+      if (!result.suggestions.length) toast.info("No personas suggested");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not define personas",
+      );
+    } finally {
+      startTransition(() => router.refresh());
+      setPhase(null);
+    }
+  };
+  const generate = (primary = false) => (
+    <Button
+      size="sm"
+      variant={primary ? "default" : "outline"}
+      loading={busy}
+      disabled={!brand.story?.trim()}
+      onClick={() => void define()}
+    >
+      {!busy && <Sparkles className="size-3.5" />}
+      {phase === "saving"
+        ? "Saving personas…"
+        : busy
+          ? "Defining personas…"
+          : "Define personas"}
+    </Button>
+  );
   const shape = (
     <ShapeBrandButton
       brandId={brand.id}
@@ -45,15 +91,24 @@ export function PersonaAudiences({
           <Users className="size-4" />
           Personas · {personas.length}
         </h2>
-        <div className="flex flex-wrap gap-2">{shape}</div>
+        <div className="flex flex-wrap gap-2">
+          {!personas.length && generate()}
+          {shape}
+        </div>
       </div>
       {!personas.length && (
         <EmptyState
           compact
           icon={Users}
           title="Define who you’re speaking to"
-          description="Shape your customer personas in chat."
-          actions={shape}
+          description={
+            busy
+              ? "Reading the brand story and defining guest personas…"
+              : brand.story?.trim()
+                ? "Define guest personas from the brand story and homes."
+                : "Write the brand story to define guest personas."
+          }
+          actions={generate(true)}
         />
       )}
       <div className="grid grid-cols-1 gap-3 @3xl:grid-cols-2">
