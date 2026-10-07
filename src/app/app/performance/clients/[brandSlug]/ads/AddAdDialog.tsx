@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
+import { Combobox } from "@/components/ui/compound/combobox";
 import {
   GalleryHorizontalEnd,
   ImageIcon,
@@ -34,14 +37,22 @@ const FORMAT_ICONS = {
 /** Shared manual creation; home-aware authoring belongs in Ad Studio. */
 export function AddAdDialog({
   brandId,
+  brandSlug,
   website,
   campaignId = null,
 }: {
   brandId: string;
+  brandSlug: string;
   website: string | null;
   campaignId?: string | null;
 }) {
   const [open, setOpen] = useState(false);
+  const [homeId, setHomeId] = useState("");
+  const inventory = useQuery({
+    ...orpc.homeGroups.context.queryOptions({ input: { brandId } }),
+    enabled: open,
+  });
+  const selectedHome = inventory.data?.homes.find((home) => home.id === homeId);
   const formatForm = useForm<{ format: Format }>({
     defaultValues: { format: "static" },
   });
@@ -54,6 +65,8 @@ export function AddAdDialog({
         toast.success(`${result.name} is ready for creative and copy.`);
         setOpen(false);
         setName("");
+        setHomeId("");
+        setLinkUrl(website ?? "");
       },
       onError: (error) => toast.error(error.message),
     }),
@@ -79,11 +92,15 @@ export function AddAdDialog({
           <Button
             size="sm"
             loading={add.isPending}
-            disabled={Boolean(linkUrl.trim()) && !safeHomeUrl(linkUrl.trim())}
+            disabled={
+              (Boolean(linkUrl.trim()) && !safeHomeUrl(linkUrl.trim())) ||
+              (Boolean(homeId) && !selectedHome)
+            }
             onClick={() => {
               add.mutate({
                 brandId,
                 format,
+                propertyId: selectedHome?.externalId,
                 campaignId: campaignId ?? undefined,
                 name: name.trim() || undefined,
                 linkUrl: linkUrl.trim() || undefined,
@@ -123,6 +140,57 @@ export function AddAdDialog({
           )
         ) : (
           <>
+            <div className="space-y-1.5">
+              <Label>Home (optional)</Label>
+              <Combobox
+                ariaLabel="Home for this ad"
+                value={homeId || "brand"}
+                disabled={add.isPending || inventory.isPending}
+                searchPlaceholder="Search by home name, listing ID or URL…"
+                options={[
+                  { value: "brand", label: "Brand ad / multiple homes" },
+                  ...(inventory.data?.homes ?? []).map((home) => ({
+                    value: home.id,
+                    label: home.name,
+                    imageUrl: home.heroSourceUrl,
+                    keywords: [home.name, home.externalId, home.url],
+                  })),
+                ]}
+                onValueChange={(value) => {
+                  const next = inventory.data?.homes.find(
+                    (home) => home.id === value,
+                  );
+                  setHomeId(next?.id ?? "");
+                  setLinkUrl(next?.url || website || "");
+                }}
+              />
+              {inventory.isPending ? (
+                <p role="status" className="text-xs text-muted-foreground">
+                  Loading homes…
+                </p>
+              ) : inventory.isError ? (
+                <p role="alert" className="text-xs">
+                  Could not load homes.{" "}
+                  <Button
+                    variant="link"
+                    size="sm"
+                    onClick={() => void inventory.refetch()}
+                  >
+                    Try again
+                  </Button>
+                </p>
+              ) : null}
+              <p className="text-xs text-muted-foreground">
+                Choose any imported home to work on its photos. For a batch,{" "}
+                <Link
+                  href={`/app/performance/clients/${brandSlug}/wanderos`}
+                  className="underline underline-offset-4"
+                >
+                  choose homes in a home group
+                </Link>{" "}
+                and use From homes.
+              </p>
+            </div>
             <div className="space-y-1.5">
               <Label htmlFor="shell-name">Ad name (optional)</Label>
               <Input

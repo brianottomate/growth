@@ -193,7 +193,9 @@ export function AdCard({
   const [imagePickerOpen, setImagePickerOpen] = useState(false);
   const homeGalleries = useQuery({
     ...orpc.ads.starterIdeaHomes.queryOptions({
-      input: campaignId ? { campaignId } : { brandId },
+      input: campaignId
+        ? { campaignId, allHomes: true }
+        : { brandId, allHomes: true },
     }),
     enabled:
       editor === "image" ||

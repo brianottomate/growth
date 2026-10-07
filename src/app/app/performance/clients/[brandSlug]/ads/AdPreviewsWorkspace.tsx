@@ -121,7 +121,7 @@ export function AdPreviewsWorkspace({
   );
   const addAction = (
     <div className="flex flex-wrap gap-2">
-      <AddAdDialog brandId={brandId} website={website} />
+      <AddAdDialog brandId={brandId} brandSlug={brandSlug} website={website} />
     </div>
   );
   const actions = (
