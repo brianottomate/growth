@@ -1,5 +1,6 @@
 "use client";
 
+import { catalogAdHeadline } from "@/lib/catalog-studio";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CatalogCollectionPreview } from "@/app/app/performance/clients/[brandSlug]/catalog/CatalogPreview";
@@ -71,6 +72,8 @@ export function catalogArtworkUrl({
     showLogo: true,
     pills,
     location: home.market?.label ?? home.place,
+    adHeadline: catalogAdHeadline(home.name),
+    adDescription: "",
   });
   return labCompositionUrl(url ?? "", home);
 }
@@ -262,8 +265,8 @@ export function HomeSuite({
       generated?.copy ?? (item.id === home.id ? output.catalog : null);
     return {
       key: item.id,
-      name: item.name,
-      home: { nightlyFrom: item.nightlyFrom, city: item.city },
+      headline: catalogAdHeadline(item.name),
+      description: item.city ?? "",
       image: catalogArtworkUrl({
         home: item,
         headline: copy?.headline ?? item.catalog.title ?? item.name,

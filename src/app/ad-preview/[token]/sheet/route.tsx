@@ -262,7 +262,7 @@ export async function GET(
                   style={{ objectFit: "cover", borderRadius: 14 }}
                 />
                 <div style={{ fontSize: 17, fontWeight: 600 }}>
-                  {clip(card.name, 28)}
+                  {clip(card.headline, 28)}
                 </div>
               </div>
             ))}

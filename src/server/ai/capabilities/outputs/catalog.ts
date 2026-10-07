@@ -128,6 +128,18 @@ export const setCatalogAdCopyActionOutputSchema = z.strictObject({
   ad: catalogAdCopySchema,
 });
 
+export const writeCatalogAdCopyActionOutputSchema = z.strictObject({
+  brandId: z.string(),
+  written: z.number(),
+  cards: z.array(
+    z.strictObject({
+      homeId: z.string(),
+      adHeadline: z.string(),
+      adDescription: z.string().optional(),
+    }),
+  ),
+});
+
 export const setCatalogDefaultTemplateActionOutputSchema = z.strictObject({
   brandId: z.string(),
   templateId: z.enum(CATALOG_TEMPLATES),

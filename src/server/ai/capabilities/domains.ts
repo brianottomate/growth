@@ -129,6 +129,7 @@ import {
   setCatalogApprovalAction,
   setCatalogDefaultTemplateAction,
   setCatalogAdCopyAction,
+  writeCatalogAdCopyAction,
   setCatalogIncludedAction,
 } from "./catalog";
 import { diagnoseAlignment } from "./alignment";
@@ -622,6 +623,7 @@ export const adsWrite = growthDomainTool({
     setCatalogIncluded: setCatalogIncludedAction,
     setCatalogDefaultTemplate: setCatalogDefaultTemplateAction,
     setCatalogAdCopy: setCatalogAdCopyAction,
+    writeCatalogAdCopy: writeCatalogAdCopyAction,
     exportCatalog: exportCatalogAction,
     deleteCatalogExport: deleteCatalogExportAction,
     attachAdSet: attachAdSetAction,

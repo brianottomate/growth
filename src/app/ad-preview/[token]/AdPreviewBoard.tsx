@@ -107,12 +107,7 @@ export function AdPreviewBoard({
               <CatalogCollectionPreview
                 brandName={preview.brandName}
                 ad={preview.catalog.ad ?? undefined}
-                cards={preview.catalog.cards.map((card) => ({
-                  key: card.key,
-                  name: card.name,
-                  image: card.image,
-                  home: { city: card.city, nightlyFrom: card.nightlyFrom },
-                }))}
+                cards={preview.catalog.cards}
               />
             </div>
           </section>

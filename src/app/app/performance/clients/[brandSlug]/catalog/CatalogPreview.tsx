@@ -6,7 +6,6 @@ import { X } from "lucide-react";
 import {
   catalogCardPreviewUrl,
   defaultCatalogAdCopy,
-  fillCatalogTags,
   type CatalogAdCopy,
   type CatalogDraft,
   type CatalogHome,
@@ -16,8 +15,9 @@ import { previewAtWidth } from "@/lib/compositions";
 export type CatalogPreviewCard = {
   key: string;
   image: string | undefined;
-  home: Pick<CatalogHome, "nightlyFrom" | "city"> | undefined;
-  name: string;
+  /** What Meta shows under the card. */
+  headline: string;
+  description: string;
 };
 
 /**
@@ -38,7 +38,6 @@ export function CatalogPreview({
   homes: CatalogHome[];
   draft: CatalogDraft;
 }) {
-  const byId = new Map(homes.map((h) => [h.id, h]));
   const cards: CatalogPreviewCard[] = draft.cards
     .filter((c) => c.included)
     .map((card) => ({
@@ -46,8 +45,8 @@ export function CatalogPreview({
       image:
         previewAtWidth(catalogCardPreviewUrl(brandId, card), 300) ??
         card.imageUrl,
-      home: byId.get(card.homeId),
-      name: byId.get(card.homeId)?.name ?? card.homeId,
+      headline: card.adHeadline,
+      description: card.adDescription,
     }));
   return (
     <CatalogCollectionPreview
@@ -133,19 +132,10 @@ function FeedPreview({
             <div className="flex items-center gap-2 px-2.5 py-2">
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[13px] font-semibold">
-                  {fillCatalogTags(ad.headline, {
-                    name: card.name,
-                    brand: brandName,
-                  }) || card.name}
+                  {card.headline}
                 </p>
                 <p className="truncate text-xs text-muted-foreground">
-                  {fillCatalogTags(ad.description, {
-                    name: card.name,
-                    brand: brandName,
-                  }) ||
-                    (card.home?.nightlyFrom
-                      ? `From $${card.home.nightlyFrom.toLocaleString("en-US")} a night`
-                      : (card.home?.city ?? ""))}
+                  {card.description}
                 </p>
               </div>
               <span className="shrink-0 rounded-md bg-muted px-2.5 py-1 text-xs font-medium">
@@ -237,7 +227,7 @@ function MoreFromPreview({
             <article key={card.key} className="space-y-1">
               <Tile card={card} className="rounded-lg" />
               <p className="line-clamp-2 px-0.5 text-[11px] leading-tight font-semibold">
-                {card.name}
+                {card.headline}
               </p>
             </article>
           ))}
@@ -266,7 +256,7 @@ function Tile({
     // oxlint-disable-next-line nextjs/no-img-element
     <img
       src={card.image}
-      alt={card.name}
+      alt={card.headline}
       loading="lazy"
       className={`aspect-square w-full bg-neutral-700 object-contain ${className ?? ""}`}
     />

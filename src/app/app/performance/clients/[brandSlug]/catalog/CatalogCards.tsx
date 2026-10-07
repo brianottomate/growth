@@ -358,6 +358,13 @@ export function CatalogCards({
       onError: (e) => setError(errorMessage(e, "Unable to write the cards")),
     }),
   );
+  const writeAdCopy = useMutation(
+    orpc.catalog.writeAdCopy.mutationOptions({
+      onMutate: () => setError(""),
+      onSuccess: () => void reload(),
+      onError: (e) => setError(errorMessage(e, "Unable to write the ad copy")),
+    }),
+  );
   const writing = running(writeRun?.status)
     ? writeRun
     : startWrite.isPending
@@ -587,6 +594,22 @@ export function CatalogCards({
                         <Sparkles aria-hidden="true" />
                         Write copy only
                       </DropdownMenuItem>
+                      {([false, true] as const).map((headlineOnly) => (
+                        <DropdownMenuItem
+                          key={String(headlineOnly)}
+                          disabled={writeAdCopy.isPending}
+                          onSelect={() =>
+                            writeAdCopy.mutate({ brandId, headlineOnly })
+                          }
+                        >
+                          <Sparkles aria-hidden="true" />
+                          {writeAdCopy.isPending
+                            ? "Writing ad copy…"
+                            : headlineOnly
+                              ? "Write ad headlines only"
+                              : "Write ad headlines + descriptions"}
+                        </DropdownMenuItem>
+                      ))}
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         disabled={importHomes.isPending}
@@ -921,6 +944,14 @@ export function CatalogCards({
                               />
                             </div>
                           )}
+                          <div className="space-y-0.5 text-sm">
+                            <p className="font-medium">{card.adHeadline}</p>
+                            {card.adDescription && (
+                              <p className="text-muted-foreground">
+                                {card.adDescription}
+                              </p>
+                            )}
+                          </div>
                           {card.aiReview?.fingerprint ===
                             catalogCardFingerprint(card) &&
                             card.aiReview.findings.length > 0 && (
@@ -1169,13 +1200,7 @@ export function CatalogCards({
                 )}
                 {item.ad && (
                   <dl className="grid grid-cols-1 gap-2 rounded-lg bg-muted/40 p-3 text-sm @xl:grid-cols-[8rem_minmax(0,1fr)_auto]">
-                    {(
-                      [
-                        ["Primary text", item.ad.primaryText],
-                        ["Headline", item.ad.headline],
-                        ["Description", item.ad.description],
-                      ] as const
-                    )
+                    {([["Primary text", item.ad.primaryText]] as const)
                       .filter(([, value]) => value)
                       .map(([label, value]) => (
                         <div key={label} className="contents [&>*]:min-w-0">
@@ -1690,6 +1715,27 @@ export function CardEditor({
         </>
       )}
       <div className="space-y-2 border-t pt-3">
+        <h5 className="text-sm font-medium">Ad</h5>
+        <label className="block space-y-1 text-sm">
+          Ad headline
+          <Input
+            value={card.adHeadline}
+            maxLength={255}
+            onChange={(e) => onChange({ ...card, adHeadline: e.target.value })}
+          />
+        </label>
+        <label className="block space-y-1 text-sm">
+          Ad description
+          <Input
+            value={card.adDescription}
+            maxLength={255}
+            onChange={(e) =>
+              onChange({ ...card, adDescription: e.target.value })
+            }
+          />
+        </label>
+      </div>
+      <div className="space-y-2 border-t pt-3">
         <h5 className="text-sm font-medium">Image</h5>
         <Button variant="outline" onClick={() => setImagePickerOpen(true)}>
           Choose image
@@ -1720,6 +1766,7 @@ export function CardEditor({
         <Button
           disabled={
             !card.title.trim() ||
+            !card.adHeadline.trim() ||
             (card.mode === "finished" && !card.finishedArtwork)
           }
           loading={saving}
@@ -1738,6 +1785,9 @@ function cardPatch(prev: CatalogCard, next: CatalogCard) {
     {};
   if (prev.title !== next.title) patch.title = next.title;
   if (prev.subtitle !== next.subtitle) patch.subtitle = next.subtitle;
+  if (prev.adHeadline !== next.adHeadline) patch.adHeadline = next.adHeadline;
+  if (prev.adDescription !== next.adDescription)
+    patch.adDescription = next.adDescription;
   if (prev.templateId !== next.templateId) patch.templateId = next.templateId;
   if (prev.imagePosition !== next.imagePosition)
     patch.imagePosition = next.imagePosition;

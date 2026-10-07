@@ -78,6 +78,13 @@
       "when": 1791325779202,
       "tag": "0009_remove_meta_lead_normalization",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791330697335,
+      "tag": "0010_catalog_card_ad_copy",
+      "breakpoints": true
     }
   ]
 }

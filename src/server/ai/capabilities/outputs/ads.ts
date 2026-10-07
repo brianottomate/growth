@@ -1296,6 +1296,8 @@ export const editCatalogCardActionOutputSchema = z.strictObject({
   homeId: z.string(),
   title: z.string(),
   subtitle: z.string(),
+  adHeadline: z.string(),
+  adDescription: z.string(),
   templateId: compositionTemplateIdSchema,
   imagePosition: compositionImagePositionSchema,
   showLogo: z.boolean(),

@@ -27,6 +27,7 @@ import {
   setCatalogDefaultTemplate,
   setCatalogIncluded,
   startCatalogExport,
+  writeCatalogAdCopy,
 } from "@/server/services/catalog-studio.service";
 import { ingestBrandHomes } from "@/server/services/homes.service";
 
@@ -42,6 +43,7 @@ import {
   setCatalogDefaultTemplateActionOutputSchema,
   setCatalogIncludedActionOutputSchema,
   writeCatalogCardsActionOutputSchema,
+  writeCatalogAdCopyActionOutputSchema,
 } from "./outputs/catalog";
 import { growthAction } from "./types";
 
@@ -266,15 +268,13 @@ export const setCatalogDefaultTemplateAction = growthAction({
 export const setCatalogAdCopyAction = growthAction({
   outputSchema: setCatalogAdCopyActionOutputSchema,
   description:
-    "Save the ad a Performance client's catalog runs in: primary text (the same above every card), and the headline and description each card shows, which Meta fills per home and may use tags such as {{hotel.name}}, {{hotel.description}} or {{hotel.brand}}. Each export freezes this copy with its cards for the operator to paste into Meta. Nothing reaches Meta.",
+    "Save the primary text a Performance client's catalog ad runs with: the same above every card. Each card's own headline and description are on the card (editCatalogCard adHeadline and adDescription). Each export freezes this copy with its cards. Nothing reaches Meta.",
   inputSchema: brandInput.extend({ ad: catalogAdCopySchema }),
   examples: [
     {
       brandId: "brd_01",
       ad: {
-        primaryText: "Find your next escape. Private homes, booked direct.",
-        headline: "{{hotel.name}}",
-        description: "",
+        primaryText: "Find your next stay. Private homes, booked direct.",
       },
     },
   ],
@@ -282,6 +282,27 @@ export const setCatalogAdCopyAction = growthAction({
     brandId: input.brandId,
     ad: await setCatalogAdCopy({ ...input, userId: ctx.userId }),
   }),
+});
+
+export const writeCatalogAdCopyAction = growthAction({
+  outputSchema: writeCatalogAdCopyActionOutputSchema,
+  description:
+    "Rewrite the ad headline and description Meta prints under each catalog card, from each home's listing: the headline names the home, the description is one front-loaded line of facts. Every included card, or only homeIds. headlineOnly keeps each card's description. Approved cards take it: ad copy is not part of the approval. Saves the cards; nothing reaches Meta until the next export.",
+  inputSchema: brandInput.extend({
+    homeIds: z
+      .array(z.string().min(1))
+      .min(1)
+      .optional()
+      .describe("WanderOS listing ids; every included card when omitted."),
+    headlineOnly: z.boolean().optional(),
+  }),
+  examples: [{ brandId: "brd_01" }, { brandId: "brd_01", headlineOnly: true }],
+  execute: async ({ homeIds, ...input }, ctx) =>
+    writeCatalogAdCopy({
+      ...input,
+      homeIds: homeIds && (await catalogListingIds(input.brandId, homeIds)),
+      userId: ctx.userId,
+    }),
 });
 
 export const exportCatalogAction = growthAction({

@@ -18,6 +18,7 @@ import {
   setCatalogAdCopyAction,
   setCatalogIncludedAction,
   writeCatalogCardsAction,
+  writeCatalogAdCopyAction,
 } from "@/server/ai/capabilities/catalog";
 
 /** The catalog Studio, served from the same actions chat and MCP call. */
@@ -37,5 +38,6 @@ export const catalogRouter = {
   exportCatalog: actionProcedure(exportCatalogAction),
   deleteExport: actionProcedure(deleteCatalogExportAction),
   writeCards: actionProcedure(writeCatalogCardsAction),
+  writeAdCopy: actionProcedure(writeCatalogAdCopyAction),
   writeStatus: actionProcedure(catalogWriteStatusAction),
 };

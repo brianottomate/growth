@@ -94,47 +94,11 @@ export function CatalogAdCopyCard({
               }
             />
           </label>
-          <div className="grid grid-cols-1 gap-3 @xl:grid-cols-2">
-            <label className="block space-y-1.5 text-sm">
-              <span className="text-muted-foreground">Headline</span>
-              <Input
-                value={draft.headline}
-                maxLength={255}
-                placeholder="{{hotel.name}}"
-                disabled={save.isPending}
-                onChange={(e) =>
-                  setDraft({ ...draft, headline: e.target.value })
-                }
-              />
-            </label>
-            <label className="block space-y-1.5 text-sm">
-              <span className="text-muted-foreground">Description</span>
-              <Input
-                value={draft.description}
-                maxLength={255}
-                placeholder="From the price in the feed"
-                disabled={save.isPending}
-                onChange={(e) =>
-                  setDraft({ ...draft, description: e.target.value })
-                }
-              />
-            </label>
-          </div>
         </div>
       ) : (
-        <dl className="grid max-w-2xl grid-cols-1 gap-3 text-sm @xl:grid-cols-2">
-          <div className="space-y-1 @xl:col-span-2">
-            <dt className="text-muted-foreground">Primary text</dt>
-            <dd className="whitespace-pre-wrap">{ad.primaryText}</dd>
-          </div>
-          <div className="space-y-1">
-            <dt className="text-muted-foreground">Headline</dt>
-            <dd>{ad.headline || "Home name"}</dd>
-          </div>
-          <div className="space-y-1">
-            <dt className="text-muted-foreground">Description</dt>
-            <dd>{ad.description || "From the price in the feed"}</dd>
-          </div>
+        <dl className="max-w-2xl space-y-1 text-sm">
+          <dt className="text-muted-foreground">Primary text</dt>
+          <dd className="whitespace-pre-wrap">{ad.primaryText}</dd>
         </dl>
       )}
     </WorkspaceCard>

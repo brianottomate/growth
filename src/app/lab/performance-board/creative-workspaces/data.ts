@@ -72,6 +72,8 @@ export function catalogCards(scenario: Scenario): CatalogCard[] {
     location: home.city,
     rating: 4.9,
     pills: ["Ocean views", "Book direct"],
+    adHeadline: home.name,
+    adDescription: home.subtitle,
   }));
 }
 export function adDrafts(scenario: Scenario): FixtureAd[] {

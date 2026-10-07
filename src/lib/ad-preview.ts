@@ -148,8 +148,8 @@ export const createAdPreviewLinkInput = z
 /** A catalog card as an export froze it: the image Meta was sent, and its home. */
 export type AdPreviewCatalogCard = {
   key: string;
-  name: string;
   image: string;
-  city: string | null;
-  nightlyFrom: number | null;
+  /** The export's feed title and description: what Meta shows under the card. */
+  headline: string;
+  description: string;
 };

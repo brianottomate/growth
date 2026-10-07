@@ -16,7 +16,7 @@ import {
   type AdPreviewCatalogCard,
   type createAdPreviewLinkInput,
 } from "@/lib/ad-preview";
-import type { CatalogDraft, CatalogHome } from "@/lib/catalog-studio";
+import type { CatalogDraft } from "@/lib/catalog-studio";
 import { freezeApprovedAd } from "./ad-approval.service";
 import { ensureBrandConnect } from "./brand-connect.service";
 
@@ -222,28 +222,23 @@ async function frozenCatalog(brandId: string, exportId: string) {
     ),
   });
   if (!row) return null;
-  const { draft, homes } = row.input as {
-    draft: CatalogDraft;
-    homes: CatalogHome[];
-  };
+  const { draft } = row.input as { draft: CatalogDraft };
   const output = row.output as {
     assets?: { homeId: string; name: string; url: string; format: string }[];
+    rows?: { id: string; title: string; description: string }[];
     primaryFormat?: string;
   };
   const format = output.primaryFormat ?? draft.primaryFormat;
-  const byHome = new Map(homes.map((home) => [home.id, home]));
+  // The export's own feed rows: exactly what it sends Meta under each card.
+  const feed = new Map((output.rows ?? []).map((r) => [r.id, r]));
   const cards: AdPreviewCatalogCard[] = (output.assets ?? [])
-    .filter((asset) => asset.format === format)
-    .map((asset) => {
-      const home = byHome.get(asset.homeId);
-      return {
-        key: asset.homeId,
-        name: asset.name,
-        image: asset.url,
-        city: home?.city ?? null,
-        nightlyFrom: home?.nightlyFrom ?? null,
-      };
-    });
+    .filter((asset) => asset.format === format && feed.has(asset.homeId))
+    .map((asset) => ({
+      key: asset.homeId,
+      image: asset.url,
+      headline: feed.get(asset.homeId)!.title,
+      description: feed.get(asset.homeId)!.description,
+    }));
   return {
     exportedAt: row.createdAt.toISOString(),
     ad: draft.ad ?? null,

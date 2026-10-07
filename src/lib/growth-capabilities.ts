@@ -210,6 +210,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "setCatalogIncluded",
     "setCatalogDefaultTemplate",
     "setCatalogAdCopy",
+    "writeCatalogAdCopy",
     "exportCatalog",
     "deleteCatalogExport",
     "attachAdSet",

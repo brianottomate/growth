@@ -138,6 +138,14 @@ export const homeTable = pgTable(
     /** Amenity pills an amenities card draws; null takes the default pick. */
     catalogPills: t.jsonb().$type<string[]>(),
     /**
+     * The words Meta shows under this home's card in the catalog ad: its
+     * headline (the home's name as a guest would say it) and description.
+     * Catalog prep writes them with the card; null takes the default made
+     * from the listing.
+     */
+    catalogAdHeadline: t.text(),
+    catalogAdDescription: t.text(),
+    /**
      * Who signed the card off, and the card as it was then. Any later change
      * to what the card shows (an edit, a new hero, a changed default) no
      * longer matches the fingerprint, so the card is back to unreviewed.

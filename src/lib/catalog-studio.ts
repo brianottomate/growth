@@ -8,6 +8,7 @@ import {
   type CompositionFormatId,
 } from "./compositions";
 import { homeCatalogCopy, place, ratingOutOfFive } from "./home-ad-previews";
+import { rankAmenities } from "./home-amenities";
 import { marketOf, type BrandMarkets } from "./markets";
 import { hotelFeedRows, type HotelFeedHome } from "./meta-hotel-feed";
 
@@ -36,6 +37,10 @@ export const catalogCardSchema = z.object({
   pills: z.array(z.string()).optional(),
   /** "Louisville, KY": the place tag on the amenities-and-place card. */
   location: z.string().optional(),
+  /** What Meta shows under the card in the catalog ad: the home's name, as a guest would say it. */
+  adHeadline: z.string().trim().min(1).max(255),
+  /** The line under that headline: what the home is and what it costs. */
+  adDescription: z.string().trim().min(1).max(255),
   /** Signed off as it stands now; derived on read, never saved from a client. */
   approved: z.boolean().optional(),
 });
@@ -45,33 +50,55 @@ export const CATALOG_FORMATS = ["square"] as const;
 export type CatalogFormatId = (typeof CATALOG_FORMATS)[number];
 
 /**
- * The ad a catalog runs in, set once per catalog: Meta fills each card's
- * headline and description from the item, so these are templates that may
- * carry tags such as {{hotel.name}}. Primary text is the same on every card.
+ * The ad a catalog runs in, set once per catalog: the primary text above every
+ * card. Each card's own headline and description sit on the card.
  */
-export const catalogAdCopySchema = z.strictObject({
+export const catalogAdCopySchema = z.object({
   primaryText: z.string().trim().max(2200),
-  headline: z.string().trim().max(255),
-  description: z.string().trim().max(255),
 });
 export type CatalogAdCopy = z.infer<typeof catalogAdCopySchema>;
 export const defaultCatalogAdCopy = (brandName: string): CatalogAdCopy => ({
   // Kept apart from "escape" and "stay": brands are named Oasis Escapes and
   // Zion Stays, and "your next Oasis Escapes escape" shipped as a default.
   primaryText: `Find your next stay. Private homes from ${brandName}, booked direct.`,
-  headline: "{{hotel.name}}",
-  description: "",
 });
-/** A template line for one card: the tags the preview can fill, filled. */
-export function fillCatalogTags(
-  template: string,
-  item: { name: string; description?: string | null; brand: string },
-) {
-  return template
-    .replaceAll("{{hotel.name}}", item.name)
-    .replaceAll("{{hotel.description}}", item.description ?? "")
-    .replaceAll("{{hotel.brand}}", item.brand)
+
+/**
+ * A listing title made into the name a guest would say: the part before a
+ * "|" or the first sentence, no emoji, and not shouted. "DerbyCity Plush Loft.
+ * Gather in Style by Hollyhock" becomes "DerbyCity Plush Loft".
+ */
+export function catalogAdHeadline(name: string) {
+  let head = name.split(" | ")[0]!.split(/(?<=[a-z0-9]{3})\. |: /i)[0]!;
+  head = head
+    .replace(/\p{Extended_Pictographic}/gu, "")
+    .replace(/\s+/g, " ")
+    .replace(/[\s!]+$/, "")
     .trim();
+  // Shouted: letters, none of them lower case.
+  if (/[A-Z]/.test(head) && !/[a-z]/.test(head))
+    head = head
+      .toLowerCase()
+      .replace(
+        /(^|[\s-])(\p{L})/gu,
+        (_, gap: string, c: string) => gap + c.toUpperCase(),
+      );
+  if (head.length > 60) head = `${head.slice(0, 60).replace(/\s+\S*$/, "")}…`;
+  return head || name.trim();
+}
+
+/**
+ * The line under the ad headline, front-loaded because Meta cuts it after a
+ * few words: where, how many it sleeps, and the amenity that sells it.
+ */
+export function catalogAdDescription(home: HotelFeedHome) {
+  const where = [home.city, home.state].filter(Boolean).join(", ");
+  const hook = rankAmenities(home.amenities)[0]?.hook;
+  return (
+    [where, home.guests ? `Sleeps ${home.guests}` : null, hook]
+      .filter(Boolean)
+      .join(" · ") || home.name
+  );
 }
 
 export type CatalogDraft = {
@@ -105,6 +132,8 @@ export type CatalogOverrides = {
   excluded?: boolean;
   /** Amenity pills chosen for the amenities cards. */
   pills?: string[] | null;
+  adHeadline?: string | null;
+  adDescription?: string | null;
 };
 export type CatalogHome = HotelFeedHome & {
   rating?: number;
@@ -349,6 +378,8 @@ export function catalogDraft(
           rating: ratingOutOfFive(home.rating),
           pills: o.pills ?? defaultCatalogPills(home),
           location: catalogLocation(home, markets) || undefined,
+          adHeadline: o.adHeadline ?? catalogAdHeadline(home.name),
+          adDescription: o.adDescription ?? catalogAdDescription(home),
         };
         return {
           ...card,
@@ -462,20 +493,27 @@ export function catalogExportRows(
     { market?: string | null; group?: string | null }
   > = new Map(),
 ) {
-  return hotelFeedRows(
-    draft.cards
-      .filter((c) => c.included)
-      .map((card) => {
-        const home = homes.find((h) => h.id === card.homeId);
-        const asset = assets.find(
-          (a) => a.homeId === card.homeId && a.format === draft.primaryFormat,
-        );
-        if (!home || !asset)
-          throw new Error("A catalog home is missing its frozen primary image");
-        return { ...home, imageUrl: asset.url, ...labels.get(home.id) };
-      }),
+  const included = draft.cards.filter((c) => c.included);
+  const rows = hotelFeedRows(
+    included.map((card) => {
+      const home = homes.find((h) => h.id === card.homeId);
+      const asset = assets.find(
+        (a) => a.homeId === card.homeId && a.format === draft.primaryFormat,
+      );
+      if (!home || !asset)
+        throw new Error("A catalog home is missing its frozen primary image");
+      return { ...home, imageUrl: asset.url, ...labels.get(home.id) };
+    }),
     brandName,
   );
+  // Meta shows the feed's title and description under each card: the card's
+  // own ad headline and description.
+  const byHome = new Map(included.map((card) => [card.homeId, card]));
+  return rows.map((row) => ({
+    ...row,
+    title: byHome.get(row.id)!.adHeadline,
+    description: byHome.get(row.id)!.adDescription,
+  }));
 }
 
 /** Never synthesize another size or apply a composition to supplied artwork. */

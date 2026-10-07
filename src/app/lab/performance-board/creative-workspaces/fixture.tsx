@@ -223,8 +223,8 @@ export function CreativeWorkspacesFixture() {
                   .map((card) => ({
                     key: card.homeId,
                     image: catalogArtworkUrl(card),
-                    name: HOMES.find((home) => home.id === card.homeId)!.name,
-                    home: HOMES.find((home) => home.id === card.homeId),
+                    headline: card.adHeadline,
+                    description: card.adDescription,
                   }))}
               />
             ) : catalogView === "exports" ? (

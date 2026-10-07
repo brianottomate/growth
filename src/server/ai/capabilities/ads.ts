@@ -1611,12 +1611,29 @@ export const catalogHomeFactsAction = growthAction({
 export const editCatalogCardAction = growthAction({
   outputSchema: editCatalogCardActionOutputSchema,
   description:
-    "Change one home's card in a Performance client's catalog draft: the headline printed on the image (title, e.g. 'Exposed-brick loft in Louisville, KY'), the facts line (subtitle), the composition template, the crop focus, the logo, whether the home is in the export, the amenity pills on the amenities cards, and the library image or supplied artwork it uses. Send only the fields to change. Saves the draft; nothing is exported or pushed. An approved card is locked: only whether it is in the export can change until the operator reopens it. Approval is the operator's, through setCatalogApproval.",
+    "Change one home's card in a Performance client's catalog draft: the headline printed on the image (title, e.g. 'Exposed-brick loft in Louisville, KY'), the facts line (subtitle), the composition template, the crop focus, the logo, whether the home is in the export, the amenity pills on the amenities cards, the ad headline and description Meta prints under the card (adHeadline, adDescription), and the library image or supplied artwork it uses. Send only the fields to change. Saves the draft; nothing is exported or pushed. An approved card is locked: only whether it is in the export can change until the operator reopens it. Approval is the operator's, through setCatalogApproval.",
   inputSchema: z.object({
     brandId: z.string().min(1),
     homeId: z.string().min(1).describe("The WanderOS listing id."),
     title: z.string().trim().min(1).max(120).optional(),
     subtitle: z.string().max(220).optional(),
+    adHeadline: z
+      .string()
+      .trim()
+      .min(1)
+      .max(255)
+      .optional()
+      .describe(
+        "The ad headline Meta prints under the card: the home's name, cleaned up.",
+      ),
+    adDescription: z
+      .string()
+      .trim()
+      .max(255)
+      .optional()
+      .describe(
+        "The line under the ad headline, e.g. 'Gatlinburg, TN · Sleeps 8 · Hot tub'.",
+      ),
     templateId: compositionTemplateIdSchema.optional(),
     imagePosition: compositionImagePositionSchema.optional(),
     showLogo: z.boolean().optional(),
