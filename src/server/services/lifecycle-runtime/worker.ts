@@ -49,6 +49,7 @@ export async function executeLifecycleDelivery(
       .select({
         websiteId: brandTable.wanderOsWebsiteId,
         email: recipients.email,
+        snapshot: revisions.snapshot,
       })
       .from(enrollments)
       .innerJoin(
@@ -57,6 +58,7 @@ export async function executeLifecycleDelivery(
       )
       .innerJoin(brandTable, eq(brandTable.id, emailSequenceTable.brandId))
       .innerJoin(recipients, eq(recipients.id, enrollments.recipientId))
+      .innerJoin(revisions, eq(revisions.id, enrollments.revisionId))
       .where(
         and(
           eq(enrollments.id, initial.enrollmentId),
@@ -64,7 +66,10 @@ export async function executeLifecycleDelivery(
           eq(enrollments.runtimeId, runtimeId),
         ),
       );
-    if (scope?.websiteId)
+    // Like blast test sends, an operator-requested direct test does not enroll
+    // a guest in marketing. Only the immutable, recipient-bound test revision
+    // can skip the customer-list lookup; local and Postmark suppression remain.
+    if (scope?.websiteId && !isTestJourney(scope.snapshot, scope.email))
       externallySuppressed = (await websiteEmailOptOuts(scope.websiteId)).has(
         scope.email,
       );

@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { orpc } from "@/orpc/client";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -31,6 +32,7 @@ export function SequenceTestPanel({
   ready: boolean;
   onStarted: () => unknown;
 }) {
+  const [recipients, setRecipients] = useState("");
   const [fast, setFast] = useState(true);
   const [open, setOpen] = useState(false);
   const [requestId, setRequestId] = useState("");
@@ -48,8 +50,7 @@ export function SequenceTestPanel({
       onSuccess: (result) => {
         setOpen(false);
         void onStarted();
-        if (result.queued)
-          toast.success("Test sequence scheduled to your inbox");
+        if (result.queued) toast.success("Test sequence scheduled");
         else
           toast.error(
             "Test saved, but scheduling failed. Use Recover queued work.",
@@ -61,11 +62,18 @@ export function SequenceTestPanel({
   const review = preview.data;
   return (
     <section className="mb-5 space-y-3 rounded-xl border p-4">
-      <h3 className="font-medium">Test sequence to me</h3>
+      <h3 className="font-medium">Test sequence</h3>
       <p className="text-sm text-muted-foreground">
-        Run the saved emails to your account. Live delivery can stay paused.
-        Test individual emails with Send test to me in the email editor.
+        Run the saved emails to one or several recipients. Live delivery can
+        stay paused. Test individual emails with Send test to me in the email
+        editor.
       </p>
+      <Input
+        aria-label="Test recipients"
+        placeholder="Email addresses, separated by commas (blank uses your account)"
+        value={recipients}
+        onChange={(event) => setRecipients(event.target.value)}
+      />
       <div className="flex flex-wrap gap-2">
         <Select
           value={fast ? "fast" : "normal"}
@@ -82,7 +90,13 @@ export function SequenceTestPanel({
         <Button
           variant="outline"
           disabled={!ready || preview.isPending || start.isPending}
-          onClick={() => preview.mutate({ sequenceId, fast })}
+          onClick={() =>
+            preview.mutate({
+              sequenceId,
+              fast,
+              recipientEmails: recipients.split(/[,;\s]+/).filter(Boolean),
+            })
+          }
         >
           Review test
         </Button>
@@ -92,8 +106,9 @@ export function SequenceTestPanel({
           <AlertDialogHeader>
             <AlertDialogTitle>Run test sequence</AlertDialogTitle>
             <AlertDialogDescription>
-              This schedules real test emails to {review?.snapshot.test?.email}.
-              Live activation stays unchanged.
+              This schedules real test emails to{" "}
+              {review?.recipientEmails.join(", ")}. Live activation stays
+              unchanged.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {review && (
@@ -132,13 +147,14 @@ export function SequenceTestPanel({
                   start.mutate({
                     sequenceId,
                     fast: preview.variables.fast,
+                    recipientEmails: review.recipientEmails,
                     reviewedHash: review.contentHash,
                     requestId,
                     confirmSends: true,
                   });
               }}
             >
-              Run test to me
+              Run test
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -37,19 +37,26 @@ export const emailSequenceRouter = {
       }),
     ),
   previewTest: workspaceProcedure
-    .input(sequenceInput.extend({ fast: z.boolean() }))
+    .input(
+      sequenceInput.extend({
+        fast: z.boolean(),
+        recipientEmails: z.array(z.email()).optional(),
+      }),
+    )
     .handler(({ context, input }) =>
       previewTestJourney(
         context.workspace.orgId,
         input.sequenceId,
         context.session.user.id,
         input.fast,
+        input.recipientEmails,
       ),
     ),
   startTest: workspaceProcedure
     .input(
       sequenceInput.extend({
         fast: z.boolean(),
+        recipientEmails: z.array(z.email()).optional(),
         reviewedHash: z.string().min(1),
         requestId: z.uuid(),
         confirmSends: z.literal(true),

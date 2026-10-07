@@ -54,7 +54,7 @@ export async function createFlexTestSequence(input: {
     draft: {
       name: "Flex test sequence",
       description:
-        "Three editable test emails, one minute apart. Run manually to your own inbox.",
+        "Three editable test emails, one minute apart. Run manually to chosen recipients.",
       triggerEvent: "test.manual",
       exitCondition: null,
       steps,

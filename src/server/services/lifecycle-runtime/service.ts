@@ -681,6 +681,7 @@ export async function previewTestJourney(
   sequenceId: string,
   userId: string,
   fast: boolean,
+  recipientEmails?: string[],
 ) {
   const program = await getEmailSequence({ organizationId, sequenceId });
   const [brand, user] = await Promise.all([
@@ -690,6 +691,13 @@ export async function previewTestJourney(
     db.query.userTable.findFirst({ where: eq(userTable.id, userId) }),
   ]);
   if (!user?.email || !brand) throw new ORPCError("NOT_FOUND");
+  const destinations = [
+    ...new Set(
+      (recipientEmails?.length ? recipientEmails : [user.email]).map((email) =>
+        email.trim().toLowerCase(),
+      ),
+    ),
+  ];
   const sender = brand.emailSender;
   const preview = await previewJourney(organizationId, sequenceId, {
     from: sender?.fromEmail
@@ -700,9 +708,13 @@ export async function previewTestJourney(
     conditions: {},
   });
   preview.snapshot.test = {
-    email: user.email.toLowerCase(),
+    email: destinations[0]!,
     attributes: {
-      first_name: user.name?.split(" ")[0] || "Guest",
+      first_name:
+        destinations.length === 1 &&
+        destinations[0] === user.email.toLowerCase()
+          ? user.name?.split(" ")[0] || "Guest"
+          : "Guest",
       last_home: "Example home",
     },
   };
@@ -711,8 +723,11 @@ export async function previewTestJourney(
       ...step,
       delayMinutes: index,
     }));
-  preview.contentHash = contentHash(preview.snapshot);
-  return preview;
+  preview.contentHash = contentHash({
+    snapshot: preview.snapshot,
+    recipientEmails: destinations,
+  });
+  return { ...preview, recipientEmails: destinations };
 }
 
 export async function startTestJourney(input: {
@@ -722,6 +737,7 @@ export async function startTestJourney(input: {
   fast: boolean;
   reviewedHash: string;
   requestId: string;
+  recipientEmails?: string[];
 }) {
   requireLifecycleRuntime();
   const preview = await previewTestJourney(
@@ -729,6 +745,7 @@ export async function startTestJourney(input: {
     input.sequenceId,
     input.userId,
     input.fast,
+    input.recipientEmails,
   );
   if (preview.errors.length)
     throw new ORPCError("BAD_REQUEST", { message: preview.errors.join("\n") });
@@ -741,8 +758,7 @@ export async function startTestJourney(input: {
     sequenceId: input.sequenceId,
   });
   const test = preview.snapshot.test!;
-  const eventId = `test:${input.requestId}`;
-  const enrollmentId = await withTransaction(async (tx) => {
+  const enrollmentIds = await withTransaction(async (tx) => {
     await tx
       .insert(executions)
       .values({ sequenceId: input.sequenceId })
@@ -752,84 +768,92 @@ export async function startTestJourney(input: {
       .from(executions)
       .where(eq(executions.sequenceId, input.sequenceId))
       .for("update");
-    const [existing] = await tx
-      .select()
-      .from(enrollments)
-      .where(
-        and(
-          eq(enrollments.sequenceId, input.sequenceId),
-          eq(enrollments.eventId, eventId),
-        ),
-      );
-    if (existing) {
-      if (existing.inputHash !== preview.contentHash)
+    const runIds: string[] = [];
+    for (const [index, email] of preview.recipientEmails.entries()) {
+      const eventId = `test:${input.requestId}:${index}`;
+      const [existing] = await tx
+        .select()
+        .from(enrollments)
+        .where(
+          and(
+            eq(enrollments.sequenceId, input.sequenceId),
+            eq(enrollments.eventId, eventId),
+          ),
+        );
+      if (existing) {
+        if (existing.inputHash !== preview.contentHash)
+          throw new ORPCError("CONFLICT", {
+            message:
+              "This test request was already used for different content.",
+          });
+        runIds.push(existing.id);
+        continue;
+      }
+      const now = new Date();
+      await tx
+        .insert(recipients)
+        .values({
+          brandId: program.brandId,
+          email,
+          attributes: {},
+          observedAt: now,
+          consentSource: "Operator requested a direct test",
+          consentAt: now,
+          unsubscribeToken: randomBytes(32).toString("base64url"),
+        })
+        .onConflictDoNothing();
+      const [recipient] = await tx
+        .select()
+        .from(recipients)
+        .where(
+          and(
+            eq(recipients.brandId, program.brandId),
+            eq(recipients.email, email),
+          ),
+        )
+        .for("update");
+      if (!recipient || recipient.suppressedAt)
         throw new ORPCError("CONFLICT", {
-          message: "This test request was already used for different content.",
+          message: `${email} is unsubscribed or suppressed for this brand.`,
         });
-      return existing.id;
+      const [revision] = await tx
+        .insert(revisions)
+        .values({
+          sequenceId: input.sequenceId,
+          snapshot: { ...preview.snapshot, test: { ...test, email } },
+          contentHash: preview.contentHash,
+          createdBy: input.userId,
+        })
+        .returning();
+      const [run] = await tx
+        .insert(enrollments)
+        .values({
+          sequenceId: input.sequenceId,
+          revisionId: revision!.id,
+          recipientId: recipient.id,
+          eventId,
+          inputHash: preview.contentHash,
+          runtimeId: env.LIFECYCLE_RUNTIME_ID!,
+          createdAt: now,
+        })
+        .returning();
+      await tx.insert(deliveries).values(
+        preview.snapshot.steps.map((step, position) => ({
+          enrollmentId: run!.id,
+          stepId: step.id,
+          position,
+          dueAt: new Date(now.getTime() + step.delayMinutes * 60_000),
+        })),
+      );
+      runIds.push(run!.id);
     }
-    const now = new Date();
-    await tx
-      .insert(recipients)
-      .values({
-        brandId: program.brandId,
-        email: test.email,
-        attributes: {},
-        observedAt: now,
-        consentSource: "Operator requested a test to their own account",
-        consentAt: now,
-        unsubscribeToken: randomBytes(32).toString("base64url"),
-      })
-      .onConflictDoNothing();
-    const [recipient] = await tx
-      .select()
-      .from(recipients)
-      .where(
-        and(
-          eq(recipients.brandId, program.brandId),
-          eq(recipients.email, test.email),
-        ),
-      )
-      .for("update");
-    if (!recipient || recipient.suppressedAt)
-      throw new ORPCError("CONFLICT", {
-        message: "Your email is unsubscribed or suppressed for this brand.",
-      });
-    const [revision] = await tx
-      .insert(revisions)
-      .values({
-        sequenceId: input.sequenceId,
-        snapshot: preview.snapshot,
-        contentHash: preview.contentHash,
-        createdBy: input.userId,
-      })
-      .returning();
-    const [run] = await tx
-      .insert(enrollments)
-      .values({
-        sequenceId: input.sequenceId,
-        revisionId: revision!.id,
-        recipientId: recipient.id,
-        eventId,
-        inputHash: preview.contentHash,
-        runtimeId: env.LIFECYCLE_RUNTIME_ID!,
-        createdAt: now,
-      })
-      .returning();
-    await tx.insert(deliveries).values(
-      preview.snapshot.steps.map((step, position) => ({
-        enrollmentId: run!.id,
-        stepId: step.id,
-        position,
-        dueAt: new Date(now.getTime() + step.delayMinutes * 60_000),
-      })),
-    );
-    return run!.id;
+    return runIds;
   });
-  try {
-    await dispatchEnrollment(enrollmentId);
-    return { enrollmentId, queued: true };
-  } catch {
-    return { enrollmentId, queued: false };
-  }
+  const scheduled = await Promise.allSettled(
+    enrollmentIds.map(dispatchEnrollment),
+  );
+  return {
+    enrollmentIds,
+    queued: scheduled.every((result) => result.status === "fulfilled"),
+  };
 }
