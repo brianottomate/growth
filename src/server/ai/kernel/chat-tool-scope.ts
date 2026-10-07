@@ -98,6 +98,7 @@ export function createChatToolScope(input: {
   content?: boolean;
   email?: boolean;
   continuation: UIMessage;
+  history?: UIMessage[];
   focus?:
     | "catalog"
     | "creative"
@@ -110,6 +111,21 @@ export function createChatToolScope(input: {
 }) {
   const selected = new Set<Domain>();
   let performanceExpanded = false;
+  for (const message of input.history ?? []) {
+    if (message.role !== "assistant") continue;
+    for (const part of message.parts) {
+      if (
+        !isToolUIPart(part) ||
+        getToolName(part) !== "selectToolDomain" ||
+        part.state !== "output-available"
+      )
+        continue;
+      const result = z.object({ enabled: domainSchema }).safeParse(part.output);
+      if (!result.success) continue;
+      selected.add(result.data.enabled);
+      if (result.data.enabled === "performance") performanceExpanded = true;
+    }
+  }
   if (input.pitch) selected.add("research");
   if (input.email) selected.add("email");
   if (/\/initiatives(\/|$)/.test(input.pagePath ?? "")) {
@@ -152,7 +168,7 @@ export function createChatToolScope(input: {
     GrowthExecutionContext
   >({
     description:
-      "Enable another Growth tool domain when the task crosses sections. Domains: performance (sales pitches, client accounts, ads, catalogs, campaigns), content (posts, calendar, strategy, publishing), email (newsletters and lifecycle), leads, listening, product (atlas, storefronts), research (web, Drive, blogs). This changes tool availability only and authorizes no edits.",
+      "Enable another Growth tool domain when the task crosses sections. Domains: performance (sales pitches, client accounts, home groups, booking targets, ads, catalogs, campaigns), content (posts, calendar, strategy, publishing), email (newsletters and lifecycle), leads, listening, product (atlas, storefronts), research (web, Drive, blogs). This changes tool availability only and authorizes no edits.",
     inputSchema: domainInputSchema,
     execute: async ({ domain }) => {
       selected.add(domain);

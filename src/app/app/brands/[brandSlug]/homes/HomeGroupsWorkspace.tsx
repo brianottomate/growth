@@ -64,8 +64,6 @@ export function HomeGroupsWorkspace({
   brandSlug,
   brandName,
   featuredHomes,
-  personaSuggestions = [],
-  personaSetupHref = `/app/brands/${brandSlug}/setup`,
   betweenSections,
   setupHref = `/app/brands/${brandSlug}/setup`,
 }: {
@@ -74,8 +72,6 @@ export function HomeGroupsWorkspace({
   brandName: string;
   setupHref?: string;
   featuredHomes?: ComponentProps<typeof PickedHomes>;
-  personaSuggestions?: { id: string; name: string; homeIds: string[] }[];
-  personaSetupHref?: string;
   betweenSections?: ReactNode;
 }) {
   const client = useQueryClient();
@@ -146,7 +142,8 @@ export function HomeGroupsWorkspace({
               group.isPrimary && featuredHomes ? (
                 <div
                   key={group.id}
-                  className="border-t pt-4 first:border-t-0 first:pt-0"
+                  aria-label={group.name}
+                  className="min-w-0 space-y-3 rounded-xl border p-4"
                 >
                   <PickedHomes
                     {...featuredHomes}
@@ -163,16 +160,12 @@ export function HomeGroupsWorkspace({
                       </Button>
                     }
                   />
-                  <GroupPersonaLinks
-                    group={group}
-                    personas={personaSuggestions}
-                    setupHref={personaSetupHref}
-                  />
                 </div>
               ) : (
                 <div
                   key={group.id}
-                  className="min-w-0 space-y-3 border-t pt-4 first:border-t-0 first:pt-0"
+                  aria-label={group.name}
+                  className="min-w-0 space-y-3 rounded-xl border p-4"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <h3 className="text-base font-semibold [overflow-wrap:anywhere]">
@@ -219,11 +212,6 @@ export function HomeGroupsWorkspace({
                       )}
                     </div>
                   </div>
-                  <GroupPersonaLinks
-                    group={group}
-                    personas={personaSuggestions}
-                    setupHref={personaSetupHref}
-                  />
                   {group.description && (
                     <p className="text-sm text-muted-foreground">
                       {group.description}
@@ -784,34 +772,5 @@ function GroupLabel({ group }: { group: Group }) {
         {SOURCE_LABEL[group.source]}
       </span>
     </span>
-  );
-}
-
-function GroupPersonaLinks({
-  group,
-  personas,
-  setupHref,
-}: {
-  group: Group;
-  personas: { id: string; name: string; homeIds: string[] }[];
-  setupHref: string;
-}) {
-  const matches = personas.filter((persona) =>
-    persona.homeIds.some((id) => group.homeIds.includes(id)),
-  );
-  if (!matches.length) return null;
-  return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-      <span>Suggested persona fits</span>
-      {matches.map((persona) => (
-        <Link
-          key={persona.id}
-          href={`${setupHref}#persona-${persona.id}`}
-          className="underline underline-offset-4"
-        >
-          {persona.name}
-        </Link>
-      ))}
-    </div>
   );
 }

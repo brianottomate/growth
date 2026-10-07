@@ -161,7 +161,7 @@ export function PickedHomes({
       className={embedded ? "space-y-3" : "space-y-3 rounded-xl border p-4"}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-baseline gap-2">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-2">
           <TitleTag className="text-base font-semibold">{title}</TitleTag>
           <span
             className={cn(

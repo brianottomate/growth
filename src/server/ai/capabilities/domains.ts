@@ -422,7 +422,7 @@ export const performanceRead = growthDomainTool({
 
 export const performanceWrite = growthDomainTool({
   description:
-    "Manage Performance accounts: onboard clients, add their homes, update one home at a time (featured on the Setup page, hero photo), open and update billing cycles, and attach existing delivery (campaigns, lifecycle campaigns, amplification targets) to a cycle. Never creates ads or sends anything.",
+    "Manage Performance accounts: onboard clients, create and edit named home groups and their membership, add their homes, update one home at a time (featured on the Setup page, hero photo), open and update billing cycles, and attach existing delivery (campaigns, lifecycle campaigns, amplification targets) to a cycle. Never creates ads or sends anything.",
   actions: {
     savePitch: savePitchAction,
     createAccount: createPerformanceAccountAction,

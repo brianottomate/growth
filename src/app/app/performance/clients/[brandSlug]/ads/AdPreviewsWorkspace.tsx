@@ -12,6 +12,7 @@ import { AdFormatFilter } from "@/components/ad-format-filter";
 import { AD_FORMATS, adFormat, type AdFormat } from "@/lib/ad-format";
 import { campaignDisplayName } from "@/lib/campaign-navigation";
 import { Button } from "@/components/ui/button";
+import { Combobox } from "@/components/ui/compound/combobox";
 import { WorkspaceCard } from "../../../WorkspaceCard";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
@@ -147,39 +148,79 @@ export function AdPreviewsWorkspace({
       >
         {drafted ? (
           <>
-            <InputGroup>
-              <InputGroupAddon>
-                <Search className="size-4" />
-              </InputGroupAddon>
-              <InputGroupInput
-                aria-label="Search ads"
-                placeholder="Search ads"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-              />
-            </InputGroup>
-            <div className="flex flex-wrap items-center gap-2">
-              <label className="flex max-w-full items-center gap-2 text-sm">
-                Campaign
-                <select
+            <div className="flex flex-col gap-3 @2xl:flex-row @2xl:items-center">
+              <div className="min-w-0 flex-1">
+                <InputGroup>
+                  <InputGroupAddon>
+                    <Search className="size-4" />
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    aria-label="Search ads"
+                    placeholder="Search ads"
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                  />
+                </InputGroup>
+              </div>
+              <div
+                role="group"
+                aria-label="Campaign filter"
+                className="flex min-w-0 items-center gap-2"
+              >
+                <span className="text-sm">Campaign</span>
+                <Combobox
+                  className="min-w-0 flex-1 @2xl:w-64 @2xl:flex-none"
                   value={assignment}
-                  onChange={(e) => setAssignment(e.target.value)}
-                  className="h-9 max-w-72 min-w-0 rounded-md border bg-background px-3 text-sm"
-                >
-                  <option value="all">All ads</option>
-                  <option value="unassigned">Unassigned ads</option>
-                  <option value="assigned">Assigned ads</option>
-                  {campaigns.length > 0 && (
-                    <optgroup label="Campaigns">
-                      {campaigns.map(([id, name]) => (
-                        <option key={id} value={`campaign:${id}`}>
-                          {name}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                </select>
-              </label>
+                  onValueChange={(value) => setAssignment(value || "all")}
+                  ariaLabel="Campaign"
+                  placeholder="Filter by campaign"
+                  searchPlaceholder="Search campaigns…"
+                  emptyText="No matching campaigns."
+                  options={[
+                    { value: "all", label: "All ads", keywords: ["all ads"] },
+                    {
+                      value: "unassigned",
+                      label: "Unassigned ads",
+                      keywords: ["unassigned ads"],
+                    },
+                    {
+                      value: "assigned",
+                      label: "Assigned ads",
+                      keywords: ["assigned ads"],
+                    },
+                    ...campaigns.map(([id, name]) => ({
+                      value: `campaign:${id}`,
+                      label: name,
+                      keywords: [name],
+                    })),
+                  ]}
+                />
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div
+                role="group"
+                aria-label="Ad review status"
+                className="flex w-fit max-w-full flex-wrap gap-1 rounded-lg border p-0.5"
+              >
+                {(["all", "draft", "ready", "approved"] as const).map((key) => (
+                  <Button
+                    key={key}
+                    size="sm"
+                    variant={filter === key ? "secondary" : "ghost"}
+                    aria-pressed={filter === key}
+                    onClick={() => setFilter(key)}
+                  >
+                    {key === "all"
+                      ? `All ${statusScope.length}`
+                      : key === "draft"
+                        ? `Draft ${draftCount}`
+                        : key === "ready"
+                          ? `Ready ${readyCount}`
+                          : `Approved ${approved}`}
+                  </Button>
+                ))}
+              </div>
               <div
                 role="group"
                 aria-label="Group ads"
@@ -197,29 +238,6 @@ export function AdPreviewsWorkspace({
                   </Button>
                 ))}
               </div>
-            </div>
-            <div
-              role="group"
-              aria-label="Ad review status"
-              className="flex w-fit max-w-full flex-wrap gap-1 rounded-lg border p-0.5"
-            >
-              {(["all", "draft", "ready", "approved"] as const).map((key) => (
-                <Button
-                  key={key}
-                  size="sm"
-                  variant={filter === key ? "secondary" : "ghost"}
-                  aria-pressed={filter === key}
-                  onClick={() => setFilter(key)}
-                >
-                  {key === "all"
-                    ? `All ${statusScope.length}`
-                    : key === "draft"
-                      ? `Draft ${draftCount}`
-                      : key === "ready"
-                        ? `Ready ${readyCount}`
-                        : `Approved ${approved}`}
-                </Button>
-              ))}
             </div>
             <AdFormatFilter
               value={kind}

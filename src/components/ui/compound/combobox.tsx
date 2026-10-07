@@ -28,6 +28,7 @@ interface ComboboxProps {
   value?: string;
   onValueChange?: (value: string) => void;
   placeholder?: string;
+  ariaLabel?: string;
   searchPlaceholder?: string;
   emptyText?: string;
   disabled?: boolean;
@@ -41,6 +42,7 @@ export function Combobox({
   value,
   onValueChange,
   placeholder = "Select option...",
+  ariaLabel,
   searchPlaceholder = "Search...",
   emptyText = "No results found.",
   disabled = false,
@@ -61,6 +63,7 @@ export function Combobox({
             <Button
               variant="outline"
               role="combobox"
+              aria-label={ariaLabel}
               aria-expanded={open}
               className={cn("w-full justify-between", triggerClassName)}
               disabled={disabled}
@@ -110,6 +113,7 @@ export function Combobox({
         <DrawerTrigger asChild>
           <Button
             variant="outline"
+            aria-label={ariaLabel}
             className={cn("w-full justify-between", triggerClassName)}
             disabled={disabled}
           >

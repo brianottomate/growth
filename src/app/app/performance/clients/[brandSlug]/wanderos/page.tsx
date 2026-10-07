@@ -1,5 +1,4 @@
 import { HomeGroupsWorkspace } from "@/app/app/brands/[brandSlug]/homes/HomeGroupsWorkspace";
-import { loadPersonaAudiences } from "@/server/services/persona-audience.service";
 import { DestinationsCard } from "../DestinationsCard";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
@@ -37,10 +36,9 @@ export default async function PerformanceWanderOsPage({
     return <div className="text-muted-foreground">No organization found.</div>;
   if (!brand) notFound();
 
-  const [rows, committed, audiences] = await Promise.all([
+  const [rows, committed] = await Promise.all([
     listAllBrandHomes(brand.id),
     listBrandHomes(brand.id),
-    loadPersonaAudiences(brand.id),
   ]);
   const slug = brand.slug ?? brand.id;
   const connected = Boolean(brand.wanderOsEnabled && brand.wanderOsWebsiteId);
@@ -111,12 +109,6 @@ export default async function PerformanceWanderOsPage({
             brandId={brand.id}
             brandName={brand.name}
             brandSlug={slug}
-            personaSuggestions={audiences.personas.map(({ persona }) => ({
-              id: persona.id,
-              name: persona.name,
-              homeIds: persona.profile?.homeIds ?? [],
-            }))}
-            personaSetupHref={`/app/performance/clients/${slug}/setup`}
             setupHref={`${brandTabHref(slug, "settings")}#wanderos`}
             featuredHomes={{
               brandId: brand.id,

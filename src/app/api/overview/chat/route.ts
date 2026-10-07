@@ -953,6 +953,7 @@ export async function POST(req: Request): Promise<Response> {
         /\/newsletters(?:[/?#]|$)/.test(pagePath ?? ""),
       content: Boolean(activeWorkContext),
       continuation: incoming,
+      history,
       focus: activeAd
         ? "creative"
         : activeCatalogContext
