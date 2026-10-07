@@ -1,5 +1,6 @@
 import {
   personaProfileSchema,
+  generatedPersonaProfileSchema,
   creativeDirectionText,
 } from "@/lib/brand-direction";
 import { steerSchema, operatorSteeringSection } from "@/lib/generation-steer";
@@ -261,7 +262,7 @@ const suggestionSchema = z.object({
 /** Read and reason separately from creation, so Shape can discuss the same proposals. */
 export const suggestPersonas = growthAction({
   description:
-    "Suggest up to three missing brand-level customer personas from the brand story and homes, preserving the existing set. Pass personaId to revise an existing persona and apply the result with update; omit it to propose missing personas. Pass steer for the requested changes. Read-only; return planning hypotheses, not measured booking facts. The UI can create them immediately when the operator clicks Define personas; chat can discuss before personaWrite.create.",
+    "Suggest up to three missing brand-level customer personas from the brand story and homes, preserving the existing set. Pass personaId to revise an existing persona and apply the result with update; omit it to propose missing personas. Pass steer for the requested changes. Read-only; return planning hypotheses, not measured booking facts. Discuss proposals in chat before applying them with personaWrite.create or personaWrite.update.",
   inputSchema: z.object({
     brandId: z.string().trim().min(1),
     steer: steerSchema,
@@ -322,7 +323,7 @@ export const suggestPersonas = growthAction({
       model: anthropic("claude-sonnet-5"),
       system:
         system +
-        " Return a structured profile with motivation, needs, objections, decisionCriteria, icon, relevant homeIds and fitReason. Write needs, objections, decision criteria and must-haves as concise 2–6 word phrases, with at most five entries each. Keep motivation under 45 words. Home IDs must come from the supplied inventory. These are suggested fits, not measured customer segments. Use travel null for non-travel brands. Unknown travel attributes must be null. evidenceNote must distinguish inferred preferences from observed evidence. When target is supplied, return exactly one updated proposal for that persona, preserving its motivation unless directed otherwise; the instruction to avoid existing personas does not apply to this target.",
+        " Return a structured profile with motivation, needs, objections, decisionCriteria, relevant homeIds and fitReason. Write at most three needs and three decision criteria as distinct 2–5 word phrases. Select the strongest factors and combine overlaps. Keep motivation to one sentence of at most 25 words and 200 characters. Use a short persona name of 2–5 words. Return empty objections and must-haves unless the operator specifically asks for them. Keep evidenceNote to one short sentence that explains the evidence basis. Home IDs must come from the supplied inventory. These are suggested fits, not measured customer segments. Use travel null for non-travel brands. Unknown travel attributes must be null. evidenceNote must distinguish inferred preferences from observed evidence. When target is supplied, return exactly one updated proposal for that persona, preserving its motivation unless directed otherwise; the instruction to avoid existing personas does not apply to this target.",
       prompt:
         prompt +
         "\n" +
@@ -330,7 +331,13 @@ export const suggestPersonas = growthAction({
         operatorSteeringSection(input.steer),
       output: Output.object({
         schema: z.object({
-          suggestions: z.array(suggestionSchema).max(3),
+          suggestions: z
+            .array(
+              suggestionSchema.extend({
+                profile: generatedPersonaProfileSchema,
+              }),
+            )
+            .max(3),
           insufficientEvidence: z.boolean(),
           reason: z.string(),
         }),

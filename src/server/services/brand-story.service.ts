@@ -1,6 +1,6 @@
 import "server-only";
 import {
-  creativeDirectionSchema,
+  generatedCreativeDirectionSchema,
   type CreativeDirection,
 } from "@/lib/brand-direction";
 import { operatorSteeringSection } from "@/lib/generation-steer";
@@ -157,11 +157,11 @@ export async function draftBrandStory(input: {
     system,
     prompt:
       prompt +
-      `\n\nCurrent saved brief and direction (preserve accepted choices unless steered otherwise):\n${JSON.stringify({ story: brand.story, creativeDirection: brand.creativeDirection })}` +
+      `\n\nCurrent saved brief and direction (preserve accepted meaning and preferences while condensing to the requested limits):\n${JSON.stringify({ story: brand.story, creativeDirection: brand.creativeDirection })}` +
       operatorSteeringSection(input.steer),
     output: Output.object({
       schema: brandStoryResultSchema.extend({
-        creativeDirection: creativeDirectionSchema.nullable(),
+        creativeDirection: generatedCreativeDirectionSchema.nullable(),
       }),
     }),
   });

@@ -64,6 +64,8 @@ export function HomeGroupsWorkspace({
   brandSlug,
   brandName,
   featuredHomes,
+  personaSuggestions = [],
+  personaSetupHref = `/app/brands/${brandSlug}/setup`,
   betweenSections,
   setupHref = `/app/brands/${brandSlug}/setup`,
 }: {
@@ -72,6 +74,8 @@ export function HomeGroupsWorkspace({
   brandName: string;
   setupHref?: string;
   featuredHomes?: ComponentProps<typeof PickedHomes>;
+  personaSuggestions?: { id: string; name: string; homeIds: string[] }[];
+  personaSetupHref?: string;
   betweenSections?: ReactNode;
 }) {
   const client = useQueryClient();
@@ -159,6 +163,11 @@ export function HomeGroupsWorkspace({
                       </Button>
                     }
                   />
+                  <GroupPersonaLinks
+                    group={group}
+                    personas={personaSuggestions}
+                    setupHref={personaSetupHref}
+                  />
                 </div>
               ) : (
                 <div
@@ -210,6 +219,11 @@ export function HomeGroupsWorkspace({
                       )}
                     </div>
                   </div>
+                  <GroupPersonaLinks
+                    group={group}
+                    personas={personaSuggestions}
+                    setupHref={personaSetupHref}
+                  />
                   {group.description && (
                     <p className="text-sm text-muted-foreground">
                       {group.description}
@@ -770,5 +784,34 @@ function GroupLabel({ group }: { group: Group }) {
         {SOURCE_LABEL[group.source]}
       </span>
     </span>
+  );
+}
+
+function GroupPersonaLinks({
+  group,
+  personas,
+  setupHref,
+}: {
+  group: Group;
+  personas: { id: string; name: string; homeIds: string[] }[];
+  setupHref: string;
+}) {
+  const matches = personas.filter((persona) =>
+    persona.homeIds.some((id) => group.homeIds.includes(id)),
+  );
+  if (!matches.length) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+      <span>Suggested persona fits</span>
+      {matches.map((persona) => (
+        <Link
+          key={persona.id}
+          href={`${setupHref}#persona-${persona.id}`}
+          className="underline underline-offset-4"
+        >
+          {persona.name}
+        </Link>
+      ))}
+    </div>
   );
 }

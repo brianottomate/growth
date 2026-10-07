@@ -147,26 +147,14 @@ export default async function PerformanceBrandSetupPage({
       <section className="rounded-xl border p-4">
         <PersonaAudiences
           brand={{ id: brand.id, slug, name: brand.name, story: brand.story }}
-          personas={audiences.personas.map(({ persona, targets }) => ({
+          personas={audiences.personas.map(({ persona }) => ({
             id: persona.id,
             name: persona.name,
             description: persona.description,
             profile: persona.profile,
             demandGeography: persona.demandGeography,
             destinationGeography: persona.destinationGeography,
-            targets,
           }))}
-          homes={rows.map((home) => ({
-            id: home.id,
-            name: home.name,
-            city: home.city,
-            imageUrl:
-              home.galleryCache?.find(
-                (photo) => photo.url === home.heroSourceUrl,
-              )?.thumbUrl ?? home.heroSourceUrl,
-            href: `/app/performance/clients/${slug}/homes/${home.externalId}`,
-          }))}
-          unassigned={audiences.unassigned}
         />
       </section>
     </div>

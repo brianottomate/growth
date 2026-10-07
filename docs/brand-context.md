@@ -1,6 +1,6 @@
 # Brand context and steering
 
-The brand story is editable prose in `brand.story`. Supporting creative direction is `brand.creativeDirection` JSONB: positioning, an optional archetype, four fixed voice axes, lead-with themes and language to avoid. Voice positions are generated judgments displayed on deterministic scales, not operator controls. Story regeneration produces both in one structured model call and saves them together. Current accepted content and operator steering are included; a concurrent edit prevents the generated result from overwriting newer work.
+The brand story is editable prose in `brand.story`. Supporting creative direction is `brand.creativeDirection` JSONB: positioning, an optional archetype, two fixed voice axes (casual to formal and understated to expressive), lead-with themes and language to avoid. Voice positions are generated judgments displayed on deterministic scales, not operator controls. Story regeneration produces both in one structured model call and saves them together. Current accepted content and operator steering are included; a concurrent edit prevents the generated result from overwriting newer work.
 
 Personas retain their IDs, prose and audience references. `persona.profile` adds motivation, needs, objections, decision criteria, suggested home IDs, a fit explanation and evidence notes. Travel details are optional, with unknown attributes null. Suggested homes must belong to the brand. Personas describe creative planning hypotheses; campaign platform targeting remains separate. Destination JSON keeps existing IDs when town membership is unchanged. Origin cities are suggestions unless supported by measured data.
 
@@ -27,3 +27,7 @@ bun --conditions=react-server scripts/brand-context/backfill.ts --apply
 ```
 
 Optional `--brand=slug` limits the backfill. Failures leave original content intact and exit nonzero; rerun to finish missing rows. No legacy prose is dropped. New destinations already use compatible JSON and need no bulk rewrite.
+
+New story generation uses a 6–12 word positioning title (100 characters maximum), a plain voice subtitle of at most 16 words (120 characters maximum), and up to three concise priorities and avoid rules each. The card shows the subtitle without an archetype label or icon. Existing saved prose remains readable until regeneration.
+
+Persona setup cards use Shape for changes and display motivation, travel details, and up to three needs and decision criteria. Generation usually suggests one or two personas, with short names and a motivation sentence under 25 words. Persona icons, edit forms, expanded stories, objections and suggested-home lists have been removed from these cards. Stored supporting evidence and inventory suggestions remain available to chat. Home groups link to personas whose suggested inventory overlaps the group, labeled as suggested fits. These links do not change saved group membership.

@@ -2,26 +2,12 @@ import { z } from "zod";
 
 export const VOICE_AXES = {
   casualFormal: ["Casual", "Conversational", "Balanced", "Polished", "Formal"],
-  playfulSerious: [
-    "Playful",
-    "Lighthearted",
-    "Balanced",
-    "Matter-of-fact",
-    "Serious",
-  ],
   understatedExpressive: [
     "Understated",
     "Restrained",
     "Balanced",
     "Expressive",
     "Vivid",
-  ],
-  accessibleTechnical: [
-    "Everyday language",
-    "Accessible",
-    "Balanced",
-    "Specialist",
-    "Technical",
   ],
 } as const;
 const dial = z.number().int().min(0).max(4);
@@ -41,14 +27,19 @@ export const creativeDirectionSchema = z.object({
   archetypeReason: z.string().max(300),
   voice: z.object({
     casualFormal: dial,
-    playfulSerious: dial,
     understatedExpressive: dial,
-    accessibleTechnical: dial,
   }),
   leadWith: z.array(z.string().trim().min(1).max(100)).max(6),
   neverSay: z.array(z.string().trim().min(1).max(120)).max(12),
 });
 export type CreativeDirection = z.infer<typeof creativeDirectionSchema>;
+
+export const generatedCreativeDirectionSchema = creativeDirectionSchema.extend({
+  positioning: z.string().trim().min(1).max(100),
+  archetypeReason: z.string().trim().max(120),
+  leadWith: z.array(z.string().trim().min(1).max(50)).max(3),
+  neverSay: z.array(z.string().trim().min(1).max(70)).max(3),
+});
 
 export function creativeDirectionText(direction?: CreativeDirection | null) {
   if (!direction) return "";
@@ -60,7 +51,6 @@ export function creativeDirectionText(direction?: CreativeDirection | null) {
 
 const phrases = z.array(z.string().trim().min(1).max(160)).max(8);
 export const personaProfileSchema = z.object({
-  icon: z.enum(["users", "heart", "briefcase", "compass", "home", "sparkles"]),
   motivation: z.string().trim().min(1).max(500),
   needs: phrases,
   objections: phrases,
@@ -81,3 +71,9 @@ export const personaProfileSchema = z.object({
   evidenceNote: z.string().trim().min(1).max(600),
 });
 export type PersonaProfile = z.infer<typeof personaProfileSchema>;
+
+export const generatedPersonaProfileSchema = personaProfileSchema.extend({
+  motivation: z.string().trim().min(1).max(200),
+  needs: z.array(z.string().trim().min(1).max(50)).max(3),
+  decisionCriteria: z.array(z.string().trim().min(1).max(50)).max(3),
+});

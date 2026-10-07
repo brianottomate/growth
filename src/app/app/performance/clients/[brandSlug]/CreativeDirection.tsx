@@ -1,4 +1,3 @@
-import { Compass } from "lucide-react";
 import {
   VOICE_AXES,
   type CreativeDirection as Direction,
@@ -11,15 +10,9 @@ export function CreativeDirection({ value }: { value: Direction }) {
         <p className="max-w-3xl text-xl font-medium tracking-tight">
           {value.positioning}
         </p>
-        {value.archetype && (
-          <p className="flex items-start gap-2 text-sm text-muted-foreground">
-            <Compass className="mt-0.5 size-4 shrink-0" />
-            <span>
-              <span className="font-medium text-foreground capitalize">
-                {value.archetype}
-              </span>
-              {value.archetypeReason && ` · ${value.archetypeReason}`}
-            </span>
+        {value.archetypeReason && (
+          <p className="max-w-3xl text-sm text-muted-foreground">
+            {value.archetypeReason}
           </p>
         )}
       </div>
