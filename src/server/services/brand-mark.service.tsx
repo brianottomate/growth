@@ -26,6 +26,7 @@ import {
 } from "@/server/services/composition-fonts";
 import {
   dominantColor,
+  removeLightIconBackground,
   tintSilhouette,
   traceSilhouette,
   trimTransparent,
@@ -231,7 +232,7 @@ function pngInsideIco(body: Buffer): Buffer | null {
   return image.subarray(0, 4).equals(png) ? image : null;
 }
 
-async function fetchPng(url: string): Promise<Buffer> {
+async function fetchPng(url: string, favicon = false): Promise<Buffer> {
   const response = await fetch(unwrapImageProxy(url), {
     signal: AbortSignal.timeout(10_000),
     // Some brand CDNs refuse a bare fetch; this is the same request a page
@@ -265,7 +266,7 @@ async function fetchPng(url: string): Promise<Buffer> {
     .toBuffer();
   // Tight bounds, so every later measurement is of the mark and not its
   // padding: the icon's size against the text, and the traced viewBox.
-  return trimTransparent(png);
+  return trimTransparent(favicon ? await removeLightIconBackground(png) : png);
 }
 
 /**
@@ -539,7 +540,12 @@ export async function renderBrandMark(
   tuning: MarkTuning = NO_TUNING,
 ): Promise<Buffer> {
   const iconUrl = await resolveMarkIconUrl(recipe, brand);
-  let iconPng = iconUrl ? await fetchPng(iconUrl) : null;
+  let iconPng = iconUrl
+    ? await fetchPng(
+        iconUrl,
+        recipe.source === "favicon" || recipe.iconFrom === "favicon",
+      )
+    : null;
   if (iconPng && recipe.iconFrom === "logo-icon")
     iconPng = await leadingGlyph(iconPng);
 

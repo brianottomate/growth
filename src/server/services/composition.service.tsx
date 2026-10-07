@@ -182,12 +182,13 @@ function pillsOnOneRow(
 
 /**
  * Hosts an on-demand preview may draw a photo from without importing it: a
- * brand's own listing photos on WanderOS and our own library. Anything else
+ * brand's listing photos, Unsplash preview photos and our own library. Anything else
  * is refused, so the preview route cannot be pointed at an arbitrary server.
  */
 const PREVIEW_SOURCE_HOSTS = new Set([
   "assets.wander.com",
   "assets-websites.wander.com",
+  "images.unsplash.com",
 ]);
 
 export function isAllowedPreviewSource(url: string): boolean {

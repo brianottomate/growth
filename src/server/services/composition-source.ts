@@ -187,6 +187,55 @@ export async function loadLogoImage(url: string): Promise<LogoImage> {
   };
 }
 
+/** Remove a flat light favicon background before measuring or tinting its glyph. */
+export async function removeLightIconBackground(png: Buffer): Promise<Buffer> {
+  const { data, info } = await sharp(png)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const { width, height } = info;
+  const corners = [0, width - 1, (height - 1) * width, width * height - 1];
+  // Existing transparency and coloured badges already define their own shape.
+  if (
+    !corners.every((p) => {
+      const i = p * 4;
+      return (
+        data[i + 3] === 255 &&
+        Math.min(data[i]!, data[i + 1]!, data[i + 2]!) >= 240 &&
+        Math.max(data[i]!, data[i + 1]!, data[i + 2]!) -
+          Math.min(data[i]!, data[i + 1]!, data[i + 2]!) <=
+          8
+      );
+    })
+  )
+    return png;
+  const background = [0, 1, 2].map((c) =>
+    Math.round(corners.reduce((sum, p) => sum + data[p * 4 + c]!, 0) / 4),
+  );
+  for (let i = 0; i < data.length; i += 4) {
+    const distance = Math.max(
+      ...background.map((b, c) => Math.abs(data[i + c]! - b)),
+    );
+    const coverage = Math.min(1, Math.max(0, (distance - 8) / 72));
+    data[i + 3] = Math.round(data[i + 3]! * coverage);
+    // Unblend the soft edge from its former matte to avoid a pale fringe.
+    if (coverage > 0 && coverage < 1)
+      for (let c = 0; c < 3; c++)
+        data[i + c] = Math.round(
+          Math.min(
+            255,
+            Math.max(
+              0,
+              (data[i + c]! - background[c]! * (1 - coverage)) / coverage,
+            ),
+          ),
+        );
+  }
+  return sharp(data, { raw: { width, height, channels: 4 } })
+    .png()
+    .toBuffer();
+}
+
 /**
  * The image with its empty margin removed, so its box is the mark itself.
  * A favicon is drawn inside a square with padding; measured with that padding
