@@ -125,12 +125,19 @@ function WaitInput({
   );
 }
 const emptyDraft = (): EmailSequenceDraft => ({
-  name: "Untitled sequence",
+  name: "Welcome",
   description: "",
-  triggerEvent: "account.created",
+  triggerEvent: "guest.subscribed",
   exitCondition: null,
   steps: [],
 });
+
+function isWelcomeSequence(triggerEvent: string) {
+  return (
+    triggerEvent.trim().toLowerCase().replaceAll("_", ".") ===
+    "guest.subscribed"
+  );
+}
 
 export function EmailSequences({
   brandId,
@@ -159,7 +166,8 @@ export function EmailSequences({
         <div>
           <h2 className="text-xl font-semibold">Email sequences</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Plan a series of emails around a moment in your customer’s journey.
+            Start with a welcome series for new subscribers. Other lifecycle
+            journeys are coming later.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -167,7 +175,7 @@ export function EmailSequences({
           <Button asChild>
             <Link href={`${basePath}?tab=sequences&sequence=new`}>
               <Plus className="size-4" />
-              New sequence
+              New welcome sequence
             </Link>
           </Button>
         </div>
@@ -186,42 +194,54 @@ export function EmailSequences({
       {query.data?.length === 0 && (
         <div className="rounded-xl border border-dashed p-10 text-center">
           <Mail className="mx-auto mb-3 size-7 text-muted-foreground" />
-          <h3 className="font-medium">
-            Start with a welcome, follow-up, or win-back
-          </h3>
+          <h3 className="font-medium">Welcome your new subscribers</h3>
           <p className="mx-auto mt-2 max-w-lg text-sm text-muted-foreground">
-            Choose an entry event, add emails and waits, then review the
-            timeline. Planning works before delivery is connected.
+            Add emails and waits, then connect your signup source to enroll new
+            subscribers. Unsubscribing stops future emails.
           </p>
         </div>
       )}
       <div className="grid grid-cols-1 gap-3 @3xl:grid-cols-2">
-        {query.data?.map((sequence) => (
-          <Link
-            key={sequence.id}
-            href={`${basePath}?tab=sequences&sequence=${sequence.id}`}
-            className="rounded-xl border p-5 transition-colors hover:bg-muted/30"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="font-medium">{sequence.name}</h3>
-              <Badge variant={sequence.enabled ? "default" : "secondary"}>
-                {sequence.enabled
-                  ? "Active"
-                  : sequence.revisionId
-                    ? "Paused"
-                    : "Draft"}
-              </Badge>
-            </div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Starts with {sequence.triggerEvent}
-            </p>
-            {sequence.description && (
-              <p className="mt-2 line-clamp-2 text-sm">
-                {sequence.description}
+        {query.data
+          ?.slice()
+          .sort(
+            (a, b) =>
+              Number(isWelcomeSequence(b.triggerEvent)) -
+              Number(isWelcomeSequence(a.triggerEvent)),
+          )
+          .map((sequence) => (
+            <Link
+              key={sequence.id}
+              href={`${basePath}?tab=sequences&sequence=${sequence.id}`}
+              className="rounded-xl border p-5 transition-colors hover:bg-muted/30"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="font-medium">{sequence.name}</h3>
+                <Badge variant={sequence.enabled ? "default" : "secondary"}>
+                  {sequence.enabled
+                    ? "Active"
+                    : !isWelcomeSequence(sequence.triggerEvent)
+                      ? "Coming later"
+                      : sequence.revisionId
+                        ? "Paused"
+                        : "Draft"}
+                </Badge>
+              </div>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Starts with {sequence.triggerEvent}
               </p>
-            )}
-          </Link>
-        ))}
+              {isWelcomeSequence(sequence.triggerEvent) ? (
+                <p className="mt-2 text-sm">
+                  Introduce your brand to new subscribers. Unsubscribing stops
+                  future emails.
+                </p>
+              ) : sequence.description ? (
+                <p className="mt-2 line-clamp-2 text-sm">
+                  {sequence.description}
+                </p>
+              ) : null}
+            </Link>
+          ))}
       </div>
     </div>
   );
