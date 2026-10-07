@@ -23,6 +23,8 @@ wander, wander.com, tracking and sites) is tracked in
 | Graph + Conversions API client | `src/server/clients/meta-leadgen.client.ts` |
 | Orchestration, idempotency | `src/server/services/meta-leadgen.service.ts` |
 | Ledger table | `leads.meta_leadgen_lead`, managed by committed Drizzle migrations |
+| RevenueHero meeting lookup (Make.com webhook) | `src/server/clients/revenuehero.client.ts` |
+| Meeting-link drain cron | `src/app/api/cron/meta-leadgen/route.ts` |
 
 Flow per lead: store the leadgen id → fetch the lead with a Page token → normalize
 and persist the answers → apply the deterministic 10-unit threshold → if
@@ -81,6 +83,55 @@ Measured on Meta's raw leads 2026-09-09 → 09-23: **782 leads, 92 qualified
 (11.8%), ~43/week**. That sits inside Meta's CRM-optimization guidance (1–40%
 conversion, ~50 qualified events/week). HubSpot's view showed ~1 because it only
 maps the Conditional form's buckets.
+
+## Meeting-link forms
+
+Meeting-link forms send the lead to book a RevenueHero call with a specific
+rep after the submit. They are recognised by name (`isMeetingLinkForm`, case
+insensitive): the form name must contain "meeting link", "book a meeting",
+"book a call", "book meeting" or "book call". Name new booking forms to match.
+Those leads route to that rep instead of the round robin,
+through the router's `salesRepEmail` override (the Slack post shows "Meeting
+Booked For"). The lead must still normalize as an operator to be routed at all.
+
+The booking lags the Meta webhook by a few minutes, so the webhook usually does
+not route these leads. Each pass over an unrouted meeting-link lead asks the
+Make.com webhook at `REVENUEHERO_LOOKUP_WEBHOOK_URL` (POST `{ email }` →
+`{ "salesRepEmail": "<rep>" }` or `{ "salesRepEmail": null }`,
+`src/server/clients/revenuehero.client.ts`) and then:
+
+| Answer | Lead age | Outcome |
+| --- | --- | --- |
+| rep email | any | `meeting_rep_email` stamped; routed to that rep |
+| none, or lookup error | < 5 min (`MEETING_LOOKUP_WINDOW_MS`) | `meeting_checked_at` stamped; `routed_at` left null, next pass asks again |
+| none, or lookup error | ≥ 5 min | routed by round robin |
+| env var unset | any | routed by round robin (warning logged once) |
+
+"None" is only an explicit no-match (`{}`, or a null or empty `salesRepEmail`).
+A non-2xx, a timeout, a body that isn't that JSON, or a rep that isn't an email
+is a lookup error, recorded in `last_error`, so a broken Make scenario shows up
+instead of passing for "nobody booked".
+
+Every lookup stamps `meeting_checked_at`. `/api/cron/meta-leadgen` re-asks only
+the leads that were told to wait (`drainMeetingLookups`): unrouted, no rep yet,
+last lookup inside the 5-minute window, and created within the last 6 hours. A
+lookup past the window is always followed by a routing attempt, so a lead whose
+attempt failed drops out of the cron and is left to the manual backfill like any
+other failure; retrying it every pass would repost it to Slack each time, since
+the router posts even when HubSpot fails. A pass stops starting leads after
+200 s (the route allows 300 s), leaving the lead in flight 100 s to finish so
+the pass isn't cut off between claiming `routed_at` and the router returning;
+the rest wait for the next pass. It runs
+`*/20` in ET business hours on weekdays, hourly otherwise, all on marks Neon is
+already awake for. An empty pass is one ledger query. The manual backfill covers
+them too. In practice the first cron pass lands after the window, so most leads
+get one more lookup and route on that pass, 5–25 minutes after submit in business
+hours and up to an hour otherwise. Because normalization is not persisted, a
+waiting lead is normalized again on that pass (a second model call per lead).
+
+A rep found once is kept on the row, so a router failure retried by the manual
+backfill uses the same rep without asking again. A booking made after the lead has routed does not
+change its owner.
 
 ## Meta setup (done 2026-09-23)
 

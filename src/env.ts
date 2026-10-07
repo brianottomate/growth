@@ -95,6 +95,7 @@ export const env = createEnv({
     META_LEADS_APP_SECRET: z.string().optional(), // verifies X-Hub-Signature-256 on the leadgen webhook
     META_LEADGEN_VERIFY_TOKEN: z.string().optional(), // hub.verify_token for the webhook subscription handshake
     META_LEADGEN_ROUTE_FROM: z.iso.datetime({ offset: true }).optional(), // hand leads created at/after this instant to the inbound router; unset while Make still does it
+    REVENUEHERO_LOOKUP_WEBHOOK_URL: z.url().optional(), // Make.com webhook: POST { email } → { salesRepEmail } from the RevenueHero booking store; unset = meeting-link forms round-robin
     // Google Ads direct API. Service account takes precedence over user OAuth.
     GOOGLE_ADS_SERVICE_ACCOUNT_JSON: z.string().optional(),
     GOOGLE_ADS_CLIENT_ID: z.string().optional(),
@@ -259,6 +260,7 @@ export const env = createEnv({
     META_LEADS_APP_SECRET: process.env.META_LEADS_APP_SECRET,
     META_LEADGEN_VERIFY_TOKEN: process.env.META_LEADGEN_VERIFY_TOKEN,
     META_LEADGEN_ROUTE_FROM: process.env.META_LEADGEN_ROUTE_FROM,
+    REVENUEHERO_LOOKUP_WEBHOOK_URL: process.env.REVENUEHERO_LOOKUP_WEBHOOK_URL,
     // Google Ads (spend-tracker connector)
     GOOGLE_ADS_SERVICE_ACCOUNT_JSON:
       process.env.GOOGLE_ADS_SERVICE_ACCOUNT_JSON,

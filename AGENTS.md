@@ -271,6 +271,9 @@ projections. Ingest via `scripts/ingest-leads.ts`; UI under `/app/leads`.
   Outreach; the cadence the whole compute budget is spent on)
 - `/api/cron/growth?job=funnel_email_backfill` — every 6h on the hour (funnel email backfill)
 - `/api/cron/hubspot` — hourly (pending HubSpot webhook retry rail)
+- `/api/cron/meta-leadgen` — `*/20` during ET business hours, hourly otherwise, on marks the
+  sweep and the HubSpot rail already wake for, so it adds no wake windows (meeting-link Meta
+  leads waiting on their RevenueHero booking before routing; see `docs/meta-leadgen.md`)
 - `/api/cron/instagram` — daily 19:00 UTC (Instagram account watch)
 - `/api/cron/x` — every 6h (X listening scan)
 - `/api/cron/affiliate` — daily 09:00 + weekly report Mon 14:00 (Impact.com monitor)

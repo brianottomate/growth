@@ -860,6 +860,11 @@ export const metaLeadgenLeadTable = leadsSchema.table(
 
     capiSentAt: t.timestamp(),
     routedAt: t.timestamp(),
+    // Meeting-link forms: the rep RevenueHero holds a meeting for, and the
+    // last time we asked. Routing waits on this for a few minutes after submit;
+    // a set `meetingCheckedAt` with no `routedAt` is a lead still waiting.
+    meetingRepEmail: t.text(),
+    meetingCheckedAt: t.timestamp(),
     lastError: t.text(),
 
     createdAt: t

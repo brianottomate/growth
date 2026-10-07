@@ -111,3 +111,35 @@ export function verifyMetaSignature(
 export function isQualified(units: number | null): boolean {
   return units !== null && units >= QUALIFIED_MIN_UNITS;
 }
+
+const MEETING_LINK_FORM =
+  /\bmeeting\s+link\b|\bbook\s+(a\s+)?(meeting|call)\b/i;
+
+/**
+ * Forms that end on a RevenueHero meeting link, by name: "meeting link",
+ * "book a meeting", "book a call", "book meeting" or "book call". The lead
+ * books a call with a specific rep after submitting, so routing waits for that
+ * booking and hands the lead to that rep instead of the round robin.
+ */
+export function isMeetingLinkForm(
+  formName: string | null | undefined,
+): boolean {
+  return MEETING_LINK_FORM.test(formName ?? "");
+}
+
+/**
+ * How long after the submit a meeting-link lead waits for its booking before
+ * it falls back to the round robin. Booking takes a couple of minutes on the
+ * thank-you page; a lead that hasn't booked by then most likely won't.
+ */
+export const MEETING_LOOKUP_WINDOW_MS = 5 * 60_000;
+
+export function shouldWaitForMeeting({
+  leadCreatedAt,
+  now = new Date(),
+}: {
+  leadCreatedAt: Date;
+  now?: Date;
+}): boolean {
+  return now.getTime() - leadCreatedAt.getTime() < MEETING_LOOKUP_WINDOW_MS;
+}
