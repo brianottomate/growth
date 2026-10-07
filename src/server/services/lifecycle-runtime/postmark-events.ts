@@ -61,8 +61,10 @@ export async function recordLifecyclePostmarkEvent(
   const deliveryId =
     metadata &&
     typeof metadata === "object" &&
-    "lifecycle_delivery_id" in metadata
-      ? metadata.lifecycle_delivery_id
+    ("lifecycle_delivery" in metadata || "lifecycle_delivery_id" in metadata)
+      ? "lifecycle_delivery" in metadata
+        ? metadata.lifecycle_delivery
+        : metadata.lifecycle_delivery_id
       : null;
   if (
     typeof deliveryId !== "string" ||

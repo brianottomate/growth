@@ -95,7 +95,7 @@ Use the existing `/api/webhooks/postmark` endpoint for Delivery, Bounce,
 SpamComplaint and SubscriptionChange events. Configure `x-growth-postmark-secret`
 with `POSTMARK_WEBHOOK_SECRET` and `x-growth-postmark-server` with that server’s ID,
 following Growth’s existing webhook convention. Lifecycle metadata is
-`lifecycle_delivery_id`. The handler checks the server, stream, email and delivery
+`lifecycle_delivery`. The handler checks the server, stream, email and delivery
 identity before associating a receipt. The existing event ledger remains intact.
 
 The brand’s email delivery settings supply its Postmark server and broadcast
@@ -209,7 +209,7 @@ and Growth receipts rather than relying on a periodic database scan.
 
 A send claim is committed before the Postmark request. If the response is lost,
 the request fails, or the process dies after claiming, the enrollment stops for
-review. Inspect Postmark using the recorded MessageID or `lifecycle_delivery_id`
+review. Inspect Postmark using the recorded MessageID or `lifecycle_delivery`
 metadata before manual action. Cancellation is available; this version deliberately
 provides no automatic reset of uncertain attempts. This chooses possible missed
 mail over duplicate mail when provider acceptance cannot be established.

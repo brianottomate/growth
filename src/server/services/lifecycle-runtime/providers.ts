@@ -106,7 +106,7 @@ export async function sendLifecycleEmail(
       TrackOpens: false,
       TrackLinks: "None",
       Metadata: {
-        lifecycle_delivery_id: deliveryId,
+        lifecycle_delivery: deliveryId,
         ...(test ? { test: "true" } : {}),
       },
     },
