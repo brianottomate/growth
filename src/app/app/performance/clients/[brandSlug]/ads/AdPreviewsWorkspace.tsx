@@ -10,6 +10,7 @@ import { Images, Search } from "lucide-react";
 
 import { AdFormatFilter } from "@/components/ad-format-filter";
 import { AD_FORMATS, adFormat, type AdFormat } from "@/lib/ad-format";
+import { campaignDisplayName } from "@/lib/campaign-navigation";
 import { Button } from "@/components/ui/button";
 import { WorkspaceCard } from "../../../WorkspaceCard";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -69,15 +70,33 @@ export function AdPreviewsWorkspace({
     "all",
   );
   const [kind, setKind] = useState<AdFormat | null>(null);
-  const [assignment, setAssignment] = useState<
-    "all" | "unassigned" | "assigned"
-  >("unassigned");
+  const [assignment, setAssignment] = useState("unassigned");
+  const campaigns = [
+    ...new Map(
+      ideas.flatMap((idea) =>
+        idea.campaignId
+          ? [
+              [
+                idea.campaignId,
+                idea.campaignName
+                  ? campaignDisplayName(idea.campaignName)
+                  : "Untitled campaign",
+              ] as const,
+            ]
+          : [],
+      ),
+    ),
+  ].sort((a, b) => a[1].localeCompare(b[1]));
   const [grouping, setGrouping] = useState<AdGrouping>("type");
   const [search, setSearch] = useState("");
   const scoped = ideas.filter(
     (idea) =>
       (assignment === "all" ||
-        (assignment === "assigned") === Boolean(idea.campaignId)) &&
+        (assignment === "unassigned"
+          ? !idea.campaignId
+          : assignment === "assigned"
+            ? Boolean(idea.campaignId)
+            : assignment === `campaign:${idea.campaignId}`)) &&
       `${idea.name} ${adHomeContext(idea, homeContext).label} ${idea.campaignName ?? ""}`
         .toLowerCase()
         .includes(search.trim().toLowerCase()),
@@ -140,18 +159,27 @@ export function AdPreviewsWorkspace({
               />
             </InputGroup>
             <div className="flex flex-wrap items-center gap-2">
-              <select
-                aria-label="Campaign assignment"
-                value={assignment}
-                onChange={(e) =>
-                  setAssignment(e.target.value as typeof assignment)
-                }
-                className="h-9 rounded-md border bg-background px-3 text-sm"
-              >
-                <option value="all">All assignments</option>
-                <option value="unassigned">Unassigned ads</option>
-                <option value="assigned">Assigned ads</option>
-              </select>
+              <label className="flex max-w-full items-center gap-2 text-sm">
+                Campaign
+                <select
+                  value={assignment}
+                  onChange={(e) => setAssignment(e.target.value)}
+                  className="h-9 max-w-72 min-w-0 rounded-md border bg-background px-3 text-sm"
+                >
+                  <option value="all">All ads</option>
+                  <option value="unassigned">Unassigned ads</option>
+                  <option value="assigned">Assigned ads</option>
+                  {campaigns.length > 0 && (
+                    <optgroup label="Campaigns">
+                      {campaigns.map(([id, name]) => (
+                        <option key={id} value={`campaign:${id}`}>
+                          {name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              </label>
               <div
                 role="group"
                 aria-label="Group ads"
@@ -200,16 +228,10 @@ export function AdPreviewsWorkspace({
                 ideas.some((idea) => adFormat(idea.content) === format.id),
               ).map((format) => ({
                 ...format,
-                count: ideas.filter(
+                count: scoped.filter(
                   (idea) =>
                     adFormat(idea.content) === format.id &&
-                    (assignment === "all" ||
-                      (assignment === "assigned") ===
-                        Boolean(idea.campaignId)) &&
-                    (filter === "all" || statusOf(idea) === filter) &&
-                    `${idea.name} ${adHomeContext(idea, homeContext).label} ${idea.campaignName ?? ""}`
-                      .toLowerCase()
-                      .includes(search.trim().toLowerCase()),
+                    (filter === "all" || statusOf(idea) === filter),
                 ).length,
               }))}
             />

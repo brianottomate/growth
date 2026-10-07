@@ -1,5 +1,10 @@
+"use client";
+
+import { useState } from "react";
 import { CampaignAdCard } from "./CampaignAdCard";
-import { adFormat } from "@/lib/ad-format";
+import { AD_FORMATS, adFormat, type AdFormat } from "@/lib/ad-format";
+import { AdFormatFilter } from "@/components/ad-format-filter";
+import { Button } from "@/components/ui/button";
 import { WorkspaceCardHeader } from "@/app/app/performance/WorkspaceCard";
 import { Images } from "lucide-react";
 import type { AdContent } from "@/server/db/schema";
@@ -52,10 +57,14 @@ export function AdIdeasList({
     replacesAdId?: string | null;
   }[];
 }) {
-  const catalogs = ads.filter(
-    (ad) => "media" in ad.content && isImportedMetaCatalog(ad.content),
-  );
-  const ideas = ads.filter((ad) => !catalogs.includes(ad));
+  const [kind, setKind] = useState<AdFormat | null>(null);
+  const formatOf = (ad: (typeof ads)[number]): AdFormat =>
+    "media" in ad.content && isImportedMetaCatalog(ad.content)
+      ? "catalog"
+      : adFormat(ad.content);
+  const visible = ads.filter((ad) => kind === null || formatOf(ad) === kind);
+  const catalogs = visible.filter((ad) => formatOf(ad) === "catalog");
+  const ideas = visible.filter((ad) => formatOf(ad) !== "catalog");
   const chronological = [...ideas].sort(
     (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
   );
@@ -102,6 +111,16 @@ export function AdIdeasList({
         count={ads.length}
         actions={actions}
       />
+      {ads.length > 0 && (
+        <AdFormatFilter
+          value={kind}
+          onChange={setKind}
+          formats={AD_FORMATS.map((format) => ({
+            ...format,
+            count: ads.filter((ad) => formatOf(ad) === format.id).length,
+          })).filter((format) => format.count > 0)}
+        />
+      )}
       {preparingHero && (
         <div
           className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground"
@@ -111,17 +130,24 @@ export function AdIdeasList({
           Preparing from the selected homes
         </div>
       )}
-      {ideas.length === 0 ? (
+      {ads.length === 0 ? (
         (emptyState ?? (
           <p className="text-sm text-muted-foreground">No ads yet.</p>
         ))
-      ) : (
+      ) : visible.length === 0 ? (
+        <div className="space-y-2 text-sm text-muted-foreground">
+          <p>No ads match this type.</p>
+          <Button size="sm" variant="outline" onClick={() => setKind(null)}>
+            Show all types
+          </Button>
+        </div>
+      ) : ideas.length > 0 ? (
         <div className="space-y-3">
           {ordered.map((ad) => (
             <div key={ad.id}>{renderAd(ad)}</div>
           ))}
         </div>
-      )}
+      ) : null}
       {catalogs.length > 0 && (
         <section
           aria-label="Imported catalog ads"
