@@ -73,7 +73,7 @@ export const importWanderOsAction = growthAction({
     run: wanderOsImportRunSchema,
   }),
   description:
-    "Requires enriched brand identity, saved brand story and creative mark before starting. Import WanderOS in the background: import homes, select up to five Featured homes while keeping existing selections, create destinations if none exist, and prepare initial catalog photo/copy. Follow wanderOsImportStatus for progress. Retry resumes unfinished steps. Does not approve or export cards.",
+    "Requires enriched brand identity, saved brand story and creative mark before starting. Import WanderOS in the background: import homes, select up to five Featured homes while keeping existing selections, create destinations if none exist, and prepare initial catalog photo/copy plus AI-generated shared post copy when unset. Saved post copy is preserved. Follow wanderOsImportStatus for progress. Retry resumes unfinished steps. Does not approve or export cards.",
   examples: [{ brandId: "brd_01" }],
   execute: async (input, ctx) => {
     const actor = { ...input, userId: ctx.userId };
@@ -271,7 +271,7 @@ export const setCatalogAdCopyAction = growthAction({
     {
       brandId: "brd_01",
       ad: {
-        primaryText: "Find your next stay. Private homes, booked direct.",
+        primaryText: "",
       },
     },
   ],

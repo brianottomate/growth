@@ -16,7 +16,7 @@ import {
   type AdPreviewCatalogCard,
   type createAdPreviewLinkInput,
 } from "@/lib/ad-preview";
-import { defaultCatalogAdCopy, type CatalogDraft } from "@/lib/catalog-studio";
+import { emptyCatalogAdCopy, type CatalogDraft } from "@/lib/catalog-studio";
 import { freezeApprovedAd } from "./ad-approval.service";
 import { ensureBrandConnect } from "./brand-connect.service";
 
@@ -291,7 +291,7 @@ export async function loadAdPreviewPage(token: string) {
   const selectedCatalog = catalog
     ? {
         ...catalog,
-        ad: catalog.ad ?? defaultCatalogAdCopy(brand.name),
+        ad: catalog.ad ?? emptyCatalogAdCopy(),
         cards: claims.h
           ? catalog.cards.filter((_, index) => claims.h!.includes(index))
           : catalog.cards,

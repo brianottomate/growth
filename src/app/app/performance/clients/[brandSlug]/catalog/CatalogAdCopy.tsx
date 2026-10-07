@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
-import { defaultCatalogAdCopy, type CatalogAdCopy } from "@/lib/catalog-studio";
+import { emptyCatalogAdCopy, type CatalogAdCopy } from "@/lib/catalog-studio";
 import { orpc } from "@/orpc/client";
 import { WorkspaceCard } from "../../../WorkspaceCard";
 import { ShapeBrandButton } from "../ShapeBrandButton";
@@ -26,7 +26,7 @@ export function CatalogAdCopyCard({
   brandName: string;
   ad: CatalogAdCopy | undefined;
 }) {
-  const ad = saved ?? defaultCatalogAdCopy(brandName);
+  const ad = saved ?? emptyCatalogAdCopy();
   const [draft, setDraft] = useState<CatalogAdCopy | null>(null);
   const client = useQueryClient();
   const save = useMutation(

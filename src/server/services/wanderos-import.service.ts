@@ -21,7 +21,11 @@ import {
   wanderOsImportStepSchema,
 } from "@/lib/wanderos-import";
 import { featuredHomeAdditions } from "@/lib/featured-home-selection";
-import { catalogBrand, catalogState } from "./catalog-studio.service";
+import {
+  catalogBrand,
+  catalogState,
+  prepareInitialCatalogAdCopy,
+} from "./catalog-studio.service";
 import { ingestBrandHomes } from "./homes.service";
 import {
   changeGroupHomes,
@@ -185,7 +189,10 @@ export async function runWanderOsImport(
             );
           return `${existing.length + additions.length} ${group.name} selected`;
         },
-        catalog: () => prepareInitialCatalog({ ...input, parentRunId: runId }),
+        catalog: async () => {
+          await prepareInitialCatalogAdCopy(input);
+          return prepareInitialCatalog({ ...input, parentRunId: runId });
+        },
         destinations: async () => {
           await authorize();
           const current = await db.query.brandTable.findFirst({

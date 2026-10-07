@@ -5,7 +5,7 @@ import { X } from "lucide-react";
 
 import {
   catalogCardPreviewUrl,
-  defaultCatalogAdCopy,
+  emptyCatalogAdCopy,
   type CatalogAdCopy,
   type CatalogDraft,
   type CatalogHome,
@@ -67,10 +67,10 @@ export function CatalogCollectionPreview({
   brandName: string;
   cards: CatalogPreviewCard[];
   compact?: boolean;
-  /** The saved ad copy; the mock falls back to the default. */
+  /** The saved ad copy; missing copy stays blank. */
   ad?: CatalogAdCopy;
 }) {
-  const ad = saved ?? defaultCatalogAdCopy(brandName);
+  const ad = saved ?? emptyCatalogAdCopy();
   const text = ad.primaryText;
 
   return (
