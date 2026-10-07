@@ -1,11 +1,14 @@
 import "server-only";
 
-import { and, eq, gte, isNotNull, isNull, or } from "drizzle-orm";
+import { and, eq, gte, isNotNull, isNull, or, sql } from "drizzle-orm";
 
 import { env } from "@/env";
 import {
+  isMeetingLinkForm,
   isQualified,
+  MEETING_LOOKUP_WINDOW_MS,
   QUALIFIED_LEAD_EVENT,
+  shouldWaitForMeeting,
   type LeadgenNotification,
 } from "@/lib/meta-leadgen";
 import {
@@ -18,6 +21,10 @@ import {
   type MetaLead,
   WANDER_PAGE_ID,
 } from "@/server/clients/meta-leadgen.client";
+import {
+  isRevenueHeroLookupConfigured,
+  lookupMeetingRep,
+} from "@/server/clients/revenuehero.client";
 import { db } from "@/server/db";
 import {
   type MetaLeadNormalization,
@@ -37,6 +44,18 @@ type ReceivedVia = "webhook" | "poll";
 const HOUR = 3_600_000;
 /** How far back the backfill drains unfinished ledger rows. */
 const RETRY_WINDOW = 7 * 24 * HOUR;
+/**
+ * How long the meeting cron keeps re-trying a lead it told to wait. Passes run
+ * at most an hour apart and a lead needs one after its window, so a lead still
+ * waiting past this failed elsewhere and is left to the manual backfill.
+ */
+const MEETING_DRAIN_MAX_AGE = 6 * HOUR;
+/**
+ * Stop starting leads this far into a cron pass; the rest wait for the next
+ * pass. Leaves the lead in flight 100 s under the route's 300 s, so the pass
+ * isn't killed between claiming `routed_at` and the router returning.
+ */
+const MEETING_DRAIN_BUDGET_MS = 200_000;
 
 /**
  * Leads created before `META_LEADGEN_ROUTE_FROM` stay with Make, so turning
@@ -115,6 +134,7 @@ async function routeLead(
   lead: MetaLead,
   formName: string | null,
   normalization: MetaLeadNormalization,
+  salesRepEmail: string | null = null,
 ) {
   const contact = normalization;
   if (!contact.email) return false;
@@ -140,11 +160,76 @@ async function routeLead(
     firstName: contact.firstName,
     lastName: contact.lastName,
     phone: contact.phone,
+    // The rep RevenueHero holds a meeting for; the router resolves the owner
+    // and falls back to the round robin when it isn't an active owner.
+    salesRepEmail,
   });
   // The router logs and swallows HubSpot failures; no contact id means the
   // handoff didn't land.
   if (!contactId) throw new Error("HubSpot upsert returned no contact");
   return true;
+}
+
+type LeadPatch = Partial<typeof metaLeadgenLeadTable.$inferInsert>;
+
+let warnedUnconfigured = false;
+
+/**
+ * Which rep a meeting-link lead goes to, and whether routing should wait.
+ *
+ * The lead books its call after the form submit, so the RevenueHero answer
+ * lags the Meta webhook by a few minutes. Within `MEETING_LOOKUP_WINDOW_MS`
+ * a miss means "not yet": leave `routed_at` unclaimed and let the next pass
+ * (cron or backfill) ask again. Past the window a miss, or a lookup error, is
+ * final and the lead takes the normal round robin, so a Make outage can delay
+ * a lead but never strand it. Other forms are untouched.
+ */
+async function meetingRepFor({
+  row,
+  email,
+  formName,
+  createdAt,
+  patch,
+  errors,
+}: {
+  row: MetaLeadgenLead;
+  email: string;
+  formName: string | null;
+  createdAt: Date;
+  patch: LeadPatch;
+  errors: string[];
+}): Promise<{ salesRepEmail: string | null; wait: boolean }> {
+  if (!isMeetingLinkForm(formName)) return { salesRepEmail: null, wait: false };
+  if (row.meetingRepEmail) {
+    return { salesRepEmail: row.meetingRepEmail, wait: false };
+  }
+  if (!isRevenueHeroLookupConfigured) {
+    if (!warnedUnconfigured) {
+      warnedUnconfigured = true;
+      console.warn(
+        "[meta-leadgen] REVENUEHERO_LOOKUP_WEBHOOK_URL is not set; meeting-link forms take the round robin",
+      );
+    }
+    return { salesRepEmail: null, wait: false };
+  }
+
+  // One instant for the stamp and the wait decision, so "told to wait" in
+  // drainMeetingLookups always agrees with what this pass decided.
+  const checkedAt = new Date();
+  patch.meetingCheckedAt = checkedAt;
+  try {
+    const rep = await lookupMeetingRep(email);
+    if (rep) {
+      patch.meetingRepEmail = rep;
+      return { salesRepEmail: rep, wait: false };
+    }
+  } catch (err) {
+    errors.push(`meeting: ${String(err)}`);
+  }
+  return {
+    salesRepEmail: null,
+    wait: shouldWaitForMeeting({ leadCreatedAt: createdAt, now: checkedAt }),
+  };
 }
 
 /**
@@ -171,7 +256,8 @@ export async function processLead({
   if (!row || isDone(row)) return row ?? null;
 
   const errors: string[] = [];
-  const patch: Partial<typeof metaLeadgenLeadTable.$inferInsert> = {};
+  const patch: LeadPatch = {};
+  let meetingWait = false;
   let stage = "fetch";
   try {
     // Keep raw answers for inspection even when the AI call fails.
@@ -212,19 +298,37 @@ export async function processLead({
     }
 
     const createdAt = new Date(lead.created_time);
+    const resolvedFormName = formName ?? row.formName;
     if (
       patch.email &&
       normalization.audience === "operator" &&
-      shouldRoute(row, createdAt) &&
-      (await claim(row.id, "routedAt"))
+      shouldRoute(row, createdAt)
     ) {
-      try {
-        if (!(await routeLead(lead, formName ?? row.formName, normalization))) {
+      const meeting = await meetingRepFor({
+        row,
+        email: patch.email,
+        formName: resolvedFormName,
+        createdAt,
+        patch,
+        errors,
+      });
+      meetingWait = meeting.wait;
+      if (!meeting.wait && (await claim(row.id, "routedAt"))) {
+        try {
+          if (
+            !(await routeLead(
+              lead,
+              resolvedFormName,
+              normalization,
+              meeting.salesRepEmail,
+            ))
+          ) {
+            await release(row.id, "routedAt");
+          }
+        } catch (err) {
           await release(row.id, "routedAt");
+          errors.push(`router: ${String(err)}`);
         }
-      } catch (err) {
-        await release(row.id, "routedAt");
-        errors.push(`router: ${String(err)}`);
       }
     }
   } catch (err) {
@@ -246,6 +350,8 @@ export async function processLead({
     qualified: patch.qualified,
     capiSent: Boolean(updated?.capiSentAt),
     routed: Boolean(updated?.routedAt),
+    ...(meetingWait && { meetingWait: true }),
+    ...(updated?.meetingRepEmail && { meetingRep: updated.meetingRepEmail }),
     via: row.receivedVia,
   };
   if (errors.length) {
@@ -340,6 +446,60 @@ export async function pollRecentLeads({ hoursBack }: { hoursBack: number }) {
   for (const row of await unfinishedLeads()) {
     if (seen.has(row.leadgenId)) continue;
     tally(await processLead({ leadgenId: row.leadgenId, pageToken }));
+  }
+  return summary;
+}
+
+/**
+ * Re-ask RevenueHero for meeting-link leads still waiting on their booking
+ * (`/api/cron/meta-leadgen`). Only the ledger is read until there is a row to
+ * process, so an empty pass never touches Graph.
+ *
+ * A waiting lead is one told to wait: no rep yet, and its last lookup landed
+ * inside the window. A lookup past the window is always followed by a routing
+ * attempt, so a lead whose attempt failed drops out here and is left to the
+ * manual backfill like any other failure. Retrying it every pass would repost
+ * it to Slack each time, since the router posts even when HubSpot fails.
+ */
+export async function drainMeetingLookups({
+  limit = 100,
+  budgetMs = MEETING_DRAIN_BUDGET_MS,
+} = {}) {
+  const t = metaLeadgenLeadTable;
+  const cutoff = routeCutoff();
+  const summary = { found: 0, routed: 0, waiting: 0, errors: 0, deferred: 0 };
+  if (!cutoff) return summary;
+
+  const stopAt = Date.now() + budgetMs;
+  const oldest = new Date(Date.now() - MEETING_DRAIN_MAX_AGE);
+  const rows = await db
+    .select({ leadgenId: t.leadgenId })
+    .from(t)
+    .where(
+      and(
+        isNotNull(t.email),
+        isNull(t.routedAt),
+        isNull(t.meetingRepEmail),
+        isNotNull(t.meetingCheckedAt),
+        sql`${t.meetingCheckedAt} < ${t.leadCreatedAt} + ${sql.raw(`interval '${MEETING_LOOKUP_WINDOW_MS / 1000} seconds'`)}`,
+        gte(t.leadCreatedAt, cutoff > oldest ? cutoff : oldest),
+      ),
+    )
+    .orderBy(t.leadCreatedAt)
+    .limit(limit);
+  summary.found = rows.length;
+  if (rows.length === 0) return summary;
+
+  const pageToken = await fetchPageAccessToken();
+  for (const { leadgenId } of rows) {
+    if (Date.now() >= stopAt) {
+      summary.deferred += 1;
+      continue;
+    }
+    const row = await processLead({ leadgenId, pageToken });
+    if (row?.routedAt) summary.routed += 1;
+    else summary.waiting += 1;
+    if (row?.lastError) summary.errors += 1;
   }
   return summary;
 }

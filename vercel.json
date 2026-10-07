@@ -33,6 +33,18 @@
       "schedule": "0 * * * *"
     },
     {
+      "path": "/api/cron/meta-leadgen",
+      "schedule": "*/20 13-22 * * 1-5"
+    },
+    {
+      "path": "/api/cron/meta-leadgen",
+      "schedule": "0 0-12,23 * * 1-5"
+    },
+    {
+      "path": "/api/cron/meta-leadgen",
+      "schedule": "0 * * * 0,6"
+    },
+    {
       "path": "/api/cron/instagram",
       "schedule": "0 19 * * *"
     },
