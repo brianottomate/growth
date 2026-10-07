@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { PerformanceNote } from "./PerformanceNote";
+import { CardStaff } from "./CardStaff";
 import { ReadinessProgress } from "./ReadinessProgress";
 import { statusChips, statusTone } from "./AccountStatus";
 import {
@@ -485,6 +486,12 @@ export function PerformanceClientCard({
           <ReadinessProgress checklist={card.readiness.checklist} compact />
         </section>
       ) : null}
+      <CardStaff
+        brandId={card.id}
+        lead={card.lead ?? null}
+        csLead={card.csLead ?? null}
+        className="mt-3 border-t pt-3"
+      />
       <PerformanceNote
         text={card.note}
         editedBy={card.noteEditedBy}
@@ -609,6 +616,17 @@ function DenseCard({
           ))}
         </div>
       ) : null}
+      <CardStaff
+        brandId={card.id}
+        lead={card.lead ?? null}
+        csLead={card.csLead ?? null}
+        className="mt-2"
+      />
+      <PerformanceNote
+        text={card.note}
+        editedBy={card.noteEditedBy}
+        editedAt={card.noteEditedAt}
+      />
     </article>
   );
 }

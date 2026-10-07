@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import {
   parseAsArrayOf,
   parseAsString,
@@ -11,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useContentWidth } from "@/components/content-width";
 import { Input } from "@/components/ui/input";
+import { orpc } from "@/orpc/client";
 import {
   PIPELINE_COLUMNS,
   type PipelineStage,
@@ -102,6 +104,7 @@ export function PipelineBoard({
         "paused",
       ]),
       who: parseAsStringLiteral(WHO).withDefault("clients"),
+      people: parseAsStringLiteral(["all", "mine"] as const).withDefault("all"),
     },
     { history: "replace", shallow: true, clearOnDefault: true },
   );
@@ -127,10 +130,18 @@ export function PipelineBoard({
         : [...collapsed, stage],
     });
   }
-  const matching = cards.filter((card) =>
-    `${card.name} ${card.website ?? ""}`
-      .toLowerCase()
-      .includes(search.trim().toLowerCase()),
+  // "Mine" is any client where I am the CSM or the lead.
+  const me = useQuery({
+    ...orpc.performance.staffRoster.queryOptions(),
+    staleTime: 5 * 60_000,
+  }).data?.currentUserId;
+  const matching = cards.filter(
+    (card) =>
+      `${card.name} ${card.website ?? ""}`
+        .toLowerCase()
+        .includes(search.trim().toLowerCase()) &&
+      (params.people === "all" ||
+        (!!me && (card.lead?.id === me || card.csLead?.id === me))),
   );
   // The board shows every column; the list narrows to clients or prospects.
   const visible =
@@ -193,6 +204,15 @@ export function PipelineBoard({
             placeholder="Search accounts or sites"
             value={search}
             onChange={(event) => void setParams({ q: event.target.value })}
+          />
+          <SegmentedToggle
+            label="Whose accounts"
+            value={params.people}
+            onChange={(people) => void setParams({ people })}
+            options={[
+              { id: "all", label: "All" },
+              { id: "mine", label: "Mine" },
+            ]}
           />
           {layouts.length > 1 ? (
             <SegmentedToggle

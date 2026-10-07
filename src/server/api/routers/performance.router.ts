@@ -8,6 +8,10 @@ import { generateBillingCycles } from "@/server/services/billing-cycles.service"
 import { PIPELINE_COLUMNS } from "@/lib/performance-pipeline";
 import { setPerformanceSettings } from "@/server/services/performance-settings.service";
 import { setBrandStages } from "@/server/services/brand-relationship.service";
+import {
+  loadStaffRoster,
+  setBrandStaff,
+} from "@/server/services/brand-staffing.service";
 import { BUSINESS_STAGES, DELIVERY_STAGES } from "@/lib/performance-stage";
 import { markCycleLinePaid } from "@/server/services/performance-billing.service";
 
@@ -122,6 +126,25 @@ export const performanceRouter = {
   // before ever filling the form, which is the ordinary case for a deal an AE
   // closed on a call.
   promoteToClient: actionProcedure(promoteToClientAction),
+
+  /** The people a client's lead or CS lead can be picked from. */
+  staffRoster: workspaceProcedure.handler(async ({ context: ctx }) => ({
+    members: await loadStaffRoster(ctx.workspace.orgId),
+    currentUserId: ctx.workspace.userId,
+  })),
+
+  /** The client's lead (sales, creative, delivery) or its CS lead. */
+  setStaff: workspaceProcedure
+    .input(
+      z.object({
+        brandId: z.string().min(1),
+        role: z.enum(["lead", "cs"]),
+        userId: z.string().min(1).nullable(),
+      }),
+    )
+    .handler(({ context: ctx, input }) =>
+      setBrandStaff(ctx.workspace.orgId, input),
+    ),
 
   /** The ⋯ dialog: either lifecycle, any stage; the relationship follows business. */
   setStage: workspaceProcedure

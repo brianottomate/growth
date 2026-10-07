@@ -158,6 +158,7 @@ export function AssigneeButton({
   onChange,
   size = "md",
   label = "Assign owner",
+  clearLabel = "Clear owner",
 }: {
   value: Member | null;
   suggested?: Member | null;
@@ -166,6 +167,7 @@ export function AssigneeButton({
   onChange: (ownerId: string | null) => void;
   size?: Size;
   label?: string;
+  clearLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const ordered = [...members].sort((a, b) =>
@@ -204,7 +206,7 @@ export function AssigneeButton({
                   }}
                   tone="muted"
                 >
-                  Clear owner
+                  {clearLabel}
                 </CommandItem>
               )}
               {ordered.map((m) => (

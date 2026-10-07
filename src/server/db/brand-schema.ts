@@ -431,6 +431,9 @@ export const brandTable = pgTable(
     // The user who owns/manages this brand — implicit full-access owner.
     // NULL for reference/competitor brands.
     ownerId: t.text().references(() => userTable.id),
+    // Customer success lead for a Performance client. The owner is the lead
+    // for everything else (sales, creative, delivery).
+    csLeadId: t.text().references(() => userTable.id, { onDelete: "set null" }),
 
     type: brandTypeEnum().default("company").notNull(),
 
@@ -795,6 +798,12 @@ export const brandRelations = relations(brandTable, ({ one, many }) => ({
   owner: one(userTable, {
     fields: [brandTable.ownerId],
     references: [userTable.id],
+    relationName: "brand_owner",
+  }),
+  csLead: one(userTable, {
+    fields: [brandTable.csLeadId],
+    references: [userTable.id],
+    relationName: "brand_cs_lead",
   }),
   // Reference brands this brand tracks.
   inspirations: many(brandInspirationTable, { relationName: "owner" }),

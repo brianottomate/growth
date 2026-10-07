@@ -53,6 +53,8 @@ export type DeskCampaign = {
   accountName: string | null;
 };
 
+type StaffMember = { id: string; name: string | null; image: string | null };
+
 export type DeskBrand = {
   id: string;
   name: string;
@@ -73,6 +75,9 @@ export type DeskBrand = {
     | import("@/lib/performance-pipeline").StoredPipelineStage
     | null;
   settings: PerformanceSettings | null;
+  /** The lead covers sales, creative and delivery; CS has its own lead. */
+  lead: StaffMember | null;
+  csLead: StaffMember | null;
   hasMark: boolean;
   /** The client-facing intake form on wander.com, by slug or by connect token. */
   intakeUrl: string | null;
@@ -169,6 +174,10 @@ export async function loadPerformanceDesk(
       deliveryStage: true,
       deliveryStageAt: true,
       performanceSettings: true,
+    },
+    with: {
+      owner: { columns: { id: true, name: true, image: true } },
+      csLead: { columns: { id: true, name: true, image: true } },
     },
     orderBy: (brand, { asc }) => [asc(brand.name)],
   });
@@ -394,6 +403,8 @@ export async function loadPerformanceDesk(
             }
           : brand.performanceSettings,
         deliveryAt: brand.deliveryStageAt,
+        lead: brand.owner,
+        csLead: brand.csLead,
         id: brand.id,
         name: brand.name,
         slug: brand.slug,

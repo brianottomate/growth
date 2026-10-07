@@ -26,7 +26,11 @@ export type PerformancePipelineCard = {
     checklist: ReadinessChecklist;
     links: Record<ReadinessFix, string | null>;
   };
+  lead?: StaffMember | null;
+  csLead?: StaffMember | null;
 };
+
+type StaffMember = { id: string; name: string | null; image: string | null };
 
 /** Recorded workflow state is never filled from campaigns, cycles, or the old delivery stage. */
 export function performanceCardFromBrand(brand: {
@@ -39,6 +43,8 @@ export function performanceCardFromBrand(brand: {
   intakeUrl?: string | null;
   settings?: PerformanceSettings | null;
   campaigns: { adCount: number }[];
+  lead?: StaffMember | null;
+  csLead?: StaffMember | null;
 }): PerformancePipelineCard {
   return {
     id: brand.id,
@@ -60,6 +66,8 @@ export function performanceCardFromBrand(brand: {
     noteEditedBy: brand.settings?.noteEditedBy,
     management: brand.settings?.monthlyFee ?? null,
     spend: brand.settings?.agreedAdSpend ?? null,
+    lead: brand.lead ?? null,
+    csLead: brand.csLead ?? null,
     campaignCount: brand.campaigns.length,
     adCount: brand.campaigns.reduce(
       (sum, campaign) => sum + campaign.adCount,

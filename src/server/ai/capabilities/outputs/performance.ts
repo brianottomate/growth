@@ -524,6 +524,7 @@ export const previewIntakeApplyActionOutputSchema = z.strictObject({
         name: z.string(),
         organizationId: z.string().nullable(),
         ownerId: z.string().nullable(),
+        csLeadId: z.string().nullable(),
         performanceChecklist: z
           .strictObject({
             meta: z
