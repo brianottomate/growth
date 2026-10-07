@@ -9,7 +9,6 @@ import {
 } from "@/lib/campaign-navigation";
 import { workspaceActor } from "@/server/workspace-actor";
 import { listBrandHomes } from "@/server/services/homes.service";
-import { isImportedMetaCatalog } from "@/lib/meta-import";
 import { notFound, redirect } from "next/navigation";
 import { and, inArray, isNotNull } from "drizzle-orm";
 import { Images, Radio, Users, ChartNoAxesCombined } from "lucide-react";
@@ -171,10 +170,7 @@ export async function CampaignView({
     />
   );
 
-  const editableAds = ads.filter(
-    (ad) => !("media" in ad.content) || !isImportedMetaCatalog(ad.content),
-  );
-  // The push sends approved ads; drafts stay here until they are approved.
+  // Campaign membership consumes approved ads.
   const approvedAds = ads.filter((ad) => ad.status === "approved");
   const adActions = (
     <div className="flex flex-wrap items-center gap-2">
@@ -373,76 +369,6 @@ export async function CampaignView({
             }
             actions={platformActions}
           >
-            {editableAds.length > 0 && (
-              <div className="mb-4 space-y-2 rounded-lg border p-3">
-                <h3 className="text-sm font-medium">Ad destinations</h3>
-                <p className="text-xs text-muted-foreground">
-                  Review the saved ad URLs below and the tracking settings in
-                  each platform draft. Edit destinations in the ad editor or Ad
-                  Studio.
-                </p>
-                <ul className="space-y-2 text-xs">
-                  {editableAds.map((ad) => {
-                    const url = ad.content.linkUrl ?? campaign.landingUrl;
-                    const safe = safeHomeUrl(url);
-                    const cardUrls =
-                      "media" in ad.content
-                        ? ad.content.media.flatMap((card, index) =>
-                            card.landingUrl
-                              ? [{ index, url: card.landingUrl }]
-                              : [],
-                          )
-                        : [];
-                    return (
-                      <li key={ad.id} className="space-y-1">
-                        <span className="font-medium">{ad.name}: </span>
-                        {safe ? (
-                          <a
-                            href={safe}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="break-all underline"
-                          >
-                            {url}
-                          </a>
-                        ) : (
-                          <span role="alert" className="text-destructive">
-                            {url
-                              ? "Invalid destination URL"
-                              : "Missing destination URL"}
-                          </span>
-                        )}
-                        {ad.content.linkUrl == null && safe && (
-                          <span className="text-muted-foreground">
-                            {" "}
-                            (campaign fallback)
-                          </span>
-                        )}
-                        {cardUrls.map((card) => (
-                          <p key={card.index} className="pl-3 break-all">
-                            Card {card.index + 1}:{" "}
-                            {safeHomeUrl(card.url) ? (
-                              <a
-                                href={safeHomeUrl(card.url)!}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="underline"
-                              >
-                                {card.url}
-                              </a>
-                            ) : (
-                              <span role="alert" className="text-destructive">
-                                Invalid card destination URL
-                              </span>
-                            )}
-                          </p>
-                        ))}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            )}
             {planned.length === 0 ? (
               <EmptyState
                 compact
@@ -468,7 +394,6 @@ export async function CampaignView({
                     draftAds={approvedAds}
                     audiences={audiences}
                     draftAdCount={approvedAds.length}
-                    unapprovedCount={editableAds.length - approvedAds.length}
                     audienceCount={audiences.length}
                     brandUrl={campaign.landingUrl ?? brand.website ?? null}
                   />

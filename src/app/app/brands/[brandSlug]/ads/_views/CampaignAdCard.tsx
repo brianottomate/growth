@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AdPreviewSlide } from "./AdPreviewSlide";
+import { destinationLabel, safeHomeUrl } from "@/lib/ad-preview-links";
 import { AD_FORMATS, adFormat } from "@/lib/ad-format";
 import type { AdReview } from "@/lib/ad-review";
 import {
@@ -81,6 +82,12 @@ export function CampaignAdCard({
   const copy =
     creative?.body ||
     ("descriptions" in ad.content ? ad.content.descriptions[0] : "");
+  const destination = safeHomeUrl(ad.content.linkUrl);
+  const cardDestinations =
+    creative?.media.flatMap((item, index) => {
+      const url = safeHomeUrl(item.landingUrl);
+      return url && url !== destination ? [{ index, url }] : [];
+    }) ?? [];
   return (
     <article
       id={`ad-${ad.id}`}
@@ -166,14 +173,15 @@ export function CampaignAdCard({
           {copy && (
             <p className="line-clamp-2 text-xs text-muted-foreground">{copy}</p>
           )}
-          {home && (
+          {destination && (
             <a
-              href={home.url}
+              href={destination}
+              title={destination}
               target="_blank"
               rel="noreferrer"
-              className="text-xs text-muted-foreground underline underline-offset-4"
+              className="block w-fit max-w-full truncate text-xs text-muted-foreground underline underline-offset-4"
             >
-              {home.name}
+              {destinationLabel(destination)} ↗
             </a>
           )}
           <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -202,6 +210,22 @@ export function CampaignAdCard({
       </div>
       {open && (
         <div id={`preview-${ad.id}`} className="space-y-4 border-t p-4">
+          {cardDestinations.length > 0 && (
+            <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs">
+              {cardDestinations.map(({ index, url }) => (
+                <a
+                  key={index}
+                  href={url}
+                  title={url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline underline-offset-4"
+                >
+                  Slide {index + 1} · {destinationLabel(url)} ↗
+                </a>
+              ))}
+            </div>
+          )}
           <AdPlatformRouting
             adId={ad.id}
             platforms={ad.platforms ?? null}
@@ -210,6 +234,7 @@ export function CampaignAdCard({
           />
           {creative && format !== "video" ? (
             <AdIdeaPreview
+              showMetaPreview={false}
               studio={
                 creative.ideaStudio ?? {
                   document: ideaDocumentFromAd({

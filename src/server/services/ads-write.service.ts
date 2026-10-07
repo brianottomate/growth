@@ -5,7 +5,6 @@ import { resolveMetaSchedule, metaScheduleIssue } from "@/lib/meta-schedule";
 import { adsConnectionProfile } from "./ads-connection-profile";
 import {
   META_DEFAULT_PLACEMENTS,
-  META_PLACEMENTS,
   isFeedPlacement,
   showsSquare,
   metaPlacementPlanSchema,
@@ -26,16 +25,7 @@ import { freezeApprovedAd } from "./ad-approval.service";
 
 import { createHash } from "node:crypto";
 
-import {
-  and,
-  desc,
-  eq,
-  inArray,
-  isNotNull,
-  isNull,
-  or,
-  sql,
-} from "drizzle-orm";
+import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 
 import {
   adWriteIdempotencyKey,
@@ -99,6 +89,10 @@ import {
 } from "@/server/clients/zernio.client";
 import { db } from "@/server/db";
 import { normalizeDomain } from "@/server/services/hubspot-contact-mirror";
+import {
+  matchAudienceLocation,
+  normalizeAudienceGeography,
+} from "@/lib/audience-targeting-geography";
 import { usStateName } from "@/lib/us-states";
 import {
   adFormatFor,
@@ -2030,7 +2024,7 @@ async function compileAudienceTargeting(input: {
   const platformSpec = requireAdPlatformSpec(input.platform);
   const canTarget = platformSpec.features.targeting;
 
-  const geography = audience.geography ?? {};
+  const geography = normalizeAudienceGeography(audience.geography ?? {});
   if (geography.countries?.length) spec.countries = geography.countries;
   if (audience.ageMin != null || audience.ageMax != null) {
     if (canTarget.age) {
@@ -2043,29 +2037,38 @@ async function compileAudienceTargeting(input: {
     }
   }
 
-  // `states` holds codes and `regions` the names the geo search takes, so a
-  // state that has no name in `regions` is named here rather than dropped. A
-  // plan that carried only codes would otherwise compile to a country-wide
-  // buy with nothing saying so.
-  const namedStates = (geography.states ?? [])
-    .map((code) => usStateName(code))
-    .filter((name): name is string => name !== null);
-  const regionNames = [
-    ...new Set([...(geography.regions ?? []), ...namedStates]),
-  ];
-  // A city key is not a region key: Zernio takes cities in their own field.
-  const cityNames = [...new Set(geography.cities ?? [])];
-  const places = [
-    ...regionNames.map((name) => ({ name, geoType: "all" as const })),
-    ...cityNames.map((name) => ({ name, geoType: "city" as const })),
-  ];
-  for (const code of geography.states ?? []) {
-    if (usStateName(code) === null) {
-      warnings.push(
-        `State code "${code}" is not one we can name, so it was left out of the location targeting`,
+  const namedStates = (geography.states ?? []).map((code) => {
+    const name = usStateName(code);
+    if (!name)
+      throw new Error(
+        `${audience.name}: unknown US state "${code}". Fix the audience before pushing.`,
       );
-    }
+    return name;
+  });
+  const regionNames = [...new Set(geography.regions ?? [])];
+  if (regionNames.length && (geography.countries?.length ?? 0) !== 1) {
+    throw new Error(
+      `${audience.name}: select one country to resolve the named regions before pushing.`,
+    );
   }
+  const places = [
+    ...namedStates.map((name) => ({
+      name,
+      geoType: "region" as const,
+      countryCode: "US",
+    })),
+    ...regionNames.map((name) => ({
+      name,
+      geoType: "region" as const,
+      countryCode: geography.countries?.[0],
+    })),
+    ...[...new Set(geography.cities ?? [])].map((name) => ({
+      name,
+      geoType: "city" as const,
+      countryCode:
+        geography.countries?.length === 1 ? geography.countries[0] : undefined,
+    })),
+  ];
   if (places.length > 0 && !canTarget.regions) {
     // Country-level platforms: say what was dropped, and never let a plan
     // that named US states compile to a worldwide buy.
@@ -2081,29 +2084,25 @@ async function compileAudienceTargeting(input: {
   } else if (places.length > 0) {
     const regions: Array<{ key: string }> = [];
     const cities: Array<{ key: string }> = [];
-    for (const { name, geoType } of places) {
+    for (const { name, geoType, countryCode } of places) {
       try {
         const { results } = await searchZernioTargeting({
           accountId: input.connectionAccountId,
           q: name,
           dimension: "geo",
           geoType,
-          countryCode: geography.countries?.[0],
+          countryCode,
           limit: 5,
         });
-        const match =
-          results.find(
-            (row) => row.name.toLowerCase() === name.toLowerCase(),
-          ) ?? results[0];
-        if (match)
-          (match.type === "city" ? cities : regions).push({ key: match.id });
-        else
-          warnings.push(
-            `"${name}" did not resolve to a targetable location on ${input.platform} — it was left out`,
+        const match = matchAudienceLocation(name, geoType, results);
+        if (!match)
+          throw new Error(
+            `"${name}" did not resolve unambiguously to a ${geoType}`,
           );
+        (geoType === "city" ? cities : regions).push({ key: match.id });
       } catch (error) {
-        warnings.push(
-          `Resolving "${name}" failed (${error instanceof Error ? error.message : String(error)}) — it was left out`,
+        throw new Error(
+          `${audience.name}: resolving "${name}" failed. Fix the audience before pushing. ${error instanceof Error ? error.message : String(error)}`,
         );
       }
     }
@@ -2377,17 +2376,11 @@ export async function pushDraftToPlatform(
     await db.query.adTable.findMany({
       where: eq(adTable.campaignId, campaign.id),
     }),
-  )
-    .filter((ad) => ad.status === "approved")
-    .map((ad) => {
-      if (!ad.approvedSnapshot)
-        throw new Error(`Approve ${ad.name} again before publishing.`);
-      return {
-        ...ad,
-        content: ad.approvedSnapshot.content,
-        placements: ad.approvedSnapshot.placements,
-      };
-    });
+  ).filter((ad) => ad.status === "approved");
+  for (const ad of ads) {
+    if (!ad.approvedBy)
+      throw new Error(`Approve ${ad.name} before publishing.`);
+  }
   // A shell is an ad someone meant to fill and did not. Sending the rest
   // around it would ship a set with a hole nobody chose.
   const shells = ads.filter(
@@ -3199,22 +3192,14 @@ async function pushToMeta(args: PushArgs) {
   const feedPlacements = placementPlan.filter(isFeedPlacement);
   const squarePlacements = feedPlacements.filter(showsSquare);
   const otherFeed = feedPlacements.filter((p) => !showsSquare(p));
-  // The push freezes approved ideas first, so their square renders exist.
-  const squareImages = async (adId: string) => {
-    const row = await db.query.adTable.findFirst({
-      where: eq(adTable.id, adId),
-      columns: { content: true },
-    });
-    const square =
-      row && "media" in row.content
-        ? row.content.ideaStudio?.approval?.renders.square
-        : undefined;
-    return square?.length ? square.map((render) => render.url) : null;
-  };
   const placementSetsFor = async (ad: Ad, content: AdCreativeContent) => {
     const media = content.media.slice(0, 10);
     const feed = media.map((card) => card.url);
-    const square = squarePlacements.length ? await squareImages(ad.id) : null;
+    const squares = content.ideaStudio?.approval?.renders.square;
+    const square =
+      squarePlacements.length && squares?.length
+        ? squares.map((render) => render.url)
+        : null;
     // Square images that already are the feed images need no set of their own.
     const distinctSquare =
       square?.length === media.length &&

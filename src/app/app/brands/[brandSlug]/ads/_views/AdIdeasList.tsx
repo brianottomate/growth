@@ -58,6 +58,7 @@ export function AdIdeasList({
   }[];
 }) {
   const [kind, setKind] = useState<AdFormat | null>(null);
+  const [showAll, setShowAll] = useState(false);
   const formatOf = (ad: (typeof ads)[number]): AdFormat =>
     "media" in ad.content && isImportedMetaCatalog(ad.content)
       ? "catalog"
@@ -91,6 +92,14 @@ export function AdIdeasList({
           Number("format" in b.content && b.content.format === "carousel")
         : 0),
   );
+  const shownIds = new Set(
+    (showAll
+      ? [...ordered, ...catalogs]
+      : [...ordered, ...catalogs].slice(0, 3)
+    ).map((ad) => ad.id),
+  );
+  const shownIdeas = ordered.filter((ad) => shownIds.has(ad.id));
+  const shownCatalogs = catalogs.filter((ad) => shownIds.has(ad.id));
   const renderAd = (ad: (typeof ordered)[number]) => (
     <CampaignAdCard
       ad={{ ...ad, review: adReviewOf(ad) }}
@@ -104,7 +113,7 @@ export function AdIdeasList({
     />
   );
   return (
-    <section aria-label="Ads" className="space-y-4">
+    <section id="campaign-ad-list" aria-label="Ads" className="space-y-4">
       <WorkspaceCardHeader
         title="Ads"
         icon={Images}
@@ -114,7 +123,10 @@ export function AdIdeasList({
       {ads.length > 0 && (
         <AdFormatFilter
           value={kind}
-          onChange={setKind}
+          onChange={(value) => {
+            setKind(value);
+            setShowAll(false);
+          }}
           formats={AD_FORMATS.map((format) => ({
             ...format,
             count: ads.filter((ad) => formatOf(ad) === format.id).length,
@@ -143,12 +155,12 @@ export function AdIdeasList({
         </div>
       ) : ideas.length > 0 ? (
         <div className="space-y-3">
-          {ordered.map((ad) => (
+          {shownIdeas.map((ad) => (
             <div key={ad.id}>{renderAd(ad)}</div>
           ))}
         </div>
       ) : null}
-      {catalogs.length > 0 && (
+      {shownCatalogs.length > 0 && (
         <section
           aria-label="Imported catalog ads"
           className="space-y-3 border-t pt-5"
@@ -161,7 +173,7 @@ export function AdIdeasList({
             fixed creative. Catalog editing and publishing are not supported
             here yet.
           </p>
-          {catalogs.map((ad) => (
+          {shownCatalogs.map((ad) => (
             <div key={ad.id} className="space-y-2 rounded-xl border p-4">
               <div className="flex flex-wrap items-center gap-3">
                 <h4 className="text-sm font-medium">{ad.name}</h4>
@@ -177,6 +189,22 @@ export function AdIdeasList({
             </div>
           ))}
         </section>
+      )}
+      {visible.length > 3 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3">
+          <span className="text-xs text-muted-foreground">
+            Showing {showAll ? visible.length : 3} of {visible.length} ads
+          </span>
+          <Button
+            size="sm"
+            variant="ghost"
+            aria-expanded={showAll}
+            aria-controls="campaign-ad-list"
+            onClick={() => setShowAll((value) => !value)}
+          >
+            {showAll ? "Show less" : `Show all ${visible.length} ads`}
+          </Button>
+        </div>
       )}
     </section>
   );

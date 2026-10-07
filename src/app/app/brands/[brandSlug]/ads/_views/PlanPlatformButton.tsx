@@ -66,7 +66,7 @@ export function PlanPlatformButton({
         onClick={() => setOpen(true)}
       >
         <Radio className="size-3.5" />
-        Choose platform
+        Add platform
       </Button>
       <Dialog
         open={open}
@@ -74,20 +74,18 @@ export function PlanPlatformButton({
           if (!plan.isPending) setOpen(value);
         }}
       >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Choose a platform</DialogTitle>
+        <DialogContent className="gap-4 pb-6">
+          <DialogHeader className="px-0 pt-4 md:pt-0 [&_*]:text-left">
+            <DialogTitle>Add platform</DialogTitle>
             <DialogDescription>
-              Create a local draft for its budget and settings. Review the
-              account, tracking and budget before pushing; creating a plan
-              starts no delivery.
+              Add a platform to prepare its budget and delivery settings.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid gap-2 sm:grid-cols-2">
             {remaining.map((platform) => (
               <Button
                 key={platform}
-                size="sm"
+                className="h-12 justify-start"
                 variant="outline"
                 disabled={plan.isPending}
                 onClick={() => plan.mutate({ campaignId, platform })}

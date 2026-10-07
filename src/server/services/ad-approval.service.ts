@@ -1,4 +1,3 @@
-import { approvedOutput } from "@/lib/ad-approved-output";
 import { withTransaction } from "@/server/db";
 import { reviewActor, reviewSubjectFields } from "./review-comments.service";
 import type { GrowthActionContext } from "@/server/ai/kernel/tool";
@@ -130,8 +129,7 @@ export async function approvedAdFrozen(adId: string): Promise<boolean> {
 
 /**
  * Render and save the images an approved ad has not saved yet, as the
- * approver when a campaign consumes it. Legacy campaign preview/push paths
- * also finish missing exports. Returns whether it saved any.
+ * approver when a campaign consumes it. Returns whether it saved any.
  */
 export async function freezeApprovedAd(
   adId: string,
@@ -139,31 +137,11 @@ export async function freezeApprovedAd(
 ): Promise<boolean> {
   const ad = await db.query.adTable.findFirst({ where: eq(adTable.id, adId) });
   if (ad?.status !== "approved") return false;
-  if (!("media" in ad.content) || !ad.content.ideaStudio) {
-    if (ad.approvedSnapshot) return false;
-    if (!ad.approvedBy)
-      throw new Error(
-        "Return this ad to Studio and approve it again before publishing.",
-      );
-    await db
-      .update(adTable)
-      .set({
-        approvedSnapshot: {
-          content: approvedOutput(ad.content),
-          placements: ad.placements,
-          approvedAt: (ad.approvedAt ?? ad.updatedAt).toISOString(),
-          approvedBy: ad.approvedBy,
-        },
-      })
-      .where(
-        and(
-          eq(adTable.id, ad.id),
-          eq(adTable.updatedAt, ad.updatedAt),
-          eq(adTable.status, "approved"),
-        ),
-      );
-    return true;
-  }
+  if (!ad.approvedBy)
+    throw new Error(
+      "Return this ad to Studio and approve it again before publishing.",
+    );
+  if (!("media" in ad.content) || !ad.content.ideaStudio) return false;
   const studio = ad.content.ideaStudio;
   const approval = studio?.approval;
   if (!studio || !approval)
@@ -174,27 +152,7 @@ export async function freezeApprovedAd(
   const missing = document.shapes.filter(
     (shape) => approval.renders[shape]?.length !== document.cards.length,
   );
-  if (!missing.length && ad.approvedSnapshot) return false;
-  if (!missing.length) {
-    await db
-      .update(adTable)
-      .set({
-        approvedSnapshot: {
-          content: approvedOutput(ad.content),
-          placements: ad.placements,
-          approvedAt: approval.approvedAt,
-          approvedBy: approval.approvedBy,
-        },
-      })
-      .where(
-        and(
-          eq(adTable.id, ad.id),
-          eq(adTable.updatedAt, ad.updatedAt),
-          eq(adTable.status, "approved"),
-        ),
-      );
-    return true;
-  }
+  if (!missing.length) return false;
   const brand = await db.query.brandTable.findFirst({
     where: and(eq(brandTable.id, ad.brandId), isNull(brandTable.deletedAt)),
   });
@@ -225,12 +183,6 @@ export async function freezeApprovedAd(
       .update(adTable)
       .set({
         ...next,
-        approvedSnapshot: {
-          content: approvedOutput(next.content),
-          placements: next.placements,
-          approvedAt: approval.approvedAt,
-          approvedBy: approval.approvedBy,
-        },
         updatedAt: new Date(),
       })
       .where(and(eq(adTable.id, ad.id), eq(adTable.updatedAt, ad.updatedAt)))
@@ -374,7 +326,6 @@ export async function approveImageAd(input: {
     .set({
       ...next,
       status: "approved",
-      approvedSnapshot: null,
       approvedAt,
       approvedBy: input.userId,
       updatedAt: new Date(),
@@ -437,7 +388,6 @@ export async function returnAdToStudio(
         readyBy: null,
         approvedAt: null,
         approvedBy: null,
-        approvedSnapshot: null,
         replacesAdId: null,
         content,
         placements,

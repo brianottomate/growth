@@ -979,15 +979,30 @@ export const addAudienceAction = growthAction({
       .array(z.string().trim().length(2))
       .max(60)
       .optional()
-      .describe('US state codes, e.g. ["CO"]. Send regions alongside them.'),
+      .describe(
+        'Whole US states to target, e.g. ["CO"]. Names are resolved during export.',
+      ),
     regions: z
       .array(z.string().trim().min(1).max(100))
       .max(60)
       .optional()
       .describe(
-        'Region/state names, e.g. ["California"] — resolved to platform geo keys at push.',
+        'Country subdivisions outside the US, e.g. ["Ontario"]. Supply countries for lookup.',
       ),
-    cities: z.array(z.string().trim().min(1).max(120)).max(100).optional(),
+    cities: z
+      .array(z.string().trim().min(1).max(120))
+      .max(100)
+      .optional()
+      .describe(
+        "Explicit city delivery targets. These add coverage alongside states and regions.",
+      ),
+    originCities: z
+      .array(z.string().trim().min(1).max(120))
+      .max(100)
+      .optional()
+      .describe(
+        "Feeder-city planning context. Never sent to advertising platforms.",
+      ),
     keywords: searchTermsInput.describe(SEARCH_TERMS_HELP),
     excludedKeywords: searchTermsInput.describe(EXCLUDED_TERMS_HELP),
   }),
@@ -1011,12 +1026,14 @@ export const addAudienceAction = growthAction({
         input.countries?.length ||
         input.states?.length ||
         input.regions?.length ||
-        input.cities?.length
+        input.cities?.length ||
+        input.originCities?.length
           ? {
               countries: input.countries,
               states: input.states?.map((code) => code.toUpperCase()),
               regions: input.regions,
               cities: input.cities,
+              originCities: input.originCities,
             }
           : null,
       keywords: input.keywords ?? null,
@@ -1039,9 +1056,32 @@ export const updateAudienceAction = growthAction({
     ageMin: z.number().int().min(13).max(100).nullish(),
     ageMax: z.number().int().min(13).max(100).nullish(),
     countries: z.array(z.string().length(2)).max(20).optional(),
-    states: z.array(z.string().trim().length(2)).max(60).optional(),
-    regions: z.array(z.string().trim().min(1).max(100)).max(60).optional(),
-    cities: z.array(z.string().trim().min(1).max(120)).max(100).optional(),
+    states: z
+      .array(z.string().trim().length(2))
+      .max(60)
+      .optional()
+      .describe("Whole US states to target, as two-letter codes."),
+    regions: z
+      .array(z.string().trim().min(1).max(100))
+      .max(60)
+      .optional()
+      .describe(
+        "Named international subdivisions. Supply countries for lookup.",
+      ),
+    cities: z
+      .array(z.string().trim().min(1).max(120))
+      .max(100)
+      .optional()
+      .describe(
+        "Explicit city delivery targets. These add coverage alongside states and regions.",
+      ),
+    originCities: z
+      .array(z.string().trim().min(1).max(120))
+      .max(100)
+      .optional()
+      .describe(
+        "Feeder-city planning context. Never sent to advertising platforms.",
+      ),
     keywords: searchTermsInput.describe(SEARCH_TERMS_HELP),
     excludedKeywords: searchTermsInput.describe(EXCLUDED_TERMS_HELP),
   }),
@@ -1064,12 +1104,14 @@ export const updateAudienceAction = growthAction({
         input.countries !== undefined ||
         input.states !== undefined ||
         input.regions !== undefined ||
-        input.cities !== undefined
+        input.cities !== undefined ||
+        input.originCities !== undefined
           ? {
               countries: input.countries,
               states: input.states?.map((code) => code.toUpperCase()),
               regions: input.regions,
               cities: input.cities,
+              originCities: input.originCities,
             }
           : undefined,
       keywords: input.keywords,

@@ -124,16 +124,14 @@ export type AdStats = {
 export type AudienceGeographyPlan = {
   /** ISO country codes, e.g. ["US"]. */
   countries?: string[];
-  /**
-   * Two-letter state codes as the source gives them, e.g. ["CO"]. This is the
-   * fact ("their homes are in Colorado"); `regions` is what a platform can be
-   * asked for. Both are kept because a code round-trips and a display name is
-   * a lookup that can fail.
-   */
+  /** Whole US states to target, as two-letter codes. */
   states?: string[];
-  /** Region/state names the platform's geo search can resolve, e.g. ["California"]. */
+  /** Named country subdivisions outside the US, resolved at export. */
   regions?: string[];
+  /** Explicit city delivery targets. */
   cities?: string[];
+  /** Feeder cities that explain the plan; never sent as delivery targets. */
+  originCities?: string[];
 };
 
 /**
@@ -553,14 +551,8 @@ export const adTable = pgTable(
     name: t.text().notNull(),
     type: adTypeEnum().default("creative").notNull(),
     status: adStatusEnum().default("drawn").notNull(),
+    /** Prepared creative. Approval locks edits; campaign attachment saves its exports. */
     content: t.jsonb().$type<AdContent>().notNull(),
-    /** Signed-off output. Composition recipes remain in content for reference. */
-    approvedSnapshot: t.jsonb().$type<{
-      content: AdContent;
-      placements: AdPlacements | null;
-      approvedAt: string;
-      approvedBy: string;
-    }>(),
     /**
      * Per platform × placement cells that differ from `content`: copy
      * overrides, a placement's own files, and whether the cell is frozen.

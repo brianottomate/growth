@@ -63,7 +63,21 @@ const suggestionSchema = z.object({
     .array(z.string())
     .describe("Geo only: two-letter codes of the whole states to target."),
   personaId: z.string().nullable(),
-  cities: z.array(z.string()),
+  cities: z
+    .array(z.string())
+    .describe(
+      "Explicit city-only delivery targets, including country and subdivision to disambiguate. Usually empty for US state targeting.",
+    ),
+  originCities: z
+    .array(z.string())
+    .describe(
+      "Feeder cities supporting the state or region choice; planning context only.",
+    ),
+  regions: z
+    .array(z.string())
+    .describe(
+      "Named country subdivisions outside the US. Supply countries to scope lookup.",
+    ),
   countries: z.array(z.string()),
   homeIds: z.array(z.string()),
   ageMin: z.number().int().nullable(),
@@ -325,18 +339,20 @@ export async function suggestCampaignAudiences(input: {
     suggestions = output.audiences
       .map((s) => ({
         ...s,
-        hasPlaceTarget: s.states.length > 0 || s.cities.length > 0,
+        hasPlaceTarget: s.states.length > 0 || s.originCities.length > 0,
         personaId:
           s.personaId && knownPersonas.has(s.personaId) ? s.personaId : null,
         homeIds: s.homeIds.filter((id) => knownHomes.has(id)),
         ...(s.kind === "geo"
           ? campaignGeography(s, feeders, coveredStates)
-          : { states: [], cities: [] }),
+          : { states: [], originCities: [] }),
       }))
       .filter((s) =>
         s.kind === "geo"
           ? Boolean(
               s.states.length ||
+              s.regions.length ||
+              s.cities.length ||
               (!s.hasPlaceTarget && (s.countries.length || s.personaId)),
             )
           : Boolean(s.platformAudienceId && known.has(s.platformAudienceId)),
@@ -349,7 +365,8 @@ export async function suggestCampaignAudiences(input: {
           cities: s.kind === "geo" ? s.cities : [],
           states,
           countries: s.kind === "geo" ? s.countries : [],
-          regions: states.map((state) => usStateName(state) ?? state),
+          regions: s.kind === "geo" ? s.regions : [],
+          originCities: s.kind === "geo" ? s.originCities : [],
           platformAudienceId: s.kind === "geo" ? null : s.platformAudienceId,
         };
       });

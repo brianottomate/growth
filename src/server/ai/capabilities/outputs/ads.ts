@@ -432,32 +432,6 @@ const placementsValueSchema = z.strictObject({
 
 const placementsSchema = z.record(z.string(), placementsValueSchema);
 
-const snapshotContentSchema = z.union([
-  contentSchema,
-  z.strictObject({
-    headlines: z.array(z.string()),
-    descriptions: z.array(z.string()),
-    linkUrl: z.string().optional(),
-  }),
-]);
-const approvedSnapshotSchema = z.strictObject({
-  content: snapshotContentSchema,
-  placements: placementsSchema.nullable(),
-  approvedAt: z.string(),
-  approvedBy: z.string(),
-});
-const nativeApprovedSnapshotSchema = approvedSnapshotSchema.extend({
-  content: z.union([
-    contentSchema.extend({
-      metaImport: metaImportSchema
-        .extend({
-          rawCreative: z.record(z.string(), z.unknown()),
-        })
-        .optional(),
-    }),
-    snapshotContentSchema.options[1],
-  ]),
-});
 const pushedCreativeSchema = z.strictObject({
   name: z.string(),
   headline: z.string().nullable(),
@@ -503,14 +477,12 @@ export const draftAdResultSchema = z.strictObject({
   readyBy: z.string().nullable(),
   approvedAt: z.date().nullable(),
   approvedBy: z.string().nullable(),
-  approvedSnapshot: nativeApprovedSnapshotSchema.nullable(),
   replacesAdId: z.string().nullable(),
   type: z.enum(["text", "creative"]),
   updatedAt: z.date(),
 });
 
 const draftAdSchema = draftAdResultSchema.extend({
-  approvedSnapshot: approvedSnapshotSchema.nullable(),
   content: z.union([
     contentSchema,
     z.strictObject({
@@ -527,6 +499,7 @@ const draftAdSchema = draftAdResultSchema.extend({
 export type DraftAdResult = z.output<typeof draftAdResultSchema>;
 
 const geographySchema = z.strictObject({
+  originCities: z.array(z.string()).optional(),
   cities: z.array(z.string()).optional(),
   countries: z.array(z.string()).optional(),
   regions: z.array(z.string()).optional(),
@@ -878,7 +851,6 @@ export const openCampaignActionOutputSchema = z.strictObject({
       readyBy: z.string().nullable(),
       approvedAt: z.iso.datetime().nullable(),
       approvedBy: z.string().nullable(),
-      approvedSnapshot: approvedSnapshotSchema.nullable(),
       replacesAdId: z.string().nullable(),
       type: z.enum(["text", "creative"]),
       updatedAt: z.iso.datetime(),
@@ -1234,6 +1206,7 @@ export const suggestCampaignAudiencesActionOutputSchema = z.strictObject({
       personaId: z.string().nullable(),
       homeIds: z.array(z.string()),
       cities: z.array(z.string()),
+      originCities: z.array(z.string()),
       states: z.array(z.string()),
       countries: z.array(z.string()),
       regions: z.array(z.string()),
@@ -1615,7 +1588,6 @@ export const openCampaignActionNativeResultSchema =
   openCampaignActionOutputSchema.extend({
     ads: z.array(
       openCampaignActionOutputSchema.shape.ads.element.extend({
-        approvedSnapshot: nativeApprovedSnapshotSchema.nullable(),
         content: z.union([
           openCampaignActionOutputSchema.shape.ads.element.shape.content.options[0].extend(
             {

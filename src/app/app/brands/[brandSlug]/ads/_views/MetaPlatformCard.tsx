@@ -1,8 +1,8 @@
 "use client";
 
+import { campaignDisplayName } from "@/lib/campaign-navigation";
 import { resolveMetaSchedule, metaScheduleIssue } from "@/lib/meta-schedule";
 import { applyMetaTrackingDefaults } from "@/lib/meta-tracking";
-import Image from "next/image";
 import { isImportedMetaCatalog } from "@/lib/meta-import";
 import { useLocalStorage } from "@/components/ui/hooks/use-local-storage";
 import { ChevronDown, ChevronRight } from "lucide-react";
@@ -31,11 +31,21 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { DeletePlatformCampaign } from "./DeletePlatformCampaign";
+import { AskAssistantButton } from "./AskAssistantButton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { orpc } from "@/orpc/client";
-import { AD_PUSH_GOALS, type AdPushGoal } from "@/lib/ad-platforms";
+import { adRoutesTo, AD_PUSH_GOALS, type AdPushGoal } from "@/lib/ad-platforms";
 import type {
   Ad,
+  AdCreativeContent,
   PlatformCampaign,
   AudienceGeographyPlan,
 } from "@/server/db/ads-schema";
@@ -76,7 +86,6 @@ export function MetaPlatformCard({
   platformCampaign: pc,
   ads,
   audiences,
-  unapprovedCount,
 }: {
   campaignId: string;
   campaignName: string;
@@ -88,9 +97,8 @@ export function MetaPlatformCard({
   platformCampaign: PlatformCampaign;
   ads: Ad[];
   audiences: Audience[];
-  unapprovedCount: number;
 }) {
-  const [expanded, setExpanded] = useState(true);
+  const [inspectOpen, setInspectOpen] = useState(false);
   const [projectionOpen, setProjectionOpen] = useLocalStorage<
     Record<string, boolean>
   >({
@@ -109,7 +117,6 @@ export function MetaPlatformCard({
   const destinations = useQuery(
     orpc.ads.destinations.queryOptions({
       input: { brandSlug, platform: "meta" },
-      enabled: expanded,
     }),
   );
   // Facebook and Meta Ads connections can expose the same paying account/Page.
@@ -135,15 +142,15 @@ export function MetaPlatformCard({
         label: `${chosen.adAccountName ?? chosen.adAccountId} · Page ${chosen.pageId ?? "not resolved"}`,
       }
     : undefined;
-  const catalogCount = ads.filter(
+  const routedAds = ads.filter((ad) => adRoutesTo(ad.platforms, "meta_ads"));
+  const catalogCount = routedAds.filter(
     (ad) => "media" in ad.content && isImportedMetaCatalog(ad.content),
   ).length;
-  const creativeAds = ads.filter(
+  const creativeAds = routedAds.filter(
     (ad) =>
       ad.type === "creative" &&
       "media" in ad.content &&
       !isImportedMetaCatalog(ad.content) &&
-      // An approved idea has no media until the push saves its images.
       (Boolean(ad.content.media[0]?.url) ||
         Boolean(
           ad.content.ideaStudio?.approval &&
@@ -189,11 +196,7 @@ export function MetaPlatformCard({
     (ad) =>
       "media" in ad.content &&
       placementPlan.some(
-        (p) =>
-          metaPlacementMedia(
-            ad.content as import("@/server/db/ads-schema").AdCreativeContent,
-            p,
-          ).issue,
+        (p) => metaPlacementMedia(ad.content as AdCreativeContent, p).issue,
       ),
   );
   const missingTracking =
@@ -202,20 +205,20 @@ export function MetaPlatformCard({
     !(meta?.pixelId && meta?.customEventType);
   const blockers = [
     scheduleError,
-    !configuration && "Choose an ad account in Edit setup.",
+    !configuration && "Choose an ad account in Settings.",
     configuration &&
       !chosen?.runsAsBrandPage &&
       "The connection does not have access to this brand’s Facebook Page.",
-    !placementPlan.length && "Choose delivery placements in Edit setup.",
+    !placementPlan.length && "Choose delivery placements in Settings.",
     missingTracking &&
-      "Set a pixel and conversion event, or a custom conversion, in Edit setup.",
-    !pc.budget && "Set a budget in Edit setup.",
+      "Set a pixel and conversion event, or a custom conversion, in Settings.",
+    !pc.budget && "Set a budget in Settings.",
     !creativeAds.length && "Add at least one creative ad.",
     missingCreative && "Add the missing artwork for the selected placements.",
     Boolean(catalogCount) &&
       "Catalog ads cannot be included in this creative push.",
     Boolean(meta?.importSource?.issues.length && !meta.importReviewed) &&
-      "Review imported delivery settings in Edit setup.",
+      "Review imported delivery settings in Settings.",
   ].filter((message): message is string => typeof message === "string");
   const ready = blockers.length === 0;
 
@@ -223,28 +226,23 @@ export function MetaPlatformCard({
     <section className="space-y-5 rounded-xl border bg-card p-5">
       <div className="flex flex-wrap items-center gap-3">
         <ChannelLogo platform="meta_ads" className="size-5" />
-        <h3 className="font-semibold">On Meta Ads</h3>
+        <h3 className="font-semibold">Meta Ads</h3>
         <span className="rounded-full bg-muted px-2 py-1 text-xs text-muted-foreground">
-          Planned
-        </span>
-        <span className="text-sm text-muted-foreground">
-          {sets.length} ad {sets.length === 1 ? "set" : "sets"} ×{" "}
-          {creativeAds.length} {creativeAds.length === 1 ? "ad" : "ads"} ·{" "}
-          {pc.budget ? money(pc.budget) : "Budget not set"}
+          Planned · paused on push
         </span>
         <div className="ml-auto flex flex-wrap gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-expanded={expanded}
-            aria-controls={sectionId}
-            onClick={() => setExpanded(!expanded)}
-          >
-            {expanded ? "Collapse" : "Expand"}
-          </Button>
+          <AskAssistantButton
+            brandId={pc.brandId}
+            brandName={brandName}
+            campaignId={campaignId}
+            campaignName={campaignName}
+            focus="platforms"
+            label="Shape"
+            ask={`Help me shape the Meta delivery setup for “${campaignName}”. Read its approved ads, campaign audiences and Meta settings, then discuss what I want to refine before changing anything.`}
+          />
           {!ready && (
             <Button size="sm" disabled>
-              Push to Meta
+              Push paused
             </Button>
           )}
           {ready && (
@@ -259,6 +257,17 @@ export function MetaPlatformCard({
               budgetType={pc.budgetType}
             />
           )}
+          <DeletePlatformCampaign
+            platformCampaignId={pc.id}
+            campaignName="Meta Ads"
+            brandSlug={brandSlug}
+            isLive={false}
+            spend={pc.spend}
+            hasExternalId={Boolean(pc.externalId)}
+            compact
+            afterDelete="refresh"
+            connectionAccountId={configuration?.connectionAccountId}
+          />
         </div>
       </div>
       {!ready && !destinations.isPending && (
@@ -266,7 +275,7 @@ export function MetaPlatformCard({
           className="space-y-1 text-sm text-muted-foreground"
           aria-label="Required before pushing"
         >
-          <p className="font-medium">Before pushing</p>
+          <p className="font-medium">To finish setup</p>
           <ul className="list-disc pl-5">
             {blockers.map((message) => (
               <li key={message}>{message}</li>
@@ -274,316 +283,288 @@ export function MetaPlatformCard({
           </ul>
         </div>
       )}
-      {expanded && (
-        <div id={sectionId} className="space-y-5">
-          <section
-            id={`${sectionId}-setup`}
-            className="space-y-4"
-            aria-label="Setup"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <h4 className="font-semibold">Setup</h4>
-              <MetaSettings
-                pc={{ ...pc, settings: { ...pc.settings, meta } }}
-                campaignStartAt={campaignStartAt}
-                campaignEndAt={campaignEndAt}
-                choices={choices}
-                destinationKey={
-                  chosen
-                    ? `${chosen.connectionAccountId}:${chosen.adAccountId}`
-                    : ""
-                }
-                goal={goal}
-                onApply={(key, nextGoal) => {
-                  setDestinationKey(key);
-                  setGoal(nextGoal);
-                }}
-              />
-            </div>
-            <dl className="grid grid-cols-2 gap-3 @2xl:grid-cols-4">
-              <SetupFact
-                label="Budget"
-                value={
-                  pc.budget
-                    ? `${money(pc.budget)}${pc.budgetType === "lifetime" ? " lifetime" : " / day"}`
-                    : "Not set"
-                }
-                detail={
-                  meta?.budgetMode === "abo"
-                    ? "Per ad set (ABO)"
-                    : "Campaign (CBO)"
-                }
-              />
-              <SetupFact
-                label="Goal"
-                value={
-                  goal.charAt(0).toUpperCase() + goal.slice(1).replace("_", " ")
-                }
-                detail={
-                  meta?.customConversionId ||
-                  (meta?.customEventType
-                    ? `${meta.customEventType} · ${
-                        meta.conversionScope === "host"
-                          ? "client site"
-                          : "shared pixel"
-                      }`
-                    : "No conversion set")
-                }
-              />
-              <SetupFact
-                label="Schedule"
-                value={
-                  schedule.startAt
-                    ? new Date(schedule.startAt).toLocaleDateString()
-                    : "When launched"
-                }
-                detail={
-                  schedule.endAt
-                    ? `Until ${new Date(schedule.endAt).toLocaleDateString()}`
-                    : "Runs until paused"
-                }
-              />
-              <SetupFact
-                label="Ad account"
-                value={
-                  chosen?.adAccountName ??
-                  chosen?.adAccountId ??
-                  (destinations.isPending ? "Loading…" : "Not selected")
-                }
-                detail={chosen?.pageId ? `Page ${chosen.pageId}` : "No Page"}
-              />
-            </dl>
-            {destinations.error && (
-              <p role="alert" className="text-sm">
-                {destinations.error.message}
-              </p>
-            )}
-            {chosen && !chosen.runsAsBrandPage && (
-              <p role="alert" className="text-sm">
-                This destination does not match the brand’s Facebook Page.
-                Choose a matching connection before pushing.
-              </p>
-            )}
-            {!destinations.isPending &&
-              !destinations.error &&
-              !choices.length && (
-                <p className="text-sm text-muted-foreground">
-                  No allowlisted Meta destination is connected to this brand.
-                </p>
-              )}
-            <details className="group text-xs text-muted-foreground">
-              <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 [&::-webkit-details-marker]:hidden">
-                <ChevronRight className="size-3 transition-transform group-open:rotate-90" />
-                <span>{placementSummary}</span>
-                <span aria-hidden>·</span>
-                <span className="break-all">
-                  Pixel {meta?.pixelId || "not configured"}
-                </span>
-              </summary>
-              {selectedPlacements.length > 0 && (
-                <p className="mt-2 pl-5">
-                  {selectedPlacements.map((p) => p.label).join(", ")}
-                </p>
-              )}
-            </details>
-          </section>
-          <section className="space-y-4 border-t pt-5" aria-label="Projection">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h4 className="font-semibold">Placement review</h4>
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() =>
-                    setProjectionOpen(
-                      Object.fromEntries(
-                        creativeAds.map((ad) => [ad.id, true]),
-                      ),
-                    )
-                  }
-                >
-                  Expand all
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() =>
-                    setProjectionOpen(
-                      Object.fromEntries(
-                        creativeAds.map((ad) => [ad.id, false]),
-                      ),
-                    )
-                  }
-                >
-                  Collapse all
-                </Button>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Compare placements for each ad. These previews share the creative
-              above; editing happens in the ad idea. Previewing does not approve
-              delivery.
+      <div id={sectionId} className="space-y-4">
+        <section
+          id={`${sectionId}-setup`}
+          className="space-y-4"
+          aria-label="Setup"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <h4 className="text-sm font-medium">Delivery setup</h4>
+            <MetaSettings
+              pc={{ ...pc, settings: { ...pc.settings, meta } }}
+              campaignStartAt={campaignStartAt}
+              campaignEndAt={campaignEndAt}
+              choices={choices}
+              destinationKey={
+                chosen
+                  ? `${chosen.connectionAccountId}:${chosen.adAccountId}`
+                  : ""
+              }
+              goal={goal}
+              onApply={(key, nextGoal) => {
+                setDestinationKey(key);
+                setGoal(nextGoal);
+              }}
+            />
+          </div>
+          <dl className="grid grid-cols-1 gap-4 @sm:grid-cols-2 @2xl:grid-cols-4">
+            <SetupFact
+              label="Budget"
+              value={
+                pc.budget
+                  ? `${money(pc.budget)}${pc.budgetType === "lifetime" ? " lifetime" : " / day"}`
+                  : "Not set"
+              }
+              detail={
+                meta?.budgetMode === "abo"
+                  ? "Per ad set (ABO)"
+                  : "Campaign (CBO)"
+              }
+            />
+            <SetupFact
+              label="Goal"
+              value={
+                goal.charAt(0).toUpperCase() + goal.slice(1).replace("_", " ")
+              }
+              detail={
+                meta?.customConversionId ||
+                (meta?.customEventType
+                  ? `${meta.customEventType} · ${
+                      meta.conversionScope === "host"
+                        ? "client site"
+                        : "shared pixel"
+                    }`
+                  : "No conversion set")
+              }
+            />
+            <SetupFact
+              label="Schedule"
+              value={
+                schedule.startAt
+                  ? new Date(schedule.startAt).toLocaleDateString()
+                  : "When launched"
+              }
+              detail={
+                schedule.endAt
+                  ? `Until ${new Date(schedule.endAt).toLocaleDateString()}`
+                  : "Runs until paused"
+              }
+            />
+            <SetupFact
+              label="Ad account"
+              value={
+                chosen?.adAccountName ??
+                chosen?.adAccountId ??
+                (destinations.isPending ? "Loading…" : "Not selected")
+              }
+              detail={chosen?.pageId ? `Page ${chosen.pageId}` : "No Page"}
+            />
+          </dl>
+          {destinations.error && (
+            <p role="alert" className="text-sm">
+              {destinations.error.message}
             </p>
-            <div>
-              <h4 className="font-semibold">{campaignName}</h4>
+          )}
+          {chosen && !chosen.runsAsBrandPage && (
+            <p role="alert" className="text-sm">
+              This destination does not match the brand’s Facebook Page. Choose
+              a matching connection before pushing.
+            </p>
+          )}
+          {!destinations.isPending &&
+            !destinations.error &&
+            !choices.length && (
               <p className="text-sm text-muted-foreground">
-                {goal} · {sets.length} ad sets ·{" "}
-                {sets.length * creativeAds.length} ads · Will create paused
+                No allowlisted Meta destination is connected to this brand.
               </p>
-            </div>
-            {sets.map((audience) => (
-              <div
-                key={audience.id}
-                className="space-y-1 rounded-lg border px-4 py-3"
+            )}
+          <details className="group text-xs text-muted-foreground">
+            <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 [&::-webkit-details-marker]:hidden">
+              <ChevronRight className="size-3 transition-transform group-open:rotate-90" />
+              <span>{placementSummary}</span>
+              <span aria-hidden>·</span>
+              <span className="break-all">
+                Pixel {meta?.pixelId || "not configured"}
+              </span>
+            </summary>
+            {selectedPlacements.length > 0 && (
+              <p className="mt-2 pl-5">
+                {selectedPlacements.map((p) => p.label).join(", ")}
+              </p>
+            )}
+          </details>
+        </section>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+          <p className="text-sm text-muted-foreground">
+            {sets.length} ad {sets.length === 1 ? "set" : "sets"} ·{" "}
+            {creativeAds.length} approved{" "}
+            {creativeAds.length === 1 ? "creative" : "creatives"} ·{" "}
+            {sets.length * creativeAds.length} Meta ads
+          </p>
+          <Dialog open={inspectOpen} onOpenChange={setInspectOpen}>
+            <DialogTrigger asChild>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!creativeAds.length}
               >
-                <h5 className="text-sm font-semibold">
-                  Ad set · {audience.name}
-                </h5>
-                <p className="text-xs text-muted-foreground">
-                  {[
-                    ...(audience.geography?.countries ?? []),
-                    ...(audience.geography?.states ?? []),
-                    ...(audience.geography?.regions ?? []),
-                    ...(audience.geography?.cities ?? []),
-                  ].join(" · ") || "Broad · provider defaults"}
-                  {audience.ageMin != null || audience.ageMax != null
-                    ? ` · Ages ${audience.ageMin ?? 13}–${audience.ageMax ?? "65+"}`
-                    : " · No age narrowing"}
-                </p>
-              </div>
-            ))}
-            {!placementPlan.length && !meta?.importSource && (
-              <p className="text-sm text-muted-foreground">
-                Choose delivery placements to preview approved artwork.{" "}
-                <a className="underline" href={`#${sectionId}-setup`}>
-                  Edit setup above
-                </a>{" "}
-                to choose delivery placements.
-              </p>
-            )}
-            {meta?.importSource && (
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button size="sm" variant="ghost">
-                    Imported from Meta · Source details
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
-                  <DialogHeader>
-                    <DialogTitle>Meta campaign source</DialogTitle>
-                    <DialogDescription>
-                      Local working copy of campaign{" "}
-                      {meta.importSource.campaignId}. Reconstructed previews are
-                      not a report of actual delivery.
-                    </DialogDescription>
-                  </DialogHeader>
-                  {meta.importSource.issues.map((issue) => (
-                    <p key={issue} className="text-sm">
-                      {issue}
-                    </p>
-                  ))}
-                  <details>
-                    <summary className="cursor-pointer text-sm">
-                      Original ad set settings
-                    </summary>
-                    <pre className="mt-3 max-h-80 overflow-auto text-xs whitespace-pre-wrap">
-                      {JSON.stringify(meta.importSource.adSets, null, 2)}
-                    </pre>
-                  </details>
-                </DialogContent>
-              </Dialog>
-            )}
-            <p className="text-xs text-muted-foreground">
-              {meta?.importSource
-                ? "Recovered from Meta · local working copy. "
-                : ""}
-              {meta?.importSource && !placementPlan.length
-                ? "Artwork below is recovered; select delivery placements in setup before shipping. "
-                : ""}
-              Each creative is shared across {sets.length} ad{" "}
-              {sets.length === 1 ? "set" : "sets"}. Expand to inspect delivery.
-            </p>
-            {creativeAds.map((ad, index) => {
-              const open = projectionOpen?.[ad.id] ?? index === 0;
-              const panelId = `${sectionId}-projection-${ad.id}`;
-              return (
-                <div key={ad.id} className="rounded-lg border">
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-3 p-4 text-left"
-                    aria-expanded={open}
-                    aria-controls={panelId}
+                Inspect placements
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-h-[85dvh] gap-4 overflow-x-hidden overflow-y-auto pb-6 md:w-[calc(100%-2rem)] md:max-w-5xl">
+              <DialogHeader>
+                <DialogTitle>Meta placements</DialogTitle>
+                <DialogDescription className="break-words">
+                  {campaignDisplayName(campaignName)} · Approved artwork for the
+                  selected placements. Meta may adjust the layout when serving
+                  an ad.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h4 className="text-sm font-medium">
+                  {creativeAds.length} approved creatives
+                </h4>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
                     onClick={() =>
-                      setProjectionOpen((current) => ({
-                        ...current,
-                        [ad.id]: !open,
-                      }))
+                      setProjectionOpen(
+                        Object.fromEntries(
+                          creativeAds.map((ad) => [ad.id, true]),
+                        ),
+                      )
                     }
                   >
-                    {open ? (
-                      <ChevronDown className="size-4 shrink-0" />
-                    ) : (
-                      <ChevronRight className="size-4 shrink-0" />
-                    )}
-                    <span className="min-w-0 flex-1 space-y-2">
-                      <span className="block text-sm font-medium">
-                        {ad.name
-                          .replace(/^[^_]+_(?:Carousel|Static)_/, "")
-                          .replaceAll("_", " ")}
-                      </span>
-                      <ProjectionSummary
-                        ad={ad}
-                        placements={placementPlan}
-                        expanded={open}
-                      />
-                    </span>
-                  </button>
-                  <div id={panelId} hidden={!open} className="px-4 pb-4">
-                    {open && (
-                      <ProjectedAd
-                        ad={ad}
-                        brandName={brandName}
-                        brandLogo={brandLogo}
-                        placements={placementPlan}
-                        configuration={configuration}
-                      />
-                    )}
-                  </div>
+                    Expand all
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() =>
+                      setProjectionOpen(
+                        Object.fromEntries(
+                          creativeAds.map((ad) => [ad.id, false]),
+                        ),
+                      )
+                    }
+                  >
+                    Collapse all
+                  </Button>
                 </div>
-              );
-            })}
-            {ads.length - catalogCount !== creativeAds.length && (
-              <p className="text-sm text-muted-foreground">
-                {ads.length - catalogCount - creativeAds.length} ads without
-                media are excluded from this Meta projection.
+              </div>
+              {!placementPlan.length && !meta?.importSource && (
+                <p className="text-sm text-muted-foreground">
+                  Choose delivery placements to preview approved artwork.{" "}
+                  <a className="underline" href={`#${sectionId}-setup`}>
+                    Settings above
+                  </a>{" "}
+                  to choose delivery placements.
+                </p>
+              )}
+              {meta?.importSource && (
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button size="sm" variant="ghost">
+                      Imported from Meta · Source details
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-h-[85dvh] gap-4 overflow-y-auto pb-6 md:max-w-2xl">
+                    <DialogHeader>
+                      <DialogTitle>Meta campaign source</DialogTitle>
+                      <DialogDescription>
+                        Local working copy of campaign{" "}
+                        {meta.importSource.campaignId}. Reconstructed previews
+                        are not a report of actual delivery.
+                      </DialogDescription>
+                    </DialogHeader>
+                    {meta.importSource.issues.map((issue) => (
+                      <p key={issue} className="text-sm">
+                        {issue}
+                      </p>
+                    ))}
+                    <details>
+                      <summary className="cursor-pointer text-sm">
+                        Original ad set settings
+                      </summary>
+                      <pre className="mt-3 max-h-80 overflow-auto text-xs whitespace-pre-wrap">
+                        {JSON.stringify(meta.importSource.adSets, null, 2)}
+                      </pre>
+                    </details>
+                  </DialogContent>
+                </Dialog>
+              )}
+              <p className="text-xs text-muted-foreground">
+                {meta?.importSource
+                  ? "Recovered from Meta · local working copy. "
+                  : ""}
+                {meta?.importSource && !placementPlan.length
+                  ? "Artwork below is recovered; select delivery placements in setup before shipping. "
+                  : ""}
+                Each creative is shared across {sets.length} ad{" "}
+                {sets.length === 1 ? "set" : "sets"}. Expand to inspect
+                delivery.
               </p>
-            )}
-          </section>
-          {catalogCount > 0 && (
-            <p className="text-sm text-muted-foreground">
-              {catalogCount} imported catalog ad(s) are reference only and
-              cannot be rebuilt by this publisher. This campaign cannot be
-              pushed with catalog ads included.
-            </p>
-          )}
-          {unapprovedCount > 0 && (
-            <p className="text-sm">
-              {unapprovedCount} unapproved{" "}
-              {unapprovedCount === 1 ? "ad stays" : "ads stay"} out of this
-              push.
-            </p>
-          )}
-          {!pc.budget && (
-            <p className="text-sm text-muted-foreground">
-              Set a budget to enable validation and push.
-            </p>
-          )}
-          <p className="text-xs text-muted-foreground">
-            Push creates the campaign paused. Launch is a separate action after
-            reviewing the result in Meta.
-          </p>
+              {creativeAds.map((ad) => {
+                const open = projectionOpen?.[ad.id] ?? false;
+                const panelId = `${sectionId}-projection-${ad.id}`;
+                return (
+                  <div key={ad.id} className="rounded-lg border">
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-3 p-4 text-left"
+                      aria-expanded={open}
+                      aria-controls={panelId}
+                      onClick={() =>
+                        setProjectionOpen((current) => ({
+                          ...current,
+                          [ad.id]: !open,
+                        }))
+                      }
+                    >
+                      {open ? (
+                        <ChevronDown className="size-4 shrink-0" />
+                      ) : (
+                        <ChevronRight className="size-4 shrink-0" />
+                      )}
+                      <span className="min-w-0 flex-1 space-y-2">
+                        <span className="block text-sm font-medium">
+                          {ad.name
+                            .replace(/^[^_]+_(?:Carousel|Static)_/, "")
+                            .replaceAll("_", " ")}
+                        </span>
+                        <ProjectionSummary ad={ad} placements={placementPlan} />
+                      </span>
+                    </button>
+                    <div id={panelId} hidden={!open} className="px-4 pb-4">
+                      {open && (
+                        <ProjectedAd
+                          ad={ad}
+                          brandName={brandName}
+                          brandLogo={brandLogo}
+                          placements={placementPlan}
+                        />
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </DialogContent>
+          </Dialog>
         </div>
-      )}
+        {catalogCount > 0 && (
+          <p className="text-sm text-muted-foreground">
+            {catalogCount} imported catalog ad(s) are reference only and cannot
+            be rebuilt by this publisher. This campaign cannot be pushed with
+            catalog ads included.
+          </p>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Push creates the campaign paused. Launch is a separate action after
+          reviewing the result in Meta.
+        </p>
+      </div>
     </section>
   );
 }
@@ -598,7 +579,7 @@ function SetupFact({
   detail: string;
 }) {
   return (
-    <div className="min-w-0 rounded-lg border p-3">
+    <div className="min-w-0">
       <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd className="mt-1 truncate text-base font-semibold" title={value}>
         {value}
@@ -726,9 +707,9 @@ function MetaSettings({
           setOpen(true);
         }}
       >
-        Edit setup
+        Settings
       </Button>
-      <DialogContent className="max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-h-[85dvh] gap-4 overflow-y-auto pb-6">
         <DialogHeader>
           <DialogTitle>Meta delivery settings</DialogTitle>
         </DialogHeader>
@@ -966,189 +947,46 @@ function MetaSettings({
 function ProjectionSummary({
   ad,
   placements,
-  expanded,
 }: {
   ad: Ad;
   placements: MetaPlacement[];
-  expanded: boolean;
 }) {
   if (!("media" in ad.content)) return null;
   const content = ad.content;
   const visible = metaPreviewPlacements(content, placements);
   const views = META_PLACEMENTS.filter((view) => visible.includes(view.id));
-  const groups = new Map<
-    string,
-    {
-      media: ReturnType<typeof metaPreviewMedia>["media"];
-      labels: Set<string>;
-      vertical: boolean;
-      square: boolean;
-    }
-  >();
-  const issues = new Set<string>();
-  for (const view of views) {
-    const resolved = metaPreviewMedia(content, view.id, ad.brandId);
-    const vertical = view.kind !== "feed";
-    // Facebook and Instagram feeds can get different cards (square on
-    // Facebook), so a feed group says which one it is.
-    const label = vertical
-      ? "Stories & Reels"
-      : view.publisher === "facebook"
-        ? "Facebook feed"
-        : "Instagram feed";
-    if (resolved.issue) {
-      issues.add(`${label}: ${resolved.issue}`);
-      continue;
-    }
-    const key = JSON.stringify(resolved.media.map((item) => item.url));
-    const existing = groups.get(key);
-    if (existing) existing.labels.add(label);
-    else
-      groups.set(key, {
-        media: resolved.media,
-        labels: new Set([label]),
-        vertical,
-        square: "crop" in resolved && resolved.crop === "square",
-      });
-  }
-  // An approved idea's media stays empty until the push saves its images.
   const slides =
     content.ideaStudio?.document.cards.length ?? content.media.length;
+  const issues = [
+    ...new Set(
+      views.flatMap((view) => {
+        const resolved = metaPreviewMedia(content, view.id, ad.brandId);
+        return resolved.issue ? [resolved.issue] : [];
+      }),
+    ),
+  ];
+  const kinds = [...new Set(views.map((view) => view.kind))];
   return (
-    <span className="block space-y-3">
-      <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+    <span className="block space-y-1 text-xs text-muted-foreground">
+      <span className="flex flex-wrap items-center gap-2">
         <span>
           {slides > 1 ? `Carousel · ${slides} slides` : "Single image"}
         </span>
-        {[...new Set(views.map((view) => view.publisher))].map((publisher) => (
-          <ChannelLogo
-            key={publisher}
-            platform={publisher}
-            className="size-3.5"
-          />
-        ))}
-        {issues.size > 0 && <span>· {[...issues].join(" · ")}</span>}
-      </span>
-      {!expanded && (
-        <span className="flex flex-wrap gap-x-5 gap-y-3">
-          {[...groups.entries()].map(([key, group]) => (
-            <span key={key} className="block max-w-full min-w-0 space-y-1.5">
-              {groups.size > 1 && (
-                <span className="block text-xs text-muted-foreground">
-                  {[...group.labels].join(" / ")}
-                </span>
-              )}
-              <span className="flex flex-wrap gap-2">
-                {group.media.map((item, index) => (
-                  <span
-                    key={`${index}:${item.url}`}
-                    className={`relative block h-[144px] shrink-0 overflow-hidden rounded-md bg-muted ${group.vertical ? "w-[81px]" : group.square ? "w-[144px]" : "w-[115px]"}`}
-                  >
-                    {item.type === "video" ? (
-                      <span className="flex size-full items-center justify-center text-xs">
-                        Video
-                      </span>
-                    ) : (
-                      <Image
-                        src={item.url}
-                        alt={`${[...group.labels].join(" / ")} · slide ${index + 1}`}
-                        fill
-                        unoptimized
-                        className="object-contain"
-                      />
-                    )}
-                  </span>
-                ))}
-              </span>
-            </span>
-          ))}
+        <span aria-hidden>·</span>
+        <span>
+          {kinds
+            .map((kind) =>
+              kind === "feed" ? "Feed" : kind === "story" ? "Stories" : "Reels",
+            )
+            .join(" / ")}
         </span>
-      )}
+      </span>
+      {issues.map((issue) => (
+        <span key={issue} className="block">
+          {issue}
+        </span>
+      ))}
     </span>
-  );
-}
-
-function MetaNativePreview({
-  adId,
-  configuration,
-}: {
-  adId: string;
-  configuration?: { connectionAccountId: string; adAccountId: string };
-}) {
-  const preview = useMutation(orpc.ads.previewAd.mutationOptions());
-  return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={!configuration}
-          onClick={() => {
-            if (configuration && !preview.data && !preview.isPending)
-              preview.mutate({
-                adId,
-                connectionAccountId: configuration.connectionAccountId,
-                adAccountId: configuration.adAccountId,
-              });
-          }}
-        >
-          Meta preview
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
-        <DialogHeader>
-          <DialogTitle>Meta-rendered feed preview</DialogTitle>
-          <DialogDescription>
-            Meta renders this local copy using the selected account and Page.
-            This is not a snapshot of the live ad. Stories and Reels use the
-            local previews.
-          </DialogDescription>
-        </DialogHeader>
-        {preview.isPending && (
-          <p role="status" className="text-sm text-muted-foreground">
-            Loading Meta previews…
-          </p>
-        )}
-        {preview.error && (
-          <p role="alert" className="text-sm">
-            {preview.error.message}
-          </p>
-        )}
-        {preview.data && !preview.data.previewUrls.length && (
-          <p className="text-sm">Meta did not return an embeddable preview.</p>
-        )}
-        {preview.data?.previewUrls.map((src, index) => {
-          let safe = false;
-          try {
-            const url = new URL(src);
-            safe =
-              url.protocol === "https:" &&
-              (url.hostname === "facebook.com" ||
-                url.hostname.endsWith(".facebook.com"));
-          } catch {}
-          return safe ? (
-            <iframe
-              key={src}
-              src={src}
-              title={`Meta feed preview ${index + 1}`}
-              className="h-[640px] w-full rounded border bg-white"
-              sandbox="allow-scripts allow-same-origin allow-popups"
-              referrerPolicy="strict-origin-when-cross-origin"
-            />
-          ) : null;
-        })}
-        {preview.error && (
-          <Button
-            variant="outline"
-            onClick={() => {
-              if (configuration) preview.mutate({ adId, ...configuration });
-            }}
-          >
-            Try again
-          </Button>
-        )}
-      </DialogContent>
-    </Dialog>
   );
 }
 
@@ -1157,16 +995,14 @@ function ProjectedAd({
   brandName,
   brandLogo,
   placements,
-  configuration,
 }: {
   ad: Ad;
   brandName: string;
   brandLogo: string | null;
   placements: MetaPlacement[];
-  configuration?: { connectionAccountId: string; adAccountId: string };
 }) {
   const [selected, setSelected] = useState<MetaPlacement | "">("");
-  const [compare, setCompare] = useState(true);
+  const [compare, setCompare] = useState(false);
   const [card, setCard] = useState(0);
   if (!("media" in ad.content)) return null;
   const content = ad.content;
@@ -1182,42 +1018,33 @@ function ProjectedAd({
         </p>
       )}
       <div className="flex flex-wrap items-center gap-3">
-        <MetaNativePreview
-          key={`${String(ad.updatedAt)}:${configuration?.connectionAccountId}:${configuration?.adAccountId}`}
-          adId={ad.id}
-          configuration={configuration}
-        />
-        {!configuration && (
-          <span className="text-xs text-muted-foreground">
-            Select an account in setup for Meta previews.
-          </span>
-        )}
-        <label className="text-sm">
-          Placements{" "}
-          <select
-            className="ml-2 rounded border bg-background p-2"
-            value={compare ? "all" : active?.id}
-            onChange={(e) => {
-              setCompare(e.target.value === "all");
-              if (e.target.value !== "all")
-                setSelected(e.target.value as MetaPlacement);
-              setCard(0);
-            }}
-          >
-            <option value="all">Compare all placements</option>
+        <span className="text-sm">Placement</span>
+        <Select
+          value={compare ? "all" : active?.id}
+          onValueChange={(value) => {
+            setCompare(value === "all");
+            if (value !== "all") setSelected(value as MetaPlacement);
+            setCard(0);
+          }}
+        >
+          <SelectTrigger aria-label="Placement" className="w-full sm:w-64">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Compare all placements</SelectItem>
             {views.map((p) => (
-              <option key={p.id} value={p.id}>
+              <SelectItem key={p.id} value={p.id}>
                 {p.label}
-              </option>
+              </SelectItem>
             ))}
-          </select>
-        </label>
+          </SelectContent>
+        </Select>
       </div>
       <div
         className={
           compare
             ? "grid grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] items-start gap-5"
-            : "max-w-72"
+            : "mx-auto w-full max-w-72"
         }
       >
         {(compare ? views : active ? [active] : []).map((view) => {
@@ -1234,26 +1061,10 @@ function ProjectedAd({
               {issue ? (
                 <div className="space-y-3 rounded-lg border border-dashed p-5 text-sm">
                   <p>{issue}</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      document.getElementById(`ad-${ad.id}`)?.scrollIntoView({
-                        behavior: "smooth",
-                        block: "start",
-                      });
-                      window.dispatchEvent(
-                        new CustomEvent("prepare-ad-creative", {
-                          detail: {
-                            adId: ad.id,
-                            shape: view.kind === "feed" ? "portrait" : "story",
-                          },
-                        }),
-                      );
-                    }}
-                  >
-                    Review ad creative
-                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    Return this ad to Studio from its campaign card to change
+                    the artwork.
+                  </p>
                 </div>
               ) : (
                 <CompactAdMock

@@ -6,6 +6,7 @@ import {
 } from "./home-groups.service";
 import { resolveMetaSchedule, metaScheduleIssue } from "@/lib/meta-schedule";
 import "server-only";
+import { normalizeAudienceGeography } from "@/lib/audience-targeting-geography";
 import { withIdeaStudio } from "@/lib/ad-idea-studio";
 
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
@@ -492,7 +493,9 @@ export async function addAudience(input: {
       type: input.type ?? "segment",
       ageMin: input.ageMin ?? null,
       ageMax: input.ageMax ?? null,
-      geography: input.geography ?? null,
+      geography: input.geography
+        ? normalizeAudienceGeography(input.geography)
+        : null,
       keywords: input.keywords ?? null,
       excludedKeywords: input.excludedKeywords ?? null,
       optimizationGoal: input.optimizationGoal ?? null,
@@ -561,7 +564,13 @@ export async function updateAudience(input: {
     .update(audienceTable)
     .set({
       ...patch,
-      ...(mergedGeography !== undefined ? { geography: mergedGeography } : {}),
+      ...(mergedGeography !== undefined
+        ? {
+            geography: mergedGeography
+              ? normalizeAudienceGeography(mergedGeography)
+              : null,
+          }
+        : {}),
     })
     .where(eq(audienceTable.id, audience.id))
     .returning();

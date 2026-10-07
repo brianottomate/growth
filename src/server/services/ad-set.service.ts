@@ -1,4 +1,3 @@
-import { approvedOutput } from "@/lib/ad-approved-output";
 import type { adSectionSchema } from "@/lib/ad-section";
 import { resolveBookingTarget } from "./home-groups.service";
 import type { z } from "zod";
@@ -1032,12 +1031,6 @@ export async function setAdStatus(input: {
         status: "approved",
         approvedAt: new Date(),
         approvedBy: userId,
-        approvedSnapshot: {
-          content: approvedOutput(ad.content),
-          placements: ad.placements,
-          approvedAt: new Date().toISOString(),
-          approvedBy: userId,
-        },
       })
       .where(
         and(

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { Trash2 } from "lucide-react";
+import { MoreHorizontal, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +14,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { orpc } from "@/orpc/client";
 
 /**
@@ -28,12 +34,20 @@ export function DeletePlatformCampaign({
   brandSlug,
   isLive,
   spend,
+  hasExternalId = true,
+  compact = false,
+  afterDelete = "list",
+  connectionAccountId,
 }: {
   platformCampaignId: string;
   campaignName: string;
   brandSlug: string;
   isLive: boolean;
   spend: number | null;
+  hasExternalId?: boolean;
+  compact?: boolean;
+  afterDelete?: "list" | "refresh";
+  connectionAccountId?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -42,54 +56,90 @@ export function DeletePlatformCampaign({
     orpc.ads.deletePlatformCampaign.mutationOptions({
       onSuccess: () => {
         setOpen(false);
-        router.push(`/app/brands/${brandSlug}/ads`);
+        if (afterDelete === "refresh") router.refresh();
+        else router.push(`/app/brands/${brandSlug}/ads`);
       },
     }),
   );
 
   return (
     <>
-      <Button
-        size="sm"
-        variant="ghost"
-        tone="muted"
-        onClick={() => setOpen(true)}
-      >
-        <Trash2 className="size-3.5" />
-        Delete
-      </Button>
+      {compact ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            appearance="icon"
+            aria-label={`More for ${campaignName}`}
+          >
+            <MoreHorizontal className="size-4" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={() => setOpen(true)}
+            >
+              <Trash2 className="size-4" />
+              {hasExternalId ? "Delete on platform…" : "Remove platform…"}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : (
+        <Button
+          size="sm"
+          variant="ghost"
+          tone="muted"
+          onClick={() => setOpen(true)}
+        >
+          <Trash2 className="size-3.5" />
+          Delete
+        </Button>
+      )}
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+      <Dialog
+        open={open}
+        onOpenChange={(value) => {
+          if (!remove.isPending) setOpen(value);
+        }}
+      >
+        <DialogContent className="gap-4 pb-6">
           <DialogHeader>
             <DialogTitle>
-              Delete “{campaignName}” from the platform?
+              {hasExternalId
+                ? `Delete “${campaignName}” from the platform?`
+                : `Remove “${campaignName}” platform setup?`}
             </DialogTitle>
             <DialogDescription>
-              This deletes the campaign on the ad account itself, along with its
-              ad sets and ads. It cannot be undone from here.
-              {isLive
-                ? " This campaign is currently LIVE — pausing it may be what you want instead."
-                : ""}
-              {spend
-                ? ` It has spent $${spend.toLocaleString()}; reporting history goes with it.`
-                : ""}
+              {hasExternalId
+                ? "This deletes the provider campaign, its ad sets and ads, and removes its records here after the provider confirms. Provider deletion also removes reporting history and cannot be undone here. Your campaign audiences and approved ads stay available."
+                : "This removes the local platform setup and its saved delivery settings. Your campaign audiences and approved ads stay available."}
+              {isLive &&
+                " This campaign is delivering. You can pause it using the delivery control before deleting."}
+              {!!spend && ` Recorded spend: $${spend.toLocaleString()}.`}
             </DialogDescription>
           </DialogHeader>
           {remove.error && (
-            <p className="text-xs text-red-300">{remove.error.message}</p>
+            <p className="text-xs text-muted-foreground">
+              {remove.error.message}
+            </p>
           )}
           <DialogFooter>
-            <Button size="sm" variant="outline" onClick={() => setOpen(false)}>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={remove.isPending}
+              onClick={() => setOpen(false)}
+            >
               Cancel
             </Button>
             <Button
               size="sm"
               variant="destructive"
               loading={remove.isPending}
-              onClick={() => remove.mutate({ platformCampaignId })}
+              disabled={remove.isPending}
+              onClick={() =>
+                remove.mutate({ platformCampaignId, connectionAccountId })
+              }
             >
-              Delete on platform
+              {hasExternalId ? "Delete on platform" : "Remove platform"}
             </Button>
           </DialogFooter>
         </DialogContent>

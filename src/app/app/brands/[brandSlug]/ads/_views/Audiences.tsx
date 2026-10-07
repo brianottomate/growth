@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { MessageSquare, Pencil, Sparkles, Trash2, Users } from "lucide-react";
 
+import { normalizeAudienceGeography } from "@/lib/audience-targeting-geography";
 import { AudienceMap } from "@/components/audience-map";
 import { GeographyChips } from "@/components/geography-chips";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ type AudienceRow = {
     states?: string[];
     regions?: string[];
     cities?: string[];
+    originCities?: string[];
   } | null;
   homeIds: string[] | null;
   description: string | null;
@@ -56,6 +58,10 @@ export function Audiences({
   /** The Meta audience each ad set will target, by campaign audience id. */
   metaTargets?: Record<string, { name: string; via: "audience" | "persona" }>;
 }) {
+  audiences = audiences.map((row) => ({
+    ...row,
+    geography: row.geography ? normalizeAudienceGeography(row.geography) : null,
+  }));
   const router = useRouter();
   const { busy, run, phase, label } = useSuggestedAudiences(campaignId);
   // A chat on this campaign's audiences; Suggest is the one-click add.
@@ -136,7 +142,7 @@ export function Audiences({
         <div className="grid grid-cols-1 gap-4 @4xl:grid-cols-2">
           <section className="space-y-4 rounded-xl border bg-card p-5">
             <div>
-              <h3 className="font-semibold">Guest-origin coverage</h3>
+              <h3 className="font-semibold">Campaign targeting</h3>
             </div>
             {audiences.map((row) => (
               <div key={row.id} className="space-y-3 rounded-xl border p-4">
@@ -202,10 +208,6 @@ export function Audiences({
                     Platform targeting
                   </h4>
                   <GeographyChips
-                    label="Countries"
-                    values={row.geography?.countries}
-                  />
-                  <GeographyChips
                     label="States"
                     values={row.geography?.states}
                   />
@@ -214,8 +216,12 @@ export function Audiences({
                     values={row.geography?.regions}
                   />
                   <GeographyChips
-                    label="Cities"
+                    label="City targets"
                     values={row.geography?.cities}
+                  />
+                  <GeographyChips
+                    label="Countries"
+                    values={row.geography?.countries}
                   />
                   <GeographyChips
                     label="Search terms"
@@ -231,6 +237,17 @@ export function Audiences({
                       : "No age narrowing"}
                   </p>
                 </div>
+                {!!row.geography?.originCities?.length && (
+                  <div className="space-y-2 border-t pt-3">
+                    <GeographyChips
+                      label="Feeder cities"
+                      values={row.geography.originCities}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Planning context for this audience.
+                    </p>
+                  </div>
+                )}
               </div>
             ))}
           </section>

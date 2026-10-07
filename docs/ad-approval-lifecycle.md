@@ -13,17 +13,17 @@ There is no copy, replacement, lineage, or versioning workflow.
 - Image approval captures the recipe, copy, included sizes and drawing brand settings
   in `ad.content.ideaStudio`. It locks editing immediately without rendering.
 - Send to campaign in Studio and Add approved ads in a campaign both call
-  `adsWrite.attachAdSet`. Consumption renders compositions and captures
-  `ad.approved_snapshot` before assigning the selected ad IDs. Supplied artwork
+  `adsWrite.attachAdSet`. Consumption renders compositions into `ad.content`
+  before assigning the selected ad IDs. Supplied artwork
   at the required dimensions passes through with its existing asset. Other sizes
   use the normal artwork fitting. The editable recipe remains for reopening.
 - Studio supports single and multiple selection, sending to an existing campaign,
   and creating a campaign from the selection. Chat/MCP use the same action with
   `campaignId` or `newCampaignName` plus `adIds`. The new campaign and assignment
   commit together after export succeeds. No previous campaign relationship is saved.
-- Publishers consume captured output. Legacy campaign previews/pushes finish
-  missing exports from older approvals using the same renderer.
-- Text/video approval captures the output immediately.
+- Publishers consume the approved `ad.content` and its saved size exports. Platform
+  ads capture their delivery copy in `pushed_creative` when exported.
+- Text/video approval locks the existing output in `ad.content`.
 
 Campaign cards show previews and delivery. Review controls and internal discussion
 live in Studio, not on campaign cards. Only approved, unassigned ads may be added.
@@ -31,7 +31,7 @@ live in Studio, not on campaign cards. Only approved, unassigned ads may be adde
 ## Return to Studio
 
 `adsWrite.returnToStudio` / `ads.returnToStudio` requires the current `updatedAt`.
-It atomically detaches the same ad, clears approval/snapshot/Ready, restores its
+It atomically detaches the same ad, clears approval/Ready, restores its
 editable recipe, and records a return event with an optional comment. Its ID and
 previous comments remain. Concurrent changes reject the return instead of
 silently overwriting them.
@@ -75,24 +75,20 @@ using their existing ad ID and source version. Returning an ad retains exports t
 
 ## Meta delivery workspace
 
-A planned Meta platform card opens expanded with stacked Setup and Projection
-sections. Setup is display-only with one edit dialog, which exposes
+A Meta platform draft can be created before ads or audiences. Its card shows a
+compact delivery setup and a placement inspection dialog. Setup is display-only
+with one settings dialog, which exposes
 allowlisted account/Page selection and goal for the current push, plus persisted
-budget, budget allocation, schedule, and conversion settings. Projection shows
-the local campaign → audience ad sets → creative ads, using saved media and copy.
-Facebook and Instagram previews reuse the shared AdMock display components with
-independent carousel navigation. It is a planning preview, not a provider validation receipt. Carousel delivery
-currently uses base images; alternate size exports are not routed to placements.
+budget, budget allocation, schedule, and conversion settings. Inspection shows the routed approved creatives, using their prepared media and copy.
+Facebook and Instagram previews reuse the shared AdMock components. Inspection
+starts with a compact list and one selected placement per expanded creative;
+Compare all placements opens the full grid. Each creative is shared across the
+campaign's audience ad sets. Feed, Stories and Reels use the prepared size exports
+that the publisher reads from `ad.content`.
 
-Validate uses the existing provider dry run, which currently supports only the
-single-audience path. Push requires its own confirmation, creates paused delivery,
-and refreshes the campaign workspace. Launch remains a separate action.
-
-Projection shows compact audience summaries and each creative once, shared across
-the ad sets. Everything is the default; platform and placement filters narrow the
-responsive preview grid. Feed and Stories/Reels use shared mocks. Carousel previews
-use base media for every surface, explicitly labeling Story crops. Static ads use
-the dedicated story image when present, matching the existing push mapping.
+The preview illustrates layout. Push compiles the current prepared ads, audiences
+and delivery setup into a paused Meta campaign; its platform records retain the
+pushed creative and compiled targeting. Launch remains a separate action.
 
 Story previews now separate Facebook and Instagram chrome and use progress bars
 and floating CTA stickers without default primary-copy overlays. Reels use a
@@ -116,8 +112,8 @@ The Meta draft separately carries `settings.meta.placements`, the actual manual
 placement plan sent to Zernio. Both projection and push use the same readiness
 resolver: no feed-image crop substitutes for an absent vertical export. The
 projection defaults to one selected placement with an optional Compare grid.
-Vertical carousel delivery remains unsupported by our current publisher, even
-when the idea contains a separately composed Story carousel.
+Image carousels use their prepared Story cards when every card has one; otherwise
+Meta receives the canonical feed cards for those placements.
 
 `adsWrite.importMetaCampaign` (also available from the brand's Import from Meta
 button) reads an allowlisted campaign and verifies each creative's Page. It creates
@@ -152,3 +148,9 @@ Performance clients can create ads before choosing a campaign. The All ads, Text
 Studio supports home-photo and brand-concept generation, uploaded media, the shared image/composition editor, video/catalog tiles, and complete text headline/description pools. Text drafts can contain partial copy; approval requires 3–15 headlines (30 characters each) and 2–4 descriptions (90 characters each). Approved text ads return to Studio for correction, like every other ad. Text editing and approval require the current `updatedAt` version, preventing a stale browser from approving or overwriting newer copy. Creative-set rebuilds preserve text drafts and approved ads.
 
 The existing `draftAd` and `writeGoogleTextAds` capabilities, and the app's From home group generation, accept exactly one of `brandId` (standalone Studio) or `campaignId`. Brand-scoped generation uses the same services as campaign authoring. `writeGoogleTextAds` optionally accepts a landing URL and search themes. `setAdCopy` accepts a complete `text` pool with `expectedUpdatedAt`. Approved standalone ads can subsequently be attached to a campaign using the existing attachment flow; the current relationship still assigns each ad to one campaign.
+
+## Campaign geography
+
+Campaign audiences retain their brand persona link and campaign-specific reasoning. US Performance plans use whole-state codes in `geography.states`; export resolves their names to Zernio region keys in the US. `regions` holds named international subdivisions and requires one country for lookup. US region names normalize into state codes when audiences are saved.
+
+`originCities` keeps feeder-city planning context without adding delivery locations. Suggestions default to states for US campaigns. `cities` is reserved for explicit city delivery targets. State, region and city targets combine as a union. The Performance card shows states first, followed by other targets, with feeder cities in a separate context section. Location lookup requires an unambiguous result of the requested type; unresolved geography stops export before provider writes.

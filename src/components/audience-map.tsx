@@ -1,6 +1,13 @@
 "use client";
 
 import { useId, useState } from "react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import {
   audienceMapTarget,
@@ -41,12 +48,7 @@ export function AudienceMap({
           (code) => !maps.world.paths.some((p) => p.id === code),
         )
       : [];
-  const partialCountries = maps.world.paths
-    .filter((p) => audienceMapCoverage(targets, "world", p.id) === "partial")
-    .map((p) => p.name);
 
-  const fullUS = targets.some((t) => t.countries.has("US") && !t.narrowed);
-  const unmapped = [...new Set(targets.flatMap((t) => t.unlocated))];
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -71,22 +73,25 @@ export function AudienceMap({
       <label htmlFor={labelId} className="sr-only">
         Audience shown on map
       </label>
-      <select
-        id={labelId}
+      <Select
         value={current}
-        onChange={(event) => {
-          setSelection(event.target.value);
+        onValueChange={(value) => {
+          setSelection(value);
           setHover(null);
         }}
-        className="w-full rounded-md border bg-background px-3 py-2 text-sm"
       >
-        <option value="all">All audiences</option>
-        {audiences.map((a) => (
-          <option key={a.id} value={a.id}>
-            {a.name}
-          </option>
-        ))}
-      </select>
+        <SelectTrigger id={labelId} className="w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All audiences</SelectItem>
+          {audiences.map((a) => (
+            <SelectItem key={a.id} value={a.id}>
+              {a.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
       <svg
         viewBox={map.viewBox}
         role="img"
@@ -121,65 +126,32 @@ export function AudienceMap({
           );
         })}
       </svg>
-      <p className="min-h-8 text-xs text-muted-foreground" aria-live="polite">
-        {hover ?? "Hover over a state or country to see coverage."}
+      <p className="min-h-5 text-xs text-muted-foreground" aria-live="polite">
+        {hover ?? ""}
       </p>
-      <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1.5">
-          <span className="size-2.5 rounded-sm bg-foreground opacity-80" />
-          {context === "persona" ? "Described geography" : "Targeted"}
-        </span>
-        {view === "world" && (
+      <div className="text-xs text-muted-foreground">
+        <div className="flex flex-wrap gap-3">
           <span className="flex items-center gap-1.5">
-            <span className="size-2.5 rounded-sm bg-foreground opacity-55" />
-            Selected locations
+            <span className="size-2.5 rounded-sm bg-foreground opacity-80" />
+            {context === "persona" ? "Described geography" : "Targeted"}
           </span>
-        )}
-        <span className="flex items-center gap-1.5">
-          <span className="size-2.5 rounded-sm border bg-muted" />
-          Not highlighted
-        </span>
-      </div>
-      {view === "us" && fullUS && (
-        <p className="text-xs text-muted-foreground">
-          Nationwide US coverage. Select an individual audience to inspect
-          narrower coverage.
-        </p>
-      )}
-      {view === "world" && partialCountries.length > 0 && (
-        <p className="text-xs text-muted-foreground">
-          Selected locations within {partialCountries.join(", ")}; not the
-          entire country.
-        </p>
-      )}
-      {missingCountries.length > 0 && (
-        <p className="text-xs text-muted-foreground">
-          Country outlines unavailable at this scale:{" "}
-          {missingCountries.join(", ")}.
-        </p>
-      )}
-      {unmapped.length > 0 && (
-        <p className="text-xs text-muted-foreground">
-          Not plotted at this scale: {unmapped.join(", ")}. See the audience’s
-          location details.
-        </p>
-      )}
-      {view === "us" &&
-        targets.some((t) => [...t.countries].some((c) => c !== "US")) && (
-          <p className="text-xs text-muted-foreground">
-            Other countries are selected. Switch to World to see them.
+          {view === "world" && (
+            <span className="flex items-center gap-1.5">
+              <span className="size-2.5 rounded-sm bg-foreground opacity-55" />
+              Selected locations
+            </span>
+          )}
+          <span className="flex items-center gap-1.5">
+            <span className="size-2.5 rounded-sm border bg-muted" />
+            Not highlighted
+          </span>
+        </div>
+        {missingCountries.length > 0 && (
+          <p className="mt-2">
+            Country outlines unavailable: {missingCountries.join(", ")}.
           </p>
         )}
-      {targets.every((t) => !t.countries.size && !t.states.size) && (
-        <p className="text-xs text-muted-foreground">
-          No country or state coverage to display.
-        </p>
-      )}
-      <p className="text-xs text-muted-foreground">
-        {context === "persona"
-          ? "Persona geography · planning context, not platform targeting or measured customer locations."
-          : "Planned targeting · audiences may overlap. This map does not show bookings or estimated reach."}
-      </p>
+      </div>
     </div>
   );
 }

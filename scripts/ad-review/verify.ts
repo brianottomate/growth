@@ -177,7 +177,7 @@ try {
   const approved = await ad();
   draftAdResultSchema.parse(approved);
   draftAdActionOutputSchema.parse(JSON.parse(JSON.stringify(approved)));
-  assert(approved.approvedSnapshot);
+  assert.deepEqual(approved.content, ready.content);
   assert.equal(approved.status, "approved");
   await assert.rejects(() =>
     setAdCopy({
@@ -246,7 +246,6 @@ try {
   assert.equal(returned.id, adId);
   assert.equal(returned.campaignId, null);
   assert.equal(returned.status, "drawn");
-  assert.equal(returned.approvedSnapshot, null);
   assert.equal(returned.approvedAt, null);
   assert.equal(returned.readyAt, null);
   const after = await listReviewComments(target, ctx.orgId);

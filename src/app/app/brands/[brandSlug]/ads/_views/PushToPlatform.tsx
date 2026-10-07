@@ -130,7 +130,11 @@ export function PushToPlatform({
               }
             >
               <UploadCloud className="size-3.5" />
-              {push.isPending ? "Pushing…" : `Push to ${platformName}`}
+              {push.isPending
+                ? "Pushing…"
+                : platform === "meta_ads"
+                  ? "Push paused"
+                  : `Push to ${platformName}`}
             </Button>
           </DialogTrigger>
           <DialogContent>
@@ -139,8 +143,9 @@ export function PushToPlatform({
               <DialogDescription>
                 {setSummary} × {draftAdCount} ad
                 {draftAdCount === 1 ? "" : "s"} at {budgetSummary} on{" "}
-                {configuration.label}, all paused. Pushed ads are locked: to
-                change one, make a new campaign.
+                {configuration.label}, all paused. Launch starts delivery after
+                you review the result. Returning a creative to Studio keeps its
+                existing platform ads running with their pushed artwork.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>

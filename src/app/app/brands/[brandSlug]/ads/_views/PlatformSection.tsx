@@ -89,7 +89,6 @@ export async function PlatformSection({
         platformCampaign={platformCampaign}
         ads={draftAds}
         audiences={audiences}
-        unapprovedCount={unapprovedCount}
       />
     );
   }
@@ -130,7 +129,17 @@ export async function PlatformSection({
                     : `Will compile ${searchShape.groups} ad group${searchShape.groups === 1 ? "" : "s"} × ${searchShape.ads} search ad${searchShape.ads === 1 ? "" : "s"}, paused.`
                 : `Will compile ${audienceCount === 0 ? "1 broad ad set" : `${audienceCount} ad set${audienceCount === 1 ? "" : "s"}`} × ${draftAdCount} ad${draftAdCount === 1 ? "" : "s"}, paused.`}
         </span>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <DeletePlatformCampaign
+            platformCampaignId={platformCampaign.id}
+            campaignName={label}
+            brandSlug={brandSlug}
+            isLive={false}
+            spend={platformCampaign.spend}
+            hasExternalId={Boolean(platformCampaign.externalId)}
+            compact
+            afterDelete="refresh"
+          />
           <PlatformBudget
             platformCampaignId={platformCampaign.id}
             budget={platformCampaign.budget}
@@ -272,6 +281,11 @@ export async function PlatformSection({
             brandSlug={brandSlug}
             isLive={running}
             spend={platformCampaign.spend}
+            compact
+            afterDelete="refresh"
+            connectionAccountId={
+              platformCampaign.settings?.meta?.destination?.connectionAccountId
+            }
           />
           <DeliverySwitch
             platformCampaignId={platformCampaign.id}

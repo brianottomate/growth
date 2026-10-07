@@ -1,0 +1,1 @@
+ALTER TABLE "ad" DROP COLUMN "approved_snapshot";

@@ -38,6 +38,7 @@ export function useSuggestedAudiences(campaignId: string) {
           states: s.states,
           regions: s.regions,
           cities: s.cities,
+          originCities: s.originCities,
         });
         saved++;
         if (s.platformAudienceId)
