@@ -939,23 +939,6 @@ export async function recommendBrandMark(input: {
   };
 }
 
-/** The direct workflow uses the same recommendation, then saves it. */
-export async function chooseBrandMark(input: {
-  brandId: string;
-  userId: string;
-}) {
-  const chosen = await recommendBrandMark(input);
-  if (!chosen) return null;
-  await setBrandMark({
-    ...input,
-    recipe: chosen.recipe,
-    tuning: chosen.tuning,
-    reason: chosen.reason,
-    previewCopy: chosen.previewCopy,
-  });
-  return chosen;
-}
-
 function describeRecipe(recipe: BrandMarkRecipe): string {
   if (recipe.source !== "lockup") return `site ${recipe.source} alone`;
   if (recipe.iconFrom === "logo-icon")

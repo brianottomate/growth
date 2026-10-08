@@ -2,6 +2,7 @@ import "server-only";
 
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import sharp from "sharp";
+import { z } from "zod";
 import { db } from "@/server/db";
 import {
   brandTable,
@@ -12,8 +13,15 @@ import {
 import { R2 } from "@/server/clients/r2.client";
 import { isAllowedPreviewSource } from "./composition.service";
 
-/** Inspect the stored assets the setup page displays, including a photo when available. */
-export async function inspectSavedBrandMark(input: {
+export const brandMarkInspectionSchema = z.object({
+  urls: z.object({ color: z.string(), white: z.string(), dark: z.string() }),
+  photoUrl: z.string().nullable(),
+  updatedAt: z.string(),
+  previewPath: z.string(),
+});
+
+/** Resolve owned saved assets for identity reads on every transport. */
+export async function readSavedBrandMarkInspection(input: {
   brandId: string;
   userId: string;
   orgId: string;
@@ -60,10 +68,44 @@ export async function inspectSavedBrandMark(input: {
     columns: { id: true, url: true },
   });
   const byId = new Map(assets.map((asset) => [asset.id, asset.url]));
+  const featuredHome =
+    !brand.previewSourceUrl && brand.featuredListingUrl
+      ? await db.query.homeTable.findFirst({
+          where: and(
+            eq(homeTable.brandId, input.brandId),
+            eq(homeTable.url, brand.featuredListingUrl),
+            isNull(homeTable.deletedAt),
+          ),
+          columns: { heroSourceUrl: true },
+        })
+      : null;
+  const photoUrl =
+    brand.previewSourceUrl ??
+    featuredHome?.heroSourceUrl ??
+    brand.brandIdentity?.raw?.images?.ogImage ??
+    brand.websiteMeta?.ogImage;
+  return brandMarkInspectionSchema.parse({
+    urls: Object.fromEntries(
+      ["color", "white", "dark"].map((tone) => [
+        tone,
+        byId.get(variants[tone as keyof typeof variants]),
+      ]),
+    ),
+    photoUrl: photoUrl ?? null,
+    updatedAt: brand.brandMark!.updatedAt,
+    previewPath: brand.slug ? `/app/brands/${brand.slug}` : "/app/brands",
+  });
+}
+
+/** Compose public saved image references into the sheet delivered to the model. */
+export async function renderSavedBrandMarkInspection(
+  inspection: z.infer<typeof brandMarkInspectionSchema>,
+) {
+  const { photoUrl } = inspection;
   const tones = ["color", "white", "dark"] as const;
   const buffers = await Promise.all(
     tones.map(async (tone) => {
-      const url = byId.get(variants[tone]);
+      const url = inspection.urls[tone];
       if (!url || !R2.isPublicUrl(url))
         throw new Error(
           `The saved ${tone} mark is unavailable in this brand's library.`,
@@ -107,22 +149,6 @@ export async function inspectSavedBrandMark(input: {
     panels.push(
       await panel(buffers[i]!, tones[i] === "white" ? "#222222" : "#ffffff"),
     );
-  const featuredHome =
-    !brand.previewSourceUrl && brand.featuredListingUrl
-      ? await db.query.homeTable.findFirst({
-          where: and(
-            eq(homeTable.brandId, input.brandId),
-            eq(homeTable.url, brand.featuredListingUrl),
-            isNull(homeTable.deletedAt),
-          ),
-          columns: { heroSourceUrl: true },
-        })
-      : null;
-  const photoUrl =
-    brand.previewSourceUrl ??
-    featuredHome?.heroSourceUrl ??
-    brand.brandIdentity?.raw?.images?.ogImage ??
-    brand.websiteMeta?.ogImage;
   let onPhoto = false;
   if (photoUrl && isAllowedPreviewSource(photoUrl)) {
     try {
@@ -155,12 +181,5 @@ export async function inspectSavedBrandMark(input: {
     .composite(panels.map((png, i) => ({ input: png, left: 0, top: i * 140 })))
     .png()
     .toBuffer();
-  return {
-    image,
-    variants,
-    onPhoto,
-    warnings,
-    updatedAt: brand.brandMark!.updatedAt,
-    previewPath: brand.slug ? `/app/brands/${brand.slug}` : "/app/brands",
-  };
+  return { image, onPhoto, warnings };
 }

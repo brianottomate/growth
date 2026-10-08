@@ -58,7 +58,14 @@ export function BrandBrandingCard({
     mutationFn: async () => {
       if (!identity?.extractedAt && website)
         await orpc.brand.enrich.call({ brandId });
-      return orpc.brand.suggestMark.call({ brandId });
+      const recommended = await orpc.brand.recommendMark.call({ brandId });
+      return orpc.brand.setMark.call({
+        brandId,
+        ...recommended.recipe,
+        tuning: recommended.tuning,
+        reason: recommended.reason,
+        previewCopy: recommended.previewCopy,
+      });
     },
     onSuccess: () => {
       toast.success("Brand mark created");

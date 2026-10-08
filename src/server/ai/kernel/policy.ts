@@ -113,8 +113,6 @@ export const growthActionPolicies = {
     // Renders three tones into our own library and points the brand at them;
     // the model-write consequence covers the lockup critique.
     setMark: write({ idempotent: true, consequence: "model-write" }),
-    // The model picks among rendered candidates; re-running may pick another.
-    suggestMark: write({ consequence: "model-write" }),
     // A reference onto the brand row; the card already exists in the library.
     addAdPreview: write({ idempotent: true }),
     // A merge into the brand's settings JSONB; the same patch twice is a no-op.

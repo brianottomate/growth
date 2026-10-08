@@ -23,8 +23,8 @@ import {
   enrichBrandAction,
   listBrands,
   setBrandMarkAction,
+  recommendBrandMarkAction,
   setPerformanceSettingsAction,
-  suggestBrandMarkAction,
 } from "@/server/ai/capabilities/brands";
 import {
   type Brand,
@@ -618,7 +618,7 @@ export const brandRouter = {
       }
     }),
 
-  suggestMark: actionProcedure(suggestBrandMarkAction),
+  recommendMark: actionProcedure(recommendBrandMarkAction),
 
   clearMark: protectedProcedure
     .input(z.object({ id: z.string() }))

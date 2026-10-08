@@ -12,6 +12,10 @@ import {
 import "server-only";
 
 import { z } from "zod";
+import {
+  brandMarkInspectionSchema,
+  readSavedBrandMarkInspection,
+} from "@/server/services/brand-mark-inspection.service";
 import { brandPreviewCopySchema } from "@/lib/brand-preview-copy";
 import { and, eq, isNull, ilike, or } from "drizzle-orm";
 
@@ -26,7 +30,6 @@ import {
   setBrandRelationship,
 } from "@/server/services/brand-relationship.service";
 import {
-  chooseBrandMark,
   recommendBrandMark,
   critiqueBrandMark,
   setBrandMark,
@@ -488,6 +491,12 @@ export const setBrandMarkAction = growthAction({
       .describe(
         "Lockup only: tracking in em. Default -0.02. Spaced capitals like a luxury wordmark sit around 0.12 to 0.18.",
       ),
+    reason: z
+      .string()
+      .trim()
+      .max(4000)
+      .optional()
+      .describe("Accepted recommendation reason, when applying recommendMark."),
     previewCopy: brandPreviewCopySchema
       .nullish()
       .describe(
@@ -519,7 +528,7 @@ export const setBrandMarkAction = growthAction({
       .string()
       .nullable()
       .describe(
-        "Optical critique before saving; confirm its claims against inspectCreative's saved images.",
+        "Optical critique before saving; confirm its claims with brandRead.identity and inspect true.",
       ),
     path: z.string(),
   }),
@@ -568,6 +577,7 @@ export const setBrandMarkAction = growthAction({
       recipe,
       tuning,
       previewCopy: input.previewCopy,
+      reason: input.reason,
     });
     return {
       brandId: brand.id,
@@ -612,8 +622,16 @@ const savedMarkSchema = markRecipeSchema.extend({
 
 export const readBrandIdentityAction = growthAction({
   description:
-    "Read the brand's visual identity and current creative mark before discussing changes. Returns website logo, favicon, colors, fonts, current mark recipe and saved variant asset IDs. Does not change anything. Identity refresh uses brandWrite.enrich; mark changes use brandWrite.setMark after agreeing the direction.",
-  inputSchema: z.object({ brandId: z.string().trim().min(1) }),
+    "Read the brand's visual identity and current creative mark before discussing changes. Returns website logo, favicon, colors, fonts, current mark recipe and saved variant asset IDs. Set inspect true to include saved image references; in Shape chat these are delivered as color, white, dark and on-photo pixels. Does not change anything. Identity refresh uses brandWrite.enrich; mark changes use brandWrite.setMark after agreeing the direction.",
+  inputSchema: z.object({
+    brandId: z.string().trim().min(1),
+    inspect: z
+      .boolean()
+      .optional()
+      .describe(
+        "Include saved mark images for visual verification. Use after setMark.",
+      ),
+  }),
   outputSchema: z.object({
     brandId: z.string(),
     logo: z.string().nullable(),
@@ -627,6 +645,7 @@ export const readBrandIdentityAction = growthAction({
     ),
     mark: savedMarkSchema.nullable(),
     logoOnCreatives: z.boolean(),
+    inspection: brandMarkInspectionSchema.optional(),
   }),
   execute: async (input, ctx) => {
     await assertOwnedBrand(input.brandId, ctx.orgId);
@@ -643,6 +662,15 @@ export const readBrandIdentityAction = growthAction({
     if (!brand) throw new Error("Brand not found");
     return {
       brandId: input.brandId,
+      ...(input.inspect && brand.brandMark
+        ? {
+            inspection: await readSavedBrandMarkInspection({
+              brandId: input.brandId,
+              userId: ctx.userId,
+              orgId: ctx.orgId,
+            }),
+          }
+        : {}),
       logo: brand.brandIdentity?.logo ?? brand.logo,
       favicon:
         brand.brandIdentity?.favicon ?? brand.websiteMeta?.favicon ?? null,
@@ -687,34 +715,6 @@ export const recommendBrandMarkAction = growthAction({
     if (!recommendation)
       throw new Error("No logo, favicon or name to build a mark from.");
     return { brandId: input.brandId, ...recommendation };
-  },
-});
-
-export const suggestBrandMarkAction = growthAction({
-  description:
-    "Pick and save the brand mark, the same as Create mark on the Setup page: renders each candidate (the scraped logo, the icon cut from it, the favicon or the name set as a lockup) at card size, has the art director choose the one that reads best, and saves its three tones plus short sample-creative copy. Run brandWrite.enrich first. Re-running replaces the mark; use setMark to set a specific one.",
-  inputSchema: z.object({ brandId: z.string().trim().min(1) }),
-  outputSchema: z.object({
-    brandId: z.string(),
-    source: z.enum(["logo", "favicon", "lockup"]),
-    reason: z.string(),
-    previewCopy: brandPreviewCopySchema,
-  }),
-  examples: [{ brandId: "brd_01" }],
-  execute: async (input, ctx) => {
-    const brand = await assertOwnedBrand(input.brandId, ctx.orgId);
-    const chosen = await chooseBrandMark({
-      brandId: brand.id,
-      userId: ctx.userId,
-    });
-    if (!chosen)
-      throw new Error("No logo, favicon or name to build a mark from.");
-    return {
-      brandId: brand.id,
-      source: chosen.recipe.source,
-      reason: chosen.reason,
-      previewCopy: chosen.previewCopy,
-    };
   },
 });
 

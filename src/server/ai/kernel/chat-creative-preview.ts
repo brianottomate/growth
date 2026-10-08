@@ -6,7 +6,6 @@ import { ideaPreviewUrl, ideaShapeSchema } from "@/lib/ad-idea-studio";
 import { catalogCardPreviewUrl } from "@/lib/catalog-studio";
 import { adChatContext } from "@/server/services/ad-chat-context.service";
 import { catalogHomeContext } from "@/server/services/catalog-studio.service";
-import { inspectSavedBrandMark } from "@/server/services/brand-mark-inspection.service";
 import { renderCompositionUrl } from "@/server/services/composition.service";
 
 /** Read-only visual inspection through the same renderer as the operator's preview. */
@@ -18,10 +17,6 @@ export function chatCreativePreview(identity: {
   const inputSchema = z.object({
     target: z.discriminatedUnion("type", [
       z.object({
-        type: z.literal("brand-mark"),
-        brandId: z.string().trim().min(1),
-      }),
-      z.object({
         type: z.literal("ad"),
         adId: z.string(),
         cardId: z.string(),
@@ -32,46 +27,19 @@ export function chatCreativePreview(identity: {
         homeId: z.string(),
       }),
     ]),
-    shape: ideaShapeSchema
-      .optional()
-      .describe(
-        "Required for ad and catalog targets. Omit for brand-mark, which returns all saved tones together.",
-      ),
+    shape: ideaShapeSchema,
   });
   return tool<
     z.infer<typeof inputSchema>,
     z.infer<typeof inputSchema> & {
       previewUrl: string;
-      onPhoto?: boolean;
-      warnings?: string[];
-      variants?: { color: string; white: string; dark: string };
     },
     GrowthExecutionContext
   >({
     description:
-      "Inspect saved brand-mark variants, or ONE saved ad slide or catalog card in ONE shape, as an image. For brand marks give target type brand-mark and brandId, omit shape; the image shows saved color, white and dark tones, plus white over the selected preview photo when available. No home ID is needed. Use after a layout, text, crop, template or photo edit, before claiming the visible result is correct. For ads give adId and stable cardId; for catalog give brandId and homeId. Repeat sequentially for affected shapes. Does not save, approve or publish.",
+      "Inspect ONE saved ad slide or catalog card in ONE shape as an image. For brand marks use brandRead.identity with inspect true. Use after a layout, text, crop, template or photo edit, before claiming the visible result is correct. For ads give adId and stable cardId; for catalog give brandId and homeId. Repeat sequentially for affected shapes. Does not save, approve or publish.",
     inputSchema,
     execute: async ({ target, shape }) => {
-      if (target.type === "brand-mark") {
-        const inspected = await inspectSavedBrandMark({
-          ...identity,
-          brandId: target.brandId,
-        });
-        const previewUrl = `${inspected.previewPath}#brand-mark-${encodeURIComponent(inspected.updatedAt)}`;
-        images.set(previewUrl, inspected.image.toString("base64"));
-        return {
-          target,
-          shape,
-          previewUrl,
-          variants: inspected.variants,
-          onPhoto: inspected.onPhoto,
-          warnings: inspected.warnings,
-        };
-      }
-      if (!shape)
-        throw new Error(
-          "Choose a shape when inspecting an ad or catalog card.",
-        );
       let url: string | null | undefined;
       if (target.type === "ad") {
         const context = await adChatContext({
@@ -132,9 +100,6 @@ export function chatCreativePreview(identity: {
               target: output.target,
               shape: output.shape,
               previewUrl: output.previewUrl,
-              variants: output.variants,
-              onPhoto: output.onPhoto,
-              warnings: output.warnings,
             }),
           },
           { type: "image-data", data: image, mediaType: "image/png" },

@@ -55,6 +55,7 @@ import {
 } from "@/server/ai/kernel/chat-context";
 import { isChatUtilityTool } from "@/lib/chat-utility-tools";
 import { createChatToolScope } from "@/server/ai/kernel/chat-tool-scope";
+import { chatBrandIdentityOutput } from "@/server/ai/kernel/chat-brand-identity";
 import { chatCreativePreview } from "@/server/ai/kernel/chat-creative-preview";
 import { creativeEditingSection } from "@/server/ai/prompts/creative-editing";
 import { OVERVIEW_AGENT_PERSONA } from "@/server/ai/overview-agent/persona";
@@ -966,7 +967,9 @@ export async function POST(req: Request): Promise<Response> {
         {
           ...definition,
           toModelOutput: ({ output }: { output: unknown }) =>
-            chatModelOutput(name, output),
+            name === "brandRead"
+              ? chatBrandIdentityOutput(output)
+              : chatModelOutput(name, output),
         },
       ]),
     );
