@@ -1,5 +1,5 @@
 "use client";
-import { CampaignSummary } from "@/components/campaigns/campaign-summary";
+import { CampaignListRow } from "@/components/campaigns/campaign-summary";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Megaphone, ImageIcon } from "lucide-react";
 import { WorkPreview, previewDate } from "./WorkPreview";
@@ -462,22 +462,26 @@ export function InitiativeDetail({ id }: { id: string }) {
               key={campaign.id}
               className="space-y-4 rounded-xl border p-4"
             >
-              <div className="flex items-start justify-between gap-3">
-                <CampaignSummary
+              <div className="-mx-4 -mt-4">
+                <CampaignListRow
                   name={campaign.name}
                   href={href}
                   status={isLive ? "Live" : "Not live"}
                   detail={`${brandName(campaign.brandId)} · ${campaign.status} · ${preview?.adCount ?? 0} ads · ${preview?.audienceCount ?? 0} audience ${preview?.audienceCount === 1 ? "plan" : "plans"}`}
                   description={preview?.description}
+                  actions={
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={unlink.isPending}
+                      onClick={() =>
+                        unlink.mutate({ id, campaignId: campaign.id })
+                      }
+                    >
+                      Unlink
+                    </Button>
+                  }
                 />
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={unlink.isPending}
-                  onClick={() => unlink.mutate({ id, campaignId: campaign.id })}
-                >
-                  Unlink
-                </Button>
               </div>
               {(preview?.ads.length ?? 0) === 0 && (
                 <EmptyState

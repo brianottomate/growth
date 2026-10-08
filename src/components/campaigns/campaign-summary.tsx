@@ -28,18 +28,24 @@ export function CampaignSummary({
           title={name}
           className={cn(
             "min-w-0 font-semibold [overflow-wrap:anywhere] hover:underline",
-            compact ? "block text-[13px] @lg:truncate" : "text-sm",
+            compact ? "block text-[13px] leading-snug" : "text-sm leading-snug",
           )}
         >
           {campaignDisplayName(name)}
         </Link>
-        {status && (
+        {typeof status === "string" ? (
           <span className="rounded-md border px-2 py-0.5 text-xs text-muted-foreground">
             {status}
           </span>
+        ) : (
+          status
         )}
       </div>
-      {detail && <p className="text-xs text-muted-foreground">{detail}</p>}
+      {detail && (
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          {detail}
+        </p>
+      )}
       {description && (
         <p className="line-clamp-2 max-w-3xl text-xs leading-relaxed text-muted-foreground">
           {description}
@@ -71,7 +77,7 @@ export function CampaignThumbnailStrip({
     <Link
       href={href}
       aria-label={`View ${total} campaign ads`}
-      className="flex items-center gap-1"
+      className="flex w-fit max-w-full flex-wrap items-center gap-1.5"
     >
       {sources.map((src) => (
         // oxlint-disable-next-line nextjs/no-img-element
@@ -80,7 +86,7 @@ export function CampaignThumbnailStrip({
           src={src}
           alt=""
           loading="lazy"
-          className="size-10 rounded-md border bg-muted object-cover"
+          className="size-12 shrink-0 rounded-lg border bg-muted object-cover"
         />
       ))}
       {total > sources.length && (
@@ -120,5 +126,65 @@ export function CampaignPlatforms({
         </span>
       ))}
     </span>
+  );
+}
+
+/** Each row responds to its own width, including when nested in a client card. */
+export function CampaignListRow({
+  name,
+  href,
+  status,
+  detail,
+  description,
+  thumbnails,
+  platforms,
+  spend,
+  actions,
+}: {
+  name: string;
+  href: string;
+  status?: ReactNode;
+  detail?: ReactNode;
+  description?: string | null;
+  thumbnails?: ReactNode;
+  platforms?: ReactNode;
+  spend?: ReactNode;
+  actions?: ReactNode;
+}) {
+  return (
+    <div className="@container/campaign min-w-0">
+      <div className="grid grid-cols-1 gap-3 px-4 py-4 @4xl/campaign:grid-cols-[minmax(0,1fr)_auto] @4xl/campaign:items-center @4xl/campaign:gap-6">
+        <div className="min-w-0 space-y-3">
+          <CampaignSummary
+            compact
+            name={name}
+            href={href}
+            status={status}
+            detail={detail}
+            description={description}
+          />
+          {thumbnails}
+        </div>
+        {(platforms || spend || actions) && (
+          <div className="flex min-w-0 flex-col gap-3 border-t pt-3 @4xl/campaign:border-0 @4xl/campaign:pt-0">
+            {(platforms || spend) && (
+              <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+                {platforms}
+                {spend && (
+                  <span className="ml-auto shrink-0 whitespace-nowrap">
+                    {spend}
+                  </span>
+                )}
+              </div>
+            )}
+            {actions && (
+              <div className="flex flex-wrap items-center gap-2 @4xl/campaign:justify-end">
+                {actions}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

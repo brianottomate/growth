@@ -1,7 +1,7 @@
 import { ClientPreviewLink } from "./clients/[brandSlug]/ads/ClientPreviewLink";
 import {
   CampaignPlatforms,
-  CampaignSummary,
+  CampaignListRow,
   CampaignThumbnailStrip,
 } from "@/components/campaigns/campaign-summary";
 import type { ReactNode } from "react";
@@ -194,59 +194,49 @@ export function CampaignRow({
     .filter((row) => row.status !== "draft")
     .map((row) => row.id);
   return (
-    <li className="grid grid-cols-1 items-center gap-x-3 gap-y-1.5 px-4 py-3 @lg:flex">
-      <div className="min-w-0 @lg:flex-1">
-        <CampaignSummary
-          compact
-          status={STATE_WORD[campaign.state]}
-          name={campaign.name}
-          href={campaignHref(brand, campaign)}
-          detail={[
-            showBrand ? client : null,
-            `Created ${createdOn(campaign.createdAt)}`,
-            campaign.adCount
-              ? `${campaign.adCount} ad${campaign.adCount === 1 ? "" : "s"}${campaign.approvedCount ? ` · ${campaign.approvedCount} approved` : ""}`
-              : "No ads yet",
-          ]
-            .filter(Boolean)
-            .join(" · ")}
-        />
-      </div>
-      {campaign.thumbs.length > 0 && (
-        <div className="py-1 @lg:w-52 @lg:shrink-0 @lg:py-0">
+    <li className="min-w-0">
+      <CampaignListRow
+        name={campaign.name}
+        href={campaignHref(brand, campaign)}
+        status={<StateChip state={campaign.state} />}
+        detail={[
+          showBrand ? client : null,
+          `Created ${createdOn(campaign.createdAt)}`,
+          campaign.adCount
+            ? `${campaign.adCount} ad${campaign.adCount === 1 ? "" : "s"}${campaign.approvedCount ? ` · ${campaign.approvedCount} approved` : ""}`
+            : "No ads yet",
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+        thumbnails={
           <CampaignThumbnailStrip
             urls={campaign.thumbs}
             total={campaign.adCount}
             href={campaignHref(brand, campaign)}
           />
-        </div>
-      )}
-      <span className="flex items-center gap-1.5 text-muted-foreground @lg:w-20 @lg:shrink-0">
-        <CampaignPlatforms platforms={campaign.platforms} />
-        <span className="ml-auto @lg:hidden">
-          <SpendCell campaign={campaign} />
-        </span>
-      </span>
-      <span className="hidden w-36 shrink-0 text-right @lg:block">
-        <SpendCell campaign={campaign} />
-      </span>
-      <ClientPreviewLink
-        brandId={brand.id}
-        campaign={{ id: campaign.id, name: campaign.name }}
+        }
+        platforms={<CampaignPlatforms platforms={campaign.platforms} />}
+        spend={<SpendCell campaign={campaign} />}
+        actions={
+          <>
+            <ClientPreviewLink
+              brandId={brand.id}
+              campaign={{ id: campaign.id, name: campaign.name }}
+            />
+            {deletable && (
+              <DeleteCampaignButton
+                campaignId={campaign.id}
+                campaignName={campaign.name}
+                brandSlug={brand.slug ?? brand.id}
+                livePlatformCampaigns={livePlatformIds.length}
+                platformCampaignIds={livePlatformIds}
+                compact
+                afterDelete="refresh"
+              />
+            )}
+          </>
+        }
       />
-      {deletable ? (
-        <span className="justify-self-end @lg:w-8 @lg:shrink-0">
-          <DeleteCampaignButton
-            campaignId={campaign.id}
-            campaignName={campaign.name}
-            brandSlug={brand.slug ?? brand.id}
-            livePlatformCampaigns={livePlatformIds.length}
-            platformCampaignIds={livePlatformIds}
-            compact
-            afterDelete="refresh"
-          />
-        </span>
-      ) : null}
     </li>
   );
 }

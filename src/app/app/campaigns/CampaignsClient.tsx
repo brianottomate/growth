@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { CampaignListRow } from "@/components/campaigns/campaign-summary";
 import { useQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 
@@ -127,49 +128,43 @@ export function CampaignsClient({
               {list.map((i) => {
                 const range = fmtRange(i.startAt, i.endAt);
                 return (
-                  <Link
+                  <article
                     key={i.id}
-                    href={
-                      i.brand?.slug
-                        ? `/app/brands/${i.brand.slug}/ads/${i.id}`
-                        : `/app/campaigns/${i.id}`
-                    }
-                    className="flex items-center gap-3 rounded-xl border bg-card p-3.5 transition-colors hover:bg-accent/40"
+                    className="min-w-0 rounded-xl border bg-card"
+                    style={{ borderLeftColor: i.color ?? undefined }}
                   >
-                    <span
-                      className="h-9 w-1 shrink-0 rounded-full"
-                      style={{ background: i.color ?? "var(--border)" }}
+                    <CampaignListRow
+                      name={i.name}
+                      href={
+                        i.brand?.slug
+                          ? `/app/brands/${i.brand.slug}/ads/${i.id}`
+                          : `/app/campaigns/${i.id}`
+                      }
+                      status={meta.label}
+                      detail={[
+                        brands.length > 1 ? i.brand?.name : null,
+                        range,
+                        i.goal,
+                        i.adCampaignCount > 0
+                          ? `${i.adCampaignCount} ad campaign${i.adCampaignCount === 1 ? "" : "s"}`
+                          : "No platform campaigns yet",
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                      description={i.description}
+                      spend={
+                        i.budget != null ? (
+                          <span className="text-xs tabular-nums">
+                            <strong>${i.budget.toLocaleString()}</strong>
+                            <span className="text-muted-foreground">
+                              {" "}
+                              budget
+                            </span>
+                          </span>
+                        ) : undefined
+                      }
                     />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="truncate text-sm font-medium">
-                          {i.name}
-                        </span>
-                        {i.goal && (
-                          <span className="rounded-full border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                            {i.goal}
-                          </span>
-                        )}
-                        {brands.length > 1 && i.brand && (
-                          <span className="text-[10px] text-muted-foreground">
-                            {i.brand.name}
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                        {range && <span>{range}</span>}
-                        {i.adCampaignCount > 0 && (
-                          <span>
-                            {i.adCampaignCount} ad campaign
-                            {i.adCampaignCount === 1 ? "" : "s"}
-                          </span>
-                        )}
-                        {i.budget != null && (
-                          <span>${i.budget.toLocaleString()}</span>
-                        )}
-                      </div>
-                    </div>
-                  </Link>
+                  </article>
                 );
               })}
             </div>
