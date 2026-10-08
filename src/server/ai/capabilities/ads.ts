@@ -1796,6 +1796,7 @@ export const returnAdToStudioAction = growthAction({
       deleted: z.number(),
       kept: z.number(),
       errors: z.array(z.string()),
+      pending: z.boolean().optional(),
     }),
   }),
   description:

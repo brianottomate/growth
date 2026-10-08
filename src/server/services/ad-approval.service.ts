@@ -2,6 +2,7 @@ import { withTransaction } from "@/server/db";
 import { reviewActor, reviewSubjectFields } from "./review-comments.service";
 import type { GrowthActionContext } from "@/server/ai/kernel/tool";
 import "server-only";
+import { after } from "next/server";
 import { reusableApprovalAsset } from "@/lib/ad-approval-assets";
 import { isImportedMetaCatalog } from "@/lib/meta-import";
 import { and, eq, isNull } from "drizzle-orm";
@@ -432,7 +433,22 @@ export async function returnAdToStudio(
       });
     }
   });
-  const mediaCleanup = await purgeAdExports({ adId: ad.id, brandId: brand.id });
+  // The draft is already saved. Export cleanup must not keep the app's dialog
+  // waiting, or turn a successful return into an apparent failure.
+  const cleanupInput = { adId: ad.id, brandId: brand.id };
+  let mediaCleanup;
+  if (ctx.surface === "app") {
+    after(async () => {
+      try {
+        await purgeAdExports(cleanupInput);
+      } catch (error) {
+        console.error("Returned ad export cleanup failed", ad.id, error);
+      }
+    });
+    mediaCleanup = { deleted: 0, kept: 0, errors: [], pending: true };
+  } else {
+    mediaCleanup = await purgeAdExports(cleanupInput);
+  }
   return {
     adId: ad.id,
     status: "drawn" as const,
