@@ -1,3 +1,4 @@
+import { assertEmailCreativeEditable } from "./email-creative-review";
 import { claimWorkflowRun } from "./workflow-run.service";
 import "server-only";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
@@ -67,6 +68,7 @@ export async function lockDocument(
   return row;
 }
 export async function assertUnlocked(tx: TransactionClient, id: string) {
+  await assertEmailCreativeEditable(tx, id);
   const active = await tx.query.workflowRunTable.findFirst({
     where: and(
       eq(workflowRunTable.packetId, id),

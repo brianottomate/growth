@@ -23,7 +23,10 @@ import {
   productUpdateEmailDraftSchema,
 } from "@/lib/email-document";
 import { DIGEST_TEMPLATE_KEY } from "@/lib/listings-digest";
-import { draftFromTemplateInputSchema } from "@/lib/newsletter-templates";
+import {
+  NEWSLETTER_TEMPLATES,
+  draftFromTemplateInputSchema,
+} from "@/lib/newsletter-templates";
 import { draftNewsletterFromTemplate } from "@/server/services/newsletter-template.service";
 import { db } from "@/server/db";
 import { brandTable, memberTable } from "@/server/db/schema";
@@ -99,10 +102,53 @@ export const createEmailSlot = growthAction({
     }),
 });
 
+export const listEmailTemplates = growthAction({
+  description:
+    "List reusable email recipes for any brand, including intended triggers, content structure, required verified facts and exact template IDs. This is a design library; it does not create, activate or send campaigns. Use before draftFromTemplate.",
+  inputSchema: z.object({
+    category: z.string().optional(),
+    query: z.string().optional(),
+  }),
+  outputSchema: z.object({
+    templates: z.array(
+      z.object({
+        id: z.string(),
+        label: z.string(),
+        category: z.string(),
+        summary: z.string(),
+        trigger: z.string().nullable(),
+        homes: z.number(),
+        structure: z.array(z.string()),
+        requiredContext: z.array(z.string()),
+      }),
+    ),
+  }),
+  execute: async (input) => ({
+    templates: NEWSLETTER_TEMPLATES.filter(
+      (t) =>
+        (!input.category ||
+          t.category.toLowerCase() === input.category.toLowerCase()) &&
+        (!input.query ||
+          `${t.id} ${t.label} ${t.summary}`
+            .toLowerCase()
+            .includes(input.query.toLowerCase())),
+    ).map((t) => ({
+      id: t.id,
+      label: t.label,
+      category: t.category,
+      summary: t.summary,
+      trigger: "trigger" in t ? t.trigger : null,
+      homes: t.homes,
+      structure: [...t.structure],
+      requiredContext: [...t.requiredContext],
+    })),
+  }),
+});
+
 export const draftEmailFromTemplate = growthAction({
   outputSchema: draftEmailFromTemplateOutputSchema,
   description:
-    "Draft a complete one-off blast for a brand from a template: picks the brand's own homes from their photos and booking evidence, writes the copy around them, renders a header card, and saves the draft on the content calendar. Templates: season-ahead (a getaway for an upcoming season or occasion: one featured home, a paragraph on the place, three more) and home-collection (four homes sharing one trait guests want, in a grid). Use for a complete property email, including homes, hero and booking CTA. When filling an existing slot, pass platformPostId and the full brief so it updates that slot rather than creating another. Honor home exclusions and use concise copy without em dashes. Pass an offer only if the operator gave one. Nothing is sent.",
+    "Recreate an email recipe for a brand using its current identity, homes and verified facts. Call emailRead.listTemplates to choose among the 57 reference recipes and two property layouts, and inspect requiredContext. Supply verifiedContext and exact homeIds when the recipe needs them; demo values are never facts. Drafts remain editable and nothing is sent or activated. For an existing slot pass platformPostId and the full brief to avoid duplicates. Offers require operator-approved wording. Sequence content can be rebuilt in its existing email slots without changing triggers or timing.",
   inputSchema: draftFromTemplateInputSchema,
   execute: async (input, ctx) => {
     const result = await draftNewsletterFromTemplate({
@@ -533,6 +579,7 @@ export const deleteEmailDraft = growthAction({
 });
 
 export const EMAIL_TOOLS = {
+  listEmailTemplates,
   getEmailDraft,
   createEmailSlot,
   createDigestFromRow,

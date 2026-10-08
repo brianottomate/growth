@@ -36,15 +36,17 @@ persists it in the email. The source photo, template ID and copy stay in the
 image’s editing metadata so reopening does not compound text onto an already
 rendered image. Older cards without a template ID remain Email header.
 
-Sequence planning remains in `/app/lifecycle`; the Email page links there.
-Sending sequences from Email remains coming soon. A future backend integration
-must map a Growth brand to its own authorized WanderOS organization. The current
-Growth service API key cannot simply call the backend automation listing and
-preview actions, which require organization/user authorization. Reuse lifecycle
-programs and steps rather than creating a second sequence model, and keep live
-enrollment and delivery in the existing sending runtime until a scoped connection
-is implemented.
+Saved sequences live in the brand’s Email → Sequences workspace. Preparing a
+sequence freezes its current email content for explicit review, while test runs
+use named recipients and accelerated timing. Growth delivery and the native
+WanderOS booking automations remain separate; a live bridge needs scoped event
+wiring and duplicate-send suppression.
 
+The [email recipe library](email-recipe-library.md) adds Brian’s 57 reference
+recipes to the two property layouts. The AI discovers exact IDs, intended use and
+required facts through `emailRead.listTemplates`. Draft generation accepts verified
+context and selected catalog homes; transactional facts and offers never come
+from the demo reference.
 For chat and MCP, `emailWrite.draftFromTemplate` accepts an existing
 `platformPostId` plus the full `brief`. It validates the slot’s organization and
 brand, retains its calendar placement, and saves against its starting revision

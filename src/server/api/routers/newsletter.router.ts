@@ -35,6 +35,7 @@ import {
   exportEmailHandoff,
   renderEmailPreview,
   rewriteEmailBlock,
+  reviewEmailCreative,
 } from "@/server/services/email-document.service";
 import {
   approveMessageSend,
@@ -99,6 +100,20 @@ async function deliveryOrganizationIdForUser(
 }
 
 export const newsletterRouter = {
+  reviewCreative: workspaceProcedure
+    .input(
+      z.object({
+        platformPostId: z.string().min(1),
+        action: z.enum(["ready", "approve", "reopen"]),
+      }),
+    )
+    .handler(({ input, context }) =>
+      reviewEmailCreative({
+        ...input,
+        organizationId: context.workspace.orgId,
+        userId: context.workspace.userId,
+      }),
+    ),
   audiences: actionProcedure(listEmailAudiencesAction),
   previewAudience: workspaceProcedure
     .input(

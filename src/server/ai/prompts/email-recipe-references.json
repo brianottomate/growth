@@ -1,0 +1,344 @@
+{
+  "brian-booking-welcome": {
+    "referenceText": "Your perfect stay starts here\nYour perfect stay starts here\nHi\n[guest]\n,\nWelcome! We built\n[brand]\nto give you what big platforms can't: direct access, honest pricing, and a curated collection of stays worth your time.\nThink of it as a more intentional way to travel.\nWhat you'll find here:\n14\nhomes across\n[destination] and [destination] Lake, Montana\nWhy book direct:\nSave over 10% on every stay\nYou're talking to hosts, not bots\nFlexible policies that actually make sense\nBrowse homes\nStart with a place you have in mind — we'll handle the rest.\nHave questions? Just reply — we're here to help.\n[host] & the [brand] team\n[brand] · 121 Central Ave, [destination], MT [verified value]\n©\n[verified value]\n[brand]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/booking/01-welcome.html",
+    "subjectExample": "Welcome to Bluewater Haven",
+    "preheaderExample": "Your perfect stay starts here"
+  },
+  "brian-booking-nurture-homes": {
+    "referenceText": "Every home earns its place — here are a few to start with\nThe homes, properly introduced\nHi\n[guest]\n,\nEvery home in the\n[brand]\ncollection earns its place. We manage each one ourselves — the hot tub is serviced, the firewood is stacked, the wifi is tested — so every stay meets the same standard.\nA few worth starting with:\n[home A]\n[destination], MT  •  4 bed  •  3 bath  •  Sleeps 8\nfrom [verified amount]/night\n[home D]\n[destination], MT  •  4 bed  •  3 bath  •  Sleeps 8\nfrom [verified amount]/night\n[home B]\n[destination], MT  •  5 bed  •  4 bath  •  Sleeps 10\nfrom [verified amount]/night\nBrowse all homes\nWondering which one fits your group? Just reply — we know these homes well.\n[host] & the [brand] team\n[brand] · 121 Central Ave, [destination], MT [verified value]\n©\n[verified value]\n[brand]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/booking/02-nurture-homes.html",
+    "subjectExample": "The homes, properly introduced",
+    "preheaderExample": "Every home earns its place — here are a few to start with"
+  },
+  "brian-booking-nurture-destination": {
+    "referenceText": "Lake mornings, mountain evenings — a weekend in [destination]\nA summer weekend in\n[destination]\nHi\n[guest]\n,\nHere's how a\n[destination]\nweekend tends to go — no planning required.\nMorning\nCoffee on the dock, then paddle out — [destination] Lake is glass before 9 AM.\nAfternoon\nTen minutes into town for Central Avenue's shops, then the Going-to-the-Sun Road if you're feeling ambitious.\nEvening\nBack to the house: grill on, feet up, sunset over the water.\nThe home that hosts it:\n[home C]\n[destination] Lake  •  3 bed  •  2 bath  •  Sleeps 6\nfrom [verified amount]/night\nSee summer availability\nGood to know: July and August weekends book 6–8 weeks out. Midweek stays stay open longer.\n[host] & the [brand] team\n[brand] · 121 Central Ave, [destination], MT [verified value]\n©\n[verified value]\n[brand]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/booking/03-nurture-destination.html",
+    "subjectExample": "A summer weekend in Whitefish",
+    "preheaderExample": "Lake mornings, mountain evenings — a weekend in Whitefish"
+  },
+  "brian-booking-nurture-proof": {
+    "referenceText": "What guests say after checkout\nDon't take our word for it\nHi\n[guest]\n,\nThe clearest picture of a\n[brand]\nstay comes from the guests who just finished one.\n★★★★★\n“\nThe house was spotless, the hot tub was ready when we arrived, and when we asked about firewood it was on the porch within the hour. We've already booked next summer.\n”\nRachel M.\nStayed at [home D], June [verified value]\n[home D]\n[destination], MT  •  4 bed  •  3 bath  •  Sleeps 8\nfrom [verified amount]/night\nAnd because you book with us directly, you get the lowest rate on every stay — no service fees, ever.\nFind your dates\n[host] & the [brand] team\n[brand] · 121 Central Ave, [destination], MT [verified value]\n©\n[verified value]\n[brand]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/booking/04-nurture-proof.html",
+    "subjectExample": "Don't take our word for it",
+    "preheaderExample": "What guests say after checkout"
+  },
+  "brian-booking-browse-abandon": {
+    "referenceText": "[home B] is worth a second look\nStill thinking about\n[home B]\n?\nHi\n[guest]\n,\nYou were looking at\n[home B]\nearlier. It's one of our most requested homes for groups — here it is again, in case it deserves a second look.\n[home B]\n[destination], MT  •  5 bed  •  4 bath  •  Sleeps 10\nfrom [verified amount]/night\nAugust weekends are filling; midweek stays are still open.\nCheck availability\nNot quite the one?\nBrowse all homes\n.\nQuestions about the home? Just reply — we manage it ourselves.\n[host] & the [brand] team\n[brand] · 121 Central Ave, [destination], MT [verified value]\n©\n[verified value]\n[brand]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/booking/05-browse-abandon.html",
+    "subjectExample": "Still thinking about Cedar Ridge Lodge?",
+    "preheaderExample": "Cedar Ridge Lodge is worth a second look"
+  },
+  "brian-booking-zero-results": {
+    "referenceText": "Your dates were a tough match — here's what's close\nAbout your search\nHi\n[guest]\n,\nWe didn't have a home free for your exact dates — the first week of August goes early. But you were close, and two options land within a week of it.\nYour search\nAug 1–4 · 6 guests\nTwo ways to make it work:\n[home C]\n[destination] Lake  •  3 bed  •  2 bath  •  Sleeps 6\nOpen Aug 5–8\n[home B]\n[destination], MT  •  5 bed  •  4 bath  •  Sleeps 10\nOpen Aug 8–11\nSee open dates\nOr reply with your dates and we'll watch cancellations for you.\n[host] & the [brand] team\n[brand] · 121 Central Ave, [destination], MT [verified value]\n©\n[verified value]\n[brand]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/booking/06-zero-results.html",
+    "subjectExample": "About your search",
+    "preheaderExample": "Your dates were a tough match — here's what's close"
+  },
+  "brian-booking-abandoned-checkout-1": {
+    "referenceText": "Complete your reservation\nComplete your reservation\n[home B]\nAug 14–17\n•\n6 guests\nYour dates at [home B] are still open and your details are saved — finishing takes about two minutes. If anything gave you pause, just reply and we'll sort it out.\nComplete your booking\n[brand] · 121 Central Ave, [destination], MT [verified value]\n©\n[verified value]\n[brand]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/booking/07-abandoned-checkout-1.html",
+    "subjectExample": "Complete your reservation",
+    "preheaderExample": "Complete your reservation"
+  },
+  "brian-booking-abandoned-checkout-2": {
+    "referenceText": "Aug 14–17 at [home B] — the full price, no surprises\nThe price you see is the price\nHi\n[guest]\n,\nStill deciding? Fair. Here's exactly what\nAug 14–17\nat\n[home B]\ncomes to — nothing added at checkout, nothing added at the door.\n[home B]\n[destination], MT  •  5 bed  •  4 bath  •  Sleeps 10\nfrom [verified amount]/night\n3 nights × [verified amount]\n[verified amount]\nCleaning\n[verified amount]\nTaxes & local fees\n[verified amount]\nService fees\n[verified amount]\nTotal\n[verified amount]\nOne honest note: mid-August weekends are our busiest, and we can't hold dates without a booking.\nComplete your booking\nIf anything gave you pause, reply and we'll sort it out.\n[host] & the [brand] team\n[brand] · 121 Central Ave, [destination], MT [verified value]\n©\n[verified value]\n[brand]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/booking/08-abandoned-checkout-2.html",
+    "subjectExample": "The price you see is the price",
+    "preheaderExample": "Aug 14–17 at Cedar Ridge Lodge — the full price, no surprises"
+  },
+  "brian-booking-booking-confirmed": {
+    "referenceText": "Your booking is confirmed!\nYour booking is confirmed!\n[home A]\nSep 18–21, [verified value]\n•\n4 guests\nView booking\nLocation\n638 Hope Bay Rd, [destination], MT [verified value]\nView in Google Maps\nCheck-in instructions\nCheck-in opens at 4 PM. Your door code arrives by text the morning of arrival — no keys, no lockbox hunt. Park in the drive; the hot tub will be at temperature when you walk in.\nThank you for booking!\n[brand] · 121 Central Ave, [destination], MT [verified value]\n©\n[verified value]\n[brand]",
+    "source": "email-library/booking/09-booking-confirmed.html",
+    "subjectExample": "Your booking is confirmed",
+    "preheaderExample": "Your booking is confirmed!"
+  },
+  "brian-booking-booking-receipt": {
+    "referenceText": "Your receipt and what happens next\nYou're booked. Here's the plan.\nHi\n[guest]\n, everything is confirmed — your receipt and the road to check-in are below.\nConfirmation\nBH-[verified value]\nDates\nSep 18–21, [verified value] · 4 guests\nHome\n[home A] — [destination], MT\nYour receipt\n3 nights × [verified amount]\n[verified amount]\nCleaning\n[verified amount]\nTaxes & local fees\n[verified amount]\nService fees\n[verified amount]\nTotal charged\n[verified amount]\nWhat happens next:\n10 days before arrival — your pre-trip guide, with everything from directions to dinner reservations\nThe morning of arrival — your door code, by text\nAnytime — reply to this email and a person answers\nView your trip\nWe look forward to welcoming you.\n[host] & the [brand] team\n[brand] · 121 Central Ave, [destination], MT [verified value]\n©\n[verified value]\n[brand]",
+    "source": "email-library/booking/10-booking-receipt.html",
+    "subjectExample": "Your receipt and what happens next",
+    "preheaderExample": "Your receipt and what happens next"
+  },
+  "brian-booking-ota-to-direct": {
+    "referenceText": "The same home, the same standards — without the service fees\nNext time, book direct\nHi\n[guest]\n,\nWe loved hosting you at\n[home D]\n. You found us through\nAirbnb\n— most guests do. But your next stay doesn't need a middleman.\nBook with\n[brand]\ndirectly and the same home costs less, with a direct line to the people who take care of it.\n[home D]\n[destination], MT\n•\n4\nbed  •\n3\nbath  •  Sleeps\n8\nYour stay, side by side\n3 nights at [home D]\n[verified amount]\nAirbnb service fee\n[verified amount]\nBooked direct with us\n[verified amount]\nYou keep\n[verified amount]\nSame home. Same dates. Same standards.\nDirect guests get more:\nThe lowest rate on every stay — no service fees\nFirst access to peak weeks and new homes\nA direct line to us before and during your stay\nBook your next stay\nWe look forward to welcoming you back.\n[host] & the [brand] team\n[brand] · 121 Central Ave, [destination], MT [verified value]\n©\n[verified value]\n[brand]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/booking/11-ota-to-direct.html",
+    "subjectExample": "Next time, come straight to the source",
+    "preheaderExample": "The same home, the same standards — without the service fees"
+  },
+  "brian-staying-pre-trip-week-out": {
+    "referenceText": "7 days to [home A]. A few things worth planning now.\n7\ndays to\n[home A]\nHi\n[guest]\n, your stay is coming up. Everything is confirmed — here's your trip at a glance, and a few things worth planning before you arrive.\n[home A]\n[destination], MT\nYour trip\nDates\nAugust 14 – 18\nStay\n4 nights · 4 guests\nCheck-in\n4:00 PM · your door code arrives the morning of\nWorth planning now\nGlacier needs a vehicle reservation\nGoing-to-the-Sun Road requires a timed vehicle entry in August. Reserve at recreation.gov before you travel — they release and sell out fast.\nStock up on the way in\nThird Street Market in downtown [destination] is 8 minutes from the cabin. Grab groceries before you head up — the kitchen is fully equipped.\nBook dinner now\n[destination] tables go fast in August. Tupelo Grille and Abruzzo are the two we send everyone to.\nView your trip\nQuestions before you go? Just reply — we read every message.\n[host] & the [brand] team\n[brand]\n·\n121 Central Ave, [destination], MT [verified value]\n©\n[verified value]\n[brand]",
+    "source": "email-library/staying/01-pre-trip-week-out.html",
+    "subjectExample": "7 days to Hope Bay Cabin",
+    "preheaderExample": "Your trip at a glance — and three things worth planning before you arrive."
+  },
+  "brian-staying-pre-trip-day-before": {
+    "referenceText": "[home A] tomorrow. Check-in opens at 4:00 PM.\nTomorrow:\n[home A]\nHi\n[guest]\n, one sleep to go. Check-in opens at\n4:00 PM\ntomorrow — here's what to know for the drive in.\nGetting there\nAddress\n48 Hope Bay Lane, [destination], MT [verified value]\nThe drive\n45 minutes from Glacier Park International (FCA). The last half mile is a gravel lane — any car handles it fine in summer.\nGetting in\nYour door code arrives by email at 8:00 AM tomorrow. No keys, no lockbox — the front door unlocks with the code.\nOne more thing\nEvenings run cool in the mountains, even in August — pack a layer for the deck.\nGet directions\nAnything you need before you set off, just reply.\n[host] & the [brand] team\n[brand]\n·\n121 Central Ave, [destination], MT [verified value]\n©\n[verified value]\n[brand]",
+    "source": "email-library/staying/02-pre-trip-day-before.html",
+    "subjectExample": "Tomorrow: Hope Bay Cabin",
+    "preheaderExample": "Check-in opens at 4:00 PM. Directions, access, and one thing to pack."
+  },
+  "brian-staying-check-in-guide": {
+    "referenceText": "[home A] is ready. Check-in opens at 4:00 PM.\nCheck-in at\n4:00 PM\ntoday\nHi\n[guest]\n, you're all set.\n[home A]\nis ready for you at\n4:00 PM\n— everything you need is below.\n[home A]\n[destination], MT\nGetting in\nAddress\n48 Hope Bay Lane, [destination], MT [verified value]\nDoor code\n[verified value]\nParking\nDriveway fits 2 cars. No permit needed.\nWiFi\nHopeBayCabin\nlakemorning\nWhile you're here\n[destination] Mountain Resort\n15 minutes up Big Mountain Road. Summer lift rides and the alpine slide run daily through Labor Day.\nGlacier National Park\n40 minutes to the West Glacier entrance. Going-to-the-Sun Road is fully open this month — leave before 8 AM to skip the gate line.\nDowntown [destination]\n8 minutes away. Central Avenue for dinner — locals start at Tupelo Grille.\nOpen your trip guide\nNeed anything during your stay? Just reply — we're nearby.\n[host] & the [brand] team\n[brand]\n·\n121 Central Ave, [destination], MT [verified value]\n©\n[verified value]\n[brand]",
+    "source": "email-library/staying/03-check-in-guide.html",
+    "subjectExample": "Check-in at 4:00 PM — your door code is inside",
+    "preheaderExample": "Hope Bay Cabin is ready. Address, code, WiFi, and what to do in Whitefish."
+  },
+  "brian-staying-mid-stay-checkin": {
+    "referenceText": "How's [home A] treating you? We're one reply away.\nHow's the cabin,\n[guest]\n?\nJust checking in — we hope\n[home A]\nis treating you well. If anything isn't exactly right, reply to this email and we'll take care of it today.\nNo news is good news. Either way, we're one reply away.\nQuick reference\nWiFi · HopeBayCabin\nlakemorning\nCheckout\nAugust 18 · 11:00 AM — late checkout is often possible, just ask.\nA tip for today\nLes Mason State Park is 10 minutes north — a quiet pebble beach with the best sunset on [destination] Lake. Stop at Sweet Peaks on Central Ave for huckleberry ice cream on the way.\nOpen your trip guide\n[host] & the [brand] team\n[brand]\n·\n121 Central Ave, [destination], MT [verified value]\n©\n[verified value]\n[brand]",
+    "source": "email-library/staying/04-mid-stay-checkin.html",
+    "subjectExample": "How's the cabin, Sarah?",
+    "preheaderExample": "One reply fixes anything. Plus a tip for today on Whitefish Lake."
+  },
+  "brian-staying-trip-extension": {
+    "referenceText": "[home A] is open for 2 more nights after you check out.\nThe nights after your stay are open\nHi\n[guest]\n, no one has\n[home A]\nafter you.\n2\nnights are open past your\nAugust 18\ncheckout — stay through them and skip packing up.\n[home A]\n[destination], MT\nYour booking\nCurrent · Aug 14 – 18\n4 nights · [verified amount] total\nWith extension · Aug 14 – 20\n6 nights · [verified amount] total\nWhat it adds\n2 nights × [verified amount] · extended-stay rate\n[verified amount]\nCleaning fee · already covered\n[verified amount]\nLodging tax\n[verified amount]\nTotal to add\n[verified amount]\n[verified amount] less per night than these dates cost to book new — this rate only applies to your current reservation.\nAdd these nights\nOr reply and\n[host]\nwill add them to your reservation.\n[host] & the [brand] team\n[brand]\n·\n121 Central Ave, [destination], MT [verified value]\n©\n[verified value]\n[brand]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/staying/05-trip-extension.html",
+    "subjectExample": "Hope Bay Cabin is open after your checkout",
+    "preheaderExample": "2 nights at the extended-stay rate — same keys, no packing up."
+  },
+  "brian-staying-guest-invite": {
+    "referenceText": "You stayed with us at [home A]. Next time, the trip can be yours.\nNext time, make it yours\nHi\n[guest]\n, you joined\n[guest]\n's trip to\n[home A]\n— we're glad you were here.\nWhen you're ready to plan your own escape, book with us directly:\n•\nDirect rates — what you see is the price, no service fees\n•\nOne local team that holds the keys and answers in minutes\n•\nFirst pick of new homes before they reach the big platforms\nHomes our guests come back for\n[home D]\n[destination], MT · 4 bed · 3 bath · Sleeps 8\nfrom [verified amount]/night\n[home B]\n[destination], MT · 5 bed · 4 bath · Sleeps 10\nfrom [verified amount]/night\n[home C]\n[destination] Lake · 3 bed · 2 bath · Sleeps 6\nfrom [verified amount]/night\nBrowse all homes\n[host] & the [brand] team\n[brand]\n·\n121 Central Ave, [destination], MT [verified value]\n©\n[verified value]\n[brand]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/staying/06-guest-invite.html",
+    "subjectExample": "Next time, make it yours",
+    "preheaderExample": "You stayed at Hope Bay Cabin with Sarah. Book your own — direct rates, no service fees."
+  },
+  "brian-after-stay-post-stay-thanks": {
+    "referenceText": "It was a pleasure hosting you at [home A]\nThank you for staying\nHi\n[guest]\n,\nWe hope the week at\n[home A]\ntreated you well. It was a pleasure having you.\n[home A]\n[destination], MT · 4 bed · 3 bath · Sleeps 8\nYour stay\n[home A] · Jul 10–17 · 7 nights\nIf anything about the home or the stay wasn't right, reply to this email — it comes straight to us, and we read every one.\nWhen you're ready for the next one, booking direct always gets our best rate.\nBrowse open dates\n[host] & the [brand] team\nFind your happy place ®\n©\n[verified value]\n[brand]\n[brand]\n·\n121 Central Ave, [destination], MT [verified value]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/after-stay/01-post-stay-thanks.html",
+    "subjectExample": "Thank you for staying with us, Sarah",
+    "preheaderExample": "It was a pleasure hosting you at Hope Bay Cabin."
+  },
+  "brian-after-stay-post-stay-return": {
+    "referenceText": "Midweek stays in September and October run 15–20% below summer pricing.\nThe valley turns gold in October\nHi\n[guest]\n,\nSummer gets the attention, but locals know fall is when the valley shows off — golden larches, quiet trails, and the lake nearly to yourself.\n[home D]\n[destination], MT · 4 bed · 3 bath · Sleeps 8 · from [verified amount]/night\nA favorite for fall — fire-pit evenings and trailheads out the back door.\nFall rates\nMidweek stays in September and October run 15–20% below summer pricing.\nSee fall availability\n[host] & the [brand] team\nFind your happy place ®\n©\n[verified value]\n[brand]\n[brand]\n·\n121 Central Ave, [destination], MT [verified value]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/after-stay/02-post-stay-return.html",
+    "subjectExample": "Whitefish in the fall is a different place",
+    "preheaderExample": "Golden larches, quiet trails, and midweek rates well below summer."
+  },
+  "brian-after-stay-survey-invite": {
+    "referenceText": "6 questions, about 2 minutes. Your answers go straight to the team that hosts you.\nHow was your stay?\nHi\n[guest]\n,\nYou checked out of [home A] a few days ago. We'd love to know how it went — what worked, and what we should do better.\nWhat to expect\n6 questions, about 2 minutes. Your answers go straight to the team that hosts you.\nShare your thoughts\nPrefer to just tell us? Reply to this email — it reaches a person, not a queue.\n[host] & the [brand] team\nFind your happy place ®\n©\n[verified value]\n[brand]\n[brand]\n·\n121 Central Ave, [destination], MT [verified value]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/after-stay/03-survey-invite.html",
+    "subjectExample": "How was your stay at Hope Bay Cabin?",
+    "preheaderExample": "6 questions, about 2 minutes — it shapes how we host."
+  },
+  "brian-after-stay-survey-follow-up": {
+    "referenceText": "Your survey notes, put to work\nYou said, we did\nHi\n[guest]\n,\nThank you for the survey notes. Feedback like yours is how the homes get better — here's what has already changed.\nYou said: the check-in code arrived late\nDoor codes now go out 48 hours before every arrival.\nYou said: better coffee\nA pour-over and a local [destination] roast are now standard in every kitchen.\nYou said: the hot tub cover was heavy\nReplaced at [home A] with a lighter hydraulic one.\nKeep it coming — reply to this email anytime.\nBook your next stay\n[host] & the [brand] team\nFind your happy place ®\n©\n[verified value]\n[brand]\n[brand]\n·\n121 Central Ave, [destination], MT [verified value]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/after-stay/04-survey-follow-up.html",
+    "subjectExample": "You said, we did",
+    "preheaderExample": "Three things changed because of your survey notes."
+  },
+  "brian-after-stay-review-referral": {
+    "referenceText": "A 2-minute review helps more than you know\nA small favor\nHi\n[guest]\n,\nReviews from real guests are how a small collection like ours earns trust. If [home A] earned yours, 2 minutes on Google goes a long way.\nLeave a review\nAnd bring someone next time\nKnow someone who'd love it here? Share your link — they get [verified amount] off a first stay, and you get a [verified amount] credit when they check out.\nShare\n[brand]\n[host] & the [brand] team\nFind your happy place ®\n©\n[verified value]\n[brand]\n[brand]\n·\n121 Central Ave, [destination], MT [verified value]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/after-stay/05-review-referral.html",
+    "subjectExample": "A small favor, Sarah",
+    "preheaderExample": "2 minutes on Google goes a long way for a small collection like ours."
+  },
+  "brian-after-stay-canceled-follow-up": {
+    "referenceText": "Your refund is on its way — and the door stays open\nPlans change — no trouble at all\nHi\n[guest]\n,\nYour booking at [home D] is canceled, and your refund is on its way.\nCanceled booking\n[home D] · Aug 14–17 · 3 nights\nRefund\n[verified amount]\nto your original card, within 5–7 business days.\nAs of today those dates are still open. If plans come back together, rebooking takes about a minute.\nRebook [home D]\n[host] & the [brand] team\nFind your happy place ®\n©\n[verified value]\n[brand]\n[brand]\n·\n121 Central Ave, [destination], MT [verified value]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/after-stay/06-canceled-follow-up.html",
+    "subjectExample": "Sorry we'll miss you this time",
+    "preheaderExample": "Your refund is on its way — and the door stays open."
+  },
+  "brian-after-stay-stay-again": {
+    "referenceText": "Sat, Jul 10, [verified value] – Sat, Jul 17, [verified value] at [home A] just opened for next year\nThe same week is open again\nHi\n[guest]\n,\nLast July you spent a week at [home A]. The same week just opened for next summer.\n[home A]\n[destination], MT · 4 bed · 3 bath · Sleeps 8\nYour dates next year\nSat, Jul 10, [verified value]\n–\nSat, Jul 17, [verified value]\nYour rate, held\n7 nights × [verified amount]\n[verified amount]\nYour [verified value] rate, held through Oct 1\n[verified amount] / night\nAfter Oct 1, next summer's rate applies — currently [verified amount] a night.\nSame home, same week. Everything else is handled.\nReserve your week\n[host] & the [brand] team\nFind your happy place ®\n©\n[verified value]\n[brand]\n[brand]\n·\n121 Central Ave, [destination], MT [verified value]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/after-stay/07-stay-again.html",
+    "subjectExample": "Your week at Hope Bay Cabin is open again",
+    "preheaderExample": "Jul 10–17 next summer just opened — same home, your rate held."
+  },
+  "brian-after-stay-flash-rebook": {
+    "referenceText": "Same week next year at [home A], this year's price\nRebook your stay at today's price\nHi\n[guest]\n,\nYou just checked out of [home A]. If you want the same week next summer, reserve it now and keep this year's price.\n[home A]\n[destination], MT · 4 bed · 3 bath · Sleeps 8\nThis year's price, next year's week\nJul 10–17, [verified value] · 7 nights\n[verified amount]\n[verified value] rate, locked\n[verified amount] / night\nNext summer's listed rate is [verified amount] a night — locking now saves [verified amount]\nOffer window\nGood for 72 hours — until Sunday, Jul 20 at 11:59 PM MT.\nReserve for\n[verified value]\nFind your happy place ®\n©\n[verified value]\n[brand]\n[brand]\n·\n121 Central Ave, [destination], MT [verified value]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/after-stay/08-flash-rebook.html",
+    "subjectExample": "Rebook your week at today's price",
+    "preheaderExample": "Same week next summer, this year's pricing — good for 72 hours."
+  },
+  "brian-after-stay-winback-lapsed": {
+    "referenceText": "Two homes have joined the collection since — both minutes from [destination] Lake.\nIt's been a while\nHi\nJordan\n,\nYour last stay with us was in the summer of [verified value].\nTwo homes have joined the collection since — both minutes from [destination] Lake.\n[home B]\n[destination], MT · 5 bed · 4 bath · Sleeps 10 · from [verified amount]/night\n[home C]\n[destination] Lake · 3 bed · 2 bath · Sleeps 6 · from [verified amount]/night\nWelcome back\n10% off your next stay when you book direct — applied automatically at checkout through Sep 30.\nYour next stay is waiting when you are.\nSee what's new\n[host] & the [brand] team\nFind your happy place ®\n©\n[verified value]\n[brand]\n[brand]\n·\n121 Central Ave, [destination], MT [verified value]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/after-stay/09-winback-lapsed.html",
+    "subjectExample": "It's been a while, Jordan",
+    "preheaderExample": "Two homes joined Bluewater Haven since your last stay — and 10% off direct bookings."
+  },
+  "brian-after-stay-stay-anniversary": {
+    "referenceText": "One year since [home A]\nOne year ago today\nHi\n[guest]\n,\nA year ago today you were checking into [home A]. We hope the week left a good mark.\n[home A]\n[destination], MT · 4 bed · 3 bath · Sleeps 8\nYour week, last year\nJul 10–17 · 7 nights · [home A]\nIf it's time for another, the calendar is open — same week, or a new season entirely.\nFind your week\n[host] & the [brand] team\nFind your happy place ®\n©\n[verified value]\n[brand]\n[brand]\n·\n121 Central Ave, [destination], MT [verified value]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/after-stay/10-stay-anniversary.html",
+    "subjectExample": "One year ago today",
+    "preheaderExample": "You were checking into Hope Bay Cabin."
+  },
+  "brian-after-stay-vip": {
+    "referenceText": "A few things are now simply yours\nFor our regulars\nHi\n[guest]\n,\nThat was your 3rd stay with us. Guests like you are why we do this, so a few things are now simply yours.\nEarly access\nNew homes and peak weeks, 7 days before anyone else.\nLate checkout\nNoon checkout on every stay, automatic.\nDirect line\n[host]'s cell now rides along on every booking confirmation.\nNo program to join, nothing to track — it's just how we host you now.\nSee what's opening this fall\n[host] & the [brand] team\nFind your happy place ®\n©\n[verified value]\n[brand]\n[brand]\n·\n121 Central Ave, [destination], MT [verified value]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/after-stay/11-vip.html",
+    "subjectExample": "A thank-you from Bluewater Haven",
+    "preheaderExample": "Three stays in — a few things are now simply yours."
+  },
+  "brian-after-stay-wishlist-price-drop": {
+    "referenceText": "[home B] is now [verified amount] a night\nA home you saved just dropped in price\nHi\n[guest]\n,\nYou saved [home B] in June. The nightly rate for fall dates just came down.\n[verified amount]\n/ night\n[home B]\n[destination], MT · 5 bed · 4 bath · Sleeps 10\nThe new math\nNightly rate in June\n[verified amount]\nNightly rate now\n[verified amount]\nSep 10–13 · 3 nights\n[verified amount]\nYou save\n[verified amount]\nAvailability\nThose September dates are open now. Fall weekends at the new rate are first come, first served.\nBook at the new rate\nFind your happy place ®\n©\n[verified value]\n[brand]\n[brand]\n·\n121 Central Ave, [destination], MT [verified value]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/after-stay/12-wishlist-price-drop.html",
+    "subjectExample": "Price drop: Cedar Ridge Lodge",
+    "preheaderExample": "The home you saved is now $610 a night for fall dates."
+  },
+  "brian-after-stay-wishlist-back-available": {
+    "referenceText": "[home C] has open dates again\nA home you saved has open dates\nHi\n[guest]\n,\n[home C] books out most of the summer. You saved it back in May, and a September window just opened.\n[home C]\n[destination] Lake · 3 bed · 2 bath · Sleeps 6 · from [verified amount]/night\nNow open\nSep 18–25 · up to 7 nights · from [verified amount] a night\nSeptember on the lake is the quiet season — warm days, empty water.\nSee the open dates\nFind your happy place ®\n©\n[verified value]\n[brand]\n[brand]\n·\n121 Central Ave, [destination], MT [verified value]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/after-stay/13-wishlist-back-available.html",
+    "subjectExample": "Driftwood House just opened for September",
+    "preheaderExample": "The lakefront home you saved has open dates again."
+  },
+  "brian-after-stay-referral-invite": {
+    "referenceText": "[verified amount] off off their first stay, [verified amount] credit for you\nShare [brand]\nHi\n[guest]\n,\nMost of our guests found us through someone who had already stayed. If you know the next one, we'd like to make the introduction easy.\nHow it works\nYour friend's first stay\n[verified amount] off\nYour credit when they check out\n[verified amount]\nCredits stack with no cap, and they never expire.\nShare your link\n[host] & the [brand] team\nFind your happy place ®\n©\n[verified value]\n[brand]\n[brand]\n·\n121 Central Ave, [destination], MT [verified value]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/after-stay/14-referral-invite.html",
+    "subjectExample": "Give a week on the lake, get $100",
+    "preheaderExample": "$100 off their first stay, a $100 credit for you."
+  },
+  "brian-after-stay-make-an-offer": {
+    "referenceText": "Open midweek dates at [home B] — name your rate\nMake us an offer\nHi\n[guest]\n,\nSome weeks the calendar has gaps, and we'd rather host you than let a home sit dark. For open midweek dates, tell us what works and we'll meet you where we can.\n[home B]\n[destination], MT · 5 bed · 4 bath · Sleeps 10\nOpen midweeks\nOct 5–8 and Oct 12–15 · listed at [verified amount] a night · offers considered from [verified amount]\nMake an offer\nFind your happy place ®\n©\n[verified value]\n[brand]\n[brand]\n·\n121 Central Ave, [destination], MT [verified value]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/after-stay/15-make-an-offer.html",
+    "subjectExample": "Name your rate for the quiet weeks",
+    "preheaderExample": "Open midweek dates at Cedar Ridge Lodge — make us an offer."
+  },
+  "brian-after-stay-use-your-credits": {
+    "referenceText": "[verified amount] on your account — it applies automatically\nYour credits are waiting\nHi\n[guest]\n,\nYour referral credit came through when Dana checked out last week. It's on your account now.\n[verified amount]\nCredit balance\n[verified amount] · applies automatically at checkout · never expires.\nPut it toward a stay\n[host] & the [brand] team\nFind your happy place ®\n©\n[verified value]\n[brand]\n[brand]\n·\n121 Central Ave, [destination], MT [verified value]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/after-stay/16-use-your-credits.html",
+    "subjectExample": "You have $200 waiting",
+    "preheaderExample": "Referral credits on your account — they apply automatically."
+  },
+  "brian-broadcasts-open-spots-this-month": {
+    "referenceText": "Every open window across our four homes this month\nJuly, at a glance\nHi\n[guest]\n,\nOne email, the whole month — every open window across our four homes, as of this morning. July in [destination] books quickly; these are the dates left.\n[home D]\nJul 21–26 · 4 bed · Sleeps 8\nFrom [verified amount]/night\nAlso open in July\n[home A]\nJul 17–20 · Jul 28–31\nFrom [verified amount]/night\n[home B]\nJul 18–21\nFrom [verified amount]/night\n[home C]\nJul 17–19 · Jul 24–27\nFrom [verified amount]/night\nSee July availability\n[brand] · 121 Central Ave, [destination], MT [verified value]\n©\n[verified value]\n[brand]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/broadcasts/01-open-spots-this-month.html",
+    "subjectExample": "July, at a glance",
+    "preheaderExample": "Every open window across our four homes this month"
+  },
+  "brian-broadcasts-last-minute-availability": {
+    "referenceText": "Jul 17–20 at [home A] · From [verified amount]/night\nA few nights just opened up\nHi\n[guest]\n,\nCancellations happen. This week they're in your favor — three homes have nights open Jul 17–20, including a few we rarely see free in July.\n[home A]\nJul 17–20 · 4 bed · Sleeps 8\nFrom [verified amount]/night\nAlso open this week\n[home B]\nJul 18–21\nFrom [verified amount]/night\n[home C]\nJul 17–19\nFrom [verified amount]/night\nSee open dates\n[brand] · 121 Central Ave, [destination], MT [verified value]\n©\n[verified value]\n[brand]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/broadcasts/02-last-minute-availability.html",
+    "subjectExample": "A few nights just opened up",
+    "preheaderExample": "Jul 17–20 at Hope Bay Cabin · From $540/night"
+  },
+  "brian-broadcasts-new-listing": {
+    "referenceText": "[home D] · [destination], MT · 4 bed · 3 bath · Sleeps 8\nNew to the collection: [home D]\nHi\n[guest]\n,\nWe just added [home D] to the collection. Wanted you to see it first.\n[home D]\n[destination], MT · 4 bed · 3 bath · Sleeps 8\nFrom [verified amount]/night\nTen minutes from downtown [destination], with floor-to-ceiling glass, a private bend of the creek, and mountain views from every room. Summer dates are open now.\nView property\n[brand] · 121 Central Ave, [destination], MT [verified value]\n©\n[verified value]\n[brand]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/broadcasts/03-new-listing.html",
+    "subjectExample": "New to the collection: Bear Creek",
+    "preheaderExample": "Bear Creek · Whitefish, MT · 4 bed · Sleeps 8"
+  },
+  "brian-broadcasts-new-site-launch": {
+    "referenceText": "Book any of our homes directly at [booking site]\nOur new booking site is live\nHi\n[guest]\n,\nWe built a home of our own on the internet. Starting today, you can book any of our four homes directly at [booking site] — no middleman, no service fees.\nBest rates, always\nBooking direct always beats the platforms — the price you see is ours, with no service fees added.\nLive availability\nReal-time calendars for all four homes, in one place.\nA real person on the other end\n[host] and the team confirm every booking personally.\nVisit the new site\n[host] & the [brand] team\n[brand] · 121 Central Ave, [destination], MT [verified value]\n©\n[verified value]\n[brand]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/broadcasts/04-new-site-launch.html",
+    "subjectExample": "Our new booking site is live",
+    "preheaderExample": "Book any of our homes directly at bluewaterhaven.com"
+  },
+  "brian-broadcasts-best-booked-homes": {
+    "referenceText": "[home A] · [home B] · [home C]\nThe homes guests book most\nHi\n[guest]\n,\nEvery season has its favorites. These are the three homes guests book most — and all three still have late-summer nights open.\n[home A]\n[destination], MT · 4 bed · 3 bath · Sleeps 8\nFrom [verified amount]/night\nBooked 41 nights this summer. The sunset view from the deck is the reason guests come back.\n[home B]\n[destination], MT · 5 bed · 4 bath · Sleeps 10\nFrom [verified amount]/night\nOur largest home, and the first to fill for the holidays. Groups tend to rebook it a year out.\n[home C]\n[destination] Lake · 3 bed · 2 bath · Sleeps 6\nFrom [verified amount]/night\nPrivate dock, morning swims, and the calmest water on the lake. Guests who stay once make it a tradition.\nCheck availability\n[brand] · 121 Central Ave, [destination], MT [verified value]\n©\n[verified value]\n[brand]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/broadcasts/05-best-booked-homes.html",
+    "subjectExample": "The homes guests book most",
+    "preheaderExample": "Hope Bay Cabin · Cedar Ridge Lodge · Driftwood House"
+  },
+  "brian-broadcasts-seasonal-availability": {
+    "referenceText": "August at the lake — the windows still open across our homes\nThe last open weeks of summer\nHi\n[guest]\n,\n[destination] is at its best in August — long evenings, warm water, quiet trails. These are the weeks still open across the collection.\n[home C]\nAug 1–7 · 3 bed · Sleeps 6\nFrom [verified amount]/night\nAlso open in August\n[home A]\nAug 3–9 · Aug 24–31\nFrom [verified amount]/night\n[home B]\nAug 10–16\nFrom [verified amount]/night\n[home D]\nAug 12–18 · Aug 28–31\nFrom [verified amount]/night\nPlan an August stay\n[brand] · 121 Central Ave, [destination], MT [verified value]\n©\n[verified value]\n[brand]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/broadcasts/06-seasonal-availability.html",
+    "subjectExample": "The last open weeks of summer",
+    "preheaderExample": "August at the lake — the windows still open across our homes"
+  },
+  "brian-broadcasts-peak-week-filling-up": {
+    "referenceText": "Dec 19–26 · [home B] and [home A] still open\nChristmas week is filling\nHi\n[guest]\n,\nEvery year, the holiday week goes first. Two of our four homes are already booked for Dec 19–26 — these two still have the week open.\n[home B]\nDec 19–26 · 5 bed · Sleeps 10\nFrom [verified amount]/night\nAlso open Dec 19–26\n[home A]\nDec 19–26 · Sleeps 8\nFrom [verified amount]/night\nSee holiday availability\n[brand] · 121 Central Ave, [destination], MT [verified value]\n©\n[verified value]\n[brand]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/broadcasts/07-peak-week-filling-up.html",
+    "subjectExample": "Christmas week: 2 of 4 homes left",
+    "preheaderExample": "Dec 19–26 · Cedar Ridge Lodge and Hope Bay Cabin still open"
+  },
+  "brian-broadcasts-price-value-update": {
+    "referenceText": "Sunday–Thursday rates are down across all four homes\nSeptember midweek, quietly lower\nHi\n[guest]\n,\nWe set September midweek rates lower across all four homes — same stays, quieter town, better price. Sunday through Thursday nights, all month.\nSeptember midweek, per night\n[home D]\nWas [verified amount]\nNow [verified amount]/night\n[home A]\nWas [verified amount]\nNow [verified amount]/night\n[home B]\nWas [verified amount]\nNow [verified amount]/night\n[home C]\nWas [verified amount]\nNow [verified amount]/night\nSee September rates\n[brand] · 121 Central Ave, [destination], MT [verified value]\n©\n[verified value]\n[brand]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/broadcasts/08-price-value-update.html",
+    "subjectExample": "September midweek, quietly lower",
+    "preheaderExample": "Sunday–Thursday rates are down across all four homes"
+  },
+  "brian-broadcasts-new-amenity": {
+    "referenceText": "Cedar, steam, and the same famous sunset — steps off the deck\nThere's a hot tub at [home A] now\nHi\n[guest]\n,\nWe spent the spring adding the thing guests asked for most. The cedar hot tub at [home A] is in — steps off the back deck, facing the sunset the home is known for.\n[home A]\n[destination], MT · 4 bed · Sleeps 8\nFrom [verified amount]/night\nSee the home\n[brand] · 121 Central Ave, [destination], MT [verified value]\n©\n[verified value]\n[brand]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/broadcasts/09-new-amenity.html",
+    "subjectExample": "There's a hot tub at Hope Bay Cabin now",
+    "preheaderExample": "Cedar, steam, and the same famous sunset — steps off the deck"
+  },
+  "brian-broadcasts-imported-guest-launch": {
+    "referenceText": "Same homes, same care — now bookable directly\nYour next stay, straight from us\nHi\n[guest]\n,\nYou've stayed with us before through Airbnb or Vrbo. We now take bookings directly at [booking site] — same homes, same care, better rates.\nLower total price\nNo platform service fees when you book direct.\nYou're already set up\nYour stay history carries over — no new account needed.\nSame team\n[host] and the team, one message away, before and during your stay.\nBook your next stay\n[host] & the [brand] team\n[brand] · 121 Central Ave, [destination], MT [verified value]\n©\n[verified value]\n[brand]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/broadcasts/10-imported-guest-launch.html",
+    "subjectExample": "Your next stay, straight from us",
+    "preheaderExample": "Same homes, same care — now bookable directly"
+  },
+  "brian-broadcasts-local-event": {
+    "referenceText": "Jul 17–19 in [destination] — two homes still have festival nights\nIn town for Under the Big Sky?\nHi\n[guest]\n,\n[destination] hosts Under the Big Sky on Jul 17–19. Our homes are a 10–15 minute drive from the grounds, and two still have festival nights open.\n[home A]\nJul 17–20 · 4 bed · Sleeps 8\nFrom [verified amount]/night\nAlso open festival weekend\n[home C]\nJul 17–19 · Sleeps 6\nFrom [verified amount]/night\nSee festival dates\n[brand] · 121 Central Ave, [destination], MT [verified value]\n©\n[verified value]\n[brand]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/broadcasts/11-local-event.html",
+    "subjectExample": "In town for Under the Big Sky?",
+    "preheaderExample": "Jul 17–19 in Whitefish — two homes still have festival nights"
+  },
+  "brian-broadcasts-dormant-reengagement": {
+    "referenceText": "A new home on the creek, and a simpler way to book\nIt's been a while\nHi\nJordan\n,\nThe lake hasn't changed. A few things here have — [home D] joined the collection this spring, and you can now book every home directly at [booking site].\n[home D]\n[destination], MT · 4 bed · Sleeps 8\nFrom [verified amount]/night\nFloor-to-ceiling glass, a private bend of the creek, and ten minutes to downtown.\nSee what's new\n[brand] · 121 Central Ave, [destination], MT [verified value]\n©\n[verified value]\n[brand]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/broadcasts/12-dormant-reengagement.html",
+    "subjectExample": "It's been a while",
+    "preheaderExample": "A new home on the creek, and a simpler way to book"
+  },
+  "brian-broadcasts-newsletter-brand-update": {
+    "referenceText": "A new home on the creek, festival weekend, and the weeks we love\nNotes from the lake — July\nHi\n[guest]\n,\nJuly in [destination] moves fast. Here's what's new at [brand], and what's worth planning around.\nNew to the collection\n[home D]\n[destination], MT · 4 bed · 3 bath · Sleeps 8\nFrom [verified amount]/night\nOur fourth home — floor-to-ceiling glass on a private bend of the creek, ten minutes from downtown.\nWorth planning around\nUnder the Big Sky · Jul 17–19\n[destination]'s festival weekend. Two homes still have nights open.\nChristmas week\nDec 19–26 is already half booked across the collection — earlier than any year we've run.\nFrom [host]\nWe rebuilt the dock at [home C] this spring, and the huckleberries came early this year. If you're here in August, the trail behind Cedar Ridge is the one to do before breakfast.\n[host] & the [brand] team\nSee open dates\n[brand] · 121 Central Ave, [destination], MT [verified value]\n©\n[verified value]\n[brand]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/broadcasts/13-newsletter-brand-update.html",
+    "subjectExample": "Notes from the lake — July",
+    "preheaderExample": "A new home on the creek, festival weekend, and the weeks we love"
+  },
+  "brian-holidays-birthday": {
+    "referenceText": "10% off at any [brand] home during your birthday month\nA birthday getaway\nHi\n[guest]\n,\nYour birthday's a good reason to go somewhere. August is yours — pick a home, bring your people, and we'll have it ready when you arrive.\nYour birthday month\n10% off\nany stay of 2 nights or more, at any [brand] home. Applied automatically when you book dates in August.\n[home A]\n[destination], MT · 4 bed · 3 bath · Sleeps 8\nFrom [verified amount]/night\nSunset from the deck, and downtown [destination] 10 minutes away.\nPlan your birthday stay\nQuestions? Just reply — we're here.\n[host] & the [brand] team\nFind your happy place ®\n©\n[verified value]\n[brand]\n[brand]\n·\n121 Central Ave, [destination], MT [verified value]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/holidays/01-birthday.html",
+    "subjectExample": "A birthday getaway, Sarah",
+    "preheaderExample": "10% off any stay in your birthday month — at any Bluewater Haven home."
+  },
+  "brian-holidays-new-years": {
+    "referenceText": "Dec 30 – Jan 2 is open at [home B] — bring everyone.\nStart the year up here\nHi\n[guest]\n,\nThere are two ways to see the year out — a crowded room, or a quiet lodge with the people you actually want there. [home B] is open for New Year's, with room for 10.\n[home B]\n[destination], MT · 5 bed · 4 bath · Sleeps 10\nFrom [verified amount]/night\nThe fire going, dinner running long, and no one driving anywhere at midnight.\nOpen for New Year's\nWed, Dec 30 – Sat, Jan 2 · 3 nights · up to 10 guests\nThe last nights of the year are the first to go.\nBook New Year's\n[host] & the [brand] team\nFind your happy place ®\n©\n[verified value]\n[brand]\n[brand]\n·\n121 Central Ave, [destination], MT [verified value]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/holidays/02-new-years.html",
+    "subjectExample": "Start the year up here",
+    "preheaderExample": "Dec 30 – Jan 2 is open at Cedar Ridge Lodge — bring everyone."
+  },
+  "brian-holidays-valentines-day": {
+    "referenceText": "Feb 12–15 is open at [home D] — a quiet weekend for 2.\nValentine's, without the dinner rush\nHi\n[guest]\n,\nDinner reservations are one way to do it. A weekend in the mountains is another. [home D] is open over Valentine's — cook together, stay in, and let the weekend go slow.\n[home D]\n[destination], MT · 4 bed · 3 bath · Sleeps 8\nFrom [verified amount]/night\nFloor-to-ceiling windows, a long table for 2, and nothing on the calendar.\nOpen over Valentine's\nFri, Feb 12 – Mon, Feb 15 · 3 nights\nFebruary weekends are quiet here. That's the point.\nBook the weekend\n[host] & the [brand] team\nFind your happy place ®\n©\n[verified value]\n[brand]\n[brand]\n·\n121 Central Ave, [destination], MT [verified value]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/holidays/03-valentines-day.html",
+    "subjectExample": "Valentine's, without the dinner rush",
+    "preheaderExample": "Feb 12–15 is open at Bear Creek — a quiet weekend for 2."
+  },
+  "brian-holidays-easter": {
+    "referenceText": "Mar 26–29 is open at [home C] — spring's first long weekend.\nEaster weekend on the lake\nHi\n[guest]\n,\nSpring reaches the lake in late March. [home C] is open for Easter weekend — brunch that runs past noon, and the first warm afternoons on the dock.\n[home C]\n[destination] Lake · 3 bed · 2 bath · Sleeps 6\nFrom [verified amount]/night\nA flat lawn down to the water, and the quietest stretch of the lake.\nOpen over Easter\nFri, Mar 26 – Mon, Mar 29 · 3 nights · up to 6 guests\nThe first warm weekend of the year rarely stays open.\nBook Easter weekend\n[host] & the [brand] team\nFind your happy place ®\n©\n[verified value]\n[brand]\n[brand]\n·\n121 Central Ave, [destination], MT [verified value]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/holidays/04-easter.html",
+    "subjectExample": "Easter weekend on the lake",
+    "preheaderExample": "Mar 26–29 is open at Driftwood House — spring's first long weekend."
+  },
+  "brian-holidays-mothers-day": {
+    "referenceText": "May 7–10 is open at [home A] — a weekend she doesn't have to plan.\nGive her the quiet\nHi\n[guest]\n,\nShe plans everything, all year. Mother's Day weekend at [home A] is the other way around — breakfast made for her, a deck with a view, and nothing she has to organize.\n[home A]\n[destination], MT · 4 bed · 3 bath · Sleeps 8\nFrom [verified amount]/night\nCoffee on the deck, and the mountains do the rest.\nOpen for Mother's Day\nFri, May 7 – Mon, May 10 · 3 nights · up to 8 guests\nShe'd never book it for herself. That's what you're for.\nBook her weekend\n[host] & the [brand] team\nFind your happy place ®\n©\n[verified value]\n[brand]\n[brand]\n·\n121 Central Ave, [destination], MT [verified value]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/holidays/05-mothers-day.html",
+    "subjectExample": "Give her the quiet",
+    "preheaderExample": "May 7–10 is open at Hope Bay Cabin — a weekend she doesn't have to plan."
+  },
+  "brian-holidays-memorial-day": {
+    "referenceText": "May 28–31 is open at [home B] — room for the whole crew.\nThe first long weekend of summer\nHi\n[guest]\n,\nMemorial Day is the unofficial start of summer up here — the lake warms up, the trails clear, and the first long weekend belongs to whoever books it. [home B] is open, with room for 10.\n[home B]\n[destination], MT · 5 bed · 4 bath · Sleeps 10\nFrom [verified amount]/night\nRoom for 10, one long table, and the season's first barbecue.\nOpen over Memorial Day\nFri, May 28 – Mon, May 31 · 3 nights · up to 10 guests\nSummer weekends go first. This is the first one.\nBook Memorial Day\n[host] & the [brand] team\nFind your happy place ®\n©\n[verified value]\n[brand]\n[brand]\n·\n121 Central Ave, [destination], MT [verified value]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/holidays/06-memorial-day.html",
+    "subjectExample": "The first long weekend of summer",
+    "preheaderExample": "May 28–31 is open at Cedar Ridge Lodge — room for the whole crew."
+  },
+  "brian-holidays-fathers-day": {
+    "referenceText": "Jun 18–21 is open at [home D] — the grill, the creek, zero plans.\nHis kind of weekend\nHi\n[guest]\n,\nFather's Day doesn't need a big production. [home D] is open that weekend — the grill on the back deck, the creek down the hill, and a Sunday with nothing on it.\n[home D]\n[destination], MT · 4 bed · 3 bath · Sleeps 8\nFrom [verified amount]/night\nThe kind of quiet he pretends he doesn't want.\nOpen for Father's Day\nFri, Jun 18 – Mon, Jun 21 · 3 nights · up to 8 guests\nHe won't plan it — that part's yours.\nBook his weekend\n[host] & the [brand] team\nFind your happy place ®\n©\n[verified value]\n[brand]\n[brand]\n·\n121 Central Ave, [destination], MT [verified value]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/holidays/07-fathers-day.html",
+    "subjectExample": "His kind of weekend",
+    "preheaderExample": "Jun 18–21 is open at Bear Creek — the grill, the creek, zero plans."
+  },
+  "brian-holidays-fourth-of-july": {
+    "referenceText": "Jul 2–6 is open at [home C] — from [verified amount] a night.\nFireworks over the lake\nHi\n[guest]\n,\nThe Fourth is three weeks out, and the long weekend is filling in. [home C] still has the holiday stretch open — right on [destination] Lake, with the fireworks over the water from the end of the dock.\n[home C]\n[destination] Lake · 3 bed · 2 bath · Sleeps 6\nFrom [verified amount]/night\nBooked most weekends this summer — the Fourth is the one still open.\nOpen over the Fourth\nFri, Jul 2 – Tue, Jul 6 · 4 nights · up to 6 guests\nLong weekends on the lake don't stay open long.\nBook the Fourth\n[host] & the [brand] team\nFind your happy place ®\n©\n[verified value]\n[brand]\n[brand]\n·\n121 Central Ave, [destination], MT [verified value]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/holidays/08-fourth-of-july.html",
+    "subjectExample": "Fireworks over the lake",
+    "preheaderExample": "Jul 2–6 is open at Driftwood House — from $390 a night."
+  },
+  "brian-holidays-labor-day": {
+    "referenceText": "Sep 4–7 is open at [home A] — the season's last long weekend.\nOne more summer weekend\nHi\n[guest]\n,\nSummer gets one more long weekend before the larches turn. [home A] is open over Labor Day — warm afternoons, cool nights, and the summer crowds already gone.\n[home A]\n[destination], MT · 4 bed · 3 bath · Sleeps 8\nFrom [verified amount]/night\nSeptember light is the best light of the year up here.\nOpen over Labor Day\nFri, Sep 4 – Mon, Sep 7 · 3 nights · up to 8 guests\nThe last weekend of summer is the easiest one to miss.\nBook Labor Day\n[host] & the [brand] team\nFind your happy place ®\n©\n[verified value]\n[brand]\n[brand]\n·\n121 Central Ave, [destination], MT [verified value]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/holidays/09-labor-day.html",
+    "subjectExample": "One more summer weekend",
+    "preheaderExample": "Sep 4–7 is open at Hope Bay Cabin — the season's last long weekend."
+  },
+  "brian-holidays-thanksgiving": {
+    "referenceText": "Nov 25–29 is open at [home B] — sleeps 10, one long table.\nThanksgiving with room for everyone\nHi\n[guest]\n,\nHosting Thanksgiving is a lot — unless the kitchen is big enough, the table is long enough, and nobody has to sleep on a couch. [home B] is open for the holiday week, with room for 10.\n[home B]\n[destination], MT · 5 bed · 4 bath · Sleeps 10\nFrom [verified amount]/night\nA kitchen built for the big meal, and mountains out every window.\nOpen for Thanksgiving\nWed, Nov 25 – Sun, Nov 29 · 4 nights · up to 10 guests\nThanksgiving books earlier than any week of the year.\nBook Thanksgiving week\n[host] & the [brand] team\nFind your happy place ®\n©\n[verified value]\n[brand]\n[brand]\n·\n121 Central Ave, [destination], MT [verified value]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/holidays/10-thanksgiving.html",
+    "subjectExample": "Thanksgiving with room for everyone",
+    "preheaderExample": "Nov 25–29 is open at Cedar Ridge Lodge — sleeps 10, one long table."
+  },
+  "brian-holidays-christmas": {
+    "referenceText": "Dec 23–27 is open at [home D] — snow, spruce, and a real fireplace.\nChristmas in the mountains\nHi\n[guest]\n,\nSome years, the best gift is getting everyone out of the house. [home D] is open over Christmas — snow on the spruce, a fire going, and 4 days that feel further away than they are.\n[home D]\n[destination], MT · 4 bed · 3 bath · Sleeps 8\nFrom [verified amount]/night\n4 bedrooms, a real fire, and [destination] lit up 10 minutes away.\nOpen over Christmas\nWed, Dec 23 – Sun, Dec 27 · 4 nights · up to 8 guests\nIf this is the year, the dates are open now.\nBook Christmas week\n[host] & the [brand] team\nFind your happy place ®\n©\n[verified value]\n[brand]\n[brand]\n·\n121 Central Ave, [destination], MT [verified value]\nIf you no longer want to receive our emails, you can\nunsubscribe\n.",
+    "source": "email-library/holidays/11-christmas.html",
+    "subjectExample": "Christmas in the mountains",
+    "preheaderExample": "Dec 23–27 is open at Bear Creek — snow, spruce, and a real fireplace."
+  }
+}

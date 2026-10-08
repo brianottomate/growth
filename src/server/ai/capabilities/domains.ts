@@ -537,6 +537,7 @@ export const emailRead = growthDomainTool({
     sequenceStatus,
     previewSequence,
     get: EMAIL_TOOLS.getEmailDraft,
+    listTemplates: EMAIL_TOOLS.listEmailTemplates,
     audiences: listEmailAudiencesAction,
     previewAudience: previewEmailAudienceAction,
     audienceSnapshot: emailAudienceSnapshotAction,

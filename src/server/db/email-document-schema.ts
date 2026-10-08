@@ -25,6 +25,7 @@ export type EmailDocumentSnapshot = {
   ctaLabel: string | null;
   ctaUrl: string | null;
   templateKey: string;
+  recipeId?: string | null;
   handoffTargetRepo: string | null;
   productUpdate?: ProductUpdateContext | null;
   /** Structured property-digest payload; see lib/listings-digest.ts. */

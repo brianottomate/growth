@@ -7,6 +7,8 @@ import {
   brandTable,
   memberTable,
   platformPostTable,
+  emailSequenceTable,
+  emailSequenceStepTable,
 } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { displayPoster } from "@/lib/utils/media";
@@ -20,6 +22,9 @@ export default async function CalendarPage({
     pillar?: string;
     y?: string;
     m?: string;
+    platform?: string;
+    source?: string;
+    kind?: string;
   }>;
 }) {
   const session = await getSession();
@@ -68,7 +73,12 @@ export default async function CalendarPage({
   const memberCols = { id: true, name: true, image: true } as const;
   const posts = allBrandIds.length
     ? await db.query.platformPostTable.findMany({
-        where: inArray(platformPostTable.brandId, allBrandIds),
+        where: and(
+          inArray(platformPostTable.brandId, allBrandIds),
+          sp.source === "owned"
+            ? eq(platformPostTable.source, "owned")
+            : undefined,
+        ),
         with: {
           contentPost: {
             with: { series: true, owner: { columns: memberCols } },
@@ -95,55 +105,88 @@ export default async function CalendarPage({
     ...trackedBrands,
   ]);
 
-  const entries: CalEntry[] = posts.map((p) => {
-    const at =
-      p.publishedAt ?? p.scheduledAt ?? p.contentPost?.plannedAt ?? p.createdAt;
-    // Whether `at` is a real calendar intent or just the row's creation date.
-    // The CIO mirror carries hundreds of never-sent drafts with no date of any
-    // kind; those land on whatever day they were imported, which is noise.
-    const dated = Boolean(
-      p.publishedAt ?? p.scheduledAt ?? p.contentPost?.plannedAt,
-    );
-    return {
-      dated,
-      id: p.id,
-      brandId: p.brandId,
-      brandName: brandName.get(p.brandId) ?? "—",
-      tracked: trackedBrands.has(p.brandId),
-      platform: p.platform,
-      format: p.format,
-      archetype: p.archetype,
-      sequence: p.sequence,
-      parentPlatformPostId: p.parentPlatformPostId,
-      contentPostId: p.contentPostId,
-      title: p.contentPost?.title ?? null,
-      pillar: p.contentPost?.pillar ?? null,
-      seriesName: p.contentPost?.series?.name ?? null,
-      seriesColor: p.contentPost?.series?.color ?? null,
-      text: p.text,
-      status: p.status,
-      isSeed: p.isSeed,
-      externalUrl: p.externalUrl,
-      mediaUrl: displayPoster(p.media),
-      handle: p.username,
-      at: at.toISOString(),
-      ideaOwner: p.contentPost?.owner
-        ? {
-            id: p.contentPost.owner.id,
-            name: p.contentPost.owner.name,
-            image: p.contentPost.owner.image,
-          }
-        : null,
-      spotOwner: p.owner
-        ? { id: p.owner.id, name: p.owner.name, image: p.owner.image }
-        : null,
-    };
-  });
+  const sequenceSteps =
+    sp.kind === "blast" && brandIds.length
+      ? await db
+          .select({ id: emailSequenceStepTable.platformPostId })
+          .from(emailSequenceStepTable)
+          .innerJoin(
+            emailSequenceTable,
+            eq(emailSequenceTable.id, emailSequenceStepTable.sequenceId),
+          )
+          .where(
+            and(
+              inArray(emailSequenceTable.brandId, brandIds),
+              isNull(emailSequenceTable.deletedAt),
+            ),
+          )
+      : [];
+  const sequenceIds = new Set(sequenceSteps.map((step) => step.id));
+  const entries: CalEntry[] = posts
+    .filter(
+      (post) =>
+        sp.kind !== "blast" ||
+        (post.format === "newsletter.blast" && !sequenceIds.has(post.id)),
+    )
+    .map((p) => {
+      const at =
+        p.publishedAt ??
+        p.scheduledAt ??
+        p.contentPost?.plannedAt ??
+        p.createdAt;
+      // Whether `at` is a real calendar intent or just the row's creation date.
+      // The CIO mirror carries hundreds of never-sent drafts with no date of any
+      // kind; those land on whatever day they were imported, which is noise.
+      const dated = Boolean(
+        p.publishedAt ?? p.scheduledAt ?? p.contentPost?.plannedAt,
+      );
+      return {
+        dated,
+        id: p.id,
+        brandId: p.brandId,
+        brandName: brandName.get(p.brandId) ?? "—",
+        tracked: trackedBrands.has(p.brandId),
+        platform: p.platform,
+        format: p.format,
+        archetype: p.archetype,
+        sequence: p.sequence,
+        parentPlatformPostId: p.parentPlatformPostId,
+        contentPostId: p.contentPostId,
+        title: p.contentPost?.title ?? null,
+        pillar: p.contentPost?.pillar ?? null,
+        seriesName: p.contentPost?.series?.name ?? null,
+        seriesColor: p.contentPost?.series?.color ?? null,
+        text: p.text,
+        status: p.status,
+        isSeed: p.isSeed,
+        externalUrl: p.externalUrl,
+        mediaUrl: displayPoster(p.media),
+        handle: p.username,
+        at: at.toISOString(),
+        ideaOwner: p.contentPost?.owner
+          ? {
+              id: p.contentPost.owner.id,
+              name: p.contentPost.owner.name,
+              image: p.contentPost.owner.image,
+            }
+          : null,
+        spotOwner: p.owner
+          ? { id: p.owner.id, name: p.owner.name, image: p.owner.image }
+          : null,
+      };
+    });
 
   // Deep-link target (from the Studio wheel): focus a brand/pillar/month.
   const initialMonth = sp.m != null ? Number(sp.m) : undefined;
   const initialYear = sp.y != null ? Number(sp.y) : undefined;
   const initial = {
+    platform: sp.platform === "newsletter" ? "newsletter" : undefined,
+    emailWorkspaceHref:
+      sp.platform === "newsletter" &&
+      sp.brand &&
+      brands.find((brand) => brand.id === sp.brand)?.slug
+        ? `/app/performance/clients/${brands.find((brand) => brand.id === sp.brand)!.slug}/newsletters`
+        : undefined,
     brandId: sp.brand && brandIds.includes(sp.brand) ? sp.brand : undefined,
     pillar: sp.pillar || undefined,
     month: Number.isInteger(initialMonth) ? initialMonth : undefined,

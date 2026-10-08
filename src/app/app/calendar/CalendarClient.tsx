@@ -234,6 +234,8 @@ export function CalendarClient({
   currentUserId: string;
   nowISO: string;
   initial?: {
+    platform?: string;
+    emailWorkspaceHref?: string;
     brandId?: string;
     pillar?: string;
     year?: number;
@@ -254,6 +256,9 @@ export function CalendarClient({
   const [year, setYear] = useState(initial?.year ?? now.getFullYear());
   const [month, setMonth] = useState(initial?.month ?? now.getMonth());
   const [brandFilter, setBrandFilter] = useState(initial?.brandId ?? "all");
+  const [platformFilter, setPlatformFilter] = useState(
+    initial?.platform ?? "all",
+  );
   const [pillarFilter, setPillarFilter] = useState(initial?.pillar ?? "all");
   const [mineOnly, setMineOnly] = useState(false);
   // Tracked/competitor posts are opt-in — the default view is our own content.
@@ -359,6 +364,8 @@ export function CalendarClient({
         )
           return false;
         if (brandFilter !== "all" && e.brandId !== brandFilter) return false;
+        if (platformFilter !== "all" && e.platform !== platformFilter)
+          return false;
         if (pillarFilter !== "all" && e.pillar !== pillarFilter) return false;
         if (
           mineOnly &&
@@ -371,6 +378,7 @@ export function CalendarClient({
     [
       entries,
       brandFilter,
+      platformFilter,
       pillarFilter,
       mineOnly,
       trackedVisible,
@@ -445,15 +453,43 @@ export function CalendarClient({
       {/* Header */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Calendar</h1>
+          {initial?.emailWorkspaceHref && (
+            <Link
+              href={initial.emailWorkspaceHref}
+              className="text-sm text-muted-foreground hover:underline"
+            >
+              Back to email workspace
+            </Link>
+          )}
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {platformFilter === "newsletter" ? "Email calendar" : "Calendar"}
+          </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {zoom === "month"
-              ? `${MONTHS[month]} ${year} · ${filtered.length} platform items · ${storyTotal} Stories`
-              : `${yearMode === "heatmap" ? year : windowLabel} · ${filtered.length} platform items · ${storyTotal} Stories`}
+              ? `${MONTHS[month]} ${year} · ${filtered.length} ${platformFilter === "newsletter" ? "emails" : `platform items · ${storyTotal} Stories`}`
+              : `${yearMode === "heatmap" ? year : windowLabel} · ${filtered.length} ${platformFilter === "newsletter" ? "emails" : `platform items · ${storyTotal} Stories`}`}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <SimpleSelect
+            value={platformFilter}
+            onValueChange={setPlatformFilter}
+            options={[
+              { value: "all", label: "All channels" },
+              ...[...new Set(entries.map((entry) => entry.platform))]
+                .sort()
+                .map((platform) => ({
+                  value: platform,
+                  label:
+                    platform === "newsletter"
+                      ? "Email"
+                      : platformLabel(platform),
+                })),
+            ]}
+            size="sm"
+            aria-label="Channel"
+          />
           <SimpleSelect
             value={brandFilter}
             onValueChange={(v) => {
@@ -515,15 +551,17 @@ export function CalendarClient({
             Unscheduled
           </button>
 
-          <button
-            onClick={() => {
-              setGenerateMonth(null);
-              setGenerateOpen(true);
-            }}
-            className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          >
-            <CalendarPlus className="size-3.5" /> Generate slots
-          </button>
+          {platformFilter !== "newsletter" && (
+            <button
+              onClick={() => {
+                setGenerateMonth(null);
+                setGenerateOpen(true);
+              }}
+              className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <CalendarPlus className="size-3.5" /> Generate slots
+            </button>
+          )}
 
           <span className="mx-1 h-5 w-px bg-border" />
 
@@ -733,6 +771,9 @@ function MonthGrid({
   };
 }) {
   const weeks = useMemo(() => monthWeeks(year, month), [year, month]);
+  const emailOnly = [...byDay.values()]
+    .flat()
+    .every((entry) => entry.platform === "newsletter");
 
   return (
     <div className="overflow-hidden rounded-xl border">
@@ -804,7 +845,7 @@ function MonthGrid({
                 >
                   {date.getDate()}
                 </span>
-                {inMonth && (
+                {inMonth && !emailOnly && (
                   <span
                     className={cn(
                       "ml-auto text-[9px] font-medium tabular-nums",
@@ -895,7 +936,13 @@ function ContentChip({ g }: { g: DayGroup }) {
             )}
           />
           <span className="shrink-0 text-[10px] text-muted-foreground capitalize">
-            {status}
+            {iconPlatform === "blast" || iconPlatform === "newsletter"
+              ? status === "pending_review"
+                ? "Ready"
+                : status === "published"
+                  ? "Sent"
+                  : status
+              : status}
           </span>
           {brand && (
             <span
@@ -1426,7 +1473,11 @@ function DayGroupBlock({ g, assign }: { g: DayGroup; assign: CalAssign }) {
               )}
             />
             <span className="shrink-0 text-muted-foreground capitalize">
-              {e.status}
+              {e.platform === "newsletter" && e.status === "pending_review"
+                ? "Ready"
+                : e.platform === "newsletter" && e.status === "published"
+                  ? "Sent"
+                  : e.status}
             </span>
             {isStoryEntry(e) && (
               <span className="shrink-0 text-violet-400">

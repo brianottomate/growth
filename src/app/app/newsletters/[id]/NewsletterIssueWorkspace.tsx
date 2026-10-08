@@ -24,6 +24,7 @@ import { DigestImageBoard } from "./DigestImageBoard";
 import { EmailPreviewFrame, type PreviewPick } from "./EmailPreviewFrame";
 import { FindHomesCard } from "./FindHomesCard";
 import { SendCard } from "./SendCard";
+import { EmailReviewActions } from "../EmailReviewActions";
 
 type Workspace = RouterOutputs["newsletter"]["workspace"];
 type Draft = Pick<
@@ -33,6 +34,7 @@ type Draft = Pick<
   | "bodyMarkdown"
   | "ctaLabel"
   | "ctaUrl"
+  | "recipeId"
   | "templateKey"
   | "handoffTargetRepo"
   | "productUpdate"
@@ -49,6 +51,7 @@ function editableDraft(document: Workspace["document"]): Draft {
     ctaLabel,
     ctaUrl,
     templateKey,
+    recipeId,
     handoffTargetRepo,
     productUpdate,
     digest,
@@ -60,6 +63,7 @@ function editableDraft(document: Workspace["document"]): Draft {
     ctaLabel,
     ctaUrl,
     templateKey,
+    recipeId,
     handoffTargetRepo,
     productUpdate,
     digest,
@@ -165,8 +169,12 @@ function Editor({ workspace }: { workspace: Workspace }) {
   const activeJob =
     workspace.latestJob?.status === "queued" ||
     workspace.latestJob?.status === "running";
-  const formatLabel =
-    workspace.spot.format === "newsletter.blast"
+  const approved = ["approved", "scheduled", "published"].includes(
+    workspace.spot.status,
+  );
+  const formatLabel = workspace.sequences?.length
+    ? "Sequence email"
+    : workspace.spot.format === "newsletter.blast"
       ? "One-off blast"
       : "Newsletter issue";
 
@@ -178,7 +186,11 @@ function Editor({ workspace }: { workspace: Workspace }) {
             <span className="rounded-full bg-muted px-2 py-1 font-medium">
               {formatLabel}
             </span>
-            <span>{workspace.spot.status.replaceAll("_", " ")}</span>
+            <span>
+              {workspace.spot.status === "pending_review"
+                ? "Ready"
+                : workspace.spot.status.replaceAll("_", " ")}
+            </span>
             {workspace.content?.plannedAt && (
               <span>
                 · Content calendar{" "}
@@ -186,11 +198,26 @@ function Editor({ workspace }: { workspace: Workspace }) {
               </span>
             )}
           </div>
+          {workspace.sequences?.map((sequence) => (
+            <Link
+              key={sequence.id}
+              className="mt-2 mr-3 inline-block text-sm text-muted-foreground underline"
+              href={`/app/brands/${workspace.brand.slug ?? workspace.brand.id}/newsletters?tab=sequences&sequence=${sequence.id}`}
+            >
+              {sequence.name} sequence
+            </Link>
+          ))}
           <h1 className="mt-2 text-2xl font-semibold tracking-tight">
             {workspace.content?.title || draft.subject || "Untitled email"}
           </h1>
         </div>
         <div className="flex flex-wrap gap-2">
+          <EmailReviewActions
+            platformPostId={workspace.spot.id}
+            status={workspace.spot.status}
+            disabled={dirty || briefDirty || activeJob}
+            onReviewed={refreshWorkspace}
+          />
           <button
             type="button"
             onClick={() =>
@@ -232,17 +259,25 @@ function Editor({ workspace }: { workspace: Workspace }) {
         </TabsList>
       </Tabs>
       <div hidden={editorTab !== "brief"}>
-        <SavedBriefPanel
-          documentId={workspace.document.id}
-          draftDirty={dirty}
-          hasDraft={!!draft.bodyMarkdown.trim() || !!draft.digest}
-          onDirtyChange={setBriefDirty}
-          onProduced={() => setEditorTab("draft")}
-        />
+        <fieldset disabled={approved} inert={approved}>
+          <SavedBriefPanel
+            documentId={workspace.document.id}
+            draftDirty={dirty}
+            hasDraft={!!draft.bodyMarkdown.trim() || !!draft.digest}
+            onDirtyChange={setBriefDirty}
+            onProduced={() => setEditorTab("draft")}
+          />
+        </fieldset>
       </div>
       {activeJob && (
         <p className="text-sm text-muted-foreground">
           Producing this document. Editing is locked until completion.
+        </p>
+      )}
+      {approved && (
+        <p className="text-sm text-muted-foreground">
+          Creative approved. Reopen to edit. Audience and send approval are
+          managed in Send.
         </p>
       )}
       {briefDirty && editorTab === "draft" && (
@@ -252,226 +287,230 @@ function Editor({ workspace }: { workspace: Workspace }) {
       )}
       <div hidden={editorTab !== "draft"}>
         <div className="grid grid-cols-1 gap-5 @5xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.9fr)]">
-          <fieldset
-            disabled={activeJob}
-            inert={activeJob}
-            className="min-w-0 space-y-4 disabled:opacity-60"
-          >
-            {/* Chat-first: the conversation is the write path for words (subject,
+          <div className="min-w-0 space-y-4">
+            <fieldset
+              disabled={activeJob || approved}
+              inert={activeJob || approved}
+              className="min-w-0 space-y-4 disabled:opacity-60"
+            >
+              {/* Chat-first: the conversation is the write path for words (subject,
               intro, CTA); the one clicky exception is photos, because picking
               an image is a recognition task a grid does better than prose. The
               form fields survive below as a collapsed escape hatch. */}
-            {/* The empty state of a Wander issue: no homes and no words yet.
+              {/* The empty state of a Wander issue: no homes and no words yet.
               wander.com homes only exist for the Wander brand. */}
-            {!draft.digest &&
-              !draft.bodyMarkdown.trim() &&
-              workspace.brand.slug === "wander" && (
-                <FindHomesCard
-                  title={
-                    workspace.content?.title || draft.subject || "Untitled"
-                  }
-                  hook={workspace.content?.hook}
-                  purpose={workspace.content?.purpose}
-                  sendDate={workspace.content?.plannedAt}
-                />
-              )}
-            <EmailBlocksCard
-              // A saved, restored or generated revision replaces the body; the
-              // blocks re-read it.
-              key={workspace.document.updatedAt.toISOString()}
-              platformPostId={workspace.spot.id}
-              brandId={workspace.brand.id}
-              campaign={workspace.content?.title || draft.subject}
-              canAddHomes={workspace.brand.homeCount > 0}
-              fields={{
-                subject: draft.subject,
-                preheader: draft.preheader,
-                bodyMarkdown: draft.bodyMarkdown,
-                ctaLabel: draft.ctaLabel,
-                ctaUrl: draft.ctaUrl,
-                templateKey: draft.templateKey,
-                digest: draft.digest,
-              }}
-              select={previewSelect}
-              onOpenChange={setActivePick}
-              onChange={(change) => {
-                const next = { ...draft, ...change };
-                setDraft(next);
-              }}
-            />
-            {/* Wander's issues match their homes to wander.com; a brand's own
-              homes are edited in their blocks above. */}
-            {draft.digest && workspace.brand.slug === "wander" && (
-              <DigestImageBoard
-                digest={draft.digest}
-                intro={draft.bodyMarkdown}
-                campaign={workspace.content?.title || draft.subject}
-                brandId={workspace.brand.id}
-                wanderMarketplace={workspace.brand.slug === "wander"}
-                onChange={(digest) => setDraft({ ...draft, digest })}
-              />
-            )}
-
-            <section className="rounded-xl border bg-card p-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    save.mutate({
-                      platformPostId: workspace.spot.id,
-                      changes: draft,
-                      note: "Saved from the newsletter workspace",
-                    })
-                  }
-                  disabled={save.isPending || activeJob || !dirty}
-                  className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-                >
-                  {save.isPending ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Save className="size-4" />
-                  )}
-                  Save document
-                </button>
-                <button
-                  type="button"
-                  onClick={() => renderPreview()}
-                  disabled={preview.isPending}
-                  className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-accent disabled:opacity-50"
-                >
-                  <RefreshCw
-                    className={`size-4 ${preview.isPending ? "animate-spin" : ""}`}
+              {!draft.digest &&
+                !draft.bodyMarkdown.trim() &&
+                workspace.brand.slug === "wander" && (
+                  <FindHomesCard
+                    title={
+                      workspace.content?.title || draft.subject || "Untitled"
+                    }
+                    hook={workspace.content?.hook}
+                    purpose={workspace.content?.purpose}
+                    sendDate={workspace.content?.plannedAt}
                   />
-                  Refresh preview
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFieldsOpen(true)}
-                  className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-accent"
-                >
-                  <Pencil className="size-4" /> Edit fields manually
-                </button>
-              </div>
-              {(save.error || preview.error) && (
-                <p className="mt-2 text-sm text-red-500">
-                  {(save.error ?? preview.error)?.message}
-                </p>
-              )}
-            </section>
-
-            {!draft.productUpdate && (
-              <SendCard workspace={workspace} dirty={dirty} />
-            )}
-
-            {fieldsOpen && (
-              <ManualFieldsDialog
-                initial={{
+                )}
+              <EmailBlocksCard
+                // A saved, restored or generated revision replaces the body; the
+                // blocks re-read it.
+                key={workspace.document.updatedAt.toISOString()}
+                platformPostId={workspace.spot.id}
+                brandId={workspace.brand.id}
+                campaign={workspace.content?.title || draft.subject}
+                canAddHomes={workspace.brand.homeCount > 0}
+                fields={{
                   subject: draft.subject,
                   preheader: draft.preheader,
                   bodyMarkdown: draft.bodyMarkdown,
                   ctaLabel: draft.ctaLabel,
                   ctaUrl: draft.ctaUrl,
+                  templateKey: draft.templateKey,
+                  digest: draft.digest,
                 }}
-                isDigest={Boolean(draft.digest)}
-                saving={save.isPending}
-                onSave={(fields) => {
-                  const next = { ...draft, ...fields };
+                select={previewSelect}
+                onOpenChange={setActivePick}
+                onChange={(change) => {
+                  const next = { ...draft, ...change };
                   setDraft(next);
-                  save.mutate(
-                    {
-                      platformPostId: workspace.spot.id,
-                      changes: next,
-                      note: "Edited fields manually",
-                    },
-                    { onSuccess: () => setFieldsOpen(false) },
-                  );
                 }}
-                onOpenChange={setFieldsOpen}
               />
-            )}
+              {/* Wander's issues match their homes to wander.com; a brand's own
+              homes are edited in their blocks above. */}
+              {draft.digest && workspace.brand.slug === "wander" && (
+                <DigestImageBoard
+                  digest={draft.digest}
+                  intro={draft.bodyMarkdown}
+                  campaign={workspace.content?.title || draft.subject}
+                  brandId={workspace.brand.id}
+                  wanderMarketplace={workspace.brand.slug === "wander"}
+                  onChange={(digest) => setDraft({ ...draft, digest })}
+                />
+              )}
 
-            {draft.productUpdate && (
               <section className="rounded-xl border bg-card p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <h2 className="font-semibold">Verified product evidence</h2>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Customer-facing claims are grounded in these exact
-                      changes. Only release-verified evidence can enter
-                      delivery.
-                    </p>
-                  </div>
-                  <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium">
-                    {new Date(
-                      draft.productUpdate.periodStart,
-                    ).toLocaleDateString()}
-                    –
-                    {new Date(
-                      draft.productUpdate.periodEnd,
-                    ).toLocaleDateString()}
-                  </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      save.mutate({
+                        platformPostId: workspace.spot.id,
+                        changes: draft,
+                        note: "Saved from the newsletter workspace",
+                      })
+                    }
+                    disabled={save.isPending || activeJob || !dirty}
+                    className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+                  >
+                    {save.isPending ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Save className="size-4" />
+                    )}
+                    Save document
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => renderPreview()}
+                    disabled={preview.isPending}
+                    className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-accent disabled:opacity-50"
+                  >
+                    <RefreshCw
+                      className={`size-4 ${preview.isPending ? "animate-spin" : ""}`}
+                    />
+                    Refresh preview
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFieldsOpen(true)}
+                    className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-accent"
+                  >
+                    <Pencil className="size-4" /> Edit fields manually
+                  </button>
                 </div>
-                <div className="mt-3 divide-y">
-                  {draft.productUpdate.changes.map((change) => (
-                    <div
-                      key={`${change.repository}:${change.ref}`}
-                      className="py-3 text-sm"
-                    >
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold uppercase">
-                          {change.category}
-                        </span>
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase ${
-                            change.releaseStatus === "shipped"
-                              ? "bg-emerald-500/10 text-emerald-700"
-                              : "bg-amber-500/10 text-amber-700"
-                          }`}
-                        >
-                          {change.releaseStatus}
-                        </span>
-                        <span className="font-medium">{change.title}</span>
-                      </div>
-                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                        {change.summary}
-                      </p>
-                      {change.customerImpact && (
-                        <p className="mt-1 text-xs">
-                          Customer impact: {change.customerImpact}
-                        </p>
-                      )}
-                      <p className="mt-1 font-mono text-[11px] text-muted-foreground">
-                        {change.url ? (
-                          <a
-                            href={change.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="underline underline-offset-2 hover:text-foreground"
-                          >
-                            {change.repository}@{change.ref}
-                          </a>
-                        ) : (
-                          <>
-                            {change.repository}@{change.ref}
-                          </>
-                        )}
+                {(save.error || preview.error) && (
+                  <p className="mt-2 text-sm text-red-500">
+                    {(save.error ?? preview.error)?.message}
+                  </p>
+                )}
+              </section>
+
+              {fieldsOpen && (
+                <ManualFieldsDialog
+                  initial={{
+                    subject: draft.subject,
+                    preheader: draft.preheader,
+                    bodyMarkdown: draft.bodyMarkdown,
+                    ctaLabel: draft.ctaLabel,
+                    ctaUrl: draft.ctaUrl,
+                  }}
+                  isDigest={Boolean(draft.digest)}
+                  saving={save.isPending}
+                  onSave={(fields) => {
+                    const next = { ...draft, ...fields };
+                    setDraft(next);
+                    save.mutate(
+                      {
+                        platformPostId: workspace.spot.id,
+                        changes: next,
+                        note: "Edited fields manually",
+                      },
+                      { onSuccess: () => setFieldsOpen(false) },
+                    );
+                  }}
+                  onOpenChange={setFieldsOpen}
+                />
+              )}
+
+              {draft.productUpdate && (
+                <section className="rounded-xl border bg-card p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h2 className="font-semibold">
+                        Verified product evidence
+                      </h2>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Customer-facing claims are grounded in these exact
+                        changes. Only release-verified evidence can enter
+                        delivery.
                       </p>
                     </div>
-                  ))}
-                </div>
-              </section>
-            )}
+                    <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium">
+                      {new Date(
+                        draft.productUpdate.periodStart,
+                      ).toLocaleDateString()}
+                      –
+                      {new Date(
+                        draft.productUpdate.periodEnd,
+                      ).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <div className="mt-3 divide-y">
+                    {draft.productUpdate.changes.map((change) => (
+                      <div
+                        key={`${change.repository}:${change.ref}`}
+                        className="py-3 text-sm"
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold uppercase">
+                            {change.category}
+                          </span>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase ${
+                              change.releaseStatus === "shipped"
+                                ? "bg-emerald-500/10 text-emerald-700"
+                                : "bg-amber-500/10 text-amber-700"
+                            }`}
+                          >
+                            {change.releaseStatus}
+                          </span>
+                          <span className="font-medium">{change.title}</span>
+                        </div>
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                          {change.summary}
+                        </p>
+                        {change.customerImpact && (
+                          <p className="mt-1 text-xs">
+                            Customer impact: {change.customerImpact}
+                          </p>
+                        )}
+                        <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+                          {change.url ? (
+                            <a
+                              href={change.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="underline underline-offset-2 hover:text-foreground"
+                            >
+                              {change.repository}@{change.ref}
+                            </a>
+                          ) : (
+                            <>
+                              {change.repository}@{change.ref}
+                            </>
+                          )}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
 
-            {activeJob ? (
-              <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="size-4 animate-spin" /> Writing a new draft
-              </p>
-            ) : workspace.latestJob?.status === "failed" ? (
-              <p className="text-sm text-red-500">
-                {workspace.latestJob.error || "Generation failed."}
-              </p>
-            ) : null}
-          </fieldset>
+              {activeJob ? (
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="size-4 animate-spin" /> Writing a new
+                  draft
+                </p>
+              ) : workspace.latestJob?.status === "failed" ? (
+                <p className="text-sm text-red-500">
+                  {workspace.latestJob.error || "Generation failed."}
+                </p>
+              ) : null}
+            </fieldset>
+            {!draft.productUpdate && (
+              <SendCard workspace={workspace} dirty={dirty} />
+            )}
+          </div>
 
           <div className="@5xl:sticky @5xl:top-4 @5xl:self-start">
             <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
@@ -519,6 +558,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
                   html={previewHtml}
                   active={activePick}
                   onPick={(pick) =>
+                    !approved &&
                     setPreviewSelect((current) => ({
                       pick,
                       nonce: (current?.nonce ?? 0) + 1,

@@ -1,10 +1,11 @@
+import { nextEmailReviewStatus } from "./email-creative-review";
 import { brandStorySection } from "@/server/ai/prompts/brand-story";
 import { emailCopyGuidance } from "@/lib/brand-email-style";
 import "server-only";
 
 import { anthropic } from "@ai-sdk/anthropic";
 import { generateText, Output } from "ai";
-import { and, count, desc, eq, isNull } from "drizzle-orm";
+import { and, count, desc, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -21,6 +22,8 @@ import { db, withTransaction } from "@/server/db";
 import {
   brandTable,
   channelTable,
+  emailSequenceTable,
+  emailSequenceStepTable,
   contentPostTable,
   productionPacketTable,
   platformDocumentTable,
@@ -42,6 +45,8 @@ import {
   failDocumentRun,
   finishDocumentRun,
   latestDocumentRun,
+  lockDocument,
+  assertUnlocked,
   saveCreativeDocument,
 } from "./creative-document.service";
 import { HOMES_MARKER } from "@/lib/listings-digest";
@@ -80,6 +85,7 @@ function snapshotOf(document: EmailDocumentDraft): EmailDocumentSnapshot {
     ctaLabel: document.ctaLabel ?? null,
     ctaUrl: document.ctaUrl ?? null,
     templateKey: document.templateKey,
+    recipeId: document.recipeId ?? null,
     handoffTargetRepo: document.handoffTargetRepo ?? null,
     productUpdate: document.productUpdate ?? null,
     digest: document.digest ?? null,
@@ -255,11 +261,26 @@ export async function getEmailWorkspace(input: {
       ),
   ]);
   const homeCount = homes?.count ?? 0;
+  const sequences = await db
+    .select({ id: emailSequenceTable.id, name: emailSequenceTable.name })
+    .from(emailSequenceStepTable)
+    .innerJoin(
+      emailSequenceTable,
+      eq(emailSequenceTable.id, emailSequenceStepTable.sequenceId),
+    )
+    .where(
+      and(
+        eq(emailSequenceStepTable.platformPostId, spot.id),
+        eq(emailSequenceTable.brandId, spot.brand.id),
+        isNull(emailSequenceTable.deletedAt),
+      ),
+    );
   return {
     document,
     latestJob,
     messageSends: rawMessageSends.map(messageSendSummary),
     canDeliver: input.canDeliver ?? false,
+    sequences,
     spot: {
       id: spot.id,
       format: spot.format as EmailDocumentFormat,
@@ -293,6 +314,69 @@ export async function getEmailWorkspace(input: {
       sendBlockers: brandSendBlockers(spot.brand),
     },
   };
+}
+
+export async function reviewEmailCreative(input: {
+  platformPostId: string;
+  organizationId: string;
+  userId: string;
+  action: "ready" | "approve" | "reopen";
+}) {
+  const { spot } = await ensureEmailDocument(input);
+  return withTransaction(async (tx) => {
+    const [current] = await tx
+      .select()
+      .from(platformPostTable)
+      .where(eq(platformPostTable.id, spot.id))
+      .for("update");
+    const link = await tx.query.platformDocumentTable.findFirst({
+      where: eq(platformDocumentTable.platformPostId, spot.id),
+    });
+    if (!current || !link) throw new Error("Email not found.");
+    const brand = await tx.query.brandTable.findFirst({
+      where: and(
+        eq(brandTable.id, current.brandId),
+        eq(brandTable.organizationId, input.organizationId),
+        isNull(brandTable.deletedAt),
+      ),
+    });
+    if (!brand) throw new Error("Email not found in this workspace.");
+    const document = await lockDocument(
+      tx,
+      link.documentId,
+      input.organizationId,
+    );
+    const status = nextEmailReviewStatus(current.status, input.action);
+    if (input.action === "reopen") {
+      const sending = await tx.query.messageSendTable.findFirst({
+        where: and(
+          eq(messageSendTable.platformPostId, current.id),
+          eq(messageSendTable.status, "sending"),
+        ),
+      });
+      if (sending)
+        throw new Error(
+          "Wait for this email's send to finish before reopening.",
+        );
+    }
+    if (input.action !== "reopen") {
+      await assertUnlocked(tx, document.id);
+      if (
+        document.document.type !== "email" ||
+        !document.document.content.subject.trim() ||
+        !document.document.content.bodyMarkdown.trim()
+      )
+        throw new Error("Save a subject and email body before review.");
+    }
+    await tx
+      .update(platformPostTable)
+      .set({
+        status,
+        metadata: sql`coalesce(${platformPostTable.metadata}, '{}'::jsonb) || ${JSON.stringify({ emailCreativeReview: { action: input.action, userId: input.userId, at: new Date().toISOString() } })}::jsonb`,
+      })
+      .where(eq(platformPostTable.id, current.id));
+    return { status };
+  });
 }
 
 export async function saveEmailDocument(input: {

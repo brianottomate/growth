@@ -38,6 +38,7 @@ export const getEmailDraftOutputSchema = z.strictObject({
     sendBlockers: z.array(z.string()),
   }),
   canDeliver: z.boolean(),
+  sequences: z.array(z.object({ id: z.string(), name: z.string() })).optional(),
   content: z
     .strictObject({
       ctaText: z.string().nullable(),
@@ -64,6 +65,7 @@ export const getEmailDraftOutputSchema = z.strictObject({
     productUpdate: productUpdateSchema.nullable().optional(),
     subject: z.string(),
     templateKey: z.string(),
+    recipeId: z.string().nullable().optional(),
     updatedAt: z.iso.datetime(),
   }),
   latestJob: z

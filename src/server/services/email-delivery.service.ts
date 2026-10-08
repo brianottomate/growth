@@ -56,6 +56,8 @@ export async function createMessageSendDraft(input: {
   segmentId: number;
 }) {
   const { document, spot } = await ensureEmailDocument(input);
+  if (spot.status !== "approved")
+    throw new Error("Approve the email creative before preparing delivery.");
   if (!document.subject.trim() || !document.bodyMarkdown.trim())
     throw new Error("Save an email before preparing a send.");
   const current = emailDocumentDraftSchema.parse(document);
@@ -177,6 +179,12 @@ export async function approveMessageSend(input: {
   if (!["draft", "failed"].includes(send.status)) {
     throw new Error(`A ${send.status} send cannot be approved.`);
   }
+  const spot = await requireOwnedEmailSpot(
+    send.platformPostId,
+    input.organizationId,
+  );
+  if (spot.status !== "approved")
+    throw new Error("Approve the email creative before approving delivery.");
   const [approved] = await db
     .update(messageSendTable)
     .set({

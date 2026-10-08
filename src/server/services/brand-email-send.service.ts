@@ -20,7 +20,7 @@ import {
   sendPostmarkBatch,
   type PostmarkOutgoingMessage,
 } from "@/server/clients/postmark.client";
-import { db } from "@/server/db";
+import { db, withTransaction } from "@/server/db";
 import {
   emailAudienceSnapshotTable,
   emailAudienceTable,
@@ -151,6 +151,8 @@ export async function prepareBrandSend(
     input.organizationId,
   );
   const blockers = brandSendBlockers(spot.brand);
+  if (spot.status !== "approved")
+    throw new Error("Approve the email creative before preparing delivery.");
   if (blockers.length) throw new Error(blockers.join(" "));
   const snapshot = await getEmailAudienceSnapshot(
     { snapshotId: input.snapshotId },
@@ -300,31 +302,45 @@ export async function dispatchBrandSend(input: {
     input.organizationId,
   );
   const snapshot = send.snapshot;
+  if (!["approved", "published"].includes(spot.status))
+    throw new Error(
+      "Approve the email creative before sending. Reopened drafts cannot be sent.",
+    );
   if (snapshot.audience.provider !== "postmark" || !snapshot.sender)
     throw new Error("This send has no Postmark audience.");
   const audience = snapshot.audience;
 
   const staleBefore = new Date(Date.now() - STALE_LEASE_MS);
-  const [claimed] = await db
-    .update(messageSendTable)
-    .set({
-      status: "sending",
-      sentBy: input.userId ?? send.approvedBy,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(messageSendTable.id, send.id),
-        or(
-          eq(messageSendTable.status, "approved"),
-          and(
-            eq(messageSendTable.status, "sending"),
-            lt(messageSendTable.updatedAt, staleBefore),
+  const claimed = await withTransaction(async (tx) => {
+    const [current] = await tx
+      .select({ status: platformPostTable.status })
+      .from(platformPostTable)
+      .where(eq(platformPostTable.id, spot.id))
+      .for("update");
+    if (!current || !["approved", "published"].includes(current.status))
+      throw new Error("Approve the email creative before sending.");
+    const [row] = await tx
+      .update(messageSendTable)
+      .set({
+        status: "sending",
+        sentBy: input.userId ?? send.approvedBy,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(messageSendTable.id, send.id),
+          or(
+            eq(messageSendTable.status, "approved"),
+            and(
+              eq(messageSendTable.status, "sending"),
+              lt(messageSendTable.updatedAt, staleBefore),
+            ),
           ),
         ),
-      ),
-    )
-    .returning();
+      )
+      .returning();
+    return row;
+  });
   if (!claimed)
     throw new Error("This send is not approved or is already being sent.");
   const actor = {

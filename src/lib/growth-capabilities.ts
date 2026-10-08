@@ -143,6 +143,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "importFromDrive",
   ],
   emailRead: [
+    "listTemplates",
     "get",
     "audiences",
     "previewAudience",

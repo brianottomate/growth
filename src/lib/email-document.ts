@@ -62,6 +62,7 @@ export const emailDocumentDraftSchema = z.object({
   ctaLabel: z.string().trim().max(100).nullable().optional(),
   ctaUrl: optionalUrl,
   templateKey: z.string().trim().min(1).max(80).default("editorial"),
+  recipeId: z.string().trim().max(100).nullable().optional(),
   handoffTargetRepo: z.string().trim().max(120).nullable().optional(),
   productUpdate: productUpdateContextSchema.nullable().optional(),
   /**

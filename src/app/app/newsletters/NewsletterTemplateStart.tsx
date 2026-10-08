@@ -16,9 +16,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/components/ui/lib/utils";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import {
   NEWSLETTER_TEMPLATES,
+  RECIPE_CONTEXT_LABELS,
   type NewsletterTemplateId,
 } from "@/lib/newsletter-templates";
 import { orpc } from "@/orpc/client";
@@ -45,6 +47,9 @@ export function NewsletterTemplateStart({
     useState<NewsletterTemplateId>("season-ahead");
   const [angle, setAngle] = useState("");
   const [offer, setOffer] = useState("");
+  const [context, setContext] = useState<Record<string, string>>({});
+  const [brief, setBrief] = useState("");
+  const [homeId, setHomeId] = useState("");
   const [sendAt, setSendAt] = useState(defaultSendTime);
   const options = useQuery({
     ...orpc.newsletter.templateOptions.queryOptions({ input: { brandId } }),
@@ -66,11 +71,19 @@ export function NewsletterTemplateStart({
           label: season.label,
           hint: season.when ?? "",
         }))
-      : (options.data?.collections ?? []).map((collection) => ({
-          label: collection.label,
-          hint: `${collection.homes} homes`,
-        }));
-  const noHomes = options.data?.homesWithPhoto === 0;
+      : template === "home-collection"
+        ? (options.data?.collections ?? []).map((collection) => ({
+            label: collection.label,
+            hint: `${collection.homes} homes`,
+          }))
+        : [];
+  const noHomes = chosen.homes > 0 && options.data?.homesWithPhoto === 0;
+  const missingContext = chosen.requiredContext.some(
+    (key) => !(key === "offer" ? offer.trim() : context[key]?.trim()),
+  );
+  const needsSpecificHomes = chosen.requiredContext.some((key) =>
+    ["viewedHome", "savedHome", "checkout", "newHome", "upgrade"].includes(key),
+  );
 
   return (
     <>
@@ -87,45 +100,109 @@ export function NewsletterTemplateStart({
           if (!draft.isPending) setOpen(value);
         }}
       >
-        <DialogContent className="sm:max-w-xl">
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Start from a template</DialogTitle>
           </DialogHeader>
 
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {NEWSLETTER_TEMPLATES.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                disabled={draft.isPending}
-                onClick={() => {
-                  setTemplate(item.id);
-                  setAngle("");
-                }}
-                aria-pressed={template === item.id}
-                className={cn(
-                  "rounded-xl border p-3 text-left transition-colors",
-                  template === item.id
-                    ? "border-foreground bg-accent/40"
-                    : "hover:bg-accent/40",
-                )}
-              >
-                <div className="text-sm font-medium">{item.label}</div>
-                <div className="text-xs text-muted-foreground">
-                  {item.summary}
-                </div>
-                <ol className="mt-2 flex flex-wrap gap-1">
-                  {item.structure.map((part) => (
-                    <li
-                      key={part}
-                      className="rounded-md bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground"
-                    >
-                      {part}
-                    </li>
+          <div className="space-y-3">
+            <Label htmlFor="email-recipe">Email recipe</Label>
+            <select
+              id="email-recipe"
+              value={template}
+              disabled={draft.isPending}
+              className="w-full rounded-md border bg-background p-2 text-sm"
+              onChange={(event) => {
+                setTemplate(event.target.value as NewsletterTemplateId);
+                setAngle("");
+                setContext({});
+                setHomeId("");
+              }}
+            >
+              {[
+                ...new Set(NEWSLETTER_TEMPLATES.map((item) => item.category)),
+              ].map((category) => (
+                <optgroup key={category} label={category}>
+                  {NEWSLETTER_TEMPLATES.filter(
+                    (item) => item.category === category,
+                  ).map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.label}
+                    </option>
                   ))}
-                </ol>
-              </button>
-            ))}
+                </optgroup>
+              ))}
+            </select>
+            <p className="text-sm text-muted-foreground">{chosen.summary}</p>
+            {"trigger" in chosen && (
+              <p className="text-xs text-muted-foreground">
+                Intended use: {chosen.trigger}. Delivery stays inactive.
+              </p>
+            )}
+            <div className="flex flex-wrap gap-1">
+              {chosen.structure.map((part) => (
+                <span
+                  key={part}
+                  className="rounded-md bg-muted px-1.5 py-0.5 text-xs"
+                >
+                  {part}
+                </span>
+              ))}
+            </div>
+            {chosen.requiredContext
+              .filter((key) => key !== "offer")
+              .map((key) => (
+                <div key={key} className="space-y-1">
+                  <Label htmlFor={`recipe-${key}`}>
+                    {RECIPE_CONTEXT_LABELS[key] ?? key}
+                  </Label>
+                  <Textarea
+                    id={`recipe-${key}`}
+                    value={context[key] ?? ""}
+                    disabled={draft.isPending}
+                    placeholder={
+                      key.endsWith("Url")
+                        ? "https://…"
+                        : "Facts approved for this email"
+                    }
+                    onChange={(event) =>
+                      setContext((current) => ({
+                        ...current,
+                        [key]: event.target.value,
+                      }))
+                    }
+                  />
+                </div>
+              ))}
+            {needsSpecificHomes && (
+              <div className="space-y-1">
+                <Label htmlFor="recipe-home">Home</Label>
+                <select
+                  id="recipe-home"
+                  value={homeId}
+                  onChange={(event) => setHomeId(event.target.value)}
+                  disabled={draft.isPending}
+                  className="w-full rounded-md border bg-background p-2 text-sm"
+                >
+                  <option value="">Choose the home this email is about</option>
+                  {options.data?.homes.map((home) => (
+                    <option key={home.id} value={home.id}>
+                      {home.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div className="space-y-1">
+              <Label htmlFor="recipe-brief">Direction</Label>
+              <Textarea
+                id="recipe-brief"
+                value={brief}
+                onChange={(event) => setBrief(event.target.value)}
+                disabled={draft.isPending}
+                placeholder="What this email should say, and what to leave out"
+              />
+            </div>
           </div>
 
           <div className="space-y-1.5">
@@ -198,11 +275,21 @@ export function NewsletterTemplateStart({
               Cancel
             </Button>
             <Button
-              disabled={draft.isPending || noHomes}
+              disabled={
+                draft.isPending ||
+                noHomes ||
+                missingContext ||
+                (needsSpecificHomes && !homeId)
+              }
               onClick={() =>
                 draft.mutate({
                   brandId,
                   template,
+                  brief: brief.trim() || undefined,
+                  homeIds: homeId ? [homeId] : undefined,
+                  verifiedContext: Object.fromEntries(
+                    Object.entries(context).filter(([, value]) => value.trim()),
+                  ),
                   angle: angle.trim() || undefined,
                   offer: offer.trim() || undefined,
                   plannedAt: sendAt
@@ -213,8 +300,7 @@ export function NewsletterTemplateStart({
             >
               {draft.isPending ? (
                 <>
-                  <Loader2 className="size-4 animate-spin" /> Picking homes and
-                  writing
+                  <Loader2 className="size-4 animate-spin" /> Writing draft
                 </>
               ) : (
                 "Draft email"

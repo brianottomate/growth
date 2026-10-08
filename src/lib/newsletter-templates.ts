@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { EMAIL_RECIPES } from "./email-recipes";
 
 // Newsletter templates: a fixed structure the email always has, the brand's
 // homes picked for it by AI (from their photos and booking evidence), and the
@@ -8,6 +9,10 @@ import { z } from "zod";
 export const NEWSLETTER_TEMPLATES = [
   {
     id: "season-ahead",
+    category: "Property emails",
+    layout: "feature-list",
+    requiredContext: [] as readonly string[],
+    source: null,
     label: "Season ahead",
     summary: "A getaway for the season coming up",
     structure: [
@@ -25,6 +30,10 @@ export const NEWSLETTER_TEMPLATES = [
   },
   {
     id: "home-collection",
+    category: "Property emails",
+    layout: "grid",
+    requiredContext: [] as readonly string[],
+    source: null,
     label: "Home collection",
     summary: "Four homes that share one thing guests want",
     structure: [
@@ -39,6 +48,7 @@ export const NEWSLETTER_TEMPLATES = [
     anglePlaceholder: "Hot tubs, big groups, pet friendly",
     homes: 4,
   },
+  ...EMAIL_RECIPES,
 ] as const;
 
 export type NewsletterTemplateId = (typeof NEWSLETTER_TEMPLATES)[number]["id"];
@@ -70,7 +80,20 @@ export const draftFromTemplateInputSchema = z.object({
   template: z
     .enum(newsletterTemplateIds)
     .describe(
-      "season-ahead: a getaway for an upcoming season or occasion, one featured home then three more. home-collection: four homes sharing one trait guests want, in a grid.",
+      "Choose from the reusable recipe library. season-ahead and home-collection are property layouts; brian-* recipes cover Booking, During the stay, After the stay, Blasts and Holidays. Use listTemplates first for exact IDs, required facts and intended triggers.",
+    ),
+  verifiedContext: z
+    .record(z.string().max(80), z.string().trim().min(1).max(10000))
+    .optional()
+    .describe(
+      "Verified facts keyed by the recipe requiredContext fields returned by listTemplates. Facts belong to this brand/guest; never copy demo facts. Keys ending in Url must contain a real https URL.",
+    ),
+  homeIds: z
+    .array(z.string())
+    .max(16)
+    .optional()
+    .describe(
+      "Restrict picks to these homes from this brand. Use for viewed, saved, checkout or newly listed homes.",
     ),
   angle: z
     .string()
@@ -153,3 +176,42 @@ export function upcomingOccasions(from: Date) {
     (offset) => OCCASIONS[(from.getMonth() + offset) % 12] ?? [],
   );
 }
+
+/** Human labels for the structured facts used by the AI tool. */
+export const RECIPE_CONTEXT_LABELS: Record<string, string> = {
+  booking: "Reservation details",
+  receipt: "Payment and line items",
+  tripUrl: "Manage booking link",
+  reviews: "Verified guest reviews",
+  viewedHome: "Home the guest viewed",
+  search: "Search details",
+  checkout: "Checkout details",
+  completedStay: "Completed stay details",
+  arrival: "Arrival instructions",
+  access: "Access and parking instructions",
+  support: "Guest support details",
+  extension: "Approved extension terms",
+  inviteUrl: "Guest invitation link",
+  surveyUrl: "Guest survey link",
+  reviewUrl: "Leave a review link",
+  cancellation: "Cancellation details",
+  lastStay: "Previous stay details",
+  loyalty: "Loyalty benefits",
+  savedHome: "Home the guest saved",
+  priceChange: "Verified price change",
+  availability: "Verified open dates",
+  referral: "Referral terms",
+  referralUrl: "Referral link",
+  offerPolicy: "Offer rules",
+  offerUrl: "Submit an offer link",
+  credits: "Credit balance and terms",
+  creditsUrl: "Use credits link",
+  birthday: "Birthday details",
+  newHome: "New home announcement",
+  launch: "Site launch details",
+  bookingRanking: "Verified booking ranking",
+  upgrade: "Completed amenity upgrade",
+  importPermission: "Imported guest permission",
+  event: "Local event facts",
+  brandNews: "Brand news",
+};

@@ -280,6 +280,7 @@ export const growthActionPolicies = {
     importFromDrive: write({ consequence: "provider-write" }),
   },
   emailRead: {
+    listTemplates: read(),
     listSequences: read(),
     getSequence: read(),
     sequenceEmails: read(),

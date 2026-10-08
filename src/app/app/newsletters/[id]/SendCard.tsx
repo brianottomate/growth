@@ -42,6 +42,8 @@ export function SendCard({
   const [confirming, setConfirming] = useState(false);
 
   const blockers = workspace.brand.sendBlockers;
+  const creativeApproved = workspace.spot.status === "approved";
+  const canDispatch = creativeApproved || workspace.spot.status === "published";
   const latest = workspace.messageSends.find(
     (send) => send.provider === "postmark",
   );
@@ -79,6 +81,12 @@ export function SendCard({
   return (
     <section className="rounded-xl border bg-card p-4">
       <h2 className="font-semibold">Send</h2>
+      {!canDispatch && (
+        <p className="mt-2 text-sm text-muted-foreground">
+          Approve the creative to prepare delivery. You can send yourself a test
+          while reviewing.
+        </p>
+      )}
       {blockers.length > 0 ? (
         <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
           {blockers.map((blocker) => (
@@ -143,7 +151,9 @@ export function SendCard({
                   snapshotId,
                 })
               }
-              disabled={!snapshotId || prepare.isPending || dirty}
+              disabled={
+                !snapshotId || prepare.isPending || dirty || !creativeApproved
+              }
               className={buttonClass}
             >
               {prepare.isPending && <Loader2 className="size-4 animate-spin" />}
@@ -185,7 +195,7 @@ export function SendCard({
                       onClick={() =>
                         approve.mutate({ messageSendId: latest.id })
                       }
-                      disabled={approve.isPending}
+                      disabled={approve.isPending || !creativeApproved}
                       className={buttonClass}
                     >
                       <Check className="size-4" /> Approve
@@ -203,7 +213,7 @@ export function SendCard({
                               confirmation: "SEND",
                             })
                           }
-                          disabled={send.isPending}
+                          disabled={send.isPending || !canDispatch}
                           className={primaryClass}
                         >
                           {send.isPending && (
@@ -224,6 +234,7 @@ export function SendCard({
                       <button
                         type="button"
                         onClick={() => setConfirming(true)}
+                        disabled={!canDispatch}
                         className={primaryClass}
                       >
                         <Send className="size-4" /> Send now
