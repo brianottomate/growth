@@ -1,14 +1,18 @@
 import { ImageResponse } from "next/og";
+import sharp, { type OverlayOptions } from "sharp";
+import type { CSSProperties, ReactNode } from "react";
+import { previewImage } from "@/server/services/ad-preview-image";
 
 import type { AdPreviewAd } from "@/lib/ad-preview";
 import { loadGoogleFont } from "@/server/services/composition-fonts";
 import { loadAdPreviewPage } from "@/server/services/ad-preview.service";
 
 export const runtime = "nodejs";
+export const maxDuration = 120;
 
 const WIDTH = 1600;
 const PAD = 64;
-const ROW = 520;
+const ROW = 620;
 const TILE = 232;
 
 type Creative = Extract<AdPreviewAd, { kind: "creative" }>;
@@ -57,19 +61,35 @@ function rowImages(ad: Creative) {
 
 function Label({ children }: { children: string }) {
   return (
-    <div style={{ fontSize: 18, color: "#6b6b6b", letterSpacing: 0.4 }}>
+    <div
+      style={{
+        fontSize: 18,
+        color: "#6b6b6b",
+        letterSpacing: 0.4,
+        flexShrink: 0,
+      }}
+    >
       {children}
     </div>
   );
 }
 
-function AdRow({ ad, index }: { ad: AdPreviewAd; index: number }) {
+function AdRow({
+  ad,
+  index,
+  images,
+}: {
+  ad: AdPreviewAd;
+  index: number;
+  images: Map<string, string>;
+}) {
   return (
     <div
       style={{
         display: "flex",
         gap: 40,
         height: ROW,
+        flexShrink: 0,
         padding: 32,
         borderRadius: 24,
         border: "1px solid #e6e6e6",
@@ -82,11 +102,21 @@ function AdRow({ ad, index }: { ad: AdPreviewAd; index: number }) {
           display: "flex",
           flexDirection: "column",
           width: 420,
+          flexShrink: 0,
           gap: 12,
         }}
       >
         <Label>{`AD ${index + 1} · ${ad.format.toUpperCase()}`}</Label>
-        <div style={{ fontSize: 32, fontWeight: 600 }}>
+        <div
+          style={{
+            fontSize: 28,
+            fontWeight: 600,
+            lineHeight: 1.2,
+            lineClamp: 3,
+            overflow: "hidden",
+            flexShrink: 0,
+          }}
+        >
           {ad.title ?? `Ad ${index + 1}`}
         </div>
         {ad.kind === "creative" ? (
@@ -97,9 +127,19 @@ function AdRow({ ad, index }: { ad: AdPreviewAd; index: number }) {
               flexDirection: "column",
               gap: 12,
               flexGrow: 1,
+              minHeight: 0,
             }}
           >
-            <div style={{ fontSize: 22, fontWeight: 600, marginTop: 8 }}>
+            <div
+              style={{
+                fontSize: 22,
+                fontWeight: 600,
+                lineHeight: 1.25,
+                lineClamp: 2,
+                overflow: "hidden",
+                flexShrink: 0,
+              }}
+            >
               {clip(ad.headline, 80)}
             </div>
             <div
@@ -108,6 +148,9 @@ function AdRow({ ad, index }: { ad: AdPreviewAd; index: number }) {
                 color: "#3d3d3d",
                 lineHeight: 1.4,
                 whiteSpace: "pre-wrap",
+                lineClamp: 6,
+                overflow: "hidden",
+                flexShrink: 0,
               }}
             >
               {clip(ad.body, 260)}
@@ -123,6 +166,7 @@ function AdRow({ ad, index }: { ad: AdPreviewAd; index: number }) {
                 color: "#ffffff",
                 fontSize: 18,
                 fontWeight: 600,
+                flexShrink: 0,
               }}
             >
               {ad.callToAction
@@ -146,12 +190,18 @@ function AdRow({ ad, index }: { ad: AdPreviewAd; index: number }) {
           </div>
         )}
       </div>
-      {ad.kind === "creative" && <AdImages ad={ad} />}
+      {ad.kind === "creative" && <AdImages ad={ad} images={images} />}
     </div>
   );
 }
 
-function AdImages({ ad }: { ad: Creative }) {
+function AdImages({
+  ad,
+  images,
+}: {
+  ad: Creative;
+  images: Map<string, string>;
+}) {
   const { cards, more, story } = rowImages(ad);
   return (
     <div
@@ -167,7 +217,7 @@ function AdImages({ ad }: { ad: Creative }) {
           // eslint-disable-next-line @next/next/no-img-element
           <img
             key={i}
-            src={card.url}
+            src={images.get(card.url)}
             width={card.width}
             height={card.height}
             style={{ objectFit: "cover", borderRadius: 16 }}
@@ -176,7 +226,7 @@ function AdImages({ ad }: { ad: Creative }) {
         {story && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={story.url}
+            src={images.get(story.url)}
             width={story.width}
             height={story.height}
             style={{ objectFit: "cover", borderRadius: 16 }}
@@ -205,6 +255,38 @@ export async function GET(
   if (!preview) return new Response(null, { status: 404 });
   const ads = preview.campaign?.ads ?? [];
   const cards = preview.catalog?.cards ?? [];
+  // Deduplicate and resize before Satori embeds images. Original campaign
+  // artwork can otherwise consume gigabytes on an all-ads export.
+  const sources = [
+    ...new Set([
+      ...ads.flatMap((ad) => {
+        if (ad.kind !== "creative") return [];
+        const { cards, story } = rowImages(ad);
+        return [
+          ...cards.map((card) => card.url),
+          ...(story ? [story.url] : []),
+        ];
+      }),
+      ...cards.map((card) => card.image),
+    ]),
+  ];
+  const images = new Map<string, string>();
+  let next = 0;
+  try {
+    await Promise.all(
+      Array.from({ length: Math.min(3, sources.length) }, async () => {
+        while (next < sources.length) {
+          const src = sources[next++]!;
+          const { body, type } = await previewImage(src);
+          images.set(src, `data:${type};base64,${body.toString("base64")}`);
+        }
+      }),
+    );
+  } catch {
+    return new Response("Artwork could not be loaded. Please try again.", {
+      status: 502,
+    });
+  }
   const perRow = Math.floor((WIDTH - PAD * 2 + 24) / (TILE + 24));
   const catalogHeight = cards.length
     ? 220 + Math.ceil(cards.length / perRow) * (TILE + 130)
@@ -238,7 +320,7 @@ export async function GET(
         <Label>{`CAMPAIGN · ${ads.length} ${ads.length === 1 ? "AD" : "ADS"}${preview.campaign?.unavailableAds ? ` · ${preview.campaign.unavailableAds} APPROVED ADS AWAITING PREVIEW ARTWORK` : ""}`}</Label>
       )}
       {ads.map((ad, index) => (
-        <AdRow key={ad.id} ad={ad} index={index} />
+        <AdRow key={ad.id} ad={ad} index={index} images={images} />
       ))}
       {cards.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -261,7 +343,7 @@ export async function GET(
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={card.image}
+                  src={images.get(card.image)}
                   width={TILE}
                   height={TILE}
                   style={{ objectFit: "contain", borderRadius: 14 }}
@@ -292,12 +374,57 @@ export async function GET(
   );
 
   const download = new URL(request.url).searchParams.get("download") === "1";
-  return new ImageResponse(sheet, {
-    width: WIDTH,
-    height,
-    emoji: "twemoji",
-    ...(fonts ? { fonts } : {}),
+  // Render bounded panels sequentially: a single tall Satori canvas grows
+  // WASM memory with every ad. Sharp assembles the finished panels natively.
+  const { children, style } = sheet.props as {
+    children: ReactNode[];
+    style: CSSProperties;
+  };
+  const panels = [
+    { content: [children[0], children[1]], height: 140 },
+    ...ads.map((ad, index) => ({
+      content: <AdRow ad={ad} index={index} images={images} />,
+      height: ROW + 32,
+    })),
+    { content: [children[3], children[4]], height: catalogHeight + 60 },
+  ];
+  const composites: OverlayOptions[] = [];
+  let top = PAD;
+  for (const panel of panels) {
+    const response = new ImageResponse(
+      <div
+        style={{
+          ...style,
+          height: panel.height,
+          padding: `0 ${PAD}px`,
+          gap: 20,
+        }}
+      >
+        {panel.content}
+      </div>,
+      {
+        width: WIDTH,
+        height: panel.height,
+        emoji: "twemoji",
+        ...(fonts ? { fonts } : {}),
+      },
+    );
+    composites.push({
+      input: Buffer.from(await response.arrayBuffer()),
+      top,
+      left: 0,
+    });
+    top += panel.height;
+  }
+  const body = await sharp({
+    create: { width: WIDTH, height, channels: 3, background: "#f6f5f3" },
+  })
+    .composite(composites)
+    .png()
+    .toBuffer();
+  return new Response(new Uint8Array(body), {
     headers: {
+      "Content-Type": "image/png",
       "Cache-Control": "private, max-age=300",
       "X-Robots-Tag": "noindex",
       ...(download

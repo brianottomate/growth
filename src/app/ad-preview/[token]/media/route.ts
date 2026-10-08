@@ -3,7 +3,7 @@ import {
   loadAdPreviewPage,
 } from "@/server/services/ad-preview.service";
 
-const MAX_BYTES = 15 * 1024 * 1024;
+import { previewImage } from "@/server/services/ad-preview-image";
 
 /** Each link's servable URLs, briefly, so an export is not a query per image. */
 const allowedByToken = new Map<string, { urls: Set<string>; at: number }>();
@@ -34,17 +34,11 @@ export async function GET(
   const allowed = src ? await allowedUrls(token) : null;
   if (!src || !allowed?.has(src)) return new Response(null, { status: 404 });
 
-  const upstream = await fetch(src, {
-    redirect: "error",
-    signal: AbortSignal.timeout(15_000),
-  }).catch(() => null);
-  const type = upstream?.headers.get("content-type") ?? "";
-  const size = Number(upstream?.headers.get("content-length") ?? 0);
-  if (!upstream?.ok || !type.startsWith("image/") || size > MAX_BYTES)
-    return new Response(null, { status: 502 });
-  return new Response(upstream.body, {
+  const image = await previewImage(src).catch(() => null);
+  if (!image) return new Response(null, { status: 502 });
+  return new Response(new Uint8Array(image.body), {
     headers: {
-      "Content-Type": type,
+      "Content-Type": image.type,
       "Cache-Control": "private, max-age=3600",
       "X-Robots-Tag": "noindex",
     },

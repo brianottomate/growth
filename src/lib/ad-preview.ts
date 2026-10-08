@@ -138,6 +138,12 @@ export const createAdPreviewLinkInput = z
   .object({
     brandId: z.string().min(1),
     campaignId: z.string().min(1).nullable(),
+    campaignAdIds: z
+      .array(z.string().min(1).max(64))
+      .min(1)
+      .max(100)
+      .nullable()
+      .default(null),
     catalogExportId: z.string().min(1).nullable(),
     catalogCardIndexes: z
       .array(z.number().int().min(0).max(9999))

@@ -17,6 +17,7 @@ import {
   type createAdPreviewLinkInput,
 } from "@/lib/ad-preview";
 import { emptyCatalogAdCopy, type CatalogDraft } from "@/lib/catalog-studio";
+import { metaPreviewMedia } from "@/lib/meta-preview";
 import { freezeApprovedAd } from "./ad-approval.service";
 import { ensureBrandConnect } from "./brand-connect.service";
 
@@ -33,6 +34,7 @@ type PreviewClaims = {
   x: string | null;
   e: number;
   h?: number[] | null;
+  a?: string[] | null;
 };
 
 function signingKey() {
@@ -52,7 +54,7 @@ function signToken(claims: PreviewClaims, brandToken: string) {
 /** The claims of a genuine, unexpired link, or null. */
 async function readToken(token: string): Promise<PreviewClaims | null> {
   const [payload, sig, extra] = token.split(".");
-  if (!payload || !sig || extra !== undefined || token.length > 8000)
+  if (!payload || !sig || extra !== undefined || token.length > 16000)
     return null;
   let claims: PreviewClaims;
   try {
@@ -118,7 +120,14 @@ export async function adPreviewOptions(orgId: string, brandId: string) {
     }),
     db.query.adTable.findMany({
       where: and(eq(adTable.brandId, brandId), eq(adTable.status, "approved")),
-      columns: { id: true, campaignId: true, replacesAdId: true },
+      columns: {
+        id: true,
+        campaignId: true,
+        name: true,
+        content: true,
+        brandId: true,
+      },
+      orderBy: (ad, { asc }) => [asc(ad.createdAt)],
     }),
     db.query.catalogExportTable.findMany({
       where: eq(catalogExportTable.brandId, brandId),
@@ -132,6 +141,29 @@ export async function adPreviewOptions(orgId: string, brandId: string) {
       .map((campaign) => ({
         ...campaign,
         approved: ads.filter((ad) => ad.campaignId === campaign.id).length,
+        ads: ads
+          .filter((ad) => ad.campaignId === campaign.id)
+          .map((ad) => {
+            const media =
+              "media" in ad.content
+                ? metaPreviewMedia(ad.content, "facebook-feed", ad.brandId)
+                    .media[0]
+                : null;
+            return {
+              id: ad.id,
+              name: ad.name,
+              headline:
+                "headline" in ad.content
+                  ? ad.content.headline
+                  : (ad.content.headlines[0] ?? "Search ad"),
+              thumbnail:
+                media?.type === "video"
+                  ? "thumbnail" in media
+                    ? (media.thumbnail ?? null)
+                    : null
+                  : (media?.url ?? null),
+            };
+          }),
       }))
       .filter((campaign) => campaign.approved > 0),
     catalogExports: exports.map((row) => ({
@@ -167,13 +199,25 @@ export async function createAdPreviewLink(
     const approved = await db.query.adTable.findMany({
       where: and(
         eq(adTable.campaignId, campaign.id),
+        eq(adTable.brandId, brand.id),
         eq(adTable.status, "approved"),
       ),
       columns: { id: true },
     });
     if (!approved.length)
       throw new Error("This campaign has no approved ads yet.");
-    for (const ad of approved) await freezeApprovedAd(ad.id);
+    if (
+      input.campaignAdIds &&
+      (new Set(input.campaignAdIds).size !== input.campaignAdIds.length ||
+        input.campaignAdIds.some((id) => !approved.some((ad) => ad.id === id)))
+    )
+      throw new Error("Choose approved ads from this campaign.");
+    const selected = input.campaignAdIds
+      ? approved.filter((ad) => input.campaignAdIds!.includes(ad.id))
+      : approved;
+    for (const ad of selected) await freezeApprovedAd(ad.id);
+  } else if (input.campaignAdIds) {
+    throw new Error("Choose a campaign before selecting ads.");
   }
   if (input.catalogExportId) {
     const catalog = await frozenCatalog(brand.id, input.catalogExportId);
@@ -198,6 +242,7 @@ export async function createAdPreviewLink(
       x: input.catalogExportId,
       e: expiresAt,
       h: input.catalogCardIndexes,
+      a: input.campaignAdIds,
     },
     brandToken,
   );
@@ -278,13 +323,17 @@ export async function loadAdPreviewPage(token: string) {
     ? await db.query.adTable.findMany({
         where: and(
           eq(adTable.campaignId, campaign.id),
+          eq(adTable.brandId, brand.id),
           eq(adTable.status, "approved"),
         ),
         with: { home: { columns: { name: true } } },
         orderBy: (ad, { asc }) => [asc(ad.createdAt)],
       })
     : [];
-  const ads = rows.flatMap((row) => {
+  const selectedRows = claims.a
+    ? rows.filter((row) => claims.a!.includes(row.id))
+    : rows;
+  const ads = selectedRows.flatMap((row) => {
     const ad = adPreviewAd({ ...row, homeName: row.home?.name });
     return ad ? [{ id: row.id, ...ad }] : [];
   });
@@ -304,7 +353,11 @@ export async function loadAdPreviewPage(token: string) {
     brandLogo,
     expiresAt: new Date(claims.e).toISOString(),
     campaign: campaign
-      ? { name: campaign.name, ads, unavailableAds: rows.length - ads.length }
+      ? {
+          name: campaign.name,
+          ads,
+          unavailableAds: selectedRows.length - ads.length,
+        }
       : null,
     catalog: selectedCatalog?.cards.length ? selectedCatalog : null,
   };

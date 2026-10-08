@@ -103,7 +103,7 @@ export function AdPreviewBoard({
             aria-label="Catalog"
             data-export-ad
             data-export-name="catalog"
-            className="space-y-5 rounded-2xl border border-border bg-surface-primary p-4 sm:p-6"
+            className="space-y-5 rounded-2xl border border-border bg-surface-primary p-4 sm:p-6 print:border-0 print:p-0"
           >
             <div>
               <p className="text-xs text-muted-foreground">
@@ -117,14 +117,14 @@ export function AdPreviewBoard({
             <p className="text-sm whitespace-pre-wrap">
               {preview.catalog.ad?.primaryText}
             </p>
-            <div className="@container">
+            <div className="@container print:[zoom:0.78] print:break-inside-avoid print:break-after-page print:[&>div]:grid-cols-3 print:[&>div]:gap-3">
               <CatalogCollectionPreview
                 brandName={preview.brandName}
                 ad={preview.catalog.ad ?? undefined}
                 cards={preview.catalog.cards}
               />
             </div>
-            <div className="space-y-3">
+            <div className="space-y-3 print:break-before-page">
               <h3 className="text-sm font-semibold">Included homes</h3>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 print:grid-cols-3">
                 {preview.catalog.cards.map((card) => (

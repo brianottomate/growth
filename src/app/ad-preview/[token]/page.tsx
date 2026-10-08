@@ -50,5 +50,45 @@ export default async function AdPreviewPage({
         </div>
       </main>
     );
-  return <AdPreviewBoard token={token} preview={preview} />;
+  const imageUrl = (src: string | null) =>
+    src?.startsWith("https://")
+      ? `/ad-preview/${token}/media?u=${encodeURIComponent(src)}`
+      : src;
+  return (
+    <AdPreviewBoard
+      token={token}
+      preview={{
+        ...preview,
+        brandLogo: imageUrl(preview.brandLogo),
+        campaign: preview.campaign && {
+          ...preview.campaign,
+          ads: preview.campaign.ads.map((ad) =>
+            ad.kind === "creative"
+              ? {
+                  ...ad,
+                  placements: ad.placements.map((placement) => ({
+                    ...placement,
+                    media: placement.media.map((media) => ({
+                      ...media,
+                      url:
+                        media.type === "image"
+                          ? imageUrl(media.url)!
+                          : media.url,
+                      thumbnail: imageUrl(media.thumbnail ?? null),
+                    })),
+                  })),
+                }
+              : ad,
+          ),
+        },
+        catalog: preview.catalog && {
+          ...preview.catalog,
+          cards: preview.catalog.cards.map((card) => ({
+            ...card,
+            image: imageUrl(card.image)!,
+          })),
+        },
+      }}
+    />
+  );
 }

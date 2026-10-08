@@ -38,7 +38,9 @@ function inline(token: string, src: string) {
   if (!data) {
     data = (async () => {
       const response = await fetch(
-        `/ad-preview/${token}/media?u=${encodeURIComponent(src)}`,
+        new URL(src, location.href).origin === location.origin
+          ? src
+          : `/ad-preview/${token}/media?u=${encodeURIComponent(src)}`,
       );
       if (!response.ok) throw new Error(`Image ${response.status}`);
       const blob = await response.blob();
@@ -72,9 +74,7 @@ function inline(token: string, src: string) {
 async function inlineImages(root: HTMLElement, token: string) {
   const images = [...root.querySelectorAll("img")].filter((img) => {
     const src = img.currentSrc || img.src;
-    return (
-      src.startsWith("https://") && new URL(src).origin !== location.origin
-    );
+    return src.startsWith("http://") || src.startsWith("https://");
   });
   const originals = images.map((img) => ({
     img,
@@ -82,10 +82,15 @@ async function inlineImages(root: HTMLElement, token: string) {
     srcset: img.getAttribute("srcset"),
   }));
   const sources = [...new Set(images.map((img) => img.currentSrc || img.src))];
-  const data = new Map(
-    await Promise.all(
-      sources.map(async (src) => [src, await inline(token, src)] as const),
-    ),
+  const data = new Map<string, string>();
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(3, sources.length) }, async () => {
+      while (next < sources.length) {
+        const src = sources[next++]!;
+        data.set(src, await inline(token, src));
+      }
+    }),
   );
   for (const img of images) {
     const copy = data.get(img.currentSrc || img.src);
