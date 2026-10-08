@@ -99,11 +99,13 @@ export function PerformanceClientCard({
   view = "All",
   detailSignal,
   context = "board",
+  dragHandle,
 }: {
   card: PerformancePipelineCard;
   view?: CardView;
   detailSignal?: { detail: CardDetail; revision: number };
   context?: "board" | "client";
+  dragHandle?: ReactNode;
 }) {
   const [detail, setDetail] = useState<CardDetail>(
     detailSignal?.detail ?? "Compact",
@@ -127,6 +129,7 @@ export function PerformanceClientCard({
           view={view}
           onDetail={setDetail}
           onEdit={() => setEditing(true)}
+          dragHandle={dragHandle}
         />
         {editing && (
           <EditClientState card={card} onClose={() => setEditing(false)} />
@@ -147,7 +150,10 @@ export function PerformanceClientCard({
         className={`grid ${context === "client" ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-[44px_minmax(0,1fr)_auto]"} items-start gap-x-2.5 gap-y-1`}
       >
         {context === "board" ? (
-          <BrandLogo brand={card} className="row-span-2 size-11" />
+          <div className="row-span-2 flex flex-col items-center gap-1">
+            <BrandLogo brand={card} className="size-11" />
+            {dragHandle}
+          </div>
         ) : null}
         <h3
           className={`${context === "client" ? "col-start-1" : "col-start-2"} row-start-1 min-w-0 self-center text-sm font-semibold`}
@@ -514,11 +520,13 @@ function DenseCard({
   view,
   onDetail,
   onEdit,
+  dragHandle,
 }: {
   card: PerformancePipelineCard;
   view: CardView;
   onDetail: (detail: CardDetail) => void;
   onEdit: () => void;
+  dragHandle?: ReactNode;
 }) {
   const chips = statusChips(card.state).filter(
     (chip) =>
@@ -533,6 +541,7 @@ function DenseCard({
       style={cardTheme}
     >
       <div className="flex items-center gap-2.5">
+        {dragHandle}
         <BrandLogo brand={card} className="size-7 text-[10px]" />
         <div className="min-w-0 flex-1">
           <Link

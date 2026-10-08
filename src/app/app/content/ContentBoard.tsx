@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
@@ -8,16 +8,19 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   DndContext,
   DragOverlay,
-  PointerSensor,
-  KeyboardSensor,
   useDraggable,
   useDroppable,
-  useSensor,
-  useSensors,
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
 
+import {
+  stageBoardCollision,
+  stageBoardInstructions,
+  stageBoardAnnouncements,
+  restoreStageBoardFocus,
+  useStageBoardSensors,
+} from "@/components/ui/stage-board-dnd";
 import { orpc } from "@/orpc/client";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { SimpleSelect } from "@/components/ui/select";
@@ -202,8 +205,6 @@ export function ContentBoard({
   const [statusFilter, setStatusFilter] = useState("all");
   const [mineOnly, setMineOnly] = useState(false);
   const [activeCard, setActiveCard] = useState<Card | null>(null);
-  // A real drag should not also "click" the card open afterwards.
-  const suppressClick = useRef(false);
 
   const input = useMemo(
     () => ({
@@ -228,12 +229,27 @@ export function ContentBoard({
     orpc.content.assignableMembers.queryOptions(),
   );
 
+  const keyboardMove = useRef<string | null>(null);
+  const keyboardFocus = useRef<{ id: string; stage: string } | null>(null);
+  useEffect(() => {
+    const focus = keyboardFocus.current;
+    if (
+      !focus ||
+      cards.find((card) => card.id === focus.id)?.status !== focus.stage
+    )
+      return;
+    keyboardFocus.current = null;
+    restoreStageBoardFocus(focus.id, focus.stage);
+  }, [cards]);
   const setStatus = useMutation(
     orpc.content.updateWorkItem.mutationOptions({
       onMutate: async ({ contentPostId, contentStatus }) => {
         const key = boardOptions.queryKey;
         await qc.cancelQueries({ queryKey: key });
         const prev = qc.getQueryData<Card[]>(key);
+        const keyboard = keyboardMove.current === contentPostId;
+        if (keyboard && contentStatus)
+          keyboardFocus.current = { id: contentPostId, stage: contentStatus };
         qc.setQueryData<Card[]>(key, (old) =>
           old?.map((c) =>
             c.id === contentPostId && contentStatus
@@ -241,9 +257,15 @@ export function ContentBoard({
               : c,
           ),
         );
-        return { prev, key };
+        return { prev, key, keyboard };
       },
       onError: (error, _v, context) => {
+        if (context?.keyboard) {
+          const card = context.prev?.find(
+            (card) => card.id === _v.contentPostId,
+          );
+          if (card) keyboardFocus.current = { id: card.id, stage: card.status };
+        }
         if (context?.prev) qc.setQueryData(context.key, context.prev);
         toast.error(error.message);
       },
@@ -415,10 +437,7 @@ export function ContentBoard({
     return m;
   }, [visible]);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor),
-  );
+  const sensors = useStageBoardSensors();
 
   const onDragStart = (e: DragStartEvent) => {
     setActiveCard(cards.find((c) => c.id === e.active.id) ?? null);
@@ -426,19 +445,16 @@ export function ContentBoard({
 
   const onDragEnd = (e: DragEndEvent) => {
     setActiveCard(null);
-    suppressClick.current = true;
     const overStatus = e.over?.id as ContentStatus | undefined;
     const card = cards.find((c) => c.id === e.active.id);
     if (overStatus && card && card.status !== overStatus) {
+      keyboardMove.current =
+        e.activatorEvent.type === "keydown" ? card.id : null;
       setStatus.mutate({ contentPostId: card.id, contentStatus: overStatus });
     }
   };
 
   const openCard = (id: string) => {
-    if (suppressClick.current) {
-      suppressClick.current = false;
-      return;
-    }
     router.push(`/app/content/${id}`);
   };
 
@@ -633,6 +649,11 @@ export function ContentBoard({
       ) : (
         <DndContext
           sensors={sensors}
+          collisionDetection={stageBoardCollision}
+          accessibility={{
+            screenReaderInstructions: stageBoardInstructions,
+            announcements: stageBoardAnnouncements,
+          }}
           onDragStart={onDragStart}
           onDragEnd={onDragEnd}
           onDragCancel={() => setActiveCard(null)}
@@ -1649,7 +1670,7 @@ function Column({
   loading: boolean;
   assign: Assign;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: status });
+  const { setNodeRef, isOver } = useDroppable({ id: status, data: { label } });
   return (
     <div className="flex w-64 shrink-0 grow flex-col">
       <div className="mb-2 flex items-center gap-2 px-1">
@@ -1661,6 +1682,9 @@ function Column({
       </div>
       <div
         ref={setNodeRef}
+        data-stage-column={status}
+        tabIndex={-1}
+        aria-label={label}
         className={cn(
           "flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto rounded-xl border border-dashed p-2 transition-colors",
           isOver ? "border-foreground/40 bg-accent/30" : "border-border/60",
@@ -1691,6 +1715,7 @@ function DraggableCard({
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, isDragging } =
     useDraggable({
       id: card.id,
+      data: { label: card.title ?? "Untitled" },
     });
   // Hover + Space self-toggles the idea owner (Trello-style).
   const hover = useSelfAssignHotkey({
@@ -1714,6 +1739,7 @@ function DraggableCard({
             ref={setActivatorNodeRef}
             {...listeners}
             {...attributes}
+            data-stage-card-handle={card.id}
             aria-label={`Move ${card.title ?? "Untitled"} between stages`}
             onClick={(event) => event.stopPropagation()}
             className="grid size-11 shrink-0 cursor-grab touch-none place-items-center rounded-md text-muted-foreground hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring @xl:size-7"

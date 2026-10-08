@@ -1,18 +1,35 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ChevronLeft, ChevronRight, GripVertical } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   parseAsArrayOf,
   parseAsString,
   parseAsStringLiteral,
   useQueryStates,
 } from "nuqs";
+import { useRouter } from "next/navigation";
+import {
+  DndContext,
+  DragOverlay,
+  useDraggable,
+  useDroppable,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import { orpc } from "@/orpc/client";
+import { toast } from "@/components/ui/toast";
+import { cn } from "@/components/ui/lib/utils";
+import {
+  stageBoardCollision,
+  stageBoardInstructions,
+  stageBoardAnnouncements,
+  restoreStageBoardFocus,
+  useStageBoardSensors,
+} from "@/components/ui/stage-board-dnd";
 import { Button } from "@/components/ui/button";
 import { useContentWidth } from "@/components/content-width";
 import { Input } from "@/components/ui/input";
-import { orpc } from "@/orpc/client";
 import {
   PIPELINE_COLUMNS,
   type PipelineStage,
@@ -90,6 +107,74 @@ export function PipelineBoard({
   /** What opens under a list row, keyed by card id. */
   details?: Record<string, ReactNode>;
 }) {
+  const router = useRouter();
+  const sensors = useStageBoardSensors();
+  const [activeCard, setActiveCard] = useState<PipelineCard | null>(null);
+  const [stageOverrides, setStageOverrides] = useState<
+    Record<string, PipelineStage>
+  >({});
+  const saving = useRef(false);
+  const keyboardMove = useRef<string | null>(null);
+  const savedMoves = useRef(new Set<string>());
+  // Keep a successful move visible until the server refresh acknowledges it.
+  useEffect(() => {
+    const saved = new Set(savedMoves.current);
+    savedMoves.current.clear();
+    setStageOverrides((current) => {
+      const confirmed = cards.filter(
+        (card) =>
+          current[card.id] !== undefined &&
+          (current[card.id] === card.stage || saved.has(card.id)),
+      );
+      if (!confirmed.length) return current;
+      const next = { ...current };
+      for (const card of confirmed) {
+        delete next[card.id];
+      }
+      return next;
+    });
+  }, [cards]);
+  const move = useMutation(
+    orpc.performance.setPipelineStage.mutationOptions({
+      onSuccess: (_result, input) => {
+        savedMoves.current.add(input.brandId);
+      },
+      onError: (error, input) => {
+        setStageOverrides((current) => {
+          const next = { ...current };
+          delete next[input.brandId];
+          return next;
+        });
+        toast.error(error.message);
+        if (keyboardMove.current === input.brandId) {
+          const card = cards.find((card) => card.id === input.brandId);
+          if (card) restoreStageBoardFocus(card.id, card.stage);
+        }
+      },
+      onSettled: () => {
+        keyboardMove.current = null;
+        saving.current = false;
+        router.refresh();
+      },
+    }),
+  );
+  function onDragEnd({ active, over, activatorEvent }: DragEndEvent) {
+    setActiveCard(null);
+    const stage = PIPELINE_COLUMNS.find((column) => column.id === over?.id)?.id;
+    const card = cards.find((card) => card.id === active.id);
+    if (
+      !stage ||
+      !card ||
+      saving.current ||
+      (stageOverrides[card.id] ?? card.stage) === stage
+    )
+      return;
+    keyboardMove.current = activatorEvent.type === "keydown" ? card.id : null;
+    if (keyboardMove.current) restoreStageBoardFocus(card.id, stage);
+    saving.current = true;
+    setStageOverrides((current) => ({ ...current, [card.id]: stage }));
+    move.mutate({ brandId: card.id, stage });
+  }
   // Every control lives in the URL so a view can be bookmarked or shared.
   const [params, setParams] = useQueryStates(
     {
@@ -135,14 +220,17 @@ export function PipelineBoard({
     ...orpc.performance.staffRoster.queryOptions(),
     staleTime: 5 * 60_000,
   }).data?.currentUserId;
-  const matching = cards.filter(
-    (card) =>
-      `${card.name} ${card.website ?? ""}`
-        .toLowerCase()
-        .includes(search.trim().toLowerCase()) &&
-      (params.people === "all" ||
-        (!!me && (card.lead?.id === me || card.csLead?.id === me))),
-  );
+  const matching = cards
+    .map((card) => ({ ...card, stage: stageOverrides[card.id] ?? card.stage }))
+    .filter(
+      (card) =>
+        `${card.name} ${card.website ?? ""}`
+          .toLowerCase()
+          .includes(search.trim().toLowerCase()) &&
+        (params.people === "all" ||
+          (!!me && (card.lead?.id === me || card.csLead?.id === me))),
+    )
+    .sort((a, b) => a.name.localeCompare(b.name));
   // The board shows every column; the list narrows to clients or prospects.
   const visible =
     layout === "list" && params.who !== "all"
@@ -262,90 +350,194 @@ export function PipelineBoard({
           />
         </div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden pb-3">
-          <div
-            className="grid h-full items-start gap-3"
-            style={{
-              gridTemplateColumns: PIPELINE_COLUMNS.map((column) =>
-                collapsed.includes(column.id) ? "44px" : "minmax(340px, 1fr)",
-              ).join(" "),
-              minWidth:
-                PIPELINE_COLUMNS.reduce(
-                  (width, column) =>
-                    width + (collapsed.includes(column.id) ? 44 : 340),
-                  0,
-                ) +
-                (PIPELINE_COLUMNS.length - 1) * 12,
-            }}
-          >
-            {PIPELINE_COLUMNS.map((column) => {
-              const rows = visible.filter((card) => card.stage === column.id);
-              if (collapsed.includes(column.id))
-                return (
-                  <button
-                    key={column.id}
-                    type="button"
-                    aria-label={`Expand ${column.name}`}
-                    aria-expanded={false}
-                    onClick={() => toggleColumn(column.id)}
-                    className="flex min-h-52 flex-col items-center gap-3 rounded-xl border bg-muted/10 px-2 py-3 hover:bg-muted/30 focus-visible:outline-2 focus-visible:outline-ring"
-                  >
-                    <ChevronRight className="size-3 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">
-                      {rows.length}
-                    </span>
-                    <span
-                      className="text-xs font-medium"
-                      style={{ writingMode: "vertical-rl" }}
+        <DndContext
+          id="performance-pipeline"
+          sensors={sensors}
+          collisionDetection={stageBoardCollision}
+          accessibility={{
+            screenReaderInstructions: stageBoardInstructions,
+            announcements: stageBoardAnnouncements,
+          }}
+          onDragStart={({ active }) =>
+            setActiveCard(visible.find((card) => card.id === active.id) ?? null)
+          }
+          onDragCancel={() => setActiveCard(null)}
+          onDragEnd={onDragEnd}
+        >
+          <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden pb-3">
+            <div
+              className="grid h-full items-start gap-3"
+              style={{
+                gridTemplateColumns: PIPELINE_COLUMNS.map((column) =>
+                  collapsed.includes(column.id) ? "44px" : "minmax(340px, 1fr)",
+                ).join(" "),
+                minWidth:
+                  PIPELINE_COLUMNS.reduce(
+                    (width, column) =>
+                      width + (collapsed.includes(column.id) ? 44 : 340),
+                    0,
+                  ) +
+                  (PIPELINE_COLUMNS.length - 1) * 12,
+              }}
+            >
+              {PIPELINE_COLUMNS.map((column) => {
+                const rows = visible.filter((card) => card.stage === column.id);
+                if (collapsed.includes(column.id))
+                  return (
+                    <StageDropTarget
+                      key={column.id}
+                      stage={column.id}
+                      collapsed
                     >
-                      {column.name}
-                    </span>
-                  </button>
-                );
-              return (
-                <section
-                  key={column.id}
-                  aria-label={column.name}
-                  className="flex max-h-full min-h-0 flex-col rounded-xl border bg-muted/10 p-2"
-                >
-                  <div className="mb-2 flex shrink-0 items-center justify-between gap-2 px-1">
-                    <h2 className="text-xs font-semibold">{column.name}</h2>
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs text-muted-foreground">
-                        {rows.length}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        aria-label={`Collapse ${column.name}`}
-                        aria-expanded
+                      <button
+                        type="button"
+                        aria-label={`Expand ${column.name}`}
+                        aria-expanded={false}
                         onClick={() => toggleColumn(column.id)}
+                        className="flex min-h-52 flex-col items-center gap-3 rounded-xl border bg-muted/10 px-2 py-3 hover:bg-muted/30 focus-visible:outline-2 focus-visible:outline-ring"
                       >
-                        <ChevronLeft />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="min-h-0 scrollbar-thin space-y-2 overflow-y-auto">
-                    {rows.map((card) => (
-                      <PerformanceClientCard
-                        key={card.id}
-                        card={card}
-                        view={view}
-                        detailSignal={detailSignal}
-                      />
-                    ))}
-                    {rows.length === 0 && (
-                      <p className="rounded-lg border border-dashed p-5 text-center text-xs text-muted-foreground">
-                        No clients in this stage.
-                      </p>
-                    )}
-                  </div>
-                </section>
-              );
-            })}
+                        <ChevronRight className="size-3 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">
+                          {rows.length}
+                        </span>
+                        <span
+                          className="text-xs font-medium"
+                          style={{ writingMode: "vertical-rl" }}
+                        >
+                          {column.name}
+                        </span>
+                      </button>
+                    </StageDropTarget>
+                  );
+                return (
+                  <StageDropTarget key={column.id} stage={column.id}>
+                    <section
+                      aria-label={column.name}
+                      className="flex h-full max-h-full min-h-52 flex-col rounded-xl border bg-muted/10 p-2"
+                    >
+                      <div className="mb-2 flex shrink-0 items-center justify-between gap-2 px-1">
+                        <h2 className="text-xs font-semibold">{column.name}</h2>
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-muted-foreground">
+                            {rows.length}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="icon-xs"
+                            aria-label={`Collapse ${column.name}`}
+                            aria-expanded
+                            onClick={() => toggleColumn(column.id)}
+                          >
+                            <ChevronLeft />
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="min-h-0 scrollbar-thin space-y-2 overflow-y-auto">
+                        {rows.map((card) => (
+                          <DraggableClientCard
+                            key={card.id}
+                            card={card}
+                            view={view}
+                            detailSignal={detailSignal}
+                            disabled={move.isPending}
+                          />
+                        ))}
+                        {rows.length === 0 && (
+                          <p className="rounded-lg border border-dashed p-5 text-center text-xs text-muted-foreground">
+                            No clients in this stage.
+                          </p>
+                        )}
+                      </div>
+                    </section>
+                  </StageDropTarget>
+                );
+              })}
+            </div>
           </div>
-        </div>
+          <DragOverlay>
+            {activeCard ? (
+              <div
+                className="rounded-xl border bg-card p-4 shadow-xl"
+                aria-hidden="true"
+              >
+                <p className="text-sm font-semibold">{activeCard.name}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Move to another stage
+                </p>
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       )}
+    </div>
+  );
+}
+
+function StageDropTarget({
+  stage,
+  collapsed = false,
+  children,
+}: {
+  stage: PipelineStage;
+  collapsed?: boolean;
+  children: ReactNode;
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: stage,
+    data: {
+      label: PIPELINE_COLUMNS.find((column) => column.id === stage)?.name,
+    },
+  });
+  return (
+    <div
+      ref={setNodeRef}
+      data-stage-column={stage}
+      tabIndex={-1}
+      className={cn(
+        "max-h-full min-h-0 rounded-xl",
+        collapsed ? "[&>button]:w-full" : "h-full",
+        isOver && "bg-accent/30 ring-2 ring-ring",
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+function DraggableClientCard({
+  card,
+  view,
+  detailSignal,
+  disabled,
+}: {
+  card: PipelineCard;
+  view: CardView;
+  detailSignal: { detail: CardDetail; revision: number };
+  disabled: boolean;
+}) {
+  const { setNodeRef, setActivatorNodeRef, attributes, listeners, isDragging } =
+    useDraggable({ id: card.id, disabled, data: { label: card.name } });
+  return (
+    <div ref={setNodeRef} className={cn(isDragging && "opacity-40")}>
+      <PerformanceClientCard
+        card={card}
+        view={view}
+        detailSignal={detailSignal}
+        dragHandle={
+          <button
+            type="button"
+            ref={setActivatorNodeRef}
+            {...attributes}
+            {...listeners}
+            aria-disabled={disabled}
+            data-stage-card-handle={card.id}
+            aria-label={`Move ${card.name} between stages`}
+            className="grid size-6 shrink-0 cursor-grab touch-none place-items-center rounded-md text-muted-foreground hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring aria-disabled:opacity-50 pointer-coarse:size-11"
+          >
+            <GripVertical className="size-4" />
+          </button>
+        }
+      />
     </div>
   );
 }
