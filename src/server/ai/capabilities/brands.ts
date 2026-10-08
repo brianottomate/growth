@@ -64,7 +64,7 @@ export async function orgBrandIds(orgId: string): Promise<string[]> {
 export const listBrands = growthAction({
   outputSchema: listBrandsOutputSchema,
   description:
-    "Find brands by name, slug, or website using query. Use this when a brand's id is unknown; use brandRead.get directly when the focused brand id is already known. Omit query only when the operator needs an organization-wide brand inventory. Returns id, name, slug, tagline and relationship.",
+    "Find brands by name, slug, or website using query. Use this when a brand's id is unknown; use brandRead.get directly when the focused brand id is already known. Omit query only when the operator needs an organization-wide brand inventory. Returns id, name, slug, tagline, logo and relationship.",
   inputSchema: z.object({
     query: z.string().trim().min(1).max(200).optional(),
   }),
@@ -91,6 +91,7 @@ export const listBrands = growthAction({
         slug: true,
         tagline: true,
         relationship: true,
+        logo: true,
       },
       orderBy: (t, { asc }) => asc(t.name),
     });

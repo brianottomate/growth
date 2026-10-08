@@ -61,7 +61,7 @@ function validationMessage(error: unknown) {
 function previewDocument(html: string, theme: string, host: string) {
   // Only trusted, server-provided widget HTML runs here. Edited JSON is sent as data.
   // The opaque-origin sandbox and CSP keep the preview away from app sessions.
-  const bootstrap = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src https://growth-red.vercel.app; connect-src 'none'; form-action 'none'; base-uri 'none'"><style>:root{color-scheme:${theme}!important}</style><script>
+  const bootstrap = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src https://growth-red.vercel.app https://www.wander.com; connect-src 'none'; form-action 'none'; base-uri 'none'"><style>:root{color-scheme:${theme}!important}</style><script>
 var waiters={},counter=0;
 window.openai={theme:${JSON.stringify(theme)},toolOutput:null};
 ${host === "openai" ? `window.openai.sendFollowUpMessage=function(args){return new Promise(function(resolve,reject){var id='openai-'+(++counter);waiters[id]={resolve:resolve,reject:reject};window.parent.postMessage({jsonrpc:'2.0',id:id,method:'openai/sendFollowUpMessage',params:args},'*')})};` : ""}

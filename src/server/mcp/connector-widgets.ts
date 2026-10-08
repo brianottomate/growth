@@ -193,7 +193,9 @@ export function registerConnectorResources(
                     "photos",
                   ].includes(widget.id)
                     ? resourceDomains
-                    : [],
+                    : widget.id === "brands"
+                      ? [...resourceDomains, "https://www.wander.com"]
+                      : [],
                 },
               },
               "openai/widgetDescription": widget.description,

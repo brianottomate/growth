@@ -16,6 +16,7 @@ export const listBrandsOutputSchema = z.strictObject({
       relationship: z.enum(["internal", "client", "prospect", "reference"]),
       slug: z.string().nullable(),
       tagline: z.string().nullable(),
+      logo: z.string().nullable().optional(),
     }),
   ),
 });

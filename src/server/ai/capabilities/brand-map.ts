@@ -28,7 +28,7 @@ export const getBrandMap = growthAction({
         isNull(brandTable.deletedAt),
         input.brandId ? eq(brandTable.id, input.brandId) : undefined,
       ),
-      columns: { id: true, name: true, slug: true, type: true },
+      columns: { id: true, name: true, slug: true, type: true, logo: true },
       orderBy: (table, { asc }) => [asc(table.name)],
     });
 

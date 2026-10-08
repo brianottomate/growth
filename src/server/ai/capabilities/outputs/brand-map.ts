@@ -7,6 +7,7 @@ export const getBrandMapOutputSchema = z.strictObject({
       id: z.string(),
       name: z.string(),
       slug: z.string().nullable(),
+      logo: z.string().nullable().optional(),
       surfaces: z.strictObject({
         blogPosts: z.number(),
         channels: z.number(),

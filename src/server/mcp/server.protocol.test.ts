@@ -108,7 +108,10 @@ async function assertToolCatalog(client: Client) {
     expect(tool?._meta?.["openai/outputTemplate"]).toBe(uri);
     const view = await client.readResource({ uri });
     expect(view.contents[0]?.mimeType).toBe("text/html;profile=mcp-app");
-    if (toolName === "mediaLibraryRead__listingPhotos") {
+    if (
+      toolName === "mediaLibraryRead__listingPhotos" ||
+      resourceName === "brand-picker"
+    ) {
       // Readability alone misses a host CSP that would blank native listing photos.
       const metadata = view.contents[0]?._meta as {
         ui?: { csp?: { resourceDomains?: string[] } };

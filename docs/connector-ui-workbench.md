@@ -37,7 +37,7 @@ own canonical result schema. Shared renderer aliases advertise one resource.
 Ad metrics explicitly refer to the returned shortlist. Spend/CPC retain the
 source account currency because the result does not carry a currency code.
 
-Samples contain synthetic workspace data and use a public Growth image. Every
+Samples contain synthetic workspace data, a public Growth image, and the public Wander logo. Every
 sample is validated against its canonical MCP tool result schema on the server.
 The same schema, serialized to JSON Schema, validates edited JSON before replay.
 Controls cover phone, chat-panel, and wide frames; light/dark themes; held tool
@@ -51,7 +51,7 @@ OpenAI follow-ups for the compatibility runtime. Host messages are logged.
 
 The iframe has an opaque origin (`sandbox="allow-scripts allow-forms"`). Its
 CSP blocks connections and form navigation while allowing local submit handlers
-and the public Growth fixture image origin. JSON is posted as data and never
+and the public Growth and Wander fixture image origins. JSON is posted as data and never
 interpolated into HTML. Messages from other frames are ignored. Unsupported RPC
 requests receive a method-not-found response. No tool, model, or provider action
 executes inside the simulator.

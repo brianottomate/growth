@@ -141,6 +141,11 @@ const ad = {
   homeId: null,
   name: "A weekend by the water",
   status: "kept",
+  readyAt: null,
+  readyBy: null,
+  approvedAt: null,
+  approvedBy: null,
+  replacesAdId: null,
   type: "creative",
   platforms: ["instagram"],
   placements: null,
@@ -270,6 +275,8 @@ const catalog = {
       imageUrl: image,
       templateId: "catalog-place",
       title: name,
+      adHeadline: name,
+      adDescription: "A place for time together",
       subtitle: "A place for time together",
       imagePosition: "center",
       showLogo: false,
@@ -283,6 +290,10 @@ const brands = ["Wander", "Coastal collection", "Mountain collection"].map(
     id: "demo-brand-" + i,
     name: name + " · Demo",
     slug: "demo-brand-" + i,
+    logo:
+      i === 0
+        ? "https://www.wander.com/Wander-Brand-Assets/svg/Logo%20Dark.svg"
+        : null,
     type: "company",
     url: "/app/brands/demo-brand-" + i,
     surfaces: {
@@ -389,11 +400,16 @@ export const workspaceFixtures: Record<string, ConnectorFixture[]> = {
       "Brand list response",
       "list",
       {
-        brands: brands.map((b) => ({
+        brands: brands.map((b, i) => ({
           id: b.id,
           name: b.name,
           slug: b.slug,
-          tagline: "Exceptional places. Better time together.",
+          logo: b.logo,
+          tagline: [
+            "Exceptional places. Better time together.",
+            "Unhurried stays by the water.",
+            "Cabins, fresh air, and room to reconnect.",
+          ][i],
           relationship: "internal",
         })),
       },
