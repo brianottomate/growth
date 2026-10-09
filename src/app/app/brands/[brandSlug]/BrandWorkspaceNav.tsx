@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 const tabs = [
   ["", "Overview"],
   ["strategy", "Strategy"],
+  ["inspiration", "Inspiration"],
   ["content", "Content"],
   ["newsletters", "Newsletters"],
   ["previews", "Organic previews"],
