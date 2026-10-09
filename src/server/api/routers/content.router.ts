@@ -99,109 +99,30 @@ const spotThreadItemInput = z.object({
 });
 
 export const contentRouter = {
-  /**
-   * Lightweight, org-scoped index for the global command palette. This stays
-   * deliberately smaller than `board`: no comments, analytics, media, or
-   * assignee joins. cmdk filters these rows client-side after the palette opens.
-   */
+  /** Lightweight, org-scoped client index for the global command palette. */
   searchIndex: protectedProcedure.handler(async ({ context: ctx }) => {
-    const { org, brands } = await orgContext(ctx);
-    if (!org) return { ideas: [], posts: [], clients: [] };
-    const brandIds = brands.map((brand) => brand.id);
-    if (!brandIds.length) return { ideas: [], posts: [], clients: [] };
-    const brandName = new Map(brands.map((brand) => [brand.id, brand.name]));
+    const { org } = await orgContext(ctx);
+    if (!org) return { clients: [] };
 
-    const [ideas, posts, clients] = await Promise.all([
-      ctx.db.query.contentPostTable.findMany({
-        where: and(
-          inArray(contentPostTable.brandId, brandIds),
-          isNull(contentPostTable.deletedAt),
-        ),
-        columns: {
-          id: true,
-          brandId: true,
-          title: true,
-          hook: true,
-          pillar: true,
-          status: true,
-          updatedAt: true,
-        },
-        with: {
-          series: { columns: { name: true } },
-        },
-        orderBy: [desc(contentPostTable.updatedAt)],
-      }),
-      ctx.db.query.platformPostTable.findMany({
-        where: and(
-          inArray(platformPostTable.brandId, brandIds),
-          eq(platformPostTable.source, "owned"),
-          isNull(platformPostTable.parentPlatformPostId),
-        ),
-        columns: {
-          id: true,
-          brandId: true,
-          contentPostId: true,
-          platform: true,
-          format: true,
-          status: true,
-          text: true,
-          updatedAt: true,
-        },
-        with: {
-          contentPost: {
-            columns: { id: true, title: true, deletedAt: true },
-          },
-        },
-        orderBy: [desc(platformPostTable.updatedAt)],
-      }),
-      // Performance clients and prospects, so ⌘K is a door into a brand.
-      ctx.db.query.brandTable.findMany({
-        where: and(
-          eq(brandTable.organizationId, org.id),
-          isNull(brandTable.deletedAt),
-          inArray(brandTable.relationship, ["client", "prospect"]),
-        ),
-        columns: {
-          id: true,
-          name: true,
-          slug: true,
-          website: true,
-          relationship: true,
-          businessStage: true,
-          deliveryStage: true,
-        },
-        orderBy: [asc(brandTable.name)],
-      }),
-    ]);
+    const clients = await ctx.db.query.brandTable.findMany({
+      where: and(
+        eq(brandTable.organizationId, org.id),
+        isNull(brandTable.deletedAt),
+        inArray(brandTable.relationship, ["client", "prospect"]),
+      ),
+      columns: {
+        id: true,
+        name: true,
+        slug: true,
+        website: true,
+        relationship: true,
+        businessStage: true,
+        deliveryStage: true,
+      },
+      orderBy: [asc(brandTable.name)],
+    });
 
     return {
-      ideas: ideas.map((idea) => ({
-        id: idea.id,
-        title: idea.title ?? "Untitled idea",
-        hook: idea.hook,
-        pillar: idea.pillar,
-        seriesName: idea.series?.name ?? null,
-        status: idea.status,
-        brandName: brandName.get(idea.brandId) ?? "—",
-        href: `/app/content/${idea.id}`,
-      })),
-      posts: posts
-        .filter(
-          (post) =>
-            post.contentPostId &&
-            post.contentPost &&
-            !post.contentPost.deletedAt,
-        )
-        .map((post) => ({
-          id: post.id,
-          title: post.contentPost?.title ?? "Untitled idea",
-          text: post.text,
-          platform: post.platform,
-          format: post.format,
-          status: post.status,
-          brandName: brandName.get(post.brandId) ?? "—",
-          href: `/app/content/${post.contentPostId}#post-${post.id}`,
-        })),
       clients: clients.map((client) => ({
         id: client.id,
         name: client.name,

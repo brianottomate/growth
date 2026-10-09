@@ -1,6 +1,7 @@
 "use client";
 import { useState, type ReactNode, type ComponentProps } from "react";
 import Link from "next/link";
+import { ClientWorkspaceSkeleton } from "@/components/client-workspace-skeleton";
 import { ContextHomes } from "@/components/brand/ContextHomes";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -102,7 +103,7 @@ export function HomeGroupsWorkspace({
       onError: (e) => toast.error(e.message),
     }),
   );
-  if (context.isPending) return <p>Loading homes…</p>;
+  if (context.isPending) return <ClientWorkspaceSkeleton />;
   if (context.error) return <p role="alert">{context.error.message}</p>;
   const data = context.data;
   if (!data) return null;

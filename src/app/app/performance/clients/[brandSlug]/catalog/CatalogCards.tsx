@@ -1,5 +1,7 @@
 "use client";
 
+import { Skeleton } from "@/components/ui/skeleton";
+
 import { ReviewFooter } from "@/components/review/ReviewFooter";
 import { CopyButton } from "@/components/copy-button";
 import { toast } from "@/components/ui/toast";
@@ -563,7 +565,11 @@ export function CatalogCards({
               {query.data.enrichmentError}
             </p>
           )}
-          {query.isLoading && <p>Loading homes…</p>}
+          {query.isLoading && (
+            <div role="status" aria-label="Loading homes">
+              <Skeleton className="h-64 w-full" />
+            </div>
+          )}
           {view !== "preview" && draft && (
             <>
               <div className="flex flex-wrap items-center justify-between gap-3">

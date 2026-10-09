@@ -13,7 +13,7 @@ import { loadPerformanceBrand } from "../_data";
 export const metadata: Metadata = { title: "Campaigns · Wander Performance" };
 export const dynamic = "force-dynamic";
 
-/** The client's campaigns, one row each, and the way to start the next one. */
+/** The client's campaigns, one card each, and the way to start the next one. */
 export default async function PerformanceBrandCampaignsPage({
   params,
 }: {
@@ -47,13 +47,14 @@ export default async function PerformanceBrandCampaignsPage({
         actions={actions}
       >
         {deskBrand && campaigns.length > 0 ? (
-          <ul className="divide-y">
+          <ul className="space-y-3">
             {campaigns.map((campaign) => (
               <CampaignRow
                 key={campaign.id}
                 brand={deskBrand}
                 campaign={campaign}
                 deletable
+                card
               />
             ))}
           </ul>

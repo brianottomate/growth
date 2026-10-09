@@ -179,12 +179,14 @@ export function CampaignRow({
   campaign,
   showBrand = false,
   deletable = false,
+  card = false,
 }: {
   brand: DeskBrand;
   campaign: DeskCampaign;
   showBrand?: boolean;
   /** Offer the confirmed delete on drafts (rows on a platform refuse it). */
   deletable?: boolean;
+  card?: boolean;
 }) {
   const client =
     campaign.accountName && brand.relationship === "internal"
@@ -194,7 +196,7 @@ export function CampaignRow({
     .filter((row) => row.status !== "draft")
     .map((row) => row.id);
   return (
-    <li className="min-w-0">
+    <li className={cn("min-w-0", card && "rounded-xl border bg-card")}>
       <CampaignListRow
         name={campaign.name}
         href={campaignHref(brand, campaign)}

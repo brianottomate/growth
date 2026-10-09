@@ -3,10 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Building2, FileText } from "lucide-react";
+import { Building2 } from "lucide-react";
 
 import { NAV_GROUPS } from "@/components/app-nav";
-import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import {
   Command,
   CommandDialog,
@@ -58,13 +57,13 @@ export function CommandMenu() {
       open={open}
       onOpenChange={setOpen}
       title="Search Wander Growth"
-      description="Go to a section, or search content ideas and their platform posts."
+      description="Go to a section, client, or prospect."
     >
       <Command>
-        <CommandInput placeholder="Go to a section, or search ideas, copy, brands, platforms…" />
+        <CommandInput placeholder="Search sections, clients, prospects…" />
         <CommandList>
           <CommandEmpty>
-            {isLoading ? "Loading content…" : "No content found."}
+            {isLoading ? "Loading clients…" : "No results found."}
           </CommandEmpty>
 
           {/* Every section the sidebar lists, so "leads" or "compositions"
@@ -126,70 +125,6 @@ export function CommandMenu() {
                             .filter(Boolean)
                             .join(" · ")
                         : client.relationship}
-                    </CommandShortcut>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </>
-          ) : null}
-
-          {data?.ideas.length ? (
-            <>
-              <CommandSeparator />
-              <CommandGroup heading={`Ideas · ${data.ideas.length}`}>
-                {data.ideas.map((idea) => (
-                  <CommandItem
-                    key={idea.id}
-                    value={[
-                      idea.title,
-                      idea.hook,
-                      idea.brandName,
-                      idea.pillar,
-                      idea.seriesName,
-                      idea.status,
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    onSelect={() => go(idea.href)}
-                  >
-                    <FileText />
-                    <span className="min-w-0 flex-1 truncate">
-                      {idea.title}
-                    </span>
-                    <CommandShortcut className="max-w-32 truncate tracking-normal">
-                      {idea.brandName}
-                    </CommandShortcut>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </>
-          ) : null}
-
-          {data?.posts.length ? (
-            <>
-              <CommandSeparator />
-              <CommandGroup heading={`Platform posts · ${data.posts.length}`}>
-                {data.posts.map((post) => (
-                  <CommandItem
-                    key={post.id}
-                    value={[
-                      post.title,
-                      post.text,
-                      post.brandName,
-                      post.platform,
-                      post.format,
-                      post.status,
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    onSelect={() => go(post.href)}
-                  >
-                    <ChannelLogo platform={post.platform} className="size-4" />
-                    <span className="min-w-0 flex-1 truncate">
-                      {post.text?.trim() || post.title}
-                    </span>
-                    <CommandShortcut className="tracking-normal">
-                      {platformLabel(post.platform)}
                     </CommandShortcut>
                   </CommandItem>
                 ))}
