@@ -28,6 +28,9 @@ import { LinkedInSettings } from "./LinkedInSettings";
 import { posterForMedia } from "@/lib/media-url";
 import { PlatformBudget } from "./PlatformBudget";
 import { PushToPlatform } from "./PushToPlatform";
+import { MetaDeliverySummary } from "./MetaDeliverySummary";
+import { PushedMetaGroups } from "./PushedMetaGroups";
+import { PushedSearchGroups } from "./PushedSearchGroups";
 
 /**
  * One platform's row of the plan. A DRAFT row is the pre-push contract: it
@@ -50,7 +53,6 @@ export async function PlatformSection({
   campaignStartAt,
   campaignEndAt,
   draftAds,
-  previewAds = [],
   audiences,
 }: {
   brandSlug: string;
@@ -69,7 +71,6 @@ export async function PlatformSection({
   campaignStartAt?: Date | null;
   campaignEndAt?: Date | null;
   draftAds?: Ad[];
-  previewAds?: Ad[];
   audiences?: {
     id: string;
     name: string;
@@ -145,7 +146,6 @@ export async function PlatformSection({
         brandLogo={brandLogo}
         platformCampaign={platformCampaign}
         ads={draftAds}
-        previewAds={previewAds}
         audiences={deliveryAudiences}
       />
     );
@@ -155,7 +155,6 @@ export async function PlatformSection({
       <GooglePlatformCard
         pc={platformCampaign}
         ads={draftAds ?? []}
-        previewAds={previewAds}
         audiences={deliveryAudiences}
         campaignId={campaignId}
         campaignName={campaignName ?? platformCampaign.name}
@@ -233,6 +232,26 @@ export async function PlatformSection({
   const ads = await db.query.platformAdTable.findMany({
     where: eq(platformAdTable.platformCampaignId, platformCampaign.id),
   });
+  const metaBrand =
+    platform === "meta_ads"
+      ? await db.query.brandTable.findFirst({
+          where: eq(brandTable.id, platformCampaign.brandId),
+          columns: { metaPageId: true },
+        })
+      : null;
+  const metaAccountId =
+    platformCampaign.settings?.meta?.destination?.adAccountId;
+  const metaAccount =
+    platform === "meta_ads" && metaAccountId
+      ? await db.query.adAccountTable.findFirst({
+          where: and(
+            eq(adAccountTable.brandId, platformCampaign.brandId),
+            eq(adAccountTable.externalId, metaAccountId),
+            eq(adAccountTable.platform, "facebook"),
+          ),
+          columns: { name: true },
+        })
+      : null;
   const stats = platformCampaign.stats ?? {};
   const running = platformCampaign.status === "live";
   // Each ad opens on its own editor in the platform. The account is the one
@@ -258,10 +277,7 @@ export async function PlatformSection({
   const figures = [
     {
       label: "Spend",
-      value:
-        platformCampaign.budget != null
-          ? `${money(stats.spend ?? platformCampaign.spend)} / ${money(platformCampaign.budget)}`
-          : money(stats.spend ?? platformCampaign.spend),
+      value: money(stats.spend ?? platformCampaign.spend),
     },
     ...(stats.impressions != null
       ? [{ label: "Impressions", value: stats.impressions.toLocaleString() }]
@@ -280,7 +296,7 @@ export async function PlatformSection({
     .join(" – ");
 
   return (
-    <div className="space-y-3 rounded-xl border bg-card p-3.5">
+    <div className="@container min-w-0 space-y-5 rounded-xl border bg-card p-5">
       <div className="flex flex-wrap items-center gap-2.5">
         <ChannelLogo platform={platform} className="size-5" />
         <Link
@@ -335,13 +351,25 @@ export async function PlatformSection({
             hasExternalId={Boolean(platformCampaign.externalId)}
             spendLine={
               platformCampaign.budget != null
-                ? `${money(platformCampaign.budget)} budget`
+                ? `${money(platformCampaign.budget)}${platformCampaign.budgetType === "daily" ? "/day" : " lifetime"} budget`
                 : "no stored budget"
             }
           />
         </div>
       </div>
 
+      {platform === "meta_ads" && (
+        <section className="space-y-4">
+          <h4 className="text-sm font-medium">Delivery setup</h4>
+          <MetaDeliverySummary
+            pc={platformCampaign}
+            accountName={metaAccount?.name}
+            pageId={metaBrand?.metaPageId}
+            campaignStartAt={campaignStartAt}
+            campaignEndAt={campaignEndAt}
+          />
+        </section>
+      )}
       {running && (
         <div className="flex flex-wrap gap-x-6 gap-y-1">
           {figures.map((figure) => (
@@ -355,55 +383,71 @@ export async function PlatformSection({
         </div>
       )}
 
-      {ads.length > 0 && (
-        <div className="flex w-full gap-2 overflow-x-auto">
-          {ads.map((ad) => {
-            const image = posterForMedia(ad.media?.[0]) ?? ad.thumbnailUrl;
-            const href = adLink(ad);
-            const Tile = href ? "a" : "div";
-            return (
-              <Tile
-                key={ad.id}
-                {...(href
-                  ? {
-                      href,
-                      target: "_blank",
-                      rel: "noreferrer",
-                      title: `Open ${ad.name ?? "this ad"} in ${label}`,
-                    }
-                  : {})}
-                className="w-32 shrink-0 overflow-hidden rounded-lg border bg-background hover:border-foreground/40"
-              >
-                <div className="relative h-20 bg-muted">
-                  {image && (
-                    // oxlint-disable-next-line nextjs/no-img-element
-                    <img
-                      src={image}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  )}
-                  <span className="absolute top-1 right-1 rounded-full bg-black/50 px-1.5 py-0.5 text-[9px] font-medium text-white capitalize backdrop-blur-sm">
-                    {platformCampaign.status === "paused"
-                      ? "paused"
-                      : (ad.status ?? "unknown")}
-                  </span>
-                </div>
-                <div className="space-y-0.5 p-2">
-                  <p className="truncate text-[11px] font-medium">
-                    {ad.headline ?? ad.name ?? "Untitled ad"}
-                  </p>
-                  {ad.stats?.spend != null && (
-                    <p className="text-[10px] text-muted-foreground tabular-nums">
-                      {money(ad.stats.spend)}
-                      {ad.stats.ctr != null ? ` · ${ad.stats.ctr}% CTR` : ""}
-                    </p>
-                  )}
-                </div>
-              </Tile>
-            );
-          })}
+      {platform === "meta_ads" ? (
+        <div className="border-t pt-4">
+          <PushedMetaGroups
+            groups={platformCampaign.deliveryGroups ?? []}
+            ads={ads}
+            pc={platformCampaign}
+          />
         </div>
+      ) : platform === "google_ads" &&
+        platformCampaign.settings?.google?.campaignType === "search" ? (
+        <PushedSearchGroups
+          groups={platformCampaign.deliveryGroups ?? []}
+          ads={ads}
+        />
+      ) : (
+        ads.length > 0 && (
+          <div className="flex w-full gap-2 overflow-x-auto">
+            {ads.map((ad) => {
+              const image = posterForMedia(ad.media?.[0]) ?? ad.thumbnailUrl;
+              const href = adLink(ad);
+              const Tile = href ? "a" : "div";
+              return (
+                <Tile
+                  key={ad.id}
+                  {...(href
+                    ? {
+                        href,
+                        target: "_blank",
+                        rel: "noreferrer",
+                        title: `Open ${ad.name ?? "this ad"} in ${label}`,
+                      }
+                    : {})}
+                  className="w-32 shrink-0 overflow-hidden rounded-lg border bg-background hover:border-foreground/40"
+                >
+                  <div className="relative h-20 bg-muted">
+                    {image && (
+                      // oxlint-disable-next-line nextjs/no-img-element
+                      <img
+                        src={image}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    )}
+                    <span className="absolute top-1 right-1 rounded-full bg-black/50 px-1.5 py-0.5 text-[9px] font-medium text-white capitalize backdrop-blur-sm">
+                      {platformCampaign.status === "paused"
+                        ? "paused"
+                        : (ad.status ?? "unknown")}
+                    </span>
+                  </div>
+                  <div className="space-y-0.5 p-2">
+                    <p className="truncate text-[11px] font-medium">
+                      {ad.headline ?? ad.name ?? "Untitled ad"}
+                    </p>
+                    {ad.stats?.spend != null && (
+                      <p className="text-[10px] text-muted-foreground tabular-nums">
+                        {money(ad.stats.spend)}
+                        {ad.stats.ctr != null ? ` · ${ad.stats.ctr}% CTR` : ""}
+                      </p>
+                    )}
+                  </div>
+                </Tile>
+              );
+            })}
+          </div>
+        )
       )}
     </div>
   );

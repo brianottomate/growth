@@ -429,6 +429,7 @@ export const growthActionPolicies = {
     setCreativePool: write({ idempotent: true }),
     setPlatformDraft: write({ idempotent: true }),
     setDeliveryGroup: write({ idempotent: true }),
+    deleteDeliveryGroup: write({ reversible: false }),
     attachCampaign: write({ idempotent: true }),
     importMetaCampaign: write({ idempotent: true }),
     // Reads the provider's audiences; writes only Growth's mirror rows and

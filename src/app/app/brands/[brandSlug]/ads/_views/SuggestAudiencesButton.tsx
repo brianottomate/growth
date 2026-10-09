@@ -30,6 +30,8 @@ export function useSuggestedAudiences(campaignId: string) {
           name: s.name,
           personaId: s.personaId ?? undefined,
           geography: s.geography,
+          ageMin: s.ageMin,
+          ageMax: s.ageMax,
           description: s.why,
         });
         saved++;

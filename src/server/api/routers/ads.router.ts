@@ -54,6 +54,7 @@ import {
   createReportingConversionAction,
   setPlatformDraftAction,
   setDeliveryGroupAction,
+  deleteDeliveryGroupAction,
   setCreativePoolAction,
   setPlacementCopyAction,
   previewAdAction,
@@ -358,6 +359,7 @@ export const adsRouter = {
 
   setPlatformDraft: actionProcedure(setPlatformDraftAction),
   setDeliveryGroup: actionProcedure(setDeliveryGroupAction),
+  deleteDeliveryGroup: actionProcedure(deleteDeliveryGroupAction),
 
   setCampaignCreativePool: actionProcedure(setCreativePoolAction),
 

@@ -24,6 +24,7 @@ import { destinationLabel, safeHomeUrl } from "@/lib/ad-preview-links";
 import { AD_FORMATS, adFormat } from "@/lib/ad-format";
 import type { AdReview } from "@/lib/ad-review";
 import { ideaDocumentFromAd } from "@/lib/ad-idea-studio";
+import type { PlatformCampaignSettings } from "@/server/db/ads-schema";
 import type { AdContent, ChannelPlatform } from "@/server/db/schema";
 
 import { AdIdeaPreview } from "./AdIdeaPreview";
@@ -39,6 +40,7 @@ export function CampaignAdCard({
   home,
   deliveryState,
   plannedPlatforms,
+  platformSettings,
   studioHref,
   studioPreview = false,
 }: {
@@ -56,6 +58,7 @@ export function CampaignAdCard({
   home?: { name: string; url: string };
   deliveryState?: string;
   plannedPlatforms: ChannelPlatform[];
+  platformSettings: Partial<Record<ChannelPlatform, PlatformCampaignSettings>>;
   studioHref: string;
   studioPreview?: boolean;
 }) {
@@ -267,6 +270,8 @@ export function CampaignAdCard({
           <AdPlatformRouting
             adId={ad.id}
             type={creative ? "creative" : "text"}
+            content={ad.content}
+            settings={platformSettings}
             platforms={ad.platforms ?? null}
             planned={plannedPlatforms}
             locked={Boolean(deliveryState)}

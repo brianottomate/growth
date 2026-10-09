@@ -1,6 +1,9 @@
 import { z } from "zod";
 
-/** Executable locations. Evidence and city-to-state reasoning belong in prose. */
+/** Where people are located. Destination interests belong in persona/audience prose. */
+// TODO(geo): model ZIP/postal targets and coordinate + radius + unit targets here,
+// then extend the editor, summaries and provider compiler together. Keep country
+// context for place lookup separate from selecting a whole country for delivery.
 export const deliveryGeographySchema = z.strictObject({
   countries: z
     .array(z.string().trim().length(2).toUpperCase())

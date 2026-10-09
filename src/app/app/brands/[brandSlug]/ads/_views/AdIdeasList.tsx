@@ -7,6 +7,7 @@ import { AdFormatFilter } from "@/components/ad-format-filter";
 import { Button } from "@/components/ui/button";
 import { WorkspaceCardHeader } from "@/app/app/performance/WorkspaceCard";
 import { Images } from "lucide-react";
+import type { PlatformCampaignSettings } from "@/server/db/ads-schema";
 import type { AdContent } from "@/server/db/schema";
 import { ideaDocumentFromAd } from "@/lib/ad-idea-studio";
 import { isImportedMetaCatalog } from "@/lib/meta-import";
@@ -25,11 +26,13 @@ export function AdIdeasList({
   actions,
   emptyState,
   plannedPlatforms = [],
+  platformSettings = {},
   studioHref,
   studioPreviewIds = [],
 }: {
   /** The campaign's planned platforms; an idea can be narrowed to some. */
   plannedPlatforms?: ChannelPlatform[];
+  platformSettings?: Partial<Record<ChannelPlatform, PlatformCampaignSettings>>;
   studioHref: string;
   studioPreviewIds?: string[];
   /** Add starter ideas, Add ad, Assets: they act on the list below them. */
@@ -111,6 +114,7 @@ export function AdIdeasList({
       deliveryState={states[ad.id]}
       home={ad.homeId ? homeLinks[ad.homeId] : undefined}
       plannedPlatforms={plannedPlatforms}
+      platformSettings={platformSettings}
       studioHref={studioHref}
       studioPreview={studioPreviewIds.includes(ad.id)}
     />

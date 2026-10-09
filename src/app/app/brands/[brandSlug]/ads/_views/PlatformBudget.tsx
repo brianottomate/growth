@@ -24,16 +24,24 @@ export function PlatformBudget({
   platformCampaignId,
   budget,
   budgetType,
+  endAt,
+  label,
 }: {
   platformCampaignId: string;
   budget: number | null;
   budgetType: string | null;
+  endAt?: Date | null;
+  label?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState(budget != null ? String(budget) : "");
   const [type, setType] = useState<"daily" | "lifetime">(
     budgetType === "lifetime" ? "lifetime" : "daily",
+  );
+
+  const [end, setEnd] = useState(
+    endAt ? new Date(endAt).toISOString().slice(0, 10) : "",
   );
 
   const save = useMutation(
@@ -46,15 +54,20 @@ export function PlatformBudget({
   );
 
   const parsed = Number(amount);
-  const valid = Number.isFinite(parsed) && parsed > 0;
+  const valid =
+    Number.isFinite(parsed) &&
+    parsed > 0 &&
+    (type !== "lifetime" ||
+      Boolean(end && new Date(`${end}T23:59:59.000Z`).getTime() > Date.now()));
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button size="sm" variant={budget ? "ghost" : "outline"}>
-          {budget
-            ? `${money(budget)}${budgetType === "lifetime" ? " lifetime" : "/day"}`
-            : "Set budget"}
+          {label ??
+            (budget
+              ? `${money(budget)}${budgetType === "lifetime" ? " lifetime" : "/day"}`
+              : "Set budget")}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-64 space-y-3">
@@ -81,10 +94,30 @@ export function PlatformBudget({
           ))}
         </div>
         {type === "lifetime" && (
-          <p className="text-xs text-muted-foreground">
-            A lifetime budget needs an end date on the campaign — it is the date
-            the spend stops.
-          </p>
+          <div className="space-y-2">
+            <Label htmlFor="pb-end">Flight end date</Label>
+            <Input
+              id="pb-end"
+              type="date"
+              value={end}
+              onChange={(event) => setEnd(event.target.value)}
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                const date = new Date();
+                date.setUTCMonth(date.getUTCMonth() + 1);
+                setEnd(date.toISOString().slice(0, 10));
+              }}
+            >
+              One month from today
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Push creates a paused campaign. This fixed end date does not move
+              when you launch.
+            </p>
+          </div>
         )}
         {save.error && (
           <p className="text-xs text-red-300">{save.error.message}</p>
@@ -99,6 +132,7 @@ export function PlatformBudget({
               platformCampaignId,
               budget: parsed,
               budgetType: type,
+              ...(type === "lifetime" ? { endAt: `${end}T23:59:59.000Z` } : {}),
             })
           }
         >

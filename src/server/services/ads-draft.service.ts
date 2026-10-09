@@ -1,3 +1,4 @@
+import { audienceAgeSchema } from "@/lib/audience-age";
 import { createHash } from "node:crypto";
 import {
   deliveryGeographySchema,
@@ -501,16 +502,15 @@ export async function setPlatformDraft(input: {
   return { ...saved, ...(warnings.length > 0 ? { warnings } : {}) };
 }
 
-/**
- * Add an audience — one buyable narrowing, which compiles to one ad set per
- * platform. Wanting two age ranges means two audiences.
- */
+/** Add shared campaign intent; platform delivery groups are planned separately. */
 export async function addAudience(input: {
   organizationId: string;
   campaignId: string;
   name: string;
   personaId?: string | null;
   geography?: DeliveryGeography | null;
+  ageMin?: number | null;
+  ageMax?: number | null;
   description?: string | null;
   type?: AudienceType | null;
 }) {
@@ -519,6 +519,7 @@ export async function addAudience(input: {
     input.organizationId,
   );
   await validateAudiencePersona(input.personaId, brand.id);
+  const age = audienceAgeSchema.parse(input);
   const [audience] = await db
     .insert(audienceTable)
     .values({
@@ -526,6 +527,8 @@ export async function addAudience(input: {
       campaignId: campaign.id,
       brandId: brand.id,
       personaId: input.personaId ?? null,
+      ageMin: age.ageMin ?? null,
+      ageMax: age.ageMax ?? null,
       geography: input.geography
         ? deliveryGeographySchema.parse(input.geography)
         : null,
@@ -560,6 +563,8 @@ export async function updateAudience(input: {
   name?: string;
   personaId?: string | null;
   geography?: DeliveryGeography | null;
+  ageMin?: number | null;
+  ageMax?: number | null;
   description?: string | null;
 }) {
   const audience = await db.query.audienceTable.findFirst({
@@ -568,6 +573,10 @@ export async function updateAudience(input: {
   if (!audience) throw new Error("Audience not found");
   await requireOwnedCampaign(audience.campaignId, input.organizationId);
   await validateAudiencePersona(input.personaId, audience.brandId);
+  audienceAgeSchema.parse({
+    ageMin: input.ageMin === undefined ? audience.ageMin : input.ageMin,
+    ageMax: input.ageMax === undefined ? audience.ageMax : input.ageMax,
+  });
   const { organizationId: _org, audienceId: _id, ...patch } = input;
   if (patch.geography)
     patch.geography = deliveryGeographySchema.parse(patch.geography);
@@ -590,21 +599,13 @@ async function ensureDeliveryGroups(
   const existing = await db.query.platformDeliveryGroupTable.findMany({
     where: eq(platformDeliveryGroupTable.platformCampaignId, plan.id),
   });
-  const placeholder = audiences.length
-    ? existing.find(
-        (group) =>
-          !group.audienceId && !group.externalId && group.name === "Broad",
-      )
-    : undefined;
-  // Reuse the pre-audience container and its operator settings instead of leaving an extra broad set.
-  if (placeholder && audiences[0]) {
-    await db
-      .update(platformDeliveryGroupTable)
-      .set({ audienceId: audiences[0].id, name: audiences[0].name })
-      .where(eq(platformDeliveryGroupTable.id, placeholder.id));
-    placeholder.audienceId = audiences[0].id;
-  }
-  const targets = audiences.length ? audiences : [{ id: null, name: "Broad" }];
+  // Audiences are planning context, not a continuously synchronized group count.
+  // Once a plan has containers, preserve the operator's chosen structure.
+  if (existing.length) return;
+  const targets =
+    plan.platform === "meta_ads" || !audiences.length
+      ? [{ id: null, name: "Broad" }]
+      : audiences;
   for (const audience of targets) {
     if (existing.some((group) => group.audienceId === audience.id)) continue;
     await db
@@ -618,11 +619,9 @@ async function ensureDeliveryGroups(
         audienceId: audience.id,
         name: audience.name,
         status: "draft",
-        configuration:
-          placeholder?.configuration ??
-          deliveryGroupConfigurationSchema.parse({
-            platform: plan.platform,
-          }),
+        configuration: deliveryGroupConfigurationSchema.parse({
+          platform: plan.platform,
+        }),
       })
       .onConflictDoNothing();
   }
@@ -632,6 +631,7 @@ export async function setDeliveryGroup(input: {
   organizationId: string;
   deliveryGroupId: string;
   name?: string;
+  audienceId?: string | null;
   configuration: DeliveryGroupConfiguration;
 }) {
   const group = await db.query.platformDeliveryGroupTable.findFirst({
@@ -649,8 +649,15 @@ export async function setDeliveryGroup(input: {
   );
   if (group.brandId !== brand.id || plan.brandId !== brand.id)
     throw new Error("Delivery group belongs to another brand");
-  if (plan.externalId || plan.status !== "draft")
+  if (group.externalId || plan.externalId || plan.status !== "draft")
     throw new Error("Only unpublished platform plans can be edited here");
+  if (input.audienceId) {
+    const audience = await db.query.audienceTable.findFirst({
+      where: eq(audienceTable.id, input.audienceId),
+    });
+    if (!audience || audience.campaignId !== plan.campaignId)
+      throw new Error("Audience belongs to another campaign");
+  }
   const configuration = deliveryGroupConfigurationSchema.parse(
     input.configuration,
   );
@@ -658,9 +665,46 @@ export async function setDeliveryGroup(input: {
     throw new Error("Configuration platform does not match the plan");
   await db
     .update(platformDeliveryGroupTable)
-    .set({ configuration, ...(input.name ? { name: input.name.trim() } : {}) })
+    .set({
+      configuration,
+      ...(input.name ? { name: input.name.trim() } : {}),
+      ...(input.audienceId !== undefined
+        ? { audienceId: input.audienceId }
+        : {}),
+    })
     .where(eq(platformDeliveryGroupTable.id, group.id));
   return { id: group.id };
+}
+
+/** Remove a local container without changing shared campaign audiences. */
+export async function deleteDeliveryGroup(input: {
+  organizationId: string;
+  deliveryGroupId: string;
+}) {
+  const group = await db.query.platformDeliveryGroupTable.findFirst({
+    where: eq(platformDeliveryGroupTable.id, input.deliveryGroupId),
+    with: { platformCampaign: true },
+  });
+  if (!group?.platformCampaign.campaignId)
+    throw new Error("Delivery group has no local campaign");
+  const plan = group.platformCampaign;
+  const { brand } = await requireOwnedCampaign(
+    plan.campaignId!,
+    input.organizationId,
+  );
+  if (group.brandId !== brand.id || plan.brandId !== brand.id)
+    throw new Error("Delivery group belongs to another brand");
+  if (group.externalId || plan.externalId || plan.status !== "draft")
+    throw new Error("Only unpublished platform plans can be edited here");
+  const siblings = await db.query.platformDeliveryGroupTable.findMany({
+    where: eq(platformDeliveryGroupTable.platformCampaignId, plan.id),
+  });
+  if (siblings.length <= 1)
+    throw new Error("Keep at least one delivery group in the platform plan");
+  await db
+    .delete(platformDeliveryGroupTable)
+    .where(eq(platformDeliveryGroupTable.id, group.id));
+  return { deleted: true };
 }
 
 /** Read the same committed set shown on the brand's Homes page. */

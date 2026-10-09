@@ -275,6 +275,31 @@ submitted JSON fields, preserving concurrent moves and unrelated card-state edit
 A stage changed through the settings editor clears its previous column rank.
 No database migration is required: the rank lives in the existing settings JSONB.
 
+
+## Campaign Search keyword ownership
+
+Search keywords belong to configured Google delivery groups. Removed the campaign-level fallback input and synthetic fallback group from the compiler and preview. Every configured Search group must have keywords before push; missing groups are surfaced rather than silently omitted. Legacy JSON keyword values remain readable in stored settings but no longer affect compilation.
+
+Google standalone campaign creation accepts daily budgets through the current provider integration. Lifetime drafts must be edited explicitly; never silently convert a total to a daily spend amount. Meta retains its supported lifetime budget option.
+
+### Google conversion bidding contract
+
+Verified 2026-10-09 against https://docs.zernio.com/ad-campaigns/create-standalone-ad and https://docs.zernio.com/platforms/google-ads/conversions. Google Search/Display create accepts traffic, engagement and awareness as provider goals, but explicitly supports campaign bidStrategy LOWEST_COST_WITHOUT_CAP for Maximize Conversions. Local conversions intent maps to provider goal traffic plus that explicit strategy on campaign creation only. Attached groups/ads inherit bidding and do not resend bidStrategy. Campaigns retain Google account-default conversion goals; selecting a specific booking action is a separate integration, and tracking readiness is not yet verified.
+
+### Geographic presence versus destination interest
+
+Verified 2026-10-09 against https://docs.zernio.com/platforms/google-ads/create-ads#location-targeting-type.
+Audience geography means the intended location of people; descriptions/personas own
+interests in destinations. Google campaign geography is the executable restriction,
+shared by all its ad groups. We previously omitted locationTargetingType, allowing
+Google's presence_or_interest default to reach people outside those locations.
+New Google campaign creation now explicitly sends presence (in or regularly in the
+selected places); attached groups/ads inherit it and never resend this create-only
+field. Existing provider campaigns require a separately authorized targeting update.
+No competing interest-location field was found in the current audience or delivery
+schemas, so no data deletion or new selector is needed. Countries/states/regions/cities
+remain supported; ZIP and coordinate-radius extensions are documented at the schema
+and provider boundaries for future implementation.
 ## Archetype-owned voice (2026-10-09)
 
 The previous direction stored an archetype key without prompt behavior and asked

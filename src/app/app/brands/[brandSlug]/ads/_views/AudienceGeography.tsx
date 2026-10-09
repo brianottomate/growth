@@ -54,10 +54,6 @@ export function AudienceGeography({
       {!configured && (
         <p className="text-xs text-muted-foreground">Not specified.</p>
       )}
-      <p className="text-xs text-muted-foreground">
-        Where we want to reach people. Confirm delivery targeting in each
-        platform plan.
-      </p>
       <Button
         size="sm"
         variant="outline"

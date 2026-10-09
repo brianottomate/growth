@@ -1,3 +1,4 @@
+import { audienceAgeSchema } from "@/lib/audience-age";
 import { deliveryGeographySchema } from "@/lib/platform-delivery";
 import { campaignAudiencesPickPrompt } from "@/server/ai/prompts/campaign-audiences";
 import "server-only";
@@ -15,6 +16,8 @@ const suggestionSchema = z.strictObject({
   personaId: z.string().nullable(),
   why: z.string().trim().min(1).max(4000),
   geography: deliveryGeographySchema.nullable(),
+  ageMin: audienceAgeSchema.shape.ageMin.nonoptional(),
+  ageMax: audienceAgeSchema.shape.ageMax.nonoptional(),
 });
 export type AudienceSuggestion = z.infer<typeof suggestionSchema>;
 
@@ -70,6 +73,8 @@ export async function suggestCampaignAudiences(input: {
     }),
   });
   if (!output) throw new Error("No audience suggestions returned");
+  for (const suggestion of output.suggestions)
+    audienceAgeSchema.parse(suggestion);
   const known = new Set(personas.map((p) => p.id));
   if (output.suggestions.some((s) => s.personaId && !known.has(s.personaId)))
     throw new Error("Suggested persona is not active on this brand");

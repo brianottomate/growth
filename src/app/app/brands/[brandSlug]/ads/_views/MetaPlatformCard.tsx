@@ -1,26 +1,19 @@
 "use client";
-import { DeliveryCoverage } from "./DeliveryCoverage";
+import { MetaDeliverySummary } from "./MetaDeliverySummary";
 import { DeliveryGroupEditor } from "./DeliveryGroupEditor";
+import { hasDeliveryLocations } from "@/lib/platform-delivery";
 import type { DeliveryGroupConfiguration } from "@/lib/platform-delivery";
 
 import { DeliveryTargetingSummary } from "./DeliveryTargetingSummary";
-import { PlatformDraftPreviews } from "./PlatformDraftPreviews";
-import { eligiblePlatformAds } from "@/lib/platform-ad-plan";
 import { PlatformAdSelection } from "./PlatformAdSelection";
 import { selectPlatformAds } from "@/lib/platform-ad-plan";
 
-import { campaignDisplayName } from "@/lib/campaign-navigation";
 import { resolveMetaSchedule, metaScheduleIssue } from "@/lib/meta-schedule";
 import { applyMetaTrackingDefaults } from "@/lib/meta-tracking";
 import { isImportedMetaCatalog } from "@/lib/meta-import";
-import { useLocalStorage } from "@/components/ui/hooks/use-local-storage";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { useId, useState } from "react";
-import {
-  metaPreviewPlacements,
-  metaPreviewMedia,
-  importedPlacementLabel,
-} from "@/lib/meta-preview";
+import { metaPreviewPlacements, metaPreviewMedia } from "@/lib/meta-preview";
 import {
   META_DEFAULT_PLACEMENTS,
   META_PLACEMENTS,
@@ -31,15 +24,6 @@ import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { ChannelLogo } from "@/components/channel-logos";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogTrigger,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import { DeletePlatformCampaign } from "./DeletePlatformCampaign";
 import { AskAssistantButton } from "./AskAssistantButton";
 import {
@@ -72,7 +56,6 @@ type Audience = {
   ageMax: number | null;
   metaTargetName?: string;
 };
-const DEFAULT_PROJECTION_EXPANSION: Record<string, boolean> = {};
 
 export function MetaPlatformCard({
   destination,
@@ -85,7 +68,6 @@ export function MetaPlatformCard({
   campaignEndAt,
   platformCampaign: pc,
   ads,
-  previewAds = [],
   audiences,
 }: {
   destination?: {
@@ -104,18 +86,10 @@ export function MetaPlatformCard({
   brandLogo: string | null;
   platformCampaign: PlatformCampaign;
   ads: Ad[];
-  previewAds?: Ad[];
   audiences: Audience[];
 }) {
-  const [inspectOpen, setInspectOpen] = useState(false);
-  const [projectionOpen, setProjectionOpen] = useLocalStorage<
-    Record<string, boolean>
-  >({
-    key: `meta-projections:${campaignId}:${pc.id}:expanded`,
-    defaultValue: DEFAULT_PROJECTION_EXPANSION,
-  });
-
   const saved = pc.settings?.meta;
+  const [editingSetup, setEditingSetup] = useState(false);
   const [goal, setGoal] = useState<AdPushGoal>(saved?.goal ?? "conversions");
   const sectionId = useId();
   const chosen = destination;
@@ -133,11 +107,6 @@ export function MetaPlatformCard({
     "meta_ads",
     pc.settings ?? {},
   ).filter((ad) => ad.status === "approved");
-  const creativePreviews = eligiblePlatformAds(
-    previewAds,
-    "meta_ads",
-    pc.settings ?? {},
-  );
   const catalogCount = routedAds.filter(
     (ad) => "media" in ad.content && isImportedMetaCatalog(ad.content),
   ).length;
@@ -152,17 +121,7 @@ export function MetaPlatformCard({
           ad.content.ideaStudio.document.cards.length,
         )),
   );
-  const sets = audiences.length
-    ? audiences
-    : [
-        {
-          id: "broad",
-          name: "Broad",
-          geography: null,
-          ageMin: null,
-          ageMax: null,
-        },
-      ];
+  const sets = audiences;
   const meta = applyMetaTrackingDefaults(
     pc.settings?.meta ?? {},
     chosen?.trackingDefaults,
@@ -176,17 +135,6 @@ export function MetaPlatformCard({
   });
   const scheduleError = metaScheduleIssue(schedule, pc.budgetType);
   const placementPlan = meta?.placements ?? META_DEFAULT_PLACEMENTS;
-  const selectedPlacements = META_PLACEMENTS.filter((p) =>
-    placementPlan.includes(p.id),
-  );
-  const placementSummary =
-    selectedPlacements.length === META_PLACEMENTS.length
-      ? `All ${META_PLACEMENTS.length} placements`
-      : selectedPlacements.length > 0
-        ? `${selectedPlacements.length} of ${META_PLACEMENTS.length} placements`
-        : meta?.importSource
-          ? importedPlacementLabel(meta.importSource.adSets)
-          : "No placements";
   const missingCreative = creativeAds.some(
     (ad) =>
       "media" in ad.content &&
@@ -200,17 +148,22 @@ export function MetaPlatformCard({
     !(meta?.pixelId && meta?.customEventType);
   const blockers = [
     scheduleError,
-    !configuration && "Configure Meta access in brand settings.",
-    !placementPlan.length && "Choose delivery placements in Settings.",
+    !configuration &&
+      "Configure an ad account and Facebook Page in brand settings.",
+    !sets.length && "Add a Meta ad set.",
+    ...sets
+      .filter((set) => !hasDeliveryLocations(set.geography))
+      .map((set) => `Set delivery locations for ${set.name} in Edit.`),
+    !placementPlan.length && "Choose delivery placements in Edit setup.",
     missingTracking &&
-      "Set a pixel and conversion event, or a custom conversion, in Settings.",
-    !pc.budget && "Set a budget in Settings.",
-    !creativeAds.length && "Add at least one creative ad.",
+      "Set a pixel and conversion event, or a custom conversion, in Edit setup.",
+    !pc.budget && "Set a budget in Edit setup.",
+    !creativeAds.length && "Add and approve a creative in Ad Studio.",
     missingCreative && "Add the missing artwork for the selected placements.",
     Boolean(catalogCount) &&
       "Catalog ads cannot be included in this creative push.",
     Boolean(meta?.importSource?.issues.length && !meta.importReviewed) &&
-      "Review imported delivery settings in Settings.",
+      "Review imported delivery settings in Edit setup.",
   ].filter((message): message is string => typeof message === "string");
   const ready = blockers.length === 0;
 
@@ -226,6 +179,13 @@ export function MetaPlatformCard({
           Planned · paused on push
         </span>
         <div className="ml-auto flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setEditingSetup(!editingSetup)}
+          >
+            {editingSetup ? "Cancel" : "Edit setup"}
+          </Button>
           <AskAssistantButton
             brandId={pc.brandId}
             brandName={brandName}
@@ -236,9 +196,11 @@ export function MetaPlatformCard({
             ask={`Help me shape the Meta delivery setup for “${campaignName}”. Read its approved ads, campaign audiences and Meta settings, then discuss what I want to refine before changing anything.`}
           />
           {!ready && (
-            <Button size="sm" disabled>
-              Push to Meta
-            </Button>
+            <span title={blockers.join("\n")}>
+              <Button size="sm" disabled>
+                Push to Meta
+              </Button>
+            </span>
           )}
           {ready && (
             <PushToPlatform
@@ -273,6 +235,8 @@ export function MetaPlatformCard({
         >
           <div className="flex items-center justify-between gap-3">
             <h4 className="text-sm font-medium">Delivery setup</h4>
+          </div>
+          {editingSetup ? (
             <MetaSettings
               pc={{ ...pc, settings: { ...pc.settings, meta } }}
               campaignStartAt={campaignStartAt}
@@ -280,287 +244,99 @@ export function MetaPlatformCard({
               choices={choices}
               goal={goal}
               onApply={setGoal}
+              onClose={() => setEditingSetup(false)}
             />
-          </div>
-          <dl className="grid grid-cols-1 gap-4 @sm:grid-cols-2 @2xl:grid-cols-4">
-            <SetupFact
-              label="Budget"
-              value={
-                pc.budget
-                  ? `${money(pc.budget)}${pc.budgetType === "lifetime" ? " lifetime" : " / day"}`
-                  : "Not set"
-              }
-              detail={
-                meta?.budgetMode === "abo"
-                  ? "Per ad set (ABO)"
-                  : "Campaign (CBO)"
-              }
-            />
-            <SetupFact
-              label="Goal"
-              value={
-                goal.charAt(0).toUpperCase() + goal.slice(1).replace("_", " ")
-              }
-              detail={
-                meta?.customConversionId ||
-                (meta?.customEventType
-                  ? `${meta.customEventType} · ${
-                      meta.conversionScope === "host"
-                        ? "client site"
-                        : "shared pixel"
-                    }`
-                  : "No conversion set")
-              }
-            />
-            <SetupFact
-              label="Schedule"
-              value={
-                schedule.startAt
-                  ? new Date(schedule.startAt).toLocaleDateString()
-                  : "When launched"
-              }
-              detail={
-                schedule.endAt
-                  ? `Until ${new Date(schedule.endAt).toLocaleDateString()}`
-                  : "Runs until paused"
-              }
-            />
-            <SetupFact
-              label="Ad account"
-              value={
-                chosen?.adAccountName ?? chosen?.adAccountId ?? "Not configured"
-              }
-              detail={chosen?.pageId ? `Page ${chosen.pageId}` : "No Page"}
-            />
-          </dl>
-          {!choices.length && (
-            <p className="text-sm text-muted-foreground">
-              Configure Meta access in brand settings before pushing.
-            </p>
+          ) : (
+            <>
+              <MetaDeliverySummary
+                pc={{
+                  ...pc,
+                  settings: { ...pc.settings, meta: { ...meta, goal } },
+                }}
+                accountName={chosen?.adAccountName ?? chosen?.adAccountId}
+                pageId={chosen?.pageId}
+                campaignStartAt={campaignStartAt}
+                campaignEndAt={campaignEndAt}
+              />
+            </>
           )}
-          <details className="group text-xs text-muted-foreground">
-            <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 [&::-webkit-details-marker]:hidden">
-              <ChevronRight className="size-3 transition-transform group-open:rotate-90" />
-              <span>{placementSummary}</span>
-              <span aria-hidden>·</span>
-              <span className="break-all">
-                Pixel {meta?.pixelId || "not configured"}
-              </span>
-            </summary>
-            {selectedPlacements.length > 0 && (
-              <p className="mt-2 pl-5">
-                {selectedPlacements.map((p) => p.label).join(", ")}
-              </p>
-            )}
-          </details>
         </section>
         <section className="space-y-3 border-t pt-4" aria-label="Meta ad sets">
-          <h4 className="text-sm font-medium">Ad sets · {sets.length}</h4>
-          <p className="text-xs text-muted-foreground">
-            Each delivery group becomes a Meta ad set. Search keywords do not
-            restrict Meta delivery.
-          </p>
-          <DeliveryCoverage targets={sets} />
-          {sets.map((audience) => (
-            <details key={audience.id} className="rounded-lg border p-3">
-              <summary className="cursor-pointer text-sm font-medium">
-                {audience.name} · {creativeAds.length} approved creatives
-                {creativePreviews.length > 0
-                  ? ` · ${creativePreviews.length} draft previews`
-                  : ""}
-              </summary>
-              <div className="mt-3">
-                <DeliveryTargetingSummary audience={audience} />
-                <DeliveryGroupEditor group={audience} />
-              </div>
-            </details>
-          ))}
-        </section>
-        <PlatformAdSelection pc={pc} ads={ads} />
-        <PlatformDraftPreviews
-          ads={creativePreviews}
-          brandId={pc.brandId}
-          brandName={brandName}
-          brandLogo={brandLogo}
-        />
-        {creativePreviews.length > 0 && (
-          <p className="text-xs text-muted-foreground">
-            After approval and assignment: {sets.length} ad sets ×{" "}
-            {creativePreviews.length} Studio ideas ={" "}
-            {sets.length * creativePreviews.length} additional planned Meta ads.
-          </p>
-        )}
-        {!ready && (
-          <div
-            className="space-y-1 text-sm text-muted-foreground"
-            aria-label="Required before pushing"
-          >
-            <p className="font-medium">To finish setup</p>
-            <ul className="list-disc pl-5">
-              {blockers.map((message) => (
-                <li key={message}>{message}</li>
-              ))}
-            </ul>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h4 className="text-sm font-medium">Ad sets · {sets.length}</h4>
           </div>
-        )}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
-          <p className="text-sm text-muted-foreground">
-            {sets.length} ad {sets.length === 1 ? "set" : "sets"} ·{" "}
-            {creativeAds.length} approved{" "}
-            {creativeAds.length === 1 ? "creative" : "creatives"} ·{" "}
-            {sets.length * creativeAds.length} Meta ads
-          </p>
-          <Dialog open={inspectOpen} onOpenChange={setInspectOpen}>
-            <DialogTrigger asChild>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={!creativeAds.length}
-              >
-                Inspect placements
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-h-[85dvh] gap-4 overflow-x-hidden overflow-y-auto pb-6 md:w-[calc(100%-2rem)] md:max-w-5xl">
-              <DialogHeader>
-                <DialogTitle>Meta placements</DialogTitle>
-                <DialogDescription className="break-words">
-                  {campaignDisplayName(campaignName)} · Approved artwork for the
-                  selected placements. Meta may adjust the layout when serving
-                  an ad.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h4 className="text-sm font-medium">
-                  {creativeAds.length} approved creatives
-                </h4>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() =>
-                      setProjectionOpen(
-                        Object.fromEntries(
-                          creativeAds.map((ad) => [ad.id, true]),
-                        ),
-                      )
-                    }
-                  >
-                    Expand all
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() =>
-                      setProjectionOpen(
-                        Object.fromEntries(
-                          creativeAds.map((ad) => [ad.id, false]),
-                        ),
-                      )
-                    }
-                  >
-                    Collapse all
-                  </Button>
-                </div>
-              </div>
-              {!placementPlan.length && !meta?.importSource && (
-                <p className="text-sm text-muted-foreground">
-                  Choose delivery placements to preview approved artwork.{" "}
-                  <a className="underline" href={`#${sectionId}-setup`}>
-                    Settings above
-                  </a>{" "}
-                  to choose delivery placements.
-                </p>
-              )}
-              {meta?.importSource && (
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button size="sm" variant="ghost">
-                      Imported from Meta · Source details
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-h-[85dvh] gap-4 overflow-y-auto pb-6 md:max-w-2xl">
-                    <DialogHeader>
-                      <DialogTitle>Meta campaign source</DialogTitle>
-                      <DialogDescription>
-                        Local working copy of campaign{" "}
-                        {meta.importSource.campaignId}. Reconstructed previews
-                        are not a report of actual delivery.
-                      </DialogDescription>
-                    </DialogHeader>
-                    {meta.importSource.issues.map((issue) => (
-                      <p key={issue} className="text-sm">
-                        {issue}
+          {sets.length > 1 && (
+            <p className="text-xs text-muted-foreground">
+              The same creative selection is included in every ad set.
+            </p>
+          )}
+          {sets.map((audience) => (
+            <div key={audience.id} className="rounded-xl border bg-background">
+              <div className="relative p-4">
+                <details className="group min-w-0">
+                  <summary className="flex cursor-pointer list-none flex-wrap items-center gap-3 pr-20 [&::-webkit-details-marker]:hidden">
+                    <ChevronDown className="size-4 shrink-0 text-muted-foreground group-open:rotate-180" />
+                    <h5 className="text-sm font-semibold">{audience.name}</h5>
+                    <span className="text-xs text-muted-foreground">
+                      {creativeAds.length}{" "}
+                      {creativeAds.length === 1 ? "ad" : "ads"}
+                    </span>
+                    <div className="w-full pl-7">
+                      <DeliveryTargetingSummary compact audience={audience} />
+                    </div>
+                  </summary>
+                  <div className="mt-4 space-y-4">
+                    {meta.budgetMode === "abo" && (
+                      <p className="text-xs text-muted-foreground">
+                        {pc.budget
+                          ? `${money(pc.budget)}${pc.budgetType === "daily" ? "/day" : " lifetime"} per ad set`
+                          : "Budget not set"}
                       </p>
-                    ))}
-                    <details>
-                      <summary className="cursor-pointer text-sm">
-                        Original ad set settings
-                      </summary>
-                      <pre className="mt-3 max-h-80 overflow-auto text-xs whitespace-pre-wrap">
-                        {JSON.stringify(meta.importSource.adSets, null, 2)}
-                      </pre>
-                    </details>
-                  </DialogContent>
-                </Dialog>
-              )}
-              <p className="text-xs text-muted-foreground">
-                {meta?.importSource
-                  ? "Recovered from Meta · local working copy. "
-                  : ""}
-                {meta?.importSource && !placementPlan.length
-                  ? "Artwork below is recovered; select delivery placements in setup before shipping. "
-                  : ""}
-                Each creative is shared across {sets.length} ad{" "}
-                {sets.length === 1 ? "set" : "sets"}. Expand to inspect
-                delivery.
-              </p>
-              {creativeAds.map((ad) => {
-                const open = projectionOpen?.[ad.id] ?? false;
-                const panelId = `${sectionId}-projection-${ad.id}`;
-                return (
-                  <div key={ad.id} className="rounded-lg border">
-                    <button
-                      type="button"
-                      className="flex w-full items-center gap-3 p-4 text-left"
-                      aria-expanded={open}
-                      aria-controls={panelId}
-                      onClick={() =>
-                        setProjectionOpen((current) => ({
-                          ...current,
-                          [ad.id]: !open,
-                        }))
-                      }
-                    >
-                      {open ? (
-                        <ChevronDown className="size-4 shrink-0" />
-                      ) : (
-                        <ChevronRight className="size-4 shrink-0" />
-                      )}
-                      <span className="min-w-0 flex-1 space-y-2">
-                        <span className="block text-sm font-medium">
-                          {ad.name
-                            .replace(/^[^_]+_(?:Carousel|Static)_/, "")
-                            .replaceAll("_", " ")}
-                        </span>
-                        <ProjectionSummary ad={ad} placements={placementPlan} />
-                      </span>
-                    </button>
-                    <div id={panelId} hidden={!open} className="px-4 pb-4">
-                      {open && (
+                    )}
+                    {creativeAds.map((ad) => (
+                      <article
+                        key={ad.id}
+                        className="space-y-4 rounded-xl border p-4"
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h6 className="min-w-0 flex-1 text-sm font-medium">
+                            {ad.name}
+                          </h6>
+                        </div>
                         <ProjectedAd
                           ad={ad}
                           brandName={brandName}
                           brandLogo={brandLogo}
                           placements={placementPlan}
                         />
-                      )}
-                    </div>
+                      </article>
+                    ))}
+                    {!creativeAds.length && (
+                      <p className="text-sm text-muted-foreground">
+                        No ads included in this ad set.
+                      </p>
+                    )}
                   </div>
-                );
-              })}
-            </DialogContent>
-          </Dialog>
-        </div>
+                </details>
+                <div className="absolute top-4 right-4">
+                  <DeliveryGroupEditor group={audience}>
+                    <section className="space-y-3 border-t pt-4">
+                      <h4 className="text-sm font-medium">
+                        Included ads · all Meta ad sets
+                      </h4>
+                      <p className="text-xs text-muted-foreground">
+                        Creative selection is saved immediately and applies to
+                        every Meta ad set. Location and age changes apply only
+                        to this set when you Save.
+                      </p>
+                      <PlatformAdSelection pc={pc} ads={ads} compact />
+                    </section>
+                  </DeliveryGroupEditor>
+                </div>
+              </div>
+            </div>
+          ))}
+        </section>
         {catalogCount > 0 && (
           <p className="text-sm text-muted-foreground">
             {catalogCount} imported catalog ad(s) are reference only and cannot
@@ -568,34 +344,8 @@ export function MetaPlatformCard({
             catalog ads included.
           </p>
         )}
-        <p className="text-xs text-muted-foreground">
-          Push creates the campaign paused. Launch is a separate action after
-          reviewing the result in Meta.
-        </p>
       </div>
     </section>
-  );
-}
-
-function SetupFact({
-  label,
-  value,
-  detail,
-}: {
-  label: string;
-  value: string;
-  detail: string;
-}) {
-  return (
-    <div className="min-w-0">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="mt-1 truncate text-base font-semibold" title={value}>
-        {value}
-      </dd>
-      <dd className="truncate text-xs text-muted-foreground" title={detail}>
-        {detail}
-      </dd>
-    </div>
   );
 }
 
@@ -606,6 +356,7 @@ function MetaSettings({
   choices,
   goal,
   onApply,
+  onClose,
 }: {
   pc: PlatformCampaign;
   campaignStartAt?: Date | null;
@@ -618,13 +369,13 @@ function MetaSettings({
   }[];
   goal: AdPushGoal;
   onApply: (goal: AdPushGoal) => void;
+  onClose: () => void;
 }) {
   const [draftGoal, setDraftGoal] = useState(goal);
   const [amount, setAmount] = useState(pc.budget?.toString() ?? "");
   const [budgetType, setBudgetType] = useState<"daily" | "lifetime">(
     pc.budgetType === "lifetime" ? "lifetime" : "daily",
   );
-  const [open, setOpen] = useState(false);
   const meta = pc.settings?.meta;
   const [importReviewed, setImportReviewed] = useState(
     meta?.importReviewed ?? false,
@@ -654,11 +405,7 @@ function MetaSettings({
     campaignEndAt,
     ...meta,
   });
-  const [start, setStart] = useState(dateValue(effective.startAt));
   const [end, setEnd] = useState(dateValue(effective.endAt));
-  const [scheduledStart, setScheduledStart] = useState(
-    Boolean(effective.startAt),
-  );
   const [scheduledEnd, setScheduledEnd] = useState(
     Boolean(effective.endAt) || pc.budgetType === "lifetime",
   );
@@ -667,316 +414,242 @@ function MetaSettings({
     orpc.ads.setPlatformDraft.mutationOptions({
       onSuccess: () => {
         onApply(draftGoal);
-        setOpen(false);
+        onClose();
         router.refresh();
       },
     }),
   );
   const dateIssue =
-    scheduledStart && !start
-      ? "Choose a start date."
-      : scheduledEnd && !end
-        ? "Choose an end date."
-        : metaScheduleIssue(
-            {
-              startAt: scheduledStart && start ? new Date(start) : null,
-              endAt: scheduledEnd && end ? new Date(end) : null,
-            },
-            budgetType,
-          );
+    scheduledEnd && !end
+      ? "Choose an end date."
+      : metaScheduleIssue(
+          {
+            startAt: null,
+            endAt: scheduledEnd && end ? new Date(end) : null,
+          },
+          budgetType,
+        );
   const invalidDates = Boolean(dateIssue);
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => {
-          setDraftGoal(goal);
-          setAmount(pc.budget?.toString() ?? "");
-          setBudgetType(pc.budgetType === "lifetime" ? "lifetime" : "daily");
-          setImportReviewed(meta?.importReviewed ?? false);
-          setPlacements(meta?.placements ?? META_DEFAULT_PLACEMENTS);
-          setPixel(meta?.pixelId ?? "");
-          setEvent(meta?.customEventType ?? "");
-          setConversion(meta?.customConversionId ?? "");
-          setScope(meta?.conversionScope ?? "pixel");
-          setMode(meta?.budgetMode ?? "cbo");
-          setStart(dateValue(effective.startAt));
-          setEnd(dateValue(effective.endAt));
-          setScheduledStart(Boolean(effective.startAt));
-          setScheduledEnd(
-            Boolean(effective.endAt) || pc.budgetType === "lifetime",
-          );
-          save.reset();
-          setOpen(true);
-        }}
-      >
-        Settings
-      </Button>
-      <DialogContent className="max-h-[85dvh] gap-4 overflow-y-auto pb-6">
-        <DialogHeader>
-          <DialogTitle>Meta delivery settings</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-1 text-sm">
-          <p>Ad account · Facebook Page</p>
-          <p className="text-muted-foreground">
-            {choices[0]
-              ? `${choices[0].adAccountName ?? choices[0].adAccountId} · Page ${choices[0].pageId ?? "not resolved"}`
-              : "Configure Meta access in brand settings."}
-          </p>
-        </div>
-        <label className="space-y-1 text-sm">
-          Goal
-          <select
-            className="w-full rounded border bg-background p-2"
-            value={draftGoal}
-            onChange={(e) => setDraftGoal(e.target.value as AdPushGoal)}
-          >
+    <div className="grid grid-cols-1 gap-4 @xl:grid-cols-2">
+      <label className="space-y-1 text-sm">
+        Goal
+        <Select
+          value={draftGoal}
+          onValueChange={(value) => setDraftGoal(value as AdPushGoal)}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
             {AD_PUSH_GOALS.map((g) => (
-              <option key={g} value={g}>
-                {g}
-              </option>
+              <SelectItem key={g} value={g}>
+                {g.charAt(0).toUpperCase() + g.slice(1).replace("_", " ")}
+              </SelectItem>
             ))}
-          </select>
-        </label>
-        <p className="text-xs text-muted-foreground">
-          Saved to the platform draft with the budget, schedule and tracking.
+          </SelectContent>
+        </Select>
+      </label>
+      <div className="space-y-1 text-sm">
+        <p>Ad account · Facebook Page</p>
+        <p className="text-muted-foreground">
+          {choices[0]
+            ? `${choices[0].adAccountName ?? choices[0].adAccountId} · Page ${choices[0].pageId ?? "not resolved"}`
+            : "Configure Meta access in brand settings."}
         </p>
-        <fieldset className="space-y-2">
-          <legend className="text-sm font-medium">Placements</legend>
-          {META_PLACEMENTS.map((p) => (
-            <label key={p.id} className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={placements.includes(p.id)}
-                onChange={(e) =>
-                  setPlacements((current) =>
-                    e.target.checked
-                      ? [...current, p.id]
-                      : current.filter((id) => id !== p.id),
-                  )
-                }
-              />
-              {p.label}
-            </label>
-          ))}
-          <p className="text-xs text-muted-foreground">
-            These are the placements sent to Meta. Missing creative is shown in
-            review.
-          </p>
-        </fieldset>
-        <label className="space-y-1 text-sm">
-          Budget (account currency)
-          <Input
-            inputMode="numeric"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
-        </label>
-        <label className="space-y-1 text-sm">
-          Budget period
-          <select
-            className="w-full rounded border bg-background p-2"
-            value={budgetType}
-            onChange={(e) => {
-              setBudgetType(e.target.value as "daily" | "lifetime");
-              if (e.target.value === "lifetime") setScheduledEnd(true);
-            }}
-          >
-            <option value="daily">Daily</option>
-            <option value="lifetime">Lifetime</option>
-          </select>
-        </label>
-        <label className="space-y-1 text-sm">
-          Budget allocation
-          <select
-            className="w-full rounded border bg-background p-2"
-            value={mode}
-            onChange={(e) => setMode(e.target.value as "cbo" | "abo")}
-          >
-            <option value="cbo">Campaign budget (CBO)</option>
-            <option value="abo">Ad set budgets (ABO)</option>
-          </select>
-        </label>
-        <label className="space-y-1 text-sm">
-          Pixel / dataset ID
-          <Input value={pixel} onChange={(e) => setPixel(e.target.value)} />
-        </label>
-        <label className="space-y-1 text-sm">
-          Conversion event
-          <Input
-            placeholder="PURCHASE"
-            value={event}
-            onChange={(e) => setEvent(e.target.value)}
-          />
-        </label>
-        <label className="space-y-1 text-sm">
-          Optimise on
-          <select
-            className="w-full rounded border bg-background p-2"
-            value={scope}
-            onChange={(e) => setScope(e.target.value as "host" | "pixel")}
-          >
-            <option value="pixel">Shared pixel event (all Wander sites)</option>
-            <option value="host">This client&apos;s site only</option>
-          </select>
-        </label>
-        <label className="space-y-1 text-sm">
-          Custom conversion ID (optional)
-          <Input
-            value={conversion}
-            onChange={(e) => setConversion(e.target.value)}
-          />
-        </label>
-        <label className="space-y-1 text-sm">
-          Start
-          <select
-            className="w-full rounded border bg-background p-2"
-            value={scheduledStart ? "scheduled" : "launch"}
-            onChange={(e) => setScheduledStart(e.target.value === "scheduled")}
-          >
-            <option value="launch">When launched</option>
-            <option value="scheduled">Schedule a date</option>
-          </select>
-        </label>
-        {scheduledStart && (
-          <label className="space-y-1 text-sm">
-            Start date (local time)
-            <Input
-              type="datetime-local"
-              value={start}
-              onChange={(e) => setStart(e.target.value)}
-            />
-          </label>
-        )}
-        <label className="space-y-1 text-sm">
-          End
-          <select
-            className="w-full rounded border bg-background p-2"
-            value={scheduledEnd ? "scheduled" : "none"}
-            onChange={(e) => setScheduledEnd(e.target.value === "scheduled")}
-          >
-            <option value="none" disabled={budgetType === "lifetime"}>
+      </div>
+      <label className="space-y-1 text-sm">
+        Budget (account currency)
+        <Input
+          inputMode="numeric"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+        />
+      </label>
+      <label className="space-y-1 text-sm">
+        Budget period
+        <Select
+          value={budgetType}
+          onValueChange={(value) => {
+            setBudgetType(value as "daily" | "lifetime");
+            if (value === "lifetime") setScheduledEnd(true);
+          }}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="daily">Daily</SelectItem>
+            <SelectItem value="lifetime">Lifetime</SelectItem>
+          </SelectContent>
+        </Select>
+      </label>
+      <label className="space-y-1 text-sm">
+        Budget allocation
+        <Select
+          value={mode}
+          onValueChange={(value) => setMode(value as "cbo" | "abo")}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="cbo">Campaign budget (CBO)</SelectItem>
+            <SelectItem value="abo">Ad set budgets (ABO)</SelectItem>
+          </SelectContent>
+        </Select>
+      </label>
+      <label className="space-y-1 text-sm">
+        End
+        <Select
+          value={scheduledEnd ? "scheduled" : "none"}
+          onValueChange={(value) => setScheduledEnd(value === "scheduled")}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none" disabled={budgetType === "lifetime"}>
               Run until paused
-            </option>
-            <option value="scheduled">Schedule an end date</option>
-          </select>
+            </SelectItem>
+            <SelectItem value="scheduled">Schedule an end date</SelectItem>
+          </SelectContent>
+        </Select>
+      </label>
+      {scheduledEnd && (
+        <label className="space-y-1 text-sm">
+          End date (local time)
+          <Input
+            type="datetime-local"
+            value={end}
+            onChange={(e) => setEnd(e.target.value)}
+          />
         </label>
-        {scheduledEnd && (
+      )}
+      <p className="text-xs text-muted-foreground">
+        Push creates ads paused. When launched, they become eligible to deliver
+        after Meta review. Lifetime budgets require an end date.
+      </p>
+      <details className="space-y-3 @xl:col-span-2">
+        <summary className="cursor-pointer text-sm font-medium">
+          Placements and tracking
+        </summary>
+        <div className="mt-3 grid grid-cols-1 gap-4 @xl:grid-cols-2">
+          {" "}
+          <fieldset className="space-y-2 @xl:col-span-2">
+            <legend className="text-sm font-medium">Placements</legend>
+            {META_PLACEMENTS.map((p) => (
+              <label key={p.id} className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={placements.includes(p.id)}
+                  onChange={(e) =>
+                    setPlacements((current) =>
+                      e.target.checked
+                        ? [...current, p.id]
+                        : current.filter((id) => id !== p.id),
+                    )
+                  }
+                />
+                {p.label}
+              </label>
+            ))}
+            <p className="text-xs text-muted-foreground">
+              These are the placements sent to Meta. Missing creative is shown
+              in review.
+            </p>
+          </fieldset>
           <label className="space-y-1 text-sm">
-            End date (local time)
+            Pixel / dataset ID
+            <Input value={pixel} onChange={(e) => setPixel(e.target.value)} />
+          </label>
+          <label className="space-y-1 text-sm">
+            Conversion event
             <Input
-              type="datetime-local"
-              value={end}
-              onChange={(e) => setEnd(e.target.value)}
+              placeholder="PURCHASE"
+              value={event}
+              onChange={(e) => setEvent(e.target.value)}
             />
           </label>
-        )}
-        <p className="text-xs text-muted-foreground">
-          Push creates ads paused. When launched, they become eligible to
-          deliver after Meta review. Lifetime budgets require an end date.
-        </p>
-        {meta?.importSource && (
-          <label className="flex gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={importReviewed}
-              onChange={(e) => setImportReviewed(e.target.checked)}
-            />
-            I reviewed the imported audience and delivery settings. Use this
-            setup for the new campaign; source-only settings will not be copied.
+          <label className="space-y-1 text-sm">
+            Optimise on
+            <Select
+              value={scope}
+              onValueChange={(value) => setScope(value as "host" | "pixel")}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pixel">
+                  Shared pixel event (all Wander sites)
+                </SelectItem>
+                <SelectItem value="host">
+                  This client&apos;s site only
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </label>
-        )}
-        {dateIssue && <p role="alert">{dateIssue}</p>}
-        {save.error && <p role="alert">{save.error.message}</p>}
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            Cancel
-          </Button>
-          <Button
-            loading={save.isPending}
-            disabled={
-              !placements.length ||
-              invalidDates ||
-              (amount !== "" &&
-                (!Number.isInteger(Number(amount)) || Number(amount) <= 0))
-            }
-            onClick={() =>
-              save.mutate({
-                platformCampaignId: pc.id,
-                budget: amount ? Number(amount) : null,
-                budgetType,
-                meta: {
-                  goal: draftGoal,
-                  startWhenLaunched: !scheduledStart,
-                  runUntilPaused: !scheduledEnd,
-                  placements,
-                  importReviewed,
-                  pixelId: pixel.trim(),
-                  customEventType: event.trim(),
-                  customConversionId: conversion.trim(),
-                  conversionScope: scope,
-                  budgetMode: mode,
-                },
-                startAt:
-                  scheduledStart && start
-                    ? new Date(start).toISOString()
-                    : null,
-                endAt: scheduledEnd && end ? new Date(end).toISOString() : null,
-              })
-            }
-          >
-            Save settings
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function ProjectionSummary({
-  ad,
-  placements,
-}: {
-  ad: Ad;
-  placements: MetaPlacement[];
-}) {
-  if (!("media" in ad.content)) return null;
-  const content = ad.content;
-  const visible = metaPreviewPlacements(content, placements);
-  const views = META_PLACEMENTS.filter((view) => visible.includes(view.id));
-  const slides =
-    content.ideaStudio?.document.cards.length ?? content.media.length;
-  const issues = [
-    ...new Set(
-      views.flatMap((view) => {
-        const resolved = metaPreviewMedia(content, view.id, ad.brandId);
-        return resolved.issue ? [resolved.issue] : [];
-      }),
-    ),
-  ];
-  const kinds = [...new Set(views.map((view) => view.kind))];
-  return (
-    <span className="block space-y-1 text-xs text-muted-foreground">
-      <span className="flex flex-wrap items-center gap-2">
-        <span>
-          {slides > 1 ? `Carousel · ${slides} slides` : "Single image"}
-        </span>
-        <span aria-hidden>·</span>
-        <span>
-          {kinds
-            .map((kind) =>
-              kind === "feed" ? "Feed" : kind === "story" ? "Stories" : "Reels",
-            )
-            .join(" / ")}
-        </span>
-      </span>
-      {issues.map((issue) => (
-        <span key={issue} className="block">
-          {issue}
-        </span>
-      ))}
-    </span>
+          <label className="space-y-1 text-sm">
+            Custom conversion ID (optional)
+            <Input
+              value={conversion}
+              onChange={(e) => setConversion(e.target.value)}
+            />
+          </label>
+        </div>
+      </details>
+      {meta?.importSource && (
+        <label className="flex gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={importReviewed}
+            onChange={(e) => setImportReviewed(e.target.checked)}
+          />
+          I reviewed the imported audience and delivery settings. Use this setup
+          for the new campaign; source-only settings will not be copied.
+        </label>
+      )}
+      {dateIssue && <p role="alert">{dateIssue}</p>}
+      {save.error && <p role="alert">{save.error.message}</p>}
+      <div className="flex justify-end gap-2 @xl:col-span-2">
+        <Button variant="outline" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button
+          loading={save.isPending}
+          disabled={
+            !placements.length ||
+            invalidDates ||
+            (amount !== "" &&
+              (!Number.isInteger(Number(amount)) || Number(amount) <= 0))
+          }
+          onClick={() =>
+            save.mutate({
+              platformCampaignId: pc.id,
+              budget: amount ? Number(amount) : null,
+              budgetType,
+              meta: {
+                goal: draftGoal,
+                startWhenLaunched: true,
+                runUntilPaused: !scheduledEnd,
+                placements,
+                importReviewed,
+                pixelId: pixel.trim(),
+                customEventType: event.trim(),
+                customConversionId: conversion.trim(),
+                conversionScope: scope,
+                budgetMode: mode,
+              },
+              startAt: null,
+              endAt: scheduledEnd && end ? new Date(end).toISOString() : null,
+            })
+          }
+        >
+          Save settings
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -992,7 +665,7 @@ function ProjectedAd({
   placements: MetaPlacement[];
 }) {
   const [selected, setSelected] = useState<MetaPlacement | "">("");
-  const [compare, setCompare] = useState(false);
+  const [compare, setCompare] = useState(true);
   const [card, setCard] = useState(0);
   if (!("media" in ad.content)) return null;
   const content = ad.content;
@@ -1008,7 +681,7 @@ function ProjectedAd({
         </p>
       )}
       <div className="flex flex-wrap items-center gap-3">
-        <span className="text-sm">Placement</span>
+        <span className="text-sm">Preview placement</span>
         <Select
           value={compare ? "all" : active?.id}
           onValueChange={(value) => {
@@ -1017,7 +690,10 @@ function ProjectedAd({
             setCard(0);
           }}
         >
-          <SelectTrigger aria-label="Placement" className="w-full sm:w-64">
+          <SelectTrigger
+            aria-label={`Preview placement for ${ad.name}`}
+            className="w-full sm:w-64"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

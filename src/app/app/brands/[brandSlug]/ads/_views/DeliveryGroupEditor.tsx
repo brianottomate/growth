@@ -1,10 +1,18 @@
 "use client";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { orpc } from "@/orpc/client";
 import type { DeliveryGroupConfiguration } from "@/lib/platform-delivery";
@@ -16,8 +24,14 @@ const lines = (text: string) =>
     .filter(Boolean);
 export function DeliveryGroupEditor({
   group,
+  children,
 }: {
-  group: { id: string; configuration?: DeliveryGroupConfiguration | null };
+  children?: ReactNode;
+  group: {
+    id: string;
+    name?: string;
+    configuration?: DeliveryGroupConfiguration | null;
+  };
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -36,25 +50,38 @@ export function DeliveryGroupEditor({
   )
     return null;
   return (
-    <div className="space-y-3">
-      <Button size="sm" variant="outline" onClick={() => setOpen(!open)}>
-        {open
-          ? "Close settings"
-          : config.platform === "google_ads"
-            ? "Edit ad group"
-            : "Edit ad set"}
+    <Dialog open={open} onOpenChange={setOpen}>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => {
+          setConfig(group.configuration);
+          save.reset();
+          setOpen(true);
+        }}
+      >
+        Edit
       </Button>
-      {open && (
-        <div className="space-y-3 rounded-lg border p-3">
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{group.name ?? "Delivery settings"}</DialogTitle>
+          <DialogDescription>
+            {config.platform === "google_ads"
+              ? "One keyword per line. Use [brackets] for exact match and quotes for phrase match."
+              : "Locations and ages for this Meta ad set."}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
           {config.platform === "google_ads" ? (
             (["keywords", "excludedKeywords"] as const).map((key) => (
               <div key={key} className="space-y-1.5">
                 <Label htmlFor={`${group.id}-${key}`}>
-                  {key === "keywords" ? "Search terms" : "Negative keywords"}
+                  {key === "keywords" ? "Keywords" : "Group negative keywords"}
                 </Label>
                 <Textarea
                   id={`${group.id}-${key}`}
-                  rows={5}
+                  rows={6}
+                  className="max-h-48"
                   value={(config[key] ?? []).join("\n")}
                   onChange={(e) =>
                     setConfig({ ...config, [key]: lines(e.target.value) })
@@ -64,9 +91,6 @@ export function DeliveryGroupEditor({
             ))
           ) : (
             <>
-              <p className="text-xs text-muted-foreground">
-                Delivery locations and ages for this Meta ad set.
-              </p>
               <div className="grid grid-cols-1 gap-3 @xl:grid-cols-2">
                 {(["states", "countries", "regions", "cities"] as const).map(
                   (key) => (
@@ -130,20 +154,29 @@ export function DeliveryGroupEditor({
               </div>
             </>
           )}
+          {children}
           {save.error && (
             <p className="text-xs text-destructive">{save.error.message}</p>
           )}
-          <Button
-            size="sm"
-            loading={save.isPending}
-            onClick={() =>
-              save.mutate({ deliveryGroupId: group.id, configuration: config })
-            }
-          >
-            Save delivery settings
-          </Button>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              loading={save.isPending}
+              onClick={() =>
+                save.mutate({
+                  deliveryGroupId: group.id,
+                  configuration: config,
+                })
+              }
+            >
+              Save
+            </Button>
+          </DialogFooter>
         </div>
-      )}
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -1084,6 +1084,9 @@ export type ZernioAdVideo = {
   thumbnailUrl?: string;
 };
 
+// TODO(geo): add ZIP keys resolved through targeting/search and radius pins as
+// customLocations { latitude, longitude, radius, distance_unit }. Google city
+// radii are not supported; do not approximate a pin by widening to its region.
 export type ZernioAdTargeting = {
   countries?: string[];
   /** Region keys from GET /v1/ads/targeting/search — ids, never names. */
@@ -1261,6 +1264,10 @@ export type CreateZernioStandaloneAdInput = {
   description?: string;
   callToAction?: string;
   campaignType?: "search" | "display";
+  /** Google new campaigns only; omit for existingCampaignId/adSetId attaches. */
+  locationTargetingType?: "presence";
+  /** Google creation: explicit campaign bidding; omit when attaching groups or ads. */
+  bidStrategy?: "LOWEST_COST_WITHOUT_CAP";
   leadGenFormId?: string;
   /** Google Search: the new ad group's keywords. A string is BROAD. */
   keywords?: ZernioKeyword[];

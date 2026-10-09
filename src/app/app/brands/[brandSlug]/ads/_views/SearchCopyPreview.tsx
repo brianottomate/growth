@@ -62,11 +62,11 @@ function CopyPool({
             className="flex items-start justify-between gap-3 px-3 py-2.5 text-sm"
           >
             <span className="min-w-0 break-words">{line}</span>
-            <span
-              className={`shrink-0 pt-0.5 text-xs tabular-nums ${line.length > limit ? "text-destructive" : "text-muted-foreground"}`}
-            >
-              {line.length}/{limit}
-            </span>
+            {line.length > limit && (
+              <span className="shrink-0 pt-0.5 text-xs text-destructive">
+                {line.length}/{limit} · Over limit
+              </span>
+            )}
           </li>
         ))}
       </ul>

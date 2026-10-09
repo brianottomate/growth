@@ -59,8 +59,8 @@ try {
     geography: audience.geography,
   });
 }
-assert.equal(google.deliveryGroups.length, 4);
-assert.equal(meta.deliveryGroups.length, 4);
+assert.equal(google.deliveryGroups.length, 2);
+assert.equal(meta.deliveryGroups.length, 1);
 assert.deepEqual(google.settings?.google?.geography?.states, [
   "OH",
   "PA",
@@ -112,5 +112,5 @@ await openCampaignAction.runValidated(
   },
 );
 console.log(
-  "Verified: four Meta groups, four Google groups, 20 search terms, OH/PA/IN, strict read contract, rejected foreign-workspace and wrong-platform edits; no provider writes.",
+  "Verified: one Meta group, two Google groups, 20 search terms, OH/PA/IN, strict read contract, rejected foreign-workspace and wrong-platform edits; no provider writes.",
 );

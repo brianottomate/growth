@@ -8,7 +8,8 @@ import {
   type AdGrouping,
 } from "@/lib/ad-collection-groups";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { SimpleDialog } from "@/components/ui/dialog";
@@ -21,9 +22,13 @@ import { useWorkspaceMutation } from "../useWorkspaceMutation";
 export function AddExistingAdsDialog({
   brandId,
   campaignId,
+  studioHref,
+  draftPreviewAction,
 }: {
   brandId: string;
   campaignId: string;
+  studioHref?: string;
+  draftPreviewAction?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
@@ -71,13 +76,13 @@ export function AddExistingAdsDialog({
           }
         }
       }}
-      title="Add approved ads"
+      title="Add ads"
       size="lg"
       scrollable
       className="flex max-h-[90dvh] flex-col"
       trigger={
         <Button size="sm" variant="outline">
-          Add approved ads
+          Add ads
         </Button>
       }
       footer={
@@ -111,6 +116,22 @@ export function AddExistingAdsDialog({
       }
     >
       <div className="space-y-3">
+        {(studioHref || draftPreviewAction) && (
+          <div className="space-y-3 border-b pb-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {studioHref && (
+                <Button size="sm" variant="outline" asChild>
+                  <Link href={studioHref}>Create in Studio</Link>
+                </Button>
+              )}
+              {draftPreviewAction}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Add approved ads for publishing, or preview Studio drafts while
+              planning.
+            </p>
+          </div>
+        )}
         {ads.isPending ? (
           <p role="status">Loading brand ads…</p>
         ) : ads.isError ? (

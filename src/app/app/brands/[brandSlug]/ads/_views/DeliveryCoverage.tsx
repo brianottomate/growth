@@ -4,7 +4,11 @@ import type { DeliveryGeography } from "@/server/db/ads-schema";
 
 export function DeliveryCoverage({
   targets,
+  compact = false,
+  showMap = true,
 }: {
+  compact?: boolean;
+  showMap?: boolean;
   targets: { id: string; name: string; geography?: DeliveryGeography | null }[];
 }) {
   const states = [
@@ -17,7 +21,9 @@ export function DeliveryCoverage({
     Object.values(t.geography ?? {}).some((values) => values?.length),
   );
   return (
-    <section className="space-y-2 rounded-lg border p-3">
+    <section
+      className={compact ? "space-y-2" : "space-y-2 rounded-lg border p-3"}
+    >
       <h4 className="text-sm font-medium">Location targeting</h4>
       <GeographyChips label="States" values={states} />
       <GeographyChips label="Countries" values={countries} />
@@ -26,7 +32,7 @@ export function DeliveryCoverage({
           Locations not configured.
         </p>
       )}
-      {configured && (
+      {configured && showMap && (
         <details>
           <summary className="cursor-pointer text-xs text-muted-foreground">
             View delivery coverage

@@ -7,6 +7,7 @@ import { workspaceActor } from "@/server/workspace-actor";
 
 import {
   campaignListPath,
+  campaignPath,
   type CampaignWorkspace,
 } from "@/lib/campaign-navigation";
 import Link from "next/link";
@@ -16,6 +17,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/server/db";
 import {
   platformAdTable,
+  platformDeliveryGroupTable,
   brandTable,
   platformCampaignTable,
   campaignTable,
@@ -28,6 +30,9 @@ import { fmtDate, money, statusStyle } from "./format";
 import { DeletePlatformCampaign } from "./DeletePlatformCampaign";
 import { DeliverySwitch } from "./DeliverySwitch";
 import { CampaignLink } from "./CampaignLink";
+import { MetaDeliverySummary } from "./MetaDeliverySummary";
+import { PushedMetaGroups } from "./PushedMetaGroups";
+import { PushedSearchGroups } from "./PushedSearchGroups";
 import { ImportCreativeButton } from "./ImportCreativeButton";
 
 /**
@@ -58,7 +63,7 @@ export async function PlatformCampaignView({
       eq(brandTable.organizationId, org.id),
       isNull(brandTable.deletedAt),
     ),
-    columns: { id: true, name: true, slug: true },
+    columns: { id: true, name: true, slug: true, metaPageId: true },
   });
   if (!brand) notFound();
 
@@ -82,11 +87,29 @@ export async function PlatformCampaignView({
       : Promise.resolve(null),
   ]);
 
+  const isSearch =
+    platformCampaign.platform === "google_ads" &&
+    platformCampaign.settings?.google?.campaignType === "search";
+  const deliveryGroups =
+    isSearch || platformCampaign.platform === "meta_ads"
+      ? await db.query.platformDeliveryGroupTable.findMany({
+          where: eq(
+            platformDeliveryGroupTable.platformCampaignId,
+            platformCampaign.id,
+          ),
+        })
+      : [];
+
   const stats = platformCampaign.stats ?? {};
   const statCards: { label: string; value: string }[] = [
     { label: "Spend", value: money(stats.spend ?? platformCampaign.spend) },
     ...(platformCampaign.budget != null
-      ? [{ label: "Budget", value: money(platformCampaign.budget) }]
+      ? [
+          {
+            label: "Budget",
+            value: `${money(platformCampaign.budget)}${platformCampaign.budgetType === "daily" ? "/day" : " lifetime"}`,
+          },
+        ]
       : []),
     ...(stats.impressions != null
       ? [{ label: "Impressions", value: stats.impressions.toLocaleString() }]
@@ -197,7 +220,7 @@ export async function PlatformCampaignView({
               hasExternalId={Boolean(platformCampaign.externalId)}
               spendLine={
                 platformCampaign.budget != null
-                  ? `${money(platformCampaign.budget)} budget`
+                  ? `${money(platformCampaign.budget)}${platformCampaign.budgetType === "daily" ? "/day" : " lifetime"} budget`
                   : "no stored budget"
               }
             />
@@ -217,6 +240,15 @@ export async function PlatformCampaignView({
           ))}
         </div>
       </WorkspaceCard>
+      {platformCampaign.platform === "meta_ads" && (
+        <section className="space-y-4 rounded-xl border bg-background p-4">
+          <h3 className="text-sm font-semibold">Delivery setup</h3>
+          <MetaDeliverySummary
+            pc={platformCampaign}
+            pageId={brand.metaPageId}
+          />
+        </section>
+      )}
       <section className="space-y-4 rounded-xl border bg-background p-4">
         <WorkspaceCardHeader title="Ads" icon={Images} count={spots.length} />
         {spots.length === 0 ? (
@@ -233,6 +265,28 @@ export async function PlatformCampaignView({
               , or draft them in chat.
             </p>
           </div>
+        ) : platformCampaign.platform === "meta_ads" ? (
+          <PushedMetaGroups
+            groups={deliveryGroups}
+            ads={spots}
+            pc={platformCampaign}
+            allowImport
+            campaignHref={
+              campaign
+                ? campaignPath(brandSlug, campaign.id, workspace)
+                : undefined
+            }
+          />
+        ) : isSearch ? (
+          <PushedSearchGroups
+            groups={deliveryGroups}
+            ads={spots}
+            campaignHref={
+              campaign
+                ? campaignPath(brandSlug, campaign.id, workspace)
+                : undefined
+            }
+          />
         ) : (
           <div className="grid grid-cols-1 gap-3 @xl:grid-cols-2 @4xl:grid-cols-3">
             {sortedSpots.map((spot) => (

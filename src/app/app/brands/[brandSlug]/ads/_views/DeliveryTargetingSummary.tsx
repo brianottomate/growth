@@ -4,7 +4,9 @@ import type { DeliveryGeography } from "@/server/db/ads-schema";
 
 export function DeliveryTargetingSummary({
   audience,
+  compact = false,
 }: {
+  compact?: boolean;
   audience: {
     geography?: DeliveryGeography | null;
     ageMin?: number | null;
@@ -18,7 +20,7 @@ export function DeliveryTargetingSummary({
   );
   return (
     <div className="space-y-2 text-xs text-muted-foreground">
-      <p className="font-medium">Ad set targeting</p>
+      {!compact && <p className="font-medium">Ad set targeting</p>}
       <GeographyChips label="Countries" values={geo.countries} />
       <GeographyChips label="States" values={geo.states} />
       <GeographyChips label="Regions" values={geo.regions} />

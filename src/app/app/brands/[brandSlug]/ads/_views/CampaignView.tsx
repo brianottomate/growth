@@ -14,7 +14,7 @@ import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { Images, Radio, Users, ChartNoAxesCombined } from "lucide-react";
 
 import { db } from "@/server/db";
-import { adTable, homeTable, platformAdTable } from "@/server/db/schema";
+import { homeTable, platformAdTable } from "@/server/db/schema";
 import { destinationLabel, safeHomeUrl } from "@/lib/ad-preview-links";
 import { getSession } from "@/server/better-auth/server";
 import { platformLabel } from "@/components/channel-logos";
@@ -32,7 +32,6 @@ import { AddExistingAdsDialog } from "@/app/app/performance/clients/[brandSlug]/
 import { money } from "./format";
 import { PlanPlatformButton } from "./PlanPlatformButton";
 import { PlatformSection } from "./PlatformSection";
-import { StudioDraftPicker } from "./StudioDraftPicker";
 import { WorkInChatButton } from "./WorkInChatButton";
 
 /**
@@ -89,16 +88,6 @@ export async function CampaignView({
   );
   const brand = draft.brand;
   const brandName = brand.name;
-  const studioAds = await db.query.adTable.findMany({
-    where: and(eq(adTable.brandId, brand.id), isNull(adTable.campaignId)),
-    orderBy: (t, { desc }) => [desc(t.createdAt)],
-  });
-  const previewIds = new Set(
-    platformCampaigns
-      .filter((p) => p.status === "draft" && !p.externalId)
-      .flatMap((p) => p.settings?.previewAdIds ?? []),
-  );
-  const previewAds = studioAds.filter((ad) => previewIds.has(ad.id));
 
   // Their homes, for binding an ad to one. Empty for a brand whose WanderOS
   // site is not connected, in which case a home is a name typed on the tile.
@@ -185,20 +174,16 @@ export async function CampaignView({
     />
   );
 
-  // Campaign membership consumes approved ads.
-  const approvedAds = ads.filter((ad) => ad.status === "approved");
+  // Campaign membership is established when approved ads are assigned.
   const adActions = (
     <div className="flex flex-wrap items-center gap-2">
       {!anyPushed && (
         <>
-          <AddExistingAdsDialog brandId={brand.id} campaignId={campaign.id} />
-          <Button size="sm" variant="outline" asChild>
-            <Link
-              href={`/app/performance/clients/${brand.slug ?? brand.id}/ads`}
-            >
-              Create in Studio
-            </Link>
-          </Button>
+          <AddExistingAdsDialog
+            brandId={brand.id}
+            campaignId={campaign.id}
+            studioHref={`/app/performance/clients/${brand.slug ?? brand.id}/ads`}
+          />
         </>
       )}
       <AskAssistantButton
@@ -294,13 +279,13 @@ export async function CampaignView({
               </p>
             )}
             {campaign.description ? (
-              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+              <p className="mt-2 text-sm text-muted-foreground">
                 {campaign.description}
               </p>
             ) : null}
             <nav aria-label="Sections" className="mt-3 flex flex-wrap gap-1.5">
               {[
-                ["campaign-ads", `Ads · ${ads.length + previewAds.length}`],
+                ["campaign-ads", `Ads · ${ads.length}`],
                 ["campaign-audiences", "Audiences"],
                 ["campaign-platforms", "Platforms"],
               ].map(([id, label]) => (
@@ -331,13 +316,7 @@ export async function CampaignView({
         className="scroll-mt-4 space-y-4 rounded-xl border bg-background p-4"
       >
         <AdIdeasList
-          actions={
-            <>
-              {adActions}
-              <StudioDraftPicker ads={studioAds} platforms={planned} />
-            </>
-          }
-          studioPreviewIds={previewAds.map((ad) => ad.id)}
+          actions={adActions}
           emptyState={
             <EmptyState
               compact
@@ -351,12 +330,15 @@ export async function CampaignView({
           homeOrder={orderedHomes.map((home) => home.id)}
           homeLinks={homeLinks}
           studioHref={`/app/performance/clients/${brandSlug}/ads`}
-          ads={[...ads, ...previewAds]}
+          ads={ads}
           brandId={brand.id}
           brandName={brandName}
           brandLogo={brand.logo}
           states={states}
           plannedPlatforms={plannedPlatforms}
+          platformSettings={Object.fromEntries(
+            planned.map((plan) => [plan.platform, plan.settings ?? {}]),
+          )}
         />
       </section>
       <section>
@@ -376,8 +358,6 @@ export async function CampaignView({
               brandId={brand.id}
               brandName={brandName}
               audiences={audiences}
-              metaTargets={metaTargets}
-              platforms={plannedPlatforms}
               personas={draft.personas}
             />
           </Step>
@@ -414,14 +394,11 @@ export async function CampaignView({
                     campaignStartAt={campaign.startAt}
                     campaignEndAt={campaign.endAt}
                     draftAds={ads}
-                    previewAds={previewAds.filter((ad) =>
-                      platformCampaign.settings?.previewAdIds?.includes(ad.id),
-                    )}
                     audiences={audiences.map((a) => ({
                       ...a,
                       metaTargetName: metaTargets[a.id]?.name,
                     }))}
-                    draftAdCount={approvedAds.length}
+                    draftAdCount={ads.length}
                     audienceCount={audiences.length}
                     brandUrl={campaign.landingUrl ?? brand.website ?? null}
                   />

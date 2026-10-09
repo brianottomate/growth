@@ -4,6 +4,7 @@ import type { IdeaStudio } from "@/lib/ad-idea-studio";
 import { relations, sql } from "drizzle-orm";
 import {
   type AnyPgColumn,
+  check,
   index,
   pgEnum,
   pgTable,
@@ -284,6 +285,7 @@ export type PlatformCampaignSettings = {
   /** Unassigned Studio ideas shown for planning only; never consumed by publishing. */
   previewAdIds?: string[];
   google?: {
+    goal?: "traffic" | "engagement" | "awareness" | "conversions";
     geography?: DeliveryGeography;
     /** Zernio supports search and display; the type decides everything else. */
     campaignType?: "search" | "display";
@@ -464,8 +466,12 @@ export const audienceTable = pgTable(
 
     name: t.text().notNull(),
     description: t.text(),
-    /** Shared geographic intent; platform plans own executable targeting. */
+    /** Intended locations of people; destination interests belong in description/persona.
+     * Platform plans own executable delivery targeting. */
     geography: t.jsonb().$type<DeliveryGeography>(),
+    /** Intended ages; never automatically inherited or sent to a platform. */
+    ageMin: t.integer(),
+    ageMax: t.integer(),
     type: audienceTypeEnum().default("segment").notNull(),
 
     createdAt: t
@@ -479,6 +485,18 @@ export const audienceTable = pgTable(
       .notNull(),
   }),
   (table) => [
+    check(
+      "audience_age_min_valid",
+      sql`${table.ageMin} IS NULL OR ${table.ageMin} BETWEEN 0 AND 120`,
+    ),
+    check(
+      "audience_age_max_valid",
+      sql`${table.ageMax} IS NULL OR ${table.ageMax} BETWEEN 0 AND 120`,
+    ),
+    check(
+      "audience_age_order_valid",
+      sql`${table.ageMin} IS NULL OR ${table.ageMax} IS NULL OR ${table.ageMin} <= ${table.ageMax}`,
+    ),
     index("audience_campaign_idx").on(table.campaignId),
     index("audience_brand_idx").on(table.brandId),
     index("audience_persona_idx").on(table.personaId),

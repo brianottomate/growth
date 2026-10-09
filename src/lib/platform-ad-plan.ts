@@ -2,6 +2,25 @@ import { adRoutesTo } from "./ad-platforms";
 import type { ChannelPlatform } from "@/server/db/channel-schema";
 import type { Ad, PlatformCampaignSettings } from "@/server/db/ads-schema";
 
+/** Format compatibility independent of an ad's saved platform selection. */
+export function adSupportsPlatform(
+  ad: Pick<Ad, "type" | "content">,
+  platform: ChannelPlatform,
+  settings: PlatformCampaignSettings,
+) {
+  if (platform === "google_ads") {
+    if (!settings.google?.campaignType) return false;
+    if (settings.google.campaignType === "search") return ad.type === "text";
+    return (
+      ad.type === "creative" &&
+      !("media" in ad.content && ad.content.media[0]?.type === "video")
+    );
+  }
+  if (platform === "meta_ads" || platform === "linkedin_ads")
+    return ad.type === "creative";
+  return true;
+}
+
 /** Shared by review and publishing: selections never override format or platform routing. */
 export function eligiblePlatformAds(
   ads: Ad[],
@@ -10,17 +29,7 @@ export function eligiblePlatformAds(
 ) {
   return ads.filter((ad) => {
     if (!adRoutesTo(ad.platforms, platform)) return false;
-    if (platform === "google_ads") {
-      if (!settings.google?.campaignType) return false;
-      if (settings.google.campaignType === "search") return ad.type === "text";
-      return (
-        ad.type === "creative" &&
-        !("media" in ad.content && ad.content.media[0]?.type === "video")
-      );
-    }
-    if (platform === "meta_ads" || platform === "linkedin_ads")
-      return ad.type === "creative";
-    return true;
+    return adSupportsPlatform(ad, platform, settings);
   });
 }
 

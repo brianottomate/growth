@@ -156,12 +156,13 @@ export const AD_PLATFORM_SPECS: readonly AdPlatformSpec[] = [
       textAds: true,
       creativeAds: true,
       targeting: { regions: true, age: true },
-      goals: ["traffic", "engagement", "awareness"],
+      goals: ["traffic", "engagement", "awareness", "conversions"],
     },
-    // Google's campaign manager needs an `ocid` we don't have, so both
-    // levels get the account-level campaigns view.
+    // Google uses an opaque browser `ocid`, distinct from the customer CID.
+    // A verified scoped URL belongs on platform_campaign.manageUrl. Returning
+    // undefined here keeps sync from replacing that URL with the generic list.
     accountManageUrl: () => "https://ads.google.com/aw/campaigns",
-    campaignManageUrl: () => "https://ads.google.com/aw/campaigns",
+    campaignManageUrl: () => undefined,
   },
   {
     platform: "linkedin_ads",

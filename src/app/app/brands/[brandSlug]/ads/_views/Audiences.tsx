@@ -1,15 +1,16 @@
 "use client";
 import { WorkspaceCardHeader } from "@/app/app/performance/WorkspaceCard";
 
-import { useRouter } from "next/navigation";
-import { useMutation } from "@tanstack/react-query";
-import { MessageSquare, Pencil, Sparkles, Trash2, Users } from "lucide-react";
+import { useState } from "react";
+import { AudienceMap } from "@/components/audience-map";
+import { GeographyChips } from "@/components/geography-chips";
+import { MessageSquare, Sparkles, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { sendAssistantIntent } from "@/lib/assistant-events";
-import type { ChannelPlatform, DeliveryGeography } from "@/server/db/schema";
-import { orpc } from "@/orpc/client";
+import type { DeliveryGeography } from "@/server/db/schema";
+import { audienceAgeLabel } from "@/lib/audience-age";
 
 import { useSuggestedAudiences } from "./SuggestAudiencesButton";
 import { AudienceGeography } from "./AudienceGeography";
@@ -21,6 +22,8 @@ type AudienceRow = {
   persona?: { id: string; name: string } | null;
   description: string | null;
   geography?: DeliveryGeography | null;
+  ageMin?: number | null;
+  ageMax?: number | null;
 };
 
 /**
@@ -33,9 +36,7 @@ export function Audiences({
   brandId,
   brandName,
   audiences,
-  metaTargets = {},
   personas = [],
-  platforms = [],
 }: {
   campaignId: string;
   campaignName: string;
@@ -43,11 +44,20 @@ export function Audiences({
   brandName: string;
   audiences: AudienceRow[];
   personas?: { id: string; name: string }[];
-  platforms?: ChannelPlatform[];
-  /** The Meta audience each ad set will target, by campaign audience id. */
-  metaTargets?: Record<string, { name: string; via: "audience" | "persona" }>;
 }) {
-  const router = useRouter();
+  const [selection, setSelection] = useState("all");
+  const selected = audiences.find((row) => row.id === selection);
+  const visibleAudiences = selected ? [selected] : audiences;
+  const rolledUp = Object.fromEntries(
+    (["countries", "states", "regions", "cities"] as const).map((key) => [
+      key,
+      [
+        ...new Set(
+          visibleAudiences.flatMap((row) => row.geography?.[key] ?? []),
+        ),
+      ],
+    ]),
+  );
   const { busy, run, phase, label } = useSuggestedAudiences(campaignId);
   // A chat on this campaign's audiences; Suggest is the one-click add.
   const audienceChat = () =>
@@ -61,12 +71,6 @@ export function Audiences({
       focus: "audiences",
       visibleText: `Help me with the audiences for “${campaignName}”. Read what it targets now and ask what I would like to add or change.`,
     });
-  const remove = useMutation(
-    orpc.ads.deleteAudience.mutationOptions({
-      onSuccess: () => router.refresh(),
-    }),
-  );
-
   const actions = (primary = false) => (
     <>
       <Button
@@ -94,8 +98,7 @@ export function Audiences({
       />
       {personas.length > 0 && (
         <p className="text-xs text-muted-foreground">
-          Brand personas: {personas.map((p) => p.name).join(" · ")}. Suggestions
-          retain their persona and explain campaign relevance.
+          Persona context: {personas.map((p) => p.name).join(" · ")}.
         </p>
       )}
       {busy && audiences.length > 0 && (
@@ -124,18 +127,28 @@ export function Audiences({
           }
         />
       ) : (
-        <div className="space-y-4">
-          <section className="space-y-4">
+        <div className="grid grid-cols-1 gap-6 @4xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+          <section className="space-y-3" aria-label="Campaign audiences">
             <p className="text-xs text-muted-foreground">
-              Who we want to reach and why. Platform plans below show how each
-              audience is used.
+              Who we want to reach and why. Select an audience to see its
+              geography.
             </p>
-            <div className="grid grid-cols-1 gap-3 @2xl:grid-cols-2">
+            <div className="space-y-3">
               {audiences.map((row) => (
-                <div key={row.id} className="space-y-3 rounded-xl border p-4">
+                <div
+                  key={row.id}
+                  className={`space-y-3 rounded-xl border p-4 ${selected?.id === row.id ? "border-foreground/30 bg-muted/50" : "bg-card"}`}
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold">{row.name}</p>
+                      <button
+                        type="button"
+                        className="text-left text-sm font-semibold hover:underline"
+                        aria-pressed={selected?.id === row.id}
+                        onClick={() => setSelection(row.id)}
+                      >
+                        {row.name}
+                      </button>
                       {row.persona && (
                         <p className="text-xs text-muted-foreground">
                           {row.persona.name}
@@ -148,8 +161,8 @@ export function Audiences({
                         variant="ghost"
                         tone="muted"
                         className="h-7"
-                        aria-label={`Edit ${row.name} in chat`}
-                        title="Edit audience in chat"
+                        aria-label={`Shape ${row.name}`}
+                        title="Shape audience"
                         onClick={() =>
                           sendAssistantIntent({
                             type: "work_ad_campaign",
@@ -158,73 +171,92 @@ export function Audiences({
                             campaignId,
                             campaignName,
                             focus: "audiences",
-                            visibleText: `Help me edit the audience “${row.name}” (${row.id}) in “${campaignName}”. Read its current settings and ask what I would like to change.`,
+                            visibleText: `Help me shape the audience “${row.name}” (${row.id}) in “${campaignName}”. Read its current name, description, persona, age range and geography, then ask what I would like to change. Audience edits, including age, and removal belong here.`,
                           })
                         }
                       >
-                        <Pencil className="size-3.5" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        tone="muted"
-                        className="h-7"
-                        aria-label={`Remove ${row.name}`}
-                        disabled={remove.isPending}
-                        onClick={() => remove.mutate({ audienceId: row.id })}
-                      >
-                        <Trash2 className="size-3.5" />
+                        <MessageSquare className="size-3.5" />
+                        Shape
                       </Button>
                     </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10.5px] text-muted-foreground">
+                        Age
+                      </span>
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-[11px]">
+                        {audienceAgeLabel(row)}
+                      </span>
+                    </div>
+                    {(
+                      [
+                        ["cities", "Cities"],
+                        ["states", "States"],
+                        ["regions", "Regions"],
+                      ] as const
+                    ).map(([key, label]) => (
+                      <GeographyChips
+                        key={key}
+                        label={label}
+                        values={row.geography?.[key]}
+                      />
+                    ))}
+                    <GeographyChips
+                      label="Countries"
+                      values={[
+                        ...(row.geography?.countries ?? []),
+                        ...(row.geography?.states?.length ? ["US"] : []),
+                      ]}
+                    />
                   </div>
                   {row.description && (
-                    <div className="space-y-2 text-xs text-muted-foreground">
-                      <p>{row.description.split(/\n\s*\n/)[0]}</p>
-                      {row.description.split(/\n\s*\n/).length > 1 && (
-                        <details>
-                          <summary className="cursor-pointer">
-                            Planning rationale
-                          </summary>
-                          <p className="mt-2 whitespace-pre-line">
-                            {row.description
-                              .split(/\n\s*\n/)
-                              .slice(1)
-                              .join("\n\n")}
-                          </p>
-                        </details>
-                      )}
-                    </div>
+                    <p className="text-xs whitespace-pre-line text-muted-foreground">
+                      {row.description}
+                    </p>
                   )}
-                  <AudienceGeography audience={row} />
-                  <div className="flex flex-wrap gap-2 border-t pt-3 text-xs text-muted-foreground">
-                    {platforms.includes("meta_ads") && (
-                      <a
-                        className="rounded-md bg-muted px-2 py-1 hover:text-foreground"
-                        href="#platform-meta_ads"
-                      >
-                        Meta ·{" "}
-                        {metaTargets[row.id]
-                          ? "linked audience"
-                          : "delivery plan"}
-                      </a>
-                    )}
-                    {platforms.includes("google_ads") && (
-                      <a
-                        className="rounded-md bg-muted px-2 py-1 hover:text-foreground"
-                        href="#platform-google_ads"
-                      >
-                        Google · delivery plan
-                      </a>
-                    )}
-                  </div>
                 </div>
               ))}
             </div>
           </section>
+          <section
+            className="min-w-0 space-y-3 @4xl:border-l @4xl:pl-6"
+            aria-label="Intended geography overview"
+          >
+            <AudienceMap
+              audiences={audiences.map((row) => ({
+                ...row,
+                geography: row.geography ?? null,
+              }))}
+              context="intent"
+              selection={selected?.id ?? "all"}
+              onSelectionChange={setSelection}
+            />
+            {selected ? (
+              <AudienceGeography key={selected.id} audience={selected} />
+            ) : (
+              <div className="space-y-2 border-t pt-3">
+                {(["countries", "states", "regions", "cities"] as const).map(
+                  (key) => (
+                    <GeographyChips
+                      key={key}
+                      label={key.charAt(0).toUpperCase() + key.slice(1)}
+                      values={rolledUp[key]}
+                    />
+                  ),
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Combined intended geography across {audiences.length}{" "}
+                  audiences. Select an audience to edit.
+                </p>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Campaign intent. Delivery targeting is configured in each platform
+              plan.
+            </p>
+          </section>
         </div>
-      )}
-      {remove.error && (
-        <p className="mt-2 text-xs text-red-300">{remove.error.message}</p>
       )}
     </div>
   );

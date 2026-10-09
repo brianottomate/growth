@@ -10,14 +10,14 @@ import { toast } from "@/components/ui/toast";
 import { orpc } from "@/orpc/client";
 
 /** Two Google Search text ideas from the landing page, on demand. */
-export function WriteSearchAdsButton({ campaignId }: { campaignId: string }) {
+export function WriteSearchAdsButton({ brandId }: { brandId: string }) {
   const router = useRouter();
   const [refreshing, startTransition] = useTransition();
   const write = useMutation(
     orpc.ads.writeGoogleTextAds.mutationOptions({
       onSuccess: ({ created }) => {
         toast.success(
-          `Saved ${created} search draft${created === 1 ? "" : "s"} in Studio. Approve and add them to this campaign.`,
+          `Saved ${created} search draft${created === 1 ? "" : "s"} in Studio. Review and approve them before adding them to a campaign.`,
         );
         startTransition(() => router.refresh());
       },
@@ -29,10 +29,10 @@ export function WriteSearchAdsButton({ campaignId }: { campaignId: string }) {
       size="sm"
       variant="outline"
       disabled={write.isPending || refreshing}
-      onClick={() => write.mutate({ campaignId })}
+      onClick={() => write.mutate({ brandId })}
     >
       <Search className="size-3.5" />
-      {write.isPending ? "Writing…" : "Write search ads"}
+      {write.isPending ? "Generating…" : "Generate Search drafts"}
     </Button>
   );
 }

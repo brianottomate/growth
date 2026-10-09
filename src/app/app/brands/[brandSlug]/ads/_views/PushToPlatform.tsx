@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Loader2, UploadCloud } from "lucide-react";
+import { UploadCloud } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/toast";
 import {
   Dialog,
   DialogContent,
@@ -31,7 +32,8 @@ import { money } from "./format";
  * from the platform draft. With the setup saved (ad account, Page, goal) a
  * short confirmation says what will be created, since a pushed ad is locked;
  * spend starts only when the delivery switch is flipped afterwards. Without
- * the setup, a dialog asks for the destination and the goal.
+ * the setup, a dialog asks for the destination and the goal. Once confirmed,
+ * the dialog closes and the existing background job owns push progress.
  */
 export function PushToPlatform({
   campaignId,
@@ -95,7 +97,18 @@ export function PushToPlatform({
 
   const push = useMutation(
     orpc.ads.pushDraftToPlatform.mutationOptions({
+      onMutate: () => {
+        setOpen(false);
+        toast.info(
+          `Pushing to ${platformName}. Follow progress in Background work.`,
+        );
+      },
+      onError: (error) => toast.error(error.message),
       onSuccess: (result) => {
+        toast.success(`Campaign pushed to ${platformName}, paused.`);
+        if ("warnings" in result) {
+          for (const warning of result.warnings ?? []) toast.warning(warning);
+        }
         // The push lands on the platform campaign it just made real.
         setOpen(false);
         if (configuration) router.refresh();
@@ -105,17 +118,6 @@ export function PushToPlatform({
     }),
   );
 
-  const [elapsed, setElapsed] = useState(0);
-  useEffect(() => {
-    if (!push.isPending) return;
-    const startedAt = Date.now();
-    setElapsed(0);
-    const timer = setInterval(
-      () => setElapsed(Math.floor((Date.now() - startedAt) / 1000)),
-      1000,
-    );
-    return () => clearInterval(timer);
-  }, [push.isPending]);
   const canPush =
     Boolean(chosen) && budget != null && budget > 0 && !push.isPending;
   const groupLabel = platform === "google_ads" ? "ad group" : "ad set";
@@ -152,35 +154,28 @@ export function PushToPlatform({
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>
-                {push.isPending
-                  ? `Pushing to ${platformName}`
-                  : `Push to ${platformName}?`}
-              </DialogTitle>
+              <DialogTitle>Push to {platformName}?</DialogTitle>
               <DialogDescription>
-                {push.isPending
-                  ? "Uploading approved artwork and creating your paused campaign. This can take several minutes. Follow progress in Background work."
-                  : `Create ${setSummary} × ${draftAdCount} ad${draftAdCount === 1 ? "" : "s"} per group (${Math.max(1, audienceCount) * draftAdCount} total) on ${configuration.label} with a ${budgetSummary} ${budgetType === "lifetime" ? "" : "campaign "}budget. Everything will be paused. Review in ${platformName} before launching.`}
+                {`Create ${setSummary} × ${draftAdCount} ad${draftAdCount === 1 ? "" : "s"} per group (${Math.max(1, audienceCount) * draftAdCount} total) on ${configuration.label} with a ${budgetSummary} ${budgetType === "lifetime" ? "" : "campaign "}budget. Everything will be paused. Review in ${platformName} before launching.`}
               </DialogDescription>
             </DialogHeader>
-            {push.isPending && (
-              <p
-                role="status"
-                className="flex items-center gap-2 text-sm text-muted-foreground"
-              >
-                <Loader2 className="size-4 animate-spin" />
-                {Math.floor(elapsed / 60)}:
-                {String(elapsed % 60).padStart(2, "0")} elapsed
+            {platform === "google_ads" && goal === "conversions" && (
+              <p className="text-sm text-muted-foreground">
+                Bidding: Maximize Conversions, using the account&apos;s default
+                conversion goals.
               </p>
             )}
             {push.error && (
-              <p role="alert" className="text-sm text-destructive">
+              <p
+                role="alert"
+                className="min-w-0 text-sm [overflow-wrap:anywhere] break-words text-destructive"
+              >
                 {push.error.message}
               </p>
             )}
             <DialogFooter>
               <Button variant="outline" onClick={() => setOpen(false)}>
-                {push.isPending ? "Close" : "Cancel"}
+                Cancel
               </Button>
               <Button
                 loading={push.isPending}
@@ -204,7 +199,7 @@ export function PushToPlatform({
           <p
             role="alert"
             title={push.error.message}
-            className="line-clamp-3 max-w-md text-right text-xs text-destructive"
+            className="line-clamp-3 max-w-md min-w-0 text-right text-xs [overflow-wrap:anywhere] break-words text-destructive"
           >
             {push.error.message}
           </p>
@@ -216,9 +211,9 @@ export function PushToPlatform({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm">
+        <Button size="sm" disabled={push.isPending} loading={push.isPending}>
           <UploadCloud className="size-3.5" />
-          Push to {platformName}
+          {push.isPending ? "Pushing…" : `Push to ${platformName}`}
         </Button>
       </DialogTrigger>
       <DialogContent>

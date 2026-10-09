@@ -1057,7 +1057,7 @@ export type CreateGoogleAdInput = {
   adAccountId: string;
   name: string;
   campaignType: "search" | "display";
-  goal: "engagement" | "traffic" | "awareness" | "video_views";
+  goal: "engagement" | "traffic" | "awareness" | "conversions";
   budgetAmount: number;
   budgetType: "daily" | "lifetime";
   headline: string;
@@ -1075,6 +1075,28 @@ export type CreateGoogleAdInput = {
   endDate?: string;
 };
 
+/** New-campaign policy: physical geography, with goal mapped to provider bidding.
+ * Never spread this onto group/ad attaches: campaign location settings are inherited.
+ */
+export function googleCampaignCreationPayload(
+  goal: CreateGoogleAdInput["goal"],
+): {
+  goal: "traffic" | "engagement" | "awareness";
+  bidStrategy?: "LOWEST_COST_WITHOUT_CAP";
+  locationTargetingType: "presence";
+} {
+  // Omission means Google's presence_or_interest default, which widens delivery
+  // to people outside the selected places. Interest is audience intent, not geo.
+  // https://docs.zernio.com/platforms/google-ads/create-ads#location-targeting-type
+  return goal === "conversions"
+    ? {
+        goal: "traffic",
+        bidStrategy: "LOWEST_COST_WITHOUT_CAP",
+        locationTargetingType: "presence",
+      }
+    : { goal, locationTargetingType: "presence" };
+}
+
 export async function createGoogleAd(
   input: CreateGoogleAdInput,
   context: AdsWriteContext,
@@ -1086,8 +1108,10 @@ export async function createGoogleAd(
     connectionAccountId: input.connectionAccountId,
     adAccountId: input.adAccountId,
   });
-  if (input.budgetType === "lifetime" && !input.endDate) {
-    throw new Error("Google lifetime budgets require endDate");
+  if (input.budgetType !== "daily") {
+    throw new Error(
+      "Google requires a daily budget. Change the budget in Edit setup before pushing.",
+    );
   }
   const creativeIssue = googleCreativeRequirement(input);
   if (creativeIssue) throw new Error(creativeIssue);
@@ -1106,7 +1130,7 @@ export async function createGoogleAd(
     adAccountId: destination.adAccount.id,
     name: input.name,
     campaignType: input.campaignType,
-    goal: input.goal,
+    ...googleCampaignCreationPayload(input.goal),
     budgetAmount: input.budgetAmount,
     budgetType: input.budgetType,
     headline: input.headline,
@@ -2109,6 +2133,8 @@ async function compileAudienceTargeting(input: {
   const platformSpec = requireAdPlatformSpec(input.platform);
   const canTarget = platformSpec.features.targeting;
 
+  // TODO(geo): resolve postal codes to provider ZIP keys and compile explicit
+  // coordinate/radius targets to customLocations. Do not turn them into cities.
   const geography = normalizeAudienceGeography(audience.geography ?? {});
   if (geography.countries?.length) spec.countries = geography.countries;
   if (audience.ageMin != null || audience.ageMax != null) {
@@ -2753,42 +2779,24 @@ export function planGoogleCompile(input: {
     spec: ZernioAdTargeting | undefined;
   }>;
   ads: Ad[];
-  /** Draft-level terms: the ad group when no audience carries any. */
-  draftKeywords?: string[];
   landingUrl: string | null;
 }): { groups: GoogleGroup[]; units: GoogleUnit[]; warnings: string[] } {
   const warnings: string[] = [];
   let groups: GoogleGroup[];
   if (input.campaignType === "search") {
-    groups = input.compiled
-      .map(({ audience, spec }) => ({
-        audience,
-        spec,
-        keywords: searchTerms(audience.keywords),
-        negatives: searchTerms(audience.excludedKeywords),
-      }))
-      .filter((group) => group.keywords.length > 0);
-    const termless = input.compiled.length - groups.length;
-    if (groups.length === 0 && input.draftKeywords?.length) {
-      const first = input.compiled[0];
-      groups = [
-        {
-          audience: first?.audience ?? null,
-          spec: first?.spec,
-          keywords: searchTerms(input.draftKeywords),
-          negatives: searchTerms(first?.audience.excludedKeywords),
-        },
-      ];
-    } else if (termless > 0 && groups.length > 0) {
-      warnings.push(
-        `${termless} audience(s) have no search terms, so Google Search left them out`,
-      );
-    }
-    if (groups.length === 0) {
+    groups = input.compiled.map(({ audience, spec }) => ({
+      audience,
+      spec,
+      keywords: searchTerms(audience.keywords),
+      negatives: searchTerms(audience.excludedKeywords),
+    }));
+    if (!groups.length)
+      throw new Error("Add at least one Google ad group with keywords");
+    const missing = groups.filter((group) => !group.keywords.length);
+    if (missing.length)
       throw new Error(
-        "A Google Search campaign needs search terms: add them to an audience",
+        `Add keywords to Google ad group(s): ${missing.map((group) => group.audience?.name).join(", ")}`,
       );
-    }
   } else {
     groups =
       input.compiled.length > 0
@@ -2926,18 +2934,16 @@ async function pushToGoogle(args: PushArgs) {
       "Set the Google campaign type (search or display) on the platform draft first",
     );
   }
-  if (input.goal === "conversions") {
-    throw new Error(
-      "Google push supports traffic, engagement, awareness, and video_views",
-    );
-  }
-  const goal = input.goal;
+  if (!google.goal)
+    throw new Error("Choose and save a Google goal in setup before pushing");
+  if (input.goal !== google.goal)
+    throw new Error("Push must use the saved Google setup goal");
+  const goal = google.goal;
 
   const plan = planGoogleCompile({
     campaignType,
     compiled,
     ads,
-    draftKeywords: google.keywords,
     landingUrl: campaign.landingUrl,
   });
   warnings.push(...plan.warnings);
@@ -3022,7 +3028,7 @@ async function pushToGoogle(args: PushArgs) {
             name: unit.ad.name,
             adName: unit.ad.name,
             campaignType,
-            goal,
+            goal: googleCampaignCreationPayload(goal).goal,
             ...unitPayload(unit),
           },
           `push-attach:${scope}:${unit.ad.id}`,
@@ -3056,7 +3062,7 @@ async function pushToGoogle(args: PushArgs) {
           adSetName: group.audience?.name,
           adName: firstUnit!.ad.name,
           campaignType,
-          goal,
+          goal: googleCampaignCreationPayload(goal).goal,
           ...unitPayload(firstUnit!),
           keywords: zernioKeywords(group.keywords),
           negativeKeywords: zernioKeywords(group.negatives),

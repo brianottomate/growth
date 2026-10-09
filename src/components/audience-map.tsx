@@ -25,9 +25,13 @@ type MapAudience = {
 export function AudienceMap({
   audiences,
   context = "campaign",
+  selection: controlledSelection,
+  onSelectionChange,
 }: {
   audiences: MapAudience[];
-  context?: "campaign" | "persona";
+  context?: "campaign" | "persona" | "intent";
+  selection?: string;
+  onSelectionChange?: (selection: string) => void;
 }) {
   const [selection, setSelection] = useState("all");
   const [view, setView] = useState<"us" | "world">(() =>
@@ -37,7 +41,8 @@ export function AudienceMap({
   );
   const [hover, setHover] = useState<string | null>(null);
   const labelId = useId();
-  const current = audiences.some((a) => a.id === selection) ? selection : "all";
+  const chosen = controlledSelection ?? selection;
+  const current = audiences.some((a) => a.id === chosen) ? chosen : "all";
   const selected =
     current === "all" ? audiences : audiences.filter((a) => a.id === current);
   const targets = selected.map((a) => audienceMapTarget(a.geography));
@@ -77,6 +82,7 @@ export function AudienceMap({
         value={current}
         onValueChange={(value) => {
           setSelection(value);
+          onSelectionChange?.(value);
           setHover(null);
         }}
       >
@@ -95,7 +101,7 @@ export function AudienceMap({
       <svg
         viewBox={map.viewBox}
         role="img"
-        aria-label={`${view === "us" ? "United States" : "World"} ${context === "persona" ? "persona geography" : "targeting coverage"} for ${current === "all" ? "all audiences" : selected[0]?.name}`}
+        aria-label={`${view === "us" ? "United States" : "World"} ${context === "persona" ? "persona geography" : context === "intent" ? "intended geography" : "targeting coverage"} for ${current === "all" ? "all audiences" : selected[0]?.name}`}
         className="w-full"
         onMouseLeave={() => setHover(null)}
       >
@@ -103,7 +109,7 @@ export function AudienceMap({
           const id =
             view === "us" ? (usStateCode(place.name) ?? place.id) : place.id;
           const coverage = audienceMapCoverage(targets, view, id);
-          const description = `${place.name}: ${coverage === "full" ? (context === "persona" ? "described geography" : "targeted") : coverage === "partial" ? "selected locations only" : "not highlighted"}`;
+          const description = `${place.name}: ${coverage === "full" ? (context === "persona" ? "described geography" : context === "intent" ? "intended geography" : "targeted") : coverage === "partial" ? "selected locations only" : "not highlighted"}`;
           return (
             <path
               key={place.id}
@@ -133,7 +139,11 @@ export function AudienceMap({
         <div className="flex flex-wrap gap-3">
           <span className="flex items-center gap-1.5">
             <span className="size-2.5 rounded-sm bg-foreground opacity-80" />
-            {context === "persona" ? "Described geography" : "Targeted"}
+            {context === "persona"
+              ? "Described geography"
+              : context === "intent"
+                ? "Intended geography"
+                : "Targeted"}
           </span>
           {view === "world" && (
             <span className="flex items-center gap-1.5">

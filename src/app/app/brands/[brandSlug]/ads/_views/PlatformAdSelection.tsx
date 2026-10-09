@@ -10,9 +10,11 @@ import type { Ad, PlatformCampaign } from "@/server/db/ads-schema";
 export function PlatformAdSelection({
   pc,
   ads,
+  compact = false,
 }: {
   pc: PlatformCampaign;
   ads: Ad[];
+  compact?: boolean;
 }) {
   const router = useRouter();
   const settings = pc.settings ?? {};
@@ -26,33 +28,44 @@ export function PlatformAdSelection({
   const locked =
     save.isPending || pc.status !== "draft" || Boolean(pc.externalId);
   return (
-    <section className="space-y-3 border-t pt-4" aria-label="Included ads">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h4 className="text-sm font-medium">
-          Included ads · {selected.length}/{eligible.length}
-        </h4>
-        <Button
-          size="sm"
-          variant="ghost"
-          disabled={locked || settings.selectedAdIds === undefined}
-          onClick={() =>
-            save.mutate({ platformCampaignId: pc.id, selectedAdIds: null })
-          }
-        >
-          Use all eligible ads
-        </Button>
-      </div>
-      <p className="text-xs text-muted-foreground">
-        {settings.selectedAdIds === undefined
-          ? "New eligible ads are included automatically."
-          : "Only the checked ads are included. New ads stay out until selected."}{" "}
-        Approval is required before publishing.
-      </p>
+    <section
+      className={compact ? "space-y-3" : "space-y-3 border-t pt-4"}
+      aria-label="Included ads"
+    >
+      {eligible.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h4 className="text-sm font-medium">
+            {selected.length} of {eligible.length} selected
+          </h4>
+          {settings.selectedAdIds !== undefined && (
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={locked || settings.selectedAdIds === undefined}
+              onClick={() =>
+                save.mutate({ platformCampaignId: pc.id, selectedAdIds: null })
+              }
+            >
+              Include all
+            </Button>
+          )}
+        </div>
+      )}
+      {!compact && (
+        <p className="text-xs text-muted-foreground">
+          {settings.selectedAdIds === undefined
+            ? "New eligible ads are included automatically."
+            : "Only the checked ads are included. New ads stay out until selected."}{" "}
+          Approval is required before publishing.
+        </p>
+      )}
       {!eligible.length && (
         <p className="text-sm text-muted-foreground">
           {pc.platform === "google_ads" && !settings.google?.campaignType
             ? "Choose Search or Display in Google settings first."
-            : "Add compatible ads to this campaign. Text ads go to Search; creative ads go to Meta and Display."}
+            : pc.platform === "meta_ads"
+              ? "No Meta creative ads are assigned to this campaign."
+              : "No compatible ads are assigned to this campaign."}
         </p>
       )}
       <div className="space-y-2">
@@ -80,8 +93,8 @@ export function PlatformAdSelection({
             <span className="min-w-0 flex-1">
               <span className="block font-medium">{ad.name}</span>
               <span className="text-xs text-muted-foreground">
-                {ad.type === "text" ? "Responsive search ad" : "Creative ad"} ·{" "}
-                {ad.status === "approved" ? "Approved" : "Awaiting approval"}
+                {ad.type === "text" ? "Responsive search ad" : "Creative ad"}
+                {ad.status !== "approved" && " · Awaiting approval"}
               </span>
             </span>
           </label>

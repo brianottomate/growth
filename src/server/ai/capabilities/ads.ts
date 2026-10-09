@@ -1,3 +1,4 @@
+import { audienceAgeSchema } from "@/lib/audience-age";
 import { deliveryGroupConfigurationSchema } from "@/lib/platform-delivery";
 import { deliveryGeographySchema } from "@/lib/platform-delivery";
 import { catalogCopyPatchSchema } from "@/lib/catalog-studio";
@@ -140,6 +141,7 @@ import {
   setCampaignCreativePool,
   setPlatformDraft,
   setDeliveryGroup,
+  deleteDeliveryGroup,
   updateAudience,
 } from "@/server/services/ads-draft.service";
 import {
@@ -951,13 +953,14 @@ export const addAudienceAction = growthAction({
   nativeOutputSchema: addAudienceActionNativeResultSchema,
   outputSchema: addAudienceActionOutputSchema,
   description:
-    "Add a shared campaign audience: who to reach and why, with optional intended geography and a brand persona link. Platform plans own executable targeting. Local only.",
+    "Add a shared campaign audience: who to reach and why, with optional intended geography, age range and a brand persona link. Platform plans own executable targeting. Local only.",
   inputSchema: z.object({
     campaignId: z.string().min(1),
     name: z.string().trim().min(1).max(300),
     description: z.string().max(4000).nullish(),
     personaId: z.string().min(1).nullish(),
     geography: deliveryGeographySchema.nullish(),
+    ...audienceAgeSchema.shape,
   }),
   execute: async (input, ctx) =>
     addAudience({ ...input, organizationId: ctx.orgId }),
@@ -966,13 +969,14 @@ export const updateAudienceAction = growthAction({
   nativeOutputSchema: updateAudienceActionNativeResultSchema,
   outputSchema: updateAudienceActionOutputSchema,
   description:
-    "Update a shared campaign audience's name, explanation, intended geography or persona. Executable targeting belongs in the platform plan. Local only.",
+    "Update a shared campaign audience's name, explanation, intended geography, age range or persona. Executable targeting belongs in the platform plan. Local only.",
   inputSchema: z.object({
     audienceId: z.string().min(1),
     name: z.string().trim().min(1).max(300).optional(),
     description: z.string().max(4000).nullish(),
     personaId: z.string().min(1).nullish(),
     geography: deliveryGeographySchema.nullish(),
+    ...audienceAgeSchema.shape,
   }),
   execute: async (input, ctx) =>
     updateAudience({ ...input, organizationId: ctx.orgId }),
@@ -1096,6 +1100,9 @@ export const setPlatformDraftAction = growthAction({
       ),
     google: z
       .object({
+        goal: z
+          .enum(["traffic", "engagement", "awareness", "conversions"])
+          .optional(),
         geography: deliveryGeographySchema.optional(),
         campaignType: z.enum(["search", "display"]).optional(),
         images: z
@@ -1268,7 +1275,7 @@ export const pushDraftAction = growthAction({
   nativeOutputSchema: pushDraftActionNativeResultSchema,
   outputSchema: pushDraftActionOutputSchema,
   description:
-    "COMPILE a LOCAL campaign onto one platform: each audience becomes an ad set / ad group, every creative ad runs under each, and region names resolve to real platform geo keys. Budget, dates and settings come from the platform DRAFT row (set them with setPlatformDraft first), so this takes no numbers of its own. Everything is created PAUSED; adsWrite.setDelivery starts spend separately. Set validateOnly for a dry run — Meta only, single audience only. LinkedIn: campaign group → campaign (the ad set) → creative. ONE push sends every creative ad, same as Meta — the first opens the campaign and the rest are attached to it, one provider call each. Do not split a campaign across several pushes or ask the operator to pick a subset. LinkedIn targets at country level only, and its goals are engagement / traffic / awareness / video_views. Meta uses the exact connection already pinned in brand settings; omit credential ids and use the saved goal (default conversions). Do not ask the operator to choose credentials. For other platforms call adsRead.listDestinations for the account ids; never guess them.",
+    "COMPILE a LOCAL campaign onto one platform: each planned delivery group becomes an ad set / ad group, every creative ad runs under each, and region names resolve to real platform geo keys. Budget, dates and settings come from the platform DRAFT row (set them with setPlatformDraft first), so this takes no numbers of its own. Everything is created PAUSED; adsWrite.setDelivery starts spend separately. Set validateOnly for a dry run — Meta only, single audience only. LinkedIn: campaign group → campaign (the ad set) → creative. ONE push sends every creative ad, same as Meta — the first opens the campaign and the rest are attached to it, one provider call each. Do not split a campaign across several pushes or ask the operator to pick a subset. LinkedIn targets at country level only, and its goals are engagement / traffic / awareness / video_views. Meta uses the exact connection already pinned in brand settings; omit credential ids and use the saved goal (default conversions). Do not ask the operator to choose credentials. For other platforms call adsRead.listDestinations for the account ids; never guess them.",
   inputSchema: z.object({
     campaignId: z.string().trim().min(1),
     platform: z
@@ -1322,7 +1329,7 @@ export const deletePlatformCampaignAction = growthAction({
 
 export const writeGoogleTextAdsAction = growthAction({
   description:
-    "Write Google Search text ads for a campaign or brand studio from a landing page and optional search terms: each a pool of up to 15 headlines (30 chars) and 4 descriptions (90 chars). Lands as unapproved text ideas; nothing is pushed. The same as Write search ads on the campaign page.",
+    "Write Google Search text ads for a campaign or brand studio from a landing page and optional search terms: each a pool of up to 15 headlines (30 chars) and 4 descriptions (90 chars). Lands as unapproved text ideas; nothing is pushed. The same as Generate Search drafts in Ad Studio.",
   inputSchema: z
     .object({
       ...adAuthoringFields,
@@ -1863,9 +1870,19 @@ export const setDeliveryGroupAction = growthAction({
   inputSchema: z.object({
     deliveryGroupId: z.string().min(1),
     name: z.string().trim().min(1).max(300).optional(),
+    audienceId: z.string().min(1).nullable().optional(),
     configuration: deliveryGroupConfigurationSchema,
   }),
   outputSchema: z.strictObject({ id: z.string() }),
   execute: async (input, ctx) =>
     setDeliveryGroup({ ...input, organizationId: ctx.orgId }),
+});
+
+export const deleteDeliveryGroupAction = growthAction({
+  description:
+    "Remove an unpublished platform delivery group without deleting its shared audience. Keep at least one group. Local only; no provider writes.",
+  inputSchema: z.object({ deliveryGroupId: z.string().min(1) }),
+  outputSchema: z.strictObject({ deleted: z.boolean() }),
+  execute: (input, ctx) =>
+    deleteDeliveryGroup({ ...input, organizationId: ctx.orgId }),
 });

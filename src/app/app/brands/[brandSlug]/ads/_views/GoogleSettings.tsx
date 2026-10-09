@@ -4,14 +4,22 @@ import type { DeliveryGeography } from "@/server/db/ads-schema";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { orpc } from "@/orpc/client";
 
 type GoogleConfig = {
+  goal?: "traffic" | "engagement" | "awareness" | "conversions";
   geography?: DeliveryGeography;
   campaignType?: "search" | "display";
   keywords?: string[];
@@ -28,28 +36,44 @@ type GoogleConfig = {
 export function GoogleSettings({
   platformCampaignId,
   config,
-  brandSlug,
-  brandUrl,
   compact = false,
+  defaultOpen = false,
+  onClose,
+  budget,
+  budgetType,
+  endAt,
 }: {
   /** The Google platform DRAFT row the settings live on. */
   platformCampaignId: string;
   config: GoogleConfig | undefined;
-  brandSlug: string;
-  brandUrl: string | null;
   /**
    * Inside a platform section the surrounding row already says which platform
    * this is and why it is blocked, so only the control is rendered.
    */
   compact?: boolean;
+  defaultOpen?: boolean;
+  onClose?: () => void;
+  budget?: number | null;
+  budgetType?: string | null;
+  endAt?: Date | null;
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [campaignType, setCampaignType] = useState<"search" | "display">(
     config?.campaignType ?? "search",
   );
+  const [amount, setAmount] = useState(budget?.toString() ?? "");
+  const [period, setPeriod] = useState(
+    budgetType === "lifetime" ? "lifetime" : "daily",
+  );
+  const [end, setEnd] = useState(
+    endAt ? new Date(endAt).toISOString().slice(0, 10) : "",
+  );
+  const budgetValid =
+    period === "daily" &&
+    (amount === "" || (Number.isInteger(Number(amount)) && Number(amount) > 0));
+  const [goal, setGoal] = useState(config?.goal ?? "");
   const [geography, setGeography] = useState(config?.geography ?? {});
-  const [keywords, setKeywords] = useState((config?.keywords ?? []).join("\n"));
   const [negatives, setNegatives] = useState(
     (config?.negativeKeywords ?? []).join("\n"),
   );
@@ -58,21 +82,11 @@ export function GoogleSettings({
     orpc.ads.setPlatformDraft.mutationOptions({
       onSuccess: () => {
         setOpen(false);
+        onClose?.();
         router.refresh();
       },
     }),
   );
-
-  // Read-only against Google: mines the brand's own site for terms and prices
-  // them. The cost number is what the Google budget should be capped at —
-  // beyond the point of owning the brand's terms, the money buys nothing.
-  const research = useMutation(orpc.ads.researchKeywords.mutationOptions());
-  const addKeyword = (keyword: string) =>
-    setKeywords((current) =>
-      lines(current).includes(keyword)
-        ? current
-        : [...lines(current), keyword].join("\n"),
-    );
 
   const lines = (value: string) =>
     value
@@ -113,22 +127,98 @@ export function GoogleSettings({
       )}
 
       {open && (
-        <div className="space-y-3 rounded-xl border border-border bg-surface-secondary/30 p-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="g-type">Campaign type</Label>
-            <select
-              id="g-type"
-              value={campaignType}
-              onChange={(event) =>
-                setCampaignType(event.target.value as "search" | "display")
-              }
-              className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs @xl:w-56"
-            >
-              <option value="search">Search · buys keywords</option>
-              <option value="display">Display · buys placements</option>
-            </select>
+        <div
+          className={
+            compact
+              ? "space-y-4"
+              : "space-y-3 rounded-xl border border-border bg-surface-secondary/30 p-3"
+          }
+        >
+          <div className="grid grid-cols-1 gap-4 @xl:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="g-type">Campaign type</Label>
+              <Select
+                value={campaignType}
+                onValueChange={(value) =>
+                  setCampaignType(value as "search" | "display")
+                }
+              >
+                <SelectTrigger id="g-type" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="search">Search</SelectItem>
+                  <SelectItem value="display">Display</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="google-goal">Goal</Label>
+              <Select value={goal} onValueChange={setGoal}>
+                <SelectTrigger id="google-goal" className="w-full">
+                  <SelectValue placeholder="Choose a goal" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="traffic">Traffic</SelectItem>
+                  <SelectItem value="engagement">Engagement</SelectItem>
+                  <SelectItem value="awareness">Awareness</SelectItem>
+                  <SelectItem value="conversions">Conversions</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          {goal === "conversions" && (
+            <p className="text-sm text-muted-foreground">
+              Maximize Conversions uses this Google account&apos;s default
+              conversion goals. Confirm booking tracking is active before
+              launching.
+            </p>
+          )}
+          <div className="grid grid-cols-1 gap-4 @xl:grid-cols-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="google-budget">
+                {period === "daily"
+                  ? "Daily budget ($)"
+                  : "Existing lifetime total ($)"}
+              </Label>
+              <Input
+                id="google-budget"
+                inputMode="numeric"
+                value={amount}
+                onChange={(event) => setAmount(event.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="google-budget-period">Budget period</Label>
+              <Select value={period} onValueChange={setPeriod}>
+                <SelectTrigger id="google-budget-period" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="daily">Daily</SelectItem>
+                  <SelectItem value="lifetime" disabled>
+                    Lifetime (unsupported)
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="google-end">Flight end date</Label>
+              <Input
+                id="google-end"
+                type="date"
+                value={end}
+                onChange={(event) => setEnd(event.target.value)}
+              />
+            </div>
           </div>
 
+          {budgetType === "lifetime" && (
+            <p className="text-sm text-muted-foreground">
+              Google accepts daily budgets only. Replace the lifetime total with
+              your intended daily amount and select Daily before saving.
+            </p>
+          )}
           <div className="space-y-3 rounded-lg border p-3">
             <p className="text-sm font-medium">Campaign location targeting</p>
             <p className="text-xs text-muted-foreground">
@@ -175,21 +265,6 @@ export function GoogleSettings({
           {campaignType === "search" ? (
             <div className="grid grid-cols-1 gap-3 @xl:grid-cols-2">
               <div className="space-y-1.5">
-                <Label htmlFor="g-keywords">
-                  Fallback keywords (when no ad group has terms)
-                </Label>
-                <Textarea
-                  id="g-keywords"
-                  rows={4}
-                  value={keywords}
-                  onChange={(event) => setKeywords(event.target.value)}
-                  placeholder={
-                    "vacation rental pawleys island\nbeach house rental sc"
-                  }
-                  textSize="xs"
-                />
-              </div>
-              <div className="space-y-1.5">
                 <Label htmlFor="g-negatives">Campaign negative keywords</Label>
                 <Textarea
                   id="g-negatives"
@@ -209,95 +284,6 @@ export function GoogleSettings({
             </p>
           )}
 
-          {campaignType === "search" && (
-            <div className="space-y-2 rounded-lg border border-border p-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-medium">Keyword research</span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  loading={research.isPending}
-                  disabled={!brandUrl}
-                  onClick={() =>
-                    research.mutate({
-                      brandSlug,
-                      seedUrl: brandUrl ?? undefined,
-                      estimateKeywords: lines(keywords).slice(0, 200),
-                      countries: ["US"],
-                    })
-                  }
-                >
-                  <Search className="size-3.5" />
-                  {brandUrl ? "Mine the brand site" : "No brand URL set"}
-                </Button>
-                {research.data && (
-                  <span className="text-xs text-muted-foreground">
-                    ~${research.data.monthlyCost.dollars.toLocaleString()}/mo to
-                    buy these at{" "}
-                    {Math.round(research.data.monthlyCost.ctrAssumption * 100)}%
-                    CTR
-                    {research.data.monthlyCost.unpriced > 0
-                      ? ` · ${research.data.monthlyCost.unpriced} unpriced`
-                      : ""}
-                  </span>
-                )}
-              </div>
-              {research.error && (
-                <p className="text-xs text-red-300">{research.error.message}</p>
-              )}
-              {research.data && (
-                <div className="max-h-56 overflow-y-auto">
-                  <table className="w-full text-xs">
-                    <thead className="sticky top-0 bg-[var(--card)] text-left text-muted-foreground">
-                      <tr>
-                        <th className="py-1 font-normal">Keyword</th>
-                        <th className="py-1 text-right font-normal">
-                          Searches/mo
-                        </th>
-                        <th className="py-1 text-right font-normal">Top bid</th>
-                        <th className="py-1" />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[...research.data.estimate, ...research.data.ideas]
-                        .slice(0, 100)
-                        .map((row) => (
-                          <tr key={row.keyword} className="border-t">
-                            <td className="py-1 pr-2">{row.keyword}</td>
-                            <td className="py-1 text-right tabular-nums">
-                              {row.avgMonthlySearches?.toLocaleString() ?? "—"}
-                            </td>
-                            <td className="py-1 text-right tabular-nums">
-                              {row.highTopOfPageBid != null
-                                ? `$${row.highTopOfPageBid.toFixed(2)}`
-                                : "—"}
-                            </td>
-                            <td className="py-1 pl-2 text-right">
-                              <button
-                                type="button"
-                                onClick={() => addKeyword(row.keyword)}
-                                className="text-muted-foreground hover:text-foreground"
-                              >
-                                add
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              <p className="text-[11px] text-muted-foreground">
-                Searches are not clicks. The monthly figure assumes{" "}
-                {Math.round(
-                  (research.data?.monthlyCost.ctrAssumption ?? 0.35) * 100,
-                )}
-                % of searches become clicks, which is a planning input for the
-                budget cap rather than a forecast.
-              </p>
-            </div>
-          )}
-
           {save.error && (
             <p className="text-xs text-red-300">{save.error.message}</p>
           )}
@@ -305,14 +291,17 @@ export function GoogleSettings({
             <Button
               size="sm"
               loading={save.isPending}
+              disabled={!goal || !budgetValid}
               onClick={() =>
                 save.mutate({
                   platformCampaignId,
+                  budget: amount ? Number(amount) : null,
+                  budgetType: period as "daily" | "lifetime",
+                  endAt: end ? `${end}T23:59:59.000Z` : null,
                   google: {
                     geography,
+                    goal: goal as NonNullable<GoogleConfig["goal"]>,
                     campaignType,
-                    keywords:
-                      campaignType === "search" ? lines(keywords) : undefined,
                     negativeKeywords:
                       campaignType === "search" ? lines(negatives) : undefined,
                   },
@@ -321,7 +310,14 @@ export function GoogleSettings({
             >
               Save
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setOpen(false);
+                onClose?.();
+              }}
+            >
               Cancel
             </Button>
           </div>

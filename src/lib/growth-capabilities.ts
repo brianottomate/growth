@@ -238,6 +238,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "setCreativePool",
     "setPlatformDraft",
     "setDeliveryGroup",
+    "deleteDeliveryGroup",
     "attachCampaign",
     "importMetaCampaign",
     "pullPlatformAudiences",

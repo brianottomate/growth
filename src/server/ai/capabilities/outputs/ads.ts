@@ -524,6 +524,9 @@ const statsSchema = z.strictObject({
 });
 
 const googleSchema = z.strictObject({
+  goal: z
+    .enum(["traffic", "engagement", "awareness", "conversions"])
+    .optional(),
   geography: deliveryGeographySchema.optional(),
   images: z
     .strictObject({ landscape: z.string(), square: z.string() })
@@ -605,6 +608,8 @@ const addAudienceSchema = z.strictObject({
 
   personaId: z.string().nullable(),
   geography: deliveryGeographySchema.nullable(),
+  ageMin: z.number().int().nullable(),
+  ageMax: z.number().int().nullable(),
 
   type: z.enum(audienceTypeEnum.enumValues),
   updatedAt: z.iso.datetime(),
@@ -883,6 +888,8 @@ export const openCampaignActionOutputSchema = z.strictObject({
       persona: z.strictObject({ id: z.string(), name: z.string() }).nullable(),
       personaId: z.string().nullable(),
       geography: deliveryGeographySchema.nullable(),
+      ageMin: z.number().int().nullable(),
+      ageMax: z.number().int().nullable(),
 
       type: z.enum(audienceTypeEnum.enumValues),
       updatedAt: z.iso.datetime(),
@@ -1218,6 +1225,8 @@ export const suggestCampaignAudiencesActionOutputSchema = z.strictObject({
       personaId: z.string().nullable(),
       why: z.string(),
       geography: deliveryGeographySchema.nullable(),
+      ageMin: z.number().int().nullable(),
+      ageMax: z.number().int().nullable(),
     }),
   ),
 });
