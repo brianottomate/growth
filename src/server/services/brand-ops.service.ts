@@ -121,11 +121,17 @@ export async function createOwnedBrand(input: {
       }),
     })
     .returning();
-  // Preview-enriched creation skips enrichBrandById, so probe here too.
-  if (website && input.enrichment) {
-    await recheckBrandWebsite(brand!.id).catch((error) =>
-      console.error("WanderOS probe failed", brand!.id, error),
-    );
+  // Detect the booking platform at creation, independent of enrichment.
+  if (website) {
+    const state = await recheckBrandWebsite(brand!.id).catch((error) => {
+      console.error("WanderOS probe failed", brand!.id, error);
+      return null;
+    });
+    if (state) {
+      brand!.wanderOsWebsiteId = state.websiteId;
+      brand!.wanderOsEnabled = state.enabled;
+      brand!.wanderOsCheckedAt = state.checkedAt;
+    }
   }
   return brand!;
 }

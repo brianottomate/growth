@@ -25,7 +25,7 @@ Work in this order. Each step reads before it writes, and re-running any step is
 
 ## 3. Mark
 
-`brandWrite.suggestMark` with the brandId. It renders each candidate at card size, picks the one that reads best and saves its three tones, the same as Suggest on Setup. Say its reason in one line. Use `brandWrite.setMark` only when the operator names a specific mark.
+`brandRead.recommendMark` with the brandId. It renders candidates and returns a recommended recipe, reason and tuning without saving. Say the recommendation in one line. When the operator has asked you to set up the brand or apply the mark, save the returned recipe, reason and tuning with `brandWrite.setMark`; otherwise discuss the recommendation first. Then use `brandRead.identity` with `inspect: true` to check the saved variants.
 
 ## 4. Photos
 

@@ -98,9 +98,20 @@ export function ProspectDesk({
                         {brand.name}
                       </Link>
                       <BusinessChip stage={brand.business} />
-                      {plausibleWanderOsId(brand.wanderOsWebsiteId) && (
-                        <Badge variant="secondary">WanderOS</Badge>
-                      )}
+                      <Badge
+                        variant={
+                          plausibleWanderOsId(brand.wanderOsWebsiteId)
+                            ? "secondary"
+                            : "outline"
+                        }
+                        title="WanderOS website check"
+                      >
+                        {plausibleWanderOsId(brand.wanderOsWebsiteId)
+                          ? "WanderOS"
+                          : brand.wanderOsCheckedAt
+                            ? "WanderOS · Not detected"
+                            : "WanderOS · Not checked"}
+                      </Badge>
                     </div>
                     <div className="relative z-10 flex flex-wrap items-center gap-x-2 text-[11.5px] text-muted-foreground">
                       <SiteTag website={brand.website} />

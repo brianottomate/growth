@@ -62,6 +62,7 @@ export type DeskBrand = {
   slug: string | null;
   logo: string | null;
   wanderOsWebsiteId: string | null;
+  wanderOsCheckedAt: Date | null;
   website: string | null;
   relationship: "internal" | "client" | "prospect" | "reference";
   /** The money and the relationship, as a person last set it. */
@@ -170,6 +171,7 @@ export async function loadPerformanceDesk(
       slug: true,
       logo: true,
       wanderOsWebsiteId: true,
+      wanderOsCheckedAt: true,
       website: true,
       relationship: true,
       brandMark: true,
@@ -410,6 +412,7 @@ export async function loadPerformanceDesk(
         slug: brand.slug,
         logo: brand.logo,
         wanderOsWebsiteId: brand.wanderOsWebsiteId,
+        wanderOsCheckedAt: brand.wanderOsCheckedAt,
         website: brand.website,
         relationship: brand.relationship,
         hasMark: Boolean(brand.brandMark),
