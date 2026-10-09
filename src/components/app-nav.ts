@@ -113,6 +113,7 @@ export const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
   {
     label: "Observe",
     items: [
+      { label: "Landscape", href: "/app/landscape", icon: Globe },
       { label: "Timeline", href: "/app/feed-v5", icon: Rows3 },
       { label: "Blog", href: "/app/blog", icon: Newspaper },
       { label: "Newsletters", href: "/app/newsletters", icon: Mail },

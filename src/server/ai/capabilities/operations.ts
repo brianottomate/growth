@@ -180,14 +180,18 @@ export const discoverBrandChannels = growthAction({
 export const scrapeBrandPosts = growthAction({
   outputSchema: scrapeBrandPostsOutputSchema,
   description:
-    "Pull recent public posts for one owned or tracked brand and platform into the canonical timeline. Use limit=5 first to confirm a channel is wired up cheaply (scraping bills per record; Instagram always returns its latest ~12), then a larger limit and sinceDays for a real backfill. The durable ingest run records progress and failures; new posts also receive pending classification suggestions.",
+    "Pull recent public posts for one owned or tracked brand and platform into the canonical timeline. Use limit=5 first to confirm a channel is wired up cheaply (scraping bills per record; Instagram always returns its latest ~12), then a larger limit and sinceDays for a real backfill. The durable ingest run records progress and failures; Set classifyPosts to request classification suggestions. A null sinceDays imports the latest posts regardless of age.",
   inputSchema: z.object({
     brandId: z.string(),
     platform: socialPlatform,
-    sinceDays: z.number().int().min(1).max(93).default(30),
-    limit: z.number().int().min(1).max(100).default(30),
+    sinceDays: z.number().int().min(1).max(93).nullable().default(null),
+    classifyPosts: z.boolean().default(false),
+    limit: z.number().int().min(1).max(100).default(10),
   }),
-  execute: async ({ brandId, platform, sinceDays, limit }, ctx) => {
+  execute: async (
+    { brandId, platform, sinceDays, limit, classifyPosts },
+    ctx,
+  ) => {
     await requireVisibleBrand(brandId, ctx);
     try {
       const result = await scrapeBrandChannel({
@@ -196,6 +200,7 @@ export const scrapeBrandPosts = growthAction({
         sinceDays,
         limit,
         requestedById: ctx.userId,
+        skipTemplate: !classifyPosts,
       });
       return { ...result, reviewUrl: "/app/review" };
     } catch (error) {

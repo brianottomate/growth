@@ -212,7 +212,7 @@ export const scrapeBrandPostsOutputSchema = z.strictObject({
   reviewUrl: z.string(),
   runId: z.string(),
   scanned: z.number(),
-  sinceDays: z.number(),
+  sinceDays: z.number().nullable(),
   skippedExisting: z.number(),
   updatedExisting: z.number(),
 });

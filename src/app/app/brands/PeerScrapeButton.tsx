@@ -23,13 +23,7 @@ function isSupported(p: string): p is ScrapePlatform {
   return (SUPPORTED as string[]).includes(p);
 }
 
-/**
- * Scrape a peer brand's recent posts across its supported channels. One month
- * is the manual default; the only wider option is three months. This is not a
- * daily refresh. One platform per request (LinkedIn/FB are async and slow).
- * one platform per request (LinkedIn/FB are async and slow). Idempotent on the
- * server — safe to re-run. Refreshes so new posts appear in Feed/Calendar.
- */
+/** Import a bounded sample from each configured social profile. */
 export function PeerScrapeButton({
   brandId,
   channels,
@@ -38,7 +32,7 @@ export function PeerScrapeButton({
   channels: { platform: string; profileUrl: string | null }[];
 }) {
   const router = useRouter();
-  const [runningDays, setRunningDays] = useState<number | null>(null);
+  const [runningDays, setRunningDays] = useState<string | null>(null);
 
   const scrape = useMutation(
     orpc.channelSuggestion.scrapePosts.mutationOptions(),
@@ -50,8 +44,8 @@ export function PeerScrapeButton({
   );
   if (targets.length === 0) return null;
 
-  async function run(sinceDays: number) {
-    setRunningDays(sinceDays);
+  async function run(limit: number, sinceDays: number | null = null) {
+    setRunningDays(sinceDays ? `${sinceDays} days` : `latest ${limit}`);
     let inserted = 0;
     let refreshed = 0;
     const failed: string[] = [];
@@ -61,6 +55,8 @@ export function PeerScrapeButton({
           brandId,
           platform: c.platform as ScrapePlatform,
           sinceDays,
+          limit,
+          classifyPosts: false,
         });
         inserted += r.inserted;
         refreshed += r.updatedExisting;
@@ -70,7 +66,7 @@ export function PeerScrapeButton({
       }
     }
     setRunningDays(null);
-    if (inserted > 0 || refreshed > 0) {
+    if (failed.length < targets.length) {
       toast.success(
         `Scraped ${targets.length - failed.length}/${targets.length} channels · ${inserted} new, ${refreshed} refreshed`,
       );
@@ -88,13 +84,11 @@ export function PeerScrapeButton({
         size="sm"
         tone="muted"
         shape="attached-left"
-        onClick={() => run(30)}
+        onClick={() => run(10)}
         loading={runningDays !== null}
       >
         <Download className="size-3.5" />
-        {runningDays
-          ? `Scraping ${runningDays === 30 ? "month" : "3 months"}…`
-          : "Scrape posts"}
+        {runningDays ? `Importing ${runningDays}…` : "Import latest 10"}
       </Button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -104,16 +98,22 @@ export function PeerScrapeButton({
             tone="muted"
             shape="attached-right"
             disabled={runningDays !== null}
-            aria-label="Choose scrape history window"
+            aria-label="Choose import sample"
           >
             <ChevronDown className="size-3.5" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => run(30)}>
+          <DropdownMenuItem onClick={() => run(5)}>
+            Latest 5 posts per channel
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => run(10)}>
+            Latest 10 posts per channel
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => run(30, 30)}>
             Last month
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => run(90)}>
+          <DropdownMenuItem onClick={() => run(100, 90)}>
             Last 3 months
           </DropdownMenuItem>
         </DropdownMenuContent>

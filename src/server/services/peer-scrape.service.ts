@@ -355,6 +355,7 @@ export async function processRecords(opts: {
   skipTemplate?: boolean;
   /** Drop dated posts older than this — the hard 30-day bound. */
   cutoff?: Date;
+  limit?: number;
   ingestProvider?: "brightdata" | "apify" | "x_api";
 }): Promise<ProcessResult> {
   const map = MAPPERS[opts.platform];
@@ -368,10 +369,18 @@ export async function processRecords(opts: {
       (m) => !m.insert.publishedAt || m.insert.publishedAt >= c,
     );
   }
+  mapped.sort(
+    (a, b) =>
+      (b.insert.publishedAt?.getTime() ?? 0) -
+      (a.insert.publishedAt?.getTime() ?? 0),
+  );
+  const distinct = [
+    ...new Map(mapped.map((row) => [row.insert.externalId, row])).values(),
+  ];
   return processMapped({
     brandId: opts.brandId,
     platform: opts.platform,
-    mapped,
+    mapped: opts.limit === undefined ? distinct : distinct.slice(0, opts.limit),
     scanned: opts.records.length,
     skipTemplate: opts.skipTemplate,
     ingestProvider: opts.ingestProvider,
@@ -417,26 +426,28 @@ async function processMapped(opts: {
 
     // 1) classification suggestion (template is the AI judgment; format/
     //    archetype are already set deterministically on the post).
-    const c = await classify({
-      platform: opts.platform,
-      fields: m.raw,
-      imageUrl: m.cover,
-      text: m.insert.text ?? undefined,
-    });
-    await db.insert(contentSuggestionTable).values({
-      brandId: opts.brandId,
-      kind: "classification",
-      subjectPostId: postId,
-      proposed: {
-        format: c.format,
-        archetype: c.archetype,
-        template: c.template,
-      },
-      confidence: c.confidence,
-      reasoning: `auto-classified (${c.source})`,
-      source: "peer-scrape",
-    });
-    result.classificationSuggestions++;
+    if (!opts.skipTemplate) {
+      const c = await classify({
+        platform: opts.platform,
+        fields: m.raw,
+        imageUrl: m.cover,
+        text: m.insert.text ?? undefined,
+      });
+      await db.insert(contentSuggestionTable).values({
+        brandId: opts.brandId,
+        kind: "classification",
+        subjectPostId: postId,
+        proposed: {
+          format: c.format,
+          archetype: c.archetype,
+          template: c.template,
+        },
+        confidence: c.confidence,
+        reasoning: `auto-classified (${c.source})`,
+        source: "peer-scrape",
+      });
+      result.classificationSuggestions++;
+    }
 
     // 2) amplification suggestion (repost/quote → resolve original).
     const amp = m.insert.amplifiedFrom;
@@ -518,13 +529,16 @@ export async function scrapeAndSuggest(opts: {
   profileUrl: string;
   limit?: number;
   /** How many days back to keep (hard bound, default 30). */
-  sinceDays?: number;
+  sinceDays?: number | null;
   skipTemplate?: boolean;
   provider?: PeerScrapeProvider;
 }): Promise<PeerScrapeResult> {
   const limit = opts.limit ?? 30;
-  const sinceDays = opts.sinceDays ?? 30;
-  const cutoff = new Date(Date.now() - sinceDays * 86_400_000);
+  const sinceDays = opts.sinceDays === undefined ? 30 : opts.sinceDays;
+  const cutoff =
+    sinceDays === null
+      ? undefined
+      : new Date(Date.now() - sinceDays * 86_400_000);
 
   const provider = opts.provider ?? peerScrapeProviderFor(opts.platform);
   if (!provider) {
@@ -540,7 +554,9 @@ export async function scrapeAndSuggest(opts: {
       directUrls: [opts.profileUrl],
       resultsType: "posts",
       resultsLimit: limit,
-      onlyPostsNewerThan: `${sinceDays} days`,
+      ...(sinceDays !== null
+        ? { onlyPostsNewerThan: `${sinceDays} days` }
+        : {}),
       skipPinnedPosts: true,
     });
     return {
@@ -550,6 +566,7 @@ export async function scrapeAndSuggest(opts: {
         records,
         skipTemplate: opts.skipTemplate,
         cutoff,
+        limit,
         ingestProvider: "apify",
       })),
       provider: "apify",
@@ -591,7 +608,9 @@ export async function scrapeAndSuggest(opts: {
         directUrls: [opts.profileUrl],
         resultsType: "posts",
         resultsLimit: limit,
-        onlyPostsNewerThan: `${sinceDays} days`,
+        ...(sinceDays !== null
+          ? { onlyPostsNewerThan: `${sinceDays} days` }
+          : {}),
         skipPinnedPosts: true,
       });
       return {
@@ -601,6 +620,7 @@ export async function scrapeAndSuggest(opts: {
           records: fallbackRecords,
           skipTemplate: opts.skipTemplate,
           cutoff,
+          limit,
           ingestProvider: "apify",
         })),
         provider: "apify",
@@ -625,6 +645,7 @@ export async function scrapeAndSuggest(opts: {
       records,
       skipTemplate: opts.skipTemplate,
       cutoff,
+      limit,
       ingestProvider: "brightdata",
     })),
     provider: "brightdata",
@@ -817,7 +838,7 @@ export type ScrapeBrandChannelResult = PeerScrapeResult & {
   runId: string;
   platform: ScrapePlatform;
   limit: number;
-  sinceDays: number;
+  sinceDays: number | null;
 };
 
 /**
@@ -832,12 +853,12 @@ export type ScrapeBrandChannelResult = PeerScrapeResult & {
 export async function scrapeBrandChannel(opts: {
   brandId: string;
   platform: ScrapePlatform;
-  sinceDays?: number;
+  sinceDays?: number | null;
   limit?: number;
   requestedById?: string;
   skipTemplate?: boolean;
 }): Promise<ScrapeBrandChannelResult> {
-  const sinceDays = opts.sinceDays ?? 30;
+  const sinceDays = opts.sinceDays === undefined ? 30 : opts.sinceDays;
   const limit = opts.limit ?? 30;
 
   const profileUrl = await profileUrlForBrand(opts.brandId, opts.platform);
@@ -858,9 +879,10 @@ export async function scrapeBrandChannel(opts: {
   }
 
   const requestedTo = new Date();
-  const requestedFrom = new Date(
-    requestedTo.getTime() - sinceDays * 86_400_000,
-  );
+  const requestedFrom =
+    sinceDays === null
+      ? undefined
+      : new Date(requestedTo.getTime() - sinceDays * 86_400_000);
   const runId = await startContentIngestRun({
     brandId: opts.brandId,
     requestedById: opts.requestedById,

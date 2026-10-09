@@ -160,6 +160,12 @@ export default async function BrandPage({
             </span>
           </h1>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+            <Link
+              href="/app/landscape"
+              className="text-muted-foreground hover:underline"
+            >
+              Landscape
+            </Link>
             <ContentStructureAssistantButton
               brandId={brand.id}
               brandName={brand.name}
