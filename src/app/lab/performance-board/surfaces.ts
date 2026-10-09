@@ -13,8 +13,8 @@ export const SURFACE_GROUPS: SurfaceGroup[] = [
     note: "Across clients · the way into the work",
     surfaces: [
       {
-        name: "Dashboard",
-        path: "/app/performance",
+        name: "Clients",
+        path: "/app/performance/clients",
         parts: [
           "Client journey board",
           "Commercial, Creative & Delivery views",

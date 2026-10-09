@@ -15,7 +15,7 @@ export default function PerformanceLayout({
 }: {
   children: ReactNode;
 }) {
-  const overview = usePathname() === "/app/performance";
+  const overview = usePathname() === "/app/performance/clients";
   return (
     <div
       className={overview ? "flex h-full min-h-0 flex-col gap-6" : "space-y-6"}

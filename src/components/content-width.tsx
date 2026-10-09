@@ -18,11 +18,11 @@ const STORAGE_KEY = "growth.content-width";
 const CHANGE_EVENT = "growth:content-width";
 
 function scopeFor(pathname: string) {
-  // The overview pipeline gets its own width preference; client workspaces
+  // The clients pipeline gets its own width preference; client workspaces
   // and all other Performance pages retain the contained default.
-  if (pathname === "/app/performance")
+  if (pathname === "/app/performance/clients")
     return {
-      prefix: "/app/performance/overview",
+      prefix: "/app/performance/clients",
       fallback: "full" as ContentWidth,
     };
   const match = DEFAULTS.filter(
@@ -96,7 +96,7 @@ export function ContentWidthToggle({ className }: { className?: string }) {
 }
 
 export function ContentColumn({ children }: { children: ReactNode }) {
-  const isPerformanceOverview = usePathname() === "/app/performance";
+  const isPerformanceOverview = usePathname() === "/app/performance/clients";
   const { width } = useContentWidth();
   return (
     <div
