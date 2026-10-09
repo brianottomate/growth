@@ -1,7 +1,8 @@
+import { effectiveVoice } from "@/lib/brand-direction";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/server/db";
 import { brandTable, memberTable, personaTable } from "@/server/db/schema";
-import { draftBrandStory } from "@/server/services/brand-story.service";
+import { updateBrandStory } from "@/server/services/brand-story.service";
 import { draftBrandMarkets } from "@/server/services/brand-markets.service";
 import {
   suggestPersonas,
@@ -29,13 +30,13 @@ const ctx = {
 };
 if (!process.argv.includes("--skip-story")) {
   console.log("Generating Hollyhock story with explicit steering");
-  const story = await draftBrandStory({
+  const story = await updateBrandStory({
     brandId: brand.id,
     steer:
-      "Keep the brand's supported positioning. Make the voice strongly understated and conversational. Never say 'luxury getaway'. Preserve specific supported destination and guest context.",
+      "Keep the brand's supported positioning. Choose the Guide archetype. Never say 'luxury getaway'. Preserve specific supported destination and guest context.",
   });
   if (
-    story.creativeDirection.voice.understatedExpressive > 1 ||
+    effectiveVoice(story.creativeDirection).understatedExpressive > 1 ||
     !story.creativeDirection.neverSay.some((s) =>
       s.toLowerCase().includes("luxury getaway"),
     )

@@ -354,17 +354,7 @@ function InternalSummaryPreview({
               Waiting for tool result…
             </p>
           ) : (
-            <GrowthResultSummary
-              kind={kind}
-              result={payload}
-              onPrompt={(prompt) => {
-                if (reject) setError("Simulated send failure. Try again.");
-                else {
-                  setError("");
-                  setMessages((entries) => [...entries, prompt]);
-                }
-              }}
-            />
+            <GrowthResultSummary kind={kind} result={payload} />
           )}
           {error && (
             <p role="alert" className="mt-2 text-xs text-destructive">

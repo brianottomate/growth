@@ -1,4 +1,3 @@
-import { AudienceResearch } from "./AudienceResearch";
 import { HomeGroupsWorkspace } from "@/app/app/brands/[brandSlug]/homes/HomeGroupsWorkspace";
 import { DestinationsCard } from "../DestinationsCard";
 import type { Metadata } from "next";
@@ -95,7 +94,6 @@ export default async function PerformanceWanderOsPage({
 
   return (
     <div className="space-y-4">
-      <AudienceResearch brandId={brand.id} />
       {!hasImportedHomes && (
         <WanderOsConnectionCard
           brandId={brand.id}

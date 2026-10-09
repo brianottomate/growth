@@ -46,7 +46,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "addAdPreview",
     "setPerformanceSettings",
     "update",
-    "draftStory",
+    "updateStory",
     "draftMarkets",
     "setMarkets",
   ],

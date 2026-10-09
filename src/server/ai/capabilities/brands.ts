@@ -45,7 +45,7 @@ import {
   setPerformanceSettings,
 } from "@/server/services/performance-settings.service";
 import {
-  draftBrandStory,
+  updateBrandStory,
   setBrandStory,
 } from "@/server/services/brand-story.service";
 import { growthAction } from "./types";
@@ -311,9 +311,9 @@ export const updateBrandAction = growthAction({
   },
 });
 
-export const draftBrandStoryAction = growthAction({
+export const updateBrandStoryAction = growthAction({
   description:
-    "Draft the brand story from what the brand already shows (its site identity, its homes, and a few things guests said) and save it. Generates story and structured creative direction together. Read brandRead.context first and pass steer for the requested changes; current accepted direction is preserved unless changed. For precise edits use brandWrite.update.",
+    "Generate and save the brand story and structured creative direction from its site identity, homes and guest evidence. Creates the first story when the saved story is null or empty; otherwise revises the existing story and direction. Read brandRead.context first and pass steer for the requested changes; current accepted direction is preserved unless changed. Voice comes from archetype defaults unless the brand has an explicit override, which regeneration preserves. For precise edits and voice overrides use brandWrite.update; creativeDirection.voice null restores archetype defaults.",
   inputSchema: z.object({ brandId: z.string().min(1), steer: steerSchema }),
   outputSchema: z.object({
     story: z.string().nullable(),
@@ -333,7 +333,7 @@ export const draftBrandStoryAction = growthAction({
       throw new Error(
         "That brand is not available in the active organization.",
       );
-    return draftBrandStory({ brandId: brand.id, steer: input.steer });
+    return updateBrandStory({ brandId: brand.id, steer: input.steer });
   },
 });
 
@@ -503,7 +503,9 @@ export const setBrandMarkAction = growthAction({
       .trim()
       .max(4000)
       .optional()
-      .describe("Accepted recommendation reason, when applying recommendMark."),
+      .describe(
+        "Optional explanation for an accepted recommendation. A saved mark is complete without a reason; absence is not a reason to replace it.",
+      ),
     previewCopy: brandPreviewCopySchema
       .nullish()
       .describe(
@@ -512,7 +514,13 @@ export const setBrandMarkAction = growthAction({
     tuning: z
       .object({
         iconScale: z.number().min(0.7).max(1.4),
-        iconShift: z.number().min(-0.3).max(0.3),
+        iconShift: z
+          .number()
+          .min(-0.3)
+          .max(0.3)
+          .describe(
+            "Vertical offset in wordmark cap heights: negative moves the icon UP, positive moves it DOWN, zero centers it on the cap height. To raise an existing icon, decrease its saved value.",
+          ),
         gapScale: z.number().min(0.6).max(1.6),
         note: z.string().max(600),
       })
@@ -535,7 +543,7 @@ export const setBrandMarkAction = growthAction({
       .string()
       .nullable()
       .describe(
-        "Optical critique before saving; confirm its claims with brandRead.identity and inspect true.",
+        "Critique of the pre-correction image used to produce the saved tuning. It is not a post-save assessment or evidence of remaining defects. Inspect final pixels with brandRead.identity and inspect true.",
       ),
     path: z.string(),
   }),
@@ -611,7 +619,11 @@ const markRecipeSchema = z.object({
 });
 const markTuningSchema = z.object({
   iconScale: z.number(),
-  iconShift: z.number(),
+  iconShift: z
+    .number()
+    .describe(
+      "Vertical offset in cap heights: negative is up, positive is down.",
+    ),
   gapScale: z.number(),
   note: z.string(),
 });

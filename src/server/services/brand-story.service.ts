@@ -81,8 +81,8 @@ async function guestQuotes(listingIds: string[]) {
   }
 }
 
-/** Draft a story from the brand's site identity, homes and guests, and save it. */
-export async function draftBrandStory(input: {
+/** Generate or revise the story and direction from brand evidence, and save them. */
+export async function updateBrandStory(input: {
   brandId: string;
   steer?: string;
 }) {
@@ -173,11 +173,15 @@ export async function draftBrandStory(input: {
     throw new Error(
       "No creative direction returned; existing content was preserved.",
     );
+  const creativeDirection: CreativeDirection = {
+    ...output.creativeDirection,
+    voice: brand.creativeDirection?.voice ?? null,
+  };
   const saved = await db
     .update(brandTable)
     .set({
       story,
-      creativeDirection: output.creativeDirection,
+      creativeDirection,
       ...(Object.keys(snapshots).length
         ? {
             websiteMeta: sql`coalesce(${brandTable.websiteMeta}, '{}'::jsonb) || ${JSON.stringify(snapshots)}::jsonb`,
@@ -187,5 +191,5 @@ export async function draftBrandStory(input: {
     .where(eq(brandTable.id, brand.id))
     .returning({ id: brandTable.id });
   if (!saved.length) throw new Error("Brand not found");
-  return { story, creativeDirection: output.creativeDirection };
+  return { story, creativeDirection };
 }

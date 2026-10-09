@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useWorkspaceMutation } from "./useWorkspaceMutation";
-import { CreativeDirection } from "./CreativeDirection";
+import { ArchetypeSelector, CreativeDirection } from "./CreativeDirection";
 import type { CreativeDirection as Direction } from "@/lib/brand-direction";
 import { FileText, Sparkles } from "lucide-react";
 
@@ -41,13 +41,16 @@ export function BrandStoryCard({
     }),
   );
   const write = useWorkspaceMutation(
-    orpc.brand.draftStory.mutationOptions({
+    orpc.brand.updateStory.mutationOptions({
       onError: (error) => toast.error(error.message),
     }),
   );
 
   const actions = (primary = false) => (
     <>
+      {creativeDirection && (
+        <ArchetypeSelector brandId={brandId} value={creativeDirection} />
+      )}
       {story ? (
         <Button
           size="sm"
@@ -123,7 +126,9 @@ export function BrandStoryCard({
         />
       ) : story ? (
         <div className="space-y-5">
-          {creativeDirection && <CreativeDirection value={creativeDirection} />}
+          {creativeDirection && (
+            <CreativeDirection brandId={brandId} value={creativeDirection} />
+          )}
           <div className={creativeDirection ? "border-t pt-5" : ""}>
             <BrandStoryContent story={story} />
           </div>

@@ -176,6 +176,13 @@
       "when": 1791565786246,
       "tag": "0023_model_first_identity",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791581666067,
+      "tag": "0024_compact_persona_profiles",
+      "breakpoints": true
     }
   ]
 }

@@ -1,8 +1,28 @@
 "use client";
 import type { PersonaProfile } from "@/lib/brand-direction";
-import { DirectionPhrases } from "./CreativeDirection";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Sparkles, Users } from "lucide-react";
+import {
+  Sparkles,
+  Users,
+  Heart,
+  Briefcase,
+  Compass,
+  Sun,
+  Home,
+  Laptop,
+  Landmark,
+} from "lucide-react";
+import type { PersonaIcon } from "@/lib/persona-profile";
+const PERSONA_ICONS = {
+  users: Users,
+  heart: Heart,
+  briefcase: Briefcase,
+  compass: Compass,
+  sun: Sun,
+  home: Home,
+  laptop: Laptop,
+  landmark: Landmark,
+} satisfies Record<PersonaIcon, typeof Users>;
 import { ShapeBrandButton } from "./ShapeBrandButton";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -99,54 +119,60 @@ export function PersonaAudiences({
         />
       )}
       <div className="grid grid-cols-1 gap-3 @3xl:grid-cols-2">
-        {personas.map((persona) => (
-          <article
-            key={persona.id}
-            id={`persona-${persona.id}`}
-            className="scroll-mt-4 space-y-3 rounded-xl border bg-muted/40 p-4"
-          >
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <h3 className="font-semibold">{persona.name}</h3>
-                {!persona.profile && (
-                  <p className="text-sm text-muted-foreground">
-                    {persona.description}
-                  </p>
-                )}
+        {personas.map((persona) => {
+          const Icon = persona.profile
+            ? PERSONA_ICONS[persona.profile.icon]
+            : Users;
+          return (
+            <article
+              key={persona.id}
+              id={`persona-${persona.id}`}
+              className="scroll-mt-4 space-y-3 rounded-xl border bg-muted/40 p-4"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="flex min-w-0 flex-1 items-start gap-3">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+                    <Icon aria-hidden="true" className="size-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="font-semibold">{persona.name}</h3>
+                    {!persona.profile && (
+                      <p className="text-sm text-muted-foreground">
+                        {persona.description}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex shrink-0 gap-1">
+                  <ShapeBrandButton
+                    brandId={brand.id}
+                    brandName={brand.name}
+                    section="persona"
+                    resource={{ id: persona.id, name: persona.name }}
+                  />
+                </div>
               </div>
-              <div className="flex shrink-0 gap-1">
-                <ShapeBrandButton
-                  brandId={brand.id}
-                  brandName={brand.name}
-                  section="persona"
-                  resource={{ id: persona.id, name: persona.name }}
-                />
-              </div>
-            </div>
-            {persona.profile && (
-              <PersonaProfileDetails profile={persona.profile} />
-            )}
-          </article>
-        ))}
+              {persona.profile && (
+                <PersonaProfileDetails profile={persona.profile} />
+              )}
+            </article>
+          );
+        })}
       </div>
     </div>
   );
 }
 function PersonaProfileDetails({ profile }: { profile: PersonaProfile }) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <p className="text-sm">{profile.motivation}</p>
-      <div className="grid grid-cols-1 gap-4 @2xl:grid-cols-2">
-        <DirectionPhrases title="Needs" values={profile.needs.slice(0, 3)} />
-        <DirectionPhrases
-          title="Decision criteria"
-          values={profile.decisionCriteria.slice(0, 3)}
-        />
+      <div className="flex flex-wrap gap-1.5">
+        {profile.pills.map((pill, index) => (
+          <span key={index} className="rounded-lg bg-muted px-2.5 py-1 text-sm">
+            {pill}
+          </span>
+        ))}
       </div>
-      {profile.objections.length > 0 && (
-        <DirectionPhrases title="Objections" values={profile.objections} />
-      )}
-      <p className="text-xs text-muted-foreground">{profile.evidenceNote}</p>
     </div>
   );
 }

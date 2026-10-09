@@ -21,11 +21,14 @@ Work in this order. Each step reads before it writes, and re-running any step is
 
 ## 2. Story
 
-`brandWrite.draftStory` with the brandId, unless the brand already has a story. Every headline and review for the brand reads it, so it comes before any copy. Say its "What makes it itself" line back to the operator in one line.
+`brandWrite.updateStory` with the brandId, unless the brand already has a story. Every headline and review for the brand reads it, so it comes before any copy. Say its "What makes it itself" line back to the operator in one line.
 
 ## 3. Mark
 
-`brandRead.recommendMark` with the brandId. It renders candidates and returns a recommended recipe, reason and tuning without saving. Say the recommendation in one line. When the operator has asked you to set up the brand or apply the mark, save the returned recipe, reason and tuning with `brandWrite.setMark`; otherwise discuss the recommendation first. Then use `brandRead.identity` with `inspect: true` to check the saved variants.
+Read the saved mark with `brandRead.identity`. If a mark already exists, preserve it and continue; a missing recommendation reason or existing tuning notes do not mean it is incomplete. Only replace an existing mark when the operator requests a change.
+
+If no mark exists, use `brandRead.recommendMark` with the brandId. It renders candidates and returns a recommended recipe, reason and tuning without saving. Say the recommendation in one line. When the operator has asked you to set up the brand or apply the mark, save the returned recipe, reason and tuning with `brandWrite.setMark`; otherwise discuss the recommendation first. Then use `brandRead.identity` with `inspect: true` to check the saved variants.
+
 
 ## 4. Photos
 

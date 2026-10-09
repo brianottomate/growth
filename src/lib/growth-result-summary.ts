@@ -3,7 +3,6 @@ export type GrowthSummaryRow = {
   detail?: string;
   thumbnail?: string;
   href?: string;
-  prompt?: string;
 };
 export type GrowthResultSummary = {
   title: string;
@@ -195,7 +194,7 @@ export function growthResultSummary(
           : text(b.relationship),
       ),
       href: path(b.url, `/app/brands/${encodeURIComponent(text(b.slug))}`),
-      prompt: `Let's work on ${text(b.name, "this brand")} (brandId ${text(b.id)}).`,
+      thumbnail: text(b.logo) || undefined,
     }));
     summary.href = "/app/brands";
     summary.linkLabel = "View brands";

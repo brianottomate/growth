@@ -164,7 +164,7 @@ import {
   addBrandAdPreviewAction,
   setPerformanceSettingsAction,
   updateBrandAction,
-  draftBrandStoryAction,
+  updateBrandStoryAction,
 } from "./brands";
 import {
   readBrandContext,
@@ -355,7 +355,7 @@ export const brandWrite = growthDomainTool({
     addAdPreview: addBrandAdPreviewAction,
     setPerformanceSettings: setPerformanceSettingsAction,
     update: updateBrandAction,
-    draftStory: draftBrandStoryAction,
+    updateStory: updateBrandStoryAction,
     draftMarkets: draftBrandMarketsAction,
     setMarkets: setBrandMarketsAction,
   },

@@ -1,9 +1,15 @@
+import {
+  personaProfileSchema,
+  readPersonaProfile,
+  type PersonaProfile,
+} from "@/lib/persona-profile";
 import type { PerformanceCardState } from "@/lib/performance-card-state";
 import type { BrandEmailTheme } from "@/lib/brand-email-style";
 import type { BrandingProfile } from "@mendable/firecrawl-js";
 import type { PerformanceChecklist } from "@/lib/performance-checklist";
 import { relations, sql } from "drizzle-orm";
 import {
+  customType,
   check,
   index,
   pgEnum,
@@ -736,6 +742,17 @@ export type PersonaDemandGeography = {
   source?: string | null;
 };
 
+// Normalize stored persona JSON once at its owning database boundary.
+const personaProfileColumn = customType<{
+  data: PersonaProfile;
+  driverData: unknown;
+}>({
+  dataType: () => "jsonb",
+  fromDriver: (value) =>
+    readPersonaProfile(typeof value === "string" ? JSON.parse(value) : value),
+  toDriver: (value) => JSON.stringify(personaProfileSchema.parse(value)),
+});
+
 export const personaTable = pgTable(
   "persona",
   (t) => ({
@@ -757,7 +774,7 @@ export const personaTable = pgTable(
     /** Loose prose, e.g. ["California", "big US cities"]. Not targeting. */
     geographies: t.jsonb().$type<string[]>(),
     notes: t.text(),
-    profile: t.jsonb().$type<import("@/lib/brand-direction").PersonaProfile>(),
+    profile: personaProfileColumn(),
 
     createdAt: t
       .timestamp()

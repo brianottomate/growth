@@ -274,3 +274,35 @@ without rejecting an operator's edit. Ordinary settings edits now merge only the
 submitted JSON fields, preserving concurrent moves and unrelated card-state edits.
 A stage changed through the settings editor clears its previous column rank.
 No database migration is required: the rank lives in the existing settings JSONB.
+
+## Archetype-owned voice (2026-10-09)
+
+The previous direction stored an archetype key without prompt behavior and asked
+generation to independently select voice dials. The archetype dictionary now owns
+role instructions and default voice. Saved `voice` values are explicit overrides;
+null derives the three axes from the selected archetype. Generation preserves
+existing overrides rather than silently replacing operator choices.
+
+Read-only inventory found 15 saved directions, all with two-axis voice objects:
+4 Guide, 2 Caretaker, 1 Expert and 8 with no archetype. Existing choices remain
+valid; a missing warmth value derives from the selected archetype, or Balanced
+when none is selected. No global backfill is needed and no schema migration is
+required for the expanded JSON contract. The owning formatter resolves defaults
+for both UI and prompts. New generated revisions drop obsolete archetypeReason
+text; existing text is retained only for compatibility with saved briefs.
+
+## Compact persona prompt context (2026-10-09)
+
+Personas do not need independently meaningful needs, decision-criteria and
+objection arrays to supply creative context. The owning profile now stores
+`icon`, `motivation` and `pills`; the UI and prompt consumers receive that shape.
+Generation combines the strongest concerns and priorities into 2–5 natural
+phrases and picks a visual icon. Evidence notes have been removed as requested.
+
+The read-only production audit found 22 non-null legacy profiles, none compact,
+with at most 15 combined phrases. Migration 0024 preserves all phrases in order
+and removes the old fields without changing IDs or audience references. A
+temporary compatibility reader lives at the JSONB database boundary, rather
+than adding fallback chains to each UI or prompt consumer. Remove it after the
+cutover and retirement of old writers. Existing unstructured persona prose and
+null profiles remain valid; no synthetic profile is created for them.

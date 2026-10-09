@@ -1,3 +1,4 @@
+import { creativeDirectionSchema } from "@/lib/brand-direction";
 import { brandPageSnapshotSchema } from "@/lib/brand-website-content";
 import { getClientPageActivity } from "@/server/services/client-page-activity.service";
 import { brandEmailThemeSchema } from "@/lib/brand-email-style";
@@ -18,7 +19,7 @@ import {
 
 import { actionProcedure, protectedProcedure } from "@/server/api/orpc";
 import {
-  draftBrandStoryAction,
+  updateBrandStoryAction,
   addBrandAdPreviewAction,
   enrichBrandAction,
   listBrands,
@@ -672,16 +673,21 @@ export const brandRouter = {
     .input(
       z.object({
         brandId: z.string().min(1),
-        story: z.string().max(4000).nullable(),
+        story: z.string().max(4000).nullable().optional(),
+        creativeDirection: creativeDirectionSchema.nullable().optional(),
       }),
     )
     .handler(async ({ context: ctx, input }) => {
       const brand = await assertBrandManageable(ctx, input.brandId);
-      return setBrandStory({ brandId: brand.id, story: input.story });
+      return setBrandStory({
+        brandId: brand.id,
+        story: input.story,
+        creativeDirection: input.creativeDirection,
+      });
     }),
 
-  /** Setup: draft the brand story from the site, the homes and the guests. */
-  draftStory: actionProcedure(draftBrandStoryAction),
+  /** Setup: generate or revise the brand story and direction, guided by steer. */
+  updateStory: actionProcedure(updateBrandStoryAction),
   draftMarkets: actionProcedure(draftBrandMarketsAction),
   setMarkets: actionProcedure(setBrandMarketsAction),
 

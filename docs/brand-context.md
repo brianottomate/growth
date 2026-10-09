@@ -2,7 +2,7 @@
 
 The brand story is editable prose in `brand.story`. Supporting creative direction is `brand.creativeDirection` JSONB: positioning, an optional archetype, two fixed voice axes (casual to formal and understated to expressive), lead-with themes and language to avoid. Voice positions are generated judgments displayed on deterministic scales, not operator controls. Story regeneration produces both in one structured model call and saves them together. Current accepted content and operator steering are included; a concurrent edit prevents the generated result from overwriting newer work.
 
-Personas retain their IDs, prose and audience references. `persona.profile` adds motivation, needs, objections, decision criteria, suggested home IDs, a fit explanation and evidence notes. Travel details are optional, with unknown attributes null. Suggested homes must belong to the brand. Personas describe creative planning hypotheses; campaign platform targeting remains separate. Destination JSON keeps existing IDs when town membership is unchanged. Origin cities are suggestions unless supported by measured data.
+Personas retain their IDs, prose and audience references. `persona.profile` contains only an icon key, motivation and one flat list of pills. Pills combine useful needs, selection criteria and concerns as creative prompt context; they are never platform targeting. No persona evidence note is stored in the new format. Destination JSON keeps existing IDs when town membership is unchanged. Origin cities are suggestions unless supported by measured data.
 
 ## Shape and tool parity
 
@@ -12,7 +12,7 @@ Shape opens a chat with the brand and resource name/ID. It does not open a hidde
 
 Supported here: brand story/direction, destinations, persona proposals (including targeted existing persona revisions), campaign audience suggestions, Google text ads, featured-home suggestions, composition copy, catalog photo/copy retries, starter-ad generation and brand mark recommendations. The mark tool's old `direction` argument remains an alias. Existing media/outreach steering and durable email briefs retain their semantics.
 
-Use `brandRead.context` for story/direction/destinations, `personaRead.list` for personas, `brandWrite.draftStory` / `draftMarkets` for regenerated context, and `personaRead.suggest` with `personaId` followed by `personaWrite.update` for a regenerated existing persona. Preserve IDs and unrelated fields on precise edits.
+Use `brandRead.context` for story/direction/destinations, `personaRead.list` for personas, `brandWrite.updateStory` / `draftMarkets` for regenerated context, and `personaRead.suggest` with `personaId` followed by `personaWrite.update` for a regenerated existing persona. Preserve IDs and unrelated fields on precise edits.
 
 ## Existing content
 
@@ -28,8 +28,31 @@ bun --conditions=react-server scripts/brand-context/backfill.ts --apply
 
 Optional `--brand=slug` limits the backfill. Failures leave original content intact and exit nonzero; rerun to finish missing rows. No legacy prose is dropped. New destinations already use compatible JSON and need no bulk rewrite.
 
-New story generation uses a 6–12 word positioning title (100 characters maximum), a plain voice subtitle of at most 16 words (120 characters maximum), and up to three concise priorities and avoid rules each. The card shows the subtitle without an archetype label or icon. Existing saved prose remains readable until regeneration.
+New story generation uses a 6–12 word positioning title (100 characters maximum), an archetype key and 2–5 compact priorities and avoid rules each. The header archetype selector opens a picker; its dictionary owns role instructions and default voice settings. Existing saved voice overrides remain intact.
 
-Persona setup cards use Shape for changes and display motivation, travel details, and up to three needs and decision criteria. Generation usually suggests one or two personas, with short names and a motivation sentence under 25 words. Persona icons, edit forms, expanded stories, objections and suggested-home lists have been removed from these cards. Stored supporting evidence and inventory suggestions remain available to chat. Home groups link to personas whose suggested inventory overlaps the group, labeled as suggested fits. These links do not change saved group membership.
+Persona setup cards show the short name with an icon, one motivation sentence and a single pill group. Icons are selected by generation, with no icon-swap control. Shape remains available. New generation limits names to 60 characters, descriptions and motivations to 160 characters, and pills to 2–5 phrases of at most 50 characters. It does not generate needs/decision/objection categories or evidence notes.
+
+Migration 0024 merges the three old arrays in order, removes evidenceNote and adds a neutral group icon. It preserves all accepted phrases, including repetitions, rather than truncating existing records to generation limits. Existing longer profiles can be condensed through a generated revision that preserves persona IDs. A temporary JSONB reader at the database boundary supports the old format before migration; remove it once the migration and retirement of old writers are confirmed. New writes use only the compact schema. Production receives the migration through the normal release flow; older deployments require the previous profile shape and must not be used as an app-only rollback after this cutover.
 
 Destination cards keep Shape, town coverage, up to three reasons to visit, two season names with time windows, and three suggested origin cities. Generation qualifies US origin cities with their states, so the existing campaign flow can derive state suggestions. A city qualifier identifies location; a broader state audience remains a separate planning choice. Included-home lists and extended travel, season and background prose stay out of the destination card. Stored context remains available to chat and other creative workflows.
+
+## Archetypes and voice
+
+`src/lib/brand-direction.ts` owns the archetype dictionary: stable key, label,
+short description, prompt instruction, and three default voice positions.
+`caregiver` is labelled Caretaker and `creator` is labelled Curator to preserve
+existing record identities. Generation selects a key and writes positioning plus
+2–5 compact lead-with and avoid phrases; it does not generate independent voice
+values or archetype explanations.
+
+The existing `creativeDirection.voice` field is the explicit override. Null uses
+archetype defaults; an existing two-axis override preserves those positions and
+derives warmth from the archetype. `effectiveVoice` is shared by prompt formatting
+and the UI. Setup offers an archetype picker, direct voice adjustment, and a reset
+to defaults. Regeneration carries the saved override forward. `archetypeReason` is
+accepted for existing records but is no longer generated or displayed.
+
+This expands the existing JSON contract without changing database columns or
+rewriting accepted preferences. Existing two-axis records remain readable. Deploy
+the new readers before using null overrides on shared production records; older
+MCP deployments require a voice object.

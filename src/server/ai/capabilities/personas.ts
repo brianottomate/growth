@@ -305,7 +305,7 @@ export const suggestPersonas = growthAction({
       model: anthropic("claude-sonnet-5"),
       system:
         system +
-        " Return a general customer profile with motivation, needs, objections, decisionCriteria and evidenceNote. Treat trip purpose or other industry context as motivation or needs, never special fields. Distinguish hypotheses from observed evidence. Keep phrases short and motivation concise. When target is supplied, propose one revision of that persona.",
+        " Return a compact profile with icon, motivation and pills. Pick an icon from the available enum; it is a visual cue, not a demographic fact. Motivation is one natural sentence under 25 words, without a Hypothesis prefix. Combine the strongest needs, selection criteria and concerns into one set of two to five distinct pills, each 2–5 words. Use positive, natural phrases such as Accurate photos rather than Photos may mismatch. Do not generate separate categories or an evidence note. Keep names to 2–5 words and at most 60 characters, and descriptions to one sentence under 160 characters. Do not invent measured customer behavior. When target is supplied, propose one revision of that persona.",
       prompt:
         prompt +
         "\n" +
@@ -316,6 +316,8 @@ export const suggestPersonas = growthAction({
           suggestions: z
             .array(
               suggestionSchema.extend({
+                name: z.string().trim().min(1).max(60),
+                description: z.string().trim().min(1).max(160),
                 profile: generatedPersonaProfileSchema,
               }),
             )

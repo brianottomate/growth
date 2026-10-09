@@ -5,15 +5,13 @@ import Link from "next/link";
 import { type ReactNode, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { House, Loader2, Sparkles, Trash2 } from "lucide-react";
+import { House, Loader2, Trash2 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { DeleteAlert } from "@/components/ui/alert-dialog";
 import { cn } from "@/components/ui/lib/utils";
 import { toast } from "@/components/ui/toast";
 import { ShapeBrandButton } from "./ShapeBrandButton";
 import { EmptyState } from "@/components/ui/empty-state";
-import { featuredHomeAdditions } from "@/lib/featured-home-selection";
 import { orpc } from "@/orpc/client";
 
 /** A committed home (a `home` row), enriched from its feed listing when matched. */
@@ -87,55 +85,6 @@ export function PickedHomes({
   const TitleTag = embedded ? "h3" : "h2";
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [selecting, setSelecting] = useState(false);
-  const suggest = useMutation(
-    orpc.performance.suggestFeaturedHomes.mutationOptions(),
-  );
-  const feature = useMutation(orpc.brand.homesSetFeatured.mutationOptions());
-  const select = async () => {
-    setSelecting(true);
-    try {
-      const { picks } = await suggest.mutateAsync({ brandId, count: 5 });
-      const additions = featuredHomeAdditions(
-        picks,
-        picked.map((home) => home.id),
-        MAX,
-      );
-      for (const homeId of additions)
-        await feature.mutateAsync({ homeId, featured: true });
-      toast.info(
-        additions.length
-          ? `Featured ${additions.length} homes`
-          : "The recommended homes are already featured.",
-      );
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Could not select homes.",
-      );
-    } finally {
-      setSelecting(false);
-      router.refresh();
-    }
-  };
-  const actions = (primary = false) => (
-    <>
-      <Button
-        size="sm"
-        variant={primary ? "default" : "outline"}
-        loading={selecting}
-        disabled={picked.length >= MAX}
-        onClick={() => void select()}
-      >
-        {!selecting && <Sparkles className="size-3.5" />}
-        {selecting ? "Selecting homes…" : "Select homes"}
-      </Button>
-      <ShapeBrandButton
-        brandId={brandId}
-        brandName={brandName}
-        section="featured homes"
-      />
-    </>
-  );
   const [confirming, setConfirming] = useState<PickedHome | null>(null);
 
   const count = picked.length;
@@ -175,7 +124,11 @@ export function PickedHomes({
           {label}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {actions()}
+          <ShapeBrandButton
+            brandId={brandId}
+            brandName={brandName}
+            section="featured homes"
+          />
           {groupActions}
         </div>
       </div>
@@ -185,14 +138,7 @@ export function PickedHomes({
           compact
           icon={House}
           title="Choose the homes that lead"
-          description={
-            selecting ? (
-              <span role="status">
-                Reviewing the homes and selecting the featured set…
-              </span>
-            ) : undefined
-          }
-          actions={actions(true)}
+          description="Choose and order homes in Edit group, or ask Shape for a selection."
         />
       ) : (
         <div className="grid grid-cols-1 gap-2.5 @xl:grid-cols-2">

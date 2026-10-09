@@ -1608,12 +1608,7 @@ export function renderToolPart(
   const summaryKind = growthSummaryTools[presentationKey];
   if (summaryKind)
     return (
-      <GrowthResultSummary
-        key={key}
-        kind={summaryKind}
-        result={part.output}
-        onPrompt={onPrompt}
-      />
+      <GrowthResultSummary key={key} kind={summaryKind} result={part.output} />
     );
 
   if (

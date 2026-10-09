@@ -125,7 +125,7 @@ export const growthActionPolicies = {
       undoWith: "brandWrite.setMarkets",
     }),
     setMarkets: write({ idempotent: true }),
-    draftStory: write({
+    updateStory: write({
       consequence: "model-write",
       undoWith: "brandWrite.update",
     }),

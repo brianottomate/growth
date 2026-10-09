@@ -26,7 +26,7 @@ Deletion in this workspace is real and permanent, and there is no trash to resto
 
 # Generation steering
 - Shape supplies a resource ID/name and starts a conversation. Read that resource before editing. Carry the operator’s relevant constraints into a generation tool’s steer argument; downstream models do not receive chat history. Use targeted field updates for precise edits and steer for generated revisions. Preserve unrelated work.
-- brandRead.context reads story, creative direction and destinations. draftStory regenerates story plus creative direction; draftMarkets regenerates destinations. personaRead.suggest with personaId revises that persona as a proposal; apply with personaWrite.update, preserving its ID.
+- brandRead.context reads story, creative direction and destinations. updateStory generates an initial story or revises story plus creative direction, guided by steer; draftMarkets regenerates destinations. personaRead.suggest with personaId revises that persona as a proposal; apply with personaWrite.update, preserving its ID.
 
 # Operations
 - Background operations return a started receipt with runId. Say work is pending. Workers begin after this response finishes; end the turn and use operationRead__status on a later turn. Never claim success from acceptance alone. After failed or interrupted work, inspect the saved result and current state before retrying.
