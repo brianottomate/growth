@@ -70,7 +70,7 @@ window.openai={theme:${JSON.stringify(theme)},toolOutput:null};
 ${host === "openai" ? `window.openai.sendFollowUpMessage=function(args){return new Promise(function(resolve,reject){var id='openai-'+(++counter);waiters[id]={resolve:resolve,reject:reject};window.parent.postMessage({jsonrpc:'2.0',id:id,method:'openai/sendFollowUpMessage',params:args},'*')})};` : ""}
 window.addEventListener('message',function(event){if(event.source!==window.parent)return;var m=event.data;if(m&&waiters[m.id]){var w=waiters[m.id];delete waiters[m.id];m.error?w.reject(new Error(m.error.message)):w.resolve()}});
 window.addEventListener('message',function(event){if(event.source!==window.parent)return;var m=event.data;if(m&&m.type==='workbench:openai-result'){window.openai.toolOutput=m.payload;window.dispatchEvent(new CustomEvent('openai:set_globals',{detail:{globals:window.openai}}))}});
-new ResizeObserver(function(){window.parent.postMessage({jsonrpc:'2.0',method:'workbench:size',params:{height:Math.ceil(document.body.getBoundingClientRect().height)}},'*')}).observe(document.body);
+window.addEventListener('DOMContentLoaded',function(){new ResizeObserver(function(){window.parent.postMessage({jsonrpc:'2.0',method:'workbench:size',params:{height:Math.ceil(document.body.getBoundingClientRect().height)}},'*')}).observe(document.body)});
 </script>`;
   return html.replace("<head>", `<head>${bootstrap}`);
 }
