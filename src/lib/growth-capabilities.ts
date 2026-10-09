@@ -63,7 +63,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "captureReference",
     "removeReference",
   ],
-  personaRead: ["list", "suggest"],
+  personaRead: ["list", "suggest", "wanderOsContext"],
   performanceRead: [
     "pitch",
     "draftPitch",
@@ -237,6 +237,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "planPlatform",
     "setCreativePool",
     "setPlatformDraft",
+    "setDeliveryGroup",
     "attachCampaign",
     "importMetaCampaign",
     "pullPlatformAudiences",

@@ -156,7 +156,7 @@ export const AD_PLATFORM_SPECS: readonly AdPlatformSpec[] = [
       textAds: true,
       creativeAds: true,
       targeting: { regions: true, age: true },
-      goals: ["traffic", "engagement", "awareness", "video_views"],
+      goals: ["traffic", "engagement", "awareness"],
     },
     // Google's campaign manager needs an `ocid` we don't have, so both
     // levels get the account-level campaigns view.

@@ -3,10 +3,7 @@ import type { PersonaProfile } from "@/lib/brand-direction";
 import { DirectionPhrases } from "./CreativeDirection";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Sparkles, Users } from "lucide-react";
-import { AudienceMap } from "@/components/audience-map";
-import { GeographyChips } from "@/components/geography-chips";
 import { ShapeBrandButton } from "./ShapeBrandButton";
-import type { PersonaDemandGeography } from "@/server/db/brand-schema";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
@@ -19,17 +16,7 @@ type Persona = {
   name: string;
   description: string | null;
   profile?: PersonaProfile | null;
-  demandGeography: PersonaDemandGeography | null;
-  destinationGeography: PersonaDemandGeography | null;
 };
-function located(geo: PersonaDemandGeography | null) {
-  return Boolean(
-    geo &&
-    [geo.countries, geo.states, geo.regions, geo.cities].some(
-      (values) => values?.length,
-    ),
-  );
-}
 export function PersonaAudiences({
   brand,
   personas,
@@ -103,10 +90,10 @@ export function PersonaAudiences({
           title="Define who you’re speaking to"
           description={
             busy
-              ? "Reading the brand story and defining guest personas…"
+              ? "Reading the brand story and defining customer personas…"
               : brand.story?.trim()
-                ? "Define guest personas from the brand story and homes."
-                : "Write the brand story to define guest personas."
+                ? "Define customer personas from the brand story."
+                : "Write the brand story to define customer personas."
           }
           actions={generate(true)}
         />
@@ -139,93 +126,16 @@ export function PersonaAudiences({
             {persona.profile && (
               <PersonaProfileDetails profile={persona.profile} />
             )}
-            {located(persona.demandGeography) && (
-              <PersonaLocation
-                persona={persona}
-                geography={persona.demandGeography!}
-                title="Where they live / travel from"
-              />
-            )}
-            {located(persona.destinationGeography) && (
-              <PersonaLocation
-                persona={persona}
-                geography={persona.destinationGeography!}
-                title="Destinations of interest"
-              />
-            )}
           </article>
         ))}
       </div>
     </div>
   );
 }
-function PersonaLocation({
-  persona,
-  geography,
-  title,
-}: {
-  persona: Persona;
-  geography: PersonaDemandGeography;
-  title: string;
-}) {
-  return (
-    <section className="space-y-2">
-      <h4 className="text-xs font-medium">{title}</h4>
-      <GeographyChips label="Countries" values={geography.countries} />
-      <GeographyChips label="States" values={geography.states} />
-      <GeographyChips label="Regions" values={geography.regions} />
-      <GeographyChips label="Cities" values={geography.cities} />
-      {geography.source && (
-        <p className="text-xs text-muted-foreground">{geography.source}</p>
-      )}
-      <details>
-        <summary className="cursor-pointer text-xs font-medium">
-          View geography map
-        </summary>
-        <div className="mt-2">
-          <AudienceMap
-            audiences={[{ id: persona.id, name: persona.name, geography }]}
-            context="persona"
-          />
-        </div>
-      </details>
-    </section>
-  );
-}
 function PersonaProfileDetails({ profile }: { profile: PersonaProfile }) {
-  const travel = profile.travel;
-  const rows = travel
-    ? [
-        ["Trip purpose", travel.purpose],
-        [
-          "Party size",
-          travel.partyMin && travel.partyMax
-            ? `${travel.partyMin}–${travel.partyMax} guests`
-            : null,
-        ],
-        ["Booking window", travel.bookingWindow],
-        ["Stay length", travel.stayLength],
-        ["Price sensitivity", travel.priceSensitivity],
-      ]
-    : [];
   return (
     <div className="space-y-4">
       <p className="text-sm">{profile.motivation}</p>
-      {rows.some(([, value]) => value) && (
-        <dl className="divide-y rounded-xl border px-3">
-          {rows
-            .filter(([, value]) => value)
-            .map(([label, value]) => (
-              <div
-                key={label}
-                className="flex justify-between gap-4 py-2 text-sm"
-              >
-                <dt className="text-muted-foreground">{label}</dt>
-                <dd className="text-right">{value}</dd>
-              </div>
-            ))}
-        </dl>
-      )}
       <div className="grid grid-cols-1 gap-4 @2xl:grid-cols-2">
         <DirectionPhrases title="Needs" values={profile.needs.slice(0, 3)} />
         <DirectionPhrases
@@ -233,6 +143,10 @@ function PersonaProfileDetails({ profile }: { profile: PersonaProfile }) {
           values={profile.decisionCriteria.slice(0, 3)}
         />
       </div>
+      {profile.objections.length > 0 && (
+        <DirectionPhrases title="Objections" values={profile.objections} />
+      )}
+      <p className="text-xs text-muted-foreground">{profile.evidenceNote}</p>
     </div>
   );
 }

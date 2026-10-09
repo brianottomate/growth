@@ -5,7 +5,6 @@ type Geography = {
   states?: string[];
   regions?: string[];
   cities?: string[];
-  originCities?: string[];
 };
 
 /** US states have one stored representation; international subdivisions retain their names. */

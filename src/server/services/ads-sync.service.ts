@@ -6,7 +6,7 @@ import { adPlatformFromZernioString, adPlatformSpec } from "@/lib/ad-platforms";
 import { db } from "@/server/db";
 import {
   adTable,
-  platformAdSetTable,
+  platformDeliveryGroupTable,
   platformAdTable,
   type AdStats,
   platformCampaignTable,
@@ -269,7 +269,7 @@ async function syncCampaignChildren(input: {
 }) {
   type PendingSet = {
     externalId: string;
-    values: typeof platformAdSetTable.$inferInsert;
+    values: typeof platformDeliveryGroupTable.$inferInsert;
   };
   type PendingAd = {
     externalId: string;
@@ -299,6 +299,7 @@ async function syncCampaignChildren(input: {
             brandId: input.brandId,
             platformCampaignId: rowId,
             name: adSet.name ?? setExternalId,
+            targetingSpec: setObj,
             status: adSet.status ?? null,
             budget:
               num(
@@ -371,13 +372,13 @@ async function syncCampaignChildren(input: {
   if (sets.length) {
     const existing = await db
       .select({
-        id: platformAdSetTable.id,
-        externalId: platformAdSetTable.externalId,
+        id: platformDeliveryGroupTable.id,
+        externalId: platformDeliveryGroupTable.externalId,
       })
-      .from(platformAdSetTable)
+      .from(platformDeliveryGroupTable)
       .where(
         inArray(
-          platformAdSetTable.externalId,
+          platformDeliveryGroupTable.externalId,
           sets.map((row) => row.externalId),
         ),
       );
@@ -391,14 +392,14 @@ async function syncCampaignChildren(input: {
         // platform reports, not what the plan meant.
         const { audienceId: _audienceId, ...values } = pending.values;
         await db
-          .update(platformAdSetTable)
+          .update(platformDeliveryGroupTable)
           .set(values)
-          .where(eq(platformAdSetTable.id, known));
+          .where(eq(platformDeliveryGroupTable.id, known));
       } else {
         const [inserted] = await db
-          .insert(platformAdSetTable)
+          .insert(platformDeliveryGroupTable)
           .values(pending.values)
-          .returning({ id: platformAdSetTable.id });
+          .returning({ id: platformDeliveryGroupTable.id });
         if (inserted) setRowIdByExternalId.set(pending.externalId, inserted.id);
       }
     }
@@ -429,7 +430,7 @@ async function syncCampaignChildren(input: {
     for (const pending of ads) {
       const values = {
         ...pending.values,
-        platformAdSetId: pending.adSetExternalId
+        platformDeliveryGroupId: pending.adSetExternalId
           ? (setRowIdByExternalId.get(pending.adSetExternalId) ?? null)
           : null,
       };

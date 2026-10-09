@@ -15,9 +15,8 @@ export function useSuggestedAudiences(campaignId: string) {
   const suggest = useMutation(
     orpc.ads.suggestCampaignAudiences.mutationOptions(),
   );
-  const link = useMutation(orpc.ads.linkAudience.mutationOptions());
   const add = useMutation(orpc.ads.addAudience.mutationOptions());
-  const busy = working || suggest.isPending || add.isPending || link.isPending;
+  const busy = working || suggest.isPending || add.isPending;
   const run = async () => {
     if (busy) return;
     setPhase("suggesting");
@@ -26,26 +25,14 @@ export function useSuggestedAudiences(campaignId: string) {
       const result = await suggest.mutateAsync({ campaignId });
       setPhase("saving");
       for (const s of result.suggestions) {
-        const audience = await add.mutateAsync({
+        await add.mutateAsync({
           campaignId,
           name: s.name,
           personaId: s.personaId ?? undefined,
+          geography: s.geography,
           description: s.why,
-          homeIds: s.homeIds,
-          ageMin: s.ageMin ?? undefined,
-          ageMax: s.ageMax ?? undefined,
-          countries: s.countries,
-          states: s.states,
-          regions: s.regions,
-          cities: s.cities,
-          originCities: s.originCities,
         });
         saved++;
-        if (s.platformAudienceId)
-          await link.mutateAsync({
-            platformAudienceId: s.platformAudienceId,
-            audienceId: audience.id,
-          });
       }
       if (saved)
         toast.success(

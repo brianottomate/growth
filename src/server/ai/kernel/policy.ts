@@ -146,7 +146,11 @@ export const growthActionPolicies = {
     }),
     removeReference: write({ reversible: false }),
   },
-  personaRead: { list: read(), suggest: read("model-read") },
+  personaRead: {
+    list: read(),
+    suggest: read("model-read"),
+    wanderOsContext: read(),
+  },
   performanceRead: {
     pitch: read(),
     draftPitch: read("model-read"),
@@ -424,6 +428,7 @@ export const growthActionPolicies = {
     planPlatform: write({ idempotent: true }),
     setCreativePool: write({ idempotent: true }),
     setPlatformDraft: write({ idempotent: true }),
+    setDeliveryGroup: write({ idempotent: true }),
     attachCampaign: write({ idempotent: true }),
     importMetaCampaign: write({ idempotent: true }),
     // Reads the provider's audiences; writes only Growth's mirror rows and

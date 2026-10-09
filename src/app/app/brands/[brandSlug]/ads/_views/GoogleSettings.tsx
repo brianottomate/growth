@@ -1,5 +1,6 @@
 "use client";
 
+import type { DeliveryGeography } from "@/server/db/ads-schema";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
@@ -11,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { orpc } from "@/orpc/client";
 
 type GoogleConfig = {
+  geography?: DeliveryGeography;
   campaignType?: "search" | "display";
   keywords?: string[];
   negativeKeywords?: string[];
@@ -46,6 +48,7 @@ export function GoogleSettings({
   const [campaignType, setCampaignType] = useState<"search" | "display">(
     config?.campaignType ?? "search",
   );
+  const [geography, setGeography] = useState(config?.geography ?? {});
   const [keywords, setKeywords] = useState((config?.keywords ?? []).join("\n"));
   const [negatives, setNegatives] = useState(
     (config?.negativeKeywords ?? []).join("\n"),
@@ -126,11 +129,54 @@ export function GoogleSettings({
             </select>
           </div>
 
+          <div className="space-y-3 rounded-lg border p-3">
+            <p className="text-sm font-medium">Campaign location targeting</p>
+            <p className="text-xs text-muted-foreground">
+              Locations apply to every Google ad group. State and country
+              targets are combined, so selecting US alongside Ohio includes the
+              whole country.
+            </p>
+            <div className="grid grid-cols-1 gap-3 @xl:grid-cols-2">
+              {(["states", "countries", "regions", "cities"] as const).map(
+                (key) => (
+                  <div key={key} className="space-y-1.5">
+                    <Label htmlFor={`${platformCampaignId}-${key}`}>
+                      {key === "states"
+                        ? "US states (codes)"
+                        : key === "countries"
+                          ? "Countries (ISO codes)"
+                          : key === "regions"
+                            ? "International regions"
+                            : "City targets"}
+                    </Label>
+                    <Textarea
+                      id={`${platformCampaignId}-${key}`}
+                      rows={2}
+                      value={(geography[key] ?? []).join("\n")}
+                      onChange={(event) =>
+                        setGeography({
+                          ...geography,
+                          [key]: lines(event.target.value),
+                        })
+                      }
+                      placeholder={
+                        key === "states"
+                          ? "OH\nPA\nIN"
+                          : key === "countries"
+                            ? "US"
+                            : "One location per line"
+                      }
+                    />
+                  </div>
+                ),
+              )}
+            </div>
+          </div>
           {campaignType === "search" ? (
             <div className="grid grid-cols-1 gap-3 @xl:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="g-keywords">
-                  Fallback keywords (when no audience has terms)
+                  Fallback keywords (when no ad group has terms)
                 </Label>
                 <Textarea
                   id="g-keywords"
@@ -263,6 +309,7 @@ export function GoogleSettings({
                 save.mutate({
                   platformCampaignId,
                   google: {
+                    geography,
                     campaignType,
                     keywords:
                       campaignType === "search" ? lines(keywords) : undefined,

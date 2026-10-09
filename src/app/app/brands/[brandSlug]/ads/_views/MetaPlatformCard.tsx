@@ -1,4 +1,13 @@
 "use client";
+import { DeliveryCoverage } from "./DeliveryCoverage";
+import { DeliveryGroupEditor } from "./DeliveryGroupEditor";
+import type { DeliveryGroupConfiguration } from "@/lib/platform-delivery";
+
+import { DeliveryTargetingSummary } from "./DeliveryTargetingSummary";
+import { PlatformDraftPreviews } from "./PlatformDraftPreviews";
+import { eligiblePlatformAds } from "@/lib/platform-ad-plan";
+import { PlatformAdSelection } from "./PlatformAdSelection";
+import { selectPlatformAds } from "@/lib/platform-ad-plan";
 
 import { campaignDisplayName } from "@/lib/campaign-navigation";
 import { resolveMetaSchedule, metaScheduleIssue } from "@/lib/meta-schedule";
@@ -42,12 +51,12 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { orpc } from "@/orpc/client";
-import { adRoutesTo, AD_PUSH_GOALS, type AdPushGoal } from "@/lib/ad-platforms";
+import { AD_PUSH_GOALS, type AdPushGoal } from "@/lib/ad-platforms";
 import type {
   Ad,
   AdCreativeContent,
   PlatformCampaign,
-  AudienceGeographyPlan,
+  DeliveryGeography,
 } from "@/server/db/ads-schema";
 import { CompactAdMock } from "@/components/ad-mock";
 import { PushToPlatform } from "./PushToPlatform";
@@ -55,11 +64,13 @@ import { META_DEFAULT_CALL_TO_ACTION } from "@/lib/zernio-ads";
 import { money } from "./format";
 
 type Audience = {
+  configuration?: DeliveryGroupConfiguration | null;
   id: string;
   name: string;
-  geography: AudienceGeographyPlan | null;
+  geography: DeliveryGeography | null;
   ageMin: number | null;
   ageMax: number | null;
+  metaTargetName?: string;
 };
 const DEFAULT_PROJECTION_EXPANSION: Record<string, boolean> = {};
 
@@ -74,6 +85,7 @@ export function MetaPlatformCard({
   campaignEndAt,
   platformCampaign: pc,
   ads,
+  previewAds = [],
   audiences,
 }: {
   destination?: {
@@ -92,6 +104,7 @@ export function MetaPlatformCard({
   brandLogo: string | null;
   platformCampaign: PlatformCampaign;
   ads: Ad[];
+  previewAds?: Ad[];
   audiences: Audience[];
 }) {
   const [inspectOpen, setInspectOpen] = useState(false);
@@ -115,7 +128,16 @@ export function MetaPlatformCard({
         label: chosen.adAccountName ?? chosen.adAccountId,
       }
     : undefined;
-  const routedAds = ads.filter((ad) => adRoutesTo(ad.platforms, "meta_ads"));
+  const routedAds = selectPlatformAds(
+    ads,
+    "meta_ads",
+    pc.settings ?? {},
+  ).filter((ad) => ad.status === "approved");
+  const creativePreviews = eligiblePlatformAds(
+    previewAds,
+    "meta_ads",
+    pc.settings ?? {},
+  );
   const catalogCount = routedAds.filter(
     (ad) => "media" in ad.content && isImportedMetaCatalog(ad.content),
   ).length;
@@ -193,7 +215,10 @@ export function MetaPlatformCard({
   const ready = blockers.length === 0;
 
   return (
-    <section className="space-y-5 rounded-xl border bg-card p-5">
+    <section
+      id="platform-meta_ads"
+      className="@container min-w-0 scroll-mt-4 space-y-5 rounded-xl border bg-card p-5"
+    >
       <div className="flex flex-wrap items-center gap-3">
         <ChannelLogo platform="meta_ads" className="size-5" />
         <h3 className="font-semibold">Meta Ads</h3>
@@ -240,19 +265,6 @@ export function MetaPlatformCard({
           />
         </div>
       </div>
-      {!ready && (
-        <div
-          className="space-y-1 text-sm text-muted-foreground"
-          aria-label="Required before pushing"
-        >
-          <p className="font-medium">To finish setup</p>
-          <ul className="list-disc pl-5">
-            {blockers.map((message) => (
-              <li key={message}>{message}</li>
-            ))}
-          </ul>
-        </div>
-      )}
       <div id={sectionId} className="space-y-4">
         <section
           id={`${sectionId}-setup`}
@@ -342,6 +354,55 @@ export function MetaPlatformCard({
             )}
           </details>
         </section>
+        <section className="space-y-3 border-t pt-4" aria-label="Meta ad sets">
+          <h4 className="text-sm font-medium">Ad sets · {sets.length}</h4>
+          <p className="text-xs text-muted-foreground">
+            Each delivery group becomes a Meta ad set. Search keywords do not
+            restrict Meta delivery.
+          </p>
+          <DeliveryCoverage targets={sets} />
+          {sets.map((audience) => (
+            <details key={audience.id} className="rounded-lg border p-3">
+              <summary className="cursor-pointer text-sm font-medium">
+                {audience.name} · {creativeAds.length} approved creatives
+                {creativePreviews.length > 0
+                  ? ` · ${creativePreviews.length} draft previews`
+                  : ""}
+              </summary>
+              <div className="mt-3">
+                <DeliveryTargetingSummary audience={audience} />
+                <DeliveryGroupEditor group={audience} />
+              </div>
+            </details>
+          ))}
+        </section>
+        <PlatformAdSelection pc={pc} ads={ads} />
+        <PlatformDraftPreviews
+          ads={creativePreviews}
+          brandId={pc.brandId}
+          brandName={brandName}
+          brandLogo={brandLogo}
+        />
+        {creativePreviews.length > 0 && (
+          <p className="text-xs text-muted-foreground">
+            After approval and assignment: {sets.length} ad sets ×{" "}
+            {creativePreviews.length} Studio ideas ={" "}
+            {sets.length * creativePreviews.length} additional planned Meta ads.
+          </p>
+        )}
+        {!ready && (
+          <div
+            className="space-y-1 text-sm text-muted-foreground"
+            aria-label="Required before pushing"
+          >
+            <p className="font-medium">To finish setup</p>
+            <ul className="list-disc pl-5">
+              {blockers.map((message) => (
+                <li key={message}>{message}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
           <p className="text-sm text-muted-foreground">
             {sets.length} ad {sets.length === 1 ? "set" : "sets"} ·{" "}

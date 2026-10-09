@@ -2,21 +2,11 @@ import { z } from "zod";
 import { personaProfileSchema } from "@/lib/brand-direction";
 
 /** Wire results for this capability. Dates are ISO strings after JSON normalization. */
-const demandGeographySchema = z.strictObject({
-  cities: z.array(z.string()).optional(),
-  countries: z.array(z.string()).optional(),
-  regions: z.array(z.string()).optional(),
-  source: z.string().nullable().optional(),
-  states: z.array(z.string()).optional(),
-});
-
 const listPersonaItemSchema = z.strictObject({
   ageRanges: z.array(z.string()).nullable(),
   brandId: z.string(),
   createdAt: z.iso.datetime(),
   deletedAt: z.iso.datetime().nullable(),
-  demandGeography: demandGeographySchema.nullable(),
-  destinationGeography: demandGeographySchema.nullable(),
   description: z.string().nullable(),
   geographies: z.array(z.string()).nullable(),
   id: z.string(),

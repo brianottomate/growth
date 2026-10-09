@@ -1,6 +1,9 @@
 import { expect, it } from "bun:test";
 import { projectIdea, type IdeaDocument } from "@/lib/ad-idea-studio";
-import { draftAdActionOutputSchema } from "./ads";
+import {
+  draftAdActionOutputSchema,
+  setPlatformDraftActionOutputSchema,
+} from "./ads";
 
 it("accepts projected creative copy with descriptions and cleared booking targets", () => {
   const copy = {
@@ -63,4 +66,21 @@ it("accepts projected creative copy with descriptions and cleared booking target
     bookingTargetId: null,
     body: "Soaking tub 🛁",
   });
+});
+
+it("returns a saved Meta goal and planning-only Studio references", () => {
+  const result = setPlatformDraftActionOutputSchema.parse({
+    id: "pcamp_fixture",
+    platform: "meta_ads",
+    budget: null,
+    budgetType: null,
+    startAt: null,
+    endAt: null,
+    settings: {
+      meta: { goal: "conversions" },
+      previewAdIds: ["ad_studio_draft"],
+    },
+  });
+  expect(result.settings?.meta?.goal).toBe("conversions");
+  expect(result.settings?.previewAdIds).toEqual(["ad_studio_draft"]);
 });

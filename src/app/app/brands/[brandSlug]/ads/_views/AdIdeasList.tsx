@@ -26,10 +26,12 @@ export function AdIdeasList({
   emptyState,
   plannedPlatforms = [],
   studioHref,
+  studioPreviewIds = [],
 }: {
   /** The campaign's planned platforms; an idea can be narrowed to some. */
   plannedPlatforms?: ChannelPlatform[];
   studioHref: string;
+  studioPreviewIds?: string[];
   /** Add starter ideas, Add ad, Assets: they act on the list below them. */
   actions?: React.ReactNode;
   emptyState?: React.ReactNode;
@@ -110,6 +112,7 @@ export function AdIdeasList({
       home={ad.homeId ? homeLinks[ad.homeId] : undefined}
       plannedPlatforms={plannedPlatforms}
       studioHref={studioHref}
+      studioPreview={studioPreviewIds.includes(ad.id)}
     />
   );
   return (

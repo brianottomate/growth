@@ -1,3 +1,5 @@
+import { readBrandBookingDemand } from "@/server/services/booking-demand.service";
+import { bookingDemandContext } from "@/lib/booking-demand";
 import {
   personaProfileSchema,
   generatedPersonaProfileSchema,
@@ -31,7 +33,6 @@ import { and, asc, eq, isNull } from "drizzle-orm";
 import { db } from "@/server/db";
 import { brandTable, homeTable, personaTable } from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
-import { demandGeographySchema } from "@/lib/persona-geography";
 import {
   assignPersonaAudience,
   createPersonaLookalike,
@@ -81,16 +82,6 @@ const personaFields = {
     .max(20)
     .nullish()
     .describe('Loose prose, e.g. ["California", "big US cities"].'),
-  demandGeography: demandGeographySchema
-    .nullish()
-    .describe(
-      "The demand side, structured: where the guests we want come FROM. This is the reusable source a campaign audience derives from; supply geography (where the homes are) is not this. Fill it from your own reasoning or a blob looked up elsewhere and note the `source`.",
-    ),
-  destinationGeography: demandGeographySchema
-    .nullish()
-    .describe(
-      "Optional destinations of interest. Never use these as where customers live.",
-    ),
   notes: z.string().trim().max(4000).nullish(),
   profile: personaProfileSchema.nullish(),
 };
@@ -124,7 +115,6 @@ export const createPersona = growthAction({
   }),
   execute: async (input, ctx) => {
     const brand = await requireOwnedBrand(input.brandId, ctx.orgId);
-    await validateProfileHomes(brand.id, input.profile);
     const [persona] = await db
       .insert(personaTable)
       .values({
@@ -134,8 +124,6 @@ export const createPersona = growthAction({
         description: input.description ?? null,
         ageRanges: input.ageRanges ?? null,
         geographies: input.geographies ?? null,
-        demandGeography: input.demandGeography ?? null,
-        destinationGeography: input.destinationGeography ?? null,
         notes: input.notes ?? null,
         profile: input.profile ?? null,
       })
@@ -155,14 +143,11 @@ export const updatePersona = growthAction({
     description: personaFields.description,
     ageRanges: personaFields.ageRanges,
     geographies: personaFields.geographies,
-    demandGeography: personaFields.demandGeography,
-    destinationGeography: personaFields.destinationGeography,
     notes: personaFields.notes,
     profile: personaFields.profile,
   }),
   execute: async (input, ctx) => {
     const persona = await requirePersona(input.personaId, ctx.orgId);
-    await validateProfileHomes(persona.brandId, input.profile);
     const { personaId: _id, ...patch } = input;
     const [updated] = await db
       .update(personaTable)
@@ -218,7 +203,7 @@ export const uploadPersonaSeedListAction = growthAction({
 export const createPersonaLookalikeAction = growthAction({
   outputSchema: createPersonaLookalikeOutputSchema,
   description:
-    "Build a Meta lookalike from a persona's seed list (a platform audience with a Meta id) and make it the persona's Meta asset, replacing the seed as what its campaigns target. Ratio defaults to 0.01 (closest 1%); country defaults to the persona's first demand country, then US. Provider write, no spend; NOT idempotent.",
+    "Build a Meta lookalike from a persona's seed list (a platform audience with a Meta id) and make it the persona's Meta asset, replacing the seed as what its campaigns target. Ratio defaults to 0.01 (closest 1%); country defaults to US; pass a country explicitly. Provider write, no spend; NOT idempotent.",
   inputSchema: z.object({
     seedPlatformAudienceId: z
       .string()
@@ -262,10 +247,18 @@ const suggestionSchema = z.object({
 /** Read and reason separately from creation, so Shape can discuss the same proposals. */
 export const suggestPersonas = growthAction({
   description:
-    "Suggest up to three missing brand-level customer personas from the brand story and homes, preserving the existing set. Pass personaId to revise an existing persona and apply the result with update; omit it to propose missing personas. Pass steer for the requested changes. Read-only; return planning hypotheses, not measured booking facts. Discuss proposals in chat before applying them with personaWrite.create or personaWrite.update.",
+    "Suggest up to three missing brand-level customer personas from the brand story and optional supplied evidence, preserving the existing set. Pass personaId to revise an existing persona and apply the result with update; omit it to propose missing personas. Pass steer for the requested changes. Read-only; return planning hypotheses, not measured booking facts. Discuss proposals in chat before applying them with personaWrite.create or personaWrite.update.",
   inputSchema: z.object({
     brandId: z.string().trim().min(1),
     steer: steerSchema,
+    context: z
+      .string()
+      .trim()
+      .max(30000)
+      .optional()
+      .describe(
+        "Optional evidence from an explicit research or enrichment workflow.",
+      ),
     personaId: z
       .string()
       .min(1)
@@ -277,7 +270,7 @@ export const suggestPersonas = growthAction({
   outputSchema: z.object({ suggestions: z.array(suggestionSchema).max(3) }),
   execute: async (input, ctx) => {
     await requireOwnedBrand(input.brandId, ctx.orgId);
-    const [brand, homes, existing] = await Promise.all([
+    const [brand, existing] = await Promise.all([
       db.query.brandTable.findFirst({
         where: eq(brandTable.id, input.brandId),
         columns: {
@@ -286,22 +279,6 @@ export const suggestPersonas = growthAction({
           story: true,
           creativeDirection: true,
         },
-      }),
-      db.query.homeTable.findMany({
-        where: and(
-          eq(homeTable.brandId, input.brandId),
-          isNull(homeTable.deletedAt),
-        ),
-        columns: {
-          id: true,
-          name: true,
-          city: true,
-          state: true,
-          bedrooms: true,
-          guests: true,
-          amenities: true,
-        },
-        limit: 100,
       }),
       db.query.personaTable.findMany({
         where: and(
@@ -317,13 +294,18 @@ export const suggestPersonas = growthAction({
     if (input.personaId && !target)
       throw new Error("That persona is not active on this brand.");
     const { system, prompt } = personaSuggestionsPrompt(
-      JSON.stringify({ brand, homes, existing, target }),
+      JSON.stringify({
+        brand,
+        existing,
+        target,
+        context: input.context ?? null,
+      }),
     );
     const { output } = await generateText({
       model: anthropic("claude-sonnet-5"),
       system:
         system +
-        " Return a structured profile with motivation, needs, objections, decisionCriteria, relevant homeIds and fitReason. Write at most three needs and three decision criteria as distinct 2–5 word phrases. Select the strongest factors and combine overlaps. Keep motivation to one sentence of at most 25 words and 200 characters. Use a short persona name of 2–5 words. Return empty objections and must-haves unless the operator specifically asks for them. Keep evidenceNote to one short sentence that explains the evidence basis. Home IDs must come from the supplied inventory. These are suggested fits, not measured customer segments. Use travel null for non-travel brands. Unknown travel attributes must be null. evidenceNote must distinguish inferred preferences from observed evidence. When target is supplied, return exactly one updated proposal for that persona, preserving its motivation unless directed otherwise; the instruction to avoid existing personas does not apply to this target.",
+        " Return a general customer profile with motivation, needs, objections, decisionCriteria and evidenceNote. Treat trip purpose or other industry context as motivation or needs, never special fields. Distinguish hypotheses from observed evidence. Keep phrases short and motivation concise. When target is supplied, propose one revision of that persona.",
       prompt:
         prompt +
         "\n" +
@@ -348,8 +330,6 @@ export const suggestPersonas = growthAction({
         "No persona suggestions were returned. Try again or Shape them in conversation.",
       );
     requirePersonaEvidence(output, existing.length);
-    for (const suggestion of output.suggestions)
-      await validateProfileHomes(input.brandId, suggestion.profile);
     return {
       suggestions: target
         ? output.suggestions.slice(0, 1)
@@ -361,24 +341,45 @@ export const suggestPersonas = growthAction({
   },
 });
 
-async function validateProfileHomes(
-  brandId: string,
-  profile: z.infer<typeof personaProfileSchema> | null | undefined,
-) {
-  if (!profile) return;
-  if (
-    profile.travel?.partyMin &&
-    profile.travel.partyMax &&
-    profile.travel.partyMin > profile.travel.partyMax
-  )
-    throw new Error("Party size minimum exceeds maximum.");
-  const homes = await db.query.homeTable.findMany({
-    where: and(eq(homeTable.brandId, brandId), isNull(homeTable.deletedAt)),
-    columns: { id: true },
-  });
-  const ids = new Set(homes.map((h) => h.id));
-  if (profile.homeIds.some((id) => !ids.has(id)))
-    throw new Error(
-      "Suggested homes must belong to this brand's active inventory.",
-    );
-}
+/** Industry-specific evidence is fetched only when this workflow is invoked. */
+export const wanderOsResearchContext = growthAction({
+  description:
+    "On demand, read owned brand inventory and optionally aggregate booking evidence as prompt context. Never writes personas, audiences or targeting. Use this context explicitly with suggest when requested; general suggestion actions do not fetch it automatically.",
+  inputSchema: z.object({
+    brandId: z.string().min(1),
+    includeBookings: z.boolean().optional(),
+  }),
+  outputSchema: z.strictObject({ context: z.string() }),
+  execute: async (input, ctx) => {
+    await requireOwnedBrand(input.brandId, ctx.orgId);
+    const homes = await db.query.homeTable.findMany({
+      where: and(
+        eq(homeTable.brandId, input.brandId),
+        isNull(homeTable.deletedAt),
+      ),
+      columns: {
+        name: true,
+        city: true,
+        state: true,
+        bedrooms: true,
+        guests: true,
+        amenities: true,
+      },
+      limit: 100,
+    });
+    const bookings = input.includeBookings
+      ? (JSON.parse(
+          bookingDemandContext(await readBrandBookingDemand(input.brandId)),
+        ) as unknown)
+      : null;
+    return {
+      context: JSON.stringify({
+        source: "Explicit WanderOS research",
+        inventory: homes,
+        bookings,
+        guidance:
+          "Inventory fit is a hypothesis. Booking evidence is aggregate and may be incomplete. Infer motivations and general campaign relevance, not automatic delivery targeting.",
+      }).slice(0, 30000),
+    };
+  },
+});

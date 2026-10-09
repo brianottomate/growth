@@ -230,11 +230,7 @@ export async function createPersonaLookalike(
   }
 
   const ratio = input.ratio ?? 0.01;
-  const country = (
-    input.country ??
-    persona.demandGeography?.countries?.[0] ??
-    DEFAULT_LOOKALIKE_COUNTRY
-  ).toUpperCase();
+  const country = (input.country ?? DEFAULT_LOOKALIKE_COUNTRY).toUpperCase();
   const seedAccount = (seed.definition as { adAccountId?: unknown } | null)
     ?.adAccountId;
   const destination = await resolveMetaDestination({

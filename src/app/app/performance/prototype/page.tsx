@@ -79,7 +79,7 @@ export default async function PerformancePrototypeRealPage({
         eq(personaTable.brandId, brand.id),
         isNull(personaTable.deletedAt),
       ),
-      columns: { id: true, name: true, demandGeography: true },
+      columns: { id: true, name: true },
     }),
   ]);
   const homes = listings
@@ -137,7 +137,7 @@ export default async function PerformancePrototypeRealPage({
     personas: personas.map((persona) => ({
       id: persona.id,
       name: persona.name,
-      demandGeography: persona.demandGeography ?? null,
+      demandGeography: null,
     })),
   };
 

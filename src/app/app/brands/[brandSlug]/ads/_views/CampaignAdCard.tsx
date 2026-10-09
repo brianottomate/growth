@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ReturnToStudioButton } from "@/components/review/ReturnToStudioButton";
 
 import { useEffect, useMemo, useState } from "react";
@@ -33,6 +34,7 @@ export function CampaignAdCard({
   deliveryState,
   plannedPlatforms,
   studioHref,
+  studioPreview = false,
 }: {
   ad: {
     id: string;
@@ -49,6 +51,7 @@ export function CampaignAdCard({
   deliveryState?: string;
   plannedPlatforms: ChannelPlatform[];
   studioHref: string;
+  studioPreview?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [slide, setSlide] = useState(0);
@@ -164,14 +167,25 @@ export function CampaignAdCard({
                 {AD_FORMATS.find((item) => item.id === format)?.label}
               </Badge>
             </div>
-            <ReturnToStudioButton
-              menu
-              adId={ad.id}
-              updatedAt={ad.updatedAt.toISOString()}
-              studioHref={studioHref}
-              pushed={Boolean(deliveryState)}
-            />
+            {studioPreview ? (
+              <Link className="shrink-0 text-xs underline" href={studioHref}>
+                Edit in Studio
+              </Link>
+            ) : (
+              <ReturnToStudioButton
+                menu
+                adId={ad.id}
+                updatedAt={ad.updatedAt.toISOString()}
+                studioHref={studioHref}
+                pushed={Boolean(deliveryState)}
+              />
+            )}
           </div>
+          {studioPreview && (
+            <p className="text-xs text-muted-foreground">
+              Studio preview · Not assigned for publishing
+            </p>
+          )}
           {deliveryState && (
             <p className="text-xs text-muted-foreground">
               {deliveryState === "live"

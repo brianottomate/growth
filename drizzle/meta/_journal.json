@@ -155,6 +155,20 @@
       "when": 1791397201971,
       "tag": "0020_brand_cs_lead",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1791502082951,
+      "tag": "0021_slimy_the_fury",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1791504248625,
+      "tag": "0022_jazzy_enchantress",
+      "breakpoints": true
     }
   ]
 }

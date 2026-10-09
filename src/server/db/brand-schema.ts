@@ -754,13 +754,6 @@ export const personaTable = pgTable(
     ageRanges: t.jsonb().$type<string[]>(),
     /** Loose prose, e.g. ["California", "big US cities"]. Not targeting. */
     geographies: t.jsonb().$type<string[]>(),
-    /**
-     * The demand side, structured: where the guests we want come from. Filled
-     * by an operator or agent; a campaign audience can be derived from it.
-     */
-    demandGeography: t.jsonb().$type<PersonaDemandGeography>(),
-    /** Places they want to visit or buy in; never residence targeting. */
-    destinationGeography: t.jsonb().$type<PersonaDemandGeography>(),
     notes: t.text(),
     profile: t.jsonb().$type<import("@/lib/brand-direction").PersonaProfile>(),
 

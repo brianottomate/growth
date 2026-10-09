@@ -32,7 +32,7 @@ import {
   performanceCycleTable,
   performanceIntakeTable,
   performancePropertyTable,
-  type AudienceGeographyPlan,
+  type DeliveryGeography,
   type PerformanceIntake,
   type PerformanceIntakeAnswers,
 } from "@/server/db/schema";
@@ -156,7 +156,7 @@ export function geographyFromProperties(
     state?: string | null;
     country?: string | null;
   }[],
-): AudienceGeographyPlan {
+): DeliveryGeography {
   // The deterministic pass, kept for callers that cannot await a model and as
   // the fallback inside `resolveGeography`. Prefer the async resolver: our own
   // feed states one place several ways and a lookup only fixes what it knows.
@@ -1258,7 +1258,7 @@ export type CampaignPrefill = {
   propertyUrls: string[];
   /** True when the client asked for everything rather than naming homes. */
   allProperties: boolean;
-  geography: AudienceGeographyPlan;
+  geography: DeliveryGeography;
 };
 
 /**

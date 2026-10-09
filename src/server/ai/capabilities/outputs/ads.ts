@@ -1,3 +1,7 @@
+import {
+  deliveryGroupConfigurationSchema,
+  deliveryGeographySchema,
+} from "@/lib/platform-delivery";
 export {
   adsScopeOutputSchema,
   previewAdActionOutputSchema,
@@ -499,7 +503,6 @@ const draftAdSchema = draftAdResultSchema.extend({
 export type DraftAdResult = z.output<typeof draftAdResultSchema>;
 
 const geographySchema = z.strictObject({
-  originCities: z.array(z.string()).optional(),
   cities: z.array(z.string()).optional(),
   countries: z.array(z.string()).optional(),
   regions: z.array(z.string()).optional(),
@@ -521,6 +524,7 @@ const statsSchema = z.strictObject({
 });
 
 const googleSchema = z.strictObject({
+  geography: deliveryGeographySchema.optional(),
   images: z
     .strictObject({ landscape: z.string(), square: z.string() })
     .optional(),
@@ -547,6 +551,9 @@ const importSourceSchema = z.strictObject({
 });
 
 const metaSchema = z.strictObject({
+  goal: z
+    .enum(["traffic", "engagement", "awareness", "video_views", "conversions"])
+    .optional(),
   budgetMode: z.enum(["cbo", "abo"]).optional(),
   conversionScope: z.enum(["host", "pixel"]).optional(),
   customConversionId: z.string().optional(),
@@ -579,26 +586,26 @@ const metaSchema = z.strictObject({
 });
 
 const settingsSchema = z.strictObject({
+  selectedAdIds: z.array(z.string()).optional(),
+  previewAdIds: z.array(z.string()).optional(),
   google: googleSchema.optional(),
   linkedin: linkedinSchema.optional(),
   meta: metaSchema.optional(),
 });
 
 const addAudienceSchema = z.strictObject({
-  ageMax: z.number().nullable(),
-  ageMin: z.number().nullable(),
   brandId: z.string(),
   campaignId: z.string(),
   createdAt: z.iso.datetime(),
   description: z.string().nullable(),
-  geography: geographySchema.nullable(),
+
   id: z.string(),
-  excludedKeywords: z.array(z.string()).nullable(),
-  keywords: z.array(z.string()).nullable(),
+
   name: z.string(),
-  optimizationGoal: z.string().nullable(),
+
   personaId: z.string().nullable(),
-  homeIds: z.array(z.string()).nullable(),
+  geography: deliveryGeographySchema.nullable(),
+
   type: z.enum(audienceTypeEnum.enumValues),
   updatedAt: z.iso.datetime(),
 });
@@ -864,21 +871,19 @@ export const openCampaignActionOutputSchema = z.strictObject({
   ),
   audiences: z.array(
     z.strictObject({
-      ageMax: z.number().nullable(),
-      ageMin: z.number().nullable(),
       brandId: z.string(),
       campaignId: z.string(),
       createdAt: z.iso.datetime(),
       description: z.string().nullable(),
-      geography: geographySchema.nullable(),
+
       id: z.string(),
-      excludedKeywords: z.array(z.string()).nullable(),
-      keywords: z.array(z.string()).nullable(),
+
       name: z.string(),
-      optimizationGoal: z.string().nullable(),
+
       persona: z.strictObject({ id: z.string(), name: z.string() }).nullable(),
       personaId: z.string().nullable(),
-      homeIds: z.array(z.string()).nullable(),
+      geography: deliveryGeographySchema.nullable(),
+
       type: z.enum(audienceTypeEnum.enumValues),
       updatedAt: z.iso.datetime(),
     }),
@@ -961,7 +966,7 @@ export const openCampaignActionOutputSchema = z.strictObject({
           name: z.string().nullable(),
           optimizationGoal: z.string().nullable(),
           platform: z.enum(channelPlatformEnum.enumValues),
-          platformAdSetId: z.string().nullable(),
+          platformDeliveryGroupId: z.string().nullable(),
           platformCampaignId: z.string(),
           platformObjective: z.string().nullable(),
           pushedCreative: pushedCreativeSchema.nullable(),
@@ -971,8 +976,9 @@ export const openCampaignActionOutputSchema = z.strictObject({
           updatedAt: z.iso.datetime(),
         }),
       ),
-      adSets: z.array(
+      deliveryGroups: z.array(
         z.strictObject({
+          configuration: deliveryGroupConfigurationSchema.nullable(),
           audienceId: z.string().nullable(),
           brandId: z.string(),
           budget: z.number().nullable(),
@@ -1208,39 +1214,11 @@ export const suggestCampaignAudiencesActionOutputSchema = z.strictObject({
   suggestions: z.array(
     z.strictObject({
       name: z.string(),
-      kind: z.enum(["geo", "lookalike", "retargeting"]),
       personaId: z.string().nullable(),
-      homeIds: z.array(z.string()),
-      cities: z.array(z.string()),
-      originCities: z.array(z.string()),
-      states: z.array(z.string()),
-      countries: z.array(z.string()),
-      regions: z.array(z.string()),
-      ageMin: z.number().nullable(),
-      ageMax: z.number().nullable(),
-      platformAudienceId: z.string().nullable(),
       why: z.string(),
+      geography: deliveryGeographySchema.nullable(),
     }),
   ),
-  evidence: z.strictObject({
-    markets: z.array(z.string()),
-    bookingWindow: z
-      .strictObject({
-        bookings: z.number(),
-        medianNights: z.number().nullable(),
-        medianLeadDays: z.number().nullable(),
-      })
-      .nullable(),
-    existingAudiences: z.number(),
-    inUse: z.array(
-      z.strictObject({
-        id: z.string(),
-        name: z.string(),
-        campaign: z.string(),
-      }),
-    ),
-    note: z.string(),
-  }),
 });
 
 const copyBrandVoiceSchema = z.strictObject({
@@ -1639,8 +1617,8 @@ export const openCampaignActionNativeResultSchema =
             { createdAt: z.date(), updatedAt: z.date() },
           ),
         ),
-        adSets: z.array(
-          openCampaignActionOutputSchema.shape.platformCampaigns.element.shape.adSets.element.extend(
+        deliveryGroups: z.array(
+          openCampaignActionOutputSchema.shape.platformCampaigns.element.shape.deliveryGroups.element.extend(
             {
               createdAt: z.date(),
               targetingSpec: z.unknown(),

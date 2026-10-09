@@ -1,0 +1,97 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useMutation } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { orpc } from "@/orpc/client";
+import { eligiblePlatformAds, selectPlatformAds } from "@/lib/platform-ad-plan";
+import type { Ad, PlatformCampaign } from "@/server/db/ads-schema";
+
+export function PlatformAdSelection({
+  pc,
+  ads,
+}: {
+  pc: PlatformCampaign;
+  ads: Ad[];
+}) {
+  const router = useRouter();
+  const settings = pc.settings ?? {};
+  const eligible = eligiblePlatformAds(ads, pc.platform, settings);
+  const selected = selectPlatformAds(ads, pc.platform, settings);
+  const save = useMutation(
+    orpc.ads.setPlatformDraft.mutationOptions({
+      onSuccess: () => router.refresh(),
+    }),
+  );
+  const locked =
+    save.isPending || pc.status !== "draft" || Boolean(pc.externalId);
+  return (
+    <section className="space-y-3 border-t pt-4" aria-label="Included ads">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h4 className="text-sm font-medium">
+          Included ads · {selected.length}/{eligible.length}
+        </h4>
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={locked || settings.selectedAdIds === undefined}
+          onClick={() =>
+            save.mutate({ platformCampaignId: pc.id, selectedAdIds: null })
+          }
+        >
+          Use all eligible ads
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {settings.selectedAdIds === undefined
+          ? "New eligible ads are included automatically."
+          : "Only the checked ads are included. New ads stay out until selected."}{" "}
+        Approval is required before publishing.
+      </p>
+      {!eligible.length && (
+        <p className="text-sm text-muted-foreground">
+          {pc.platform === "google_ads" && !settings.google?.campaignType
+            ? "Choose Search or Display in Google settings first."
+            : "Add compatible ads to this campaign. Text ads go to Search; creative ads go to Meta and Display."}
+        </p>
+      )}
+      <div className="space-y-2">
+        {eligible.map((ad) => (
+          <label
+            key={ad.id}
+            className="flex items-start gap-3 rounded-lg border p-3 text-sm"
+          >
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={selected.some((row) => row.id === ad.id)}
+              disabled={locked}
+              onChange={(event) =>
+                save.mutate({
+                  platformCampaignId: pc.id,
+                  selectedAdIds: event.target.checked
+                    ? [...selected.map((row) => row.id), ad.id]
+                    : selected
+                        .filter((row) => row.id !== ad.id)
+                        .map((row) => row.id),
+                })
+              }
+            />
+            <span className="min-w-0 flex-1">
+              <span className="block font-medium">{ad.name}</span>
+              <span className="text-xs text-muted-foreground">
+                {ad.type === "text" ? "Responsive search ad" : "Creative ad"} ·{" "}
+                {ad.status === "approved" ? "Approved" : "Awaiting approval"}
+              </span>
+            </span>
+          </label>
+        ))}
+      </div>
+      {save.error && (
+        <p role="alert" className="text-sm text-destructive">
+          {save.error.message}
+        </p>
+      )}
+    </section>
+  );
+}

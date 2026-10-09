@@ -1,13 +1,19 @@
 import { describe, expect, it } from "bun:test";
-import { planGoogleCompile } from "@/server/services/ads-write.service";
-import type { Ad, PlanAudience } from "@/server/db/ads-schema";
-const audience = (id: string, keywords: string[] | null): PlanAudience =>
+import {
+  planGoogleCompile,
+  type CompiledDeliveryAudience,
+} from "@/server/services/ads-write.service";
+import type { Ad } from "@/server/db/ads-schema";
+const audience = (
+  id: string,
+  keywords: string[] | null,
+): CompiledDeliveryAudience =>
   ({
     id,
     name: id,
     keywords,
     excludedKeywords: ["[free]"],
-  }) as PlanAudience;
+  }) as CompiledDeliveryAudience;
 const textAd = (id: string, headlines: string[], descriptions: string[]): Ad =>
   ({
     id,

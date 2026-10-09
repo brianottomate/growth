@@ -116,11 +116,13 @@ export function PushToPlatform({
     );
     return () => clearInterval(timer);
   }, [push.isPending]);
-  const canPush = Boolean(chosen) && budget != null && !push.isPending;
+  const canPush =
+    Boolean(chosen) && budget != null && budget > 0 && !push.isPending;
+  const groupLabel = platform === "google_ads" ? "ad group" : "ad set";
   const setSummary =
     audienceCount === 0
-      ? "1 broad ad set"
-      : `${audienceCount} ad set${audienceCount === 1 ? "" : "s"}`;
+      ? `1 broad ${groupLabel}`
+      : `${audienceCount} ${groupLabel}${audienceCount === 1 ? "" : "s"}`;
   const budgetSummary =
     budget != null
       ? `${money(budget)}${budgetType === "lifetime" ? " lifetime" : "/day"}`
@@ -158,7 +160,7 @@ export function PushToPlatform({
               <DialogDescription>
                 {push.isPending
                   ? "Uploading approved artwork and creating your paused campaign. This can take several minutes. Follow progress in Background work."
-                  : `Create ${setSummary} and ${draftAdCount} ad${draftAdCount === 1 ? "" : "s"} on ${configuration.label} with a ${budgetSummary} ${budgetType === "lifetime" ? "" : "campaign "}budget. Everything will be paused. Review in ${platformName} before launching.`}
+                  : `Create ${setSummary} × ${draftAdCount} ad${draftAdCount === 1 ? "" : "s"} per group (${Math.max(1, audienceCount) * draftAdCount} total) on ${configuration.label} with a ${budgetSummary} ${budgetType === "lifetime" ? "" : "campaign "}budget. Everything will be paused. Review in ${platformName} before launching.`}
               </DialogDescription>
             </DialogHeader>
             {push.isPending && (

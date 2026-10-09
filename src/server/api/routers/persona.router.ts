@@ -6,12 +6,14 @@ import {
   deletePersona,
   listPersonas,
   suggestPersonas,
+  wanderOsResearchContext,
   updatePersona,
 } from "@/server/ai/capabilities/personas";
 
 export const personaRouter = {
   list: actionProcedure(listPersonas),
   suggest: actionProcedure(suggestPersonas),
+  wanderOsContext: actionProcedure(wanderOsResearchContext),
   create: actionProcedure(createPersona),
   update: actionProcedure(updatePersona),
   delete: actionProcedure(deletePersona),

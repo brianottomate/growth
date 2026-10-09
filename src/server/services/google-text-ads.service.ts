@@ -9,7 +9,7 @@ import { z } from "zod";
 import { brandStorySection } from "@/server/ai/prompts";
 import { scrapeBasicContent } from "@/server/clients/firecrawl.client";
 import { db } from "@/server/db";
-import { adTable, audienceTable, brandTable } from "@/server/db/schema";
+import { adTable, platformCampaignTable, brandTable } from "@/server/db/schema";
 import type { AdCreativeContent } from "@/server/db/ads-schema";
 import { createId } from "@/server/db/utils";
 import { searchTerms } from "@/lib/search-terms";
@@ -61,9 +61,12 @@ export async function writeGoogleTextAds(input: {
     }),
     scrapeBasicContent({ url: landingUrl }),
     campaign
-      ? db.query.audienceTable.findMany({
-          where: eq(audienceTable.campaignId, campaign.id),
-          columns: { name: true, keywords: true },
+      ? db.query.platformCampaignTable.findMany({
+          where: and(
+            eq(platformCampaignTable.campaignId, campaign.id),
+            eq(platformCampaignTable.platform, "google_ads"),
+          ),
+          with: { deliveryGroups: true },
         })
       : Promise.resolve([]),
     db.query.adTable.findMany({
@@ -78,8 +81,14 @@ export async function writeGoogleTextAds(input: {
   }
   const terms = [
     ...(input.keywords ?? []),
-    ...audiences.flatMap((audience) =>
-      searchTerms(audience.keywords).map((term) => term.text),
+    ...audiences.flatMap((plan) =>
+      plan.deliveryGroups.flatMap((group) =>
+        searchTerms(
+          group.configuration?.platform === "google_ads"
+            ? group.configuration.keywords
+            : [],
+        ).map((term) => term.text),
+      ),
     ),
   ];
   const messages = ideas

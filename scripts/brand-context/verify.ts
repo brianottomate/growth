@@ -86,22 +86,4 @@ try {
   rejected = true;
 }
 if (!rejected) throw new Error("Cross-workspace brand context was exposed");
-if (existing && proposals.suggestions[0]) {
-  rejected = false;
-  try {
-    await updatePersona.runValidated(
-      {
-        personaId: existing.id,
-        profile: {
-          ...proposals.suggestions[0].profile,
-          homeIds: ["home_foreign_verification"],
-        },
-      },
-      ctx,
-    );
-  } catch {
-    rejected = true;
-  }
-  if (!rejected) throw new Error("Cross-brand inventory was accepted");
-}
-console.log("Workspace and persona inventory boundaries valid");
+console.log("Workspace boundary valid");

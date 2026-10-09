@@ -1,3 +1,4 @@
+import type { DeliveryGroupConfiguration } from "@/lib/platform-delivery";
 import type { MetaPlacement } from "@/lib/meta-placement-plan";
 import type { IdeaStudio } from "@/lib/ad-idea-studio";
 import { relations, sql } from "drizzle-orm";
@@ -121,7 +122,7 @@ export type AdStats = {
  * Where a plan audience buys. Strict enough to compile (country codes,
  * platform-resolvable region names), unlike a persona's loose prose arrays.
  */
-export type AudienceGeographyPlan = {
+export type DeliveryGeography = {
   /** ISO country codes, e.g. ["US"]. */
   countries?: string[];
   /** Whole US states to target, as two-letter codes. */
@@ -130,8 +131,6 @@ export type AudienceGeographyPlan = {
   regions?: string[];
   /** Explicit city delivery targets. */
   cities?: string[];
-  /** Feeder cities that explain the plan; never sent as delivery targets. */
-  originCities?: string[];
 };
 
 /**
@@ -280,7 +279,12 @@ export type HomesRun = {
  * column.
  */
 export type PlatformCampaignSettings = {
+  /** Omitted = all eligible campaign ads; [] = none. Explicit selection stays fixed as ideas are added. */
+  selectedAdIds?: string[];
+  /** Unassigned Studio ideas shown for planning only; never consumed by publishing. */
+  previewAdIds?: string[];
   google?: {
+    geography?: DeliveryGeography;
     /** Zernio supports search and display; the type decides everything else. */
     campaignType?: "search" | "display";
     images?: { landscape: string; square: string };
@@ -434,17 +438,9 @@ export const campaignTable = pgTable(
 export type Campaign = typeof campaignTable.$inferSelect;
 export type CampaignInsert = typeof campaignTable.$inferInsert;
 
-// ---- AUDIENCE (the plan's "who", with the money) ----------------------
+// ---- AUDIENCE (the campaign's "who and why") ----------------------
 
-/**
- * One buyable narrowing under a campaign: a coherent targeting cell (one age
- * window, one geography) plus its optional budget split. The row IS the
- * allocation — each one compiles to a Meta ad set / Google ad group. Wanting
- * two age ranges means two audiences, by design.
- *
- * Reuse lives on `persona` (the stable brand-level "who"), not here: these
- * rows are campaign working data, allowed to be many and disposable.
- */
+/** Campaign-specific customer intent. Executable settings live on platform plans. */
 export const audienceTable = pgTable(
   "audience",
   (t) => ({
@@ -468,27 +464,9 @@ export const audienceTable = pgTable(
 
     name: t.text().notNull(),
     description: t.text(),
+    /** Shared geographic intent; platform plans own executable targeting. */
+    geography: t.jsonb().$type<DeliveryGeography>(),
     type: audienceTypeEnum().default("segment").notNull(),
-
-    ageMin: t.integer(),
-    ageMax: t.integer(),
-    homeIds: t.jsonb().$type<string[]>(),
-    geography: t.jsonb().$type<AudienceGeographyPlan>(),
-    /**
-     * What this audience searches for, one term per entry. Match type rides
-     * in the notation search platforms share: `[exact]`, `"phrase"`, bare for
-     * broad (see `parseSearchTerm`). Google makes one ad group per audience
-     * from these; platforms without term targeting ignore them.
-     */
-    keywords: t.jsonb().$type<string[]>(),
-    /**
-     * Terms this audience must NOT be reached on, in the same notation as
-     * `keywords`. Google sends them as the ad group's negatives; platforms
-     * without term targeting ignore them.
-     */
-    excludedKeywords: t.jsonb().$type<string[]>(),
-
-    optimizationGoal: t.text(),
 
     createdAt: t
       .timestamp()
@@ -697,7 +675,7 @@ export const platformCampaignTable = pgTable(
 export type PlatformCampaign = typeof platformCampaignTable.$inferSelect;
 export type PlatformCampaignInsert = typeof platformCampaignTable.$inferInsert;
 
-// ---- PLATFORM AD SET (mirror: the middle tier every platform has) ------
+// ---- PLATFORM DELIVERY GROUP (planned or imported native delivery unit) ------
 
 /**
  * Meta ad set, Google ad group, TikTok ad group, LinkedIn "campaign" (its
@@ -706,17 +684,17 @@ export type PlatformCampaignInsert = typeof platformCampaignTable.$inferInsert;
  * objective and money strategy, the ad owns creative. One generic table;
  * `platform` on the parent campaign says which dialect you are reading.
  *
- * A physical ad lives in exactly ONE ad set on every platform, so the mirror
+ * A mirrored ad belongs to one native delivery group, so the mirror
  * is a strict tree. Reuse across ad sets happens one level up: a plan `ad`
  * fans out to one platform_ad per set at compile time.
  */
-export const platformAdSetTable = pgTable(
-  "platform_ad_set",
+export const platformDeliveryGroupTable = pgTable(
+  "platform_delivery_group",
   (t) => ({
     id: t
       .text()
       .primaryKey()
-      .$defaultFn(() => createId("pas")),
+      .$defaultFn(() => createId("pdg")),
 
     platformCampaignId: t
       .text()
@@ -727,7 +705,7 @@ export const platformAdSetTable = pgTable(
       .references(() => brandTable.id, { onDelete: "cascade" })
       .notNull(),
 
-    /** The plan audience this was compiled from. NULL = discovered by sync. */
+    /** Optional shared audience lineage. NULL for broad plans and native imports. */
     audienceId: t
       .text()
       .references(() => audienceTable.id, { onDelete: "set null" }),
@@ -735,6 +713,8 @@ export const platformAdSetTable = pgTable(
     name: t.text().notNull(),
     status: t.text(), // raw platform status, ingested as-is
     /** What was actually sent to / read from the platform. */
+    /** Editable, validated local delivery plan; null for unreviewed imports. */
+    configuration: t.jsonb().$type<DeliveryGroupConfiguration>(),
     targetingSpec: t.jsonb(),
     budget: t.integer(),
     budgetType: t.text(),
@@ -754,16 +734,18 @@ export const platformAdSetTable = pgTable(
       .notNull(),
   }),
   (table) => [
-    index("platform_ad_set_campaign_idx").on(table.platformCampaignId),
-    index("platform_ad_set_audience_idx").on(table.audienceId),
-    uniqueIndex("platform_ad_set_external_id_idx")
+    index("platform_delivery_group_campaign_idx").on(table.platformCampaignId),
+    index("platform_delivery_group_audience_idx").on(table.audienceId),
+    uniqueIndex("platform_delivery_group_external_id_idx")
       .on(table.externalId)
       .where(sql`${table.externalId} IS NOT NULL`),
   ],
 );
 
-export type PlatformAdSet = typeof platformAdSetTable.$inferSelect;
-export type PlatformAdSetInsert = typeof platformAdSetTable.$inferInsert;
+export type PlatformDeliveryGroup =
+  typeof platformDeliveryGroupTable.$inferSelect;
+export type PlatformDeliveryGroupInsert =
+  typeof platformDeliveryGroupTable.$inferInsert;
 
 // ---- PLATFORM AD (mirror) ----------------------------------------------
 
@@ -789,9 +771,11 @@ export const platformAdTable = pgTable(
       .references(() => platformCampaignTable.id, { onDelete: "cascade" })
       .notNull(),
     /** The true parent (one ad set per ad, on every platform); sync backfills. */
-    platformAdSetId: t
+    platformDeliveryGroupId: t
       .text()
-      .references(() => platformAdSetTable.id, { onDelete: "set null" }),
+      .references(() => platformDeliveryGroupTable.id, {
+        onDelete: "set null",
+      }),
     brandId: t
       .text()
       .references(() => brandTable.id, { onDelete: "cascade" })
@@ -827,7 +811,7 @@ export const platformAdTable = pgTable(
     optimizationGoal: t.text(),
     bidStrategy: t.text(),
 
-    // Ad set context as Zernio flattens it onto the ad; platformAdSetId is
+    // Ad set context as Zernio flattens it onto the ad; platformDeliveryGroupId is
     // resolved from these when the set row exists.
     externalAdSetId: t.text(),
     adSetName: t.text(),
@@ -851,7 +835,7 @@ export const platformAdTable = pgTable(
   }),
   (table) => [
     index("platform_ad_campaign_idx").on(table.platformCampaignId),
-    index("platform_ad_set_idx").on(table.platformAdSetId),
+    index("platform_delivery_group_idx").on(table.platformDeliveryGroupId),
     index("platform_ad_brand_idx").on(table.brandId),
     index("platform_ad_status_idx").on(table.status),
     index("platform_ad_plan_idx").on(table.adId),
@@ -971,7 +955,7 @@ export const audienceRelations = relations(audienceTable, ({ one, many }) => ({
     fields: [audienceTable.personaId],
     references: [personaTable.id],
   }),
-  platformAdSets: many(platformAdSetTable),
+  platformDeliveryGroups: many(platformDeliveryGroupTable),
   platformAudiences: many(platformAudienceTable),
 }));
 
@@ -1006,20 +990,20 @@ export const platformCampaignRelations = relations(
       fields: [platformCampaignTable.campaignId],
       references: [campaignTable.id],
     }),
-    adSets: many(platformAdSetTable),
+    deliveryGroups: many(platformDeliveryGroupTable),
     ads: many(platformAdTable),
   }),
 );
 
-export const platformAdSetRelations = relations(
-  platformAdSetTable,
+export const platformDeliveryGroupRelations = relations(
+  platformDeliveryGroupTable,
   ({ one, many }) => ({
     platformCampaign: one(platformCampaignTable, {
-      fields: [platformAdSetTable.platformCampaignId],
+      fields: [platformDeliveryGroupTable.platformCampaignId],
       references: [platformCampaignTable.id],
     }),
     audience: one(audienceTable, {
-      fields: [platformAdSetTable.audienceId],
+      fields: [platformDeliveryGroupTable.audienceId],
       references: [audienceTable.id],
     }),
     ads: many(platformAdTable),
@@ -1031,9 +1015,9 @@ export const platformAdRelations = relations(platformAdTable, ({ one }) => ({
     fields: [platformAdTable.platformCampaignId],
     references: [platformCampaignTable.id],
   }),
-  adSet: one(platformAdSetTable, {
-    fields: [platformAdTable.platformAdSetId],
-    references: [platformAdSetTable.id],
+  deliveryGroup: one(platformDeliveryGroupTable, {
+    fields: [platformAdTable.platformDeliveryGroupId],
+    references: [platformDeliveryGroupTable.id],
   }),
   ad: one(adTable, {
     fields: [platformAdTable.adId],

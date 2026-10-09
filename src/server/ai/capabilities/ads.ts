@@ -1,3 +1,5 @@
+import { deliveryGroupConfigurationSchema } from "@/lib/platform-delivery";
+import { deliveryGeographySchema } from "@/lib/platform-delivery";
 import { catalogCopyPatchSchema } from "@/lib/catalog-studio";
 import { steerSchema } from "@/lib/generation-steer";
 import {
@@ -137,6 +139,7 @@ import {
   planPlatform,
   setCampaignCreativePool,
   setPlatformDraft,
+  setDeliveryGroup,
   updateAudience,
 } from "@/server/services/ads-draft.service";
 import {
@@ -944,181 +947,35 @@ export const replaceAdCardAction = growthAction({
   },
 });
 
-const searchTermsInput = z
-  .array(z.string().trim().min(1).max(82))
-  .max(80)
-  .optional();
-const SEARCH_TERMS_HELP =
-  'What this audience searches for. Match type in the notation: [exact], "phrase", bare for broad. Google Search makes one ad group per audience from these; feed platforms ignore them.';
-const EXCLUDED_TERMS_HELP =
-  "Terms this audience must not be reached on, same notation. Sent as the Google ad group's negative keywords.";
-
 export const addAudienceAction = growthAction({
   nativeOutputSchema: addAudienceActionNativeResultSchema,
   outputSchema: addAudienceActionOutputSchema,
   description:
-    "Add an audience to a LOCAL campaign: one buyable narrowing (one age window, one geography, optional keyword suggestions) that the push compiles to a Meta ad set / Google ad group. Default to ONE audience and ONE ad set per campaign. Reuse or update the existing audience. Only propose or create multiple audiences when the operator explicitly requests a split or experiment. Local only, and an audience carries NO money — budgets live on the platform draft. Omit everything but the name for broad targeting, which is a legitimate and often correct choice.",
+    "Add a shared campaign audience: who to reach and why, with optional intended geography and a brand persona link. Platform plans own executable targeting. Local only.",
   inputSchema: z.object({
-    campaignId: z.string().trim().min(1),
+    campaignId: z.string().min(1),
     name: z.string().trim().min(1).max(300),
-    personaId: z
-      .string()
-      .trim()
-      .min(1)
-      .optional()
-      .describe("The brand persona (pers_) this audience narrows."),
-    description: z.string().trim().max(2000).optional(),
-    homeIds: z.array(z.string().min(1)).max(100).optional(),
-    ageMin: z.number().int().min(13).max(100).optional(),
-    ageMax: z.number().int().min(13).max(100).optional(),
-    countries: z
-      .array(z.string().length(2))
-      .max(20)
-      .optional()
-      .describe('ISO country codes, e.g. ["US"].'),
-    states: z
-      .array(z.string().trim().length(2))
-      .max(60)
-      .optional()
-      .describe(
-        'Whole US states to target, e.g. ["CO"]. Names are resolved during export.',
-      ),
-    regions: z
-      .array(z.string().trim().min(1).max(100))
-      .max(60)
-      .optional()
-      .describe(
-        'Country subdivisions outside the US, e.g. ["Ontario"]. Supply countries for lookup.',
-      ),
-    cities: z
-      .array(z.string().trim().min(1).max(120))
-      .max(100)
-      .optional()
-      .describe(
-        "Explicit city delivery targets. These add coverage alongside states and regions.",
-      ),
-    originCities: z
-      .array(z.string().trim().min(1).max(120))
-      .max(100)
-      .optional()
-      .describe(
-        "Feeder-city planning context. Never sent to advertising platforms.",
-      ),
-    keywords: searchTermsInput.describe(SEARCH_TERMS_HELP),
-    excludedKeywords: searchTermsInput.describe(EXCLUDED_TERMS_HELP),
+    description: z.string().max(4000).nullish(),
+    personaId: z.string().min(1).nullish(),
+    geography: deliveryGeographySchema.nullish(),
   }),
-  examples: [
-    {
-      campaignId: "camp_contract",
-      name: "US multi-state",
-      regions: Array.from({ length: 28 }, (_, index) => `Region ${index + 1}`),
-    },
-  ],
   execute: async (input, ctx) =>
-    addAudience({
-      campaignId: input.campaignId,
-      name: input.name,
-      personaId: input.personaId ?? null,
-      description: input.description ?? null,
-      homeIds: input.homeIds ?? null,
-      ageMin: input.ageMin ?? null,
-      ageMax: input.ageMax ?? null,
-      geography:
-        input.countries?.length ||
-        input.states?.length ||
-        input.regions?.length ||
-        input.cities?.length ||
-        input.originCities?.length
-          ? {
-              countries: input.countries,
-              states: input.states?.map((code) => code.toUpperCase()),
-              regions: input.regions,
-              cities: input.cities,
-              originCities: input.originCities,
-            }
-          : null,
-      keywords: input.keywords ?? null,
-      excludedKeywords: input.excludedKeywords ?? null,
-      organizationId: ctx.orgId,
-    }),
+    addAudience({ ...input, organizationId: ctx.orgId }),
 });
-
 export const updateAudienceAction = growthAction({
   nativeOutputSchema: updateAudienceActionNativeResultSchema,
   outputSchema: updateAudienceActionOutputSchema,
   description:
-    "Update a campaign audience's fields — name, age window, geography, search terms, or excluded terms. Only the fields sent are changed. Local only. Budgets live on the platform draft (setPlatformDraft), never on an audience.",
+    "Update a shared campaign audience's name, explanation, intended geography or persona. Executable targeting belongs in the platform plan. Local only.",
   inputSchema: z.object({
-    audienceId: z.string().trim().min(1),
+    audienceId: z.string().min(1),
     name: z.string().trim().min(1).max(300).optional(),
-    description: z.string().trim().max(2000).nullish(),
+    description: z.string().max(4000).nullish(),
     personaId: z.string().min(1).nullish(),
-    homeIds: z.array(z.string().min(1)).max(100).nullish(),
-    ageMin: z.number().int().min(13).max(100).nullish(),
-    ageMax: z.number().int().min(13).max(100).nullish(),
-    countries: z.array(z.string().length(2)).max(20).optional(),
-    states: z
-      .array(z.string().trim().length(2))
-      .max(60)
-      .optional()
-      .describe("Whole US states to target, as two-letter codes."),
-    regions: z
-      .array(z.string().trim().min(1).max(100))
-      .max(60)
-      .optional()
-      .describe(
-        "Named international subdivisions. Supply countries for lookup.",
-      ),
-    cities: z
-      .array(z.string().trim().min(1).max(120))
-      .max(100)
-      .optional()
-      .describe(
-        "Explicit city delivery targets. These add coverage alongside states and regions.",
-      ),
-    originCities: z
-      .array(z.string().trim().min(1).max(120))
-      .max(100)
-      .optional()
-      .describe(
-        "Feeder-city planning context. Never sent to advertising platforms.",
-      ),
-    keywords: searchTermsInput.describe(SEARCH_TERMS_HELP),
-    excludedKeywords: searchTermsInput.describe(EXCLUDED_TERMS_HELP),
+    geography: deliveryGeographySchema.nullish(),
   }),
-  examples: [
-    {
-      audienceId: "aud_contract",
-      regions: Array.from({ length: 28 }, (_, index) => `Region ${index + 1}`),
-    },
-  ],
   execute: async (input, ctx) =>
-    updateAudience({
-      audienceId: input.audienceId,
-      name: input.name,
-      description: input.description,
-      personaId: input.personaId,
-      homeIds: input.homeIds,
-      ageMin: input.ageMin,
-      ageMax: input.ageMax,
-      geography:
-        input.countries !== undefined ||
-        input.states !== undefined ||
-        input.regions !== undefined ||
-        input.cities !== undefined ||
-        input.originCities !== undefined
-          ? {
-              countries: input.countries,
-              states: input.states?.map((code) => code.toUpperCase()),
-              regions: input.regions,
-              cities: input.cities,
-              originCities: input.originCities,
-            }
-          : undefined,
-      keywords: input.keywords,
-      excludedKeywords: input.excludedKeywords,
-      organizationId: ctx.orgId,
-    }),
+    updateAudience({ ...input, organizationId: ctx.orgId }),
 });
 
 export const planPlatformAction = growthAction({
@@ -1193,13 +1050,27 @@ export const setPlatformDraftAction = growthAction({
   nativeOutputSchema: setPlatformDraftActionNativeResultSchema,
   outputSchema: setPlatformDraftActionOutputSchema,
   description:
-    "Set a platform draft's AUTHORITATIVE budget and its platform-specific settings before pushing: Google needs a campaign type (a search campaign without keywords is rejected at push — its keywords derive from the audiences' suggestions unless overridden here); Meta takes pixel, conversion event, placements, budget mode, and optional schedule controls (startWhenLaunched/runUntilPaused). Daily budgets need no dates; lifetime budgets need an end. Read listDestinations for verified trackingDefaults instead of guessing a pixel; LinkedIn takes the authoring Company Page id, a manual bid and the CTA, all optional. Also the only place to set flight dates, which a lifetime budget requires. Local only.",
+    "Set a platform draft's AUTHORITATIVE budget and its platform-specific settings before pushing: Google needs a campaign type (a search campaign without keywords is rejected at push — keywords live in delivery groups, with optional fallback keywords here); Meta takes pixel, conversion event, placements, budget mode, and optional schedule controls (startWhenLaunched/runUntilPaused). Daily budgets need no dates; lifetime budgets need an end. Read listDestinations for verified trackingDefaults instead of guessing a pixel; LinkedIn takes the authoring Company Page id, a manual bid and the CTA, all optional. Also the only place to set flight dates, which a lifetime budget requires. Local only.",
   inputSchema: z.object({
     platformCampaignId: z
       .string()
       .trim()
       .min(1)
       .describe("The pcamp_ draft row, from openCampaign."),
+    previewAdIds: z
+      .array(z.string().trim().min(1))
+      .max(500)
+      .nullish()
+      .describe(
+        "Unassigned Studio ad IDs to preview in this platform plan. Local only; does not approve, assign or publish. null clears previews.",
+      ),
+    selectedAdIds: z
+      .array(z.string().trim().min(1))
+      .max(500)
+      .nullish()
+      .describe(
+        "Campaign ad IDs to include on this platform. Omit to preserve, null for all eligible ads, [] for none. Local drafts only; does not approve ads.",
+      ),
     budget: z
       .number()
       .int()
@@ -1225,6 +1096,7 @@ export const setPlatformDraftAction = growthAction({
       ),
     google: z
       .object({
+        geography: deliveryGeographySchema.optional(),
         campaignType: z.enum(["search", "display"]).optional(),
         images: z
           .object({ landscape: z.string().url(), square: z.string().url() })
@@ -1613,10 +1485,11 @@ export const setHomeHeroAction = growthAction({
 export const suggestCampaignAudiencesAction = growthAction({
   outputSchema: suggestCampaignAudiencesActionOutputSchema,
   description:
-    "Propose the next audience for a Performance client's campaign (one by default, up to 5 with count), skipping what the campaign already targets, from brand personas, story, home fit, and the evidence: the brand's market (feeder cities), what its direct bookings say about the booking window, and the audiences already synced in its ad account. Each suggestion says why; add the ones the operator wants with addAudience (geo: cities, states, countries, ages; lookalike or retargeting: the platformAudienceId names the asset). Nothing is saved or pushed. Guest-origin data is not available for WanderOS sites, so geo suggestions rest on the market on Setup.",
+    "Suggest general campaign audiences from the brand story, personas and optional explicitly supplied research context. Nothing is saved or sent to providers.",
   inputSchema: z.object({
     campaignId: z.string().min(1),
     steer: steerSchema,
+    context: z.string().trim().max(30000).optional(),
     count: z.number().int().min(1).max(5).optional(),
   }),
   examples: [{ campaignId: "camp_01" }],
@@ -1987,4 +1860,17 @@ export const ideaContextAction = growthAction({
   }),
   execute: (input, ctx) =>
     adChatContext({ ...input, organizationId: ctx.orgId }),
+});
+
+export const setDeliveryGroupAction = growthAction({
+  description:
+    "Edit an unpublished platform delivery group. Meta uses ad sets, Google uses ad groups. Configuration must match its parent platform. Local only; no provider writes.",
+  inputSchema: z.object({
+    deliveryGroupId: z.string().min(1),
+    name: z.string().trim().min(1).max(300).optional(),
+    configuration: deliveryGroupConfigurationSchema,
+  }),
+  outputSchema: z.strictObject({ id: z.string() }),
+  execute: async (input, ctx) =>
+    setDeliveryGroup({ ...input, organizationId: ctx.orgId }),
 });

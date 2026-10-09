@@ -1,13 +1,15 @@
+import type { PlatformDeliveryGroup } from "@/server/db/schema";
+import { GooglePlatformCard } from "./GooglePlatformCard";
 import {
   campaignListPath,
   type CampaignWorkspace,
 } from "@/lib/campaign-navigation";
 import { MetaPlatformCard } from "./MetaPlatformCard";
-import type { Ad, AudienceGeographyPlan } from "@/server/db/ads-schema";
+import type { Ad, DeliveryGeography } from "@/server/db/ads-schema";
 import Link from "next/link";
 
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
-import { adRoutesTo, isPushableAdPlatform } from "@/lib/ad-platforms";
+import { isPushableAdPlatform } from "@/lib/ad-platforms";
 import { db } from "@/server/db";
 import { and, eq } from "drizzle-orm";
 import { adPlatformSpec } from "@/lib/ad-platforms";
@@ -22,8 +24,6 @@ import { metaTrackingDefaults } from "@/server/services/meta-tracking-defaults";
 import { fmtDate, money, statusStyle } from "./format";
 import { DeletePlatformCampaign } from "./DeletePlatformCampaign";
 import { DeliverySwitch } from "./DeliverySwitch";
-import { GoogleSettings } from "./GoogleSettings";
-import { searchTerms } from "@/lib/search-terms";
 import { LinkedInSettings } from "./LinkedInSettings";
 import { posterForMedia } from "@/lib/media-url";
 import { PlatformBudget } from "./PlatformBudget";
@@ -50,6 +50,7 @@ export async function PlatformSection({
   campaignStartAt,
   campaignEndAt,
   draftAds,
+  previewAds = [],
   audiences,
 }: {
   brandSlug: string;
@@ -57,7 +58,9 @@ export async function PlatformSection({
   brandName?: string;
   brandLogo?: string | null;
   campaignId: string;
-  platformCampaign: PlatformCampaign;
+  platformCampaign: PlatformCampaign & {
+    deliveryGroups?: PlatformDeliveryGroup[];
+  };
   draftAdCount: number;
   unapprovedCount?: number;
   audienceCount: number;
@@ -66,19 +69,40 @@ export async function PlatformSection({
   campaignStartAt?: Date | null;
   campaignEndAt?: Date | null;
   draftAds?: Ad[];
+  previewAds?: Ad[];
   audiences?: {
     id: string;
     name: string;
-    geography: AudienceGeographyPlan | null;
-    ageMin: number | null;
-    ageMax: number | null;
-    keywords?: string[] | null;
+    metaTargetName?: string;
   }[];
 }) {
+  const deliveryAudiences = (platformCampaign.deliveryGroups ?? []).map(
+    (group) => {
+      const config = group.configuration;
+      const targeting =
+        config && "targeting" in config ? config.targeting : undefined;
+      const shared = audiences?.find((a) => a.id === group.audienceId);
+      return {
+        ...group,
+        metaTargetName: shared?.metaTargetName,
+        geography:
+          platformCampaign.platform === "google_ads"
+            ? (platformCampaign.settings?.google?.geography ?? null)
+            : (targeting?.geography ?? null),
+        ageMin: targeting?.ageMin ?? null,
+        ageMax: targeting?.ageMax ?? null,
+        keywords:
+          config?.platform === "google_ads" ? (config.keywords ?? null) : null,
+        excludedKeywords:
+          config?.platform === "google_ads"
+            ? (config.excludedKeywords ?? null)
+            : null,
+      };
+    },
+  );
   const platform = platformCampaign.platform;
   const label = platformLabel(platform);
   const isDraft = platformCampaign.status === "draft";
-  const google = platformCampaign.settings?.google;
   const linkedin = platformCampaign.settings?.linkedin;
 
   // ---- draft: the pre-push contract ------------------------------------
@@ -121,27 +145,29 @@ export async function PlatformSection({
         brandLogo={brandLogo}
         platformCampaign={platformCampaign}
         ads={draftAds}
-        audiences={audiences}
+        previewAds={previewAds}
+        audiences={deliveryAudiences}
+      />
+    );
+  }
+  if (isDraft && platform === "google_ads") {
+    return (
+      <GooglePlatformCard
+        pc={platformCampaign}
+        ads={draftAds ?? []}
+        previewAds={previewAds}
+        audiences={deliveryAudiences}
+        campaignId={campaignId}
+        campaignName={campaignName ?? platformCampaign.name}
+        brandSlug={brandSlug}
+        brandName={brandName}
+        brandUrl={brandUrl}
+        campaignEndAt={campaignEndAt}
       />
     );
   }
   if (isDraft) {
-    const googleBlocked = platform === "google_ads" && !google?.campaignType;
     const pushable = isPushableAdPlatform(platform);
-    // Search compiles audiences with terms to ad groups and text ideas to ads.
-    const searchShape =
-      platform === "google_ads" && google?.campaignType === "search"
-        ? {
-            groups:
-              (audiences ?? []).filter(
-                (row) => searchTerms(row.keywords).length > 0,
-              ).length || (google.keywords?.length ? 1 : 0),
-            ads: (draftAds ?? []).filter(
-              (ad) =>
-                ad.type === "text" && adRoutesTo(ad.platforms, "google_ads"),
-            ).length,
-          }
-        : null;
     return (
       <div className="flex flex-wrap items-center gap-2.5 rounded-xl border bg-card p-3.5">
         <ChannelLogo platform={platform} className="size-5" />
@@ -152,15 +178,7 @@ export async function PlatformSection({
         <span className="text-xs text-muted-foreground">
           {draftAdCount === 0
             ? "Add ads to the plan, set the budget, then push."
-            : googleBlocked
-              ? "Pick a campaign type and the push compiles the plan."
-              : searchShape
-                ? searchShape.groups === 0
-                  ? "Add search terms to an audience."
-                  : searchShape.ads === 0
-                    ? "Add a text ad: Write search ads."
-                    : `Will compile ${searchShape.groups} ad group${searchShape.groups === 1 ? "" : "s"} × ${searchShape.ads} search ad${searchShape.ads === 1 ? "" : "s"}, paused.`
-                : `Will compile ${audienceCount === 0 ? "1 broad ad set" : `${audienceCount} ad set${audienceCount === 1 ? "" : "s"}`} × ${draftAdCount} ad${draftAdCount === 1 ? "" : "s"}, paused.`}
+            : `Will compile ${audienceCount === 0 ? "1 broad ad set" : `${audienceCount} ad set${audienceCount === 1 ? "" : "s"}`} × ${draftAdCount} ad${draftAdCount === 1 ? "" : "s"}, paused.`}
         </span>
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <DeletePlatformCampaign
@@ -178,22 +196,13 @@ export async function PlatformSection({
             budget={platformCampaign.budget}
             budgetType={platformCampaign.budgetType}
           />
-          {platform === "google_ads" && (
-            <GoogleSettings
-              platformCampaignId={platformCampaign.id}
-              config={google}
-              brandSlug={brandSlug}
-              brandUrl={brandUrl}
-              compact
-            />
-          )}
           {platform === "linkedin_ads" && (
             <LinkedInSettings
               platformCampaignId={platformCampaign.id}
               config={linkedin}
             />
           )}
-          {pushable && draftAdCount > 0 && !googleBlocked && (
+          {pushable && draftAdCount > 0 && (
             <PushToPlatform
               campaignId={campaignId}
               brandSlug={brandSlug}

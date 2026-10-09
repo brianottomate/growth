@@ -152,8 +152,6 @@ export default async function PerformanceBrandSetupPage({
             name: persona.name,
             description: persona.description,
             profile: persona.profile,
-            demandGeography: persona.demandGeography,
-            destinationGeography: persona.destinationGeography,
           }))}
         />
       </section>

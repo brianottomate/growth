@@ -1,3 +1,21 @@
+export type CompiledDeliveryAudience = {
+  type: string;
+  id: string;
+  deliveryGroupId: string;
+  name: string;
+  personaId: string | null;
+  ageMin: number | null;
+  ageMax: number | null;
+  geography: DeliveryGeography | null;
+  keywords: string[] | null;
+  excludedKeywords: string[] | null;
+};
+
+import {
+  hasDeliveryLocations,
+  deliveryGroupConfigurationSchema,
+} from "@/lib/platform-delivery";
+import { selectPlatformAds } from "@/lib/platform-ad-plan";
 import {
   startWorkflowRun,
   claimWorkflowRun,
@@ -55,7 +73,6 @@ import {
 } from "@/lib/zernio-ads";
 import {
   adPlatformSpec,
-  adRoutesTo,
   channelPlatformForZernioKey,
   requireAdPlatformSpec,
   zernioAdPlatformKey,
@@ -115,11 +132,12 @@ import {
   adAccountTable,
   adTable,
   audienceTable,
-  platformAdSetTable,
+  platformDeliveryGroupTable,
   platformAdTable,
   platformAudienceTable,
   personaTable,
   campaignAudienceAssetTable,
+  type DeliveryGeography,
   type Ad,
   type AdCreativeContent,
   type AdTextContent,
@@ -127,7 +145,6 @@ import {
   type AudienceType,
   type Campaign,
   type MediaItem,
-  type PlanAudience,
   type PlatformCampaign,
   type PlatformCampaignSettings,
   brandTable,
@@ -1105,6 +1122,7 @@ export async function createGoogleAd(
     targeting: input.targeting,
     startDate: input.startDate,
     endDate: input.endDate,
+    status: "PAUSED",
   };
   const result = await createZernioStandaloneAd(payload, {
     idempotencyKey: idempotencyKey(
@@ -1114,8 +1132,7 @@ export async function createGoogleAd(
       input.businessKey,
     ),
   });
-  // Google's create call takes no status, so the campaign can be delivering the
-  // moment the provider accepts it. Pausing is a second, documented call.
+  // Request a hold at creation; retain the follow-up pause as a defensive check.
   const pause = await pauseFreshGoogleCampaign(result);
   return {
     brand: destination.brand,
@@ -2081,7 +2098,7 @@ async function platformAudienceExternalIdFor(
  * silently widening to a whole country is the expensive failure mode.
  */
 async function compileAudienceTargeting(input: {
-  audience: PlanAudience;
+  audience: CompiledDeliveryAudience;
   connectionAccountId: string;
   brandId: string;
   platform: PushableAdPlatform;
@@ -2498,8 +2515,7 @@ async function performPlatformPush(
   if (loadedAds.length === 0) {
     throw new Error("This campaign has no drafted ads — add ads first");
   }
-  const routed = (rows: Ad[]) =>
-    rows.filter((ad) => adRoutesTo(ad.platforms, platform));
+  const routed = (rows: Ad[]) => selectPlatformAds(rows, platform, settings);
   let ads = routed(loadedAds);
   if (ads.length === 0) {
     throw new Error(
@@ -2588,8 +2604,49 @@ async function performPlatformPush(
   // Compile every audience's targeting up front, so a resolution failure
   // surfaces before anything is created.
   await context.reportProgress?.("Preparing audience targeting");
+  if (
+    platform === "google_ads" &&
+    !hasDeliveryLocations(settings.google?.geography)
+  )
+    throw new Error("Set Google campaign location targeting before pushing");
   const compiled = [];
-  for (const audience of audiences) {
+  const deliveryGroups = await db.query.platformDeliveryGroupTable.findMany({
+    where: eq(platformDeliveryGroupTable.platformCampaignId, draft.id),
+  });
+  for (const group of deliveryGroups) {
+    if (group.brandId !== brand.id)
+      throw new Error("Delivery group belongs to another brand");
+    const configuration = deliveryGroupConfigurationSchema.parse(
+      group.configuration,
+    );
+    if (configuration.platform !== platform)
+      throw new Error("Delivery configuration does not match platform");
+    const shared = audiences.find((a) => a.id === group.audienceId);
+    if (group.audienceId && !shared)
+      throw new Error("Delivery group audience is not in this campaign");
+    const target =
+      "targeting" in configuration ? configuration.targeting : undefined;
+    const audience: CompiledDeliveryAudience = {
+      type: shared?.type ?? "segment",
+      id: shared?.id ?? group.id,
+      deliveryGroupId: group.id,
+      name: group.name,
+      personaId: shared?.personaId ?? null,
+      geography:
+        platform === "google_ads"
+          ? (settings.google?.geography ?? null)
+          : (target?.geography ?? null),
+      ageMin: target?.ageMin ?? null,
+      ageMax: target?.ageMax ?? null,
+      keywords:
+        configuration.platform === "google_ads"
+          ? (configuration.keywords ?? null)
+          : null,
+      excludedKeywords:
+        configuration.platform === "google_ads"
+          ? (configuration.excludedKeywords ?? null)
+          : null,
+    };
     const { spec, warnings: audienceWarnings } = await compileAudienceTargeting(
       {
         audience,
@@ -2638,7 +2695,7 @@ type PushArgs = {
   draft: PlatformCampaign;
   destination: AdDestination;
   compiled: Array<{
-    audience: PlanAudience;
+    audience: CompiledDeliveryAudience;
     spec: ZernioAdTargeting | undefined;
   }>;
   ads: Ad[];
@@ -2678,7 +2735,7 @@ type GoogleUnit = {
 };
 
 type GoogleGroup = {
-  audience: PlanAudience | null;
+  audience: CompiledDeliveryAudience | null;
   spec: ZernioAdTargeting | undefined;
   keywords: SearchTerm[];
   negatives: SearchTerm[];
@@ -2692,7 +2749,7 @@ type GoogleGroup = {
 export function planGoogleCompile(input: {
   campaignType: "search" | "display";
   compiled: Array<{
-    audience: PlanAudience;
+    audience: CompiledDeliveryAudience;
     spec: ZernioAdTargeting | undefined;
   }>;
   ads: Ad[];
@@ -3304,7 +3361,7 @@ async function pushToMeta(args: PushArgs) {
       .slice(0, 7)
       .replace("-", ""),
   });
-  const adSetNameFor = (audience: PlanAudience | null) =>
+  const adSetNameFor = (audience: CompiledDeliveryAudience | null) =>
     performanceAdSetName({
       customer: brand.name,
       isClient,
@@ -3472,7 +3529,7 @@ async function pushToMeta(args: PushArgs) {
 
   /** An ad set opened with the first ad, then every other ad attached. */
   const createAdSet = async (setArgs: {
-    audience: PlanAudience | null;
+    audience: CompiledDeliveryAudience | null;
     spec: ZernioAdTargeting | undefined;
     existingCampaignId?: string;
     validateOnly: boolean;
@@ -3589,7 +3646,7 @@ async function pushToMeta(args: PushArgs) {
 
   const sets = compiled.length
     ? compiled
-    : [{ audience: null as PlanAudience | null, spec: undefined }];
+    : [{ audience: null as CompiledDeliveryAudience | null, spec: undefined }];
 
   // ---- dry run: Meta validates the first ad set as a standalone create --
   if (input.validateOnly) {
@@ -3642,7 +3699,7 @@ async function pushToMeta(args: PushArgs) {
   if (!shellId) throw new Error("Zernio returned no campaign id for the shell");
 
   const perSet: Array<{
-    audience: PlanAudience | null;
+    audience: CompiledDeliveryAudience | null;
     spec: ZernioAdTargeting | undefined;
     set: CreatedSet;
   }> = [];
@@ -3827,7 +3884,7 @@ async function pushToLinkedIn(args: PushArgs) {
 
   /** Opens a LinkedIn campaign — and, without existingCampaignId, its group. */
   const openingPayload = (setArgs: {
-    audience: PlanAudience | null;
+    audience: CompiledDeliveryAudience | null;
     spec: ZernioAdTargeting | undefined;
     existingCampaignId?: string;
     lead: (typeof usable)[number];
@@ -3890,7 +3947,7 @@ async function pushToLinkedIn(args: PushArgs) {
    * attach on a fresh group deletes the group rather than stranding it.
    */
   const createCampaignWithAds = async (setArgs: {
-    audience: PlanAudience | null;
+    audience: CompiledDeliveryAudience | null;
     spec: ZernioAdTargeting | undefined;
     existingCampaignId?: string;
     keyScope: string;
@@ -4076,7 +4133,7 @@ async function pushToLinkedIn(args: PushArgs) {
   }
 
   const perSet: Array<{
-    audience: PlanAudience;
+    audience: CompiledDeliveryAudience;
     spec: ZernioAdTargeting | undefined;
     set: CreatedSet;
   }> = [];
@@ -4160,7 +4217,7 @@ async function recordCompiledCampaign(input: {
   /** The account the campaign was created under, for the manage deep link. */
   adAccountId: string;
   sets: Array<{
-    audience: PlanAudience | null;
+    audience: CompiledDeliveryAudience | null;
     name: string;
     externalId: string | null;
     targetingSpec: ZernioAdTargeting | null;
@@ -4212,26 +4269,38 @@ async function recordCompiledCampaign(input: {
     .where(eq(campaignTable.id, input.campaign.id));
 
   for (const set of input.sets) {
-    const [setRow] = await db
-      .insert(platformAdSetTable)
-      .values({
-        id: createId("pas"),
-        platformCampaignId: input.draft.id,
-        brandId: input.draft.brandId,
-        audienceId: set.audience?.id ?? null,
-        name: set.name,
-        status: input.status,
-        targetingSpec: set.targetingSpec,
-        budget: set.budget,
-        budgetType: set.budgetType,
-        externalId: set.externalId,
-      })
-      .returning({ id: platformAdSetTable.id });
+    const values = {
+      platformCampaignId: input.draft.id,
+      brandId: input.draft.brandId,
+      name: set.name,
+      status: input.status,
+      targetingSpec: set.targetingSpec,
+      budget: set.budget,
+      budgetType: set.budgetType,
+      externalId: set.externalId,
+    };
+    const plannedId = set.audience?.deliveryGroupId;
+    const [setRow] = plannedId
+      ? await db
+          .update(platformDeliveryGroupTable)
+          .set(values)
+          .where(
+            and(
+              eq(platformDeliveryGroupTable.id, plannedId),
+              eq(platformDeliveryGroupTable.platformCampaignId, input.draft.id),
+            ),
+          )
+          .returning({ id: platformDeliveryGroupTable.id })
+      : await db
+          .insert(platformDeliveryGroupTable)
+          .values({ ...values, id: createId("pdg"), audienceId: null })
+          .returning({ id: platformDeliveryGroupTable.id });
+    if (!setRow) throw new Error("Planned delivery group disappeared");
     for (const ad of set.ads) {
       await db.insert(platformAdTable).values({
         id: createId("pad"),
         platformCampaignId: input.draft.id,
-        platformAdSetId: setRow!.id,
+        platformDeliveryGroupId: setRow.id,
         brandId: input.draft.brandId,
         channelId: input.draft.channelId,
         platform: input.draft.platform,

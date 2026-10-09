@@ -53,6 +53,7 @@ import {
   createGoogleAdsAccountAction,
   createReportingConversionAction,
   setPlatformDraftAction,
+  setDeliveryGroupAction,
   setCreativePoolAction,
   setPlacementCopyAction,
   previewAdAction,
@@ -357,6 +358,7 @@ export const adsRouter = {
   importMetaCampaign: actionProcedure(importMetaCampaignAction),
 
   setPlatformDraft: actionProcedure(setPlatformDraftAction),
+  setDeliveryGroup: actionProcedure(setDeliveryGroupAction),
 
   setCampaignCreativePool: actionProcedure(setCreativePoolAction),
 

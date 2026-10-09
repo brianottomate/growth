@@ -1,43 +1,74 @@
-# Connected campaign audiences
+# Shared campaign intent and platform delivery
 
-Brand personas describe motivations. Geography is optional; `demandGeography`
-is where people live/travel from and `destinationGeography` is where they want
-to go. Neither description is automatically a platform targeting instruction.
-Setup edits both and uses the existing US/world geography map when populated.
+Personas are general brand-level customer reasoning: motivation, needs, objections,
+decision criteria and evidence. Industry details (including trip purpose) belong
+in that prose. Loose age ranges and geography descriptions are optional context,
+never executable targeting. Personas have no home IDs, travel object, demand
+geography or destination geography fields.
 
-Campaign audience suggestions read personas, brand story, markets, booking
-demand evidence, brand-owned homes and reusable platform assets. The operator
-reviews proposals before saving. Each audience retains its persona, explanation
-and optional relevant home IDs. These links can also be edited in the campaign.
-Creative generation uses the selected personas and brand pillars; featured-home
-suggestions retain their aggregate booking/review ranking and use motivations,
-destinations, home facts, open-night context and photos to assess fit. Persona
-fit is a planning hypothesis, never an assertion about individual customers.
+A campaign is one initiative with text and creative ideas, shared audiences and
+separate platform plans. Each `audience` stores name, explanation, optional
+`persona_id` and intended `geography` JSONB (countries, states, regions, cities).
+Geography is general campaign intent: no home IDs, feeder-city structure, age
+limits or search terms. Editing it does not change an existing platform plan;
+operators confirm executable locations inside each plan.
 
-## Booking evidence in AI inputs
+`platform_campaign` owns the provider enum, budget, schedule, account settings and
+provider ID. `platform_delivery_group` replaces `platform_ad_set`. Its optional
+`audience_id` records lineage. Its `configuration` JSONB is a TypeScript and Zod
+discriminated union whose `platform` must match the parent:
 
-Destination generation and campaign audience suggestions share a bounded
-BigQuery summary. The cohort contains confirmed, non-manual, uncanceled
-direct-site bookings confirmed in the past 12 months, scoped to both the
-brand's linked WanderOS website and its imported active homes. Distinct booking
-IDs and one current profile per user prevent duplicate joins from inflating counts.
+- Meta: group targeting (geography and optional ages).
+- Google: group keywords and negatives. Delivery geography and campaign negatives
+  live in `platform_campaign.settings.google` and apply to every Google group.
+- LinkedIn: group targeting supported by its adapter.
+- Other platforms: explicitly add executable schemas when their adapter is built.
 
-The summary includes portfolio totals and up to six busiest home towns, median
-stay length from local check-in/check-out dates, median booking lead time and
-check-in month counts. Seasonal counts describe this confirmation cohort, not
-occupancy or a forecast. Top five cities and states carry booking counts and
-shares of all qualifying bookings; locations with fewer than three bookings
-are omitted. Guest locations come from current `analytics.customer_profiles`
-fields and can differ from residence at booking time. Profile, city and state
-coverage counts travel with the evidence.
+Groups can be planned before ads exist. Adding a platform materializes groups for
+current shared audiences; adding an audience materializes groups in unpublished
+plans. A broad placeholder is reused when the first audience arrives. The shared
+cross product is a starting point; editable group configurations are independent.
+UI labels remain native: Meta “Ad set”, Google “Ad group”.
 
-The aggregate payload is capped at 8,000 characters across the brand. Least
-busy town summaries are dropped if needed while portfolio totals remain.
-No guest identifiers, contact details or individual booking rows reach the AI.
-An unavailable warehouse query stays unknown evidence; a successful empty
-result means zero qualifying bookings. The model must distinguish observed
-aggregates from suggested markets and exploration hypotheses. Each read has
-a 2 GB scan ceiling and a 15-second warehouse job limit.
+External IDs, native `targeting_spec` snapshots, metrics and mirrored ad links are
+preserved for sync and reverse engineering. Native imports may have null editable
+configuration until translated/reviewed. Publishing reads group configurations,
+validates parent-platform and brand ownership, and resolves geography before any
+provider write. Google requires an explicit campaign location selection. Publishing
+fills the existing planned group row instead of creating a second mirror container.
+
+The app, assistant and MCP share oRPC-backed canonical actions:
+`adsWrite.setDeliveryGroup`, `adsWrite.setPlatformDraft`, `personaRead.suggest` and
+`adsRead.suggestCampaignAudiences`. Suggestions are proposals; saving is separate.
+
+## Explicit industry research
+
+General persona and audience suggestions read the brand story, existing personas
+and campaign intent. They never fetch inventory or BigQuery automatically. Optional
+`context` carries explicitly supplied research into the same general schemas.
+
+The WanderOS page exposes `personaRead.wanderOsContext`: prepare owned inventory
+context, optionally include aggregate booking evidence, edit/review that input, then
+request persona suggestions. Saving a proposal is a separate click. No travel-specific
+fields feed back into personas or campaign audiences, and no delivery targeting is
+inferred automatically. Booking evidence remains bounded, aggregate, and subject to
+its existing warehouse scan limits; the context contains no individual guest records.
+
+## Migration and preview
+
+Migration 0021 renames the native group table and ad foreign key, materializes local
+delivery groups, moves existing targeting and search terms into platform plans,
+cleans persona profiles, and drops the retired columns. Consistent Google geography
+moves to campaign settings; conflicting previous geographies require an operator
+selection before publishing. There are no compatibility aliases.
+
+Migration 0022 adds general intended geography to shared audiences. Where
+unpublished platform plans agree on geography, it initializes the intent from
+that location choice. Conflicting plans leave intent unspecified. Delivery
+settings are unchanged.
+
+Test migrations on disposable Neon branches. Production applies committed migrations
+through the release build. Local schema previews must use the experiment database.
 
 ## Platform assets
 

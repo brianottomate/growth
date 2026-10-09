@@ -1,3 +1,9 @@
+import { createHash } from "node:crypto";
+import {
+  deliveryGeographySchema,
+  deliveryGroupConfigurationSchema,
+  type DeliveryGroupConfiguration,
+} from "@/lib/platform-delivery";
 import type { DraftAdResult } from "@/server/ai/capabilities/outputs/ads";
 import type { CampaignListResult } from "@/server/contracts/ad-tool-output";
 import {
@@ -6,7 +12,6 @@ import {
 } from "./home-groups.service";
 import { resolveMetaSchedule, metaScheduleIssue } from "@/lib/meta-schedule";
 import "server-only";
-import { normalizeAudienceGeography } from "@/lib/audience-targeting-geography";
 import { withIdeaStudio } from "@/lib/ad-idea-studio";
 
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
@@ -31,14 +36,14 @@ import {
   brandTable,
   channelTable,
   personaTable,
-  platformAdSetTable,
+  platformDeliveryGroupTable,
   platformAdTable,
   platformAudienceTable,
   platformCampaignTable,
   campaignTable,
   type AdContent,
-  type AudienceGeographyPlan,
   type AudienceType,
+  type DeliveryGeography,
   type MediaItem,
   type PlatformCampaignSettings,
 } from "@/server/db/schema";
@@ -281,7 +286,8 @@ async function planPlatformInternal(input: {
       startAt: input.campaign.startAt,
       endAt: input.campaign.endAt,
     })
-    .returning({ id: platformCampaignTable.id });
+    .returning();
+  await ensureDeliveryGroups(created!);
   return created!;
 }
 
@@ -300,6 +306,10 @@ export async function planPlatform(input: {
     brandId: brand.id,
     platform: input.platform,
   });
+  const plan = await db.query.platformCampaignTable.findFirst({
+    where: eq(platformCampaignTable.id, row.id),
+  });
+  if (plan) await ensureDeliveryGroups(plan);
   return { platformCampaignId: row.id };
 }
 
@@ -333,6 +343,8 @@ export async function unplanPlatform(input: {
 export async function setPlatformDraft(input: {
   organizationId: string;
   platformCampaignId: string;
+  selectedAdIds?: string[] | null;
+  previewAdIds?: string[] | null;
   budget?: number | null;
   budgetType?: "daily" | "lifetime" | null;
   /**
@@ -358,6 +370,46 @@ export async function setPlatformDraft(input: {
   );
   const parentEndAt = parent.endAt;
 
+  if (input.selectedAdIds !== undefined) {
+    if (row.externalId || row.status !== "draft")
+      throw new Error(
+        "Ad selection can only change on an unpushed platform draft.",
+      );
+    if (input.selectedAdIds?.length) {
+      const ids = [...new Set(input.selectedAdIds)];
+      const owned = await db.query.adTable.findMany({
+        where: and(
+          eq(adTable.campaignId, row.campaignId),
+          eq(adTable.brandId, row.brandId),
+          inArray(adTable.id, ids),
+        ),
+        columns: { id: true },
+      });
+      if (owned.length !== ids.length)
+        throw new Error("Select ads belonging to this campaign.");
+    }
+  }
+
+  if (input.previewAdIds !== undefined) {
+    if (row.externalId || row.status !== "draft")
+      throw new Error(
+        "Studio previews can only change on an unpushed platform draft.",
+      );
+    const ids = [...new Set(input.previewAdIds ?? [])];
+    if (ids.length) {
+      const owned = await db.query.adTable.findMany({
+        where: and(
+          eq(adTable.brandId, row.brandId),
+          isNull(adTable.campaignId),
+          inArray(adTable.id, ids),
+        ),
+        columns: { id: true },
+      });
+      if (owned.length !== ids.length)
+        throw new Error("Choose unassigned Studio ads from this brand.");
+    }
+  }
+
   const current = row.settings ?? {};
   const merge = <K extends keyof PlatformCampaignSettings>(
     key: K,
@@ -380,6 +432,17 @@ export async function setPlatformDraft(input: {
       ...(input.endAt !== undefined ? { endAt: input.endAt } : {}),
       settings: {
         ...current,
+        ...(input.previewAdIds !== undefined
+          ? { previewAdIds: [...new Set(input.previewAdIds ?? [])] }
+          : {}),
+        ...(input.selectedAdIds !== undefined
+          ? {
+              selectedAdIds:
+                input.selectedAdIds === null
+                  ? undefined
+                  : [...new Set(input.selectedAdIds)],
+            }
+          : {}),
         ...merge("google", input.google),
         ...merge("meta", input.meta),
         ...merge("linkedin", input.linkedin),
@@ -446,41 +509,15 @@ export async function addAudience(input: {
   campaignId: string;
   name: string;
   personaId?: string | null;
-  homeIds?: string[] | null;
+  geography?: DeliveryGeography | null;
   description?: string | null;
   type?: AudienceType | null;
-  ageMin?: number | null;
-  ageMax?: number | null;
-  geography?: AudienceGeographyPlan | null;
-  keywords?: string[] | null;
-  excludedKeywords?: string[] | null;
-  optimizationGoal?: string | null;
 }) {
   const { campaign, brand } = await requireOwnedCampaign(
     input.campaignId,
     input.organizationId,
   );
-  if (input.personaId) {
-    const persona = await db.query.personaTable.findFirst({
-      where: eq(personaTable.id, input.personaId),
-      columns: { brandId: true },
-    });
-    if (persona?.brandId !== brand.id) {
-      throw new Error("That persona belongs to a different brand");
-    }
-  }
-  if (input.homeIds?.length) {
-    const owned = await db.query.homeTable.findMany({
-      where: and(
-        eq(homeTable.brandId, brand.id),
-        inArray(homeTable.id, input.homeIds),
-        isNull(homeTable.deletedAt),
-      ),
-      columns: { id: true },
-    });
-    if (owned.length !== new Set(input.homeIds).size)
-      throw new Error("A selected home is not owned by this brand");
-  }
+  await validateAudiencePersona(input.personaId, brand.id);
   const [audience] = await db
     .insert(audienceTable)
     .values({
@@ -488,21 +525,32 @@ export async function addAudience(input: {
       campaignId: campaign.id,
       brandId: brand.id,
       personaId: input.personaId ?? null,
-      homeIds: input.homeIds ?? null,
+      geography: input.geography
+        ? deliveryGeographySchema.parse(input.geography)
+        : null,
       name: input.name.trim(),
       description: input.description ?? null,
       type: input.type ?? "segment",
-      ageMin: input.ageMin ?? null,
-      ageMax: input.ageMax ?? null,
-      geography: input.geography
-        ? normalizeAudienceGeography(input.geography)
-        : null,
-      keywords: input.keywords ?? null,
-      excludedKeywords: input.excludedKeywords ?? null,
-      optimizationGoal: input.optimizationGoal ?? null,
     })
     .returning();
+  const plans = await db.query.platformCampaignTable.findMany({
+    where: eq(platformCampaignTable.campaignId, campaign.id),
+  });
+  for (const plan of plans)
+    if (!plan.externalId) await ensureDeliveryGroups(plan);
   return audience!;
+}
+
+async function validateAudiencePersona(
+  personaId: string | null | undefined,
+  brandId: string,
+) {
+  if (!personaId) return;
+  const persona = await db.query.personaTable.findFirst({
+    where: and(eq(personaTable.id, personaId), isNull(personaTable.deletedAt)),
+  });
+  if (persona?.brandId !== brandId)
+    throw new Error("Persona belongs to another brand");
 }
 
 export async function updateAudience(input: {
@@ -510,72 +558,108 @@ export async function updateAudience(input: {
   audienceId: string;
   name?: string;
   personaId?: string | null;
-  homeIds?: string[] | null;
+  geography?: DeliveryGeography | null;
   description?: string | null;
-  ageMin?: number | null;
-  ageMax?: number | null;
-  geography?: AudienceGeographyPlan | null;
-  keywords?: string[] | null;
-  excludedKeywords?: string[] | null;
 }) {
   const audience = await db.query.audienceTable.findFirst({
     where: eq(audienceTable.id, input.audienceId),
   });
   if (!audience) throw new Error("Audience not found");
   await requireOwnedCampaign(audience.campaignId, input.organizationId);
-  if (input.personaId) {
-    const persona = await db.query.personaTable.findFirst({
-      where: and(
-        eq(personaTable.id, input.personaId),
-        isNull(personaTable.deletedAt),
-      ),
-    });
-    if (persona?.brandId !== audience.brandId)
-      throw new Error("Persona belongs to another brand");
-  }
-  if (input.homeIds?.length) {
-    const homes = await db.query.homeTable.findMany({
-      where: and(
-        eq(homeTable.brandId, audience.brandId),
-        inArray(homeTable.id, input.homeIds),
-        isNull(homeTable.deletedAt),
-      ),
-      columns: { id: true },
-    });
-    if (homes.length !== new Set(input.homeIds).size)
-      throw new Error("Home belongs to another brand");
-  }
-  const { organizationId: _org, audienceId: _id, geography, ...patch } = input;
-  // Geography merges key-by-key: sending only countries must not clear the
-  // stored regions. Explicit null still clears the whole object.
-  const mergedGeography =
-    geography === undefined
-      ? undefined
-      : geography === null
-        ? null
-        : {
-            ...(audience.geography ?? {}),
-            ...Object.fromEntries(
-              Object.entries(geography).filter(
-                ([, value]) => value !== undefined,
-              ),
-            ),
-          };
+  await validateAudiencePersona(input.personaId, audience.brandId);
+  const { organizationId: _org, audienceId: _id, ...patch } = input;
+  if (patch.geography)
+    patch.geography = deliveryGeographySchema.parse(patch.geography);
   const [updated] = await db
     .update(audienceTable)
-    .set({
-      ...patch,
-      ...(mergedGeography !== undefined
-        ? {
-            geography: mergedGeography
-              ? normalizeAudienceGeography(mergedGeography)
-              : null,
-          }
-        : {}),
-    })
+    .set(patch)
     .where(eq(audienceTable.id, audience.id))
     .returning();
   return updated!;
+}
+
+/** Materialize platform containers before ads exist. No provider calls. */
+async function ensureDeliveryGroups(
+  plan: typeof platformCampaignTable.$inferSelect,
+) {
+  if (!plan.campaignId || plan.externalId) return;
+  const audiences = await db.query.audienceTable.findMany({
+    where: eq(audienceTable.campaignId, plan.campaignId),
+  });
+  const existing = await db.query.platformDeliveryGroupTable.findMany({
+    where: eq(platformDeliveryGroupTable.platformCampaignId, plan.id),
+  });
+  const placeholder = audiences.length
+    ? existing.find(
+        (group) =>
+          !group.audienceId && !group.externalId && group.name === "Broad",
+      )
+    : undefined;
+  // Reuse the pre-audience container and its operator settings instead of leaving an extra broad set.
+  if (placeholder && audiences[0]) {
+    await db
+      .update(platformDeliveryGroupTable)
+      .set({ audienceId: audiences[0].id, name: audiences[0].name })
+      .where(eq(platformDeliveryGroupTable.id, placeholder.id));
+    placeholder.audienceId = audiences[0].id;
+  }
+  const targets = audiences.length ? audiences : [{ id: null, name: "Broad" }];
+  for (const audience of targets) {
+    if (existing.some((group) => group.audienceId === audience.id)) continue;
+    await db
+      .insert(platformDeliveryGroupTable)
+      .values({
+        id: `pdg_${createHash("md5")
+          .update(`${plan.id}:${audience.id ?? "broad"}`)
+          .digest("hex")}`,
+        platformCampaignId: plan.id,
+        brandId: plan.brandId,
+        audienceId: audience.id,
+        name: audience.name,
+        status: "draft",
+        configuration:
+          placeholder?.configuration ??
+          deliveryGroupConfigurationSchema.parse({
+            platform: plan.platform,
+          }),
+      })
+      .onConflictDoNothing();
+  }
+}
+
+export async function setDeliveryGroup(input: {
+  organizationId: string;
+  deliveryGroupId: string;
+  name?: string;
+  configuration: DeliveryGroupConfiguration;
+}) {
+  const group = await db.query.platformDeliveryGroupTable.findFirst({
+    where: eq(platformDeliveryGroupTable.id, input.deliveryGroupId),
+  });
+  if (!group) throw new Error("Delivery group not found");
+  const plan = await db.query.platformCampaignTable.findFirst({
+    where: eq(platformCampaignTable.id, group.platformCampaignId),
+  });
+  if (!plan?.campaignId)
+    throw new Error("Delivery group has no local campaign");
+  const { brand } = await requireOwnedCampaign(
+    plan.campaignId,
+    input.organizationId,
+  );
+  if (group.brandId !== brand.id || plan.brandId !== brand.id)
+    throw new Error("Delivery group belongs to another brand");
+  if (plan.externalId || plan.status !== "draft")
+    throw new Error("Only unpublished platform plans can be edited here");
+  const configuration = deliveryGroupConfigurationSchema.parse(
+    input.configuration,
+  );
+  if (configuration.platform !== plan.platform)
+    throw new Error("Configuration platform does not match the plan");
+  await db
+    .update(platformDeliveryGroupTable)
+    .set({ configuration, ...(input.name ? { name: input.name.trim() } : {}) })
+    .where(eq(platformDeliveryGroupTable.id, group.id));
+  return { id: group.id };
 }
 
 /** Read the same committed set shown on the brand's Homes page. */
@@ -913,6 +997,7 @@ export async function getDraftCampaign(
     await Promise.all([
       db.query.audienceTable.findMany({
         where: eq(audienceTable.campaignId, campaign.id),
+        orderBy: (t, { asc }) => [asc(t.createdAt), asc(t.id)],
         with: { persona: { columns: { id: true, name: true } } },
       }),
       db.query.adTable.findMany({
@@ -928,7 +1013,12 @@ export async function getDraftCampaign(
       }),
       db.query.platformCampaignTable.findMany({
         where: eq(platformCampaignTable.campaignId, campaign.id),
-        with: { adSets: true, ads: true },
+        with: {
+          deliveryGroups: {
+            orderBy: (t, { asc }) => [asc(t.createdAt), asc(t.name)],
+          },
+          ads: true,
+        },
       }),
       db.query.personaTable.findMany({
         where: and(
@@ -1118,9 +1208,9 @@ async function adoptMirrorIntoPlan(input: {
   brandId: string;
 }) {
   const [sets, mirrorAds, planAds] = await Promise.all([
-    db.query.platformAdSetTable.findMany({
+    db.query.platformDeliveryGroupTable.findMany({
       where: eq(
-        platformAdSetTable.platformCampaignId,
+        platformDeliveryGroupTable.platformCampaignId,
         input.platformCampaignId,
       ),
     }),
@@ -1135,11 +1225,6 @@ async function adoptMirrorIntoPlan(input: {
   let audiencesAdopted = 0;
   for (const set of sets) {
     if (set.audienceId) continue;
-    const spec = (set.targetingSpec ?? {}) as {
-      ageMin?: number;
-      ageMax?: number;
-      countries?: string[];
-    };
     const [audience] = await db
       .insert(audienceTable)
       .values({
@@ -1148,17 +1233,12 @@ async function adoptMirrorIntoPlan(input: {
         brandId: input.brandId,
         name: set.name,
         description: "Read back from the platform's ad set.",
-        ageMin: spec.ageMin ?? null,
-        ageMax: spec.ageMax ?? null,
-        geography: spec.countries?.length
-          ? { countries: spec.countries }
-          : null,
       })
       .returning({ id: audienceTable.id });
     await db
-      .update(platformAdSetTable)
+      .update(platformDeliveryGroupTable)
       .set({ audienceId: audience!.id })
-      .where(eq(platformAdSetTable.id, set.id));
+      .where(eq(platformDeliveryGroupTable.id, set.id));
     audiencesAdopted++;
   }
 
@@ -1521,15 +1601,21 @@ export async function deleteAudience(input: {
   });
   if (!audience) throw new Error("Audience not found");
   await requireOwnedCampaign(audience.campaignId, input.organizationId);
-  const compiled = await db.query.platformAdSetTable.findFirst({
-    where: eq(platformAdSetTable.audienceId, audience.id),
-    columns: { id: true },
+  const groups = await db.query.platformDeliveryGroupTable.findMany({
+    where: eq(platformDeliveryGroupTable.audienceId, audience.id),
+    with: { platformCampaign: true },
   });
-  if (compiled) {
+  if (
+    groups.some(
+      (group) => group.externalId || group.platformCampaign.externalId,
+    )
+  )
     throw new Error(
-      "This audience is compiled to a live ad set — pause or delete the platform campaign first",
+      "This audience has published delivery groups; pause or delete the platform campaign first",
     );
-  }
+  await db
+    .delete(platformDeliveryGroupTable)
+    .where(eq(platformDeliveryGroupTable.audienceId, audience.id));
   await db.delete(audienceTable).where(eq(audienceTable.id, audience.id));
   return { deleted: true };
 }

@@ -47,27 +47,22 @@ export async function brandStrategyContext(
           id,
           name,
           description,
-          demandGeography,
-          destinationGeography,
+
           profile,
         }) => ({
           id,
           name,
           description,
-          demandGeography,
-          destinationGeography,
+
           profile,
         }),
       ),
     pillars: pillars.map(({ name, description }) => ({ name, description })),
-    campaignAudiences: audiences.map(
-      ({ name, description, personaId, homeIds }) => ({
-        name,
-        description,
-        personaId,
-        homeIds,
-      }),
-    ),
+    campaignAudiences: audiences.map(({ name, description, personaId }) => ({
+      name,
+      description,
+      personaId,
+    })),
     guidance:
       "Personas explain motivations, pillars explain themes. Treat inferred preferences as hypotheses. Customer origins and destinations of interest are distinct. Never invent measured affinities or targeting from a creative description.",
   });

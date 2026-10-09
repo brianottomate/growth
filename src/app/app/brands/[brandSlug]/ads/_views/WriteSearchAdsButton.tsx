@@ -16,7 +16,9 @@ export function WriteSearchAdsButton({ campaignId }: { campaignId: string }) {
   const write = useMutation(
     orpc.ads.writeGoogleTextAds.mutationOptions({
       onSuccess: ({ created }) => {
-        toast.success(`Added ${created} search ad${created === 1 ? "" : "s"}`);
+        toast.success(
+          `Saved ${created} search draft${created === 1 ? "" : "s"} in Studio. Approve and add them to this campaign.`,
+        );
         startTransition(() => router.refresh());
       },
       onError: (error) => toast.error(error.message),

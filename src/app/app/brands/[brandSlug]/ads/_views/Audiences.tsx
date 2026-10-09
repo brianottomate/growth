@@ -5,40 +5,27 @@ import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { MessageSquare, Pencil, Sparkles, Trash2, Users } from "lucide-react";
 
-import { normalizeAudienceGeography } from "@/lib/audience-targeting-geography";
-import { AudienceMap } from "@/components/audience-map";
-import { GeographyChips } from "@/components/geography-chips";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { sendAssistantIntent } from "@/lib/assistant-events";
+import type { ChannelPlatform, DeliveryGeography } from "@/server/db/schema";
 import { orpc } from "@/orpc/client";
 
 import { useSuggestedAudiences } from "./SuggestAudiencesButton";
+import { AudienceGeography } from "./AudienceGeography";
 
 type AudienceRow = {
   id: string;
   name: string;
   personaId: string | null;
   persona?: { id: string; name: string } | null;
-  ageMin: number | null;
-  ageMax: number | null;
-  geography: {
-    countries?: string[];
-    states?: string[];
-    regions?: string[];
-    cities?: string[];
-    originCities?: string[];
-  } | null;
-  homeIds: string[] | null;
   description: string | null;
-  keywords: string[] | null;
-  excludedKeywords?: string[] | null;
+  geography?: DeliveryGeography | null;
 };
 
 /**
- * The campaign's audiences: each row is one buyable narrowing that the push
- * compiles to a Meta ad set and, when it has search terms, a Google ad group. Budgets here are advisory
- * splits; the authoritative number lives on each platform's draft.
+ * Shared campaign intent and intended geography. Executable targeting is
+ * configured separately in each platform plan's delivery groups.
  */
 export function Audiences({
   campaignId,
@@ -48,6 +35,7 @@ export function Audiences({
   audiences,
   metaTargets = {},
   personas = [],
+  platforms = [],
 }: {
   campaignId: string;
   campaignName: string;
@@ -55,13 +43,10 @@ export function Audiences({
   brandName: string;
   audiences: AudienceRow[];
   personas?: { id: string; name: string }[];
+  platforms?: ChannelPlatform[];
   /** The Meta audience each ad set will target, by campaign audience id. */
   metaTargets?: Record<string, { name: string; via: "audience" | "persona" }>;
 }) {
-  audiences = audiences.map((row) => ({
-    ...row,
-    geography: row.geography ? normalizeAudienceGeography(row.geography) : null,
-  }));
   const router = useRouter();
   const { busy, run, phase, label } = useSuggestedAudiences(campaignId);
   // A chat on this campaign's audiences; Suggest is the one-click add.
@@ -110,7 +95,7 @@ export function Audiences({
       {personas.length > 0 && (
         <p className="text-xs text-muted-foreground">
           Brand personas: {personas.map((p) => p.name).join(" · ")}. Suggestions
-          retain their persona and explain proposed targeting.
+          retain their persona and explain campaign relevance.
         </p>
       )}
       {busy && audiences.length > 0 && (
@@ -134,126 +119,111 @@ export function Audiences({
                   : "Reading personas and market evidence to suggest audiences…"}
               </span>
             ) : (
-              "Keep broad targeting, or add audiences from the brand’s evidence to narrow by age or place. Shape lets you explore the targeting before changing it."
+              "Keep broad targeting, or add audiences from the brand’s evidence to describe who this campaign should reach. Shape lets you explore the targeting before changing it."
             )
           }
         />
       ) : (
-        <div className="grid grid-cols-1 gap-4 @4xl:grid-cols-2">
+        <div className="space-y-4">
           <section className="space-y-4 rounded-xl border bg-card p-5">
             <div>
-              <h3 className="font-semibold">Campaign targeting</h3>
+              <h3 className="font-semibold">Shared audiences</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Who we want to reach and why. Platform plans below show how each
+                audience is used.
+              </p>
             </div>
-            {audiences.map((row) => (
-              <div key={row.id} className="space-y-3 rounded-xl border p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold">{row.name}</p>
-                    {row.persona && (
-                      <p className="text-xs text-muted-foreground">
-                        {row.persona.name}
-                      </p>
-                    )}
-                    {metaTargets[row.id] && (
-                      <p className="text-xs text-muted-foreground">
-                        Meta audience: {metaTargets[row.id]!.name}
-                        {metaTargets[row.id]!.via === "persona"
-                          ? " · from persona"
-                          : ""}
-                      </p>
-                    )}
+            <div className="grid grid-cols-1 gap-3 @2xl:grid-cols-2 @5xl:grid-cols-4">
+              {audiences.map((row) => (
+                <div key={row.id} className="space-y-3 rounded-xl border p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold">{row.name}</p>
+                      {row.persona && (
+                        <p className="text-xs text-muted-foreground">
+                          {row.persona.name}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        tone="muted"
+                        className="h-7"
+                        aria-label={`Edit ${row.name} in chat`}
+                        title="Edit audience in chat"
+                        onClick={() =>
+                          sendAssistantIntent({
+                            type: "work_ad_campaign",
+                            brandId,
+                            brandName,
+                            campaignId,
+                            campaignName,
+                            focus: "audiences",
+                            visibleText: `Help me edit the audience “${row.name}” (${row.id}) in “${campaignName}”. Read its current settings and ask what I would like to change.`,
+                          })
+                        }
+                      >
+                        <Pencil className="size-3.5" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        tone="muted"
+                        className="h-7"
+                        aria-label={`Remove ${row.name}`}
+                        disabled={remove.isPending}
+                        onClick={() => remove.mutate({ audienceId: row.id })}
+                      >
+                        <Trash2 className="size-3.5" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      tone="muted"
-                      className="h-7"
-                      aria-label={`Edit ${row.name} in chat`}
-                      title="Edit audience in chat"
-                      onClick={() =>
-                        sendAssistantIntent({
-                          type: "work_ad_campaign",
-                          brandId,
-                          brandName,
-                          campaignId,
-                          campaignName,
-                          focus: "audiences",
-                          visibleText: `Help me edit the audience “${row.name}” (${row.id}) in “${campaignName}”. Read its current settings and ask what I would like to change.`,
-                        })
-                      }
-                    >
-                      <Pencil className="size-3.5" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      tone="muted"
-                      className="h-7"
-                      aria-label={`Remove ${row.name}`}
-                      disabled={remove.isPending}
-                      onClick={() => remove.mutate({ audienceId: row.id })}
-                    >
-                      <Trash2 className="size-3.5" />
-                    </Button>
+                  {row.description && (
+                    <div className="space-y-2 text-xs text-muted-foreground">
+                      <p>{row.description.split(/\n\s*\n/)[0]}</p>
+                      {row.description.split(/\n\s*\n/).length > 1 && (
+                        <details>
+                          <summary className="cursor-pointer">
+                            Planning rationale
+                          </summary>
+                          <p className="mt-2 whitespace-pre-line">
+                            {row.description
+                              .split(/\n\s*\n/)
+                              .slice(1)
+                              .join("\n\n")}
+                          </p>
+                        </details>
+                      )}
+                    </div>
+                  )}
+                  <AudienceGeography audience={row} />
+                  <div className="flex flex-wrap gap-2 border-t pt-3 text-xs text-muted-foreground">
+                    {platforms.includes("meta_ads") && (
+                      <a
+                        className="rounded-md bg-muted px-2 py-1 hover:text-foreground"
+                        href="#platform-meta_ads"
+                      >
+                        Meta ·{" "}
+                        {metaTargets[row.id]
+                          ? "linked audience"
+                          : "delivery plan"}
+                      </a>
+                    )}
+                    {platforms.includes("google_ads") && (
+                      <a
+                        className="rounded-md bg-muted px-2 py-1 hover:text-foreground"
+                        href="#platform-google_ads"
+                      >
+                        Google · delivery plan
+                      </a>
+                    )}
                   </div>
                 </div>
-                {row.description && (
-                  <p className="text-xs text-muted-foreground">
-                    {row.description}
-                  </p>
-                )}
-                <div className="space-y-2 border-t pt-3">
-                  <h4 className="text-xs font-medium text-muted-foreground">
-                    Platform targeting
-                  </h4>
-                  <GeographyChips
-                    label="States"
-                    values={row.geography?.states}
-                  />
-                  <GeographyChips
-                    label="Regions"
-                    values={row.geography?.regions}
-                  />
-                  <GeographyChips
-                    label="City targets"
-                    values={row.geography?.cities}
-                  />
-                  <GeographyChips
-                    label="Countries"
-                    values={row.geography?.countries}
-                  />
-                  <GeographyChips
-                    label="Search terms"
-                    values={row.keywords ?? undefined}
-                  />
-                  <GeographyChips
-                    label="Excluded terms"
-                    values={row.excludedKeywords ?? undefined}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {row.ageMin != null || row.ageMax != null
-                      ? `Ages ${row.ageMin ?? 13}–${row.ageMax ?? "65+"}`
-                      : "No age narrowing"}
-                  </p>
-                </div>
-                {!!row.geography?.originCities?.length && (
-                  <div className="space-y-2 border-t pt-3">
-                    <GeographyChips
-                      label="Feeder cities"
-                      values={row.geography.originCities}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Planning context for this audience.
-                    </p>
-                  </div>
-                )}
-              </div>
-            ))}
+              ))}
+            </div>
           </section>
-          <aside className="space-y-4 rounded-xl border bg-card p-5">
-            <AudienceMap audiences={audiences} />
-          </aside>
         </div>
       )}
       {remove.error && (

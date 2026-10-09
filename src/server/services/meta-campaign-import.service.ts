@@ -7,6 +7,7 @@ import {
   campaignTable,
   adTable,
   audienceTable,
+  platformDeliveryGroupTable,
   platformCampaignTable,
   mediaAssetTable,
   mediaFolderTable,
@@ -215,25 +216,51 @@ export async function importMetaCampaign(
         },
       })
       .where(eq(platformCampaignTable.id, pc!.id));
+    // Replace the empty planning placeholder with the source's native groups.
+    await db
+      .delete(platformDeliveryGroupTable)
+      .where(
+        and(
+          eq(platformDeliveryGroupTable.platformCampaignId, pc!.id),
+          isNull(platformDeliveryGroupTable.audienceId),
+          isNull(platformDeliveryGroupTable.externalId),
+        ),
+      );
     for (const set of sets) {
       const targeting = object(set.targeting),
         geo = object(targeting.geo_locations);
-      await db.insert(audienceTable).values({
+      const [audience] = await db
+        .insert(audienceTable)
+        .values({
+          brandId: brand.id,
+          campaignId: created.campaign.id,
+          name: string(set.name),
+          description: `Imported Meta ad set ${string(set.id)}; full source settings retained on the platform draft.`,
+        })
+        .returning();
+      await db.insert(platformDeliveryGroupTable).values({
         brandId: brand.id,
-        campaignId: created.campaign.id,
+        platformCampaignId: pc!.id,
+        audienceId: audience!.id,
         name: string(set.name),
-        ageMin:
-          typeof targeting.age_min === "number" ? targeting.age_min : null,
-        ageMax:
-          typeof targeting.age_max === "number" ? targeting.age_max : null,
-        geography: {
-          regions: objects(geo.regions).map((r) => string(r.name)),
-          countries: Array.isArray(geo.countries)
-            ? (geo.countries as string[])
-            : undefined,
-        },
+        status: "draft",
+        targetingSpec: set,
         optimizationGoal: string(set.optimization_goal),
-        description: `Imported Meta ad set ${string(set.id)}; full source settings retained on the platform draft.`,
+        configuration: {
+          platform: "meta_ads",
+          targeting: {
+            ageMin:
+              typeof targeting.age_min === "number" ? targeting.age_min : null,
+            ageMax:
+              typeof targeting.age_max === "number" ? targeting.age_max : null,
+            geography: {
+              regions: objects(geo.regions).map((r) => string(r.name)),
+              countries: Array.isArray(geo.countries)
+                ? (geo.countries as string[])
+                : undefined,
+            },
+          },
+        },
       });
     }
     for (const c of creatives) {

@@ -5,7 +5,7 @@ import { generateText, Output } from "ai";
 import { z } from "zod";
 
 import { usStateCode, usStateName } from "@/lib/us-states";
-import type { AudienceGeographyPlan } from "@/server/db/schema";
+import type { DeliveryGeography } from "@/server/db/schema";
 
 const MODEL = "claude-sonnet-5";
 
@@ -60,7 +60,7 @@ const ResolvedSchema = z.object({
     ),
 });
 
-export type ResolvedGeography = AudienceGeographyPlan & {
+export type ResolvedGeography = DeliveryGeography & {
   /** Named travel markets, the part no lookup table can derive. */
   markets?: string[];
 };
@@ -78,7 +78,7 @@ type LocationRow = {
  * every exit from the resolver below lands here. It still collapses a state
  * name to its code, which handles the one case we know by name.
  */
-export function geographyByLookup(rows: LocationRow[]): AudienceGeographyPlan {
+export function geographyByLookup(rows: LocationRow[]): DeliveryGeography {
   const countries = new Set<string>();
   const states = new Set<string>();
   const cities = new Set<string>();
@@ -92,7 +92,7 @@ export function geographyByLookup(rows: LocationRow[]): AudienceGeographyPlan {
     if (city) cities.add(city);
   }
 
-  const plan: AudienceGeographyPlan = {};
+  const plan: DeliveryGeography = {};
   if (countries.size > 0) plan.countries = [...countries].sort();
   if (states.size > 0) {
     plan.states = [...states].sort();

@@ -50,24 +50,11 @@ export function creativeDirectionText(direction?: CreativeDirection | null) {
 }
 
 const phrases = z.array(z.string().trim().min(1).max(160)).max(8);
-export const personaProfileSchema = z.object({
+export const personaProfileSchema = z.strictObject({
   motivation: z.string().trim().min(1).max(500),
   needs: phrases,
   objections: phrases,
   decisionCriteria: phrases,
-  homeIds: z.array(z.string().min(1)).max(100),
-  fitReason: z.string().max(500),
-  travel: z
-    .object({
-      purpose: z.string().max(100).nullable(),
-      partyMin: z.number().int().min(1).max(100).nullable(),
-      partyMax: z.number().int().min(1).max(100).nullable(),
-      bookingWindow: z.string().max(100).nullable(),
-      stayLength: z.string().max(100).nullable(),
-      priceSensitivity: z.enum(["low", "medium", "high"]).nullable(),
-      mustHaves: phrases,
-    })
-    .nullable(),
   evidenceNote: z.string().trim().min(1).max(600),
 });
 export type PersonaProfile = z.infer<typeof personaProfileSchema>;

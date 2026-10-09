@@ -409,7 +409,7 @@ export default async function BrandAdsPage({
     ...planAudiences.map((aud) => {
       const campaignName =
         campaigns.find((row) => row.id === aud.campaignId)?.name ?? "?";
-      return `- ${aud.name} (in ${campaignName})${aud.ageMin != null || aud.ageMax != null ? ` · ${aud.ageMin ?? "13"}-${aud.ageMax ?? "65+"}` : ""}${aud.geography?.regions?.length ? ` · ${aud.geography.regions.join(", ")}` : ""}`;
+      return `- ${aud.name} (in ${campaignName})${aud.description ? ` · ${aud.description}` : ""}`;
     }),
     unmappedAudiences.length
       ? `\n## Platform audiences not mapped to one of the above (${unmappedAudiences.length})`

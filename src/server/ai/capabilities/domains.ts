@@ -99,6 +99,7 @@ import {
   setCreativePoolAction,
   setDeliveryAction,
   setPlatformDraftAction,
+  setDeliveryGroupAction,
   topAds,
   updateAudienceAction,
   writeGoogleTextAdsAction,
@@ -146,6 +147,7 @@ import {
   deletePersona,
   listPersonas,
   suggestPersonas,
+  wanderOsResearchContext,
   updatePersona,
 } from "./personas";
 import { getBrandMap } from "./brand-map";
@@ -450,7 +452,11 @@ export const performanceWrite = growthDomainTool({
 export const personaRead = growthDomainTool({
   description:
     "Read a brand's personas — the stable 'who we talk to' layer that inspires campaign audiences and content.",
-  actions: { list: listPersonas, suggest: suggestPersonas },
+  actions: {
+    list: listPersonas,
+    suggest: suggestPersonas,
+    wanderOsContext: wanderOsResearchContext,
+  },
 });
 
 export const personaWrite = growthDomainTool({
@@ -649,6 +655,7 @@ export const adsWrite = growthDomainTool({
     planPlatform: planPlatformAction,
     setCreativePool: setCreativePoolAction,
     setPlatformDraft: setPlatformDraftAction,
+    setDeliveryGroup: setDeliveryGroupAction,
     attachCampaign: attachCampaignAction,
     importMetaCampaign: importMetaCampaignAction,
     pullPlatformAudiences: pullPlatformAudiencesAction,
