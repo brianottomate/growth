@@ -25,6 +25,32 @@ export function CardBilling({
   className?: string;
   dense?: boolean;
 }) {
+  if (dense) {
+    return (
+      <div
+        className={cn(
+          "grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)] items-start gap-x-2 gap-y-1 text-[10px]",
+          className,
+        )}
+      >
+        <span className="text-muted-foreground">Billing month</span>
+        <span className="text-muted-foreground">Fee</span>
+        <span className="text-muted-foreground">Spend</span>
+        <DenseCycle
+          label={periodLabel(card.billing.period)}
+          cycle={card.billing.current}
+        />
+        <DenseCycle
+          label={
+            card.billing.upcoming
+              ? periodLabel(card.billing.upcoming.period)
+              : "Next month"
+          }
+          cycle={card.billing.upcoming}
+        />
+      </div>
+    );
+  }
   return (
     <div className={cn("space-y-1 text-[11px]", className)}>
       <div className="flex flex-wrap gap-x-3 gap-y-1 tabular-nums">
@@ -43,43 +69,22 @@ export function CardBilling({
           )}
         </span>
       </div>
-      {card.stage !== "prospects" &&
-        (dense ? (
-          <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)] items-start gap-x-2 gap-y-1 text-[10px]">
-            <span className="text-muted-foreground">Billing month</span>
-            <span className="text-muted-foreground">Fee</span>
-            <span className="text-muted-foreground">Ads</span>
-            <DenseCycle
-              label={`Current · ${periodLabel(card.billing.period)}`}
-              cycle={card.billing.current}
-              card={card}
-            />
-            <DenseCycle
-              label={
-                card.billing.upcoming
-                  ? `Next · ${periodLabel(card.billing.upcoming.period)}`
-                  : "Next month"
-              }
-              cycle={card.billing.upcoming}
-              card={card}
-            />
-          </div>
-        ) : (
-          <div className="space-y-1">
-            <CycleReceipt
-              label={`Current · ${periodLabel(card.billing.period)}`}
-              cycle={card.billing.current}
-            />
-            <CycleReceipt
-              label={
-                card.billing.upcoming
-                  ? `Upcoming · ${periodLabel(card.billing.upcoming.period)}`
-                  : "Upcoming"
-              }
-              cycle={card.billing.upcoming}
-            />
-          </div>
-        ))}
+      {card.stage !== "prospects" && (
+        <div className="space-y-1">
+          <CycleReceipt
+            label={`Current · ${periodLabel(card.billing.period)}`}
+            cycle={card.billing.current}
+          />
+          <CycleReceipt
+            label={
+              card.billing.upcoming
+                ? `Upcoming · ${periodLabel(card.billing.upcoming.period)}`
+                : "Upcoming"
+            }
+            cycle={card.billing.upcoming}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -103,7 +108,7 @@ function CycleReceipt({
             invoiceState={cycle.feeInvoiceState}
           />
           <Receipt
-            label="Ads"
+            label="Spend"
             amount={cycle.clientMediaContribution}
             paidAt={cycle.mediaPaidAt}
             invoiceState={cycle.mediaInvoiceState}
@@ -122,14 +127,12 @@ function Receipt({
   paidAt,
   invoiceState,
   dense = false,
-  recurring,
 }: {
   label: string;
   amount: number | null;
   paidAt: Date | null;
   invoiceState?: "Not invoiced" | "Open" | null;
   dense?: boolean;
-  recurring?: number | null;
 }) {
   const status = paidAt ? "Paid" : (invoiceState ?? "Not recorded");
   return (
@@ -140,16 +143,18 @@ function Receipt({
           : "inline-flex items-center gap-1 rounded border px-1.5 py-0.5"
       }
       style={{
-        color: paidAt
-          ? "var(--color-success)"
-          : status === "Open"
-            ? "var(--color-warning)"
-            : undefined,
+        color: dense
+          ? undefined
+          : paidAt
+            ? "var(--color-success)"
+            : status === "Open"
+              ? "var(--color-warning)"
+              : undefined,
       }}
       title={`${label}: ${money(amount)}${paidAt ? ` · Marked Paid ${new Date(paidAt).toLocaleDateString("en-US", { timeZone: "UTC" })}` : ""}`}
       aria-label={`${label}: ${money(amount)}, ${status}`}
     >
-      {(!dense || (amount != null && amount !== recurring)) && (
+      {(!dense || amount != null) && (
         <span className="text-muted-foreground">
           {!dense && label}
           {amount != null ? ` ${money(amount)}` : ""}
@@ -163,11 +168,9 @@ function Receipt({
 function DenseCycle({
   label,
   cycle,
-  card,
 }: {
   label: string;
   cycle: PipelineBillingCycle | null;
-  card: PerformancePipelineCard;
 }) {
   return (
     <>
@@ -180,15 +183,13 @@ function DenseCycle({
             paidAt={cycle.feePaidAt}
             invoiceState={cycle.feeInvoiceState}
             dense
-            recurring={card.management}
           />
           <Receipt
-            label="Ads"
+            label="Spend"
             amount={cycle.clientMediaContribution}
             paidAt={cycle.mediaPaidAt}
             invoiceState={cycle.mediaInvoiceState}
             dense
-            recurring={card.spend}
           />
         </>
       ) : (
