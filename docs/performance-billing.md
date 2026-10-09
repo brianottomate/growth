@@ -6,12 +6,23 @@ end date. Amounts are USD with two decimal places. Tracker/chat commercial setti
 independently. Neither store automatically synchronizes commercial edits to
 the other.
 
-Each `performance_cycle` snapshots one calendar month. `billedAmount` is the
+Billing is currently a manually maintained spreadsheet. Chat saves operator input
+directly, including overwrites, without payment-provider or campaign verification.
+Use `brandWrite.setPerformanceSettings` with `patch.billing` containing a required
+`period` (`YYYY-MM`) and any of `managementFee`, `adSpend`, `managementPayment`,
+or `spendPayment`. Paid, Open (unpaid), and Not invoiced are manual statuses;
+null clears a cell and omitted fields remain unchanged. Past and future months
+are equally editable. The result includes the actual saved billing row.
+Recording payment never changes the client's journey, business stage, delivery,
+or campaign state. Recurring card amounts remain separately editable as
+`monthlyFee` and `agreedAdSpend`.
+
+Each `performance_cycle` stores one calendar month. `billedAmount` is the
 management fee, `mediaBudget` is the full ad spending limit, and
 `clientMediaContribution` is the client media charge. Wander's media contribution
 is budget minus client contribution. Null amounts mean unrecorded; zero means a
 recorded zero. Actual spend remains in cents. Fee/media paid dates are manual
-receipts, independent of the cycle's delivery status. The cycle also owns
+Paid markers, independent of the cycle's delivery status. The cycle also owns
 fee/media invoice states (Open, Not invoiced, or unrecorded). Card reads derive
 Paid from these timestamps for the selected billing month; there is no separate
 brand JSON payment flag to synchronize. Clearing Paid records Open. Brand
@@ -56,3 +67,4 @@ bun run db:experiment verify-internal-billing -- bun --conditions=react-server s
 The script rejects ordinary database connections and tests generation, monthly
 edit preservation, payment dates, current-month selection, workspace isolation,
 zero budgets and the AI result contracts. It cleans up its own fixtures.
+

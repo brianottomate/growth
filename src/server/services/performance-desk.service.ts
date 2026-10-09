@@ -92,6 +92,8 @@ export type DeskBrand = {
     billedAmount: number | null;
     mediaBudget: number | null;
     clientMediaContribution: number | null;
+    feeInvoiceState?: "Not invoiced" | "Open" | null;
+    mediaInvoiceState?: "Not invoiced" | "Open" | null;
     feePaidAt: Date | null;
     mediaPaidAt: Date | null;
   }[];

@@ -118,7 +118,9 @@ for (const row of reviewed) {
           throw new Error(`Verification failed: ${row.slug} ${field}`);
     } else if (
       JSON.stringify(
-        saved?.performanceSettings?.[key as keyof typeof row.patch],
+        saved?.performanceSettings?.[
+          key as keyof NonNullable<typeof saved.performanceSettings>
+        ],
       ) !== JSON.stringify(value)
     )
       throw new Error(`Verification failed: ${row.slug} ${key}`);

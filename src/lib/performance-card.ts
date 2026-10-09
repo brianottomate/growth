@@ -9,6 +9,8 @@ export type PipelineBillingCycle = {
   billedAmount: number | null;
   mediaBudget: number | null;
   clientMediaContribution: number | null;
+  feeInvoiceState?: "Not invoiced" | "Open" | null;
+  mediaInvoiceState?: "Not invoiced" | "Open" | null;
   feePaidAt: Date | null;
   mediaPaidAt: Date | null;
 };
@@ -24,6 +26,7 @@ export type PerformancePipelineCard = {
   state: PerformanceCardState;
   management: number | null;
   spend: number | null;
+  billingCycles: PipelineBillingCycle[];
   billing: {
     period: string;
     current: PipelineBillingCycle | null;
@@ -65,6 +68,8 @@ export function performanceCardFromBrand(brand: {
 }): PerformancePipelineCard {
   const period = currentPeriod();
   const cycles = brand.billingCycles ?? [];
+  const selectedPeriod = brand.settings?.cardState?.billingPeriod ?? period;
+  const selectedCycle = cycles.find((cycle) => cycle.period === selectedPeriod);
   return {
     id: brand.id,
     name: brand.name,
@@ -75,7 +80,16 @@ export function performanceCardFromBrand(brand: {
       relationship: brand.relationship,
       pipelineStage: brand.settings?.pipelineStage,
     }),
-    state: brand.settings?.cardState ?? {},
+    state: {
+      ...brand.settings?.cardState,
+      billingPeriod: selectedPeriod,
+      managementPayment: selectedCycle?.feePaidAt
+        ? "Paid"
+        : (selectedCycle?.feeInvoiceState ?? null),
+      spendPayment: selectedCycle?.mediaPaidAt
+        ? "Paid"
+        : (selectedCycle?.mediaInvoiceState ?? null),
+    },
     pipelineOrder: brand.settings?.pipelineOrder ?? null,
     intakeUrl: brand.intakeUrl,
     effectiveDate: brand.settings?.effectiveDate,
@@ -86,6 +100,7 @@ export function performanceCardFromBrand(brand: {
     noteEditedBy: brand.settings?.noteEditedBy,
     management: brand.settings?.monthlyFee ?? null,
     spend: brand.settings?.agreedAdSpend ?? null,
+    billingCycles: cycles,
     billing: {
       period,
       current: cycles.find((cycle) => cycle.period === period) ?? null,

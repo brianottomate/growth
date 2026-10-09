@@ -1,4 +1,7 @@
+import { readPaymentSettings } from "./performance-payment-state";
 import "server-only";
+import { manualBillingPatchSchema } from "@/lib/manual-billing";
+import { currentPeriod } from "@/lib/performance-billing";
 
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -15,14 +18,11 @@ import {
   type Database,
   type TransactionClient,
 } from "@/server/db";
+import { brandTable, userTable } from "@/server/db/schema";
 import {
-  brandTable,
-  userTable,
-  performanceCycleTable,
-} from "@/server/db/schema";
-import { ensureCurrentCycle } from "./performance-billing.service";
-import { readPaymentSettings } from "./performance-payment-state";
-import { advanceBusinessStage } from "./brand-relationship.service";
+  writeManualBilling,
+  manualBillingResult,
+} from "./performance-billing.service";
 import type { PerformanceSettings } from "@/server/db/brand-schema";
 import type { PerformanceIntakeAnswers } from "@/server/db/performance-schema";
 
@@ -36,6 +36,7 @@ const text = z.string().max(500);
 
 /** What a patch may carry. An empty string clears a cell; omitted keys are untouched. */
 export const performanceSettingsPatchSchema = z.object({
+  billing: manualBillingPatchSchema.optional(),
   note: z.string().trim().max(2000).nullish(),
   cardState: performanceCardStateSchema.nullish(),
   pipelineStage: z.enum(STORED_PIPELINE_STAGES).nullish(),
@@ -88,21 +89,12 @@ type SettingsInput = {
   from: NonNullable<PerformanceSettings["updatedFrom"]>;
   client?: Database | TransactionClient;
 };
-
-export async function setPerformanceSettings(
-  input: SettingsInput,
-): Promise<{ settings: PerformanceSettings; changed: string[] }> {
-  const result = input.client
-    ? await writePerformanceSettings(input, input.client)
-    : await withTransaction((client) =>
-        writePerformanceSettings(input, client),
-      );
-  if (input.patch.cardState?.managementPayment === "Paid")
-    await advanceBusinessStage(input.brandId, "paid");
-  return result;
+export async function setPerformanceSettings(input: SettingsInput) {
+  return input.client
+    ? writeSettings(input, input.client)
+    : withTransaction((client) => writeSettings(input, client));
 }
-
-async function writePerformanceSettings(
+async function writeSettings(
   input: SettingsInput,
   client: Database | TransactionClient,
 ) {
@@ -120,7 +112,7 @@ async function writePerformanceSettings(
   const next: PerformanceSettings = { ...current };
   const changed: string[] = [];
   for (const [key, raw] of Object.entries(input.patch)) {
-    if (raw === undefined) continue;
+    if (raw === undefined || key === "billing") continue;
     const value =
       key === "cardState" && raw != null
         ? mergePerformanceCardState(
@@ -132,15 +124,33 @@ async function writePerformanceSettings(
           : raw === ""
             ? null
             : raw;
-    const k = key as keyof PerformanceSettingsPatch;
+    const k = key as keyof PerformanceSettings;
     (next as Record<string, unknown>)[k] = value;
-    if (
-      JSON.stringify(current[k]) === JSON.stringify(value) ||
-      (current[k] == null && value == null)
-    )
-      continue;
     changed.push(k);
   }
+  const payment = input.patch.cardState;
+  const billingPatch =
+    input.patch.billing ??
+    (payment?.managementPayment !== undefined ||
+    payment?.spendPayment !== undefined
+      ? {
+          period: payment?.billingPeriod ?? currentPeriod(),
+          managementPayment: payment?.managementPayment,
+          spendPayment: payment?.spendPayment,
+        }
+      : undefined);
+  const billing = billingPatch
+    ? manualBillingResult(
+        await writeManualBilling(
+          { orgId: input.orgId },
+          input.brandId,
+          billingPatch,
+          client,
+        ),
+      )
+    : undefined;
+  if (billingPatch) changed.push("billing");
+  if (changed.length === 0) return { settings: current, changed, billing };
 
   next.updatedAt = new Date().toISOString();
   const editor = input.by
@@ -163,47 +173,14 @@ async function writePerformanceSettings(
         }
       : { id: null, name: input.by, image: null };
   }
-  // Payment is owned by the selected billing cycle, never persisted in brand JSON.
-  const state = input.patch.cardState;
-  if (
-    state?.managementPayment !== undefined ||
-    state?.spendPayment !== undefined
-  ) {
-    const cycle = await ensureCurrentCycle(
-      { orgId: input.orgId },
-      brand.id,
-      next.cardState?.billingPeriod ?? undefined,
-      state.managementPayment === "Paid" || state.spendPayment === "Paid",
-    );
-    const paymentChanges: Partial<typeof performanceCycleTable.$inferInsert> =
-      {};
-    for (const [key, paidAtKey, invoiceKey] of [
-      ["managementPayment", "feePaidAt", "feeInvoiceState"],
-      ["spendPayment", "mediaPaidAt", "mediaInvoiceState"],
-    ] as const) {
-      const value = state[key];
-      if (value === undefined) continue;
-      paymentChanges[paidAtKey] =
-        value === "Paid" ? (cycle[paidAtKey] ?? new Date()) : null;
-      paymentChanges[invoiceKey] = value === "Paid" ? null : value;
-    }
-    await client
-      .update(performanceCycleTable)
-      .set(paymentChanges)
-      .where(eq(performanceCycleTable.id, cycle.id));
-  }
   // Patch submitted facts atomically, preserving concurrent board moves and
   // edits to unrelated settings instead of replacing the read snapshot.
   const patch = Object.fromEntries(
-    Object.keys(input.patch)
-      .filter(
-        (key) =>
-          key !== "cardState" &&
-          input.patch[key as keyof PerformanceSettingsPatch] !== undefined,
-      )
+    changed
+      .filter((key) => key !== "cardState" && key !== "billing")
       .map((key) => [key, next[key as keyof PerformanceSettings]]),
   );
-  if (input.patch.pipelineStage !== undefined) patch.pipelineOrder = null;
+  if (changed.includes("pipelineStage")) patch.pipelineOrder = null;
   Object.assign(patch, {
     updatedAt: next.updatedAt,
     updatedBy: next.updatedBy,
@@ -215,16 +192,11 @@ async function writePerformanceSettings(
       noteEditedBy: next.noteEditedBy,
     });
   let expression = sql`coalesce(${brandTable.performanceSettings}, '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb`;
-  if (input.patch.cardState !== undefined) {
-    const {
-      managementPayment: _fee,
-      spendPayment: _media,
-      ...cardPatch
-    } = input.patch.cardState ?? {};
+  if (changed.includes("cardState")) {
     const state =
       input.patch.cardState == null
         ? sql`'null'::jsonb`
-        : sql`(coalesce(nullif(${brandTable.performanceSettings}->'cardState', 'null'::jsonb), '{}'::jsonb) || ${JSON.stringify(cardPatch)}::jsonb) - 'managementPayment' - 'spendPayment'`;
+        : sql`(coalesce(nullif(${brandTable.performanceSettings}->'cardState', 'null'::jsonb), '{}'::jsonb) || ${JSON.stringify(Object.fromEntries(Object.entries(performanceCardStateSchema.parse(input.patch.cardState)).filter(([key]) => key !== "managementPayment" && key !== "spendPayment")))}::jsonb) - 'managementPayment' - 'spendPayment'`;
     expression = sql`jsonb_set(${expression}, '{cardState}', ${state}, true)`;
   }
   const saved = await client
@@ -246,6 +218,7 @@ async function writePerformanceSettings(
       client,
     ),
     changed,
+    billing,
   };
 }
 
@@ -300,7 +273,7 @@ export async function fillSettingsFromIntake(input: {
   const candidate = settingsFromIntake(input.answers);
   const patch: PerformanceSettingsPatch = {};
   for (const [key, value] of Object.entries(candidate)) {
-    const k = key as keyof PerformanceSettingsPatch;
+    const k = key as keyof PerformanceSettings;
     if (value === undefined) continue;
     if (current[k] != null && current[k] !== "") continue;
     (patch as Record<string, unknown>)[k] = value;

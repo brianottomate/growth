@@ -643,16 +643,14 @@ export async function updatePerformanceCycle(
       ...changes,
       ...(feePaid !== undefined
         ? {
-            feePaidAt: feePaid ? (currentCycle.feePaidAt ?? new Date()) : null,
+            feePaidAt: feePaid ? new Date() : null,
             feeInvoiceState: feePaid ? null : "Open",
           }
         : {}),
       ...(mediaPaid !== undefined
         ? {
             mediaInvoiceState: mediaPaid ? null : "Open",
-            mediaPaidAt: mediaPaid
-              ? (currentCycle.mediaPaidAt ?? new Date())
-              : null,
+            mediaPaidAt: mediaPaid ? new Date() : null,
           }
         : {}),
       ...(startAt !== undefined

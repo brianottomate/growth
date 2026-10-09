@@ -847,9 +847,26 @@ function EditClientState({
       return;
     }
     const cardPatch: PerformanceCardState = {};
+    const cycle = card.billingCycles.find(
+      (cycle) => cycle.period === state.billingPeriod,
+    );
+    const originalState = {
+      ...card.state,
+      managementPayment: cycle?.feePaidAt
+        ? "Paid"
+        : (cycle?.feeInvoiceState ?? null),
+      spendPayment: cycle?.mediaPaidAt
+        ? "Paid"
+        : (cycle?.mediaInvoiceState ?? null),
+    };
     for (const [key, value] of Object.entries(validated.data))
-      if (value !== card.state[key as keyof PerformanceCardState])
+      if (value !== originalState[key as keyof PerformanceCardState])
         (cardPatch as Record<string, unknown>)[key] = value;
+    if (
+      cardPatch.managementPayment !== undefined ||
+      cardPatch.spendPayment !== undefined
+    )
+      cardPatch.billingPeriod = state.billingPeriod;
     save.mutate({
       brandId: card.id,
       patch: {
@@ -984,12 +1001,22 @@ function EditClientState({
               aria-label="Billing month"
               type="month"
               value={state.billingPeriod ?? ""}
-              onChange={(event) =>
+              onChange={(event) => {
+                const period = event.target.value || null;
+                const cycle = card.billingCycles.find(
+                  (cycle) => cycle.period === period,
+                );
                 setState((current) => ({
                   ...current,
-                  billingPeriod: event.target.value || null,
-                }))
-              }
+                  billingPeriod: period,
+                  managementPayment: cycle?.feePaidAt
+                    ? "Paid"
+                    : (cycle?.feeInvoiceState ?? null),
+                  spendPayment: cycle?.mediaPaidAt
+                    ? "Paid"
+                    : (cycle?.mediaInvoiceState ?? null),
+                }));
+              }}
             />
           </label>
           <label className="space-y-1 text-xs">

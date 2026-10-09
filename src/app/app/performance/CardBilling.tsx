@@ -77,11 +77,13 @@ function CycleReceipt({
             label="Fee"
             amount={cycle.billedAmount}
             paidAt={cycle.feePaidAt}
+            invoiceState={cycle.feeInvoiceState}
           />
           <Receipt
             label="Ads"
             amount={cycle.clientMediaContribution}
             paidAt={cycle.mediaPaidAt}
+            invoiceState={cycle.mediaInvoiceState}
           />
         </>
       ) : (
@@ -95,33 +97,31 @@ function Receipt({
   label,
   amount,
   paidAt,
+  invoiceState,
 }: {
   label: string;
   amount: number | null;
   paidAt: Date | null;
+  invoiceState?: "Not invoiced" | "Open" | null;
 }) {
-  // A zero charge needs no receipt; an unknown charge is not assumed paid.
-  const status = paidAt
-    ? "Paid"
-    : amount === 0
-      ? "No charge"
-      : amount == null
-        ? "Not recorded"
-        : "Open";
+  const status = paidAt ? "Paid" : (invoiceState ?? "Not recorded");
   return (
     <span
       className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5"
       style={{
         color: paidAt
           ? "var(--color-success)"
-          : amount != null && amount > 0
+          : status === "Open"
             ? "var(--color-warning)"
             : undefined,
       }}
-      title={`${label}: ${money(amount)}${paidAt ? ` · Payment recorded ${new Date(paidAt).toLocaleDateString("en-US", { timeZone: "UTC" })}` : ""}`}
+      title={`${label}: ${money(amount)}${paidAt ? ` · Marked Paid ${new Date(paidAt).toLocaleDateString("en-US", { timeZone: "UTC" })}` : ""}`}
       aria-label={`${label}: ${money(amount)}, ${status}`}
     >
-      <span className="text-muted-foreground">{label}</span>
+      <span className="text-muted-foreground">
+        {label}
+        {amount != null ? ` ${money(amount)}` : ""}
+      </span>
       <span className="font-medium">{status}</span>
     </span>
   );

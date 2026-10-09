@@ -1,3 +1,4 @@
+import { manualBillingResultSchema } from "@/lib/manual-billing";
 import { creativeDirectionSchema } from "@/lib/brand-direction";
 import { catalogAdCopySchema } from "@/lib/catalog-studio";
 import { homesSchema, metaReportingConversionsSchema } from "./shared";
@@ -121,6 +122,7 @@ export const setPerformanceSettingsActionOutputSchema = z.strictObject({
   ok: z.literal(true),
   path: z.string(),
   settings: performanceSettingsSchema,
+  billing: manualBillingResultSchema.optional(),
 });
 
 export const getBrandOutputSchema = z.strictObject({
