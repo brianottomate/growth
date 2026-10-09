@@ -27,11 +27,17 @@ const selectClass = "h-9 w-full rounded-md border bg-background px-3 text-sm";
 export function ClientPreviewLink({
   brandId,
   campaign,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
 }: {
   brandId: string;
   campaign?: { id: string; name: string };
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [localOpen, setLocalOpen] = useState(false);
+  const open = controlledOpen ?? localOpen;
+  const setOpen = controlledOnOpenChange ?? setLocalOpen;
   const [campaignId, setCampaignId] = useState(campaign?.id ?? "");
   // Null keeps the existing live preview of every approved campaign ad.
   const [selectedAdIds, setSelectedAdIds] = useState<string[] | null>(null);
@@ -88,10 +94,12 @@ export function ClientPreviewLink({
       size="lg"
       scrollable
       trigger={
-        <Button size="sm" variant="outline">
-          <Share2 className="size-3.5" />
-          Client preview
-        </Button>
+        controlledOpen === undefined ? (
+          <Button size="sm" variant="outline">
+            <Share2 className="size-3.5" />
+            Client preview
+          </Button>
+        ) : undefined
       }
     >
       {link ? (

@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { MoreHorizontal, Trash2 } from "lucide-react";
+import { MoreHorizontal, Share2, Trash2 } from "lucide-react";
 
+import { ClientPreviewLink } from "@/app/app/performance/clients/[brandSlug]/ads/ClientPreviewLink";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -30,6 +31,7 @@ import { orpc } from "@/orpc/client";
  */
 export function DeleteCampaignButton({
   campaignId,
+  previewBrandId,
   campaignName,
   brandSlug,
   livePlatformCampaigns,
@@ -39,6 +41,7 @@ export function DeleteCampaignButton({
   listPath,
 }: {
   campaignId: string;
+  previewBrandId?: string;
   campaignName: string;
   brandSlug: string;
   livePlatformCampaigns: number;
@@ -52,6 +55,7 @@ export function DeleteCampaignButton({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const onPlatform = livePlatformCampaigns > 0;
   const finish = (result: { mediaCleanup: { errors: string[] } }) => {
@@ -92,6 +96,12 @@ export function DeleteCampaignButton({
             <MoreHorizontal className="size-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
+            {previewBrandId && (
+              <DropdownMenuItem onSelect={() => setPreviewOpen(true)}>
+                <Share2 className="size-4" />
+                Client preview
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem
               variant="destructive"
               onClick={() => setOpen(true)}
@@ -112,6 +122,14 @@ export function DeleteCampaignButton({
         </Button>
       )}
 
+      {previewBrandId && previewOpen && (
+        <ClientPreviewLink
+          brandId={previewBrandId}
+          campaign={{ id: campaignId, name: campaignName }}
+          open={previewOpen}
+          onOpenChange={setPreviewOpen}
+        />
+      )}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>

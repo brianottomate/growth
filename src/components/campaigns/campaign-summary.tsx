@@ -153,7 +153,7 @@ export function CampaignListRow({
 }) {
   return (
     <div className="@container/campaign min-w-0">
-      <div className="grid grid-cols-1 gap-3 px-4 py-4 @4xl/campaign:grid-cols-[minmax(0,1fr)_auto] @4xl/campaign:items-center @4xl/campaign:gap-6">
+      <div className="grid grid-cols-1 gap-3 px-4 py-4 @4xl/campaign:grid-cols-[minmax(0,1fr)_auto] @4xl/campaign:items-start @4xl/campaign:gap-6">
         <div className="min-w-0 space-y-3">
           <CampaignSummary
             compact
@@ -166,20 +166,16 @@ export function CampaignListRow({
           {thumbnails}
         </div>
         {(platforms || spend || actions) && (
-          <div className="flex min-w-0 flex-col gap-3 border-t pt-3 @4xl/campaign:border-0 @4xl/campaign:pt-0">
-            {(platforms || spend) && (
-              <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
-                {platforms}
-                {spend && (
-                  <span className="ml-auto shrink-0 whitespace-nowrap">
-                    {spend}
-                  </span>
-                )}
+          <div className="flex min-w-0 flex-col gap-2 border-t pt-3 @4xl/campaign:items-end @4xl/campaign:border-0 @4xl/campaign:pt-0">
+            {actions && (
+              <div className="flex flex-wrap items-center gap-1 @4xl/campaign:justify-end">
+                {actions}
               </div>
             )}
-            {actions && (
-              <div className="flex flex-wrap items-center gap-2 @4xl/campaign:justify-end">
-                {actions}
+            {(platforms || spend) && (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-muted-foreground @4xl/campaign:justify-end">
+                {platforms}
+                {spend && <span className="whitespace-nowrap">{spend}</span>}
               </div>
             )}
           </div>

@@ -221,12 +221,15 @@ export function CampaignRow({
         spend={<SpendCell campaign={campaign} />}
         actions={
           <>
-            <ClientPreviewLink
-              brandId={brand.id}
-              campaign={{ id: campaign.id, name: campaign.name }}
-            />
+            {!deletable && (
+              <ClientPreviewLink
+                brandId={brand.id}
+                campaign={{ id: campaign.id, name: campaign.name }}
+              />
+            )}
             {deletable && (
               <DeleteCampaignButton
+                previewBrandId={brand.id}
                 campaignId={campaign.id}
                 campaignName={campaign.name}
                 brandSlug={brand.slug ?? brand.id}
