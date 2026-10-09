@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LayoutTemplate, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -34,17 +35,34 @@ function defaultSendTime() {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T10:00`;
 }
 
+function recipeGroup(category: string) {
+  return ["Booking", "During the stay", "After the stay"].includes(category)
+    ? "Sequence emails"
+    : "Blasts";
+}
+
 export function NewsletterTemplateStart({
   brandId,
   primary = false,
+  initialTemplate = "season-ahead",
+  onDrafted,
 }: {
   brandId: string;
   primary?: boolean;
+  initialTemplate?: NewsletterTemplateId;
+  onDrafted?: (platformPostId: string) => void;
 }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [template, setTemplate] =
-    useState<NewsletterTemplateId>("season-ahead");
+    useState<NewsletterTemplateId>(initialTemplate);
+  const [group, setGroup] = useState(() =>
+    recipeGroup(
+      NEWSLETTER_TEMPLATES.find((item) => item.id === initialTemplate)!
+        .category,
+    ),
+  );
   const [angle, setAngle] = useState("");
   const [offer, setOffer] = useState("");
   const [context, setContext] = useState<Record<string, string>>({});
@@ -59,7 +77,13 @@ export function NewsletterTemplateStart({
     orpc.newsletter.draftFromTemplate.mutationOptions({
       onSuccess: (result) => {
         toast.success(`Drafted "${result.subject}"`);
-        router.push(result.url);
+        if (onDrafted) {
+          onDrafted(result.platformPostId);
+          setOpen(false);
+          void queryClient.invalidateQueries({
+            queryKey: orpc.emailSequence.emails.key(),
+          });
+        } else router.push(result.url);
       },
       onError: (error) => toast.error(error.message),
     }),
@@ -92,7 +116,10 @@ export function NewsletterTemplateStart({
         size="sm"
         onClick={() => setOpen(true)}
       >
-        <LayoutTemplate className="size-4" /> Start from a template
+        <LayoutTemplate className="size-4" />{" "}
+        {onDrafted || initialTemplate === "season-ahead"
+          ? "From template"
+          : "Use this template"}
       </Button>
       <Dialog
         open={open}
@@ -104,8 +131,47 @@ export function NewsletterTemplateStart({
           <DialogHeader>
             <DialogTitle>Start from a template</DialogTitle>
           </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Choose a shared recipe. Your draft uses this brand’s voice, homes
+            and email styling.
+          </p>
+          <Button variant="outline" asChild>
+            <Link
+              href={`/app/newsletters/templates?brandId=${encodeURIComponent(brandId)}`}
+            >
+              Browse the template wall
+            </Link>
+          </Button>
 
           <div className="space-y-3">
+            <div className="flex gap-2" aria-label="Template groups">
+              {["Blasts", "Sequence emails"].map((value) => (
+                <Button
+                  key={value}
+                  variant={group === value ? "secondary" : "outline"}
+                  size="sm"
+                  disabled={draft.isPending}
+                  aria-pressed={group === value}
+                  onClick={() => {
+                    setGroup(value);
+                    setTemplate(
+                      NEWSLETTER_TEMPLATES.find(
+                        (item) => recipeGroup(item.category) === value,
+                      )!.id,
+                    );
+                    setAngle("");
+                    setContext({});
+                    setHomeId("");
+                  }}
+                >
+                  {value}
+                </Button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Groups describe common uses; an individual recipe can work in
+              either. Each recipe creates one email.
+            </p>
             <Label htmlFor="email-recipe">Email recipe</Label>
             <select
               id="email-recipe"
@@ -120,7 +186,11 @@ export function NewsletterTemplateStart({
               }}
             >
               {[
-                ...new Set(NEWSLETTER_TEMPLATES.map((item) => item.category)),
+                ...new Set(
+                  NEWSLETTER_TEMPLATES.filter(
+                    (item) => recipeGroup(item.category) === group,
+                  ).map((item) => item.category),
+                ),
               ].map((category) => (
                 <optgroup key={category} label={category}>
                   {NEWSLETTER_TEMPLATES.filter(
@@ -248,17 +318,25 @@ export function NewsletterTemplateStart({
                 onChange={(event) => setOffer(event.target.value)}
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="template-send">Send</Label>
-              <Input
-                id="template-send"
-                type="datetime-local"
-                value={sendAt}
-                disabled={draft.isPending}
-                onChange={(event) => setSendAt(event.target.value)}
-              />
-            </div>
+            {!onDrafted && (
+              <div className="space-y-1.5">
+                <Label htmlFor="template-send">Send</Label>
+                <Input
+                  id="template-send"
+                  type="datetime-local"
+                  value={sendAt}
+                  disabled={draft.isPending}
+                  onChange={(event) => setSendAt(event.target.value)}
+                />
+              </div>
+            )}
           </div>
+          {onDrafted && (
+            <p className="text-sm text-muted-foreground">
+              This creates an unscheduled email for this step. Save the sequence
+              draft to keep its assignment; the sequence controls timing.
+            </p>
+          )}
 
           {noHomes && (
             <p className="text-sm text-destructive">
@@ -292,9 +370,10 @@ export function NewsletterTemplateStart({
                   ),
                   angle: angle.trim() || undefined,
                   offer: offer.trim() || undefined,
-                  plannedAt: sendAt
-                    ? new Date(sendAt).toISOString()
-                    : undefined,
+                  plannedAt:
+                    !onDrafted && sendAt
+                      ? new Date(sendAt).toISOString()
+                      : undefined,
                 })
               }
             >

@@ -33,6 +33,8 @@ import {
 } from "@/lib/validators/email-sequence";
 import { ExecutionPanel, ConditionEditor } from "./ExecutionPanel";
 import { SequenceTestAction } from "./SequenceTestPanel";
+import { SequenceEmailPreview } from "./SequenceEmailPreview";
+import { NewsletterTemplateStart } from "../NewsletterTemplateStart";
 
 function SequenceChatStart({
   brandId,
@@ -649,7 +651,7 @@ function SequenceEditor({
                           href={`/app/newsletters/${step.platformPostId}`}
                           target="_blank"
                         >
-                          Edit email ↗
+                          Edit in email workspace ↗
                         </Link>
                       </Button>
                     ) : (
@@ -677,6 +679,23 @@ function SequenceEditor({
                       </Button>
                     )}
                   </div>
+                  {!step.platformPostId && (
+                    <div className="mt-3">
+                      <NewsletterTemplateStart
+                        brandId={brandId}
+                        initialTemplate="brian-booking-welcome"
+                        onDrafted={(platformPostId) =>
+                          updateStep(step.id, { platformPostId })
+                        }
+                      />
+                    </div>
+                  )}
+                  {step.platformPostId && (
+                    <SequenceEmailPreview
+                      key={step.platformPostId}
+                      platformPostId={step.platformPostId}
+                    />
+                  )}
                 </div>
               </div>
             ))}
