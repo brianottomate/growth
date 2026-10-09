@@ -232,18 +232,8 @@ export function PlatformPostEditDialog({
       ),
     );
 
-  const setItemMedia = (index: number, next: MediaItem[]) => {
-    const seen = new Set<string>();
-    updateItem(index, (item) => ({
-      ...item,
-      media: next.filter((mediaItem) => {
-        const key = mediaItem.assetId ?? mediaItem.url;
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      }),
-    }));
-  };
+  const setItemMedia = (index: number, media: MediaItem[]) =>
+    updateItem(index, (item) => ({ ...item, media }));
 
   const addLink = (index: number) => {
     updateItem(index, (item) => {

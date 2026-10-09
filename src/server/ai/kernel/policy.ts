@@ -267,8 +267,8 @@ export const growthActionPolicies = {
     deleteWorkItem: write({ reversible: false }),
   },
   contentMediaWrite: {
-    attachChatImage: write({ idempotent: true }),
-    attachLibraryMedia: write({ idempotent: true }),
+    attachChatImage: write(),
+    attachLibraryMedia: write(),
     freezeComposition: write({ consequence: "provider-write" }),
     // A render and a vision pass; nothing is saved.
     directComposition: read("model-read", PRODUCT),
@@ -279,7 +279,7 @@ export const growthActionPolicies = {
     recoverArchiveMedia: write({ consequence: "provider-write" }),
     makeCarousel: write({ idempotent: true }),
     prepareUpload: write(),
-    finishUpload: write({ idempotent: true }),
+    finishUpload: write(),
     importRemoteImages: write({ consequence: "provider-write" }),
     importFromDrive: write({ consequence: "provider-write" }),
   },

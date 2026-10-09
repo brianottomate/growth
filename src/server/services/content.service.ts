@@ -352,17 +352,10 @@ export type SaveSpotThreadInput = {
 };
 
 const cleanThreadItem = (item: SaveSpotThreadItemInput) => {
-  const seenMedia = new Set<string>();
-  const media = item.media.filter((mediaItem) => {
-    const key = mediaItem.assetId ?? mediaItem.url;
-    if (seenMedia.has(key)) return false;
-    seenMedia.add(key);
-    return true;
-  });
   return {
     text: item.text?.trim() || null,
     textDocument: item.textDocument,
-    media: media.length ? media : null,
+    media: item.media.length ? item.media : null,
     assetLinks: [
       ...new Set(item.assetLinks.map((link) => link.trim()).filter(Boolean)),
     ],
@@ -764,22 +757,14 @@ async function recordExternalPublish(input: {
   });
 }
 
-/** Set the content-level media pool (`content_post.media`). Deduped by assetId
- *  — the same dedupe the spot attach-list uses. */
+/** Save the submitted content-level media pool (`content_post.media`). */
 async function setPoolMedia(input: {
   contentPostId: string;
   media: MediaItem[];
 }): Promise<{ id: string }> {
-  const seen = new Set<string>();
-  const deduped = input.media.filter((m) => {
-    if (!m.assetId) return true;
-    if (seen.has(m.assetId)) return false;
-    seen.add(m.assetId);
-    return true;
-  });
   await db
     .update(contentPostTable)
-    .set({ media: deduped.length ? deduped : null })
+    .set({ media: input.media.length ? input.media : null })
     .where(eq(contentPostTable.id, input.contentPostId));
   return { id: input.contentPostId };
 }
@@ -789,16 +774,9 @@ async function setSpotMedia(input: {
   media: MediaItem[];
 }): Promise<{ id: string }> {
   await requireOpenPost(input.platformPostId);
-  const seen = new Set<string>();
-  const deduped = input.media.filter((item) => {
-    const key = item.assetId ?? item.url;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
   await db
     .update(platformPostTable)
-    .set({ media: deduped.length ? deduped : null })
+    .set({ media: input.media.length ? input.media : null })
     .where(eq(platformPostTable.id, input.platformPostId));
   return { id: input.platformPostId };
 }
@@ -809,19 +787,12 @@ async function setSpotCarousel(input: {
   media: MediaItem[];
 }): Promise<{ id: string }> {
   await requireOpenPost(input.platformPostId);
-  const seen = new Set<string>();
-  const deduped = input.media.filter((item) => {
-    const key = item.assetId ?? item.url;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
   await db
     .update(platformPostTable)
     .set({
       format: input.format,
       archetype: "carousel",
-      media: deduped.length ? deduped : null,
+      media: input.media.length ? input.media : null,
     })
     .where(eq(platformPostTable.id, input.platformPostId));
   return { id: input.platformPostId };

@@ -927,12 +927,7 @@ export const makeCarouselFromPool = growthAction({
         .filter((post) => post.source === "owned")
         .map((post) => [post.id, post]),
     );
-    const seenTargets = new Set<string>();
     const prepared = targets.map((target) => {
-      if (seenTargets.has(target.platformPostId)) {
-        throw new Error("Each target platform post may only appear once.");
-      }
-      seenTargets.add(target.platformPostId);
       const post = ownedById.get(target.platformPostId);
       if (!post) {
         throw rejectUnusableDraft({
@@ -960,11 +955,6 @@ export const makeCarouselFromPool = growthAction({
         }
         return item;
       });
-      if (new Set(target.mediaAssetIds).size !== target.mediaAssetIds.length) {
-        throw new Error(
-          "A carousel cannot contain the same media asset twice.",
-        );
-      }
       const minimum = format.media.min ?? 1;
       const maximum = format.media.max ?? 300;
       if (media.length < minimum || media.length > maximum) {
@@ -1054,7 +1044,7 @@ export const prepareContentMediaUploads = growthAction({
 export const finishContentMediaUploads = growthAction({
   outputSchema: finishContentMediaUploadsOutputSchema,
   description:
-    "Verify and finalize direct image uploads prepared by prepareUpload, then attach them to the content media pool in the provided order. Safe to retry: already-ready media is reused and pool attachment dedupes by asset ID.",
+    "Verify and finalize direct image uploads prepared by prepareUpload, then attach them to the content media pool in the provided order. Repeated attachments are preserved.",
   inputSchema: z.object({
     contentPostId: z.string(),
     uploads: z
