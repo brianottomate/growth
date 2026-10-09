@@ -32,12 +32,6 @@ export const PIPELINE_COLUMNS = [
     color: "border-t-emerald-500",
   },
   {
-    id: "first_month",
-    name: "First month",
-    description: "Initial launch and settling in; advanced manually",
-    color: "border-t-amber-500",
-  },
-  {
     id: "live",
     name: "Ongoing",
     description: "Manually recorded stage",
@@ -64,8 +58,9 @@ export const STORED_PIPELINE_STAGES = [
  */
 export function pipelineStage(brand: {
   relationship: string;
-  pipelineStage?: StoredPipelineStage | null;
+  pipelineStage?: StoredPipelineStage | "first_month" | null;
 }): PipelineStage {
+  if (brand.pipelineStage === "first_month") return "live";
   if (brand.pipelineStage === "review") return "onboarding";
   return (
     brand.pipelineStage ??

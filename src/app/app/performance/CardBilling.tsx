@@ -19,9 +19,11 @@ const money = (value: number | null) =>
 export function CardBilling({
   card,
   className,
+  dense = false,
 }: {
   card: PerformancePipelineCard;
   className?: string;
+  dense?: boolean;
 }) {
   return (
     <div className={cn("space-y-1 text-[11px]", className)}>
@@ -41,22 +43,43 @@ export function CardBilling({
           )}
         </span>
       </div>
-      {card.stage !== "prospects" && (
-        <div className="space-y-1">
-          <CycleReceipt
-            label={`Current · ${periodLabel(card.billing.period)}`}
-            cycle={card.billing.current}
-          />
-          <CycleReceipt
-            label={
-              card.billing.upcoming
-                ? `Upcoming · ${periodLabel(card.billing.upcoming.period)}`
-                : "Upcoming"
-            }
-            cycle={card.billing.upcoming}
-          />
-        </div>
-      )}
+      {card.stage !== "prospects" &&
+        (dense ? (
+          <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)] items-start gap-x-2 gap-y-1 text-[10px]">
+            <span className="text-muted-foreground">Billing month</span>
+            <span className="text-muted-foreground">Fee</span>
+            <span className="text-muted-foreground">Ads</span>
+            <DenseCycle
+              label={`Current · ${periodLabel(card.billing.period)}`}
+              cycle={card.billing.current}
+              card={card}
+            />
+            <DenseCycle
+              label={
+                card.billing.upcoming
+                  ? `Next · ${periodLabel(card.billing.upcoming.period)}`
+                  : "Next month"
+              }
+              cycle={card.billing.upcoming}
+              card={card}
+            />
+          </div>
+        ) : (
+          <div className="space-y-1">
+            <CycleReceipt
+              label={`Current · ${periodLabel(card.billing.period)}`}
+              cycle={card.billing.current}
+            />
+            <CycleReceipt
+              label={
+                card.billing.upcoming
+                  ? `Upcoming · ${periodLabel(card.billing.upcoming.period)}`
+                  : "Upcoming"
+              }
+              cycle={card.billing.upcoming}
+            />
+          </div>
+        ))}
     </div>
   );
 }
@@ -98,16 +121,24 @@ function Receipt({
   amount,
   paidAt,
   invoiceState,
+  dense = false,
+  recurring,
 }: {
   label: string;
   amount: number | null;
   paidAt: Date | null;
   invoiceState?: "Not invoiced" | "Open" | null;
+  dense?: boolean;
+  recurring?: number | null;
 }) {
   const status = paidAt ? "Paid" : (invoiceState ?? "Not recorded");
   return (
     <span
-      className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5"
+      className={
+        dense
+          ? "flex flex-wrap items-center gap-x-1 tabular-nums"
+          : "inline-flex items-center gap-1 rounded border px-1.5 py-0.5"
+      }
       style={{
         color: paidAt
           ? "var(--color-success)"
@@ -118,11 +149,53 @@ function Receipt({
       title={`${label}: ${money(amount)}${paidAt ? ` · Marked Paid ${new Date(paidAt).toLocaleDateString("en-US", { timeZone: "UTC" })}` : ""}`}
       aria-label={`${label}: ${money(amount)}, ${status}`}
     >
-      <span className="text-muted-foreground">
-        {label}
-        {amount != null ? ` ${money(amount)}` : ""}
-      </span>
+      {(!dense || (amount != null && amount !== recurring)) && (
+        <span className="text-muted-foreground">
+          {!dense && label}
+          {amount != null ? ` ${money(amount)}` : ""}
+        </span>
+      )}
       <span className="font-medium">{status}</span>
     </span>
+  );
+}
+
+function DenseCycle({
+  label,
+  cycle,
+  card,
+}: {
+  label: string;
+  cycle: PipelineBillingCycle | null;
+  card: PerformancePipelineCard;
+}) {
+  return (
+    <>
+      <span className="text-muted-foreground">{label}</span>
+      {cycle ? (
+        <>
+          <Receipt
+            label="Fee"
+            amount={cycle.billedAmount}
+            paidAt={cycle.feePaidAt}
+            invoiceState={cycle.feeInvoiceState}
+            dense
+            recurring={card.management}
+          />
+          <Receipt
+            label="Ads"
+            amount={cycle.clientMediaContribution}
+            paidAt={cycle.mediaPaidAt}
+            invoiceState={cycle.mediaInvoiceState}
+            dense
+            recurring={card.spend}
+          />
+        </>
+      ) : (
+        <span className="col-span-2 text-muted-foreground">
+          No cycle recorded
+        </span>
+      )}
+    </>
   );
 }

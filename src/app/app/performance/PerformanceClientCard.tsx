@@ -495,12 +495,41 @@ function DenseCard({
   onEdit: () => void;
   dragHandle?: ReactNode;
 }) {
-  const chips = statusChips(card.state).filter(
-    (chip) =>
-      chip.value &&
-      (view === "All" ? chip.lens !== "Commercial" : chip.lens === view),
-  );
-  const checklist = card.readiness?.checklist;
+  const show = (lens: CardView) => view === "All" || view === lens;
+  const chips = statusChips(card.state);
+  const checklist = show("Commercial") ? card.readiness?.checklist : undefined;
+  const groups = [
+    {
+      lens: "Commercial",
+      items: [
+        { label: "Relationship", value: card.state.commercial },
+        { label: "Intake", value: card.state.intake },
+      ],
+    },
+    {
+      lens: "Creative",
+      items: chips.filter((chip) => chip.lens === "Creative"),
+    },
+    {
+      lens: "Delivery",
+      items: [
+        { label: "Meta", value: card.state.meta },
+        { label: "Google", value: card.state.google },
+        { label: "Site", value: card.state.site },
+        {
+          label: "WanderOS",
+          value:
+            card.state.siteConnected == null
+              ? null
+              : card.state.siteConnected
+                ? "Connected"
+                : "Not connected",
+        },
+        { label: "Zernio", value: card.state.zernioAccess },
+        { label: "Email DNS", value: card.state.emailDns },
+      ],
+    },
+  ] as const;
   return (
     <article
       aria-label={`${card.name} client card`}
@@ -519,7 +548,11 @@ function DenseCard({
           </Link>
         </div>
         {checklist ? (
-          <div className="w-14 shrink-0 space-y-1 text-right">
+          <div
+            title="Onboarding checklist"
+            aria-label={`Onboarding checklist: ${checklist.done} of ${checklist.total}`}
+            className="w-14 shrink-0 space-y-1 text-right"
+          >
             <span className="block text-[10px] text-muted-foreground tabular-nums">
               {checklist.done}/{checklist.total}
             </span>
@@ -567,27 +600,45 @@ function DenseCard({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      <CardBilling card={card} className="mt-2" />
-      {chips.length > 0 ? (
-        <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px]">
-          {chips.map((chip) => (
-            <span
-              key={chip.label}
-              title={`${chip.label} · ${chip.value}`}
-              className="inline-flex items-center gap-1 text-muted-foreground"
+      {groups
+        .filter((group) => show(group.lens))
+        .map((group) => {
+          const items =
+            view === "All"
+              ? group.items.filter((item) => item.value)
+              : group.items;
+          if (group.lens !== "Commercial" && view === "All" && !items.length)
+            return null;
+          return (
+            <section
+              key={group.lens}
+              aria-label={group.lens}
+              className="mt-2 space-y-1.5 border-t border-border/60 pt-2"
             >
-              <span
-                aria-hidden="true"
-                className="size-1.5 rounded-full bg-muted-foreground/40"
-                style={{
-                  backgroundColor: statusTone(chip.value)?.color ?? undefined,
-                }}
-              />
-              {chip.label}
-            </span>
-          ))}
-        </div>
-      ) : null}
+              <h4 className="text-[10px] font-medium text-muted-foreground">
+                {group.lens}
+              </h4>
+              {group.lens === "Commercial" && <CardBilling card={card} dense />}
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
+                {items.map((item) => (
+                  <span
+                    key={item.label}
+                    className="inline-flex items-center gap-1.5"
+                    aria-label={`${item.label}: ${item.value || "Not recorded"}`}
+                  >
+                    <span className="text-muted-foreground">{item.label}</span>
+                    <span
+                      className="font-medium"
+                      style={{ color: statusTone(item.value || "")?.color }}
+                    >
+                      {item.value || "Not recorded"}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            </section>
+          );
+        })}
       <CardStaff
         brandId={card.id}
         lead={card.lead ?? null}
